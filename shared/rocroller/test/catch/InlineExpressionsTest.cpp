@@ -291,6 +291,52 @@ namespace InlineExpressionsTest
             CHECK(InlineExpressionsDetail::findInliningCandidates(graph).size() == 0);
         }
 
+        SECTION(
+            "Write-read-read with non-assign node from a different region (should not be inlined)")
+        {
+            // A write and a read along with a second read from a StoreVGPR node from a different region
+
+            rocRoller::KernelGraph::KernelGraph graph;
+
+            auto kernel = graph.control.addElement(Kernel());
+
+            // a = 1
+            int    coordA = graph.coordinates.addElement(Linear{});
+            Assign nodeA;
+            nodeA.expression = Expression::literal(2);
+            int idxA         = graph.control.addElement(nodeA);
+            graph.mapper.connect(idxA, coordA, NaryArgument::DEST);
+
+            // b = 2 * a
+            int    coordB = graph.coordinates.addElement(Linear{});
+            Assign nodeB;
+            auto   doubleLiteral = Expression::literal(2);
+            auto   doubleVariable
+                = std::make_shared<Expression::Expression>(Expression::DataFlowTag{coordA});
+            nodeB.expression = std::make_shared<Expression::Expression>(
+                Expression::Add{doubleVariable, doubleLiteral});
+            int idxB = graph.control.addElement(nodeB);
+            graph.mapper.connect(idxB, coordB, NaryArgument::DEST);
+
+            // StoreVGPR
+            int storeVGPR = graph.control.addElement(StoreVGPR{});
+            graph.mapper.connect<VGPR>(storeVGPR, coordA);
+
+            // Insert nodes under the kernel node
+            graph.control.addElement(Body(), {kernel}, {idxA});
+            insertAfter(graph, idxA, idxB, idxB);
+            graph.control.addElement(Body(), {kernel}, {storeVGPR});
+
+            auto bodyEdges = graph.control.getOutputNodeIndices<Body>(kernel).to<std::vector>();
+            CHECK(std::find(bodyEdges.begin(), bodyEdges.end(), idxA) != bodyEdges.end());
+            CHECK(graph.control.getOutputNodeIndices<Sequence>(idxA).to<std::vector>().back()
+                  == idxB);
+            CHECK(std::find(bodyEdges.begin(), bodyEdges.end(), storeVGPR) != bodyEdges.end());
+
+            // Expect that none of these are candidates
+            CHECK(InlineExpressionsDetail::findInliningCandidates(graph).size() == 0);
+        }
+
         SECTION("Write-read-write-read")
         {
             // Multiple pairs of one write, one read

@@ -51,7 +51,7 @@ namespace PrefetchScaleTest
         graph = transform<LowerTensorContraction>(graph, params, context.get());
         graph = transform<Simplify>(graph);
         graph = transform<ConstantPropagation>(graph);
-        graph = transform<FuseExpressions>(graph);
+        graph = transform<InlineExpressions>(graph);
 
         // AddStreamK has pre-loop of K loop inside of
         // another ForLoop which cause the bug.
