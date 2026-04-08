@@ -2179,6 +2179,64 @@ void zhegst_(int* itype,
              int* ldb,
              int* info);
 
+// geev
+void sgeev_(char* jobvl,
+            char* jobvr,
+            int* n,
+            float* A,
+            int* lda,
+            float* wr,
+            float* wi,
+            float* VL,
+            int* ldvl,
+            float* VR,
+            int* ldvr,
+            float* work,
+            int* lwork,
+            int* info);
+void dgeev_(char* jobvl,
+            char* jobvr,
+            int* n,
+            double* A,
+            int* lda,
+            double* wr,
+            double* wi,
+            double* VL,
+            int* ldvl,
+            double* VR,
+            int* ldvr,
+            double* work,
+            int* lwork,
+            int* info);
+void cgeev_(char* jobvl,
+            char* jobvr,
+            int* n,
+            rocblas_float_complex* A,
+            int* lda,
+            rocblas_float_complex* W,
+            rocblas_float_complex* VL,
+            int* ldvl,
+            rocblas_float_complex* VR,
+            int* ldvr,
+            rocblas_float_complex* work,
+            int* lwork,
+            float* rwork,
+            int* info);
+void zgeev_(char* jobvl,
+            char* jobvr,
+            int* n,
+            rocblas_double_complex* A,
+            int* lda,
+            rocblas_double_complex* W,
+            rocblas_double_complex* VL,
+            int* ldvl,
+            rocblas_double_complex* VR,
+            int* ldvr,
+            rocblas_double_complex* work,
+            int* lwork,
+            double* rwork,
+            int* info);
+
 void ssyev_(char* evect,
             char* uplo,
             int* n,
@@ -7153,6 +7211,95 @@ void cpu_sygst_hegst<rocblas_double_complex>(rocblas_eform itype,
     int itypeI = rocblas2char_eform(itype) - '0';
     char uploC = rocblas2char_fill(uplo);
     zhegst_(&itypeI, &uploC, &n, A, &lda, B, &ldb, &info);
+}
+
+// geev
+template <>
+void cpu_geev<float, float>(rocblas_evect jobvl,
+                            rocblas_evect jobvr,
+                            rocblas_int n,
+                            float* A,
+                            rocblas_int lda,
+                            float* Wr,
+                            float* Wi,
+                            float* VL,
+                            rocblas_int ldvl,
+                            float* VR,
+                            rocblas_int ldvr,
+                            float* work,
+                            rocblas_int lwork,
+                            float* rwork,
+                            rocblas_int* info)
+{
+    char jvlC = rocblas2char_evect(jobvl);
+    char jvrC = rocblas2char_evect(jobvr);
+    sgeev_(&jvlC, &jvrC, &n, A, &lda, Wr, Wi, VL, &ldvl, VR, &ldvr, work, &lwork, info);
+}
+
+template <>
+void cpu_geev<double, double>(rocblas_evect jobvl,
+                              rocblas_evect jobvr,
+                              rocblas_int n,
+                              double* A,
+                              rocblas_int lda,
+                              double* Wr,
+                              double* Wi,
+                              double* VL,
+                              rocblas_int ldvl,
+                              double* VR,
+                              rocblas_int ldvr,
+                              double* work,
+                              rocblas_int lwork,
+                              double* rwork,
+                              rocblas_int* info)
+{
+    char jvlC = rocblas2char_evect(jobvl);
+    char jvrC = rocblas2char_evect(jobvr);
+    dgeev_(&jvlC, &jvrC, &n, A, &lda, Wr, Wi, VL, &ldvl, VR, &ldvr, work, &lwork, info);
+}
+
+template <>
+void cpu_geev<rocblas_float_complex, float>(rocblas_evect jobvl,
+                                            rocblas_evect jobvr,
+                                            rocblas_int n,
+                                            rocblas_float_complex* A,
+                                            rocblas_int lda,
+                                            rocblas_float_complex* Wr,
+                                            rocblas_float_complex* Wi,
+                                            rocblas_float_complex* VL,
+                                            rocblas_int ldvl,
+                                            rocblas_float_complex* VR,
+                                            rocblas_int ldvr,
+                                            rocblas_float_complex* work,
+                                            rocblas_int lwork,
+                                            float* rwork,
+                                            rocblas_int* info)
+{
+    char jvlC = rocblas2char_evect(jobvl);
+    char jvrC = rocblas2char_evect(jobvr);
+    cgeev_(&jvlC, &jvrC, &n, A, &lda, Wr, VL, &ldvl, VR, &ldvr, work, &lwork, rwork, info);
+}
+
+template <>
+void cpu_geev<rocblas_double_complex, double>(rocblas_evect jobvl,
+                                              rocblas_evect jobvr,
+                                              rocblas_int n,
+                                              rocblas_double_complex* A,
+                                              rocblas_int lda,
+                                              rocblas_double_complex* Wr,
+                                              rocblas_double_complex* Wi,
+                                              rocblas_double_complex* VL,
+                                              rocblas_int ldvl,
+                                              rocblas_double_complex* VR,
+                                              rocblas_int ldvr,
+                                              rocblas_double_complex* work,
+                                              rocblas_int lwork,
+                                              double* rwork,
+                                              rocblas_int* info)
+{
+    char jvlC = rocblas2char_evect(jobvl);
+    char jvrC = rocblas2char_evect(jobvr);
+    zgeev_(&jvlC, &jvrC, &n, A, &lda, Wr, VL, &ldvl, VR, &ldvr, work, &lwork, rwork, info);
 }
 
 // syev & heev

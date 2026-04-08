@@ -34,6 +34,7 @@
 #include "common/misc/rocsolver.hpp"
 #include "common/misc/rocsolver_arguments.hpp"
 #include "common/misc/rocsolver_test.hpp"
+#include "common/misc/rocsolver_timer.hpp"
 
 template <bool STRIDED, bool COMPLEX, typename Td, typename Sd, typename Id>
 void geev_checkBadArgs(const rocblas_handle handle,
@@ -183,6 +184,40 @@ void testing_geev_bad_arg()
     }
 }
 
+template <bool CPU, bool GPU, typename T, typename Td, typename Th>
+void geev_initData(const rocblas_handle handle,
+                   const rocblas_int n,
+                   Td& dA,
+                   const rocblas_int lda,
+                   const rocblas_int bc,
+                   Th& hA,
+                   std::vector<T>& A,
+                   bool test = true)
+{
+    if(CPU)
+    {
+        rocblas_init<T>(hA, true);
+
+        for(rocblas_int b = 0; b < bc; ++b)
+        {
+            for(rocblas_int i = 0; i < n; i++)
+                hA[b][i + (size_t)i * lda] = std::real(hA[b][i + (size_t)i * lda]) + 400;
+
+            if(test)
+            {
+                for(rocblas_int i = 0; i < n; i++)
+                    for(rocblas_int j = 0; j < n; j++)
+                        A[b * (size_t)lda * n + i + (size_t)j * lda] = hA[b][i + (size_t)j * lda];
+            }
+        }
+    }
+
+    if(GPU)
+    {
+        CHECK_HIP_ERROR(dA.transfer_from(hA));
+    }
+}
+
 template <bool STRIDED, typename T, typename Td, typename Sd, typename Id, typename Th, typename Sh, typename Ih>
 void geev_getError(const rocblas_handle handle,
                    const rocblas_evect jobvl,
@@ -215,20 +250,10 @@ void geev_getError(const rocblas_handle handle,
     using S = decltype(std::real(T{}));
     bool wantvr = (jobvr == rocblas_evect_original);
 
-    rocblas_init<T>(hA, true);
+    std::vector<T> Acopy((size_t)lda * n * bc);
 
-    // save copy for residual check
-    std::vector<T> Acopy;
-    if(wantvr)
-    {
-        Acopy.resize((size_t)lda * n * bc);
-        for(rocblas_int b = 0; b < bc; ++b)
-            for(rocblas_int j = 0; j < n; ++j)
-                for(rocblas_int i = 0; i < n; ++i)
-                    Acopy[b * (size_t)lda * n + i + (size_t)j * lda] = hA[b][i + (size_t)j * lda];
-    }
-
-    CHECK_HIP_ERROR(dA.transfer_from(hA));
+    // input data initialization
+    geev_initData<true, true, T>(handle, n, dA, lda, bc, hA, Acopy);
 
     // GPU computation
     CHECK_ROCBLAS_ERROR(rocsolver_geev(STRIDED, handle, jobvl, jobvr, n, dA.data(), lda, stA,
@@ -380,6 +405,117 @@ void geev_getError(const rocblas_handle handle,
     }
 }
 
+template <bool STRIDED, typename T, typename Td, typename Sd, typename Id, typename Th, typename Sh, typename Ih>
+void geev_getPerfData(const rocblas_handle handle,
+                      const rocblas_evect jobvl,
+                      const rocblas_evect jobvr,
+                      const rocblas_int n,
+                      Td& dA,
+                      const rocblas_int lda,
+                      const rocblas_stride stA,
+                      Sd& dWr,
+                      const rocblas_stride stWr,
+                      Sd& dWi,
+                      const rocblas_stride stWi,
+                      Td& dVL,
+                      const rocblas_int ldvl,
+                      const rocblas_stride stVL,
+                      Td& dVR,
+                      const rocblas_int ldvr,
+                      const rocblas_stride stVR,
+                      Id& dinfo,
+                      const rocblas_int bc,
+                      Th& hA,
+                      Sh& hWr,
+                      Sh& hWi,
+                      Ih& hinfo,
+                      double* gpu_time_used,
+                      double* cpu_time_used,
+                      const rocblas_int hot_calls,
+                      const int profile,
+                      const bool profile_kernels,
+                      const bool perf)
+{
+    constexpr bool COMPLEX = rocblas_is_complex<T>;
+    using S = decltype(std::real(T{}));
+
+    size_t eig_elems = COMPLEX ? 2 * (size_t)n : (size_t)n;
+    rocblas_int lwork_query = -1;
+    rocblas_int lapack_info;
+    S rwork_dummy;
+    std::vector<T> A((size_t)lda * n * bc);
+
+    if(!perf)
+    {
+        geev_initData<true, false, T>(handle, n, dA, lda, bc, hA, A);
+
+        // workspace query
+        T work_query;
+        if constexpr(COMPLEX)
+            cpu_geev(jobvl, jobvr, n, hA[0], lda, hWr[0], hWi[0],
+                     (T*)nullptr, ldvl, (T*)nullptr, ldvr,
+                     &work_query, lwork_query, &rwork_dummy, &lapack_info);
+        else
+            cpu_geev(jobvl, jobvr, n, hA[0], lda, hWr[0], hWi[0],
+                     (T*)nullptr, ldvl, (T*)nullptr, ldvr,
+                     &work_query, lwork_query, &rwork_dummy, &lapack_info);
+
+        rocblas_int lwork = (rocblas_int)std::real(work_query);
+        std::vector<T> work(lwork);
+        std::vector<S> rwork(COMPLEX ? 2 * n : 0);
+        std::vector<T> hVL_cpu(size_t(ldvl) * n);
+        std::vector<T> hVR_cpu(size_t(ldvr) * n);
+
+        geev_initData<true, false, T>(handle, n, dA, lda, bc, hA, A);
+
+        *cpu_time_used = get_time_us_no_sync();
+        for(rocblas_int b = 0; b < bc; ++b)
+            cpu_geev(jobvl, jobvr, n, hA[b], lda, hWr[b], hWi[b],
+                     hVL_cpu.data(), ldvl, hVR_cpu.data(), ldvr,
+                     work.data(), lwork, rwork.data(), hinfo[b]);
+        *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
+    }
+
+    geev_initData<true, false, T>(handle, n, dA, lda, bc, hA, A);
+
+    // cold calls
+    for(int iter = 0; iter < 2; iter++)
+    {
+        geev_initData<false, true, T>(handle, n, dA, lda, bc, hA, A);
+
+        CHECK_ROCBLAS_ERROR(rocsolver_geev(STRIDED, handle, jobvl, jobvr, n, dA.data(), lda, stA,
+                                           dWr.data(), stWr, dWi.data(), stWi, dVL.data(), ldvl,
+                                           stVL, dVR.data(), ldvr, stVR, dinfo.data(), bc));
+    }
+
+    // gpu-lapack performance
+    hipStream_t stream;
+    CHECK_ROCBLAS_ERROR(rocblas_get_stream(handle, &stream));
+    rocsolver_timer timer;
+
+    if(profile > 0)
+    {
+        if(profile_kernels)
+            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile
+                                         | rocblas_layer_mode_ex_log_kernel);
+        else
+            rocsolver_log_set_layer_mode(rocblas_layer_mode_log_profile);
+        rocsolver_log_set_max_levels(profile);
+    }
+
+    for(rocblas_int iter = 0; iter < hot_calls; iter++)
+    {
+        geev_initData<false, true, T>(handle, n, dA, lda, bc, hA, A);
+
+        timer.start(stream);
+        rocsolver_geev(STRIDED, handle, jobvl, jobvr, n, dA.data(), lda, stA, dWr.data(), stWr,
+                       dWi.data(), stWi, dVL.data(), ldvl, stVL, dVR.data(), ldvr, stVR,
+                       dinfo.data(), bc);
+        timer.end(stream);
+    }
+    *gpu_time_used = timer.get_combined();
+}
+
 template <bool BATCHED, bool STRIDED, typename T>
 void testing_geev(Arguments& argus)
 {
@@ -520,6 +656,16 @@ void testing_geev(Arguments& argus)
                                       dVL, ldvl, stVL, dVR, ldvr, stVR, dinfo, bc, hA, hWr, hWi,
                                       hVR, hinfo, hinfoRes, &max_error);
         }
+
+        // collect performance data
+        if(argus.timing && hot_calls > 0)
+        {
+            geev_getPerfData<STRIDED, T>(handle, jobvl, jobvr, n, dA, lda, stA, dWr, stWr, dWi,
+                                         stWi, dVL, ldvl, stVL, dVR, ldvr, stVR, dinfo, bc, hA,
+                                         hWr, hWi, hinfo, &gpu_time_used, &cpu_time_used,
+                                         hot_calls, argus.profile, argus.profile_kernels,
+                                         argus.perf);
+        }
     }
     else
     {
@@ -555,6 +701,16 @@ void testing_geev(Arguments& argus)
             geev_getError<STRIDED, T>(handle, jobvl, jobvr, n, dA, lda, stA, dWr, stWr, dWi, stWi,
                                       dVL, ldvl, stVL, dVR, ldvr, stVR, dinfo, bc, hA, hWr, hWi,
                                       hVR, hinfo, hinfoRes, &max_error);
+        }
+
+        // collect performance data
+        if(argus.timing && hot_calls > 0)
+        {
+            geev_getPerfData<STRIDED, T>(handle, jobvl, jobvr, n, dA, lda, stA, dWr, stWr, dWi,
+                                         stWi, dVL, ldvl, stVL, dVR, ldvr, stVR, dinfo, bc, hA,
+                                         hWr, hWi, hinfo, &gpu_time_used, &cpu_time_used,
+                                         hot_calls, argus.profile, argus.profile_kernels,
+                                         argus.perf);
         }
     }
 

@@ -696,6 +696,23 @@ void cpu_sygst_hegst(rocblas_eform itype,
                      rocblas_int ldb);
 
 template <typename T, typename S>
+void cpu_geev(rocblas_evect jobvl,
+              rocblas_evect jobvr,
+              rocblas_int n,
+              T* A,
+              rocblas_int lda,
+              T* Wr,
+              T* Wi,
+              T* VL,
+              rocblas_int ldvl,
+              T* VR,
+              rocblas_int ldvr,
+              T* work,
+              rocblas_int lwork,
+              S* rwork,
+              rocblas_int* info);
+
+template <typename T, typename S>
 void cpu_syev_heev(rocblas_evect evect,
                    rocblas_fill uplo,
                    rocblas_int n,
