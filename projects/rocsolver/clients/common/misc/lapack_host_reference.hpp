@@ -854,6 +854,46 @@ void cpu_bdsvdx(rocblas_fill uplo,
                 rocblas_int* iwork,
                 rocblas_int* info);
 
+template <typename T>
+void cpu_gebal(char job,
+               rocblas_int n,
+               T* A,
+               rocblas_int lda,
+               rocblas_int* ilo,
+               rocblas_int* ihi,
+               T* scale,
+               rocblas_int* info);
+
+template <typename T>
+void cpu_gehrd(rocblas_int n,
+               rocblas_int ilo,
+               rocblas_int ihi,
+               T* A,
+               rocblas_int lda,
+               T* tau,
+               rocblas_int* info);
+
+template <typename T>
+void cpu_orghr(rocblas_int n,
+               rocblas_int ilo,
+               rocblas_int ihi,
+               T* A,
+               rocblas_int lda,
+               T* tau,
+               rocblas_int* info);
+
+template <typename T>
+void cpu_gebak(char job,
+               rocblas_side side,
+               rocblas_int n,
+               rocblas_int ilo,
+               rocblas_int ihi,
+               T* scale,
+               rocblas_int m,
+               T* V,
+               rocblas_int ldv,
+               rocblas_int* info);
+
 template <typename T, typename W>
 void cpu_gesvdx(rocblas_svect leftv,
                 rocblas_svect rightv,

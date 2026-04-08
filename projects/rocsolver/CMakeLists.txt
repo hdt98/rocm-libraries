@@ -161,46 +161,63 @@ cmake_dependent_option(USE_HIPCXX "Use CMake HIP language support" OFF CMAKE_HIP
 if(USE_HIPCXX)
   enable_language(HIP)
 else()
-  if(NOT DEFINED AMDGPU_TARGETS)
-    set(XNACK_PLUS_TARGETS
-      gfx90a:xnack+
-      gfx908:xnack+
-      gfx942:xnack+
-      gfx950:xnack+)
-    set(XNACK_MINUS_TARGETS gfx90a:xnack-)
-    set(MISC_TARGETS
-      gfx942
-      gfx950
-      gfx10-1-generic
-      gfx10-3-generic
-      gfx1100
-      gfx1101
-      gfx1102
-      gfx1150
-      gfx1151
-      gfx1152
-      gfx1153
-      gfx12-generic
-    )
-    if(BUILD_ADDRESS_SANITIZER)
-      set(OPTIONAL_TARGETS_QUERY ${XNACK_PLUS_TARGETS})
+  if(DEFINED AMDGPU_TARGETS AND AMDGPU_TARGETS STREQUAL "auto")
+    # Explicit "auto" request: detect the local GPU and build only for that target
+    include(detect-local-gpu)
+    detect_local_gpu_arch(_LOCAL_GPU_ARCHS)
+    if(_LOCAL_GPU_ARCHS)
+      set(AMDGPU_TARGETS_INIT ${_LOCAL_GPU_ARCHS})
+      message(STATUS "AMDGPU_TARGETS=auto: detected local GPU(s): ${_LOCAL_GPU_ARCHS}")
     else()
-      set(OPTIONAL_TARGETS_QUERY ${XNACK_MINUS_TARGETS} ${MISC_TARGETS})
-      set(DEFAULT_TARGETS
-        gfx900
-        gfx906:xnack-
-        gfx908:xnack-
-      )
+      message(WARNING "AMDGPU_TARGETS=auto but no local GPU detected; falling back to default target list")
+      set(AMDGPU_TARGETS_INIT "")
     endif()
-    # Query for compiler support of GPU archs
-    rocm_check_target_ids(OPTIONAL_AMDGPU_TARGETS TARGETS ${OPTIONAL_TARGETS_QUERY})
-    set(AMDGPU_TARGETS_INIT ${OPTIONAL_AMDGPU_TARGETS} ${DEFAULT_TARGETS})
+    unset(AMDGPU_TARGETS CACHE)
+  endif()
+
+  if(NOT DEFINED AMDGPU_TARGETS)
+    if(NOT DEFINED AMDGPU_TARGETS_INIT)
+      set(XNACK_PLUS_TARGETS
+        gfx90a:xnack+
+        gfx908:xnack+
+        gfx942:xnack+
+        gfx950:xnack+)
+      set(XNACK_MINUS_TARGETS gfx90a:xnack-)
+      set(MISC_TARGETS
+        gfx942
+        gfx950
+        gfx10-1-generic
+        gfx10-3-generic
+        gfx1100
+        gfx1101
+        gfx1102
+        gfx1150
+        gfx1151
+        gfx1152
+        gfx1153
+        gfx12-generic
+      )
+      if(BUILD_ADDRESS_SANITIZER)
+        set(OPTIONAL_TARGETS_QUERY ${XNACK_PLUS_TARGETS})
+      else()
+        set(OPTIONAL_TARGETS_QUERY ${XNACK_MINUS_TARGETS} ${MISC_TARGETS})
+        set(DEFAULT_TARGETS
+          gfx900
+          gfx906:xnack-
+          gfx908:xnack-
+        )
+      endif()
+      # Query for compiler support of GPU archs
+      rocm_check_target_ids(OPTIONAL_AMDGPU_TARGETS TARGETS ${OPTIONAL_TARGETS_QUERY})
+      set(AMDGPU_TARGETS_INIT ${OPTIONAL_AMDGPU_TARGETS} ${DEFAULT_TARGETS})
+    endif()
   endif()
 
   # Set this before finding hip so that hip::device has the required arch flags
   # added as usage requirements on its interface
   set(AMDGPU_TARGETS "${AMDGPU_TARGETS_INIT}"
     CACHE STRING "List of specific machine types for library to target")
+  message(STATUS "Building for GPU targets: ${AMDGPU_TARGETS}")
 endif()
 
 # Find HIP dependencies

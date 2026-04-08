@@ -25,7 +25,9 @@
  * SUCH DAMAGE.
  * *************************************************************************/
 
+#include <algorithm>
 #include <rocblas/rocblas.h>
+#include <vector>
 
 #include "lapack_host_reference.hpp"
 
@@ -1023,6 +1025,65 @@ void zlacpy_(char* uplo,
 
 void slaswp_(int* n, float* A, int* lda, int* k1, int* k2, int* ipiv, int* inc);
 void dlaswp_(int* n, double* A, int* lda, int* k1, int* k2, int* ipiv, int* inc);
+
+void sgebal_(char* job, int* n, float* A, int* lda, int* ilo, int* ihi, float* scale, int* info);
+void dgebal_(char* job, int* n, double* A, int* lda, int* ilo, int* ihi, double* scale, int* info);
+
+void dgehrd_(int* n,
+             int* ilo,
+             int* ihi,
+             double* A,
+             int* lda,
+             double* tau,
+             double* work,
+             int* lwork,
+             int* info);
+
+void dorghr_(int* n,
+             int* ilo,
+             int* ihi,
+             double* A,
+             int* lda,
+             double* tau,
+             double* work,
+             int* lwork,
+             int* info);
+
+void dhseqr_(char* job,
+             char* compz,
+             int* n,
+             int* ilo,
+             int* ihi,
+             double* h,
+             int* ldh,
+             double* wr,
+             double* wi,
+             double* z,
+             int* ldz,
+             double* work,
+             int* lwork,
+             int* info);
+
+void sgebak_(char* job,
+             char* side,
+             int* n,
+             int* ilo,
+             int* ihi,
+             float* scale,
+             int* m,
+             float* V,
+             int* ldv,
+             int* info);
+void dgebak_(char* job,
+             char* side,
+             int* n,
+             int* ilo,
+             int* ihi,
+             double* scale,
+             int* m,
+             double* V,
+             int* ldv,
+             int* info);
 void claswp_(int* n, rocblas_float_complex* A, int* lda, int* k1, int* k2, int* ipiv, int* inc);
 void zlaswp_(int* n, rocblas_double_complex* A, int* lda, int* k1, int* k2, int* ipiv, int* inc);
 
@@ -2817,6 +2878,172 @@ void cpu_laswp<double>(rocblas_int n,
                        rocblas_int inc)
 {
     dlaswp_(&n, A, &lda, &k1, &k2, ipiv, &inc);
+}
+
+// gebal
+
+template <>
+void cpu_gebal<float>(char job,
+                      rocblas_int n,
+                      float* A,
+                      rocblas_int lda,
+                      rocblas_int* ilo,
+                      rocblas_int* ihi,
+                      float* scale,
+                      rocblas_int* info)
+{
+    int n_ = n;
+    int lda_ = lda;
+    int ilo_ = 0;
+    int ihi_ = 0;
+    int info_ = 0;
+    sgebal_(&job, &n_, A, &lda_, &ilo_, &ihi_, scale, &info_);
+    *ilo = ilo_;
+    *ihi = ihi_;
+    *info = info_;
+}
+
+template <>
+void cpu_gebal<double>(char job,
+                       rocblas_int n,
+                       double* A,
+                       rocblas_int lda,
+                       rocblas_int* ilo,
+                       rocblas_int* ihi,
+                       double* scale,
+                       rocblas_int* info)
+{
+    int n_ = n;
+    int lda_ = lda;
+    int ilo_ = 0;
+    int ihi_ = 0;
+    int info_ = 0;
+    dgebal_(&job, &n_, A, &lda_, &ilo_, &ihi_, scale, &info_);
+    *ilo = ilo_;
+    *ihi = ihi_;
+    *info = info_;
+}
+
+template <>
+void cpu_gehrd<double>(rocblas_int n,
+                       rocblas_int ilo,
+                       rocblas_int ihi,
+                       double* A,
+                       rocblas_int lda,
+                       double* tau,
+                       rocblas_int* info)
+{
+    int n_ = n;
+    int ilo_ = ilo;
+    int ihi_ = ihi;
+    int lda_ = lda;
+    int lwork = -1;
+    int info_ = 0;
+    double wkopt = 0;
+    dgehrd_(&n_, &ilo_, &ihi_, A, &lda_, tau, &wkopt, &lwork, &info_);
+    lwork = int(wkopt);
+    std::vector<double> work(static_cast<size_t>(lwork));
+    dgehrd_(&n_, &ilo_, &ihi_, A, &lda_, tau, work.data(), &lwork, &info_);
+    *info = info_;
+}
+
+template <>
+void cpu_orghr<double>(rocblas_int n,
+                       rocblas_int ilo,
+                       rocblas_int ihi,
+                       double* A,
+                       rocblas_int lda,
+                       double* tau,
+                       rocblas_int* info)
+{
+    int n_ = n;
+    int ilo_ = ilo;
+    int ihi_ = ihi;
+    int lda_ = lda;
+    int lwork = -1;
+    int info_ = 0;
+    double wkopt = 0;
+    dorghr_(&n_, &ilo_, &ihi_, A, &lda_, tau, &wkopt, &lwork, &info_);
+    lwork = std::max(1, int(wkopt));
+    std::vector<double> work(static_cast<size_t>(lwork));
+    dorghr_(&n_, &ilo_, &ihi_, A, &lda_, tau, work.data(), &lwork, &info_);
+    *info = info_;
+}
+
+void cpu_dhseqr(char job,
+                char compz,
+                rocblas_int n,
+                rocblas_int ilo,
+                rocblas_int ihi,
+                double* H,
+                rocblas_int ldh,
+                double* wr,
+                double* wi,
+                double* Z,
+                rocblas_int ldz,
+                rocblas_int* info)
+{
+    int n_ = n;
+    int ilo_ = ilo;
+    int ihi_ = ihi;
+    int ldh_ = ldh;
+    int ldz_ = ldz;
+    int lwork = -1;
+    int info_ = 0;
+    double wkopt = 0;
+    dhseqr_(&job, &compz, &n_, &ilo_, &ihi_, H, &ldh_, wr, wi, Z, &ldz_, &wkopt, &lwork, &info_);
+    lwork = int(wkopt);
+    std::vector<double> work(static_cast<size_t>(std::max(1, lwork)));
+    dhseqr_(&job, &compz, &n_, &ilo_, &ihi_, H, &ldh_, wr, wi, Z, &ldz_, work.data(), &lwork, &info_);
+    *info = info_;
+}
+
+// gebak
+
+template <>
+void cpu_gebak<float>(char job,
+                      rocblas_side side,
+                      rocblas_int n,
+                      rocblas_int ilo,
+                      rocblas_int ihi,
+                      float* scale,
+                      rocblas_int m,
+                      float* V,
+                      rocblas_int ldv,
+                      rocblas_int* info)
+{
+    char sidec = (side == rocblas_side_left) ? 'L' : 'R';
+    int n_ = n;
+    int ilo_ = ilo;
+    int ihi_ = ihi;
+    int m_ = m;
+    int ldv_ = ldv;
+    int info_ = 0;
+    sgebak_(&job, &sidec, &n_, &ilo_, &ihi_, scale, &m_, V, &ldv_, &info_);
+    *info = info_;
+}
+
+template <>
+void cpu_gebak<double>(char job,
+                       rocblas_side side,
+                       rocblas_int n,
+                       rocblas_int ilo,
+                       rocblas_int ihi,
+                       double* scale,
+                       rocblas_int m,
+                       double* V,
+                       rocblas_int ldv,
+                       rocblas_int* info)
+{
+    char sidec = (side == rocblas_side_left) ? 'L' : 'R';
+    int n_ = n;
+    int ilo_ = ilo;
+    int ihi_ = ihi;
+    int m_ = m;
+    int ldv_ = ldv;
+    int info_ = 0;
+    dgebak_(&job, &sidec, &n_, &ilo_, &ihi_, scale, &m_, V, &ldv_, &info_);
+    *info = info_;
 }
 
 template <>

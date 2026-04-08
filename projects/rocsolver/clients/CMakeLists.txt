@@ -102,6 +102,9 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/auxiliary/testing_ormlx_unmlx.cpp
     common/auxiliary/testing_ormbr_unmbr.cpp
     common/auxiliary/testing_ormtr_unmtr.cpp
+    common/auxiliary/testing_orghr.cpp
+    common/auxiliary/testing_gebal.cpp
+    common/auxiliary/testing_gebak.cpp
   )
 
   set(roclapack_inst_files
@@ -112,6 +115,8 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_getf2_getrf_npvt.cpp
     common/lapack/testing_getf2_getrf.cpp
     common/lapack/testing_geqr2_geqrf.cpp
+    common/lapack/testing_hseqr.cpp
+    common/lapack/testing_geev.cpp
     common/lapack/testing_gerq2_gerqf.cpp
     common/lapack/testing_geql2_geqlf.cpp
     common/lapack/testing_gelq2_gelqf.cpp
@@ -128,6 +133,7 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_getri_npvt_outofplace.cpp
     common/lapack/testing_gels.cpp
     common/lapack/testing_gebd2_gebrd.cpp
+    common/lapack/testing_gehrd.cpp
     common/lapack/testing_sytf2_sytrf.cpp
     common/lapack/testing_sytxx_hetxx.cpp
     common/lapack/testing_sygsx_hegsx.cpp
@@ -147,6 +153,7 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_geblttrf_npvt_interleaved.cpp
     common/lapack/testing_geblttrs_npvt.cpp
     common/lapack/testing_geblttrs_npvt_interleaved.cpp
+    common/lapack/testing_trevc.cpp
   )
 
   set(rocrefact_inst_files

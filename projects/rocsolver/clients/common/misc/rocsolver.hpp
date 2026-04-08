@@ -46,6 +46,87 @@
 extern "C" {
 #endif
 
+rocblas_status rocsolver_dgebal(rocblas_handle handle,
+                                const rocblas_int n,
+                                double* A,
+                                const rocblas_int lda,
+                                rocblas_int* ilo,
+                                rocblas_int* ihi,
+                                double* scale,
+                                rocblas_int* info);
+
+rocblas_status rocsolver_dgebal_strided_batched(rocblas_handle handle,
+                                                const rocblas_int n,
+                                                double* A,
+                                                const rocblas_int lda,
+                                                const rocblas_stride strideA,
+                                                rocblas_int* ilo,
+                                                const rocblas_stride strideIlo,
+                                                rocblas_int* ihi,
+                                                const rocblas_stride strideIhi,
+                                                double* scale,
+                                                const rocblas_stride strideScale,
+                                                rocblas_int* info,
+                                                const rocblas_int batch_count);
+
+rocblas_status rocsolver_dgebal_batched(rocblas_handle handle,
+                                        const rocblas_int n,
+                                        double* const A[],
+                                        const rocblas_int lda,
+                                        rocblas_int* ilo,
+                                        const rocblas_stride strideIlo,
+                                        rocblas_int* ihi,
+                                        const rocblas_stride strideIhi,
+                                        double* scale,
+                                        const rocblas_stride strideScale,
+                                        rocblas_int* info,
+                                        const rocblas_int batch_count);
+
+rocblas_status rocsolver_dgebak(rocblas_handle handle,
+                                const rocblas_side side,
+                                const rocblas_int n,
+                                rocblas_int* ilo,
+                                rocblas_int* ihi,
+                                double* scale,
+                                const rocblas_int m,
+                                double* V,
+                                const rocblas_int ldv,
+                                rocblas_int* info);
+
+rocblas_status rocsolver_dgebak_strided_batched(rocblas_handle handle,
+                                                const rocblas_side side,
+                                                const rocblas_int n,
+                                                rocblas_int* ilo,
+                                                const rocblas_stride strideIlo,
+                                                rocblas_int* ihi,
+                                                const rocblas_stride strideIhi,
+                                                double* scale,
+                                                const rocblas_stride strideScale,
+                                                const rocblas_int m,
+                                                double* V,
+                                                const rocblas_stride shiftV,
+                                                const rocblas_int ldv,
+                                                const rocblas_stride strideV,
+                                                rocblas_int* info,
+                                                const rocblas_int batch_count);
+
+rocblas_status rocsolver_dgebak_batched(rocblas_handle handle,
+                                        const rocblas_side side,
+                                        const rocblas_int n,
+                                        rocblas_int* ilo,
+                                        const rocblas_stride strideIlo,
+                                        rocblas_int* ihi,
+                                        const rocblas_stride strideIhi,
+                                        double* scale,
+                                        const rocblas_stride strideScale,
+                                        const rocblas_int m,
+                                        double* const V[],
+                                        const rocblas_stride shiftV,
+                                        const rocblas_int ldv,
+                                        const rocblas_stride strideV,
+                                        rocblas_int* info,
+                                        const rocblas_int batch_count);
+
 rocblas_status rocsolver_slatrd_forsytrd(rocblas_handle handle,
                                          rocblas_fill uplo,
                                          rocblas_int n,
@@ -1379,6 +1460,240 @@ inline rocblas_status rocsolver_laswp(rocblas_handle handle,
 {
     return rocsolver_zlaswp(handle, n, A, lda, k1, k2, ipiv, inc);
 }
+/*****************************************************/
+
+/******************** GEBAL ********************/
+inline rocblas_status rocsolver_gebal(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      double* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ilo,
+                                      rocblas_int* ihi,
+                                      double* scale,
+                                      rocblas_stride stScale,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    if(STRIDED)
+        return rocsolver_dgebal_strided_batched(handle, n, A, lda, stA, ilo, 1, ihi, 1, scale,
+                                                stScale, info, bc);
+    else
+        return rocsolver_dgebal(handle, n, A, lda, ilo, ihi, scale, info);
+}
+
+inline rocblas_status rocsolver_gebal(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      double* const* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ilo,
+                                      rocblas_int* ihi,
+                                      double* scale,
+                                      rocblas_stride stScale,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    (void)STRIDED;
+    (void)stA;
+    return rocsolver_dgebal_batched(handle, n, A, lda, ilo, 1, ihi, 1, scale, stScale, info, bc);
+}
+/*****************************************************/
+
+/******************** GEBAK ********************/
+inline rocblas_status rocsolver_gebak(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_side side,
+                                      rocblas_int n,
+                                      rocblas_int* ilo,
+                                      rocblas_int* ihi,
+                                      double* scale,
+                                      rocblas_stride stScale,
+                                      rocblas_int m,
+                                      double* V,
+                                      rocblas_stride shiftV,
+                                      rocblas_int ldv,
+                                      rocblas_stride stV,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    (void)shiftV;
+    if(STRIDED)
+        return rocsolver_dgebak_strided_batched(handle, side, n, ilo, 1, ihi, 1, scale, stScale, m,
+                                                V, 0, ldv, stV, info, bc);
+    else
+        return rocsolver_dgebak(handle, side, n, ilo, ihi, scale, m, V, ldv, info);
+}
+
+inline rocblas_status rocsolver_gebak(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_side side,
+                                      rocblas_int n,
+                                      rocblas_int* ilo,
+                                      rocblas_int* ihi,
+                                      double* scale,
+                                      rocblas_stride stScale,
+                                      rocblas_int m,
+                                      double* const* V,
+                                      rocblas_stride shiftV,
+                                      rocblas_int ldv,
+                                      rocblas_stride stV,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    (void)STRIDED;
+    return rocsolver_dgebak_batched(handle, side, n, ilo, 1, ihi, 1, scale, stScale, m, V, shiftV,
+                                    ldv, stV, info, bc);
+}
+
+/*****************************************************/
+
+/******************** GEHRD ********************/
+inline rocblas_status rocsolver_gehrd(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      rocblas_int ilo,
+                                      rocblas_int ihi,
+                                      double* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      double* tau,
+                                      rocblas_stride stTau,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    if(STRIDED)
+        return rocsolver_dgehrd_strided_batched(handle, n, ilo, ihi, A, lda, stA, tau, stTau, info,
+                                                bc);
+    else
+        return rocsolver_dgehrd(handle, n, ilo, ihi, A, lda, tau, info);
+}
+
+inline rocblas_status rocsolver_gehrd(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      rocblas_int ilo,
+                                      rocblas_int ihi,
+                                      double* const* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      double* tau,
+                                      rocblas_stride stTau,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    (void)STRIDED;
+    (void)stA;
+    return rocsolver_dgehrd_batched(handle, n, ilo, ihi, A, lda, tau, stTau, info, bc);
+}
+
+/*****************************************************/
+
+/******************** ORGHR ********************/
+inline rocblas_status rocsolver_orghr(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      rocblas_int ilo,
+                                      rocblas_int ihi,
+                                      double* A,
+                                      rocblas_stride shiftA,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      double* tau,
+                                      rocblas_stride stTau,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    if(STRIDED)
+        return rocsolver_dorghr_strided_batched(handle, n, ilo, ihi, A, shiftA, lda, stA, tau,
+                                                stTau, info, bc);
+    else
+    {
+        (void)shiftA;
+        (void)stA;
+        (void)stTau;
+        (void)bc;
+        return rocsolver_dorghr(handle, n, ilo, ihi, A, lda, tau, info);
+    }
+}
+
+inline rocblas_status rocsolver_orghr(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_int n,
+                                      rocblas_int ilo,
+                                      rocblas_int ihi,
+                                      double* const A[],
+                                      rocblas_stride shiftA,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      double* const tau[],
+                                      rocblas_stride stTau,
+                                      rocblas_int* info,
+                                      rocblas_int bc)
+{
+    (void)STRIDED;
+    return rocsolver_dorghr_batched(handle, n, ilo, ihi, A, shiftA, lda, stA, tau, stTau, info,
+                                    bc);
+}
+
+/*****************************************************/
+
+/******************** HSEQR ********************/
+inline rocblas_status rocsolver_hseqr(bool STRIDED,
+                                      rocblas_handle handle,
+                                      const rocblas_evect job,
+                                      const rocblas_evect compz,
+                                      const rocblas_int n,
+                                      const rocblas_int ilo,
+                                      const rocblas_int ihi,
+                                      double* H,
+                                      const rocblas_int ldh,
+                                      const rocblas_stride stH,
+                                      double* wr,
+                                      const rocblas_stride stWr,
+                                      double* wi,
+                                      const rocblas_stride stWi,
+                                      double* Z,
+                                      const rocblas_int ldz,
+                                      const rocblas_stride stZ,
+                                      rocblas_int* info,
+                                      const rocblas_int bc)
+{
+    if(STRIDED)
+        return rocsolver_dhseqr_strided_batched(handle, job, compz, n, ilo, ihi, H, ldh, stH, wr,
+                                                stWr, wi, stWi, Z, ldz, stZ, info, bc);
+    else
+        return rocsolver_dhseqr(handle, job, compz, n, ilo, ihi, H, ldh, wr, wi, Z, ldz, info);
+}
+
+inline rocblas_status rocsolver_hseqr(bool STRIDED,
+                                      rocblas_handle handle,
+                                      const rocblas_evect job,
+                                      const rocblas_evect compz,
+                                      const rocblas_int n,
+                                      const rocblas_int ilo,
+                                      const rocblas_int ihi,
+                                      double* const H[],
+                                      const rocblas_int ldh,
+                                      const rocblas_stride stH,
+                                      double* wr,
+                                      const rocblas_stride stWr,
+                                      double* wi,
+                                      const rocblas_stride stWi,
+                                      double* const Z[],
+                                      const rocblas_int ldz,
+                                      const rocblas_stride stZ,
+                                      rocblas_int* info,
+                                      const rocblas_int bc)
+{
+    (void)stH;
+    (void)stZ;
+    return rocsolver_dhseqr_batched(handle, job, compz, n, ilo, ihi, H, ldh, wr, stWr, wi, stWi, Z,
+                                    ldz, info, bc);
+}
+
 /*****************************************************/
 
 /******************** LANGE ********************/
@@ -12800,4 +13115,746 @@ inline rocblas_status rocsolver_csrrf_solve(rocblas_handle handle,
     return rocsolver_dcsrrf_solve(handle, n, nrhs, nnzT, ptrT, indT, valT, pivP, pivQ, B, ldb,
                                   rfinfo);
 }
+/********************************************************/
+
+/******************** GEEV ********************/
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     float* A,
+                                     rocblas_int lda,
+                                     float* wr,
+                                     float* wi,
+                                     float* VL,
+                                     rocblas_int ldvl,
+                                     float* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_sgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     double* A,
+                                     rocblas_int lda,
+                                     double* wr,
+                                     double* wi,
+                                     double* VL,
+                                     rocblas_int ldvl,
+                                     double* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_dgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     rocblas_int n,
+                                                     float* A,
+                                                     rocblas_int lda,
+                                                     rocblas_stride strideA,
+                                                     float* wr,
+                                                     rocblas_stride strideWr,
+                                                     float* wi,
+                                                     rocblas_stride strideWi,
+                                                     float* VL,
+                                                     rocblas_int ldvl,
+                                                     rocblas_stride strideVL,
+                                                     float* VR,
+                                                     rocblas_int ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     rocblas_int batch_count)
+{
+    return rocsolver_sgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, strideA,
+                                           wr, strideWr, wi, strideWi,
+                                           VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                           info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     rocblas_int n,
+                                                     double* A,
+                                                     rocblas_int lda,
+                                                     rocblas_stride strideA,
+                                                     double* wr,
+                                                     rocblas_stride strideWr,
+                                                     double* wi,
+                                                     rocblas_stride strideWi,
+                                                     double* VL,
+                                                     rocblas_int ldvl,
+                                                     rocblas_stride strideVL,
+                                                     double* VR,
+                                                     rocblas_int ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     rocblas_int batch_count)
+{
+    return rocsolver_dgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, strideA,
+                                           wr, strideWr, wi, strideWi,
+                                           VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                           info, batch_count);
+}
+
+// complex single
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_float_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_float_complex* W,
+                                     rocblas_float_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_float_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_cgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_double_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_double_complex* W,
+                                     rocblas_double_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_double_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_zgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+// batched (real)
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             rocblas_int n,
+                                             float* const A[],
+                                             rocblas_int lda,
+                                             float* wr,
+                                             rocblas_stride strideWr,
+                                             float* wi,
+                                             rocblas_stride strideWi,
+                                             float* const VL[],
+                                             rocblas_int ldvl,
+                                             float* const VR[],
+                                             rocblas_int ldvr,
+                                             rocblas_int* info,
+                                             rocblas_int batch_count)
+{
+    return rocsolver_sgeev_batched(handle, jobvl, jobvr, n, A, lda, wr, strideWr, wi, strideWi,
+                                   VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             rocblas_int n,
+                                             double* const A[],
+                                             rocblas_int lda,
+                                             double* wr,
+                                             rocblas_stride strideWr,
+                                             double* wi,
+                                             rocblas_stride strideWi,
+                                             double* const VL[],
+                                             rocblas_int ldvl,
+                                             double* const VR[],
+                                             rocblas_int ldvr,
+                                             rocblas_int* info,
+                                             rocblas_int batch_count)
+{
+    return rocsolver_dgeev_batched(handle, jobvl, jobvr, n, A, lda, wr, strideWr, wi, strideWi,
+                                   VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+// batched (complex)
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             rocblas_int n,
+                                             rocblas_float_complex* const A[],
+                                             rocblas_int lda,
+                                             rocblas_float_complex* W,
+                                             rocblas_stride strideW,
+                                             rocblas_float_complex* const VL[],
+                                             rocblas_int ldvl,
+                                             rocblas_float_complex* const VR[],
+                                             rocblas_int ldvr,
+                                             rocblas_int* info,
+                                             rocblas_int batch_count)
+{
+    return rocsolver_cgeev_batched(handle, jobvl, jobvr, n, A, lda, W, strideW,
+                                   VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             rocblas_int n,
+                                             rocblas_double_complex* const A[],
+                                             rocblas_int lda,
+                                             rocblas_double_complex* W,
+                                             rocblas_stride strideW,
+                                             rocblas_double_complex* const VL[],
+                                             rocblas_int ldvl,
+                                             rocblas_double_complex* const VR[],
+                                             rocblas_int ldvr,
+                                             rocblas_int* info,
+                                             rocblas_int batch_count)
+{
+    return rocsolver_zgeev_batched(handle, jobvl, jobvr, n, A, lda, W, strideW,
+                                   VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+// complex strided-batched
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     rocblas_int n,
+                                                     rocblas_float_complex* A,
+                                                     rocblas_int lda,
+                                                     rocblas_stride strideA,
+                                                     rocblas_float_complex* W,
+                                                     rocblas_stride strideW,
+                                                     rocblas_float_complex* VL,
+                                                     rocblas_int ldvl,
+                                                     rocblas_stride strideVL,
+                                                     rocblas_float_complex* VR,
+                                                     rocblas_int ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     rocblas_int batch_count)
+{
+    return rocsolver_cgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, strideA,
+                                           W, strideW,
+                                           VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                           info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     rocblas_int n,
+                                                     rocblas_double_complex* A,
+                                                     rocblas_int lda,
+                                                     rocblas_stride strideA,
+                                                     rocblas_double_complex* W,
+                                                     rocblas_stride strideW,
+                                                     rocblas_double_complex* VL,
+                                                     rocblas_int ldvl,
+                                                     rocblas_stride strideVL,
+                                                     rocblas_double_complex* VR,
+                                                     rocblas_int ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     rocblas_int batch_count)
+{
+    return rocsolver_zgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, strideA,
+                                           W, strideW,
+                                           VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                           info, batch_count);
+}
+
+// 64-bit integer API: single (real)
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     int64_t n,
+                                     float* A,
+                                     int64_t lda,
+                                     float* wr,
+                                     float* wi,
+                                     float* VL,
+                                     int64_t ldvl,
+                                     float* VR,
+                                     int64_t ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_sgeev_64(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     int64_t n,
+                                     double* A,
+                                     int64_t lda,
+                                     double* wr,
+                                     double* wi,
+                                     double* VL,
+                                     int64_t ldvl,
+                                     double* VR,
+                                     int64_t ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_dgeev_64(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+// 64-bit integer API: single (complex)
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     int64_t n,
+                                     rocblas_float_complex* A,
+                                     int64_t lda,
+                                     rocblas_float_complex* W,
+                                     rocblas_float_complex* VL,
+                                     int64_t ldvl,
+                                     rocblas_float_complex* VR,
+                                     int64_t ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_cgeev_64(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev(rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     int64_t n,
+                                     rocblas_double_complex* A,
+                                     int64_t lda,
+                                     rocblas_double_complex* W,
+                                     rocblas_double_complex* VL,
+                                     int64_t ldvl,
+                                     rocblas_double_complex* VR,
+                                     int64_t ldvr,
+                                     rocblas_int* info)
+{
+    return rocsolver_zgeev_64(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+// 64-bit integer API: batched (real)
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             int64_t n,
+                                             float* const A[],
+                                             int64_t lda,
+                                             float* wr,
+                                             rocblas_stride strideWr,
+                                             float* wi,
+                                             rocblas_stride strideWi,
+                                             float* const VL[],
+                                             int64_t ldvl,
+                                             float* const VR[],
+                                             int64_t ldvr,
+                                             rocblas_int* info,
+                                             int64_t batch_count)
+{
+    return rocsolver_sgeev_batched_64(handle, jobvl, jobvr, n, A, lda, wr, strideWr, wi, strideWi,
+                                      VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             int64_t n,
+                                             double* const A[],
+                                             int64_t lda,
+                                             double* wr,
+                                             rocblas_stride strideWr,
+                                             double* wi,
+                                             rocblas_stride strideWi,
+                                             double* const VL[],
+                                             int64_t ldvl,
+                                             double* const VR[],
+                                             int64_t ldvr,
+                                             rocblas_int* info,
+                                             int64_t batch_count)
+{
+    return rocsolver_dgeev_batched_64(handle, jobvl, jobvr, n, A, lda, wr, strideWr, wi, strideWi,
+                                      VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+// 64-bit integer API: batched (complex)
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             int64_t n,
+                                             rocblas_float_complex* const A[],
+                                             int64_t lda,
+                                             rocblas_float_complex* W,
+                                             rocblas_stride strideW,
+                                             rocblas_float_complex* const VL[],
+                                             int64_t ldvl,
+                                             rocblas_float_complex* const VR[],
+                                             int64_t ldvr,
+                                             rocblas_int* info,
+                                             int64_t batch_count)
+{
+    return rocsolver_cgeev_batched_64(handle, jobvl, jobvr, n, A, lda, W, strideW,
+                                      VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_batched(rocblas_handle handle,
+                                             rocblas_evect jobvl,
+                                             rocblas_evect jobvr,
+                                             int64_t n,
+                                             rocblas_double_complex* const A[],
+                                             int64_t lda,
+                                             rocblas_double_complex* W,
+                                             rocblas_stride strideW,
+                                             rocblas_double_complex* const VL[],
+                                             int64_t ldvl,
+                                             rocblas_double_complex* const VR[],
+                                             int64_t ldvr,
+                                             rocblas_int* info,
+                                             int64_t batch_count)
+{
+    return rocsolver_zgeev_batched_64(handle, jobvl, jobvr, n, A, lda, W, strideW,
+                                      VL, ldvl, VR, ldvr, info, batch_count);
+}
+
+// 64-bit integer API: strided-batched (real)
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     int64_t n,
+                                                     float* A,
+                                                     int64_t lda,
+                                                     rocblas_stride strideA,
+                                                     float* wr,
+                                                     rocblas_stride strideWr,
+                                                     float* wi,
+                                                     rocblas_stride strideWi,
+                                                     float* VL,
+                                                     int64_t ldvl,
+                                                     rocblas_stride strideVL,
+                                                     float* VR,
+                                                     int64_t ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     int64_t batch_count)
+{
+    return rocsolver_sgeev_strided_batched_64(handle, jobvl, jobvr, n, A, lda, strideA,
+                                              wr, strideWr, wi, strideWi,
+                                              VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                              info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     int64_t n,
+                                                     double* A,
+                                                     int64_t lda,
+                                                     rocblas_stride strideA,
+                                                     double* wr,
+                                                     rocblas_stride strideWr,
+                                                     double* wi,
+                                                     rocblas_stride strideWi,
+                                                     double* VL,
+                                                     int64_t ldvl,
+                                                     rocblas_stride strideVL,
+                                                     double* VR,
+                                                     int64_t ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     int64_t batch_count)
+{
+    return rocsolver_dgeev_strided_batched_64(handle, jobvl, jobvr, n, A, lda, strideA,
+                                              wr, strideWr, wi, strideWi,
+                                              VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                              info, batch_count);
+}
+
+// 64-bit integer API: strided-batched (complex)
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     int64_t n,
+                                                     rocblas_float_complex* A,
+                                                     int64_t lda,
+                                                     rocblas_stride strideA,
+                                                     rocblas_float_complex* W,
+                                                     rocblas_stride strideW,
+                                                     rocblas_float_complex* VL,
+                                                     int64_t ldvl,
+                                                     rocblas_stride strideVL,
+                                                     rocblas_float_complex* VR,
+                                                     int64_t ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     int64_t batch_count)
+{
+    return rocsolver_cgeev_strided_batched_64(handle, jobvl, jobvr, n, A, lda, strideA,
+                                              W, strideW,
+                                              VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                              info, batch_count);
+}
+
+inline rocblas_status rocsolver_geev_strided_batched(rocblas_handle handle,
+                                                     rocblas_evect jobvl,
+                                                     rocblas_evect jobvr,
+                                                     int64_t n,
+                                                     rocblas_double_complex* A,
+                                                     int64_t lda,
+                                                     rocblas_stride strideA,
+                                                     rocblas_double_complex* W,
+                                                     rocblas_stride strideW,
+                                                     rocblas_double_complex* VL,
+                                                     int64_t ldvl,
+                                                     rocblas_stride strideVL,
+                                                     rocblas_double_complex* VR,
+                                                     int64_t ldvr,
+                                                     rocblas_stride strideVR,
+                                                     rocblas_int* info,
+                                                     int64_t batch_count)
+{
+    return rocsolver_zgeev_strided_batched_64(handle, jobvl, jobvr, n, A, lda, strideA,
+                                              W, strideW,
+                                              VL, ldvl, strideVL, VR, ldvr, strideVR,
+                                              info, batch_count);
+}
+
+// unified rocsolver_geev(bool STRIDED, ...) dispatchers for testing
+// real: wr and wi are separate real eigenvalue arrays
+// complex: wr is the complex eigenvalue array W, wi is unused
+
+// normal and strided_batched (real float)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     float* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     float* wr,
+                                     rocblas_stride stWr,
+                                     float* wi,
+                                     rocblas_stride stWi,
+                                     float* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     float* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return STRIDED
+        ? rocsolver_sgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, stA,
+                                          wr, stWr, wi, stWi,
+                                          VL, ldvl, stVL, VR, ldvr, stVR, info, bc)
+        : rocsolver_sgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+// normal and strided_batched (real double)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     double* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     double* wr,
+                                     rocblas_stride stWr,
+                                     double* wi,
+                                     rocblas_stride stWi,
+                                     double* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     double* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return STRIDED
+        ? rocsolver_dgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, stA,
+                                          wr, stWr, wi, stWi,
+                                          VL, ldvl, stVL, VR, ldvr, stVR, info, bc)
+        : rocsolver_dgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+// normal and strided_batched (complex float)
+// wr points to complex eigenvalue array W; wi is unused
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_float_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     float* wr,
+                                     rocblas_stride stWr,
+                                     float* /*wi*/,
+                                     rocblas_stride /*stWi*/,
+                                     rocblas_float_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_float_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    auto* W = reinterpret_cast<rocblas_float_complex*>(wr);
+    rocblas_stride stW = stWr / 2;
+    return STRIDED
+        ? rocsolver_cgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, stA,
+                                          W, stW,
+                                          VL, ldvl, stVL, VR, ldvr, stVR, info, bc)
+        : rocsolver_cgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+// normal and strided_batched (complex double)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_double_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     double* wr,
+                                     rocblas_stride stWr,
+                                     double* /*wi*/,
+                                     rocblas_stride /*stWi*/,
+                                     rocblas_double_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_double_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    auto* W = reinterpret_cast<rocblas_double_complex*>(wr);
+    rocblas_stride stW = stWr / 2;
+    return STRIDED
+        ? rocsolver_zgeev_strided_batched(handle, jobvl, jobvr, n, A, lda, stA,
+                                          W, stW,
+                                          VL, ldvl, stVL, VR, ldvr, stVR, info, bc)
+        : rocsolver_zgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, info);
+}
+
+// batched (real float)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     float* const A[],
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     float* wr,
+                                     rocblas_stride stWr,
+                                     float* wi,
+                                     rocblas_stride stWi,
+                                     float* const VL[],
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     float* const VR[],
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return rocsolver_sgeev_batched(handle, jobvl, jobvr, n, A, lda,
+                                   wr, stWr, wi, stWi,
+                                   VL, ldvl, VR, ldvr, info, bc);
+}
+
+// batched (real double)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     double* const A[],
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     double* wr,
+                                     rocblas_stride stWr,
+                                     double* wi,
+                                     rocblas_stride stWi,
+                                     double* const VL[],
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     double* const VR[],
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return rocsolver_dgeev_batched(handle, jobvl, jobvr, n, A, lda,
+                                   wr, stWr, wi, stWi,
+                                   VL, ldvl, VR, ldvr, info, bc);
+}
+
+// batched (complex float)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_float_complex* const A[],
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     float* wr,
+                                     rocblas_stride stWr,
+                                     float* /*wi*/,
+                                     rocblas_stride /*stWi*/,
+                                     rocblas_float_complex* const VL[],
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_float_complex* const VR[],
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    auto* W = reinterpret_cast<rocblas_float_complex*>(wr);
+    rocblas_stride stW = stWr / 2;
+    return rocsolver_cgeev_batched(handle, jobvl, jobvr, n, A, lda,
+                                   W, stW,
+                                   VL, ldvl, VR, ldvr, info, bc);
+}
+
+// batched (complex double)
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_double_complex* const A[],
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     double* wr,
+                                     rocblas_stride stWr,
+                                     double* /*wi*/,
+                                     rocblas_stride /*stWi*/,
+                                     rocblas_double_complex* const VL[],
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_double_complex* const VR[],
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    auto* W = reinterpret_cast<rocblas_double_complex*>(wr);
+    rocblas_stride stW = stWr / 2;
+    return rocsolver_zgeev_batched(handle, jobvl, jobvr, n, A, lda,
+                                   W, stW,
+                                   VL, ldvl, VR, ldvr, info, bc);
+}
+
 /********************************************************/
