@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
-"""Pack per-architecture .hsaco files for multiple kernel variants into a kpack archive.
+"""Pack per-architecture .hsaco files into a self-describing kpack archive.
 
-Extended from example 02 to handle multiple binary names. Each variant
-produces per-architecture .hsaco files; the TOC maps each binary name
-to its per-arch blob ordinals.
+Reads .spec.json files (emitted by build-time spec extractors) to discover
+variants and their metadata. The archive carries both device code and
+structured spec metadata in the msgpack TOC.
 
 Archive format:
 
@@ -17,6 +17,7 @@ Archive format:
     [toc_offset]  TOC        variable  MessagePack table of contents
 """
 
+import json
 import struct
 import sys
 from pathlib import Path
@@ -35,181 +36,46 @@ KPACK_MAGIC = b"KPAK"
 KPACK_VERSION = 1
 HEADER_SIZE = 16  # 4 (magic) + 4 (version) + 8 (toc_offset)
 
-# Variant metadata mirrors the constexpr ALL_VARIANTS table in
-# rocm_vector_add_registry.hpp. Each entry carries the make_spec
-# parameters so the archive TOC can describe the tuning surface.
-VARIANTS = [
-    {
-        "name": "vector_add_fp32_b256",
-        "in_dtype": "fp32",
-        "out_dtype": "fp32",
-        "block_tile": 256,
-        "block_waves": 1,
-        "wave_tile": 256,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp32_b512",
-        "in_dtype": "fp32",
-        "out_dtype": "fp32",
-        "block_tile": 512,
-        "block_waves": 1,
-        "wave_tile": 512,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp32_b1024",
-        "in_dtype": "fp32",
-        "out_dtype": "fp32",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp16_b512",
-        "in_dtype": "fp16",
-        "out_dtype": "fp16",
-        "block_tile": 512,
-        "block_waves": 1,
-        "wave_tile": 512,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp16_b1024",
-        "in_dtype": "fp16",
-        "out_dtype": "fp16",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_bf16_b512",
-        "in_dtype": "bf16",
-        "out_dtype": "bf16",
-        "block_tile": 512,
-        "block_waves": 1,
-        "wave_tile": 512,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_bf16_b1024",
-        "in_dtype": "bf16",
-        "out_dtype": "bf16",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp32_b2048_w8",
-        "in_dtype": "fp32",
-        "out_dtype": "fp32",
-        "block_tile": 2048,
-        "block_waves": 8,
-        "wave_tile": 64,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp16_b1024_w2",
-        "in_dtype": "fp16",
-        "out_dtype": "fp16",
-        "block_tile": 1024,
-        "block_waves": 2,
-        "wave_tile": 512,
-        "pad": True,
-    },
-    # Mixed-type variants
-    {
-        "name": "vector_add_fp16_fp32_b1024",
-        "in_dtype": "fp16",
-        "out_dtype": "fp32",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp32_fp16_b1024",
-        "in_dtype": "fp32",
-        "out_dtype": "fp16",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_bf16_fp32_b1024",
-        "in_dtype": "bf16",
-        "out_dtype": "fp32",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    # RDNA (wave32) variants
-    {
-        "name": "vector_add_fp32_b1024_rdna",
-        "in_dtype": "fp32",
-        "out_dtype": "fp32",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_fp16_b1024_rdna",
-        "in_dtype": "fp16",
-        "out_dtype": "fp16",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-    {
-        "name": "vector_add_bf16_b1024_rdna",
-        "in_dtype": "bf16",
-        "out_dtype": "bf16",
-        "block_tile": 1024,
-        "block_waves": 1,
-        "wave_tile": 1024,
-        "pad": True,
-    },
-]
-ARCHITECTURES = [
-    "gfx90a",
-    "gfx942",
-    "gfx950",
-    "gfx1100",
-    "gfx1101",
-    "gfx1102",
-    "gfx1150",
-    "gfx1151",
-]
-
 
 def main() -> None:
     # Accept an optional build directory argument (used by CMake).
-    # Defaults to ./build relative to this script.
     build_dir = (
         Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).parent / "build"
     )
     output_path = build_dir / "kernels.kpack"
 
-    # Read .hsaco blobs for each variant × architecture
+    # --- Discover variants from .spec.json files ---
+    spec_files = sorted(build_dir.glob("*.spec.json"))
+    if not spec_files:
+        print(
+            f"Error: no .spec.json files found in {build_dir}/",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    variants: list[dict] = []
+    for spec_file in spec_files:
+        with spec_file.open() as f:
+            variant = json.load(f)
+        variants.append(variant)
+        print(f"  Loaded spec: {variant['name']} ({variant['spec_type']})")
+
+    # --- Read .hsaco blobs for each variant x architecture ---
     blobs: list[bytes] = []
     found_arches: set[str] = set()
-    # Map: variant_name -> {arch -> ordinal} for building the TOC
     variant_map: dict[str, dict[str, int]] = {}
 
-    for variant in VARIANTS:
+    for variant in variants:
         name = variant["name"]
         variant_entries: dict[str, int] = {}
-        for arch in ARCHITECTURES:
-            hsaco_path = build_dir / f"{name}_{arch}.hsaco"
-            if not hsaco_path.exists():
-                print(f"  Skipping {name}/{arch}: {hsaco_path.name} not found")
+
+        # Scan for .hsaco files matching this variant
+        for hsaco_path in sorted(build_dir.glob(f"{name}_*.hsaco")):
+            # Extract arch from filename: {name}_{arch}.hsaco
+            arch = hsaco_path.stem[len(name) + 1 :]
+            if not arch or "_" in arch:
+                # Arch names (gfx90a, gfx1100, etc.) never contain underscores.
+                # An underscore means the glob matched a different variant.
                 continue
             blob = hsaco_path.read_bytes()
             ordinal = len(blobs)
@@ -225,10 +91,9 @@ def main() -> None:
         print("Error: no .hsaco files found in build/", file=sys.stderr)
         sys.exit(1)
 
-    # Stable arch ordering for the TOC
     sorted_arches = sorted(found_arches)
 
-    # Write the archive
+    # --- Write the archive ---
     with output_path.open("wb") as out:
         # Header (toc_offset patched after writing blobs)
         out.write(KPACK_MAGIC)
@@ -245,24 +110,21 @@ def main() -> None:
         # Build and write the MessagePack TOC
         toc_offset = out.tell()
 
-        # Variant metadata: tuning surface parameters for each variant
-        variant_metadata = {}
-        for v in VARIANTS:
-            if v["name"] in variant_map:
-                variant_metadata[v["name"]] = {
-                    "in_dtype": v["in_dtype"],
-                    "out_dtype": v["out_dtype"],
-                    "block_tile": v["block_tile"],
-                    "block_waves": v["block_waves"],
-                    "wave_tile": v["wave_tile"],
-                    "pad": v["pad"],
+        # Structured variant specs (the self-describing metadata)
+        variant_specs = {}
+        for variant in variants:
+            if variant["name"] in variant_map:
+                variant_specs[variant["name"]] = {
+                    "spec_type": variant["spec_type"],
+                    "targets": variant.get("targets", []),
+                    "spec": variant["spec"],
                 }
 
         toc = {
             "compression_scheme": "none",
             "gfx_arches": sorted_arches,
             "blobs": blob_infos,
-            "variant_metadata": variant_metadata,
+            "variant_specs": variant_specs,
             "toc": {
                 variant_name: {
                     arch: {
