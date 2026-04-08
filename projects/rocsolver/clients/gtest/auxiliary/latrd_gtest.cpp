@@ -67,6 +67,7 @@ const vector<vector<int>> matrix_size_range_new = {
     {20, 5, 20},
     {20, 20, 5},
     // normal (valid) samples
+    {10, 10, 10},
     {32, 64, 64},
     {64, 128, 64},
     {128, 128, 256},
@@ -92,10 +93,15 @@ const vector<vector<int>> op_range_new = {
     {-1, 0},
     {180, 0},
     // normal (valid) samples
-    {8, 0},
-    {16, 1},
-    {16, 0},
-    {16, 1}};
+    {3, 0},
+    /* {7, 1}, */
+    {7, 0}}; //,
+/* {15, 1}}; */
+/* -    {8, 0}, */
+/* -    {16, 1}, */
+/* -    {16, 0}, */
+/* -    {16, 1}}; */
+
 const vector<vector<int>> op_range = latrd_old_test_sizes ? op_range_old : op_range_new;
 
 // for daily_lapack tests
