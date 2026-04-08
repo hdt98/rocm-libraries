@@ -73,7 +73,7 @@ HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
  * @note The version returned by this function must be a version for which all plugin API functions have been
  * implemented for your class of plugin:
  * - Engine plugins need to implement PluginApi.h and EnginePluginApi.h
- * - Heuristic plugins need to implement PluginApi.h and HeuristicsPluginApi.h (once it exists)
+ * - Heuristic plugins need to implement HeuristicsPluginApi.h only (separate C ABI, does NOT include PluginApi.h)
  */
 HIPDNN_PLUGIN_NODISCARD HIPDNN_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnPluginGetApiVersion(const char** version);
