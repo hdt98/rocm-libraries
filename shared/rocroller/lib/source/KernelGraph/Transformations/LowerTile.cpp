@@ -2259,7 +2259,7 @@ namespace rocRoller
                 // LR swizzle: insert LDSSwizzleLR edge that un-permutes
                 // the K-column so the wave reads the correct logical element.
                 //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --ET--> {colCoord, rowCoord}
+                //   {rawIMacY} --LDSSwizzleLR--> {colCoord, rowCoord}
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
                 {

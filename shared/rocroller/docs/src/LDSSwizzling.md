@@ -97,52 +97,35 @@ all tile rows sharing a bank row.
 
 ## Implementation in rocRoller
 
-Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle). Both GR
-and LR transforms are expressed as `ExpressionTransform`
-edges in the coordinate graph. No new instruction emission or cross-lane
-operations needed.
+Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle). GR and LR
+transforms use dedicated `LDSSwizzleGR` and `LDSSwizzleLR` coordinate
+graph edges. No new instruction emission or cross-lane operations needed.
 
-### ExpressionTransform edge
+### LDSSwizzleGR edge
 
-A coordinate transform edge carrying arbitrary forward and reverse
-`ExpressionPtr` trees. Uses `PositionalArgument` slots (`$0`, `$1`, ...)
-as placeholders for input dimension indexes. The visitor calls
-`positionalArgumentPropagation(expr, indexes)` to substitute actual index
-expressions at transform time.
-
-The row coordinate is passed as a downstream neighbor (`positionalArgument(1)`)
-on the graph edge, not via `DataFlowTag`.
-
-### GR ExpressionTransform
-
-Positional arguments:
-- `$0` = input K-column chunk index (ThreadTileNumber for K dimension)
-- `$1` = tile row coordinate (ThreadTileNumber for the non-K dimension)
-
-The expression includes group splitting (`columnInGroup` / `groupIndex`)
-so that the output has the form `groupIndex * numColumns + swizzledInGroup`.
-This algebraic structure is required for the `Tile` edge to correctly invert
-the expression during coordinate graph traversal. Without it, the Tile edge
-falls back to an incorrect bitmask.
+Coordinate transform edge for the Global Read (write) side. Takes a
+column index and row index as inputs, and produces the swizzled column.
+The `swizzle()` method computes the permuted column from the two inputs
+at visitor traversal time.
 
 Graph topology (MATRIX_B, swizzle enabled):
 
 ```
   Workitem --Flatten--> {nThrX, nThrY}
-  {nThrX, nThrY} --ExpressionTransform--> grSwizzleNThrX
+  {nThrX, nThrY} --LDSSwizzleGR--> grSwizzleNThrX
   grSwizzleNThrX, iThrX --Tile--> iMacX
 ```
 
 For MATRIX_A, the roles of X/Y are swapped (K is dim 1).
 
-### LR ExpressionTransform
+### LDSSwizzleLR edge
 
-Positional arguments:
-- `$0` = element index within K (iMacY for MATRIX_B, iMacX for MATRIX_A)
-- `$1` = tile row coordinate (iMacX for MATRIX_B, iMacY for MATRIX_A)
-
-The element index is decomposed into a dwordx4 chunk index and sub-element
-offset; only the chunk's within-group bits are swizzled, then reassembled:
+Coordinate transform edge for the Local Read side. Un-permutes the
+element-granularity K-column index based on tile row so the wave reads
+the correct logical element from the swizzled LDS layout. The
+`unswizzle()` method decomposes the element index into dwordx4 chunk
+and sub-element offset, applies the inverse permutation, then
+reassembles:
 
 ```
 fullChunk      = elemIdx / elementsPerChunk
@@ -158,7 +141,7 @@ Graph topology (swizzle enabled):
 
 ```
   ldsTag --Tile--> {iMacX, rawIMacY}
-  {rawIMacY} --ExpressionTransform--> {colCoord, rowCoord}
+  {rawIMacY} --LDSSwizzleLR--> {colCoord, rowCoord}
 ```
 
 ### Verification tables
