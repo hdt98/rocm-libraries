@@ -165,3 +165,22 @@ INSTANTIATE_TEST_SUITE_P(Full,
                          testing::Combine(testing::Values(GetTestParamsFull()),
                                           testing::Values(miopenConvolutionAlgoImplicitGEMM),
                                           testing::ValuesIn(GetConvTestCasesFull(miopenHalf))));
+
+// DEBUG: Deterministic test cases for ALMIOPEN-718 investigation
+auto GetConvDeterministicTestCases(miopenDataType_t datatype)
+{
+    using TestCase = miopen::unit_tests::ConvTestCase;
+    return std::vector{
+        TestCase{{datatype, {128, 48, 13, 13}},
+                 {datatype, {192, 48, 1, 1}},
+                 datatype,
+                 {{0, 0}, {1, 1}, {1, 1}, 1, true}},
+    };
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    DEBUG_Deterministic_GPU,
+    GPU_UnitTestConvSolverHipImplicitGemmForwardV4R4XdlopsFwd_FP32,
+    testing::Combine(testing::Values(GetTestParamsFP32()),
+                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::ValuesIn(GetConvDeterministicTestCases(miopenFloat))));

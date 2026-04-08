@@ -131,3 +131,35 @@ INSTANTIATE_TEST_SUITE_P(
     CPU_UnitTestConvSolverHipImplicitGemmForwardV4R5XdlopsDevApplicabilityFwd_FP32,
     testing::Combine(testing::Values(GetTestParamsFP32()),
                      testing::Values(GetConvTestCases(miopenFloat)[0])));
+
+// DEBUG: Deterministic test cases for ALMIOPEN-718 investigation
+// Uses the same shape as smoke test but with deterministic=true
+// These tests will fail until the solver's IsApplicable() is fixed
+// to not return false for deterministic mode.
+auto GetConvDeterministicTestCases(miopenDataType_t datatype)
+{
+    using TestCase = miopen::unit_tests::ConvTestCase;
+
+    return std::vector{
+        // clang-format off
+        TestCase{{datatype, {128, 16, 54, 54}},
+                 {datatype, {64, 16, 3, 3}},
+                 datatype,
+                 {{1, 1}, {1, 1}, {1, 1}, 1, true}},
+        // clang-format on
+    };
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    DEBUG_Deterministic_GPU,
+    GPU_UnitTestConvSolverHipImplicitGemmForwardV4R5XdlopsFwd_FP32,
+    testing::Combine(testing::Values(GetTestParamsFP32()),
+                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::ValuesIn(GetConvDeterministicTestCases(miopenFloat))));
+
+INSTANTIATE_TEST_SUITE_P(
+    DEBUG_Deterministic_GPU,
+    GPU_UnitTestConvSolverHipImplicitGemmForwardV4R5XdlopsFwd_BFP16,
+    testing::Combine(testing::Values(GetTestParamsBFP16()),
+                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
+                     testing::ValuesIn(GetConvDeterministicTestCases(miopenBFloat16))));
