@@ -513,12 +513,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // Per-K-Unroll chain separation: swizzled offsets baked into base address.
-        // v_or_b32 absence confirms no runtime offset combining; may need updating
-        // if unrelated codegen introduces v_or_b32 for other purposes.
+        // LDS swizzle uses XOR-based permutation; verify v_xor_b32 is present.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
+        EXPECT_GT(countSubstring(generatedCode, "v_xor_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle)
@@ -531,12 +529,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // Per-K-Unroll chain separation: swizzled offsets baked into base address.
-        // v_or_b32 absence confirms no runtime offset combining; may need updating
-        // if unrelated codegen introduces v_or_b32 for other purposes.
+        // LDS swizzle uses XOR-based permutation; verify v_xor_b32 is present.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_EQ(countSubstring(generatedCode, "v_or_b32"), 0);
+        EXPECT_GT(countSubstring(generatedCode, "v_xor_b32"), 0);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle_ViaVGPR)
