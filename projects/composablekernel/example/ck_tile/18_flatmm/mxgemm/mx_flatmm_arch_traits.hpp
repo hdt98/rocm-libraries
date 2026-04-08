@@ -57,39 +57,7 @@ struct MXfp4_FlatmmConfig16 : public MXFlatmmConfigBase16
     static constexpr ck_tile::index_t N_Tile = 512;
 };
 
-// Architecture traits for MX Flatmm - Primary template (gfx950 implementation)
-template <ck_tile::core::arch::TargetId Arch, typename FlatmmConfig>
-struct MXFp6FlatmmConfigBase16
-{
-    static constexpr ck_tile::index_t M_Tile = 128;
-    static constexpr ck_tile::index_t N_Tile = 256;
-    static constexpr ck_tile::index_t K_Tile = 256;
-
-    static constexpr ck_tile::index_t M_Warp = 1;
-    static constexpr ck_tile::index_t N_Warp = 4;
-    static constexpr ck_tile::index_t K_Warp = 1;
-
-    static constexpr ck_tile::index_t M_Warp_Tile = 16;
-    static constexpr ck_tile::index_t N_Warp_Tile = 16;
-    static constexpr ck_tile::index_t K_Warp_Tile = 128;
-
-    static constexpr bool kPadM = false;
-    static constexpr bool kPadN = false;
-    static constexpr bool kPadK = false;
-
-    static constexpr bool TransposeC            = false;
-    static constexpr bool UseStructuredSparsity = false;
-
-    static constexpr int kBlockPerCu                = 1;
-    static constexpr int TileParitionerGroupNum     = 8;
-    static constexpr int TileParitionerM01          = 4;
-    static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
-    static constexpr ck_tile::index_t NumWaveGroups = 1;
-    static constexpr bool DoubleSmemBuffer          = false;
-
-    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
-    static constexpr bool TiledMMAPermuteN = false;
-};
+using MXFp6FlatmmConfigBase16 = MXFlatmmConfigBase16;
 
 // Base FlatmmConfig with 32x32 warp tile (for GFX1250 TDM)
 struct MXFlatmmConfigBase32TDM
@@ -187,8 +155,7 @@ struct MXFlatmmArchTraits
 
         size_t MNXdlPack   = 2;
         size_t KXdlPack    = 2;
-        size_t XdlMNThread = Config::N_Warp_Tile;       // 16
-        size_t XdlMNThread = FlatmmConfig::N_Warp_Tile; // 16
+        size_t XdlMNThread = Config::N_Warp_Tile; // 16
         size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread;
 
         const auto MN_Paded = ck_tile::integer_least_multiple(MN, XdlMNThread * MNXdlPack);
@@ -244,11 +211,17 @@ using MXFlatmm_GFX950_FP8FP4_Traits =
     MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase16>;
 using MXFlatmm_GFX950_FP4FP8_Traits =
     MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX950, MXFlatmmConfigBase16>;
-// Architecture traits for MX Flatmm - GFX1250 TDM specialization
-template <>
-struct MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250>
+
+template <ck_tile::core::arch::TargetId Arch, typename FlatmmConfig>
+struct MXFlatmmTDMArchTraits;
+
+// Architecture traits for MX Flatmm - GFX1250 TDM
+template <typename FlatmmConfig>
+struct MXFlatmmTDMArchTraits<ck_tile::core::arch::TargetId::GFX1250, FlatmmConfig>
 {
     static constexpr int BlockedXDLN_PerWarp = 1;
+
+    using Config = FlatmmConfig;
 
     template <typename MXPipelineProblem>
     using MXFlatmmPipeline = ck_tile::WeightPreshufflePipelineAGmemBGmemCRegTDM<MXPipelineProblem>;
@@ -260,7 +233,7 @@ struct MXFlatmmArchTraits<ck_tile::core::arch::TargetId::GFX1250>
         return 16;
     }
 
-    template <class FlatmmConfig, bool KLast, typename dtype>
+    template <bool KLast, typename dtype>
     static auto preShuffleScale(ck_tile::HostTensor<dtype>& src)
     {
         auto src_lengths = src.get_lengths();

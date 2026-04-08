@@ -426,6 +426,24 @@ struct GemmTypeConfig<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, ck_tile::half_t>
     using CDataType   = ck_tile::half_t;
 };
 
+template <>
+struct GemmTypeConfig<ck_tile::fp8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::fp8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::bf8_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::bf8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
 template <ck_tile::GemmPipeline PipelineId>
 struct PipelineTypeTraits;
 
