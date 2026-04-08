@@ -247,7 +247,7 @@ struct GemmMicroscalePipelineAgBgCrPolicy : public UniversalGemmPipelineAgBgCrPo
         using WarpTile         = typename Problem::BlockGemmShape::WarpTile;
         using AComputeDataType = typename Problem::AComputeDataType;
         using BComputeDataType = typename Problem::BComputeDataType;
-#if defined(__gfx125__)
+#if defined(__gfx125__) || defined(__gfx13__)
         constexpr auto wg_attr_num_accessA = WGAttrNumAccessEnum::Single;
         constexpr auto wg_attr_num_accessB = WGAttrNumAccessEnum::Single;
 #else
