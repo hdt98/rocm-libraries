@@ -429,6 +429,7 @@ namespace rocRoller
             transforms.push_back(std::make_shared<KernelGraph::ScheduleMultiplyAndLDS>());
         transforms.push_back(std::make_shared<KernelGraph::Simplify>());
         transforms.push_back(std::make_shared<KernelGraph::OrderExchangeNodes>());
+        transforms.push_back(std::make_shared<KernelGraph::AssignVariableType>());
         transforms.push_back(std::make_shared<KernelGraph::AliasDataFlowTags>());
         transforms.push_back(std::make_shared<KernelGraph::AddLDSBarriers>());
         transforms.push_back(std::make_shared<KernelGraph::AddDeallocateDataFlow>());
