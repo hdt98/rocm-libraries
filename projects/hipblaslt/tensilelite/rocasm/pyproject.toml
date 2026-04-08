@@ -1,0 +1,16 @@
+[project]
+name = "rocasm"
+version = "0.1.0"
+requires-python = ">=3.13"
+description = "Python layer for programmatic manipulation of AMD CDNA ISA instruction sequences"
+license = {text = "MIT"}
+dependencies = [
+    "rocisa",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["rocasm*"]
