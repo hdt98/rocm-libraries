@@ -33,9 +33,9 @@ struct TensorName
     char data[16]{};
     int len = 0;
 
-    consteval TensorName() = default;
+    constexpr TensorName() = default;
 
-    consteval TensorName(std::string_view sv) : len(static_cast<int>(sv.size()))
+    constexpr TensorName(std::string_view sv) : len(static_cast<int>(sv.size()))
     {
         if(sv.size() > 15)
             throw "tensor name too long (max 15 chars)";
@@ -43,7 +43,7 @@ struct TensorName
             data[i] = sv[i];
     }
 
-    consteval bool operator==(std::string_view sv) const
+    constexpr bool operator==(std::string_view sv) const
     {
         if(len != static_cast<int>(sv.size()))
             return false;
