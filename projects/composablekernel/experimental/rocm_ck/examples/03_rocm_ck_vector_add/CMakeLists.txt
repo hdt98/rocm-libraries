@@ -129,9 +129,9 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/kernels.kpack
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py ${CMAKE_CURRENT_BINARY_DIR} --zstd
     DEPENDS ${HSACO_FILES} ${SPEC_JSON_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/pack.py
-    COMMENT "Creating kernels.kpack archive"
+    COMMENT "Creating kernels.kpack archive (zstd)"
 )
 add_custom_target(rocm_ck_vector_add_kpack_archive ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/kernels.kpack)
 
