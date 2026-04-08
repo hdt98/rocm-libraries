@@ -1139,13 +1139,13 @@ class KernelComponentFactoryGfx950(
             # SA3: same pipeline config as MXFP4 but uses sageattnv3 qscale token and dedicated pipeline.
             # Both "sageattnv3" (float output) and "sageattnv3fp16" (fp16 output) share the same pipeline;
             # output type differs only via FmhaFwdTypeConfig<dtype>::ODataType → epilogue type cast.
-            lse = "t"
             dropout = "f"
-            for logits, qscale, mask, bias, sink in itertools.product(
+            for logits, qscale, mask, bias, lse, sink in itertools.product(
                 ["f"],
                 ["sageattnv3"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
+                ["t", "f"],
                 ["f", "t"],
             ):
                 pipelines.append(FmhaFwdPipeline("qr_sageattn", "col", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, "f", "f", sink))  # fmt: skip

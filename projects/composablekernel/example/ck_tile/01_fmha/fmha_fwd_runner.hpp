@@ -5,7 +5,7 @@
 
 #include "ck_tile/host.hpp"
 #include "ck_tile/ref/naive_attention.hpp"
-#include "ck_tile/host/reference/reference_sageattn_preprocess.hpp"
+#include "ck_tile/host/reference/reference_sageattn_v3_preprocess.hpp"
 #include "fmha_fwd.hpp"
 #include "utils.hpp"
 #include "ck_tile/utility/json_dump.hpp"
