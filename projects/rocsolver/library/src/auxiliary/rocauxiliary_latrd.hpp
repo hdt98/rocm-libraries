@@ -32,7 +32,10 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <sstream>
+
+#include <hip/hip_cooperative_groups.h>
 
 #include "../auxiliary/rocauxiliary_lacgv.hpp"
 #include "../auxiliary/rocauxiliary_larfg.hpp"
@@ -2682,7 +2685,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         const auto tidy = tid / (MAX_THDS / 2);
         for(I j = tidy; j < nb; j += 2)
         {
-            W[i + j * lda] = Ws[i + j * n];
+            W[i + j * ldw] = Ws[i + j * n];
         }
     }
 }
@@ -2706,6 +2709,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
                              T* work)
 {
     constexpr bool is_complex_t = rocblas_is_complex<T>;
+    auto grid = cooperative_groups::this_grid();
 
     I batch_id = blockIdx.z;
     I bid = blockIdx.x;
@@ -2716,6 +2720,8 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     S* E = load_ptr_batch<S>(EE, batch_id, 0, strideE);
     T* tau = load_ptr_batch<T>(tauA, batch_id, 0, strideP);
     T* W = load_ptr_batch<T>(WW, batch_id, 0, strideW);
+    T* pw = nullptr;
+    T* pv = nullptr;
     T* Atmp = nullptr;
     T* Wtmp = nullptr;
 
@@ -2723,24 +2729,28 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     extern __shared__ double lmem[];
     T* tau_j = reinterpret_cast<T*>(lmem);
     /* T* As = reinterpret_cast<T*>(tau_j + 1); */
-    T* As = work;
-    /* T* Ws = reinterpret_cast<T*>(As + n * n); */
-    T* Ws = work + n * n;
-    /* T* v = reinterpret_cast<T*>(Ws + n * nb); */
+    T* pSA = A;
+    /* T* Ws = reinterpret_cast<T*>(pSA + n * n); */
+    T* pSW = W;
+    /* T* v = reinterpret_cast<T*>(pSW + n * nb); */
     T* v = reinterpret_cast<T*>(lmem + 1);
     T* w = reinterpret_cast<T*>(v + n); // this piece of LDS is left unused for the time being
-    T* smem = reinterpret_cast<T*>(w + n);
+    T* pSmem = reinterpret_cast<T*>(w + n);
 
-    // Load A into LDS
-    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
-    {
-        const auto tidy = tid / (MAX_THDS / 2);
-        for(I jj = tidy; jj < n; jj += 2)
-        {
-            As[ii + jj * n] = A[ii + jj * lda];
-        }
-    }
-    __syncthreads();
+    T tauj;
+    I ldSA = lda;
+    I ldSW = ldw;
+
+    /* // Load A into LDS */
+    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
+    /* { */
+    /*     const auto tidy = tid / (MAX_THDS / 2); */
+    /*     for(I jj = tidy; jj < n; jj += 2) */
+    /*     { */
+    /*         pSA[ii + jj * n] = A[ii + jj * lda]; */
+    /*     } */
+    /* } */
+    /* __syncthreads(); */
 
     // Remove later if not necessary
     for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
@@ -2751,26 +2761,26 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
             // Ignore imaginary part of the diagonal
             if(ii == jj)
             {
-                As[ii + jj * n] = std::real(As[ii + jj * n]);
+                pSA[ii + jj * ldSA] = std::real(pSA[ii + jj * ldSA]);
             }
             // Copy lower triangular part to upper triangle
             if(ii < jj)
             {
-                As[ii + jj * n] = conj(As[jj + ii * n]);
+                pSA[ii + jj * ldSA] = conj(pSA[jj + ii * ldSA]);
             }
         }
     }
 
-    // Zero W
-    for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2))
-    {
-        const auto tidy = tid / (MAX_THDS / 2);
-        for(I jj = tidy; jj < nb; jj += 2)
-        {
-            Ws[ii + jj * n] = T(0);
-        }
-    }
-    __syncthreads();
+    /* // Zero W */
+    /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
+    /* { */
+    /*     const auto tidy = tid / (MAX_THDS / 2); */
+    /*     for(I jj = tidy; jj < nb; jj += 2) */
+    /*     { */
+    /*         pSW[ii + jj * n] = T(0); */
+    /*     } */
+    /* } */
+    /* __syncthreads(); */
 
     // Reduce the lower part of A: main loop running forwards (for each column)
     I nj{};
@@ -2778,10 +2788,17 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
     for(rocblas_int j = 0; j < nb; ++j)
     {
         nj = n - j - 1;
-        w = Ws + j * n;
+        pv = A + j * lda;
+        pw = W + j * ldw;
+
+        // Zero W
+        for(I ii = tid; ii < n; ii += MAX_THDS)
+        {
+            w[ii] = T(0);
+        }
 
         //
-        // Update A(j:n-1, j) with previously computed reflectors and Ws.
+        // Update A(j:n-1, j) with previously computed reflectors and pSW.
         // (Notice that the triangle below the diagonal of A(:, 0:j-1) holds
         // previously computed Householder reflectors.)
         //
@@ -2789,13 +2806,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         {
             // Step 1: A(j:n-1, j) = -A(j:n-1, 0:j-1) * W(j, 0:1-j)^H + A(j:n-1, j)
             //
-            Atmp = As + j + j * n;
+            Atmp = pSA + j + j * ldSA;
             for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
             {
                 temp = T(0);
                 for(I jj = 0; jj < j; jj++)
                 {
-                    temp += As[j + ii + jj * n] * Ws[j + jj * n];
+                    temp += pSA[j + ii + jj * ldSA] * pSW[j + jj * ldSW];
                 }
                 Atmp[ii] -= temp;
             }
@@ -2803,13 +2820,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 
             // Step 2: A(j:n-1, j) = -W(j:n-1, 0:j-1) * A(j, 0:j-1)^H + A(j:n-1, j)
             //
-            Atmp = As + j + j * n;
+            Atmp = pSA + j + j * ldSA;
             for(I ii = tid; ii < nj + 1; ii += MAX_THDS)
             {
                 temp = T(0);
                 for(I jj = 0; jj < j; jj++)
                 {
-                    temp += Ws[j + ii + jj * n] * As[j + jj * n];
+                    temp += pSW[j + ii + jj * ldSW] * pSA[j + jj * ldSA];
                 }
                 Atmp[ii] -= temp;
             }
@@ -2838,34 +2855,34 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         //
 
         // Load A(j+1:n-1,j) into v
-        for(I i = tid; i < nj; i += MAX_THDS)
+        for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
-            v[i] = As[i + (j + 1) + j * n];
+            v[ii] = pSA[ii + (j + 1) + j * ldSA];
         }
 
         // LARFG
         temp = T(0);
-        for(I i = tid; i < nj - 1; i += MAX_THDS)
+        for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
         {
-            temp += v[i + 1] * conj(v[i + 1]);
+            temp += v[ii + 1] * conj(v[ii + 1]);
         }
-        reduce_block_sum(temp, smem);
+        reduce_block_sum(temp, pSmem);
 
         if(tid == 0)
         {
-            // set tau, beta, and put scaling factor into smem[0]
+            // set tau, beta, and put scaling factor into pSmem[0]
             run_set_taubeta<T>(tau_j, &temp, v, E + j);
 
             tau[j] = tau_j[0];
-            smem[0] = temp;
+            pSmem[0] = temp;
         }
         __syncthreads();
 
         // Scale v
-        T scal = smem[0];
-        for(I i = tid; i < nj - 1; i += MAX_THDS)
+        T scal = pSmem[0];
+        for(I ii = tid; ii < nj - 1; ii += MAX_THDS)
         {
-            v[i + 1] *= scal;
+            v[ii + 1] *= scal;
         }
         __syncthreads();
 
@@ -2878,7 +2895,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         // provided that j < nb - 1.
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
-            As[(ii + j + 1) + j * n] = v[ii];
+            pSA[(ii + j + 1) + j * ldSA] = v[ii];
         }
 
         //
@@ -2889,13 +2906,13 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         //
         // Step 4: w_0 = A(j+1:n-1, j+1:n-1) * v(0:n-1-j)
         //
-        Atmp = As + (j + 1) + (j + 1) * n;
+        Atmp = pSA + (j + 1) + (j + 1) * ldSA;
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
             for(I jj = 0; jj < nj; jj++)
             {
-                temp += Atmp[ii + jj * n] * v[jj];
+                temp += Atmp[ii + jj * ldSA] * v[jj];
             }
             w[ii + j + 1] = temp;
         }
@@ -2903,29 +2920,29 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 
         // Step 5: w(0:j-1) = W(j+1:n-1, 0:j-1)^H * v(0:n-1-j)
         //
-        Wtmp = Ws + (j + 1);
+        Wtmp = pSW + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
         {
             temp = T(0);
             for(I ii = 0; ii < nj; ++ii)
             {
-                temp += conj(Wtmp[ii + jj * n]) * v[ii];
+                temp += conj(Wtmp[ii + jj * ldSW]) * v[ii];
             }
-            /* reduce_block_sum(temp, smem); */
-            /* Ws[jj + j * n] = smem[0]; */
+            /* reduce_block_sum(temp, pSmem); */
+            /* pSW[jj + j * ldSW] = pSmem[0]; */
             w[jj] = temp;
         }
         __syncthreads();
 
         // Step 6: w(j+1:n-1) = -A(j+1:n-1, 0:j-1) * w(0:j-1) + w(j+1:n-1)
         //
-        Atmp = As + (j + 1);
+        Atmp = pSA + (j + 1);
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
             for(I jj = 0; jj < j; ++jj)
             {
-                temp -= Atmp[ii + jj * n] * w[jj];
+                temp -= Atmp[ii + jj * ldSA] * w[jj];
             }
             w[j + 1 + ii] += temp;
         }
@@ -2938,29 +2955,29 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 
         // Step 7: w(0:j-1) = A(j+1:n-1, 0:j-1)^H * v(0:n - 1 -j);
         //
-        Atmp = As + (j + 1);
+        Atmp = pSA + (j + 1);
         for(I jj = tid; jj < j; jj += MAX_THDS)
         {
             temp = T(0);
             for(I ii = 0; ii < nj; ++ii)
             {
-                temp += conj(Atmp[ii + jj * n]) * v[ii];
+                temp += conj(Atmp[ii + jj * ldSA]) * v[ii];
             }
-            /* reduce_block_sum(temp, smem); */
-            /* Ws[jj + j * n] = smem[0]; */
+            /* reduce_block_sum(temp, pSmem); */
+            /* pSW[jj + j * ldSW] = pSmem[0]; */
             w[jj] = temp;
         }
         __syncthreads();
 
         // Step 8: w(j+1:n-1) = -W(j+1:n, 0:j-1) * w(0:j-1) + W(j+1:n-1)
         //
-        Wtmp = Ws + (j + 1);
+        Wtmp = pSW + (j + 1);
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
             temp = T(0);
             for(I jj = 0; jj < j; ++jj)
             {
-                temp -= Wtmp[ii + jj * n] * w[jj];
+                temp -= Wtmp[ii + jj * ldSW] * w[jj];
             }
             w[j + 1 + ii] += temp;
         }
@@ -2980,19 +2997,25 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         {
             temp += v[ii] * conj(w[ii + j + 1]);
         }
-        reduce_block_sum(temp, smem);
+        reduce_block_sum(temp, pSmem);
 
         if(tid == 0)
         {
             // alpha = - 1/2 * tauj^2 * <v, w>
-            smem[0] = -0.5 * tau_j[0] * tau_j[0] * temp;
+            pSmem[0] = -0.5 * tau_j[0] * tau_j[0] * temp;
         }
         __syncthreads();
 
         // AXPY
         for(I ii = tid; ii < nj; ii += MAX_THDS)
         {
-            w[ii + j + 1] = smem[0] * v[ii] + tau_j[0] * w[ii + j + 1];
+            w[ii + j + 1] = pSmem[0] * v[ii] + tau_j[0] * w[ii + j + 1];
+        }
+        __syncthreads();
+
+        for(I ii = tid; ii < n; ii += MAX_THDS)
+        {
+            pSW[ii + j * ldSW] = w[ii];
         }
         __syncthreads();
 
@@ -3001,48 +3024,48 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
         // Note: the result of the AXPY is required for Steps 1 and 2.
     }
 
-    // Write LDS back to A
-    for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2))
-    {
-        const auto tidy = tid / (MAX_THDS / 2);
-        for(I j = tidy; j < n; j += 2)
-        {
-            if(i >= j)
-            {
-                A[i + j * lda] = As[i + j * n];
-            }
-        }
-    }
+    /* // Write LDS back to A */
+    /* for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2)) */
+    /* { */
+    /*     const auto tidy = tid / (MAX_THDS / 2); */
+    /*     for(I j = tidy; j < n; j += 2) */
+    /*     { */
+    /*         if(i >= j) */
+    /*         { */
+    /*             A[i + j * lda] = pSA[i + j * ldSA]; */
+    /*         } */
+    /*     } */
+    /* } */
 
-    // Write LDS back to W
-    for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2))
-    {
-        const auto tidy = tid / (MAX_THDS / 2);
-        for(I j = tidy; j < nb; j += 2)
-        {
-            W[i + j * lda] = Ws[i + j * n];
-        }
-    }
+    /* // Write LDS back to W */
+    /* for(I i = tid % (MAX_THDS / 2); i < n; i += (MAX_THDS / 2)) */
+    /* { */
+    /*     const auto tidy = tid / (MAX_THDS / 2); */
+    /*     for(I j = tidy; j < nb; j += 2) */
+    /*     { */
+    /*         W[i + j * ldw] = pSW[i + j * ldSW]; */
+    /*     } */
+    /* } */
 }
 
 template <typename T, typename S, typename U, bool COMPLEX = rocblas_is_complex<T>>
 rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                                  const rocblas_fill uplo,
-                                                 const rocblas_int n,
-                                                 const rocblas_int k,
+                                                 rocblas_int n,
+                                                 rocblas_int k,
                                                  U A,
-                                                 const rocblas_int shiftA,
-                                                 const rocblas_int lda,
-                                                 const rocblas_stride strideA,
+                                                 rocblas_int shiftA,
+                                                 rocblas_int lda,
+                                                 rocblas_stride strideA,
                                                  S* E,
-                                                 const rocblas_stride strideE,
+                                                 rocblas_stride strideE,
                                                  T* tau,
-                                                 const rocblas_stride strideP,
+                                                 rocblas_stride strideP,
                                                  T* W,
-                                                 const rocblas_int shiftW,
-                                                 const rocblas_int ldw,
-                                                 const rocblas_stride strideW,
-                                                 const rocblas_int batch_count,
+                                                 rocblas_int shiftW,
+                                                 rocblas_int ldw,
+                                                 rocblas_stride strideW,
+                                                 rocblas_int batch_count,
                                                  rocsolver_device_workspace_ptr_t dwptr)
 {
     ROCSOLVER_ENTER("latrd_forsytrd_alt", "uplo:", uplo, "n:", n, "k:", k, "shiftA:", shiftA,
@@ -3103,7 +3126,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         bool use_small_kernel
             = false && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
 
-        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 3 * k + 2 * k * k) * sizeof(T);
+        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * k + 2 * k * k) * sizeof(T);
         bool use_fused_kernel = (lmemsize_fused <= props->sharedMemPerBlock);
 
         if(!latrd_forsytrd_multi_kernel && use_small_kernel)
@@ -3121,20 +3144,44 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                     shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE,
                                     tau + j, strideP, W, shiftW, ldw, strideW);
         }
-        if(!latrd_forsytrd_multi_kernel && use_fused_kernel)
+        else if(!latrd_forsytrd_multi_kernel && use_fused_kernel)
         {
             if(print_debug_messages_latrd_forsytrd)
             {
-                std::cout << "Using latrd's small kernel, lmemsize = "
+                std::cout << "Using latrd's fused kernel, lmemsize = "
                           << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl;
             }
 
             HIP_CHECK(hipMemsetAsync((void*)W, 0, size_W, stream));
             rocblas_int j = 0;
-            ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_naive<256, T>), dim3(1, 1, batch_count),
-                                    dim3(256), lmemsize_fused, stream, n, k, A,
-                                    shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE,
-                                    tau + j, strideP, W, shiftW, ldw, strideW, work);
+
+            /* ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_naive<256, T>), dim3(1, 1, batch_count), */
+            /*                         dim3(256), lmemsize_small, stream, n, k, A, */
+            /*                         shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE, */
+            /*                         tau + j, strideP, W, shiftW, ldw, strideW, work); */
+
+            int supports_coop_launch = 0;
+            auto status = hipDeviceGetAttribute(&supports_coop_launch,
+                                                hipDeviceAttributeCooperativeLaunch, 0);
+            if(!supports_coop_launch)
+            {
+                // Device does not support cooperative launch
+                /* return hipErrorIllegalState; */
+                std::cout << "::: Device does not support cooperative launch" << std::endl;
+                abort();
+            }
+
+            rocblas_int shiftA_ = shiftA + idx2D(j, j, lda);
+            void* kernelArgs[] = {&n,      &j,       &A, &shiftA_, &lda, &strideA, &E[j], &strideE,
+                                  &tau[j], &strideP, &W, &shiftW,  &ldw, &strideW, &work};
+
+            HIP_CHECK(hipLaunchCooperativeKernel(
+                (void*)(latrd_lower_kernel_naive<256, T, rocblas_int, S, U>),
+                dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream));
+
+            /* n, k, A, */
+            /*                         shiftA_, lda, strideA, E + j, strideE, */
+            /*                         tau + j, strideP, W, shiftW, ldw, strideW, work); */
         }
         else
         {
