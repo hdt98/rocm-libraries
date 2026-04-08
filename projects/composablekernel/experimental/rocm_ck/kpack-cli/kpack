@@ -1,0 +1,476 @@
+#!/usr/bin/env python3
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+"""CLI tool for inspecting kpack kernel archives."""
+
+import argparse
+import json
+import os
+import struct
+import sys
+
+try:
+    import msgpack
+except ImportError:
+    print("Error: msgpack required.  pip install msgpack", file=sys.stderr)
+    sys.exit(1)
+
+# -- constants ----------------------------------------------------------------
+
+MAGIC = b"KPAK"
+HEADER_SIZE = 16  # 4 magic + 4 version + 8 toc_offset
+
+# -- ANSI helpers -------------------------------------------------------------
+
+_NO_COLOR = os.environ.get("NO_COLOR") is not None or not sys.stdout.isatty()
+
+
+def _sgr(code: str) -> str:
+    return "" if _NO_COLOR else f"\033[{code}m"
+
+
+BOLD = _sgr("1")
+DIM = _sgr("2")
+RED = _sgr("31")
+GREEN = _sgr("32")
+YELLOW = _sgr("33")
+BLUE = _sgr("34")
+MAGENTA = _sgr("35")
+CYAN = _sgr("36")
+RESET = _sgr("0")
+
+
+# -- kpack reader -------------------------------------------------------------
+
+
+def read_kpack(path: str) -> dict:
+    """Read a kpack file and return parsed header + TOC."""
+    with open(path, "rb") as f:
+        header = f.read(HEADER_SIZE)
+        if len(header) < HEADER_SIZE:
+            raise ValueError("File too small for kpack header")
+
+        magic, version, toc_offset = struct.unpack("<4sIQ", header)
+        if magic != MAGIC:
+            raise ValueError(f"Bad magic: {magic!r} (expected {MAGIC!r})")
+
+        f.seek(0, 2)
+        file_size = f.tell()
+
+        if toc_offset >= file_size:
+            raise ValueError(f"TOC offset {toc_offset} beyond file size {file_size}")
+
+        f.seek(toc_offset)
+        toc_bytes = f.read()
+        toc = msgpack.unpackb(toc_bytes, raw=False)
+
+    return {
+        "path": path,
+        "file_size": file_size,
+        "version": version,
+        "toc_offset": toc_offset,
+        "toc_size": file_size - toc_offset,
+        "toc": toc,
+    }
+
+
+# -- formatting helpers -------------------------------------------------------
+
+
+def _human_size(n: int) -> str:
+    if n < 1024:
+        return f"{n} B"
+    elif n < 1024 * 1024:
+        return f"{n / 1024:.1f} KiB"
+    elif n < 1024 * 1024 * 1024:
+        return f"{n / (1024 * 1024):.1f} MiB"
+    else:
+        return f"{n / (1024 * 1024 * 1024):.2f} GiB"
+
+
+def _arch_badge(arch: str) -> str:
+    """Color-code architectures by family."""
+    if arch.startswith("gfx9"):
+        return f"{GREEN}{arch}{RESET}"
+    elif arch.startswith("gfx1"):
+        return f"{BLUE}{arch}{RESET}"
+    else:
+        return f"{YELLOW}{arch}{RESET}"
+
+
+def _dim3_str(d: dict) -> str:
+    return f"{d.get('m', '?')}x{d.get('n', '?')}x{d.get('k', '?')}"
+
+
+# -- commands -----------------------------------------------------------------
+
+
+def cmd_info(kp: dict) -> None:
+    """Show archive summary."""
+    toc = kp["toc"]
+    arches = toc.get("gfx_arches", [])
+    blobs = toc.get("blobs", [])
+    variants = toc.get("variant_specs", {})
+    kernels = toc.get("toc", {})
+    compression = toc.get("compression_scheme", "unknown")
+
+    data_size = kp["toc_offset"] - HEADER_SIZE
+
+    print(f"{BOLD}kpack{RESET} {DIM}{kp['path']}{RESET}")
+    print()
+    print(f"  {'Version:':<20} {kp['version']}")
+    print(f"  {'File size:':<20} {_human_size(kp['file_size'])}")
+    print(f"  {'Kernel data:':<20} {_human_size(data_size)}")
+    print(f"  {'TOC size:':<20} {_human_size(kp['toc_size'])}")
+    print(f"  {'Compression:':<20} {compression}")
+    print(f"  {'Blobs:':<20} {len(blobs)}")
+    print(f"  {'Kernels:':<20} {len(kernels)}")
+    print(f"  {'Variant specs:':<20} {len(variants)}")
+    print(f"  {'Architectures:':<20} {' '.join(_arch_badge(a) for a in arches)}")
+
+    if compression == "zstd-per-kernel":
+        zoff = toc.get("zstd_offset", 0)
+        zsz = toc.get("zstd_size", 0)
+        print(f"  {'Zstd blob:':<20} offset={zoff}, size={_human_size(zsz)}")
+
+
+def cmd_list(kp: dict) -> None:
+    """List all kernels/variants."""
+    toc = kp["toc"]
+    kernels = toc.get("toc", {})
+    specs = toc.get("variant_specs", {})
+
+    if not kernels:
+        print(f"{DIM}(no kernels){RESET}")
+        return
+
+    # Header
+    print(
+        f"  {BOLD}{'Kernel':<30} {'Type':<12} {'Architectures':<50} {'Blob sizes'}{RESET}"
+    )
+    print(f"  {'─' * 100}")
+
+    for name in sorted(kernels.keys()):
+        arch_entries = kernels[name]
+        archs = sorted(arch_entries.keys())
+        arch_str = " ".join(_arch_badge(a) for a in archs)
+
+        # Spec type
+        spec_info = specs.get(name, {})
+        spec_type = spec_info.get("spec_type", "")
+        if spec_type == "GemmSpec":
+            type_str = f"{MAGENTA}GEMM{RESET}"
+        elif spec_type == "ElementwiseSpec":
+            type_str = f"{CYAN}Eltwise{RESET}"
+        else:
+            type_str = f"{DIM}hsaco{RESET}"
+
+        # Sizes
+        sizes = []
+        for arch in archs:
+            meta = arch_entries[arch]
+            sz = meta.get("original_size", 0)
+            sizes.append(_human_size(sz))
+        size_str = ", ".join(sizes)
+
+        print(f"  {name:<30} {type_str:<22} {arch_str:<70} {DIM}{size_str}{RESET}")
+
+
+def cmd_spec(kp: dict, name: str | None) -> None:
+    """Show variant spec details."""
+    specs = kp["toc"].get("variant_specs", {})
+
+    if not specs:
+        print(f"{DIM}(no variant specs in this archive){RESET}")
+        return
+
+    if name:
+        if name not in specs:
+            print(f"{RED}Error:{RESET} variant '{name}' not found")
+            print(f"Available: {', '.join(sorted(specs.keys()))}")
+            sys.exit(1)
+        _print_spec(name, specs[name])
+    else:
+        for n in sorted(specs.keys()):
+            _print_spec(n, specs[n])
+            print()
+
+
+def _print_spec(name: str, entry: dict) -> None:
+    spec_type = entry.get("spec_type", "?")
+    targets = entry.get("targets", [])
+    spec = entry.get("spec", {})
+
+    color = MAGENTA if spec_type == "GemmSpec" else CYAN
+    print(f"  {BOLD}{name}{RESET}  {color}{spec_type}{RESET}")
+    print(f"  targets: {' '.join(_arch_badge(t) for t in targets)}")
+
+    if spec_type == "GemmSpec":
+        _print_gemm_spec(spec)
+    elif spec_type == "ElementwiseSpec":
+        _print_eltwise_spec(spec)
+
+
+def _print_gemm_spec(s: dict) -> None:
+    # Tensors
+    tensors = s.get("physical_tensors", [])
+    if tensors:
+        parts = []
+        for t in tensors:
+            n = t.get("name", "?")
+            d = t.get("dtype", "?")
+            lay = t.get("layout", "?")
+            slot = t.get("args_slot", "?")
+            parts.append(f"{BOLD}{n}{RESET}({d},{lay[0]},slot={slot})")
+        print(f"  tensors: {' '.join(parts)}")
+
+    # Tile geometry
+    bt = s.get("block_tile", {})
+    bw = s.get("block_waves", {})
+    wt = s.get("wave_tile", {})
+    print(
+        f"  tile:    block={YELLOW}{_dim3_str(bt)}{RESET}"
+        f"  waves={_dim3_str(bw)}"
+        f"  wave_tile={_dim3_str(wt)}"
+    )
+
+    # Compute
+    wg = s.get("workgroup_size", "?")
+    acc = s.get("acc_dtype", "?")
+    kb = s.get("k_batch", 1)
+    print(f"  compute: wg_size={BOLD}{wg}{RESET}  acc={acc}  k_batch={kb}")
+
+    # Pipeline
+    pipe = s.get("pipeline", "?")
+    sched = s.get("pipeline_scheduler", "?")
+    part = s.get("tile_partitioner", "?")
+    store = s.get("store_strategy", "?")
+    print(f"  pipeline: {CYAN}{pipe}{RESET}/{sched}  partitioner={part}  store={store}")
+
+    # Epilogue
+    epi = s.get("epilogue_ops", [])
+    pad_m = s.get("pad_m", False)
+    pad_n = s.get("pad_n", False)
+    gs = s.get("group_size", 0)
+    extras = []
+    if epi:
+        extras.append(f"epilogue=[{','.join(epi)}]")
+    if pad_m or pad_n:
+        extras.append(f"pad={'M' if pad_m else ''}{'N' if pad_n else ''}")
+    if gs:
+        extras.append(f"group_size={gs}")
+    if extras:
+        print(f"  options: {' '.join(extras)}")
+
+
+def _print_eltwise_spec(s: dict) -> None:
+    tensors = s.get("physical_tensors", [])
+    if tensors:
+        parts = []
+        for t in tensors:
+            n = t.get("name", "?")
+            d = t.get("dtype", "?")
+            parts.append(f"{BOLD}{n}{RESET}({d})")
+        print(f"  tensors: {' '.join(parts)}")
+
+    bt = s.get("block_tile", "?")
+    wg = s.get("workgroup_size", "?")
+    bw = s.get("block_waves", "?")
+    wt = s.get("wave_tile", "?")
+    pad = s.get("pad", False)
+    print(f"  tile: block={bt}  waves={bw}  wave_tile={wt}  wg_size={wg}  pad={pad}")
+
+
+def cmd_blobs(kp: dict) -> None:
+    """Show blob layout."""
+    toc = kp["toc"]
+    blobs = toc.get("blobs", [])
+    kernels = toc.get("toc", {})
+
+    if not blobs:
+        print(f"{DIM}(no blobs){RESET}")
+        return
+
+    # Build reverse map: ordinal -> (variant, arch)
+    ordinal_map: dict[int, list[str]] = {}
+    for name, arch_entries in kernels.items():
+        for arch, meta in arch_entries.items():
+            ord_idx = meta.get("ordinal", -1)
+            ordinal_map.setdefault(ord_idx, []).append(f"{name}/{arch}")
+
+    print(f"  {BOLD}{'#':<5} {'Offset':<14} {'Size':<14} {'Kernel'}{RESET}")
+    print(f"  {'─' * 80}")
+
+    for i, blob in enumerate(blobs):
+        offset = blob.get("offset", 0)
+        size = blob.get("size", 0)
+        owners = ordinal_map.get(i, ["?"])
+        owner_str = ", ".join(owners)
+        print(
+            f"  {DIM}{i:<5}{RESET} 0x{offset:<12x} {_human_size(size):<14} {owner_str}"
+        )
+
+
+def cmd_toc(kp: dict) -> None:
+    """Dump raw TOC as JSON."""
+    print(json.dumps(kp["toc"], indent=2, default=str))
+
+
+def cmd_header(kp: dict) -> None:
+    """Show raw header bytes."""
+    with open(kp["path"], "rb") as f:
+        raw = f.read(HEADER_SIZE)
+
+    magic = raw[:4]
+    version = struct.unpack("<I", raw[4:8])[0]
+    toc_offset = struct.unpack("<Q", raw[8:16])[0]
+
+    print(f"  {BOLD}Offset  Hex{' ' * 36}Decoded{RESET}")
+    print(f"  {'─' * 60}")
+    print(
+        f"  0x00    {' '.join(f'{b:02x}' for b in raw[:4]):<40}{CYAN}{magic!r}{RESET}"
+    )
+    print(
+        f"  0x04    {' '.join(f'{b:02x}' for b in raw[4:8]):<40}"
+        f"version = {YELLOW}{version}{RESET}"
+    )
+    print(
+        f"  0x08    {' '.join(f'{b:02x}' for b in raw[8:16]):<40}"
+        f"toc_offset = {YELLOW}{toc_offset}{RESET} (0x{toc_offset:x})"
+    )
+
+
+def cmd_diff(path_a: str, path_b: str) -> None:
+    """Compare two kpack files."""
+    a = read_kpack(path_a)
+    b = read_kpack(path_b)
+
+    ta = a["toc"]
+    tb = b["toc"]
+
+    # Header comparison
+    print(f"  {BOLD}{'':>30} {'Left':<24} {'Right'}{RESET}")
+    print(f"  {'─' * 80}")
+
+    def _row(label, va, vb):
+        eq = va == vb
+        mark = f"{GREEN}={RESET}" if eq else f"{RED}!={RESET}"
+        print(f"  {label:>30} {str(va):<24} {mark} {vb}")
+
+    _row("File size", _human_size(a["file_size"]), _human_size(b["file_size"]))
+    _row("Version", a["version"], b["version"])
+    _row("TOC size", _human_size(a["toc_size"]), _human_size(b["toc_size"]))
+    _row("Compression", ta.get("compression_scheme"), tb.get("compression_scheme"))
+    _row("Architectures", ta.get("gfx_arches", []), tb.get("gfx_arches", []))
+    _row("Blob count", len(ta.get("blobs", [])), len(tb.get("blobs", [])))
+
+    ka = set(ta.get("toc", {}).keys())
+    kb = set(tb.get("toc", {}).keys())
+
+    only_a = ka - kb
+    only_b = kb - ka
+    common = ka & kb
+
+    print()
+    _row("Kernels (total)", len(ka), len(kb))
+    _row("Kernels (common)", len(common), len(common))
+
+    if only_a:
+        print(f"\n  {RED}Only in left:{RESET}")
+        for k in sorted(only_a):
+            print(f"    - {k}")
+    if only_b:
+        print(f"\n  {GREEN}Only in right:{RESET}")
+        for k in sorted(only_b):
+            print(f"    + {k}")
+
+    # Architecture differences for common kernels
+    arch_diffs = []
+    for k in sorted(common):
+        aa = set(ta["toc"][k].keys())
+        ab = set(tb["toc"][k].keys())
+        if aa != ab:
+            arch_diffs.append((k, aa, ab))
+
+    if arch_diffs:
+        print(f"\n  {YELLOW}Architecture differences:{RESET}")
+        for k, aa, ab in arch_diffs:
+            only_la = aa - ab
+            only_lb = ab - aa
+            parts = []
+            if only_la:
+                parts.append(f"{RED}-{','.join(sorted(only_la))}{RESET}")
+            if only_lb:
+                parts.append(f"{GREEN}+{','.join(sorted(only_lb))}{RESET}")
+            print(f"    {k}: {' '.join(parts)}")
+
+
+# -- main ---------------------------------------------------------------------
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        prog="kpack",
+        description="Inspect kpack kernel archives",
+    )
+    sub = p.add_subparsers(dest="command")
+
+    # info
+    s = sub.add_parser("info", help="Archive summary")
+    s.add_argument("file", help="Path to .kpack file")
+
+    # list
+    s = sub.add_parser("list", aliases=["ls"], help="List kernels")
+    s.add_argument("file", help="Path to .kpack file")
+
+    # spec
+    s = sub.add_parser("spec", help="Show variant specs")
+    s.add_argument("file", help="Path to .kpack file")
+    s.add_argument("name", nargs="?", help="Variant name (omit for all)")
+
+    # blobs
+    s = sub.add_parser("blobs", help="Show blob layout")
+    s.add_argument("file", help="Path to .kpack file")
+
+    # toc
+    s = sub.add_parser("toc", help="Dump raw TOC as JSON")
+    s.add_argument("file", help="Path to .kpack file")
+
+    # header
+    s = sub.add_parser("header", help="Show raw header bytes")
+    s.add_argument("file", help="Path to .kpack file")
+
+    # diff
+    s = sub.add_parser("diff", help="Compare two kpack files")
+    s.add_argument("file_a", help="First .kpack file")
+    s.add_argument("file_b", help="Second .kpack file")
+
+    args = p.parse_args()
+
+    if not args.command:
+        p.print_help()
+        sys.exit(0)
+
+    if args.command == "diff":
+        cmd_diff(args.file_a, args.file_b)
+        return
+
+    kp = read_kpack(args.file)
+
+    match args.command:
+        case "info":
+            cmd_info(kp)
+        case "list" | "ls":
+            cmd_list(kp)
+        case "spec":
+            cmd_spec(kp, args.name)
+        case "blobs":
+            cmd_blobs(kp)
+        case "toc":
+            cmd_toc(kp)
+        case "header":
+            cmd_header(kp)
+
+
+if __name__ == "__main__":
+    main()
