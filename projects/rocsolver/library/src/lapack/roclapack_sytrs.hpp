@@ -472,7 +472,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(SYTRS_MAX_THDS) sytrs_kernel(bool const 
         auto ipiv = [=](auto i) -> I& { return (ipiv_bid[(i - 1)]); };
 
         // simple heuristic
-        bool use_reduce_sync = (nrhs > warpSize);
+        bool use_reduce_sync = (nrhs >= warpSize);
 
         //   -------------------------------------------------------------------------------------
         //   Matrix-vector multiply to update a row of matrix B
@@ -1410,10 +1410,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
 
     I const lrhs = ceildiv(nrhs, nbx);
 
-    I const nthreads = (lrhs >= SYTRS_MAX_THDS) ? SYTRS_MAX_THDS
-        : (lrhs >= (SYTRS_MAX_THDS / 2))        ? (SYTRS_MAX_THDS / 2)
-        : (lrhs >= (SYTRS_MAX_THDS / 4))        ? (SYTRS_MAX_THDS / 4)
-                                                : warp_size;
+    I const nthreads = std::max(I(warp_size), std::min(lrhs, I(SYTRS_MAX_THDS)));
 
     size_t const lds_size_max = get_lds_size();
 
