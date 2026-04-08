@@ -101,6 +101,21 @@ namespace rocRoller::KernelGraph::ControlGraph
         Throw<FatalError>("Invalid NodeOrdering");
     }
 
+    inline NodeOrdering
+        bucketOrderForNode(EnumArray<std::unordered_set<int>, NodeOrdering> const& nodeOrderBuckets,
+                           int                                                     node)
+    {
+        if(nodeOrderBuckets[NodeOrdering::LeftFirst].contains(node))
+            return NodeOrdering::LeftFirst;
+        if(nodeOrderBuckets[NodeOrdering::LeftInBodyOfRight].contains(node))
+            return NodeOrdering::LeftInBodyOfRight;
+        if(nodeOrderBuckets[NodeOrdering::RightInBodyOfLeft].contains(node))
+            return NodeOrdering::RightInBodyOfLeft;
+        if(nodeOrderBuckets[NodeOrdering::RightFirst].contains(node))
+            return NodeOrdering::RightFirst;
+        return NodeOrdering::Undefined;
+    }
+
     inline void ControlGraph::checkOrderCache() const
     {
         if(m_orderCache.empty())
@@ -112,32 +127,27 @@ namespace rocRoller::KernelGraph::ControlGraph
         if(nodeA > nodeB)
             return opposite(lookupOrder(CacheOnly, nodeB, nodeA));
 
-        if(not m_orderCache.contains(nodeA))
-            return NodeOrdering::Undefined;
+        if(auto iter = m_orderCache.find(nodeA); iter != m_orderCache.end())
+            return bucketOrderForNode(iter->second, nodeB);
 
-        auto const& nodeOrderPairs = m_orderCache.at(nodeA);
-        return nodeOrderPairs.contains(nodeB) ? nodeOrderPairs.at(nodeB) : NodeOrdering::Undefined;
+        return NodeOrdering::Undefined;
     }
 
     inline Generator<int> ControlGraph::nodesAfter(int node) const
     {
         populateOrderCache();
 
-        if(m_orderCache.contains(node))
+        if(auto iter = m_orderCache.find(node); iter != m_orderCache.end())
         {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::LeftFirst)
-                    co_yield otherNode;
-            }
+            for(int otherNode : iter->second[NodeOrdering::LeftFirst])
+                co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
         {
             if(otherNode >= node)
                 continue;
-
-            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::RightFirst)
+            if(nodeOrderBuckets[NodeOrdering::RightFirst].contains(node))
                 co_yield otherNode;
         }
     }
@@ -146,21 +156,17 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         populateOrderCache();
 
-        if(m_orderCache.contains(node))
+        if(auto iter = m_orderCache.find(node); iter != m_orderCache.end())
         {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::RightFirst)
-                    co_yield otherNode;
-            }
+            for(int otherNode : iter->second[NodeOrdering::RightFirst])
+                co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
         {
             if(otherNode >= node)
                 continue;
-
-            if(nodeOrderPairs.contains(node) && nodeOrderPairs.at(node) == NodeOrdering::LeftFirst)
+            if(nodeOrderBuckets[NodeOrdering::LeftFirst].contains(node))
                 co_yield otherNode;
         }
     }
@@ -169,22 +175,17 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         populateOrderCache();
 
-        if(m_orderCache.contains(node))
+        if(auto iter = m_orderCache.find(node); iter != m_orderCache.end())
         {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::RightInBodyOfLeft)
-                    co_yield otherNode;
-            }
+            for(int otherNode : iter->second[NodeOrdering::RightInBodyOfLeft])
+                co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
         {
             if(otherNode >= node)
                 continue;
-
-            if(nodeOrderPairs.contains(node)
-               && nodeOrderPairs.at(node) == NodeOrdering::LeftInBodyOfRight)
+            if(nodeOrderBuckets[NodeOrdering::LeftInBodyOfRight].contains(node))
                 co_yield otherNode;
         }
     }
@@ -193,22 +194,17 @@ namespace rocRoller::KernelGraph::ControlGraph
     {
         populateOrderCache();
 
-        if(m_orderCache.contains(node))
+        if(auto iter = m_orderCache.find(node); iter != m_orderCache.end())
         {
-            for(auto const& [otherNode, order] : m_orderCache.at(node))
-            {
-                if(order == NodeOrdering::LeftInBodyOfRight)
-                    co_yield otherNode;
-            }
+            for(int otherNode : iter->second[NodeOrdering::LeftInBodyOfRight])
+                co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderPairs] : m_orderCache)
+        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
         {
             if(otherNode >= node)
                 continue;
-
-            if(nodeOrderPairs.contains(node)
-               && nodeOrderPairs.at(node) == NodeOrdering::RightInBodyOfLeft)
+            if(nodeOrderBuckets[NodeOrdering::RightInBodyOfLeft].contains(node))
                 co_yield otherNode;
         }
     }

@@ -10,7 +10,7 @@
 
 namespace rocRoller::KernelGraph::ControlGraph
 {
-    std::unordered_map<int, std::unordered_map<int, NodeOrdering>> const&
+    std::unordered_map<int, EnumArray<std::unordered_set<int>, NodeOrdering>> const&
         ControlGraph::nodeOrderTable() const
     {
         populateOrderCache();
@@ -76,12 +76,18 @@ namespace rocRoller::KernelGraph::ControlGraph
 
         std::set<int> nodes;
 
-        for(auto const& [node, nodeOrderPairs] : m_orderCache)
+        for(auto const& [node, nodeOrderBuckets] : m_orderCache)
         {
-            for(auto const pair : nodeOrderPairs)
+            for(auto order : {NodeOrdering::LeftFirst,
+                              NodeOrdering::LeftInBodyOfRight,
+                              NodeOrdering::RightInBodyOfLeft,
+                              NodeOrdering::RightFirst})
             {
-                nodes.insert(node);
-                nodes.insert(pair.first);
+                for(int otherNode : nodeOrderBuckets[order])
+                {
+                    nodes.insert(node);
+                    nodes.insert(otherNode);
+                }
             }
         }
 
@@ -255,21 +261,28 @@ namespace rocRoller::KernelGraph::ControlGraph
         }
         else
         {
+            AssertFatal(order != NodeOrdering::Undefined && order != NodeOrdering::Count,
+                        "Cannot cache an undefined ordering",
+                        ShowValue(nodeA),
+                        ShowValue(nodeB),
+                        ShowValue(order));
+
             auto [iter, _ignore] = m_orderCache.try_emplace(nodeA);
 
-            if(iter->second.contains(nodeB))
-            {
-                AssertFatal(iter->second.at(nodeB) == order,
-                            "Different kinds of orderings!",
-                            ShowValue(nodeA),
-                            ShowValue(nodeB),
-                            ShowValue(iter->second.at(nodeB)),
-                            ShowValue(order));
-            }
-            else
-            {
-                iter->second.emplace(nodeB, order);
-            }
+            // Skip existing check to compare performance
+            //auto existingOrder = bucketOrderForNode(iter->second, nodeB);
+            //if(existingOrder != NodeOrdering::Undefined)
+            //{
+            //    AssertFatal(existingOrder == order,
+            //            "Different kinds of orderings!",
+            //            ShowValue(nodeA),
+            //            ShowValue(nodeB),
+            //            ShowValue(existingOrder),
+            //            ShowValue(order));
+            //    return;
+            //}
+
+            iter->second[order].insert(nodeB);
         }
     }
 

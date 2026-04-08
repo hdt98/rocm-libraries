@@ -4,6 +4,9 @@
 #pragma once
 
 #include <functional>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <variant>
 
 #include <rocRoller/KernelGraph/ControlGraph/ControlGraph_fwd.hpp>
@@ -15,6 +18,7 @@
 #include <rocRoller/KernelGraph/ControlGraph/Operation.hpp>
 #include <rocRoller/KernelGraph/Policy.hpp>
 #include <rocRoller/Utilities/Comparison.hpp>
+#include <rocRoller/Utilities/EnumArray.hpp>
 
 namespace rocRoller
 {
@@ -172,7 +176,7 @@ namespace rocRoller
              * Also, if a reference to the returned value is maintained through any changes
              * to the graph, the returned map will be cleared.
              */
-            std::unordered_map<int, std::unordered_map<int, NodeOrdering>> const&
+            std::unordered_map<int, EnumArray<std::unordered_set<int>, NodeOrdering>> const&
                 nodeOrderTable() const;
 
             template <typename T>
@@ -262,7 +266,9 @@ namespace rocRoller
                                  BRange const& nodesB,
                                  NodeOrdering  order) const;
 
-            mutable std::unordered_map<int, std::unordered_map<int, NodeOrdering>> m_orderCache;
+            mutable std::unordered_map<int, EnumArray<std::unordered_set<int>, NodeOrdering>>
+                m_orderCache;
+
             /**
              * If an entry is present, the value will be the IDs of every descendent from the key,
              * following every kind of edge.
