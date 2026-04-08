@@ -60,18 +60,6 @@ namespace rocRoller
                 return {result};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
-            {
-                AssertFatal(e.forward.size() == dsts.size(),
-                            "ExpressionTransform forward size mismatch",
-                            ShowValue(e.forward.size()),
-                            ShowValue(dsts.size()));
-                std::vector<Expression::ExpressionPtr> rv;
-                rv.reserve(e.forward.size());
-                for(size_t i = 0; i < e.forward.size(); ++i)
-                    rv.push_back(positionalArgumentPropagation(e.forward[i], indexes));
-                return rv;
-            }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
@@ -211,20 +199,6 @@ namespace rocRoller
                 return {result};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
-            {
-                AssertFatal(e.reverse.size() == srcs.size(),
-                            "ExpressionTransform reverse size mismatch",
-                            ShowValue(e.reverse.size()),
-                            ShowValue(srcs.size()));
-                std::vector<Expression::ExpressionPtr> rv;
-                rv.reserve(e.reverse.size());
-                for(auto const& expr : e.reverse)
-                {
-                    rv.push_back(positionalArgumentPropagation(expr, indexes));
-                }
-                return rv;
-            }
 
             std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleGR const& e)
             {
@@ -402,12 +376,6 @@ namespace rocRoller
                 return {index};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
-            {
-                Throw<FatalError>(
-                    "Forward diff traversal through ExpressionTransform is currently unused");
-                return {};
-            }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
@@ -552,27 +520,6 @@ namespace rocRoller
                 return {index};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(ExpressionTransform const& e)
-            {
-                // Passing the delta through unchanged is safe only because
-                // per-K-unroll chain separation (AssignIndexExpressions) bakes
-                // the unroll value into the base address, so the stride path
-                // never traverses this edge with a varying coordinate. If a
-                // future change routes a stride through here, the non-affine
-                // transform would produce incorrect results.
-                AssertFatal(e.reverse.size() == srcs.size(),
-                            "ExpressionTransform reverse size mismatch",
-                            ShowValue(e.reverse.size()),
-                            ShowValue(srcs.size()));
-                auto delta = getDelta(dstTags[0]);
-                for(size_t i = 0; i < srcs.size(); ++i)
-                    deltas.emplace(srcTags[i], delta);
-                std::vector<Expression::ExpressionPtr> rv;
-                rv.reserve(e.reverse.size());
-                for(size_t i = 0; i < e.reverse.size(); ++i)
-                    rv.push_back(positionalArgumentPropagation(e.reverse[i], indexes));
-                return rv;
-            }
 
             std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleGR const& e)
             {

@@ -261,45 +261,6 @@ namespace rocRoller
          */
         RR_EMPTY_STRUCT_WITH_NAME(PassThrough);
 
-        /**
-         * Arbitrary expression-based coordinate transform.
-         *
-         * Maps N input dimensions to M output dimensions via explicit
-         * ExpressionPtr trees.  PositionalArgument slots ($0, $1, ...)
-         * in the expressions are substituted with the actual input index
-         * expressions at transform time via positionalArgumentPropagation.
-         *
-         * forward[i]($0, $1, ...) computes output dimension i from the inputs.
-         * reverse[i]($0, $1, ...) computes input dimension i from the outputs.
-         *
-         * Diff visitors throw -- this edge is not used in stride-differentiable paths.
-         */
-        struct ExpressionTransform
-        {
-            using ExpressionPtr = Expression::ExpressionPtr;
-
-            std::vector<ExpressionPtr> forward;
-            std::vector<ExpressionPtr> reverse;
-
-            ExpressionTransform() = default;
-
-            ExpressionTransform(std::vector<ExpressionPtr> forward,
-                                std::vector<ExpressionPtr> reverse)
-                : forward(std::move(forward))
-                , reverse(std::move(reverse))
-            {
-            }
-
-            std::string toString() const
-            {
-                return name();
-            }
-
-            std::string name() const
-            {
-                return "ExpressionTransform";
-            }
-        };
 
         /**
          * LDS bank swizzle for Global Read (write) side.
