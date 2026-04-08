@@ -54,7 +54,10 @@ auto create_args(int argc, char* argv[])
                 "permute input\n"
                 "if true, will be b*h*s*d, else b*s*h*d")
         .insert("operm", "1", "permute output")
-        .insert("prec", "fp8bf16", "data type. fp8bf16/i8fp8bf16/i4fp8bf16")
+        .insert("prec",
+                "fp8bf16",
+                "Primary: fp8bf16, i8fp8bf16, i4fp8bf16. Also bf16 (keep): pipeline validation "
+                "with qscale=n (no quant); not the quantized Sage product path.")
         .insert("mask",
                 "0",
                 "0: no mask, 1: top-left(same as 't'), 2:bottom-right(same as 'b')\n"
@@ -167,11 +170,7 @@ int main(int argc, char* argv[])
             return -1;
 
         const std::string data_type = arg_parser.get_str("prec");
-        if(data_type == "fp16")
-        {
-            return run<SageAttentionFwdFp16>(arg_parser) == fwd_result::success ? 0 : -2;
-        }
-        else if(data_type == "bf16")
+        if(data_type == "bf16")
         {
             return run<SageAttentionFwdBf16>(arg_parser) == fwd_result::success ? 0 : -2;
         }

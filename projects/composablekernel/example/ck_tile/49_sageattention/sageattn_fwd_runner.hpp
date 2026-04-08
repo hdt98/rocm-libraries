@@ -38,14 +38,6 @@ auto get_elimit(std::string /*init_method*/)
 }
 
 template <>
-auto get_elimit<SageAttentionFwdFp32>(std::string /*init_method*/)
-{
-    double rtol = 1e-5;
-    double atol = 1e-5;
-    return ck_tile::make_tuple(rtol, atol);
-}
-
-template <>
 auto get_elimit<SageAttentionFwdBf16>(std::string /*init_method*/)
 {
     double rtol = 1e-2;
@@ -114,11 +106,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                             std::optional<std::string> json = std::nullopt)
 {
     const std::string data_type = []() {
-        if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp32>)
-            return "fp32";
-        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp16>)
-            return "fp16";
-        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdBf16>)
+        if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdBf16>)
             return "bf16";
         else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp8>)
             return "fp8";
@@ -147,12 +135,6 @@ fwd_result sageattn_fwd_run(mode_enum mode,
 
     if(hdim_v < 0)
         hdim_v = hdim_q;
-
-    if constexpr(!(std::is_same_v<DataTypeConfig, SageAttentionFwdFp16> ||
-                   std::is_same_v<DataTypeConfig, SageAttentionFwdBf16>))
-    {
-        // Currently no restrictions for fp16/bf16
-    }
 
     // Check padding usage
     const bool has_group_q_padding =
@@ -214,6 +196,11 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     const ck_tile::index_t block_scale_size_k_ = (qscale.type == quant_scale_enum::perthread) ? 16
                                                  : (qscale.type == quant_scale_enum::perwarp) ? 64
                                                                                               : 128;
+
+    // blockscale, perwarp, or perthread
+    const bool qscale_uses_bwp =
+        qscale.type == quant_scale_enum::blockscale ||
+        qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::perthread;
 
     const auto seqstart_q_host              = to_seqstarts(seqlen_qs);
     const auto seqstart_k_host              = to_seqstarts(seqlen_ks);
@@ -394,19 +381,16 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                       : get_lengths(i_perm, shape_batch, nhead_k, hdim_v, shape_seqlen_k));
 
     ck_tile::HostTensor<float> q_descale_host(
-        (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp ||
-         qscale.type == quant_scale_enum::perthread)
+        qscale_uses_bwp
             ? std::array<ck_tile::index_t, 3>{shape_batch, nhead, num_block_scale_q}
             : std::array<ck_tile::index_t, 3>{1, 1, 1});
     ck_tile::HostTensor<float> k_descale_host(
-        (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp ||
-         qscale.type == quant_scale_enum::perthread)
+        qscale_uses_bwp
             ? std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_k}
             : std::array<ck_tile::index_t, 3>{1, 1, 1});
     // BLOCKSCALE, PERWARP, and PERTHREAD V all use per-channel scale (col-major layout)
     ck_tile::HostTensor<float> v_descale_host(
-        (qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::blockscale ||
-         qscale.type == quant_scale_enum::perthread)
+        qscale_uses_bwp
             ? std::array<ck_tile::index_t, 3>{batch, nhead_k, hdim_v}
             : std::array<ck_tile::index_t, 3>{1, 1, 1});
 
@@ -472,8 +456,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
         k_descale_host(0) = qkv_max / k_dtype_max;
         v_descale_host(0) = qkv_max / v_dtype_max;
     }
-    else if(qscale.type == quant_scale_enum::blockscale ||
-            qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::perthread)
+    else if(qscale_uses_bwp)
     {
         float q_dtype_max = get_dtype_max.template operator()<QDataType>();
         float k_dtype_max = get_dtype_max.template operator()<KDataType>();
@@ -520,16 +503,18 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                                                        : cuq_cum.size() * sizeof(ck_tile::index_t));
     ck_tile::DeviceMem cu_seqlen_kv_buf(
         cukv_cum.empty() ? 0 : cukv_cum.size() * sizeof(ck_tile::index_t));
-    ck_tile::DeviceMem block_scale_seqstart_q_buf(
-        (mode == mode_enum::group &&
-         (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp))
-            ? block_scale_seqstart_q_host.size() * sizeof(int32_t)
-            : 0);
-    ck_tile::DeviceMem block_scale_seqstart_k_buf(
-        (mode == mode_enum::group &&
-         (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp))
-            ? block_scale_seqstart_k_host.size() * sizeof(int32_t)
-            : 0);
+    // Must match args.block_scale_seqstart_* (group + bs/pw/pth only). bf16 validation (qscale=n)
+    // never binds these pointers; allocating only when the kernel uses them avoids empty uploads.
+    const bool need_block_scale_seqstart_buf =
+        mode == mode_enum::group && qscale_uses_bwp;
+    ck_tile::DeviceMem block_scale_seqstart_q_buf(need_block_scale_seqstart_buf
+                                                      ? block_scale_seqstart_q_host.size() *
+                                                            sizeof(int32_t)
+                                                      : 0);
+    ck_tile::DeviceMem block_scale_seqstart_k_buf(need_block_scale_seqstart_buf
+                                                      ? block_scale_seqstart_k_host.size() *
+                                                            sizeof(int32_t)
+                                                      : 0);
 
     if constexpr(need_q_i4_permute)
     {
@@ -566,16 +551,12 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     cu_seqlen_kv_buf.ToDevice(cukv_cum.empty() ? nullptr : cukv_cum.data());
     seqlen_q_buf.ToDevice(has_group_q_padding ? seqlen_qs.data() : nullptr);
     seqlen_k_buf.ToDevice(has_group_k_padding ? seqlen_ks.data() : nullptr);
-    block_scale_seqstart_q_buf.ToDevice(
-        (mode == mode_enum::group &&
-         (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp))
-            ? block_scale_seqstart_q_host.data()
-            : nullptr);
-    block_scale_seqstart_k_buf.ToDevice(
-        (mode == mode_enum::group &&
-         (qscale.type == quant_scale_enum::blockscale || qscale.type == quant_scale_enum::perwarp))
-            ? block_scale_seqstart_k_host.data()
-            : nullptr);
+    block_scale_seqstart_q_buf.ToDevice(need_block_scale_seqstart_buf
+                                            ? block_scale_seqstart_q_host.data()
+                                            : nullptr);
+    block_scale_seqstart_k_buf.ToDevice(need_block_scale_seqstart_buf
+                                            ? block_scale_seqstart_k_host.data()
+                                            : nullptr);
 
     // clang-format off
     auto layout_str = [&](bool permute){
@@ -729,8 +710,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
         args.v_descale_ptr = v_descale_buf.GetDeviceBuffer();
 
         // BLOCKSCALE/PERWARP/PERTHREAD parameters
-        if(qscale.type == quant_scale_enum::blockscale ||
-           qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::perthread)
+        if(qscale_uses_bwp)
         {
             args.nhead_stride_q_descale = num_block_scale_q;
             args.nhead_stride_k_descale = num_block_scale_k;
@@ -752,13 +732,8 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                 // BLOCKSCALE, PERWARP, and PERTHREAD all use block_scale_seqstart in group mode
                 // They differ only in block size: BLOCKSCALE (Q:128, K:64), PERWARP (Q:32, K:64),
                 // PERTHREAD (Q:4, K:16)
-                if(qscale.type == quant_scale_enum::blockscale ||
-                   qscale.type == quant_scale_enum::perwarp ||
-                   qscale.type == quant_scale_enum::perthread)
-                {
-                    args.block_scale_seqstart_q_ptr = block_scale_seqstart_q_buf.GetDeviceBuffer();
-                    args.block_scale_seqstart_k_ptr = block_scale_seqstart_k_buf.GetDeviceBuffer();
-                }
+                args.block_scale_seqstart_q_ptr = block_scale_seqstart_q_buf.GetDeviceBuffer();
+                args.block_scale_seqstart_k_ptr = block_scale_seqstart_k_buf.GetDeviceBuffer();
                 // BLOCKSCALE, PERWARP, and PERTHREAD V all use per-channel scale: batch_stride =
                 // nhead_k * hdim_v
                 args.batch_stride_v_descale = nhead_k * hdim_v;
@@ -968,9 +943,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                 return unpacked;
             };
 
-            if(qscale.type == quant_scale_enum::blockscale ||
-               qscale.type == quant_scale_enum::perwarp ||
-               qscale.type == quant_scale_enum::perthread)
+            if(qscale_uses_bwp)
             {
                 const ck_tile::index_t q_offset =
                     (mode == mode_enum::batch) ? 0 : block_scale_seqstart_q_host[wb];
@@ -1098,9 +1071,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             ck_tile::reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
                 s_host_ref, p_host_ref, p_compute_element_func);
 
-            if(qscale.type == quant_scale_enum::blockscale ||
-               qscale.type == quant_scale_enum::perwarp ||
-               qscale.type == quant_scale_enum::perthread)
+            if(qscale_uses_bwp)
             {
                 // BLOCKSCALE, PERWARP, and PERTHREAD V all use per-channel scale (col-major)
                 // v_descale shape: [batch, nhead_k, hdim_v]

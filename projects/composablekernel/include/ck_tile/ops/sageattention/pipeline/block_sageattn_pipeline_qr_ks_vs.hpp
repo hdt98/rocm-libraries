@@ -471,9 +471,9 @@ struct BlockSageAttentionPipelineQRKSVS
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_reg[i];
-                int count                  = 0;
                 constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
+                    int count = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         s_acc(i_j_idx) *= combined_scales_reg[count >> 4];
@@ -487,9 +487,9 @@ struct BlockSageAttentionPipelineQRKSVS
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPW; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_perwarp[i];
-                int count                  = 0;
                 constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
+                    int count = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         s_acc(i_j_idx) *= combined_scales_reg[count >> 5];

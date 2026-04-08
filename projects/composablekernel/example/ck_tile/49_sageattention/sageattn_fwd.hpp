@@ -56,6 +56,8 @@ struct SageAttentionFwdI4Fp8Bf16
 template <typename DataType>
 struct SageAttentionFwdTypeConfig;
 
+// fp16/bf16 are not Sage product dtypes; bf16 is intentionally kept in tile_example_sageattn_fwd
+// for pipeline validation with qscale=n (no quant).
 template <>
 struct SageAttentionFwdTypeConfig<SageAttentionFwdFp16>
 {
