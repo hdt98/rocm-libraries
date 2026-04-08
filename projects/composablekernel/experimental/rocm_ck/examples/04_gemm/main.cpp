@@ -14,7 +14,6 @@
 //   - Per-type tolerance for correctness verification
 
 #include "cpu_ref.hpp"
-#include "gemm_variants.hpp"
 
 #include <rocm_ck/args.hpp>
 #include <rocm_ck/datatype_convert.hpp>
@@ -22,6 +21,7 @@
 #include <rocm_ck/gpu_arch.hpp>
 #include <rocm_ck/hip_check.hpp>
 #include <rocm_ck/kpack_module.hpp>
+#include <rocm_ck/kpack_spec_reader.hpp>
 #include <rocm_ck/typed_buffer.hpp>
 #include <rocm_ck/verify.hpp>
 
@@ -40,13 +40,15 @@
 // ============================================================================
 
 /// Run a block-quantized (INT4) GEMM variant: generate data, pack INT4, launch, verify.
-bool runBQuantVariant(
-    const rocm_ck::GemmVariant& variant, rocm_ck::KpackArchive& archive, int M, int N, int K)
+bool runBQuantVariant(const char* name,
+                      const rocm_ck::GemmSpec& spec,
+                      rocm_ck::KpackArchive& archive,
+                      int M,
+                      int N,
+                      int K)
 {
-    const rocm_ck::GemmSpec& spec = variant.spec;
-
     rocm_ck::KpackKernel kernel;
-    if(!kernel.load(archive, variant.name))
+    if(!kernel.load(archive, name))
         return true; // skip, not a failure
 
     // BQuant uses small values exact in FP8 E4M3 and INT4
@@ -115,7 +117,7 @@ bool runBQuantVariant(
     int grid_size = grid_m * grid_n;
 
     std::printf("%s: M=%d, N=%d, K=%d, grid=%dx1x%d, block=%d\n",
-                variant.name,
+                name,
                 M,
                 N,
                 K,
@@ -163,7 +165,7 @@ bool runBQuantVariant(
     buf_c.download(result.data());
 
     auto vr     = rocm_ck::verify(result.data(), ref_c.data(), M * N, spec.output().dtype);
-    bool passed = rocm_ck::reportVerify(variant.name, vr);
+    bool passed = rocm_ck::reportVerify(name, vr);
 
     HIP_CHECK(hipFree(dev_b));
     return passed;
@@ -175,7 +177,8 @@ bool runBQuantVariant(
 
 /// Run a standard (non-quantized) GEMM variant: allocate, launch, verify.
 /// Handles padded, batched, and epilogue-fused variants internally.
-bool runStandardVariant(const rocm_ck::GemmVariant& variant,
+bool runStandardVariant(const char* name,
+                        const rocm_ck::GemmSpec& spec,
                         rocm_ck::KpackArchive& archive,
                         const float* ref_a,
                         const float* ref_b,
@@ -186,10 +189,8 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
                         int K,
                         int batch_count_for_batched)
 {
-    const rocm_ck::GemmSpec& spec = variant.spec;
-
     // Batched variant uses batch dimension
-    bool is_batched = (std::strcmp(variant.name, "gemm_fp16_batched") == 0);
+    bool is_batched = (std::strcmp(name, "gemm_fp16_batched") == 0);
     int batch_count = is_batched ? batch_count_for_batched : 0;
 
     // Padded variant uses non-aligned M/N (K stays tile-aligned)
@@ -207,7 +208,7 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
 
     // Load kernel
     rocm_ck::KpackKernel kernel;
-    if(!kernel.load(archive, variant.name))
+    if(!kernel.load(archive, name))
         return true; // skip, not a failure
 
     // --- Layout-aware strides from physical tensor table ---
@@ -318,7 +319,7 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
     }
 
     std::printf("%s: M=%d, N=%d, K=%d, grid=%dx%dx%d, block=%d%s\n",
-                variant.name,
+                name,
                 cur_M,
                 cur_N,
                 cur_K,
@@ -389,7 +390,7 @@ bool runStandardVariant(const rocm_ck::GemmVariant& variant,
     buf_c.download(result.data());
 
     auto vr = rocm_ck::verify(result.data(), ref, cur_M * cur_N, spec.output().dtype);
-    return rocm_ck::reportVerify(variant.name, vr);
+    return rocm_ck::reportVerify(name, vr);
 }
 
 // ============================================================================
@@ -432,9 +433,13 @@ int main(int argc, char** argv)
     for(int i = 0; i < M * N; ++i)
         ref_d1[i] = static_cast<float>(i % 3);
 
-    // --- Run each variant ---
-    bool all_passed  = true;
-    int variants_run = 0;
+    // --- Discover variants from the kpack archive's TOC ---
+    auto variants = rocm_ck::readVariantSpecs(argv[1]);
+    if(variants.empty())
+    {
+        std::fprintf(stderr, "No variant specs found in kpack TOC\n");
+        return 1;
+    }
 
     // Detect GPU target for variant filtering
     auto detected_target = rocm_ck::detectGpuTarget();
@@ -443,21 +448,25 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "Unsupported GPU\n");
         return 1;
     }
-    // Batch count for the batched variant
+
+    // --- Run each variant ---
+    bool all_passed          = true;
+    int variants_run         = 0;
     constexpr int BatchCount = 4;
 
-    for(const rocm_ck::GemmVariant& variant : rocm_ck::gemm_variants)
+    for(const rocm_ck::VariantInfo& vi : variants)
     {
-        const rocm_ck::GemmSpec& spec = variant.spec;
+        const char* name              = vi.name.c_str();
+        const rocm_ck::GemmSpec& spec = vi.gemm_spec;
 
         // Skip variants that don't target this GPU
-        if(!variant.targets.contains(*detected_target))
+        if(!vi.targets.contains(*detected_target))
             continue;
 
         // BQuant: separate data preparation path (INT4 packing + scale tensor)
         if(spec.group_size > 0)
         {
-            if(!runBQuantVariant(variant, archive, M, N, K))
+            if(!runBQuantVariant(name, spec, archive, M, N, K))
                 all_passed = false;
             ++variants_run;
             continue;
@@ -466,11 +475,12 @@ int main(int argc, char** argv)
         // Skip preshuffle — requires host-side B matrix rearrangement (not yet wired)
         if(spec.pipeline == rocm_ck::Pipeline::Preshuffle)
         {
-            std::printf("%s: SKIPPED (requires host-side preshuffle)\n", variant.name);
+            std::printf("%s: SKIPPED (requires host-side preshuffle)\n", name);
             continue;
         }
 
-        if(!runStandardVariant(variant,
+        if(!runStandardVariant(name,
+                               spec,
                                archive,
                                ref_a.data(),
                                ref_b.data(),
