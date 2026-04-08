@@ -1792,6 +1792,165 @@ module hipsolver
         end function hipsolverZZgesv
     end interface
     
+    ! ******************** GEEV ********************
+    interface
+        function hipsolverSgeev_bufferSize(handle, jobvl, jobvr, n, lwork) &
+                bind(c, name = 'hipsolverSgeev_bufferSize')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverSgeev_bufferSize
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: lwork
+        end function hipsolverSgeev_bufferSize
+    end interface
+
+    interface
+        function hipsolverDgeev_bufferSize(handle, jobvl, jobvr, n, lwork) &
+                bind(c, name = 'hipsolverDgeev_bufferSize')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverDgeev_bufferSize
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: lwork
+        end function hipsolverDgeev_bufferSize
+    end interface
+
+    interface
+        function hipsolverCgeev_bufferSize(handle, jobvl, jobvr, n, lwork) &
+                bind(c, name = 'hipsolverCgeev_bufferSize')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverCgeev_bufferSize
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: lwork
+        end function hipsolverCgeev_bufferSize
+    end interface
+
+    interface
+        function hipsolverZgeev_bufferSize(handle, jobvl, jobvr, n, lwork) &
+                bind(c, name = 'hipsolverZgeev_bufferSize')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverZgeev_bufferSize
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: lwork
+        end function hipsolverZgeev_bufferSize
+    end interface
+
+    interface
+        function hipsolverSgeev(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, info) &
+                bind(c, name = 'hipsolverSgeev')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverSgeev
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: A
+            integer(c_int), value :: lda
+            type(c_ptr), value :: WR
+            type(c_ptr), value :: WI
+            type(c_ptr), value :: VL
+            integer(c_int), value :: ldvl
+            type(c_ptr), value :: VR
+            integer(c_int), value :: ldvr
+            type(c_ptr), value :: work
+            integer(c_int), value :: lwork
+            type(c_ptr), value :: info
+        end function hipsolverSgeev
+    end interface
+
+    interface
+        function hipsolverDgeev(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, info) &
+                bind(c, name = 'hipsolverDgeev')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverDgeev
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: A
+            integer(c_int), value :: lda
+            type(c_ptr), value :: WR
+            type(c_ptr), value :: WI
+            type(c_ptr), value :: VL
+            integer(c_int), value :: ldvl
+            type(c_ptr), value :: VR
+            integer(c_int), value :: ldvr
+            type(c_ptr), value :: work
+            integer(c_int), value :: lwork
+            type(c_ptr), value :: info
+        end function hipsolverDgeev
+    end interface
+
+    interface
+        function hipsolverCgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, info) &
+                bind(c, name = 'hipsolverCgeev')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverCgeev
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: A
+            integer(c_int), value :: lda
+            type(c_ptr), value :: W
+            type(c_ptr), value :: VL
+            integer(c_int), value :: ldvl
+            type(c_ptr), value :: VR
+            integer(c_int), value :: ldvr
+            type(c_ptr), value :: work
+            integer(c_int), value :: lwork
+            type(c_ptr), value :: info
+        end function hipsolverCgeev
+    end interface
+
+    interface
+        function hipsolverZgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, info) &
+                bind(c, name = 'hipsolverZgeev')
+            use iso_c_binding
+            use hipsolver_enums
+            implicit none
+            integer(kind(HIPSOLVER_STATUS_SUCCESS)) :: hipsolverZgeev
+            type(c_ptr), value :: handle
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvl
+            integer(kind(HIPSOLVER_EIG_MODE_NOVECTOR)), value :: jobvr
+            integer(c_int), value :: n
+            type(c_ptr), value :: A
+            integer(c_int), value :: lda
+            type(c_ptr), value :: W
+            type(c_ptr), value :: VL
+            integer(c_int), value :: ldvl
+            type(c_ptr), value :: VR
+            integer(c_int), value :: ldvr
+            type(c_ptr), value :: work
+            integer(c_int), value :: lwork
+            type(c_ptr), value :: info
+        end function hipsolverZgeev
+    end interface
+
     ! ******************** GESVD ********************
     interface
         function hipsolverSgesvd_bufferSize(handle, jobu, jobv, m, n, lwork) &

@@ -3317,6 +3317,203 @@ inline hipsolverStatus_t hipsolver_gesv(testAPI_t               API,
 }
 /********************************************************/
 
+/******************** GEEV ********************/
+// normal and strided_batched
+inline hipsolverStatus_t hipsolver_geev_bufferSize(testAPI_t          API,
+                                                   hipsolverHandle_t  handle,
+                                                   hipsolverEigMode_t jobvl,
+                                                   hipsolverEigMode_t jobvr,
+                                                   int                n,
+                                                   float*             A,
+                                                   int                lda,
+                                                   int*               lwork)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverSgeev_bufferSize(handle, jobvl, jobvr, n, lwork);
+    case API_FORTRAN:
+        return hipsolverSgeev_bufferSizeFortran(handle, jobvl, jobvr, n, lwork);
+    default:
+        *lwork = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev_bufferSize(testAPI_t          API,
+                                                   hipsolverHandle_t  handle,
+                                                   hipsolverEigMode_t jobvl,
+                                                   hipsolverEigMode_t jobvr,
+                                                   int                n,
+                                                   double*            A,
+                                                   int                lda,
+                                                   int*               lwork)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverDgeev_bufferSize(handle, jobvl, jobvr, n, lwork);
+    case API_FORTRAN:
+        return hipsolverDgeev_bufferSizeFortran(handle, jobvl, jobvr, n, lwork);
+    default:
+        *lwork = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev_bufferSize(testAPI_t          API,
+                                                   hipsolverHandle_t  handle,
+                                                   hipsolverEigMode_t jobvl,
+                                                   hipsolverEigMode_t jobvr,
+                                                   int                n,
+                                                   hipFloatComplex*   A,
+                                                   int                lda,
+                                                   int*               lwork)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverCgeev_bufferSize(handle, jobvl, jobvr, n, lwork);
+    case API_FORTRAN:
+        return hipsolverCgeev_bufferSizeFortran(handle, jobvl, jobvr, n, lwork);
+    default:
+        *lwork = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev_bufferSize(testAPI_t          API,
+                                                   hipsolverHandle_t  handle,
+                                                   hipsolverEigMode_t jobvl,
+                                                   hipsolverEigMode_t jobvr,
+                                                   int                n,
+                                                   hipDoubleComplex*  A,
+                                                   int                lda,
+                                                   int*               lwork)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverZgeev_bufferSize(handle, jobvl, jobvr, n, lwork);
+    case API_FORTRAN:
+        return hipsolverZgeev_bufferSizeFortran(handle, jobvl, jobvr, n, lwork);
+    default:
+        *lwork = 0;
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev(testAPI_t          API,
+                                        hipsolverHandle_t  handle,
+                                        hipsolverEigMode_t jobvl,
+                                        hipsolverEigMode_t jobvr,
+                                        int                n,
+                                        float*             A,
+                                        int                lda,
+                                        float*             WR,
+                                        float*             WI,
+                                        float*             VL,
+                                        int                ldvl,
+                                        float*             VR,
+                                        int                ldvr,
+                                        float*             work,
+                                        int                lwork,
+                                        int*               devInfo)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverSgeev(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    case API_FORTRAN:
+        return hipsolverSgeevFortran(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev(testAPI_t          API,
+                                        hipsolverHandle_t  handle,
+                                        hipsolverEigMode_t jobvl,
+                                        hipsolverEigMode_t jobvr,
+                                        int                n,
+                                        double*            A,
+                                        int                lda,
+                                        double*            WR,
+                                        double*            WI,
+                                        double*            VL,
+                                        int                ldvl,
+                                        double*            VR,
+                                        int                ldvr,
+                                        double*            work,
+                                        int                lwork,
+                                        int*               devInfo)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverDgeev(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    case API_FORTRAN:
+        return hipsolverDgeevFortran(handle, jobvl, jobvr, n, A, lda, WR, WI, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev(testAPI_t          API,
+                                        hipsolverHandle_t  handle,
+                                        hipsolverEigMode_t jobvl,
+                                        hipsolverEigMode_t jobvr,
+                                        int                n,
+                                        hipFloatComplex*   A,
+                                        int                lda,
+                                        hipFloatComplex*   W,
+                                        hipFloatComplex*   VL,
+                                        int                ldvl,
+                                        hipFloatComplex*   VR,
+                                        int                ldvr,
+                                        hipFloatComplex*   work,
+                                        int                lwork,
+                                        int*               devInfo)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverCgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    case API_FORTRAN:
+        return hipsolverCgeevFortran(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+
+inline hipsolverStatus_t hipsolver_geev(testAPI_t          API,
+                                        hipsolverHandle_t  handle,
+                                        hipsolverEigMode_t jobvl,
+                                        hipsolverEigMode_t jobvr,
+                                        int                n,
+                                        hipDoubleComplex*  A,
+                                        int                lda,
+                                        hipDoubleComplex*  W,
+                                        hipDoubleComplex*  VL,
+                                        int                ldvl,
+                                        hipDoubleComplex*  VR,
+                                        int                ldvr,
+                                        hipDoubleComplex*  work,
+                                        int                lwork,
+                                        int*               devInfo)
+{
+    switch(API)
+    {
+    case API_NORMAL:
+        return hipsolverZgeev(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    case API_FORTRAN:
+        return hipsolverZgeevFortran(handle, jobvl, jobvr, n, A, lda, W, VL, ldvl, VR, ldvr, work, lwork, devInfo);
+    default:
+        return HIPSOLVER_STATUS_NOT_SUPPORTED;
+    }
+}
+/********************************************************/
+
 /******************** GESVD ********************/
 // normal and strided_batched
 inline hipsolverStatus_t hipsolver_gesvd_bufferSize(testAPI_t         API,

@@ -842,6 +842,81 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZZgesvFortran(hipsolverHandle_t hand
                                                           int*              niters,
                                                           int*              devInfo);
 
+// geev
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgeev_bufferSizeFortran(
+    hipsolverHandle_t handle, hipsolverEigMode_t jobvl, hipsolverEigMode_t jobvr, int n, int* lwork);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDgeev_bufferSizeFortran(
+    hipsolverHandle_t handle, hipsolverEigMode_t jobvl, hipsolverEigMode_t jobvr, int n, int* lwork);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCgeev_bufferSizeFortran(
+    hipsolverHandle_t handle, hipsolverEigMode_t jobvl, hipsolverEigMode_t jobvr, int n, int* lwork);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZgeev_bufferSizeFortran(
+    hipsolverHandle_t handle, hipsolverEigMode_t jobvl, hipsolverEigMode_t jobvr, int n, int* lwork);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgeevFortran(hipsolverHandle_t  handle,
+                                                         hipsolverEigMode_t jobvl,
+                                                         hipsolverEigMode_t jobvr,
+                                                         int                n,
+                                                         float*             A,
+                                                         int                lda,
+                                                         float*             WR,
+                                                         float*             WI,
+                                                         float*             VL,
+                                                         int                ldvl,
+                                                         float*             VR,
+                                                         int                ldvr,
+                                                         float*             work,
+                                                         int                lwork,
+                                                         int*               devInfo);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDgeevFortran(hipsolverHandle_t  handle,
+                                                         hipsolverEigMode_t jobvl,
+                                                         hipsolverEigMode_t jobvr,
+                                                         int                n,
+                                                         double*            A,
+                                                         int                lda,
+                                                         double*            WR,
+                                                         double*            WI,
+                                                         double*            VL,
+                                                         int                ldvl,
+                                                         double*            VR,
+                                                         int                ldvr,
+                                                         double*            work,
+                                                         int                lwork,
+                                                         int*               devInfo);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverCgeevFortran(hipsolverHandle_t  handle,
+                                                         hipsolverEigMode_t jobvl,
+                                                         hipsolverEigMode_t jobvr,
+                                                         int                n,
+                                                         hipFloatComplex*   A,
+                                                         int                lda,
+                                                         hipFloatComplex*   W,
+                                                         hipFloatComplex*   VL,
+                                                         int                ldvl,
+                                                         hipFloatComplex*   VR,
+                                                         int                ldvr,
+                                                         hipFloatComplex*   work,
+                                                         int                lwork,
+                                                         int*               devInfo);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverZgeevFortran(hipsolverHandle_t  handle,
+                                                         hipsolverEigMode_t jobvl,
+                                                         hipsolverEigMode_t jobvr,
+                                                         int                n,
+                                                         hipDoubleComplex*  A,
+                                                         int                lda,
+                                                         hipDoubleComplex*  W,
+                                                         hipDoubleComplex*  VL,
+                                                         int                ldvl,
+                                                         hipDoubleComplex*  VR,
+                                                         int                ldvr,
+                                                         hipDoubleComplex*  work,
+                                                         int                lwork,
+                                                         int*               devInfo);
+
 // gesvd
 HIPSOLVER_EXPORT hipsolverStatus_t hipsolverSgesvd_bufferSizeFortran(
     hipsolverHandle_t handle, signed char jobu, signed char jobv, int m, int n, int* lwork);

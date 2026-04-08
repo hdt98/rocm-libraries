@@ -2446,6 +2446,157 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
+/******************** GEEV ********************/
+hipsolverStatus_t hipsolverSgeev_bufferSize(hipsolverHandle_t  handle,
+                                            hipsolverEigMode_t jobvl,
+                                            hipsolverEigMode_t jobvr,
+                                            int                n,
+                                            int*               lwork)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDgeev_bufferSize(hipsolverHandle_t  handle,
+                                            hipsolverEigMode_t jobvl,
+                                            hipsolverEigMode_t jobvr,
+                                            int                n,
+                                            int*               lwork)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCgeev_bufferSize(hipsolverHandle_t  handle,
+                                            hipsolverEigMode_t jobvl,
+                                            hipsolverEigMode_t jobvr,
+                                            int                n,
+                                            int*               lwork)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZgeev_bufferSize(hipsolverHandle_t  handle,
+                                            hipsolverEigMode_t jobvl,
+                                            hipsolverEigMode_t jobvr,
+                                            int                n,
+                                            int*               lwork)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverSgeev(hipsolverHandle_t  handle,
+                                 hipsolverEigMode_t jobvl,
+                                 hipsolverEigMode_t jobvr,
+                                 int                n,
+                                 float*             A,
+                                 int                lda,
+                                 float*             WR,
+                                 float*             WI,
+                                 float*             VL,
+                                 int                ldvl,
+                                 float*             VR,
+                                 int                ldvr,
+                                 float*             work,
+                                 int                lwork,
+                                 int*               devInfo)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverDgeev(hipsolverHandle_t  handle,
+                                 hipsolverEigMode_t jobvl,
+                                 hipsolverEigMode_t jobvr,
+                                 int                n,
+                                 double*            A,
+                                 int                lda,
+                                 double*            WR,
+                                 double*            WI,
+                                 double*            VL,
+                                 int                ldvl,
+                                 double*            VR,
+                                 int                ldvr,
+                                 double*            work,
+                                 int                lwork,
+                                 int*               devInfo)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverCgeev(hipsolverHandle_t  handle,
+                                 hipsolverEigMode_t jobvl,
+                                 hipsolverEigMode_t jobvr,
+                                 int                n,
+                                 hipFloatComplex*   A,
+                                 int                lda,
+                                 hipFloatComplex*   W,
+                                 hipFloatComplex*   VL,
+                                 int                ldvl,
+                                 hipFloatComplex*   VR,
+                                 int                ldvr,
+                                 hipFloatComplex*   work,
+                                 int                lwork,
+                                 int*               devInfo)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
+hipsolverStatus_t hipsolverZgeev(hipsolverHandle_t  handle,
+                                 hipsolverEigMode_t jobvl,
+                                 hipsolverEigMode_t jobvr,
+                                 int                n,
+                                 hipDoubleComplex*  A,
+                                 int                lda,
+                                 hipDoubleComplex*  W,
+                                 hipDoubleComplex*  VL,
+                                 int                ldvl,
+                                 hipDoubleComplex*  VR,
+                                 int                ldvr,
+                                 hipDoubleComplex*  work,
+                                 int                lwork,
+                                 int*               devInfo)
+try
+{
+    return HIPSOLVER_STATUS_NOT_SUPPORTED;
+}
+catch(...)
+{
+    return hipsolver::exception2hip_status();
+}
+
 /******************** GESVD ********************/
 hipsolverStatus_t hipsolverSgesvd_bufferSize(
     hipsolverHandle_t handle, signed char jobu, signed char jobv, int m, int n, int* lwork)

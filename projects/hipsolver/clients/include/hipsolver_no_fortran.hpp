@@ -110,6 +110,15 @@
 #define hipsolverDDgesvFortran hipsolverDDgesv
 #define hipsolverCCgesvFortran hipsolverCCgesv
 #define hipsolverZZgesvFortran hipsolverZZgesv
+// geev
+#define hipsolverSgeev_bufferSizeFortran hipsolverSgeev_bufferSize
+#define hipsolverDgeev_bufferSizeFortran hipsolverDgeev_bufferSize
+#define hipsolverCgeev_bufferSizeFortran hipsolverCgeev_bufferSize
+#define hipsolverZgeev_bufferSizeFortran hipsolverZgeev_bufferSize
+#define hipsolverSgeevFortran hipsolverSgeev
+#define hipsolverDgeevFortran hipsolverDgeev
+#define hipsolverCgeevFortran hipsolverCgeev
+#define hipsolverZgeevFortran hipsolverZgeev
 // gesvd
 #define hipsolverSgesvd_bufferSizeFortran hipsolverSgesvd_bufferSize
 #define hipsolverDgesvd_bufferSizeFortran hipsolverDgesvd_bufferSize
