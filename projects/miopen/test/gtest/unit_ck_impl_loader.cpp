@@ -4,12 +4,15 @@
 #include <gtest/gtest.h>
 #include <miopen/env.hpp>
 #include <miopen/filesystem.hpp>
-#include <miopen/solver/ck_grouped_conv_lib_loader.hpp>
+#include <miopen/solver/ck_impl_error.hpp>
+#include <miopen/solver/ck_impl_lib_loader.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/conv_solution.hpp>
 #include <miopen/convolution.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/tensor.hpp>
+
+#include <thread>
 
 #if MIOPEN_BACKEND_HIP
 #include <hip/hip_runtime.h>
@@ -52,7 +55,7 @@ private:
 
 miopen::fs::path MakeMissingDirectory(const std::string& tag)
 {
-    return miopen::fs::temp_directory_path() / "miopen_ck_grouped_conv_loader_missing" / tag /
+    return miopen::fs::temp_directory_path() / "miopen_ck_impl_loader_missing" / tag /
            "not_created";
 }
 
@@ -85,12 +88,12 @@ miopen::conv::ProblemDescription MakeGroupedConvProblem()
 
 #if MIOPEN_BACKEND_HIP
 
-TEST(GPU_CKGroupedConvLoader_FP16, LoaderLoadsForCurrentDevice)
+TEST(GPU_CkImplLoader_FP16, LoaderLoadsForCurrentDevice)
 {
     const auto device_name = GetCurrentDeviceName();
     ASSERT_FALSE(device_name.empty()) << "Failed to query HIP device";
 
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get(device_name);
+    const auto& loader = miopen::solver::CkImplLibLoader::Get(device_name);
 
     // The library may or may not be installed; if it loads, symbols must resolve.
     // We don't hard-fail on IsLoaded()==false because the .so might not be
@@ -105,12 +108,12 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderLoadsForCurrentDevice)
     }
 }
 
-TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernels)
+TEST(GPU_CkImplLoader_FP16, LoaderFillsValidKernels)
 {
     const auto device_name = GetCurrentDeviceName();
     ASSERT_FALSE(device_name.empty());
 
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get(device_name);
+    const auto& loader = miopen::solver::CkImplLibLoader::Get(device_name);
     if(!loader.IsLoaded())
         GTEST_SKIP() << "CK grouped conv library not installed for " << device_name;
 
@@ -122,12 +125,12 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernels)
                                   << device_name;
 }
 
-TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernelsWithTf32Fallback)
+TEST(GPU_CkImplLoader_FP16, LoaderFillsValidKernelsWithTf32Fallback)
 {
     const auto device_name = GetCurrentDeviceName();
     ASSERT_FALSE(device_name.empty());
 
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get(device_name);
+    const auto& loader = miopen::solver::CkImplLibLoader::Get(device_name);
     if(!loader.IsLoaded())
         GTEST_SKIP() << "CK grouped conv library not installed for " << device_name;
 
@@ -140,18 +143,18 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderFillsValidKernelsWithTf32Fallback)
     EXPECT_FALSE(use_tf32) << "use_tf32 should remain false when called with false";
 }
 
-TEST(GPU_CKGroupedConvLoader_FP16, LoaderCachesPerDevice)
+TEST(GPU_CkImplLoader_FP16, LoaderCachesPerDevice)
 {
     const auto device_name = GetCurrentDeviceName();
     ASSERT_FALSE(device_name.empty());
 
-    const auto& loader1 = miopen::solver::CKGroupedConvLibLoader::Get(device_name);
-    const auto& loader2 = miopen::solver::CKGroupedConvLibLoader::Get(device_name);
+    const auto& loader1 = miopen::solver::CkImplLibLoader::Get(device_name);
+    const auto& loader2 = miopen::solver::CkImplLibLoader::Get(device_name);
 
     EXPECT_EQ(&loader1, &loader2) << "Get() should return the same cached instance";
 }
 
-TEST(GPU_CKGroupedConvLoader_FP16, LoaderStripsDeviceSuffix)
+TEST(GPU_CkImplLoader_FP16, LoaderStripsDeviceSuffix)
 {
     const auto device_name = GetCurrentDeviceName();
     ASSERT_FALSE(device_name.empty());
@@ -164,8 +167,8 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderStripsDeviceSuffix)
 
     // Query with a synthesized suffix and with the bare base arch
     const auto suffixed = base_arch + ":sramecc+:xnack-";
-    const auto& loader1 = miopen::solver::CKGroupedConvLibLoader::Get(suffixed);
-    const auto& loader2 = miopen::solver::CKGroupedConvLibLoader::Get(base_arch);
+    const auto& loader1 = miopen::solver::CkImplLibLoader::Get(suffixed);
+    const auto& loader2 = miopen::solver::CkImplLibLoader::Get(base_arch);
 
     EXPECT_EQ(&loader1, &loader2)
         << "Suffixed and bare device names should resolve to the same cached loader";
@@ -175,32 +178,32 @@ TEST(GPU_CKGroupedConvLoader_FP16, LoaderStripsDeviceSuffix)
 
 // -- CPU tests (no GPU required) ----------------------------------------------
 
-TEST(CPU_CKGroupedConvLoader_NONE, LoaderFailsGracefullyForUnknownDevice)
+TEST(CPU_CkImplLoader_NONE, LoaderFailsGracefullyForUnknownDevice)
 {
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get("gfx_nonexistent");
+    const auto& loader = miopen::solver::CkImplLibLoader::Get("gfx_nonexistent");
     EXPECT_FALSE(loader.IsLoaded());
 }
 
-TEST(CPU_CKGroupedConvLoader_NONE, LoaderStripsDeviceSuffixWithoutGpu)
+TEST(CPU_CkImplLoader_NONE, LoaderStripsDeviceSuffixWithoutGpu)
 {
     const auto base_arch = std::string{"gfx_ck_loader_suffix_unit_test"};
     const auto suffixed  = base_arch + ":sramecc+:xnack-";
 
-    const auto& loader1 = miopen::solver::CKGroupedConvLibLoader::Get(suffixed);
-    const auto& loader2 = miopen::solver::CKGroupedConvLibLoader::Get(base_arch);
+    const auto& loader1 = miopen::solver::CkImplLibLoader::Get(suffixed);
+    const auto& loader2 = miopen::solver::CkImplLibLoader::Get(base_arch);
 
     EXPECT_EQ(&loader1, &loader2)
         << "Suffixed and bare device names should resolve to the same cached loader";
     EXPECT_FALSE(loader1.IsLoaded());
 }
 
-TEST(CPU_CKGroupedConvLoader_NONE, LoaderFailsGracefullyWithInvalidEnvPath)
+TEST(CPU_CkImplLoader_NONE, LoaderFailsGracefullyWithInvalidEnvPath)
 {
     const auto missing_dir = MakeMissingDirectory("invalid_env_path");
     ASSERT_FALSE(miopen::fs::exists(missing_dir));
 
     const ScopedCKLibraryPath scoped_ck_lib_path{missing_dir.string()};
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get("gfx_ck_loader_invalid_env");
+    const auto& loader = miopen::solver::CkImplLibLoader::Get("gfx_ck_loader_invalid_env");
 
     EXPECT_FALSE(loader.IsLoaded());
     EXPECT_TRUE(
@@ -209,9 +212,9 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderFailsGracefullyWithInvalidEnvPath)
             .empty());
 }
 
-TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
+TEST(CPU_CkImplLoader_NONE, LoaderReturnsEmptyOnFailure)
 {
-    const auto& loader = miopen::solver::CKGroupedConvLibLoader::Get("gfx_bogus");
+    const auto& loader = miopen::solver::CkImplLibLoader::Get("gfx_bogus");
     ASSERT_FALSE(loader.IsLoaded());
 
     const auto problem = MakeGroupedConvProblem();
@@ -413,7 +416,7 @@ TEST(CPU_CKGroupedConvLoader_NONE, LoaderReturnsEmptyOnFailure)
         miopenStatusInternalError);
 }
 
-TEST(CPU_CKGroupedConvLoader_NONE, IsDeterministicSplitKValid)
+TEST(CPU_CkImplLoader_NONE, IsDeterministicSplitKValid)
 {
     // Non-deterministic mode: always valid regardless of split_k
     EXPECT_TRUE(IsDeterministicSplitKValid("Kernel+4", false));
@@ -431,4 +434,308 @@ TEST(CPU_CKGroupedConvLoader_NONE, IsDeterministicSplitKValid)
     // Deterministic mode with parse failures: invalid
     EXPECT_FALSE(IsDeterministicSplitKValid("Kernel+abc", true));
     EXPECT_FALSE(IsDeterministicSplitKValid("Kernel+", true));
+}
+
+// -- Error infrastructure tests (CPU, no GPU required) ------------------------
+
+TEST(CPU_CkImplError_NONE, LastErrorSetAndGet)
+{
+    // Setting a non-success status stores the message
+    CkImplLastError::setLastError(CK_IMPL_STATUS_BAD_PARAM, "test error message");
+    EXPECT_STREQ(CkImplLastError::getLastError(), "test error message");
+
+    // Setting SUCCESS does NOT overwrite the buffer
+    CkImplLastError::setLastError(CK_IMPL_STATUS_SUCCESS, "should not appear");
+    EXPECT_STREQ(CkImplLastError::getLastError(), "test error message");
+
+    // Setting another error overwrites the buffer
+    CkImplLastError::setLastError(CK_IMPL_STATUS_INTERNAL_ERROR, "second error");
+    EXPECT_STREQ(CkImplLastError::getLastError(), "second error");
+
+    // Null message clears the buffer
+    CkImplLastError::setLastError(CK_IMPL_STATUS_BAD_PARAM, nullptr);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "");
+}
+
+TEST(CPU_CkImplError_NONE, LastErrorThreadIsolation)
+{
+    // Set an error on the main thread
+    CkImplLastError::setLastError(CK_IMPL_STATUS_BAD_PARAM, "main thread error");
+
+    std::string child_error;
+    std::thread t([&child_error]() {
+        // Child thread should see empty last error (thread-local)
+        child_error = CkImplLastError::getLastError();
+    });
+    t.join();
+
+    EXPECT_EQ(child_error, "") << "Child thread should have empty last error";
+    EXPECT_STREQ(CkImplLastError::getLastError(), "main thread error")
+        << "Main thread error should be unaffected";
+}
+
+TEST(CPU_CkImplError_NONE, TryCatchSuccess)
+{
+    auto status = ck_impl_try_catch([]() {
+        // no-op, no throw
+    });
+    EXPECT_EQ(status, CK_IMPL_STATUS_SUCCESS);
+}
+
+TEST(CPU_CkImplError_NONE, TryCatchCkImplException)
+{
+    auto status = ck_impl_try_catch(
+        []() { throw CkImplException(CK_IMPL_STATUS_BAD_PARAM, "bad parameter test"); });
+    EXPECT_EQ(status, CK_IMPL_STATUS_BAD_PARAM);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "bad parameter test");
+}
+
+TEST(CPU_CkImplError_NONE, TryCatchStdException)
+{
+    auto status = ck_impl_try_catch([]() { throw std::runtime_error("std runtime error test"); });
+    EXPECT_EQ(status, CK_IMPL_STATUS_INTERNAL_ERROR);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "std runtime error test");
+}
+
+TEST(CPU_CkImplError_NONE, TryCatchUnknownException)
+{
+    auto status = ck_impl_try_catch([]() {
+        throw 42; // NOLINT(hicpp-exception-baseclass)
+    });
+    EXPECT_EQ(status, CK_IMPL_STATUS_INTERNAL_ERROR);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "Unknown exception occurred");
+}
+
+TEST(CPU_CkImplError_NONE, StatusToString)
+{
+    EXPECT_STREQ(toString(CK_IMPL_STATUS_SUCCESS), "CK_IMPL_STATUS_SUCCESS");
+    EXPECT_STREQ(toString(CK_IMPL_STATUS_BAD_PARAM), "CK_IMPL_STATUS_BAD_PARAM");
+    EXPECT_STREQ(toString(CK_IMPL_STATUS_INVALID_VALUE), "CK_IMPL_STATUS_INVALID_VALUE");
+    EXPECT_STREQ(toString(CK_IMPL_STATUS_INTERNAL_ERROR), "CK_IMPL_STATUS_INTERNAL_ERROR");
+    EXPECT_STREQ(toString(CK_IMPL_STATUS_ALLOC_FAILED), "CK_IMPL_STATUS_ALLOC_FAILED");
+    EXPECT_STREQ(toString(static_cast<ck_impl_status_t>(99)), "CK_IMPL_STATUS_UNKNOWN");
+}
+
+// -- CkImplException direct tests -----------------------------------------
+
+TEST(CPU_CkImplError_NONE, ExceptionStoresStatusAndMessage)
+{
+    CkImplException ex(CK_IMPL_STATUS_INVALID_VALUE, "invalid value message");
+    EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_INVALID_VALUE);
+    EXPECT_STREQ(ex.what(), "invalid value message");
+}
+
+TEST(CPU_CkImplError_NONE, ExceptionIsStdException)
+{
+    CkImplException ex(CK_IMPL_STATUS_ALLOC_FAILED, "alloc failed");
+    const std::exception& base = ex;
+    EXPECT_STREQ(base.what(), "alloc failed");
+}
+
+TEST(CPU_CkImplError_NONE, ExceptionCopyPreservesFields)
+{
+    CkImplException original(CK_IMPL_STATUS_BAD_PARAM, "original message");
+    CkImplException copy(original); // NOLINT(performance-unnecessary-copy-initialization)
+    EXPECT_EQ(copy.getStatus(), CK_IMPL_STATUS_BAD_PARAM);
+    EXPECT_STREQ(copy.what(), "original message");
+}
+
+// -- THROW_IF macro tests ----------------------------------------------------
+
+TEST(CPU_CkImplError_NONE, ThrowIfNullThrowsOnNull)
+{
+    int* ptr = nullptr;
+    EXPECT_THROW(
+        { CK_IMPL_THROW_IF_NULL(ptr, CK_IMPL_STATUS_BAD_PARAM, "null pointer"); },
+        CkImplException);
+
+    try
+    {
+        CK_IMPL_THROW_IF_NULL(ptr, CK_IMPL_STATUS_BAD_PARAM, "null pointer detail");
+        FAIL() << "Expected CkImplException";
+    }
+    catch(const CkImplException& ex)
+    {
+        EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_BAD_PARAM);
+        EXPECT_STREQ(ex.what(), "null pointer detail");
+    }
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfNullPassesOnNonNull)
+{
+    int value = 42;
+    int* ptr  = &value;
+    EXPECT_NO_THROW(
+        { CK_IMPL_THROW_IF_NULL(ptr, CK_IMPL_STATUS_BAD_PARAM, "should not throw"); });
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfFalseThrowsOnFalse)
+{
+    try
+    {
+        CK_IMPL_THROW_IF_FALSE(false, CK_IMPL_STATUS_INVALID_VALUE, "condition was false");
+        FAIL() << "Expected CkImplException";
+    }
+    catch(const CkImplException& ex)
+    {
+        EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_INVALID_VALUE);
+        EXPECT_STREQ(ex.what(), "condition was false");
+    }
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfFalsePassesOnTrue)
+{
+    EXPECT_NO_THROW(
+        { CK_IMPL_THROW_IF_FALSE(true, CK_IMPL_STATUS_INVALID_VALUE, "should not throw"); });
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfTrueThrowsOnTrue)
+{
+    try
+    {
+        CK_IMPL_THROW_IF_TRUE(true, CK_IMPL_STATUS_INTERNAL_ERROR, "condition was true");
+        FAIL() << "Expected CkImplException";
+    }
+    catch(const CkImplException& ex)
+    {
+        EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_INTERNAL_ERROR);
+        EXPECT_STREQ(ex.what(), "condition was true");
+    }
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfTruePassesOnFalse)
+{
+    EXPECT_NO_THROW(
+        { CK_IMPL_THROW_IF_TRUE(false, CK_IMPL_STATUS_INTERNAL_ERROR, "should not throw"); });
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfNeThrowsOnNotEqual)
+{
+    try
+    {
+        CK_IMPL_THROW_IF_NE(3, 5, CK_IMPL_STATUS_INVALID_VALUE, "values not equal");
+        FAIL() << "Expected CkImplException";
+    }
+    catch(const CkImplException& ex)
+    {
+        EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_INVALID_VALUE);
+        EXPECT_STREQ(ex.what(), "values not equal");
+    }
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfNePassesOnEqual)
+{
+    EXPECT_NO_THROW(
+        { CK_IMPL_THROW_IF_NE(7, 7, CK_IMPL_STATUS_INVALID_VALUE, "should not throw"); });
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfEqThrowsOnEqual)
+{
+    try
+    {
+        CK_IMPL_THROW_IF_EQ(10, 10, CK_IMPL_STATUS_BAD_PARAM, "values equal");
+        FAIL() << "Expected CkImplException";
+    }
+    catch(const CkImplException& ex)
+    {
+        EXPECT_EQ(ex.getStatus(), CK_IMPL_STATUS_BAD_PARAM);
+        EXPECT_STREQ(ex.what(), "values equal");
+    }
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfEqPassesOnNotEqual)
+{
+    EXPECT_NO_THROW(
+        { CK_IMPL_THROW_IF_EQ(1, 2, CK_IMPL_STATUS_BAD_PARAM, "should not throw"); });
+}
+
+// -- LastError additional coverage -------------------------------------------
+
+TEST(CPU_CkImplError_NONE, LastErrorSetReturnsStatus)
+{
+    auto result = CkImplLastError::setLastError(CK_IMPL_STATUS_BAD_PARAM, "msg");
+    EXPECT_EQ(result, CK_IMPL_STATUS_BAD_PARAM);
+
+    result = CkImplLastError::setLastError(CK_IMPL_STATUS_ALLOC_FAILED, "alloc");
+    EXPECT_EQ(result, CK_IMPL_STATUS_ALLOC_FAILED);
+
+    result = CkImplLastError::setLastError(CK_IMPL_STATUS_SUCCESS, "ignored");
+    EXPECT_EQ(result, CK_IMPL_STATUS_SUCCESS);
+}
+
+TEST(CPU_CkImplError_NONE, LastErrorStdStringOverload)
+{
+    std::string msg = "std::string overload test";
+    CkImplLastError::setLastError(CK_IMPL_STATUS_INTERNAL_ERROR, msg);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "std::string overload test");
+}
+
+TEST(CPU_CkImplError_NONE, LastErrorTruncatesLongMessage)
+{
+    // Create a message longer than CK_IMPL_ERROR_STRING_MAX_LENGTH
+    std::string long_msg(CK_IMPL_ERROR_STRING_MAX_LENGTH + 100, 'X');
+    CkImplLastError::setLastError(CK_IMPL_STATUS_INTERNAL_ERROR, long_msg);
+
+    const char* stored = CkImplLastError::getLastError();
+    auto stored_len    = std::strlen(stored);
+    EXPECT_EQ(stored_len, CK_IMPL_ERROR_STRING_MAX_LENGTH - 1)
+        << "Stored message should be truncated to buffer size - 1";
+    EXPECT_EQ(stored[stored_len], '\0') << "Stored message must be null-terminated";
+}
+
+// -- tryCatch status preservation for each status code -----------------------
+
+TEST(CPU_CkImplError_NONE, TryCatchPreservesAllStatusCodes)
+{
+    const ck_impl_status_t codes[] = {
+        CK_IMPL_STATUS_BAD_PARAM,
+        CK_IMPL_STATUS_INVALID_VALUE,
+        CK_IMPL_STATUS_INTERNAL_ERROR,
+        CK_IMPL_STATUS_ALLOC_FAILED,
+    };
+
+    for(auto code : codes)
+    {
+        auto status =
+            ck_impl_try_catch([code]() { throw CkImplException(code, toString(code)); });
+        EXPECT_EQ(status, code) << "tryCatch should preserve status " << toString(code);
+        EXPECT_STREQ(CkImplLastError::getLastError(), toString(code));
+    }
+}
+
+// -- Throw macros through tryCatch (end-to-end error propagation) ------------
+
+TEST(CPU_CkImplError_NONE, ThrowIfNullPropagatesThroughTryCatch)
+{
+    int* ptr    = nullptr;
+    auto status = ck_impl_try_catch([&]() {
+        CK_IMPL_THROW_IF_NULL(ptr, CK_IMPL_STATUS_BAD_PARAM, "null ptr in tryCatch");
+    });
+    EXPECT_EQ(status, CK_IMPL_STATUS_BAD_PARAM);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "null ptr in tryCatch");
+}
+
+TEST(CPU_CkImplError_NONE, ThrowIfFalsePropagatesThroughTryCatch)
+{
+    auto status = ck_impl_try_catch([]() {
+        size_t idx  = 10;
+        size_t size = 5;
+        CK_IMPL_THROW_IF_FALSE(idx < size, CK_IMPL_STATUS_INVALID_VALUE, "Index out of range");
+    });
+    EXPECT_EQ(status, CK_IMPL_STATUS_INVALID_VALUE);
+    EXPECT_STREQ(CkImplLastError::getLastError(), "Index out of range");
+}
+
+TEST(CPU_CkImplError_NONE, NoThrowOnValidInputsThroughTryCatch)
+{
+    int value   = 42;
+    int* ptr    = &value;
+    auto status = ck_impl_try_catch([&]() {
+        CK_IMPL_THROW_IF_NULL(ptr, CK_IMPL_STATUS_BAD_PARAM, "should not throw");
+        CK_IMPL_THROW_IF_FALSE(true, CK_IMPL_STATUS_INVALID_VALUE, "should not throw");
+        CK_IMPL_THROW_IF_TRUE(false, CK_IMPL_STATUS_INTERNAL_ERROR, "should not throw");
+        CK_IMPL_THROW_IF_NE(1, 1, CK_IMPL_STATUS_BAD_PARAM, "should not throw");
+        CK_IMPL_THROW_IF_EQ(1, 2, CK_IMPL_STATUS_BAD_PARAM, "should not throw");
+    });
+    EXPECT_EQ(status, CK_IMPL_STATUS_SUCCESS);
 }

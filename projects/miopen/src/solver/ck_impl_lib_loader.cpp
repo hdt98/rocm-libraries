@@ -1,8 +1,9 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-#include <miopen/solver/ck_grouped_conv_lib_loader.hpp>
-#include <miopen/solver/ck_grouped_conv_interface.hpp>
+#include <miopen/solver/ck_impl_lib_loader.hpp>
+#include <miopen/solver/ck_impl_error.hpp>
+#include <miopen/solver/ck_impl_interface.hpp>
 #include <miopen/conv_solution.hpp>
 #include <miopen/execution_context.hpp>
 #include <miopen/conv/problem_description.hpp>
@@ -144,24 +145,37 @@ void* ResolveDynamicSymbol(void* handle, const char* symbol_name)
 #endif
 }
 
+miopenStatus_t toMiopenStatus(ck_impl_status_t status)
+{
+    switch(status)
+    {
+    case CK_IMPL_STATUS_SUCCESS: return miopenStatusSuccess;
+    case CK_IMPL_STATUS_BAD_PARAM: return miopenStatusBadParm;
+    case CK_IMPL_STATUS_INVALID_VALUE: return miopenStatusInvalidValue;
+    case CK_IMPL_STATUS_INTERNAL_ERROR: return miopenStatusInternalError;
+    case CK_IMPL_STATUS_ALLOC_FAILED: return miopenStatusAllocFailed;
+    default: return miopenStatusInternalError;
+    }
+}
+
 } // namespace
 
 // -- Singleton infrastructure -------------------------------------------------
 
-std::mutex& CKGroupedConvLibLoader::CacheMutex()
+std::mutex& CkImplLibLoader::CacheMutex()
 {
     static std::mutex mtx;
     return mtx;
 }
 
-std::unordered_map<std::string, std::unique_ptr<CKGroupedConvLibLoader>>&
-CKGroupedConvLibLoader::Cache()
+std::unordered_map<std::string, std::unique_ptr<CkImplLibLoader>>&
+CkImplLibLoader::Cache()
 {
-    static std::unordered_map<std::string, std::unique_ptr<CKGroupedConvLibLoader>> cache;
+    static std::unordered_map<std::string, std::unique_ptr<CkImplLibLoader>> cache;
     return cache;
 }
 
-const CKGroupedConvLibLoader& CKGroupedConvLibLoader::Get(const std::string& device_name)
+const CkImplLibLoader& CkImplLibLoader::Get(const std::string& device_name)
 {
     const auto key = StripDeviceSuffix(device_name);
     std::lock_guard<std::mutex> lock(CacheMutex());
@@ -170,7 +184,7 @@ const CKGroupedConvLibLoader& CKGroupedConvLibLoader::Get(const std::string& dev
     if(it == cache.end())
     {
         // Use new + reset instead of make_unique because the constructor is private.
-        std::unique_ptr<CKGroupedConvLibLoader> ptr(new CKGroupedConvLibLoader(device_name));
+        std::unique_ptr<CkImplLibLoader> ptr(new CkImplLibLoader(device_name));
         it = cache.emplace(key, std::move(ptr)).first;
     }
     return *it->second;
@@ -178,12 +192,12 @@ const CKGroupedConvLibLoader& CKGroupedConvLibLoader::Get(const std::string& dev
 
 // -- Construction / Destruction -----------------------------------------------
 
-CKGroupedConvLibLoader::CKGroupedConvLibLoader(const std::string& device_name)
+CkImplLibLoader::CkImplLibLoader(const std::string& device_name)
 {
     OpenRuntimeLibraryForDevice(device_name);
 }
 
-CKGroupedConvLibLoader::~CKGroupedConvLibLoader()
+CkImplLibLoader::~CkImplLibLoader()
 {
     if(lib_handle_ != nullptr)
         CloseDynamicLibrary(lib_handle_);
@@ -191,7 +205,7 @@ CKGroupedConvLibLoader::~CKGroupedConvLibLoader()
 
 // -- Library loading ----------------------------------------------------------
 
-void CKGroupedConvLibLoader::OpenRuntimeLibraryForDevice(const std::string& device_name)
+void CkImplLibLoader::OpenRuntimeLibraryForDevice(const std::string& device_name)
 {
     const miopen::fs::path filename{MakeLibraryFilename(device_name)};
 
@@ -251,11 +265,11 @@ void CKGroupedConvLibLoader::OpenRuntimeLibraryForDevice(const std::string& devi
 
     // API version check
     const int lib_version = get_api_version_fn_();
-    if(lib_version != CK_GROUPED_CONV_API_VERSION)
+    if(lib_version != CK_IMPL_API_VERSION)
     {
         MIOPEN_LOG_W("CK grouped conv API version mismatch for device "
                      << StripDeviceSuffix(device_name) << ": expected "
-                     << CK_GROUPED_CONV_API_VERSION << ", got " << lib_version);
+                     << CK_IMPL_API_VERSION << ", got " << lib_version);
         loaded_ = false;
         return;
     }
@@ -265,12 +279,12 @@ void CKGroupedConvLibLoader::OpenRuntimeLibraryForDevice(const std::string& devi
 
 // -- Symbol resolution --------------------------------------------------------
 
-void* CKGroupedConvLibLoader::ResolveRawSymbol(const char* symbol_name) const
+void* CkImplLibLoader::ResolveRawSymbol(const char* symbol_name) const
 {
     return ResolveDynamicSymbol(lib_handle_, symbol_name);
 }
 
-void CKGroupedConvLibLoader::BindRequiredCommonSymbols(std::vector<std::string>& missing)
+void CkImplLibLoader::BindRequiredCommonSymbols(std::vector<std::string>& missing)
 {
     auto bind_symbol = [this, &missing](auto& member, const char* symbol_name) {
         using FnPtr = std::remove_reference_t<decltype(member)>;
@@ -279,14 +293,15 @@ void CKGroupedConvLibLoader::BindRequiredCommonSymbols(std::vector<std::string>&
             missing.emplace_back(symbol_name);
     };
 
-    bind_symbol(get_api_version_fn_, "ckgrpconv_get_api_version");
-    bind_symbol(kernel_list_size_fn_, "ckgrpconv_kernel_list_size");
-    bind_symbol(kernel_list_get_fn_, "ckgrpconv_kernel_list_get");
-    bind_symbol(kernel_list_free_fn_, "ckgrpconv_kernel_list_free");
-    bind_symbol(solution_free_fn_, "ckgrpconv_solution_free");
+    bind_symbol(get_api_version_fn_, "ck_impl_get_api_version");
+    bind_symbol(kernel_list_size_fn_, "ck_impl_kernel_list_size");
+    bind_symbol(kernel_list_get_fn_, "ck_impl_kernel_list_get");
+    bind_symbol(kernel_list_free_fn_, "ck_impl_kernel_list_free");
+    bind_symbol(solution_free_fn_, "ck_impl_solution_free");
+    bind_symbol(get_last_error_string_fn_, "ck_impl_get_last_error_string");
 }
 
-void CKGroupedConvLibLoader::BindSolverSymbols(CKSolverType solver,
+void CkImplLibLoader::BindSolverSymbols(CKSolverType solver,
                                                const char* prefix,
                                                std::vector<std::string>& missing)
 {
@@ -298,7 +313,7 @@ void CKGroupedConvLibLoader::BindSolverSymbols(CKSolverType solver,
     };
 
     auto& fns             = solver_fns_[ToSolverIndex(solver)];
-    const std::string sym = std::string("ckgrpconv_") + prefix + "_";
+    const std::string sym = std::string("ck_impl_") + prefix + "_";
     bind_symbol(fns.fill_valid_kernels, (sym + "fill_valid_kernels").c_str());
     bind_symbol(fns.is_applicable, (sym + "is_applicable").c_str());
     bind_symbol(fns.is_args_supported, (sym + "is_args_supported").c_str());
@@ -306,7 +321,7 @@ void CKGroupedConvLibLoader::BindSolverSymbols(CKSolverType solver,
     bind_symbol(fns.get_solution, (sym + "get_solution").c_str());
 }
 
-void CKGroupedConvLibLoader::BindOptionalKernelTypeSymbols(std::vector<std::string>& missing)
+void CkImplLibLoader::BindOptionalKernelTypeSymbols(std::vector<std::string>& missing)
 {
     auto bind_symbol = [this, &missing](auto& member, const char* symbol_name) {
         using FnPtr = std::remove_reference_t<decltype(member)>;
@@ -316,14 +331,14 @@ void CKGroupedConvLibLoader::BindOptionalKernelTypeSymbols(std::vector<std::stri
     };
 
     bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dFwd)].get_all_kernel_types,
-                "ckgrpconv_3d_fwd_get_all_kernel_type_strings");
+                "ck_impl_3d_fwd_get_all_kernel_type_strings");
     bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dBwd)].get_all_kernel_types,
-                "ckgrpconv_3d_bwd_get_all_kernel_type_strings");
+                "ck_impl_3d_bwd_get_all_kernel_type_strings");
     bind_symbol(solver_fns_[ToSolverIndex(CKSolverType::GrpConv3dWrw)].get_all_kernel_types,
-                "ckgrpconv_3d_wrw_get_all_kernel_type_strings");
+                "ck_impl_3d_wrw_get_all_kernel_type_strings");
 }
 
-bool CKGroupedConvLibLoader::LoadSymbols()
+bool CkImplLibLoader::LoadSymbols()
 {
     std::vector<std::string> missing;
     missing.reserve(32);
@@ -371,48 +386,75 @@ bool CKGroupedConvLibLoader::LoadSymbols()
 
 // -- Helpers ------------------------------------------------------------------
 
-std::vector<std::string> CKGroupedConvLibLoader::ExtractKernelList(CKKernelListHandle* handle) const
+void CkImplLibLoader::CheckStatus(ck_impl_status_t status, const char* operation) const
 {
-    if(handle == nullptr)
+    if(status == CK_IMPL_STATUS_SUCCESS)
+        return;
+    const char* error_msg = "";
+    if(get_last_error_string_fn_ != nullptr)
+        get_last_error_string_fn_(&error_msg);
+    MIOPEN_THROW(toMiopenStatus(status),
+                 std::string("CK grouped conv ") + operation +
+                     " failed. Status: " + toString(status) + "(" + std::to_string(status) + ")" +
+                     ", Error: " + (error_msg != nullptr ? error_msg : ""));
+}
+
+std::vector<std::string> CkImplLibLoader::ExtractKernelList(ck_impl_status_t status,
+                                                                   CKKernelListHandle* handle,
+                                                                   const char* operation) const
+{
+    // RAII guard: ensure handle is freed even if CheckStatus throws
+    auto handle_guard =
+        std::unique_ptr<CKKernelListHandle, KernelListFreeFn>(handle, kernel_list_free_fn_);
+
+    CheckStatus(status, operation);
+    if(handle_guard == nullptr)
         return {};
     std::vector<std::string> result;
-    const size_t n = kernel_list_size_fn_(handle);
+    size_t n = 0;
+    CheckStatus(kernel_list_size_fn_(handle_guard.get(), &n), "kernel_list_size");
     result.reserve(n);
     for(size_t i = 0; i < n; ++i)
     {
-        const char* s = kernel_list_get_fn_(handle, i);
+        const char* s = nullptr;
+        CheckStatus(kernel_list_get_fn_(handle_guard.get(), i, &s), "kernel_list_get");
         if(s != nullptr)
             result.emplace_back(s);
     }
-    kernel_list_free_fn_(handle);
     return result;
 }
 
-ConvSolution CKGroupedConvLibLoader::ExtractSolution(ConvSolution* ptr) const
+ConvSolution CkImplLibLoader::ExtractSolution(ck_impl_status_t status,
+                                                     ConvSolution* ptr,
+                                                     const char* operation) const
 {
-    if(ptr == nullptr)
+    // RAII guard: ensure ptr is freed even if CheckStatus throws
+    auto ptr_guard = std::unique_ptr<ConvSolution, SolutionFreeFn>(ptr, solution_free_fn_);
+
+    CheckStatus(status, operation);
+    if(ptr_guard == nullptr)
         return ConvSolution{miopenStatusInternalError};
-    ConvSolution result = std::move(*ptr);
-    solution_free_fn_(ptr);
-    return result;
+    return std::move(*ptr_guard);
 }
 
 // -- Solver-parameterized wrappers --------------------------------------------
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernels(CKSolverType solver,
+CkImplLibLoader::FillValidKernels(CKSolverType solver,
                                          const conv::ProblemDescription& problem,
                                          miopenDataType_t dtype,
                                          bool use_tf32) const
 {
     if(!IsLoaded())
         return {};
-    return ExtractKernelList(
-        solver_fns_[ToSolverIndex(solver)].fill_valid_kernels(&problem, dtype, use_tf32));
+    CKKernelListHandle* handle = nullptr;
+    auto status =
+        solver_fns_[ToSolverIndex(solver)].fill_valid_kernels(&problem, dtype, use_tf32, &handle);
+    return ExtractKernelList(status, handle, "fill_valid_kernels");
 }
 
 std::vector<std::string>
-CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solver,
+CkImplLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solver,
                                                          const conv::ProblemDescription& problem,
                                                          miopenDataType_t dtype,
                                                          bool& use_tf32) const
@@ -426,17 +468,21 @@ CKGroupedConvLibLoader::FillValidKernelsWithTf32Fallback(CKSolverType solver,
     return result;
 }
 
-bool CKGroupedConvLibLoader::IsApplicable(CKSolverType solver,
+bool CkImplLibLoader::IsApplicable(CKSolverType solver,
                                           const conv::ProblemDescription& problem,
                                           miopenDataType_t dtype,
                                           bool use_tf32) const
 {
     if(!IsLoaded())
         return false;
-    return solver_fns_[ToSolverIndex(solver)].is_applicable(&problem, dtype, use_tf32);
+    bool result = false;
+    auto status =
+        solver_fns_[ToSolverIndex(solver)].is_applicable(&problem, dtype, use_tf32, &result);
+    CheckStatus(status, "is_applicable");
+    return result;
 }
 
-bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solver,
+bool CkImplLibLoader::IsArgsSupported(CKSolverType solver,
                                              const conv::ProblemDescription& problem,
                                              const std::string& kernel_id,
                                              miopenDataType_t dtype,
@@ -444,21 +490,28 @@ bool CKGroupedConvLibLoader::IsArgsSupported(CKSolverType solver,
 {
     if(!IsLoaded())
         return false;
-    return solver_fns_[ToSolverIndex(solver)].is_args_supported(
-        &problem, kernel_id.c_str(), dtype, use_tf32);
+    bool result = false;
+    auto status = solver_fns_[ToSolverIndex(solver)].is_args_supported(
+        &problem, kernel_id.c_str(), dtype, use_tf32, &result);
+    CheckStatus(status, "is_args_supported");
+    return result;
 }
 
-size_t CKGroupedConvLibLoader::GetWorkspaceSize(CKSolverType solver,
+size_t CkImplLibLoader::GetWorkspaceSize(CKSolverType solver,
                                                 const conv::ProblemDescription& problem,
                                                 miopenDataType_t dtype,
                                                 bool use_tf32) const
 {
     if(!IsLoaded())
         return 0;
-    return solver_fns_[ToSolverIndex(solver)].get_workspace_size(&problem, dtype, use_tf32);
+    size_t result = 0;
+    auto status =
+        solver_fns_[ToSolverIndex(solver)].get_workspace_size(&problem, dtype, use_tf32, &result);
+    CheckStatus(status, "get_workspace_size");
+    return result;
 }
 
-ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solver,
+ConvSolution CkImplLibLoader::GetSolution(CKSolverType solver,
                                                  const ExecutionContext& ctx,
                                                  const conv::ProblemDescription& problem,
                                                  const std::string& kernel_id,
@@ -466,18 +519,22 @@ ConvSolution CKGroupedConvLibLoader::GetSolution(CKSolverType solver,
 {
     if(!IsLoaded())
         return ConvSolution{miopenStatusInternalError};
-    return ExtractSolution(solver_fns_[ToSolverIndex(solver)].get_solution(
-        &ctx, &problem, kernel_id.c_str(), use_tf32));
+    ConvSolution* ptr = nullptr;
+    auto status       = solver_fns_[ToSolverIndex(solver)].get_solution(
+        &ctx, &problem, kernel_id.c_str(), use_tf32, &ptr);
+    return ExtractSolution(status, ptr, "get_solution");
 }
 
-std::vector<std::string> CKGroupedConvLibLoader::GetAllKernelTypeStrings(CKSolverType solver) const
+std::vector<std::string> CkImplLibLoader::GetAllKernelTypeStrings(CKSolverType solver) const
 {
     if(!IsLoaded())
         return {};
     auto fn = solver_fns_[ToSolverIndex(solver)].get_all_kernel_types;
     if(fn == nullptr)
         return {};
-    return ExtractKernelList(fn());
+    CKKernelListHandle* handle = nullptr;
+    auto status                = fn(&handle);
+    return ExtractKernelList(status, handle, "get_all_kernel_type_strings");
 }
 
 } // namespace solver
