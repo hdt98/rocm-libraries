@@ -2,6 +2,20 @@
 
 Describe GPU kernels as data (Signature + Algorithm), validate at compile time, dispatch with a universal argument struct.
 
+## Motivation
+
+rocm-libraries distributes GPU kernels as **kpack archives** — compressed, multiarch bundles of code objects loaded at runtime based on the detected GPU. This allows all rocm-library users to have common host code (indpendent of device) and to selectively download the precompiled kernels specific to their GPU device. The multiarch kpack design is becoming a fundamental requirement of the build system for TheRock.
+
+CK Tile is the template metaprogramming engine that generates these kernels. It's powerful but deeply template-driven: wiring a single GEMM variant requires threading ~7 internal type layers with dozens of positional template parameters. All of this complexity lives at compile time and disappears in the final binary — but it makes the *definition* of kernel variants expensive to write, review, and maintain.
+
+rocm_ck defiines **kernel specs** to solve two problems at once:
+
+1. **Non-templated metaprogramming interface.** Signature and Algorithm are plain `constexpr` structs — no template parameters at the user level. The device-side `makeSpec()` pipeline validates and resolves them into CK Tile's template machinery at compile time. All metaprogramming stays on the device side of the compilation boundary.
+
+2. **Serializable kernel descriptions.** The same specs that drive compile-time instantiation are serialized into the kpack TOC as structured metadata (`variant_specs`). At runtime, host-side code — dispatchers, registries, tooling — can read these descriptions without any CK Tile headers or device compiler. A Python script, a C++ dispatcher, or a runtime registry can all evaluate kernel properties from the archive alone.
+
+This is the architectural separation: the device build owns all template metaprogramming and produces self-describing kpack archives. The host side consumes them through the kpack C API and the serialized rocm-ck specs — no templates, no device compiler, no CK Tile dependency.
+
 ## Architecture
 
 rocm_ck replaces CK Tile's template-parameter API with a data-driven schema. Kernels are defined by two pure-data structs — no template parameters at the user level:
