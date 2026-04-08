@@ -1,36 +1,37 @@
 # Rocroller Test Categories Configuration
-# Includes tests for gtest based rocroller-tests.
+# Includes tests for catch2 based rocroller-tests-catch.
 
 test_categories:
   quick:
     description: "Quick tests (smoke)"
-    test_patterns: &quick_test_patterns
-      - "*quick*"
-      - "ErrorFixtureDeathTest.*"
-      - "ArgumentLoaderTest.*"
-      - "AssemblerTest.*"
-      - "ControlGraphTest.*"
-      - "CommandTest.*"
-      - "ComponentTest.*"
-    exclude: &quick_exclude
-      - "GPU_KernelTests/GPU_KernelTest.GPU_WholeKernel/1"
+    test_patterns: 
+    exclude: 
+    test_tags:
+      - "[kernel-graph]"
+    exclude_tags:
+      - "[gpu]"
     labels:
       - "quick"
       - "smoke"
 
   standard:
     description: "Standard tests (precheckin)"
-    test_patterns: *quick_test_patterns
-    exclude: *quick_exclude
+    test_patterns: 
+    exclude: 
+    test_tags:
+      - "[]"
+    exclude_tags:
     labels:
       - "standard"
       - "pr"
 
   comprehensive:
     description: "Comprehensive tests (nightly)"
-    test_patterns:
-      - "*"
-    exclude: *quick_exclude
+    test_patterns: 
+    exclude: 
+    test_tags:
+      - "[]"
+    exclude_tags:
     labels:
       - "comprehensive"
       - "nightly"
@@ -38,10 +39,11 @@ test_categories:
 
   full:
     description: "Full tests (weekly)"
-    test_patterns:
-      - "*"
-
-    exclude: *quick_exclude
+    test_patterns: 
+    exclude: 
+    test_tags:
+      - "[]"
+    exclude_tags:
     labels:
       - "full"
       - "weekly"

@@ -257,6 +257,8 @@ file(WRITE "${INSTALL_TEST_FILE}"
 set(_test_categories_yaml "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
 include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake OPTIONAL)
 
+set(_test_categories_catch2_yaml "${CMAKE_CURRENT_SOURCE_DIR}/test_categories_catch2.yaml")
+
 if(COMMAND apply_test_category_labels)
     if(EXISTS "${_test_categories_yaml}")
         message(STATUS "YAML-based test categorization")
@@ -266,6 +268,17 @@ if(COMMAND apply_test_category_labels)
     endif()
 else()
     message(STATUS "Test categorization not available (TestCategories.cmake not found)")
+endif()
+
+if(COMMAND apply_catch2_test_category_labels)
+    if(EXISTS "${_test_categories_catch2_yaml}")
+        message(STATUS "YAML-based Catch2 test categorization")
+        apply_catch2_test_category_labels("rocroller-tests-catch" "${_test_categories_catch2_yaml}" "${PROJECT_BINARY_DIR}" "${INSTALL_TEST_FILE}")
+    else()
+        message(STATUS "No Catch2 test categorization (YAML missing)")
+    endif()
+else()
+    message(STATUS "Catch2 test categorization not available (TestCategories.cmake not found)")
 endif()
 
 install(
