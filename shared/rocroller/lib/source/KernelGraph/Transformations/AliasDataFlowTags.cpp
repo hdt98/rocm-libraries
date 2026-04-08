@@ -457,52 +457,101 @@ namespace rocRoller
                 return groupedExtents;
             }
 
+            using namespace rocRoller::KernelGraph;
+            using TagExtent = AliasDataFlowTagsDetail::TagExtent;
+
+            void findMaxAliasesBacktrack(KernelGraph const&    kgraph,
+                                         std::list<TagExtent>& extents,
+                                         std::map<int, int>&   currentAliases,
+                                         std::map<int, int>&   bestAliases)
+            {
+                // Update the best solution if the current one is superior.
+                if(currentAliases.size() > bestAliases.size())
+                    bestAliases = currentAliases;
+
+                // Pruning: even merging every remaining extent cannot beat the best.
+                if(extents.size() <= 1)
+                    return;
+                if(currentAliases.size() + extents.size() - 1 <= bestAliases.size())
+                    return;
+
+                // Collect all feasible (outer, inner) merge pairs, identified by
+                // baseTag to avoid iterator-invalidation issues across branches.
+                std::vector<std::pair<int, int>> candidates;
+                for(auto& outer : extents)
+                {
+                    for(auto& inner : extents)
+                    {
+                        if(&outer != &inner && inner.fitsWithin(kgraph, outer))
+                        {
+                            candidates.emplace_back(outer.baseTag, inner.baseTag);
+                        }
+                    }
+                }
+                for(auto const& [outerTag, innerTag] : candidates)
+                {
+                    // Locate elements by baseTag. O(N) per lookup, acceptable for
+                    // small N. State is fully restored between iterations, so both
+                    // elements are guaranteed to be present.
+                    auto outerIt
+                        = std::find_if(extents.begin(), extents.end(), [outerTag](auto const& e) {
+                              return e.baseTag == outerTag;
+                          });
+                    auto innerIt
+                        = std::find_if(extents.begin(), extents.end(), [innerTag](auto const& e) {
+                              return e.baseTag == innerTag;
+                          });
+
+                    if(outerIt == extents.end() || innerIt == extents.end())
+                        continue;
+
+                    // Re-verify fitness after state restoration (defensive check).
+                    if(!innerIt->fitsWithin(kgraph, *outerIt))
+                        continue;
+
+                    // Save state before the merge.
+                    TagExtent outerSaved     = *outerIt;
+                    TagExtent innerSaved     = *innerIt;
+                    int       savedInnerBase = innerIt->baseTag;
+
+                    // Perform the merge.
+                    currentAliases[innerIt->baseTag] = outerIt->baseTag;
+                    innerIt->validate(kgraph);
+                    outerIt->merge(kgraph, *innerIt);
+                    outerIt->validate(kgraph);
+                    auto insertPos = extents.erase(innerIt);
+
+                    // Recurse to find the best continuation from this state.
+                    findMaxAliasesBacktrack(kgraph, extents, currentAliases, bestAliases);
+
+                    // Restore state: re-insert inner, restore outer, remove alias.
+                    extents.insert(insertPos, std::move(innerSaved));
+                    *outerIt = std::move(outerSaved);
+                    currentAliases.erase(savedInnerBase);
+
+                    // Post-restore pruning.
+                    if(currentAliases.size() + extents.size() - 1 <= bestAliases.size())
+                        return;
+                }
+            }
+
             std::map<int, int> findAliasCandidatesForExtents(KernelGraph const&   kgraph,
                                                              std::list<TagExtent> extents)
             {
-                std::map<int, int> aliases;
+                std::map<int, int> bestAliases;
+                std::map<int, int> currentAliases;
 
-                bool foundAny = false;
-                do
-                {
-                    auto e   = extents.size();
-                    foundAny = false;
-                    for(auto outer = extents.begin(); outer != extents.end(); outer++)
-                    {
-                        for(auto inner = extents.begin(); inner != extents.end();)
-                        {
-                            if(outer != inner && inner->fitsWithin(kgraph, *outer))
-                            {
-                                foundAny = true;
-                                AssertFatal(!aliases.contains(inner->baseTag));
-                                aliases[inner->baseTag] = outer->baseTag;
-                                Log::debug("{} -> {}", inner->baseTag, outer->baseTag);
+                findMaxAliasesBacktrack(kgraph, extents, currentAliases, bestAliases);
 
-                                inner->validate(kgraph);
+                Log::debug("{} aliases found (backtracking optimal).", bestAliases.size());
 
-                                outer->merge(kgraph, *inner);
-
-                                outer->validate(kgraph);
-
-                                Log::debug("merged {}", outer->toString());
-                                inner = extents.erase(inner);
-                            }
-                            else
-                            {
-                                inner++;
-                            }
-                        }
-                    }
-                    Log::debug("{} aliases so far.", aliases.size());
-                } while(foundAny);
-
-                for(auto ext : extents)
+                for(auto const& ext : extents)
                 {
                     Log::debug("{}\n{}", ext.toString(), ext.orderInfo(kgraph));
                     ext.validate(kgraph);
                 }
 
-                return aliases;
+                return bestAliases;
             }
 
             std::map<int, int> findAliasCandidates(KernelGraph const& kgraph)
