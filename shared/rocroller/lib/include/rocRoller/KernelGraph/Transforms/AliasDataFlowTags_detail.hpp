@@ -94,7 +94,7 @@ namespace rocRoller
                 /**
                  * Returns true if `this` fits within a gap within `outer`.
                  */
-                bool fitsWithin(KernelGraph const& kgraph, TagExtent const& outer) const;
+                bool fitsWithin(KernelGraph const& kgraph, TagExtent const& outer);
             };
 
             /**
@@ -134,9 +134,6 @@ namespace rocRoller
              * for the kernel.
              */
             std::map<int, int> findAliasCandidates(KernelGraph const& kgraph);
-
-            std::map<int, int> computeMatchCounts(KernelGraph const&          kgraph,
-                                                  std::list<TagExtent> const& extents);
 
         }
     }
