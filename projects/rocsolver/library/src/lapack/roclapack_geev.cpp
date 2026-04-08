@@ -262,6 +262,13 @@ rocblas_status rocsolver_geev_complex_impl(
     rocblas_get_stream(handle, &stream);
     HIP_CHECK(hipStreamSynchronize(stream));
 
+    if(n == 0)
+    {
+        rocblas_int zero = 0;
+        HIP_CHECK(hipMemcpy(info, &zero, sizeof(rocblas_int), hipMemcpyHostToDevice));
+        return rocblas_status_success;
+    }
+
     const int n_i = static_cast<int>(n);
     const int lda_i = static_cast<int>(lda);
     const size_t n_sz = static_cast<size_t>(n);
