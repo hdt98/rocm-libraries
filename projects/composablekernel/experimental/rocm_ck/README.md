@@ -192,6 +192,18 @@ Use this pattern for fixed kernel configurations with simple builds. Use kpack
 
 See the [example 05 README](examples/05_gemm_no_kpack/README.md) for full details.
 
+### Dispatcher Bridge
+
+Loads a self-describing kpack archive and registers its GEMM kernels with the
+CK dispatcher's `KernelInstance` interface. Proves that kpack kernels can plug
+into the dispatcher's registry, selection, and execution pipeline:
+
+- **Projection** — `GemmSpec` maps 1:1 to the dispatcher's `KernelKey` via `projectToDispatcher()`
+- **KpackKernelInstance** — dispatcher backend that translates `(a_ptr, b_ptr, c_ptr, Problem)` to rocm\_ck's slot-based `Args` and launches via `hipModuleLaunchKernel`
+- **Validation** — downloads device buffers, computes CPU reference GEMM, compares output
+
+See the [dispatcher bridge README](tools/dispatcher_bridge/README.md) for build instructions and architecture details.
+
 ## Design for Integration
 
 The schema's structural properties make it straightforward to integrate with dispatchers and tooling:
@@ -251,6 +263,9 @@ experimental/rocm_ck/
 │       ├── datatype_convert.hpp    # float ↔ typed conversions, verification tolerances
 │       ├── verify.hpp              # verify(): result-vs-reference comparison
 │       ├── kpack_module.hpp        # KpackArchive, KpackKernel RAII wrappers
+│       ├── kpack_spec_reader.hpp   # readVariantSpecs(): deserialize specs from kpack TOC
+│       ├── spec_json.hpp           # to_json(): build-time spec serialization
+│       ├── projection.hpp          # projectToDispatcher(): GemmSpec → KernelKey mapping
 │       │
 │       │ # Device-only — requires CK Tile headers (--cuda-device-only)
 │       ├── ck_type_map.hpp         # DataType → CK Tile C++ type mapping
@@ -300,6 +315,17 @@ experimental/rocm_ck/
     └── 05_gemm_no_kpack/            # GEMM without kpack: single-file HIP program
         ├── CMakeLists.txt
         └── gemm_no_kpack.hip           # Kernel + host in one file, <<<>>> launch
+├── tools/
+│   ├── extract_spec.cpp            # Generic build-time spec extractor (dual-compile)
+│   └── dispatcher_bridge/          # Dispatcher integration PoC
+│       ├── CMakeLists.txt
+│       ├── kpack_kernel_instance.hpp   # KpackKernelInstance : KernelInstance
+│       ├── register_kpack.hpp          # Load kpack → register with dispatcher
+│       ├── main.cpp                    # Demo: register, dispatch, verify
+│       └── README.md
+├── kpack-cli/                      # Archive inspection tool
+│   ├── kpack                           # Python CLI script
+│   └── README.md
 ```
 
 ## Dependencies
