@@ -47,14 +47,17 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
                         ldb);
 
     if(!handle)
+    {
         return rocblas_status_invalid_handle;
+    }
 
     // argument checking
 
     {
         rocblas_status st = rocsolver_sytrs2_argCheck(handle, uplo, n, nrhs, lda, ldb, A, B, ipiv);
 
-        if(st != rocblas_status_continue)
+        bool const is_ok = (st == rocblas_status_continue) || (st == rocblas_status_success);
+        if(!is_ok)
         {
             return st;
         }
@@ -89,17 +92,18 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     void* const work = static_cast<void*>(mem[0]);
 
     // execution
-    return rocsolver_sytrs2_template<T>(handle, uplo, n, nrhs,
+    auto const istat = rocsolver_sytrs2_template<T>(handle, uplo, n, nrhs,
 
-                                        A, shiftA, lda, strideA,
+                                                    A, shiftA, lda, strideA,
 
-                                        ipiv, strideP,
+                                                    ipiv, strideP,
 
-                                        B, shiftB, ldb, strideB,
+                                                    B, shiftB, ldb, strideB,
 
-                                        batch_count,
+                                                    batch_count,
 
-                                        work, size_work);
+                                                    work, size_work);
+    return (istat);
 }
 
 ROCSOLVER_END_NAMESPACE

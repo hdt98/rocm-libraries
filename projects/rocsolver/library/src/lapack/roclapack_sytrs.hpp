@@ -35,7 +35,9 @@
 #include "rocblas.hpp"
 #include "rocsolver/rocsolver.h"
 
+#ifdef USE_SYTRS2
 #include "roclapack_sytrs2.hpp"
+#endif
 
 ROCSOLVER_BEGIN_NAMESPACE
 
@@ -1323,6 +1325,7 @@ void rocsolver_sytrs_getMemorySize(I const n,
     // ---------------------------
 
     size_t size_work = 1;
+#ifdef USE_SYTRS2
     if(use_sytrs2<T>(n, nrhs, batch_count))
     {
         size_t size_sytrs2 = 0;
@@ -1330,6 +1333,7 @@ void rocsolver_sytrs_getMemorySize(I const n,
 
         size_work += size_sytrs2;
     }
+#endif
     *p_size_work = size_work;
     return;
 }
@@ -1377,7 +1381,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
             return (rocblas_status_success);
         }
     }
-
+#ifdef USE_SYTRS2
     if(use_sytrs2<T>(n, nrhs, batch_count))
     {
         rocblas_status const istat = rocsolver_sytrs2_template<T, I>(handle, uplo, n, nrhs,
@@ -1391,6 +1395,7 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
                                                                      batch_count, work, size_work);
         return (istat);
     }
+#endif
 
     I const warp_size = get_warp_size();
     I const max_blocks = 64 * 1024 - 3;
