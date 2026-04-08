@@ -142,6 +142,12 @@ set(rocsolver_lapack_source
   lapack/roclapack_gebrd.cpp
   lapack/roclapack_gebrd_batched.cpp
   lapack/roclapack_gebrd_strided_batched.cpp
+  lapack/roclapack_gehrd.cpp
+  lapack/roclapack_gehrd_batched.cpp
+  lapack/roclapack_gehrd_strided_batched.cpp
+  lapack/roclapack_hseqr.cpp
+  lapack/roclapack_hseqr_batched.cpp
+  lapack/roclapack_hseqr_strided_batched.cpp
   #- tridiagonalization
   lapack/roclapack_sytd2_hetd2.cpp
   lapack/roclapack_sytd2_hetd2_batched.cpp
@@ -225,6 +231,14 @@ set(rocsolver_lapack_source
   lapack/roclapack_sygvdx_hegvdx_strided_batched.cpp
   lapack/roclapack_syevdx_heevdx_inplace.cpp
   lapack/roclapack_sygvdx_hegvdx_inplace.cpp
+  #### Non-Symmetric Eigensolvers ####
+  ####################################
+  lapack/roclapack_trevc.cpp
+  lapack/roclapack_trevc_batched.cpp
+  lapack/roclapack_trevc_strided_batched.cpp
+  lapack/roclapack_geev.cpp
+  lapack/roclapack_geev_batched.cpp
+  lapack/roclapack_geev_strided_batched.cpp
 )
 
 set(rocsolver_auxiliary_source
@@ -265,6 +279,15 @@ set(rocsolver_auxiliary_source
   auxiliary/rocauxiliary_labrd.cpp
   # tridiagonal matrices
   auxiliary/rocauxiliary_sterf.cpp
+  auxiliary/rocauxiliary_gebal.cpp
+  auxiliary/rocauxiliary_gebal_batched.cpp
+  auxiliary/rocauxiliary_gebal_strided_batched.cpp
+  auxiliary/rocauxiliary_gebak.cpp
+  auxiliary/rocauxiliary_gebak_batched.cpp
+  auxiliary/rocauxiliary_gebak_strided_batched.cpp
+  auxiliary/rocauxiliary_orghr.cpp
+  auxiliary/rocauxiliary_orghr_batched.cpp
+  auxiliary/rocauxiliary_orghr_strided_batched.cpp
   auxiliary/rocauxiliary_stebz.cpp
   auxiliary/rocauxiliary_steqr.cpp
   auxiliary/rocauxiliary_stedc.cpp
@@ -432,6 +455,19 @@ if(ROCSOLVER_EMBED_FMT)
 else()
   list(APPEND static_depends PACKAGE fmt)
   target_link_libraries(rocsolver PRIVATE fmt::fmt)
+endif()
+
+find_package(OpenMP QUIET COMPONENTS CXX)
+if(OpenMP_CXX_FOUND)
+  target_compile_options(rocsolver PRIVATE ${OpenMP_CXX_FLAGS})
+  target_link_libraries(rocsolver PRIVATE OpenMP::OpenMP_CXX)
+endif()
+
+find_package(LAPACK QUIET)
+if(LAPACK_FOUND)
+  target_link_libraries(rocsolver PRIVATE ${LAPACK_LIBRARIES})
+else()
+  target_link_libraries(rocsolver PRIVATE lapack blas)
 endif()
 
 # In ROCm 4.0 and earlier, the default maximum threads per block is 256

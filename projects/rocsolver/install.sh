@@ -583,6 +583,20 @@ fi
 
 if [[ -n "${architecture+x}" ]]; then
   cmake_common_options+=("-DAMDGPU_TARGETS=${architecture}")
+else
+  # Auto-detect GPU architecture from the local machine
+  if command -v rocm_agent_enumerator &>/dev/null; then
+    detected_archs=$(rocm_agent_enumerator 2>/dev/null | grep -v gfx000 | sort -u | paste -sd ';')
+    if [[ -n "${detected_archs}" ]]; then
+      echo "Auto-detected GPU architecture(s): ${detected_archs}"
+      cmake_common_options+=("-DAMDGPU_TARGETS=${detected_archs}")
+    else
+      echo "WARNING: rocm_agent_enumerator found no GPUs; using CMake defaults"
+      cmake_common_options+=("-DAMDGPU_TARGETS=auto")
+    fi
+  else
+    echo "WARNING: rocm_agent_enumerator not found; using CMake defaults"
+  fi
 fi
 
 if [[ "${build_sanitizer}" == true ]]; then
