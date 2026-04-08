@@ -1,8 +1,13 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+<<<<<<< HEAD
 #include "descriptors/GraphDescriptor.hpp"
 #include "descriptors/GraphTestUtils.hpp"
+=======
+#include "descriptors/FlatbufferTestUtils.hpp"
+#include "descriptors/GraphDescriptor.hpp"
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include "logging/GraphLogger.hpp"
 #include "logging/Logging.hpp"
 
@@ -59,6 +64,7 @@ protected:
         }
     }
 
+<<<<<<< HEAD
     static GraphDescriptor createAndFinalizeGraph(hipdnnDataType_t computeType = HIPDNN_DATA_FLOAT)
     {
         auto bundle = test_utilities::createDefaultConvOp(computeType);
@@ -69,6 +75,15 @@ protected:
                                 HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                 1,
                                 static_cast<const void*>(ops.data()));
+=======
+    static GraphDescriptor createAndFinalizeGraph()
+    {
+        auto builder = test_utilities::createValidGraph();
+        auto serializedGraph = builder.Release();
+
+        GraphDescriptor descriptor;
+        descriptor.deserializeGraph(serializedGraph.data(), serializedGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         auto handle = reinterpret_cast<hipdnnHandle_t>(0x12345678);
         descriptor.setAttribute(HIPDNN_ATTR_OPERATIONGRAPH_HANDLE,
@@ -151,11 +166,43 @@ TEST_F(TestGraphLogger, DifferentGraphsLoggedSeparately)
     hipdnn_data_sdk::utilities::setEnv("HIPDNN_LOG_GRAPH_DIR", _tempDirStr.c_str());
     hipdnn_backend::logging::loggerShutdown();
 
+<<<<<<< HEAD
     // Create first graph with FLOAT compute type
     auto descriptor1 = createAndFinalizeGraph(HIPDNN_DATA_FLOAT);
 
     // Create a second graph with HALF compute type (produces different serialized content)
     auto descriptor2 = createAndFinalizeGraph(HIPDNN_DATA_HALF);
+=======
+    // Create first graph with default data types
+    auto descriptor1 = createAndFinalizeGraph();
+
+    // Create a second graph with different data types
+    {
+        flatbuffers::FlatBufferBuilder builder;
+        const std::vector<::flatbuffers::Offset<hipdnn_data_sdk::data_objects::TensorAttributes>>
+            tensorAttributes;
+        const std::vector<::flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>> nodes;
+        auto graphOffset = hipdnn_data_sdk::data_objects::CreateGraphDirect(
+            builder,
+            "different_graph",
+            hipdnn_data_sdk::data_objects::DataType::HALF,
+            hipdnn_data_sdk::data_objects::DataType::FLOAT,
+            hipdnn_data_sdk::data_objects::DataType::FLOAT,
+            &tensorAttributes,
+            &nodes);
+        builder.Finish(graphOffset);
+        auto serialized = builder.Release();
+
+        GraphDescriptor descriptor2;
+        descriptor2.deserializeGraph(serialized.data(), serialized.size());
+        auto handle = reinterpret_cast<hipdnnHandle_t>(0x12345678);
+        descriptor2.setAttribute(HIPDNN_ATTR_OPERATIONGRAPH_HANDLE,
+                                 HIPDNN_TYPE_HANDLE,
+                                 1,
+                                 static_cast<const void*>(&handle));
+        descriptor2.finalize();
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto jsonFiles = getJsonFilesInDir(_tempDir);
     EXPECT_EQ(jsonFiles.size(), 2u);

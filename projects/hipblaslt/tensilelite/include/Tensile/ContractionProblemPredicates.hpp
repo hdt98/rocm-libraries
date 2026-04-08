@@ -1424,13 +1424,66 @@ namespace TensileLite
                     return "TypesEqual";
                 }
 
+                // This function checks if the computeInputType of a problem matches the computeInputType of a
+                // solution. Because for Float8{_fnuz}/BFloat8{_fnuz}, the computeInputTypeA and computeInputTypeB
+                // might be concatenated like this: computeInputTypeAcomputeInputTypeB{_fnuz}, this function
+                // includes special logic to inspect types at the concatenation position.
+                //
+                bool validateComputeType(rocisa::DataType const& problemComputeInputType, bool const isComputeInputTypeA) const
+                {
+                    using ArrType = std::array<std::pair<rocisa::DataType, rocisa::DataType>, 4>;
+
+                    // computeInputTypeA corresponds to the first type in the concatenated type
+                    ArrType const computeInputTypeAMapping =
+                    {{
+                        {rocisa::DataType::BFloat8_fnuz, rocisa::DataType::BFloat8Float8_fnuz},
+                        {rocisa::DataType::Float8_fnuz,  rocisa::DataType::Float8BFloat8_fnuz},
+                        {rocisa::DataType::BFloat8, rocisa::DataType::BFloat8Float8},
+                        {rocisa::DataType::Float8,  rocisa::DataType::Float8BFloat8}
+                    }};
+
+                    // computeInputTypeB corresponds to the second type in the concatenated type
+                    ArrType const computeInputTypeBMapping =
+                    {{
+                        {rocisa::DataType::Float8_fnuz,  rocisa::DataType::BFloat8Float8_fnuz},
+                        {rocisa::DataType::BFloat8_fnuz, rocisa::DataType::Float8BFloat8_fnuz},
+                        {rocisa::DataType::Float8,  rocisa::DataType::BFloat8Float8},
+                        {rocisa::DataType::BFloat8, rocisa::DataType::Float8BFloat8}
+                    }};
+
+                    auto validate = [](ArrType const& arr,
+                            rocisa::DataType const& t1, rocisa::DataType const& t2){
+                          if(t1 == t2)
+                              return true;
+                          return std::any_of(arr.begin(), arr.end(), [&](const auto& p){
+                                  return (p == std::make_pair(t1, t2)) or (p == std::make_pair(t2, t1));
+                        });
+                    };
+
+                    if(isComputeInputTypeA)
+                    {
+                        // value[4] is computeInputTypeA
+                        return
+                            validate(computeInputTypeAMapping, problemComputeInputType, value[4]);
+                    }
+                    else
+                    {
+                        // value[5] is computeInputTypeB
+                        return
+                            validate(computeInputTypeBMapping, problemComputeInputType, value[5]);
+                    }
+                }
+
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-                    return problem.a().dataType() == value[0] && problem.b().dataType() == value[1]
-                           && problem.c().dataType() == value[2]
-                           && problem.d().dataType() == value[3]
-                           && problem.computeInputTypeA() == value[4]
-                           && problem.computeInputTypeB() == value[5];
+                    auto ret = problem.a().dataType() == value[0]
+                            && problem.b().dataType() == value[1]
+                            && problem.c().dataType() == value[2]
+                            && problem.d().dataType() == value[3];
+
+                    return ret &&
+                        validateComputeType(problem.computeInputTypeA(), true) &&
+                        validateComputeType(problem.computeInputTypeB(), false);
                 }
 
                 virtual std::string toString() const override
@@ -2858,6 +2911,78 @@ namespace TensileLite
                 {
                     return debugEvalCmp(
                         problem, stream, "prob", problem.swizzleTensorB(), "==", "sol", value);
+                }
+            };
+
+	    struct MXBlockACheck : public Predicate_CRTP<MXBlockACheck, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = false,
+                    HasValue = true
+                };
+                int value;
+
+                MXBlockACheck() = default;
+                MXBlockACheck(int value)
+                    : value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "MXBlockA";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    return (problem.mxBlockA() == value);
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    bool rv = (*this)(problem);
+
+                    stream << *this << ": prob: " << problem.mxBlockA()
+                           << ", Is sol support: " << value << std::endl;
+                    return rv;
+                }
+            };
+
+	    struct MXBlockBCheck : public Predicate_CRTP<MXBlockBCheck, ContractionProblemGemm>
+            {
+                enum
+                {
+                    HasIndex = false,
+                    HasValue = true
+                };
+                int value;
+
+                MXBlockBCheck() = default;
+                MXBlockBCheck(int value)
+                    : value(value)
+                {
+                }
+
+                static std::string Type()
+                {
+                    return "MXBlockB";
+                }
+
+                virtual bool operator()(ContractionProblemGemm const& problem) const override
+                {
+                    return (problem.mxBlockB() == value);
+                }
+
+                virtual bool debugEval(ContractionProblemGemm const& problem,
+                                       std::ostream&                 stream) const override
+                {
+                    bool rv = (*this)(problem);
+
+                    stream << *this << ": prob: " << problem.mxBlockB()
+                           << ", Is sol support: " << value << std::endl;
+                    return rv;
                 }
             };
 

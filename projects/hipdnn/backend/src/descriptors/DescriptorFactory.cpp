@@ -25,9 +25,14 @@
 #include "MatmulOperationDescriptor.hpp"
 #include "PointwiseOperationDescriptor.hpp"
 #include "RMSNormOperationDescriptor.hpp"
+<<<<<<< HEAD
 #include "ReductionOperationDescriptor.hpp"
 #include "SdpaBwdOperationDescriptor.hpp"
 #include "SdpaFwdOperationDescriptor.hpp"
+=======
+#include "SdpaBpropOperationDescriptor.hpp"
+#include "SdpaFpropOperationDescriptor.hpp"
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include "TensorDescriptor.hpp"
 #include "VariantDescriptor.hpp"
 #include "logging/Logging.hpp"
@@ -95,10 +100,17 @@ void DescriptorFactory::create(hipdnnBackendDescriptorType_t descriptorType,
     case HIPDNN_BACKEND_OPERATION_BATCHNORM_INFERENCE_VARIANCE_DESCRIPTOR_EXT:
         privateDesc = std::make_shared<BatchnormInferenceVarianceExtOperationDescriptor>();
         break;
+<<<<<<< HEAD
     case HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR:
         privateDesc = std::make_shared<BlockScaleQuantizeOperationDescriptor>();
         break;
     case HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR:
+=======
+    case HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR_EXT:
+        privateDesc = std::make_shared<BlockScaleQuantizeOperationDescriptor>();
+        break;
+    case HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         privateDesc = std::make_shared<MatmulOperationDescriptor>();
         break;
     case HIPDNN_BACKEND_OPERATION_RMSNORM_DESCRIPTOR_EXT:
@@ -113,17 +125,26 @@ void DescriptorFactory::create(hipdnnBackendDescriptorType_t descriptorType,
     case HIPDNN_BACKEND_OPERATION_BATCHNORM_DESCRIPTOR_EXT:
         privateDesc = std::make_shared<BatchnormOperationDescriptor>();
         break;
+<<<<<<< HEAD
     case HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR:
+=======
+    case HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         privateDesc = std::make_shared<BlockScaleDequantizeOperationDescriptor>();
         break;
     case HIPDNN_BACKEND_OPERATION_CUSTOM_OP_DESCRIPTOR_EXT:
         privateDesc = std::make_shared<CustomOpOperationDescriptor>();
         break;
+<<<<<<< HEAD
     case HIPDNN_BACKEND_OPERATION_SDPA_BWD_DESCRIPTOR_EXT:
         privateDesc = std::make_shared<SdpaBwdOperationDescriptor>();
         break;
     case HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR:
         privateDesc = std::make_shared<ReductionOperationDescriptor>();
+=======
+    case HIPDNN_BACKEND_OPERATION_SDPA_BPROP_DESCRIPTOR_EXT:
+        privateDesc = std::make_shared<SdpaBpropOperationDescriptor>();
+>>>>>>> d9e199e220 (merge b-shi branch)
         break;
     default:
         throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,

@@ -224,18 +224,110 @@ inline std::pair<Error, Knob> Knob::tryCreate(std::string knobIdStr,
         return {{ErrorCode::INVALID_VALUE, "Knob ID must not be empty"}, {}};
     }
 
+<<<<<<< HEAD
     Knob knob(std::move(knobIdStr), std::move(description), std::move(defaultValue), deprecated);
     knob._constraint
         = constraint != nullptr ? std::move(constraint) : std::make_shared<EmptyConstraint>();
+=======
+    const hipdnn_data_sdk::flatbuffer_utilities::KnobWrapper knobWrapper(fbData.ptr, fbData.size);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const KnobSetting defaultSetting(knob._knobId, knob._defaultValue);
     auto validationError = knob._constraint->validateKnobSetting(defaultSetting);
     if(validationError.code != ErrorCode::OK)
     {
+<<<<<<< HEAD
+=======
+        return {{ErrorCode::INVALID_VALUE, "Knob flatbuffer failed verification"}, {}};
+    }
+
+    auto fbKnob = &knobWrapper.getKnob();
+
+    // Unpack to native KnobT - all conversions done automatically by FlatBuffers
+    std::unique_ptr<hipdnn_data_sdk::data_objects::KnobT> knobT(fbKnob->UnPack());
+
+    // Get knob_id for error messages
+    const std::string knobId = knobT->knob_id;
+
+    // Extract default value from the union
+    KnobValueVariant defaultValue;
+    switch(knobT->default_value.type)
+    {
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+        defaultValue = knobT->default_value.AsIntValue()->value;
+        break;
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+        defaultValue = knobT->default_value.AsFloatValue()->value;
+        break;
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+        defaultValue = knobT->default_value.AsStringValue()->value; // Already std::string
+        break;
+    case hipdnn_data_sdk::data_objects::KnobValue::NONE:
+        // NONE default_value is invalid - knobs must have a default value
+>>>>>>> d9e199e220 (merge b-shi branch)
         return {{ErrorCode::INVALID_VALUE,
                  "Knob '" + knob._knobId + "' has default_value that violates its constraint: "
                      + validationError.err_msg},
                 {}};
+<<<<<<< HEAD
+=======
+    default:
+        return {{ErrorCode::INVALID_VALUE, "Knob '" + knobId + "' has unknown default_value type"},
+                {}};
+    }
+
+    // Create the knob - strings are already std::string in KnobT
+    Knob knob(std::move(knobT->knob_id),
+              std::move(knobT->description),
+              std::move(defaultValue),
+              knobT->deprecated);
+
+    // Handle constraints using the native union types
+    switch(knobT->constraint.type)
+    {
+    case hipdnn_data_sdk::data_objects::KnobConstraint::IntConstraint:
+    {
+        auto* c = knobT->constraint.AsIntConstraint();
+        std::unordered_set<int64_t> validValues(c->valid_values.begin(), c->valid_values.end());
+        knob._constraint = std::make_unique<IntConstraint>(
+            c->min_value, c->max_value, c->step, std::move(validValues));
+        break;
+    }
+    case hipdnn_data_sdk::data_objects::KnobConstraint::FloatConstraint:
+    {
+        auto* c = knobT->constraint.AsFloatConstraint();
+        knob._constraint = std::make_unique<FloatConstraint>(c->min_value, c->max_value);
+        break;
+    }
+    case hipdnn_data_sdk::data_objects::KnobConstraint::StringConstraint:
+    {
+        auto* c = knobT->constraint.AsStringConstraint();
+        std::unordered_set<std::string> validValues(c->valid_values.begin(), c->valid_values.end());
+        knob._constraint
+            = std::make_unique<StringConstraint>(c->max_length, std::move(validValues));
+        break;
+    }
+    case hipdnn_data_sdk::data_objects::KnobConstraint::NONE:
+        knob._constraint = std::make_unique<EmptyConstraint>();
+        break;
+    default:
+        return {{ErrorCode::INVALID_VALUE, "Knob '" + knobId + "' has unknown constraint type"},
+                {}};
+    }
+
+    // Validate that the default_value satisfies the constraint
+    if(knob._constraint)
+    {
+        const KnobSetting defaultSetting(knob._knobId, knob._defaultValue);
+        auto validationError = knob._constraint->validateKnobSetting(defaultSetting);
+        if(validationError.code != ErrorCode::OK)
+        {
+            return {{ErrorCode::INVALID_VALUE,
+                     "Knob '" + knob._knobId + "' has default_value that violates its constraint: "
+                         + validationError.err_msg},
+                    {}};
+        }
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     return {{ErrorCode::OK, ""}, knob};

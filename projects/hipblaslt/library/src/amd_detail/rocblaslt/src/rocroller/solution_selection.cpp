@@ -34,7 +34,11 @@ constexpr std::array<WorkGroupTileSize, possibleTileSizesCount> possibleTileSize
         {32, 32, 128},   {32, 32, 64},    {16, 256, 128},  {64, 16, 128},   {16, 64, 128},
         {32, 16, 128},   {16, 32, 128},   {16, 16, 128},   {16, 16, 256},   {16, 64, 256}}};
 
+<<<<<<< HEAD
 constexpr size_t possibleSwizzleTileSizesCount = 37;
+=======
+constexpr size_t possibleSwizzleTileSizesCount = 38;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 constexpr std::array<WorkGroupTileSize, possibleSwizzleTileSizesCount> possibleSwizzleTileSizes
     = {{{32,32,128}, {64, 32, 128}, {64, 64, 128}, {128, 32, 128},
@@ -284,6 +288,88 @@ std::vector<SolutionIndexParameters> chooseSolutionIndexParameters(
                 continue;
             if (wgt.m % 32 != 0 || wgt.n % 32 != 0)
                 continue;
+<<<<<<< HEAD
+=======
+
+            // check if this size is valid for pre-swizzled data
+            if (hasPreSwizzle)
+            {
+                if (kernelType.typeA != rocRoller::DataType::FP4 ||
+                    kernelType.typeB != rocRoller::DataType::FP4)
+                    continue;
+                if (wgt.m % 32 != 0 || wgt.n % 32 != 0)
+                    continue;
+            }
+
+            // wgt.k has to be at least 256 when scale data is pre-swizzled
+            if(kernelType.scaleTypeA.preSwizzleTile.size() == 3
+               && kernelType.scaleTypeB.preSwizzleTile.size() == 3 && wgt.k < 256)
+                continue;
+
+            // {256, 256, 256} tile size is only supported for FP4 data types with preSwizzled and preTiled scale data
+            bool isFP4 = (kernelType.typeA == rocRoller::DataType::FP4
+                          && kernelType.typeB == rocRoller::DataType::FP4);
+
+            bool is256Tile = (wgt.m == 256 && wgt.n == 256 && wgt.k == 256);
+
+            // Only allow 256x256x256 for FP4 with preSwizzled and preTiled scale data
+            if(is256Tile && !(isFP4))
+                continue;
+
+            bool useTailLoops = true;
+
+            
+
+            bool useWorkgroupMapping = true;
+            if(prob.k < USE_WORKGROUP_MAPPING_K_SIZE)
+            {
+                useWorkgroupMapping = false;
+            }
+
+            // Enable StreamK when:
+            // 1. Number of output tiles < number of CUs
+            // 2. There are enough K iterations per tile (itersPerTile >= 16) to
+            //    amortize StreamK overhead. Threshold is derived from origami's
+            //    MinItersPerCU (8) applied to the smallest useful split factor (2).
+            // 3. Data type is not f6 (unsupported) or large f8 (register pressure).
+            // 4. Not the 256x256x256 FP4 pre-swizzled tile.
+            bool useStreamK = false;
+            size_t numTilesM    = prob.m / wgt.m;
+            size_t numTilesN    = prob.n / wgt.n;
+            size_t numTiles     = numTilesM * numTilesN * prob.batch_count;
+            size_t itersPerTile = prob.k / wgt.k;
+            auto   isF6         = (kernelType.typeA == rocRoller::DataType::FP6
+                         || kernelType.typeA == rocRoller::DataType::BF6
+                         || kernelType.typeB == rocRoller::DataType::FP6
+                         || kernelType.typeB == rocRoller::DataType::BF6);
+            auto isLargeF8 = ((kernelType.typeA == rocRoller::DataType::FP8
+                || kernelType.typeA == rocRoller::DataType::BF8
+                || kernelType.typeB == rocRoller::DataType::FP8
+                || kernelType.typeB == rocRoller::DataType::BF8)
+               && wgt.m + wgt.n > 256);
+            int cu_multiplier = 1;
+            if(kernelType.swizzleA)
+                cu_multiplier = 4;
+            if(numTiles * cu_multiplier < analytical_hardware.N_CU && itersPerTile >= 16
+               && !isF6 && !isLargeF8 && !is256Tile)
+            {
+                useStreamK = true;
+            }
+
+            // Heuristics:
+            // 64x256 performs poorly for StreamK
+            if(useStreamK && wgt.m == 64 && wgt.n == 256)
+                continue;
+
+            // Prefer assembly kernels for swizzleA
+            if(kernelType.swizzleA && !useStreamK && ((wgt.m == 32 && wgt.n == 32) ||
+                                                      (wgt.m == 64 && wgt.n == 32) ||
+                                                      (wgt.m == 64 && wgt.n == 64) ||
+                                                      (wgt.m == 128 && wgt.n == 32)))
+                lastParams.push_back({wgt, useWorkgroupMapping, useStreamK, useTailLoops});
+            else
+                params.push_back({wgt, useWorkgroupMapping, useStreamK, useTailLoops});
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
 
         // wgt.k has to be at least 256 when scale data is pre-swizzled

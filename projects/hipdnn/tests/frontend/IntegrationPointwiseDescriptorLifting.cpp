@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <hipdnn_frontend.hpp>
+<<<<<<< HEAD
 #include <hipdnn_frontend/node/PointwiseNode.hpp>
 #include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
 #include <hipdnn_test_sdk/constants/PointwiseConstants.hpp>
@@ -29,6 +30,67 @@ namespace
 {
 class IntegrationPointwiseDescriptorLifting : public IntegrationTestFixture
 {
+=======
+#include <hipdnn_frontend/detail/ScopedHipdnnBackendDescriptor.hpp>
+#include <hipdnn_frontend/node/PointwiseNode.hpp>
+#include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
+#include <hipdnn_test_sdk/constants/PointwiseConstants.hpp>
+#include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
+#include <hipdnn_test_sdk/utilities/ToVec.hpp>
+
+#include "test_plugins/TestPluginConstants.hpp"
+
+using namespace hipdnn_frontend;
+using namespace hipdnn_frontend::graph;
+using hipdnn_tests::toVec;
+using namespace hipdnn_tests::constants::integration;
+
+namespace
+{
+
+// Exposes protected Graph methods for testing
+class TestableGraph : public Graph
+{
+public:
+    using Graph::build_operation_graph;
+    using Graph::deserialize_via_backend;
+    using Graph::fromBackendDescriptor;
+    using Graph::get_raw_graph_descriptor;
+
+    const std::vector<std::shared_ptr<INode>>& getSubNodes() const
+    {
+        return _sub_nodes;
+    }
+};
+
+class IntegrationPointwiseDescriptorLifting : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        SKIP_IF_NO_DEVICES();
+
+        ASSERT_EQ(hipInit(0), hipSuccess);
+
+        const std::array<const char*, 1> paths
+            = {hipdnn_tests::plugin_constants::testGoodPluginPath().c_str()};
+        ASSERT_EQ(hipdnnSetEnginePluginPaths_ext(
+                      paths.size(), paths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+
+        ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
+    }
+
+    void TearDown() override
+    {
+        if(_handle != nullptr)
+        {
+            hipdnnDestroy(_handle);
+        }
+    }
+
+    hipdnnHandle_t _handle = nullptr;
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 // Builds a binary pointwise (ADD) graph, lowers via build_operation_graph(handle),
@@ -36,7 +98,11 @@ class IntegrationPointwiseDescriptorLifting : public IntegrationTestFixture
 // and graph-level data types.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseBinaryAddRoundTripViaCApi)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseAddLiftingTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -57,8 +123,24 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseBinaryAddRoundTripViaCApi
     auto out0 = graph->pointwise(in0, in1, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    // Lift back into a new graph
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify graph-level data types
     EXPECT_EQ(liftedGraph->get_compute_data_type(), DataType::FLOAT);
@@ -89,8 +171,12 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseBinaryAddRoundTripViaCApi
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::ADD);
     EXPECT_EQ(pwNode->attributes.get_name(), "add_op");
@@ -103,7 +189,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseBinaryAddRoundTripViaCApi
 // lowers, lifts, and verifies mode + activation parameters.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseUnaryReluScalarsPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseReluLiftingTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -127,15 +217,34 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseUnaryReluScalarsPreserved
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::RELU_FWD);
 
@@ -159,7 +268,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseUnaryReluScalarsPreserved
 // and verifies all three inputs and the output are correctly reconstructed.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTernarySelectRoundTrip)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseTernaryLiftingTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -184,8 +297,23 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTernarySelectRoundTrip)
     auto out0 = graph->pointwise(in0, in1, in2, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto tensorMap = liftedGraph->getTensorsByUid();
     ASSERT_EQ(tensorMap.size(), 4u);
@@ -214,8 +342,12 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTernarySelectRoundTrip)
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::BINARY_SELECT);
     EXPECT_EQ(pwNode->attributes.get_input_0()->get_uid(), K_PW_TENSOR_IN0_UID);
@@ -229,7 +361,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTernarySelectRoundTrip)
 // pointwise operation survives the FlatBuffer-direct deserialization path.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseLiftWithoutFinalization)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseFlatBufferLiftTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -250,8 +386,26 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseLiftWithoutFinalization)
     auto out0 = graph->pointwise(in0, in1, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraphWithoutFinalization(*graph);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    // Serialize to binary
+    auto data = graph->toBinary();
+    ASSERT_FALSE(data.empty());
+
+    // Create backend descriptor from bytes (no handle, no finalize)
+    const detail::ScopedHipdnnBackendDescriptor graphDesc(data.data(), data.size());
+    ASSERT_TRUE(graphDesc.valid()) << "Failed to create backend graph descriptor";
+
+    // Lift into a new graph
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(graphDesc.get());
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(liftedGraph->get_compute_data_type(), DataType::FLOAT);
 
@@ -259,8 +413,12 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseLiftWithoutFinalization)
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::MUL);
     EXPECT_EQ(pwNode->attributes.get_input_0()->get_uid(), K_PW_TENSOR_IN0_UID);
@@ -272,7 +430,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseLiftWithoutFinalization)
 // pointwise node attributes after lifting.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTensorSharingPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseTensorSharingTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -289,8 +451,23 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTensorSharingPreserved)
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto tensorMap = liftedGraph->getTensorsByUid();
     auto& subNodes = liftedGraph->getSubNodes();
@@ -308,7 +485,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseTensorSharingPreserved)
 // lowers, lifts, and verifies the scalar survives the round trip.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSwishBetaPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseSwishBetaLiftTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -326,15 +507,34 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSwishBetaPreserved)
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::SWISH_FWD);
     EXPECT_TRUE(pwNode->attributes.get_swish_beta().has_value());
@@ -345,7 +545,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSwishBetaPreserved)
 // lowers, lifts, and verifies the scalar survives the round trip.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseEluAlphaPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseEluAlphaLiftTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -363,15 +567,34 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseEluAlphaPreserved)
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::ELU_FWD);
     EXPECT_TRUE(pwNode->attributes.get_elu_alpha().has_value());
@@ -382,7 +605,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseEluAlphaPreserved)
 // lowers, lifts, and verifies the scalar survives the round trip.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSoftplusBetaPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseSoftplusBetaLiftTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -400,15 +627,34 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSoftplusBetaPreserved)
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::SOFTPLUS_FWD);
     EXPECT_TRUE(pwNode->attributes.get_softplus_beta().has_value());
@@ -419,7 +665,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseSoftplusBetaPreserved)
 // lowers, lifts, and verifies the scalar survives the round trip.
 TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseGenIndexAxisPreserved)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("PointwiseGenIndexAxisLiftTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -437,15 +687,34 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseGenIndexAxisPreserved)
     auto out0 = graph->pointwise(in0, pwAttrs);
     out0->set_uid(K_PW_TENSOR_OUT0_UID).set_output(true).set_name("OUT0");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 1u);
 
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[0].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected a PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected a PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::GEN_INDEX);
     EXPECT_TRUE(pwNode->attributes.get_axis().has_value());
@@ -456,7 +725,11 @@ TEST_F(IntegrationPointwiseDescriptorLifting, PointwiseGenIndexAxisPreserved)
 // lifts back, and verifies both operation nodes and the shared virtual tensor.
 TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
 {
+<<<<<<< HEAD
     auto graph = std::make_shared<TestableGraphLifting>();
+=======
+    auto graph = std::make_shared<TestableGraph>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     graph->set_name("ConvReluFusionTest")
         .set_compute_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -464,6 +737,7 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
 
     // Conv fprop inputs
     auto x = std::make_shared<TensorAttributes>();
+<<<<<<< HEAD
     x->set_uid(K_FPROP_TENSOR_X_UID).set_name("X").set_data_type(DataType::FLOAT);
     x->set_dim(toVec(K_FPROP_TENSOR_X_DIMS)).set_stride(toVec(K_FPROP_TENSOR_X_STRIDES));
 
@@ -477,6 +751,21 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
     convAttrs.set_post_padding(toVec(K_FPROP_CONV_PADDING));
     convAttrs.set_stride(toVec(K_FPROP_CONV_STRIDE));
     convAttrs.set_dilation(toVec(K_FPROP_CONV_DILATION));
+=======
+    x->set_uid(K_TENSOR_X_UID).set_name("X").set_data_type(DataType::FLOAT);
+    x->set_dim(toVec(K_TENSOR_X_DIMS)).set_stride(toVec(K_TENSOR_X_STRIDES));
+
+    auto w = std::make_shared<TensorAttributes>();
+    w->set_uid(K_TENSOR_W_UID).set_name("W").set_data_type(DataType::FLOAT);
+    w->set_dim(toVec(K_TENSOR_W_DIMS)).set_stride(toVec(K_TENSOR_W_STRIDES));
+
+    ConvFpropAttributes convAttrs;
+    convAttrs.set_name("conv_fprop_op");
+    convAttrs.set_pre_padding(toVec(K_CONV_PRE_PADDING));
+    convAttrs.set_post_padding(toVec(K_CONV_POST_PADDING));
+    convAttrs.set_stride(toVec(K_CONV_STRIDE));
+    convAttrs.set_dilation(toVec(K_CONV_DILATION));
+>>>>>>> d9e199e220 (merge b-shi branch)
     convAttrs.set_convolution_mode(ConvolutionMode::CROSS_CORRELATION);
 
     // Conv output y is a virtual intermediate — no UID, not an output
@@ -490,6 +779,7 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
     auto reluOut = graph->pointwise(y, reluAttrs);
     reluOut->set_uid(K_PW_RELU_OUT_UID).set_output(true).set_name("relu_out");
 
+<<<<<<< HEAD
     auto liftedGraph = liftGraph(*graph, _handle);
     ASSERT_NE(liftedGraph, nullptr);
 
@@ -497,21 +787,51 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
     auto& subNodes = liftedGraph->getSubNodes();
     ASSERT_EQ(subNodes.size(), 2u)
         << "Expected 2 operation nodes (conv + relu)"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    // Lift back into a new graph
+    auto liftedGraph = std::make_shared<TestableGraph>();
+    result = liftedGraph->fromBackendDescriptor(rawDesc);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    // Verify 2 operation nodes
+    auto& subNodes = liftedGraph->getSubNodes();
+    ASSERT_EQ(subNodes.size(), 2u) << "Expected 2 operation nodes (conv + relu)";
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // First node: ConvolutionFpropNode
     auto* convNode = dynamic_cast<ConvolutionFpropNode*>(subNodes[0].get());
     ASSERT_NE(convNode, nullptr) << "Expected first node to be ConvolutionFpropNode";
+<<<<<<< HEAD
     EXPECT_EQ(convNode->attributes.get_pre_padding(), toVec(K_FPROP_CONV_PADDING));
     EXPECT_EQ(convNode->attributes.get_post_padding(), toVec(K_FPROP_CONV_PADDING));
     EXPECT_EQ(convNode->attributes.get_stride(), toVec(K_FPROP_CONV_STRIDE));
     EXPECT_EQ(convNode->attributes.get_dilation(), toVec(K_FPROP_CONV_DILATION));
+=======
+    EXPECT_EQ(convNode->attributes.get_pre_padding(), toVec(K_CONV_PRE_PADDING));
+    EXPECT_EQ(convNode->attributes.get_post_padding(), toVec(K_CONV_POST_PADDING));
+    EXPECT_EQ(convNode->attributes.get_stride(), toVec(K_CONV_STRIDE));
+    EXPECT_EQ(convNode->attributes.get_dilation(), toVec(K_CONV_DILATION));
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_EQ(convNode->attributes.get_convolution_mode(), ConvolutionMode::CROSS_CORRELATION);
     EXPECT_EQ(convNode->attributes.get_name(), "conv_fprop_op");
 
     // Second node: PointwiseNode with RELU_FWD
     auto* pwNode = dynamic_cast<PointwiseNode*>(subNodes[1].get());
+<<<<<<< HEAD
     ASSERT_NE(pwNode, nullptr)
         << "Expected second node to be PointwiseNode"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    ASSERT_NE(pwNode, nullptr) << "Expected second node to be PointwiseNode";
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_EQ(pwNode->attributes.get_mode(), PointwiseMode::RELU_FWD);
     EXPECT_EQ(pwNode->attributes.get_name(), "relu_activation");
 
@@ -519,6 +839,7 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
     auto convY = convNode->attributes.get_y();
     auto reluIn0 = pwNode->attributes.get_input_0();
     EXPECT_EQ(convY.get(), reluIn0.get())
+<<<<<<< HEAD
         << "Conv output and relu input should share the same "
            "TensorAttributes object"; // NOLINT(readability-implicit-bool-conversion)
 
@@ -526,6 +847,14 @@ TEST_F(IntegrationPointwiseDescriptorLifting, ConvFpropReluFusionRoundTrip)
     auto tensorMap = liftedGraph->getTensorsByUid();
     EXPECT_NE(tensorMap.count(K_FPROP_TENSOR_X_UID), 0u) << "X tensor not found";
     EXPECT_NE(tensorMap.count(K_FPROP_TENSOR_W_UID), 0u) << "W tensor not found";
+=======
+        << "Conv output and relu input should share the same TensorAttributes object";
+
+    // Verify tensor map contains external tensors (X, W, relu_out) plus the virtual intermediate
+    auto tensorMap = liftedGraph->getTensorsByUid();
+    EXPECT_NE(tensorMap.count(K_TENSOR_X_UID), 0u) << "X tensor not found";
+    EXPECT_NE(tensorMap.count(K_TENSOR_W_UID), 0u) << "W tensor not found";
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_NE(tensorMap.count(K_PW_RELU_OUT_UID), 0u) << "relu_out tensor not found";
 }
 

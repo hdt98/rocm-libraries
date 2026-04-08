@@ -47,6 +47,21 @@ protected:
     {
         SKIP_IF_NO_DEVICES();
 
+<<<<<<< HEAD
+=======
+        // Skip tests that are listed as expected failures in the config
+        auto* testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
+        if(testInfo != nullptr)
+        {
+            std::string fullName
+                = std::string(testInfo->test_suite_name()) + "." + std::string(testInfo->name());
+            if(TestConfig::get().isExpectedFailure(fullName))
+            {
+                GTEST_SKIP() << "Expected failure (XFAIL)";
+            }
+        }
+
+>>>>>>> d9e199e220 (merge b-shi branch)
         // Initialize HIP
         ASSERT_EQ(hipInit(0), hipSuccess);
         ASSERT_EQ(hipGetDevice(&_deviceId), hipSuccess);
@@ -56,10 +71,18 @@ protected:
 
     // Determine tolerance for an output tensor based on the graph and
     // configured tolerance mode for the engine.
+<<<<<<< HEAD
     float getTolerance(const hipdnn_frontend::graph::Graph& graph,
                        const std::shared_ptr<hipdnn_frontend::graph::TensorAttributes>& output)
     {
         ToleranceMode mode = TestConfig::get().getToleranceMode();
+=======
+    float getTolerance(int64_t engineId,
+                       const hipdnn_frontend::graph::Graph& graph,
+                       const std::shared_ptr<hipdnn_frontend::graph::TensorAttributes>& output)
+    {
+        ToleranceMode mode = TestConfig::get().getToleranceMode(engineId);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         if(mode == ToleranceMode::DEFAULT)
         {
@@ -198,6 +221,7 @@ protected:
                            float absoluteTolerance,
                            float relativeTolerance)
     {
+<<<<<<< HEAD
         // Check for per-test tolerance override from TOML config
         float finalAtol = absoluteTolerance;
         float finalRtol = relativeTolerance;
@@ -221,6 +245,11 @@ protected:
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
         _deferredValidators.emplace_back([this, attr, finalAtol, finalRtol]() {
+=======
+        // Since the graph can infer properties + Ids, we defer validator registration until right
+        // before validation in verifyGraph
+        _deferredValidators.emplace_back([this, attr, absoluteTolerance, relativeTolerance]() {
+>>>>>>> d9e199e220 (merge b-shi branch)
             _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createAllCloseValidator(
@@ -237,11 +266,17 @@ protected:
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
         _deferredValidators.emplace_back([this, attr, rmsThreshold]() {
+<<<<<<< HEAD
             _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createRmsValidator(
                      hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
                      rmsThreshold)});
+=======
+            _tensorIdToValidatorMap.insert({attr->get_uid(),
+                                            hipdnn_test_sdk::utilities::createRmsValidator(
+                                                toSdkType(attr->get_data_type()), rmsThreshold)});
+>>>>>>> d9e199e220 (merge b-shi branch)
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -340,8 +375,12 @@ protected:
     void executeCpuGraph(hipdnn_frontend::graph::Graph& graph,
                          hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
     {
+<<<<<<< HEAD
         auto [serializedGraph, serErr] = graph.to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+=======
+        auto flatbufferGraph = graph.buildFlatbufferOperationGraph();
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
             serializedGraph.data(), serializedGraph.size(), bundle.toHostVariantPack());

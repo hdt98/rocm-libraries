@@ -198,7 +198,11 @@ void getByteArray(const std::vector<uint8_t>& source,
     std::memcpy(arrayOfElements, source.data(), static_cast<size_t>(copyCount));
 }
 
+<<<<<<< HEAD
 void setDataType(hipdnn_flatbuffers_sdk::data_objects::DataType& target,
+=======
+void setDataType(hipdnn_data_sdk::data_objects::DataType& target,
+>>>>>>> d9e199e220 (merge b-shi branch)
                  hipdnnBackendAttributeType_t attributeType,
                  int64_t elementCount,
                  const void* arrayOfElements,
@@ -375,6 +379,7 @@ void getNormFwdPhase(hipdnn_flatbuffers_sdk::data_objects::NormFwdPhase source,
     std::memcpy(arrayOfElements, &tmp, sizeof(tmp));
 }
 
+<<<<<<< HEAD
 void setReductionMode(hipdnn_flatbuffers_sdk::data_objects::ReductionMode& target,
                       hipdnnBackendAttributeType_t attributeType,
                       int64_t elementCount,
@@ -420,6 +425,9 @@ void getReductionMode(hipdnn_flatbuffers_sdk::data_objects::ReductionMode source
 }
 
 void getOperationType(hipdnnOperationType_ext_t source,
+=======
+void getOperationType(hipdnnOperationType_t source,
+>>>>>>> d9e199e220 (merge b-shi branch)
                       hipdnnBackendAttributeType_t attributeType,
                       int64_t requestedElementCount,
                       int64_t* elementCount,
@@ -440,7 +448,11 @@ void getOperationType(hipdnnOperationType_ext_t source,
     THROW_IF_FALSE(requestedElementCount >= 1,
                    HIPDNN_STATUS_BAD_PARAM,
                    std::string(errorPrefix) + ": requestedElementCount < 1");
+<<<<<<< HEAD
     std::memcpy(arrayOfElements, &source, sizeof(hipdnnOperationType_ext_t));
+=======
+    std::memcpy(arrayOfElements, &source, sizeof(hipdnnOperationType_t));
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(elementCount != nullptr)
     {
         *elementCount = 1;
@@ -714,29 +726,52 @@ void getAttentionImplementation(
     }
 }
 
+<<<<<<< HEAD
 void copyKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& src,
                         hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& dst,
+=======
+void copyKnobValueUnion(const hipdnn_data_sdk::data_objects::KnobValueUnion& src,
+                        hipdnn_data_sdk::data_objects::KnobValueUnion& dst,
+>>>>>>> d9e199e220 (merge b-shi branch)
                         const char* errorPrefix)
 {
     switch(src.type)
     {
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::IntValue:
     {
         hipdnn_flatbuffers_sdk::data_objects::IntValueT intVal;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+    {
+        hipdnn_data_sdk::data_objects::IntValueT intVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         intVal.value = src.AsIntValue()->value;
         dst.Set(intVal);
         break;
     }
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::FloatValue:
     {
         hipdnn_flatbuffers_sdk::data_objects::FloatValueT floatVal;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+    {
+        hipdnn_data_sdk::data_objects::FloatValueT floatVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         floatVal.value = src.AsFloatValue()->value;
         dst.Set(floatVal);
         break;
     }
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
     {
         hipdnn_flatbuffers_sdk::data_objects::StringValueT strVal;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+    {
+        hipdnn_data_sdk::data_objects::StringValueT strVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         strVal.value = src.AsStringValue()->value;
         dst.Set(std::move(strVal));
         break;
@@ -748,7 +783,11 @@ void copyKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUni
     }
 }
 
+<<<<<<< HEAD
 void setKnobValueUnion(hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& target,
+=======
+void setKnobValueUnion(hipdnn_data_sdk::data_objects::KnobValueUnion& target,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        hipdnnBackendAttributeType_t attributeType,
                        int64_t elementCount,
                        const void* arrayOfElements,
@@ -759,7 +798,11 @@ void setKnobValueUnion(hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& tar
     {
     case HIPDNN_TYPE_INT64:
     {
+<<<<<<< HEAD
         hipdnn_flatbuffers_sdk::data_objects::IntValueT intVal;
+=======
+        hipdnn_data_sdk::data_objects::IntValueT intVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalar(intVal.value,
                   HIPDNN_TYPE_INT64,
                   attributeType,
@@ -771,7 +814,11 @@ void setKnobValueUnion(hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& tar
     }
     case HIPDNN_TYPE_DOUBLE:
     {
+<<<<<<< HEAD
         hipdnn_flatbuffers_sdk::data_objects::FloatValueT floatVal;
+=======
+        hipdnn_data_sdk::data_objects::FloatValueT floatVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalar(floatVal.value,
                   HIPDNN_TYPE_DOUBLE,
                   attributeType,
@@ -783,7 +830,11 @@ void setKnobValueUnion(hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& tar
     }
     case HIPDNN_TYPE_CHAR:
     {
+<<<<<<< HEAD
         hipdnn_flatbuffers_sdk::data_objects::StringValueT strVal;
+=======
+        hipdnn_data_sdk::data_objects::StringValueT strVal;
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundedString(strVal.value,
                          attributeType,
                          elementCount,
@@ -801,7 +852,11 @@ void setKnobValueUnion(hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& tar
     }
 }
 
+<<<<<<< HEAD
 void getKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion& source,
+=======
+void getKnobValueUnion(const hipdnn_data_sdk::data_objects::KnobValueUnion& source,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        hipdnnBackendAttributeType_t attributeType,
                        int64_t requestedElementCount,
                        int64_t* elementCount,
@@ -810,7 +865,11 @@ void getKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUnio
 {
     switch(source.type)
     {
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::IntValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalar(source.AsIntValue()->value,
                   HIPDNN_TYPE_INT64,
                   attributeType,
@@ -819,7 +878,11 @@ void getKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUnio
                   arrayOfElements,
                   errorPrefix);
         break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::FloatValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalar(source.AsFloatValue()->value,
                   HIPDNN_TYPE_DOUBLE,
                   attributeType,
@@ -828,7 +891,11 @@ void getKnobValueUnion(const hipdnn_flatbuffers_sdk::data_objects::KnobValueUnio
                   arrayOfElements,
                   errorPrefix);
         break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getString(source.AsStringValue()->value,
                   attributeType,
                   requestedElementCount,

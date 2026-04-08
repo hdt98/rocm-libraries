@@ -6,7 +6,11 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/batchnorm_backward_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/batchnorm_backward_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -87,6 +91,13 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    // Creates a finalized BatchnormBackwardOperationDescriptor directly from a FlatBuffer NodeT.
+    // Casts nodeT.attributes to BatchnormBackwardAttributesT internally, then directly assigns
+    // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
+    static std::shared_ptr<BatchnormBackwardOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
@@ -108,8 +119,13 @@ private:
     std::vector<std::shared_ptr<TensorDescriptor>> _peerStatsDescs;
 
     // Compute data type for this operation (stored at node level in graph)
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType _computeDataType
         = hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET;
+=======
+    hipdnn_data_sdk::data_objects::DataType _computeDataType
+        = hipdnn_data_sdk::data_objects::DataType::UNSET;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::string _name;
 };

@@ -279,8 +279,12 @@ TEST_F(IntegrationLayerNormDescriptorLowering, AutoAssignedUidsPreservedInRoundT
                                                   layernorm->y_tensor_uid,
                                                   layernorm->mean_tensor_uid.value(),
                                                   layernorm->inv_variance_tensor_uid.value()};
+<<<<<<< HEAD
     EXPECT_EQ(nodeUids.size(), 7u)
         << "LayerNorm node tensor UIDs are not distinct"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    EXPECT_EQ(nodeUids.size(), 7u) << "LayerNorm node tensor UIDs are not distinct";
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 // Inference mode: mean and inv_variance should not appear in the serialized graph.

@@ -11,9 +11,15 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/matmul_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/matmul_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/MatmulConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
@@ -24,7 +30,11 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
 
@@ -61,9 +71,15 @@ protected:
         _tensorMap[K_MATMUL_TENSOR_C_UID] = TensorDescriptor::fromFlatBuffer(cAttrs);
     }
 
+<<<<<<< HEAD
     static hipdnn_flatbuffers_sdk::data_objects::MatmulAttributesT createStandardMatmulAttrs()
     {
         hipdnn_flatbuffers_sdk::data_objects::MatmulAttributesT attrs;
+=======
+    static hipdnn_data_sdk::data_objects::MatmulAttributesT createStandardMatmulAttrs()
+    {
+        hipdnn_data_sdk::data_objects::MatmulAttributesT attrs;
+>>>>>>> d9e199e220 (merge b-shi branch)
         attrs.a_tensor_uid = K_MATMUL_TENSOR_A_UID;
         attrs.b_tensor_uid = K_MATMUL_TENSOR_B_UID;
         attrs.c_tensor_uid = K_MATMUL_TENSOR_C_UID;
@@ -86,7 +102,11 @@ TEST_F(TestMatmulOperationFromNode, CreatesValidFinalizedDescriptor)
 
     ASSERT_NE(desc, nullptr);
     ASSERT_TRUE(desc->isFinalized());
+<<<<<<< HEAD
     ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR);
+=======
+    ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR_EXT);
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_EQ(desc->getData().a_tensor_uid, K_MATMUL_TENSOR_A_UID);
 }
 
@@ -219,13 +239,21 @@ TEST_F(TestMatmulOperationFromNode, GetAttributeWorksAfterFromNode)
     hipdnnDataType_t computeType = {};
     int64_t dtCount = 0;
     desc->getAttribute(
+<<<<<<< HEAD
         HIPDNN_ATTR_MATMUL_COMP_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &dtCount, &computeType);
+=======
+        HIPDNN_ATTR_MATMUL_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &dtCount, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     ASSERT_EQ(computeType, HIPDNN_DATA_FLOAT);
 
     // Verify a tensor
     hipdnn_backend::ScopedDescriptor aScoped;
     int64_t aCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_ADESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_A_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &aCount,
@@ -241,7 +269,11 @@ TEST_F(TestMatmulOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify b tensor
     hipdnn_backend::ScopedDescriptor bScoped;
     int64_t bCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_BDESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_B_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &bCount,
@@ -257,7 +289,11 @@ TEST_F(TestMatmulOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify c tensor
     hipdnn_backend::ScopedDescriptor cScoped;
     int64_t cCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_CDESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_MATMUL_C_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &cCount,
@@ -271,12 +307,20 @@ TEST_F(TestMatmulOperationFromNode, GetAttributeWorksAfterFromNode)
                            toVec(K_MATMUL_TENSOR_C_STRIDES));
 
     // Verify operation type
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t opTypeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType);
     ASSERT_EQ(opTypeCount, 1);
+<<<<<<< HEAD
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_MATMUL_EXT);
+=======
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_MATMUL);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestMatmulOperationFromNode, NamePreservedFromNode)

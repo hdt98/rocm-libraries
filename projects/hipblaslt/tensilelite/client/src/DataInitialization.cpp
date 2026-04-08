@@ -918,6 +918,7 @@ namespace TensileLite
             , m_keepPristineCopyOnGPU(args["pristine-on-gpu"].as<bool>())
             , m_workspaceSize(problemFactory.workspaceSize())
             , m_pruneMode(args["prune-mode"].as<PruneSparseMode>())
+            , m_mxScaleFormat(args["mx-scale-format"].as<int>())
 
         {
             HIP_CHECK_EXC(hipStreamCreate(&m_copyStream));
@@ -1258,7 +1259,6 @@ namespace TensileLite
                 std::cout << "Tensor name " << m_vdata[i].name << " init mode "
                           << ToString(m_vdata[i].init) << std::endl;
             }
-
             // Init contants
             for(size_t i = 0; i < m_cdata.size(); i++)
             {
@@ -1314,6 +1314,13 @@ namespace TensileLite
             m_problemDependentData
                 |= (m_sparse
                     | (args["bias-type-args"].as<std::vector<rocisa::DataType>>().size() > 1));
+
+            // Force problem-dependent initialization for MX FP4 to enable mxDataGenerator
+            if(args.count("mx-block-a") && args["mx-block-a"].as<int>() > 0)
+                m_problemDependentData = true;
+            if(args.count("mx-block-b") && args["mx-block-b"].as<int>() > 0)
+                m_problemDependentData = true;
+
             allocNewCPUInputs();
             allocNewGPUInputs();
 
@@ -1672,7 +1679,8 @@ namespace TensileLite
                         {
                             padding = p.maxElements - t.totalAllocatedElements();
                         }
-                        padding *= DataTypeInfo::Get(t.dataType()).elementSize;
+                        padding = multiplyElementSize(padding,
+                                                      DataTypeInfo::Get(t.dataType()).elementSize);
                         return padding;
                     };
 
@@ -1788,11 +1796,21 @@ namespace TensileLite
 
         void DataInitialization::initializeCPUInputs(ContractionProblemGemm const& problem)
         {
+            bool useMXGenerator = isMXFP4Problem(problem);
+            if(useMXGenerator)
+                initializeMXDataForFP4(problem);
+
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
             {
                 if(i == ContractionProblemGemm::TENSOR::COMPRESSED
                    or i == ContractionProblemGemm::TENSOR::METADATA)
+                    continue;
+
+                if(useMXGenerator && (i == ContractionProblemGemm::TENSOR::A
+                                      || i == ContractionProblemGemm::TENSOR::B
+                                      || i == ContractionProblemGemm::TENSOR::MXSA
+                                      || i == ContractionProblemGemm::TENSOR::MXSB))
                     continue;
 
                 if(m_problemDependentData)
@@ -1853,6 +1871,129 @@ namespace TensileLite
             }
         }
 
+        static std::string_view initModeToMXMethod(InitMode mode)
+        {
+            switch(mode)
+            {
+            case InitMode::Zero:
+                return "Zeros";
+            case InitMode::One:
+                return "Ones";
+            case InitMode::Identity:
+                return "Identity";
+            case InitMode::SerialIdx:
+            case InitMode::SerialDim0:
+            case InitMode::SerialDim1:
+                return "Sequential";
+            default:
+                return "Bounded";
+            }
+        }
+
+        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
+        {
+            // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
+            // the scale tensor into the GPU kernel's expected memory layout
+            std::vector<size_t> preSwizzleA, preTileA, preSwizzleB, preTileB;
+
+            if(m_mxScaleFormat > 0 && m_currentSolution != nullptr)
+            {
+                auto const&      mi            = m_currentSolution->sizeMapping.matrixInstruction;
+                size_t           MiK           = static_cast<size_t>(mi[2]);
+                constexpr size_t swizzleTileMN = 32; // 2 SIMDs * 16 lanes per wave for MN access
+                constexpr size_t tileK         = 256 / swizzleTileMN; // scale blocks per wave in K
+
+                if(MiK > 0)
+                {
+                    if(problem.mxBlockA() > 0 && MiK % problem.mxBlockA() == 0)
+                    {
+                        // scale tensor: scaleRows = sizes[0]/mxBlock, scaleCols = sizes[1]
+                        // preSwizzle requires both to be multiples of their tile dimensions
+                        size_t scaleRowsA = problem.a().sizes()[0] / problem.mxBlockA();
+                        size_t scaleColsA = problem.a().sizes()[1];
+                        if(scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0)
+                        {
+                            size_t subTileK = MiK / problem.mxBlockA();
+                            preSwizzleA     = {swizzleTileMN, tileK, subTileK};
+                            preTileA        = {tileK, swizzleTileMN};
+                        }
+                    }
+
+                    if(problem.mxBlockB() > 0 && MiK % problem.mxBlockB() == 0)
+                    {
+                        size_t scaleRowsB = problem.b().sizes()[0] / problem.mxBlockB();
+                        size_t scaleColsB = problem.b().sizes()[1];
+                        if(scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0)
+                        {
+                            size_t subTileK = MiK / problem.mxBlockB();
+                            preSwizzleB     = {swizzleTileMN, tileK, subTileK};
+                            preTileB        = {tileK, swizzleTileMN};
+                        }
+                    }
+                }
+            }
+
+            if(isMXFP4Tensor(problem.a(), problem.mxBlockA()))
+            {
+                auto const& tensorA = problem.a();
+                auto        rows    = tensorA.sizes()[0];
+                auto        cols    = tensorA.sizes()[1];
+                auto        stride  = tensorA.strides()[1];
+
+                auto& pristineA
+                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[rocisa::DataType::Float4];
+                auto& pristineMXScaleA
+                    = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
+
+                auto initA = m_vdata[ContractionProblemGemm::TENSOR::A].init;
+                generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                pristineA.cpuInput.valid.get(),
+                                pristineMXScaleA.cpuInput.valid.get(),
+                                rows,
+                                cols,
+                                stride,
+                                problem.transA(),
+                                preSwizzleA,
+                                preTileA,
+                                problem.mxBlockA(),
+                                1,
+                                true,
+                                initModeToMXMethod(initA),
+                                -1.0f,
+                                1.0f);
+            }
+
+            if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
+            {
+                auto const& tensorB = problem.b();
+                auto        rows    = tensorB.sizes()[0];
+                auto        cols    = tensorB.sizes()[1];
+                auto        stride  = tensorB.strides()[1];
+
+                auto& pristineB
+                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[rocisa::DataType::Float4];
+                auto& pristineMXScaleB
+                    = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
+
+                auto initB = m_vdata[ContractionProblemGemm::TENSOR::B].init;
+                generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                pristineB.cpuInput.valid.get(),
+                                pristineMXScaleB.cpuInput.valid.get(),
+                                rows,
+                                cols,
+                                stride,
+                                problem.transB(),
+                                preSwizzleB,
+                                preTileB,
+                                problem.mxBlockB(),
+                                1,
+                                false,
+                                initModeToMXMethod(initB),
+                                -1.0f,
+                                1.0f);
+            }
+        }
+
         void DataInitialization::initializeConstantInputs(ContractionProblemGemm const& problem)
         {
             // Update constants if needed
@@ -1903,9 +2044,26 @@ namespace TensileLite
                     case rocisa::DataType::BFloat8_fnuz:
                         prop.value = getValue<BFloat8_fnuz>(prop.init, prop.freeValue);
                         break;
+                    case rocisa::DataType::MXScale:
+                        prop.value = getValue<MXScale>(prop.init, prop.freeValue);
+                        break;
+#ifndef _WIN32
+#ifdef TENSILE_USE_FP6
                     case rocisa::DataType::Float6:
+                        prop.value = getValue<Float6x32>(prop.init, prop.freeValue);
+                        break;
+#endif // #ifdef TENSILE_USE_FP6
+#ifdef TENSILE_USE_BF6
                     case rocisa::DataType::BFloat6:
+                        prop.value = getValue<BFloat6x32>(prop.init, prop.freeValue);
+                        break;
+#endif // #ifdef TENSILE_USE_BF6
+#ifdef TENSILE_USE_FP4
                     case rocisa::DataType::Float4:
+                        prop.value = getValue<Float4x2>(prop.init, prop.freeValue);
+                        break;
+#endif // #ifdef TENSILE_USE_FP4
+#endif // !_WIN32
                     case rocisa::DataType::E8:
                     case rocisa::DataType::E5M3:
                     case rocisa::DataType::Int64:
@@ -1914,7 +2072,13 @@ namespace TensileLite
                     case rocisa::DataType::Float8BFloat8:
                     case rocisa::DataType::BFloat8Float8:
                     case rocisa::DataType::Float8BFloat8_fnuz:
-                    case rocisa::DataType::BFloat8Float8_fnuz:;
+                    case rocisa::DataType::BFloat8Float8_fnuz:
+#ifdef _WIN32
+                    case rocisa::DataType::Float6:
+                    case rocisa::DataType::BFloat6:
+                    case rocisa::DataType::Float4:
+#endif // _WIN32
+                    ;
                     }
                 }
                 if(Debug::Instance().printTensorInfo() && prop.dataType != rocisa::DataType::None)

@@ -66,6 +66,7 @@ operation:
   tensor_array_fields: []
 
   has_compute_data_type: true
+<<<<<<< HEAD
   compute_data_type_attr: "HIPDNN_ATTR_MATMUL_COMP_TYPE"
 
   operation_type_enum: "HIPDNN_OPERATION_TYPE_MATMUL_EXT"
@@ -74,6 +75,15 @@ operation:
     constants_include: "MatmulConstants"
     tensor_const_prefix: "K_MATMUL_"
     tensor_uids: { a: 1500, b: 1501, c: 1502 }
+=======
+  compute_data_type_attr: "HIPDNN_ATTR_MATMUL_MATH_PREC_EXT"
+
+  operation_type_enum: "HIPDNN_OPERATION_TYPE_MATMUL"
+
+  test_data:
+    constants_include: "MatmulConstants"
+    tensor_uids: { a: 30, b: 31, c: 32 }
+>>>>>>> d9e199e220 (merge b-shi branch)
     tensor_configs:
       a: { dims: [1, 1, 64, 128], strides: [8192, 8192, 128, 1] }
       b: { dims: [1, 1, 128, 256], strides: [32768, 32768, 256, 1] }

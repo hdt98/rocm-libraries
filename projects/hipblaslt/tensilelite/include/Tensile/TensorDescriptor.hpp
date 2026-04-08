@@ -350,6 +350,24 @@ namespace TensileLite
 
         float elementBytes() const
         {
+            // TODO:Need to enhance this to support segment type in tensileLite.
+            // tensileLite currently maps MX data types to unsegmented
+            // types in DataTypeInfo, i.e., Float4 -> Float4x2,
+            // Float6 -> Float6x32. As a result, return elementSize is
+            // incorrect for MX data types because elementSize represents
+            // unsegmented size in bytes not segment size.
+            //
+            // To get element size (in bytes) for f4/f6/bf6, use
+            //
+            //   auto const info = DataTypeInfo::Get(m_dataType);
+            //   auto elementSize = info.elementSize / info.packing
+            //
+            // tensileLite returns sizeof(Float4x2), sizeof(Float6x32),
+            // sizeof(BFloat6x32) for rocisa::f4,f6,bf6.
+            //
+            assert(m_dataType != rocisa::DataType::Float6  &&
+                   m_dataType != rocisa::DataType::BFloat6 &&
+                   m_dataType != rocisa::DataType::Float4);
             return DataTypeInfo::Get(m_dataType).elementSize;
         }
 
@@ -446,11 +464,13 @@ namespace TensileLite
         if(decorated)
             stream << "[";
 
+        constexpr size_t packing = TypeInfo<std::remove_cv_t<T>>::Packing;
+
         if(desc.sizes()[0] > 0)
             stream << data[0];
 
-        for(size_t i = 1; i < desc.sizes()[0]; i++)
-            stream << " " << data[i];
+        for(size_t i = packing; i < desc.sizes()[0]; i += packing)
+            stream << " " << data[i / packing];
 
         if(decorated)
             stream << "]" << std::endl;
@@ -504,6 +524,8 @@ namespace TensileLite
                 streamJoin(stream, coord, ", ");
                 stream << ")" << std::endl << "[" << std::endl;
             }
+
+            constexpr size_t packing = TypeInfo<std::remove_cv_t<T>>::Packing;
 
             for(coord[1] = 0; coord[1] < sizes[1]; coord[1]++)
             {

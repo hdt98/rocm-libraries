@@ -6,7 +6,11 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/matmul_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/matmul_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -66,12 +70,23 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    // Creates a finalized MatmulOperationDescriptor directly from a FlatBuffer NodeT.
+    // Casts nodeT.attributes to MatmulAttributesT internally, then directly assigns
+    // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
+    static std::shared_ptr<MatmulOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
 
 private:
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::MatmulAttributesT _data;
+=======
+    hipdnn_data_sdk::data_objects::MatmulAttributesT _data;
+>>>>>>> d9e199e220 (merge b-shi branch)
     std::string _name;
 
     // Store tensor descriptor references for validation and graph building

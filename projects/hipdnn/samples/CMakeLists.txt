@@ -48,8 +48,12 @@ macro(add_hipdnn_sample NAME SOURCE)
     # (brings in hipdnn_flatbuffers_sdk as well).
     target_link_libraries(${NAME} PRIVATE hip::host Threads::Threads hipdnn_frontend hipdnn_test_sdk)
     target_compile_options(${NAME} PRIVATE ${HIPDNN_SAMPLE_NO_RTTI_OPTIONS})
+<<<<<<< HEAD
     list(APPEND HIPDNN_ALL_SAMPLES ${NAME})
 endmacro()
+=======
+endfunction()
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 add_hipdnn_sample(hipdnn_sample_bn_inference batchnorm/BnInference.cpp)
 add_hipdnn_sample(hipdnn_sample_bn_inference_with_variance batchnorm/BnInferenceWithVariance.cpp)
@@ -67,12 +71,17 @@ add_hipdnn_sample(hipdnn_sample_fused_conv_fprop_bias_activ convolution/FusedCon
 add_hipdnn_sample(hipdnn_sample_conv_wgrad convolution/ConvWgrad.cpp)
 add_hipdnn_sample(hipdnn_sample_conv_fprop_deterministic convolution/ConvFpropDeterministic.cpp)
 
+<<<<<<< HEAD
 if(HIPDNN_ENABLE_SDPA)
     add_hipdnn_sample(hipdnn_sample_sdpa_fprop sdpa/SdpaFprop.cpp)
 endif()
 
 add_hipdnn_sample(hipdnn_sample_serialization_roundtrip serialization/SerializationRoundTrip.cpp)
 
+=======
+add_hipdnn_sample(hipdnn_sample_serialization_roundtrip serialization/SerializationRoundTrip.cpp)
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 add_hipdnn_sample(hipdnn_sample_knobs_usage knobs/KnobsUsage.cpp)
 
 # Enable testing and add sample tests
@@ -124,11 +133,14 @@ add_hipdnn_sample_test(hipdnn_sample_bn_backward)
 add_hipdnn_sample_test(hipdnn_sample_fused_bn_inference_activ)
 add_hipdnn_sample_test(hipdnn_sample_fused_bn_inference_drelu_bn_backward)
 add_hipdnn_sample_test(hipdnn_sample_fused_bn_inference_variance_activ)
+<<<<<<< HEAD
 
 # Register SDPA samples as tests
 # Note: SDPA sample test is disabled until the ASM SDPA engine's isApplicable
 # check properly gates on architecture, data type, and head dimension.
 # add_hipdnn_sample_test(hipdnn_sample_sdpa_fprop)
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 # Register serialization samples as tests
 add_hipdnn_sample_test(hipdnn_sample_serialization_roundtrip)
@@ -136,9 +148,12 @@ add_hipdnn_sample_test(hipdnn_sample_serialization_roundtrip)
 # Register knobs sample
 # Note: knobs_usage is informational/educational, not validation
 install(TARGETS hipdnn_sample_knobs_usage RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+<<<<<<< HEAD
 
 # Umbrella target for superbuild dependency tracking
 add_custom_target(hipdnn_samples COMMENT "Building all hipDNN samples" DEPENDS ${HIPDNN_ALL_SAMPLES})
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 # Install the generated CTestTestfile.cmake to HIPDNN_SAMPLES_CTEST_FILE_INSTALL_PATH
 install(FILES "${INSTALLED_CTEST_FILE}" DESTINATION ${HIPDNN_SAMPLES_CTEST_FILE_INSTALL_PATH}

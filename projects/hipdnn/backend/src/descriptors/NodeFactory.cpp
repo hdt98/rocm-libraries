@@ -9,10 +9,17 @@ namespace hipdnn_backend
 {
 
 std::shared_ptr<IBackendDescriptor> NodeFactory::createOperationFromNode(
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
     const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     using NodeAttributes = hipdnn_flatbuffers_sdk::data_objects::NodeAttributes;
+=======
+    const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+    const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
+{
+    using NodeAttributes = hipdnn_data_sdk::data_objects::NodeAttributes;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     switch(nodeT.attributes.type)
     {
@@ -42,6 +49,7 @@ std::shared_ptr<IBackendDescriptor> NodeFactory::createOperationFromNode(
         return MatmulOperationDescriptor::fromNode(nodeT, tensorMap);
     case NodeAttributes::PointwiseAttributes:
         return PointwiseOperationDescriptor::fromNode(nodeT, tensorMap);
+<<<<<<< HEAD
     case NodeAttributes::ReductionAttributes:
         return ReductionOperationDescriptor::fromNode(nodeT, tensorMap);
     case NodeAttributes::RMSNormAttributes:
@@ -50,18 +58,35 @@ std::shared_ptr<IBackendDescriptor> NodeFactory::createOperationFromNode(
         return SdpaFwdOperationDescriptor::fromNode(nodeT, tensorMap);
     case NodeAttributes::SdpaBackwardAttributes:
         return SdpaBwdOperationDescriptor::fromNode(nodeT, tensorMap);
+=======
+    case NodeAttributes::RMSNormAttributes:
+        return RMSNormOperationDescriptor::fromNode(nodeT, tensorMap);
+    case NodeAttributes::SdpaAttributes:
+        return SdpaFpropOperationDescriptor::fromNode(nodeT, tensorMap);
+    case NodeAttributes::SdpaBackwardAttributes:
+        return SdpaBpropOperationDescriptor::fromNode(nodeT, tensorMap);
+>>>>>>> d9e199e220 (merge b-shi branch)
     default:
         throw HipdnnException(
             HIPDNN_STATUS_NOT_SUPPORTED,
             "NodeFactory::createOperationFromNode: unsupported node type "
+<<<<<<< HEAD
                 + std::string(hipdnn_flatbuffers_sdk::data_objects::EnumNameNodeAttributes(
                     nodeT.attributes.type)));
+=======
+                + std::string(
+                    hipdnn_data_sdk::data_objects::EnumNameNodeAttributes(nodeT.attributes.type)));
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 }
 
 std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>> NodeFactory::buildTensorMap(
+<<<<<<< HEAD
     const std::vector<std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT>>&
         tensors)
+=======
+    const std::vector<std::unique_ptr<hipdnn_data_sdk::data_objects::TensorAttributesT>>& tensors)
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>> tensorMap;
     for(const auto& tensorT : tensors)

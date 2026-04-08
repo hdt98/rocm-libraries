@@ -9,9 +9,15 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_fwd_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/ConvFpropConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
@@ -186,6 +192,7 @@ protected:
     {
         // Build tensor descriptors using fromFlatBuffer
         TensorAttributesT xAttrs;
+<<<<<<< HEAD
         xAttrs.uid = K_FPROP_TENSOR_X_UID;
         xAttrs.data_type = DataType::FLOAT;
         xAttrs.dims = toVec(K_FPROP_TENSOR_X_DIMS);
@@ -206,12 +213,35 @@ protected:
         _tensorMap[K_FPROP_TENSOR_X_UID] = TensorDescriptor::fromFlatBuffer(xAttrs);
         _tensorMap[K_FPROP_TENSOR_W_UID] = TensorDescriptor::fromFlatBuffer(wAttrs);
         _tensorMap[K_FPROP_TENSOR_Y_UID] = TensorDescriptor::fromFlatBuffer(yAttrs);
+=======
+        xAttrs.uid = K_TENSOR_X_UID;
+        xAttrs.data_type = DataType::FLOAT;
+        xAttrs.dims = toVec(K_TENSOR_X_DIMS);
+        xAttrs.strides = toVec(K_TENSOR_X_STRIDES);
+
+        TensorAttributesT wAttrs;
+        wAttrs.uid = K_TENSOR_W_UID;
+        wAttrs.data_type = DataType::FLOAT;
+        wAttrs.dims = toVec(K_TENSOR_W_DIMS);
+        wAttrs.strides = toVec(K_TENSOR_W_STRIDES);
+
+        TensorAttributesT yAttrs;
+        yAttrs.uid = K_TENSOR_Y_UID;
+        yAttrs.data_type = DataType::FLOAT;
+        yAttrs.dims = toVec(K_TENSOR_Y_DIMS);
+        yAttrs.strides = toVec(K_TENSOR_Y_STRIDES);
+
+        _tensorMap[K_TENSOR_X_UID] = TensorDescriptor::fromFlatBuffer(xAttrs);
+        _tensorMap[K_TENSOR_W_UID] = TensorDescriptor::fromFlatBuffer(wAttrs);
+        _tensorMap[K_TENSOR_Y_UID] = TensorDescriptor::fromFlatBuffer(yAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     // Creates a standard ConvolutionFwdAttributesT
     static ConvolutionFwdAttributesT createStandardConvAttrs()
     {
         ConvolutionFwdAttributesT attrs;
+<<<<<<< HEAD
         attrs.x_tensor_uid = K_FPROP_TENSOR_X_UID;
         attrs.w_tensor_uid = K_FPROP_TENSOR_W_UID;
         attrs.y_tensor_uid = K_FPROP_TENSOR_Y_UID;
@@ -219,6 +249,15 @@ protected:
         attrs.post_padding = toVec(K_FPROP_CONV_PADDING);
         attrs.stride = toVec(K_FPROP_CONV_STRIDE);
         attrs.dilation = toVec(K_FPROP_CONV_DILATION);
+=======
+        attrs.x_tensor_uid = K_TENSOR_X_UID;
+        attrs.w_tensor_uid = K_TENSOR_W_UID;
+        attrs.y_tensor_uid = K_TENSOR_Y_UID;
+        attrs.pre_padding = toVec(K_CONV_PADDING);
+        attrs.post_padding = toVec(K_CONV_PADDING);
+        attrs.stride = toVec(K_CONV_STRIDE);
+        attrs.dilation = toVec(K_CONV_DILATION);
+>>>>>>> d9e199e220 (merge b-shi branch)
         attrs.conv_mode = ConvMode::CROSS_CORRELATION;
         return attrs;
     }
@@ -241,7 +280,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, CreatesValidFinalizedDescriptor)
     ASSERT_NE(desc, nullptr);
     ASSERT_TRUE(desc->isFinalized());
     ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_CONVOLUTION_FORWARD_DESCRIPTOR);
+<<<<<<< HEAD
     EXPECT_EQ(desc->getData().x_tensor_uid, K_FPROP_TENSOR_X_UID);
+=======
+    EXPECT_EQ(desc->getData().x_tensor_uid, K_TENSOR_X_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, NodeFactoryDelegatesCorrectly)
@@ -263,6 +306,7 @@ TEST_F(TestConvolutionFwdOperationFromNode, NodeFactoryDelegatesCorrectly)
     ASSERT_TRUE(desc->isFinalized());
 
     // Verify all attributes are correctly populated via the delegated path
+<<<<<<< HEAD
     EXPECT_EQ(desc->getData().x_tensor_uid, K_FPROP_TENSOR_X_UID);
     EXPECT_EQ(desc->getData().w_tensor_uid, K_FPROP_TENSOR_W_UID);
     EXPECT_EQ(desc->getData().y_tensor_uid, K_FPROP_TENSOR_Y_UID);
@@ -275,6 +319,20 @@ TEST_F(TestConvolutionFwdOperationFromNode, NodeFactoryDelegatesCorrectly)
     EXPECT_EQ(desc->getXDesc()->getData().uid, K_FPROP_TENSOR_X_UID);
     EXPECT_EQ(desc->getWDesc()->getData().uid, K_FPROP_TENSOR_W_UID);
     EXPECT_EQ(desc->getYDesc()->getData().uid, K_FPROP_TENSOR_Y_UID);
+=======
+    EXPECT_EQ(desc->getData().x_tensor_uid, K_TENSOR_X_UID);
+    EXPECT_EQ(desc->getData().w_tensor_uid, K_TENSOR_W_UID);
+    EXPECT_EQ(desc->getData().y_tensor_uid, K_TENSOR_Y_UID);
+    EXPECT_EQ(desc->getData().pre_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(desc->getData().post_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(desc->getData().stride, toVec(K_CONV_STRIDE));
+    EXPECT_EQ(desc->getData().dilation, toVec(K_CONV_DILATION));
+    EXPECT_EQ(desc->getData().conv_mode, ConvMode::CROSS_CORRELATION);
+    EXPECT_EQ(desc->getComputeDataType(), DataType::FLOAT);
+    EXPECT_EQ(desc->getXDesc()->getData().uid, K_TENSOR_X_UID);
+    EXPECT_EQ(desc->getWDesc()->getData().uid, K_TENSOR_W_UID);
+    EXPECT_EQ(desc->getYDesc()->getData().uid, K_TENSOR_Y_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, PreservesComputeDataType)
@@ -301,10 +359,17 @@ TEST_F(TestConvolutionFwdOperationFromNode, PreservesPaddingStridesDilation)
     auto node = createStandardNode();
     auto desc = ConvolutionFwdOperationDescriptor::fromNode(node, _tensorMap);
 
+<<<<<<< HEAD
     EXPECT_EQ(desc->getData().pre_padding, toVec(K_FPROP_CONV_PADDING));
     EXPECT_EQ(desc->getData().post_padding, toVec(K_FPROP_CONV_PADDING));
     EXPECT_EQ(desc->getData().stride, toVec(K_FPROP_CONV_STRIDE));
     EXPECT_EQ(desc->getData().dilation, toVec(K_FPROP_CONV_DILATION));
+=======
+    EXPECT_EQ(desc->getData().pre_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(desc->getData().post_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(desc->getData().stride, toVec(K_CONV_STRIDE));
+    EXPECT_EQ(desc->getData().dilation, toVec(K_CONV_DILATION));
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, SetsTensorReferences)
@@ -315,9 +380,15 @@ TEST_F(TestConvolutionFwdOperationFromNode, SetsTensorReferences)
     ASSERT_NE(desc->getXDesc(), nullptr);
     ASSERT_NE(desc->getWDesc(), nullptr);
     ASSERT_NE(desc->getYDesc(), nullptr);
+<<<<<<< HEAD
     EXPECT_EQ(desc->getXDesc()->getData().uid, K_FPROP_TENSOR_X_UID);
     EXPECT_EQ(desc->getWDesc()->getData().uid, K_FPROP_TENSOR_W_UID);
     EXPECT_EQ(desc->getYDesc()->getData().uid, K_FPROP_TENSOR_Y_UID);
+=======
+    EXPECT_EQ(desc->getXDesc()->getData().uid, K_TENSOR_X_UID);
+    EXPECT_EQ(desc->getWDesc()->getData().uid, K_TENSOR_W_UID);
+    EXPECT_EQ(desc->getYDesc()->getData().uid, K_TENSOR_Y_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, TensorReferencesMatchTensorMap)
@@ -326,14 +397,24 @@ TEST_F(TestConvolutionFwdOperationFromNode, TensorReferencesMatchTensorMap)
     auto desc = ConvolutionFwdOperationDescriptor::fromNode(node, _tensorMap);
 
     // Verify the shared_ptrs point to the same objects in the tensor map
+<<<<<<< HEAD
     EXPECT_EQ(desc->getXDesc(), _tensorMap[K_FPROP_TENSOR_X_UID]);
     EXPECT_EQ(desc->getWDesc(), _tensorMap[K_FPROP_TENSOR_W_UID]);
     EXPECT_EQ(desc->getYDesc(), _tensorMap[K_FPROP_TENSOR_Y_UID]);
+=======
+    EXPECT_EQ(desc->getXDesc(), _tensorMap[K_TENSOR_X_UID]);
+    EXPECT_EQ(desc->getWDesc(), _tensorMap[K_TENSOR_W_UID]);
+    EXPECT_EQ(desc->getYDesc(), _tensorMap[K_TENSOR_Y_UID]);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, FailsWithMissingXTensor)
 {
+<<<<<<< HEAD
     _tensorMap.erase(K_FPROP_TENSOR_X_UID);
+=======
+    _tensorMap.erase(K_TENSOR_X_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto node = createStandardNode();
 
     ASSERT_THROW_HIPDNN_STATUS(ConvolutionFwdOperationDescriptor::fromNode(node, _tensorMap),
@@ -342,7 +423,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, FailsWithMissingXTensor)
 
 TEST_F(TestConvolutionFwdOperationFromNode, FailsWithMissingWTensor)
 {
+<<<<<<< HEAD
     _tensorMap.erase(K_FPROP_TENSOR_W_UID);
+=======
+    _tensorMap.erase(K_TENSOR_W_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto node = createStandardNode();
 
     ASSERT_THROW_HIPDNN_STATUS(ConvolutionFwdOperationDescriptor::fromNode(node, _tensorMap),
@@ -351,7 +436,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, FailsWithMissingWTensor)
 
 TEST_F(TestConvolutionFwdOperationFromNode, FailsWithMissingYTensor)
 {
+<<<<<<< HEAD
     _tensorMap.erase(K_FPROP_TENSOR_Y_UID);
+=======
+    _tensorMap.erase(K_TENSOR_Y_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto node = createStandardNode();
 
     ASSERT_THROW_HIPDNN_STATUS(ConvolutionFwdOperationDescriptor::fromNode(node, _tensorMap),
@@ -365,9 +454,15 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetTensorDescriptorsReturnsAllTensor
 
     auto tensors = desc->getTensorDescriptors();
     ASSERT_EQ(tensors.size(), 3);
+<<<<<<< HEAD
     EXPECT_EQ(tensors[0]->getData().uid, K_FPROP_TENSOR_X_UID);
     EXPECT_EQ(tensors[1]->getData().uid, K_FPROP_TENSOR_W_UID);
     EXPECT_EQ(tensors[2]->getData().uid, K_FPROP_TENSOR_Y_UID);
+=======
+    EXPECT_EQ(tensors[0]->getData().uid, K_TENSOR_X_UID);
+    EXPECT_EQ(tensors[1]->getData().uid, K_TENSOR_W_UID);
+    EXPECT_EQ(tensors[2]->getData().uid, K_TENSOR_Y_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, BuildNodeRoundTrip)
@@ -383,6 +478,7 @@ TEST_F(TestConvolutionFwdOperationFromNode, BuildNodeRoundTrip)
 
     const auto* rebuiltAttrs = rebuiltNode->attributes.AsConvolutionFwdAttributes();
     ASSERT_NE(rebuiltAttrs, nullptr);
+<<<<<<< HEAD
     EXPECT_EQ(rebuiltAttrs->x_tensor_uid, K_FPROP_TENSOR_X_UID);
     EXPECT_EQ(rebuiltAttrs->w_tensor_uid, K_FPROP_TENSOR_W_UID);
     EXPECT_EQ(rebuiltAttrs->y_tensor_uid, K_FPROP_TENSOR_Y_UID);
@@ -390,6 +486,15 @@ TEST_F(TestConvolutionFwdOperationFromNode, BuildNodeRoundTrip)
     EXPECT_EQ(rebuiltAttrs->post_padding, toVec(K_FPROP_CONV_PADDING));
     EXPECT_EQ(rebuiltAttrs->stride, toVec(K_FPROP_CONV_STRIDE));
     EXPECT_EQ(rebuiltAttrs->dilation, toVec(K_FPROP_CONV_DILATION));
+=======
+    EXPECT_EQ(rebuiltAttrs->x_tensor_uid, K_TENSOR_X_UID);
+    EXPECT_EQ(rebuiltAttrs->w_tensor_uid, K_TENSOR_W_UID);
+    EXPECT_EQ(rebuiltAttrs->y_tensor_uid, K_TENSOR_Y_UID);
+    EXPECT_EQ(rebuiltAttrs->pre_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(rebuiltAttrs->post_padding, toVec(K_CONV_PADDING));
+    EXPECT_EQ(rebuiltAttrs->stride, toVec(K_CONV_STRIDE));
+    EXPECT_EQ(rebuiltAttrs->dilation, toVec(K_CONV_DILATION));
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_EQ(rebuiltAttrs->conv_mode, ConvMode::CROSS_CORRELATION);
 }
 
@@ -407,7 +512,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
                        &elementCount,
                        prePadding.data());
     ASSERT_EQ(elementCount, 2);
+<<<<<<< HEAD
     EXPECT_EQ(prePadding, toVec(K_FPROP_CONV_PADDING));
+=======
+    EXPECT_EQ(prePadding, toVec(K_CONV_PADDING));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct compute type
     hipdnnDataType_t computeType = {};
@@ -421,7 +530,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
     int64_t modeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_CONVOLUTION_CONV_MODE, HIPDNN_TYPE_CONVOLUTION_MODE, 1, &modeCount, &convMode);
+<<<<<<< HEAD
     ASSERT_EQ(convMode, HIPDNN_CROSS_CORRELATION);
+=======
+    ASSERT_EQ(convMode, HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct post_padding
     std::vector<int64_t> postPadding(2);
@@ -432,7 +545,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
                        &postPadCount,
                        postPadding.data());
     ASSERT_EQ(postPadCount, 2);
+<<<<<<< HEAD
     EXPECT_EQ(postPadding, toVec(K_FPROP_CONV_PADDING));
+=======
+    EXPECT_EQ(postPadding, toVec(K_CONV_PADDING));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct filter strides
     std::vector<int64_t> filterStrides(2);
@@ -443,7 +560,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
                        &filterStrideCount,
                        filterStrides.data());
     ASSERT_EQ(filterStrideCount, 2);
+<<<<<<< HEAD
     EXPECT_EQ(filterStrides, toVec(K_FPROP_CONV_STRIDE));
+=======
+    EXPECT_EQ(filterStrides, toVec(K_CONV_STRIDE));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct dilations
     std::vector<int64_t> dilations(2);
@@ -451,7 +572,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
     desc->getAttribute(
         HIPDNN_ATTR_CONVOLUTION_DILATIONS, HIPDNN_TYPE_INT64, 2, &dilationCount, dilations.data());
     ASSERT_EQ(dilationCount, 2);
+<<<<<<< HEAD
     EXPECT_EQ(dilations, toVec(K_FPROP_CONV_DILATION));
+=======
+    EXPECT_EQ(dilations, toVec(K_CONV_DILATION));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct X tensor descriptor
     HipdnnBackendDescriptor* xTensorDesc = nullptr;
@@ -468,7 +593,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
     int64_t xUidCount = 0;
     xTensorDesc->getAttribute(
         HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &xUidCount, &xUid);
+<<<<<<< HEAD
     EXPECT_EQ(xUid, K_FPROP_TENSOR_X_UID);
+=======
+    EXPECT_EQ(xUid, K_TENSOR_X_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct W tensor descriptor
     HipdnnBackendDescriptor* wTensorDesc = nullptr;
@@ -485,7 +614,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
     int64_t wUidCount = 0;
     wTensorDesc->getAttribute(
         HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &wUidCount, &wUid);
+<<<<<<< HEAD
     EXPECT_EQ(wUid, K_FPROP_TENSOR_W_UID);
+=======
+    EXPECT_EQ(wUid, K_TENSOR_W_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify getAttribute returns correct Y tensor descriptor
     HipdnnBackendDescriptor* yTensorDesc = nullptr;
@@ -502,15 +635,26 @@ TEST_F(TestConvolutionFwdOperationFromNode, GetAttributeWorksAfterFromNode)
     int64_t yUidCount = 0;
     yTensorDesc->getAttribute(
         HIPDNN_ATTR_TENSOR_UNIQUE_ID, HIPDNN_TYPE_INT64, 1, &yUidCount, &yUid);
+<<<<<<< HEAD
     EXPECT_EQ(yUid, K_FPROP_TENSOR_Y_UID);
 
     // Verify getAttribute returns correct operation type
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    EXPECT_EQ(yUid, K_TENSOR_Y_UID);
+
+    // Verify getAttribute returns correct operation type
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t opTypeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType);
     ASSERT_EQ(opTypeCount, 1);
+<<<<<<< HEAD
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT);
+=======
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationFromNode, NamePreservedFromNode)
@@ -551,11 +695,19 @@ TEST_F(TestConvolutionFwdOperationFromNode, NameSetViaAttributeRoundTrips)
 
     // Wrap tensor descriptors into HipdnnBackendDescriptor for the C API boundary
     const std::unique_ptr<HipdnnBackendDescriptor> xPacked(
+<<<<<<< HEAD
         HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_FPROP_TENSOR_X_UID]));
     const std::unique_ptr<HipdnnBackendDescriptor> wPacked(
         HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_FPROP_TENSOR_W_UID]));
     const std::unique_ptr<HipdnnBackendDescriptor> yPacked(
         HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_FPROP_TENSOR_Y_UID]));
+=======
+        HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_TENSOR_X_UID]));
+    const std::unique_ptr<HipdnnBackendDescriptor> wPacked(
+        HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_TENSOR_W_UID]));
+    const std::unique_ptr<HipdnnBackendDescriptor> yPacked(
+        HipdnnBackendDescriptor::packDescriptor(_tensorMap[K_TENSOR_Y_UID]));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // setAttribute takes void* pointing to a HipdnnBackendDescriptor*, so use raw pointers
     auto* xRaw = xPacked.get();
@@ -576,7 +728,11 @@ TEST_F(TestConvolutionFwdOperationFromNode, NameSetViaAttributeRoundTrips)
                        static_cast<const void*>(&yRaw));
 
     // Set convolution parameters
+<<<<<<< HEAD
     std::vector<int64_t> padding = toVec(K_FPROP_CONV_PADDING);
+=======
+    std::vector<int64_t> padding = toVec(K_CONV_PADDING);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS,
                        HIPDNN_TYPE_INT64,
                        static_cast<int64_t>(padding.size()),
@@ -585,17 +741,29 @@ TEST_F(TestConvolutionFwdOperationFromNode, NameSetViaAttributeRoundTrips)
                        HIPDNN_TYPE_INT64,
                        static_cast<int64_t>(padding.size()),
                        padding.data());
+<<<<<<< HEAD
     std::vector<int64_t> strideVals = toVec(K_FPROP_CONV_STRIDE);
+=======
+    std::vector<int64_t> strideVals = toVec(K_CONV_STRIDE);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES,
                        HIPDNN_TYPE_INT64,
                        static_cast<int64_t>(strideVals.size()),
                        strideVals.data());
+<<<<<<< HEAD
     std::vector<int64_t> dilationVals = toVec(K_FPROP_CONV_DILATION);
+=======
+    std::vector<int64_t> dilationVals = toVec(K_CONV_DILATION);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->setAttribute(HIPDNN_ATTR_CONVOLUTION_DILATIONS,
                        HIPDNN_TYPE_INT64,
                        static_cast<int64_t>(dilationVals.size()),
                        dilationVals.data());
+<<<<<<< HEAD
     auto convMode = static_cast<int64_t>(HIPDNN_CROSS_CORRELATION);
+=======
+    auto convMode = static_cast<int64_t>(HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->setAttribute(
         HIPDNN_ATTR_CONVOLUTION_CONV_MODE, HIPDNN_TYPE_CONVOLUTION_MODE, 1, &convMode);
     auto compType = static_cast<int64_t>(HIPDNN_DATA_FLOAT);

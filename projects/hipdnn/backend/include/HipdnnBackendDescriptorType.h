@@ -241,7 +241,11 @@ typedef enum
      * Represents a block scale quantize operation with input (X),
      * output (Y), and scale tensors plus block_size, axis, and transpose parameters.
      */
+<<<<<<< HEAD
     HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR = 26,
+=======
+    HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR_EXT = 26,
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     /**
      * @brief Batchnorm training forward operation descriptor (extension)
@@ -258,7 +262,11 @@ typedef enum
      * Represents a block scale dequantize operation with input (X),
      * scale, and output (Y) tensors plus block size parameters.
      */
+<<<<<<< HEAD
     HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR = 28,
+=======
+    HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR_EXT = 28,
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     /**
      * @brief Custom operation descriptor
@@ -276,6 +284,7 @@ typedef enum
      * query (Q), key (K), value (V), output (O), gradient output (dO),
      * and stats tensors as inputs, producing gradients dQ, dK, dV.
      */
+<<<<<<< HEAD
     HIPDNN_BACKEND_OPERATION_SDPA_BWD_DESCRIPTOR_EXT = 30,
 
     /**
@@ -285,5 +294,8 @@ typedef enum
      * tensors, a reduction operator, and a compute data type.
      */
     HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR = 31,
+=======
+    HIPDNN_BACKEND_OPERATION_SDPA_BPROP_DESCRIPTOR_EXT = 30,
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 } hipdnnBackendDescriptorType_t;

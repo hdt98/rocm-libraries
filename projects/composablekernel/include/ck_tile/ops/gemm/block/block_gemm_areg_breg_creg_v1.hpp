@@ -320,6 +320,7 @@ struct BlockGemmARegBRegCRegV1
         constexpr index_t MPackIterPerWarp = MIterPerWarp / MXdlPack;
         constexpr index_t NPackIterPerWarp = NIterPerWarp / NXdlPack;
         constexpr index_t KPackIterPerWarp = KIterPerWarp / KXdlPack;
+<<<<<<< HEAD
 
         // hot loop with MX scaling and pre-packed int32_t scales:
         // Outer loops iterate over pack groups (scale tile indices)
@@ -386,6 +387,78 @@ struct BlockGemmARegBRegCRegV1
                             merge_sequences(c_iter_idx{}, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                             c_warp_tensor.get_thread_buffer());
+=======
+
+        // hot loop with MX scaling and pre-packed int32_t scales:
+        // Outer loops iterate over pack groups (scale tile indices)
+        static_for<0, KPackIterPerWarp, 1>{}([&](auto ikpack) {
+            static_for<0, MPackIterPerWarp, 1>{}([&](auto impack) {
+                // Get pre-packed int32_t A scale (already contains MXdlPack*KXdlPack e8m0_t)
+                auto scale_a_slice = scale_a_tensor.get_y_sliced_thread_data(
+                    sequence<ikpack, impack, 0>{}, sequence<1, 1, 1>{});
+                const int32_t a_scale_packed = bit_cast<int32_t>(scale_a_slice[number<0>{}]);
+
+                static_for<0, NPackIterPerWarp, 1>{}([&](auto inpack) {
+                    // Get pre-packed int32_t B scale
+                    auto scale_b_slice = scale_b_tensor.get_y_sliced_thread_data(
+                        sequence<ikpack, inpack, 0>{}, sequence<1, 1, 1>{});
+                    const int32_t b_scale_packed = bit_cast<int32_t>(scale_b_slice[number<0>{}]);
+
+                    // Inner loops: issue MFMAs within the pack group using OpSel
+                    static_for<0, KXdlPack, 1>{}([&](auto ikxdl) {
+                        static_for<0, MXdlPack, 1>{}([&](auto imxdl) {
+                            constexpr auto kIter = ikpack * KXdlPack + ikxdl;
+                            constexpr auto mIter = impack * MXdlPack + imxdl;
+
+                            // read A warp tensor from A block tensor
+                            AWarpTensor a_warp_tensor;
+                            a_warp_tensor.get_thread_buffer() =
+                                a_block_tensor.get_y_sliced_thread_data(
+                                    merge_sequences(sequence<mIter, kIter>{}, a_warp_y_index_zeros),
+                                    merge_sequences(sequence<1, 1>{}, a_warp_y_lengths));
+
+                            // OpSel for A: selects byte within packed int32_t
+                            constexpr index_t kOpSelA = ikxdl * MXdlPack + imxdl;
+
+                            static_for<0, NXdlPack, 1>{}([&](auto inxdl) {
+                                constexpr auto nIter = inpack * NXdlPack + inxdl;
+
+                                // read B warp tensor from B block tensor
+                                BWarpTensor b_warp_tensor;
+                                b_warp_tensor.get_thread_buffer() =
+                                    b_block_tensor.get_y_sliced_thread_data(
+                                        merge_sequences(sequence<nIter, kIter>{},
+                                                        b_warp_y_index_zeros),
+                                        merge_sequences(sequence<1, 1>{}, b_warp_y_lengths));
+
+                                // OpSel for B: selects byte within packed int32_t
+                                constexpr index_t kOpSelB = ikxdl * NXdlPack + inxdl;
+
+                                // read C warp tensor from C block tensor
+                                using c_iter_idx = std::conditional_t<TransposeC,
+                                                                      sequence<nIter, mIter>,
+                                                                      sequence<mIter, nIter>>;
+                                CWarpTensor c_warp_tensor;
+                                c_warp_tensor.get_thread_buffer() =
+                                    c_block_tensor.get_y_sliced_thread_data(
+                                        merge_sequences(c_iter_idx{}, c_warp_y_index_zeros),
+                                        merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
+
+                                // warp GEMM with MX scaling using pre-packed scale and OpSel
+                                WarpGemm{}.template operator()<kOpSelA, kOpSelB>(c_warp_tensor,
+                                                                                 a_warp_tensor,
+                                                                                 b_warp_tensor,
+                                                                                 a_scale_packed,
+                                                                                 b_scale_packed);
+
+                                // write C warp tensor into C block tensor
+                                c_block_tensor.set_y_sliced_thread_data(
+                                    merge_sequences(c_iter_idx{}, c_warp_y_index_zeros),
+                                    merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
+                                    c_warp_tensor.get_thread_buffer());
+                            });
+                        });
+>>>>>>> d9e199e220 (merge b-shi branch)
                     });
                 });
             });

@@ -24,9 +24,14 @@ class RMSnormFwdParams
 {
 public:
     RMSnormFwdParams(
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::data_objects::RMSNormAttributes& attributes,
         const std::unordered_map<int64_t,
                                  const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
+=======
+        const hipdnn_data_sdk::data_objects::RMSNormAttributes& attributes,
+        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+>>>>>>> d9e199e220 (merge b-shi branch)
             tensorMap);
 
     RMSnormFwdParams(const RMSnormFwdParams&) = delete;
@@ -35,6 +40,7 @@ public:
     RMSnormFwdParams(RMSnormFwdParams&&) = default;
     RMSnormFwdParams& operator=(RMSnormFwdParams&&) = default;
 
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* x() const;
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* scale() const;
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* bias() const;
@@ -49,6 +55,22 @@ private:
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* _y;
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* _invRMS;
     const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* _epsilon;
+=======
+    const hipdnn_data_sdk::data_objects::TensorAttributes* x() const;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* scale() const;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* bias() const;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* y() const;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* invRMS() const;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* epsilon() const;
+
+private:
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _x;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _scale;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _bias;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _y;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _invRMS;
+    const hipdnn_data_sdk::data_objects::TensorAttributes* _epsilon;
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 class RMSnormFwdPlan : public hipdnn_plugin_sdk::IPlan<HipKernelHandle>

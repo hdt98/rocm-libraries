@@ -12,12 +12,20 @@
 
 #include <flatbuffers/flatbuffers.h>
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/custom_op_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
 
 #include <hipdnn_test_sdk/constants/CustomOpConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/custom_op_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+
+#include <hipdnn_test_sdk/constants/CustomOpConstants.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <array>
 #include <memory>
@@ -26,9 +34,14 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_tests::constants;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 namespace
 {
@@ -124,7 +137,11 @@ namespace
 // @param tensorSideAttr  The attribute to set — either INPUTS or OUTPUTS — controls which side
 //                        receives the tensor (the other side remains zero).
 // @param fixture  The test fixture (provides getDescriptor() and setHandle()).
+<<<<<<< HEAD
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::GraphT>
+=======
+std::unique_ptr<hipdnn_data_sdk::data_objects::GraphT>
+>>>>>>> d9e199e220 (merge b-shi branch)
     buildAndSerializeZeroPortCustomOp(HipdnnBackendDescriptor* tensorDesc,
                                       hipdnnBackendAttributeName_t tensorSideAttr,
                                       TestGraphDescriptorCustomOp& fixture)
@@ -174,6 +191,7 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::GraphT>
 
 TEST_F(TestGraphDescriptorCustomOp, BuildFromSingleCustomOpOperation)
 {
+<<<<<<< HEAD
     auto input0Desc = createFinalizedTensor(
         K_CUSTOM_OP_INPUT_UID_0, toVec(K_CUSTOM_OP_TENSOR_DIMS), toVec(K_CUSTOM_OP_TENSOR_STRIDES));
     auto input1Desc = createFinalizedTensor(
@@ -181,6 +199,11 @@ TEST_F(TestGraphDescriptorCustomOp, BuildFromSingleCustomOpOperation)
     auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0,
                                              toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                              toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+    auto input0Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1});
+    auto input1Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_1, {2, 3}, {3, 1});
+    auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto customOp = createFinalizedCustomOp(input0Desc.get(), input1Desc.get(), output0Desc.get());
 
@@ -223,9 +246,13 @@ TEST_F(TestGraphDescriptorCustomOp, BuildFromSingleCustomOpOperation)
 
 TEST_F(TestGraphDescriptorCustomOp, FinalizeSucceedsWithZeroInputTensors)
 {
+<<<<<<< HEAD
     auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0,
                                              toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                              toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+    auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto graphT = buildAndSerializeZeroPortCustomOp(
         output0Desc.get(), HIPDNN_ATTR_OPERATION_CUSTOM_OP_OUTPUTS_EXT, *this);
 
@@ -239,8 +266,12 @@ TEST_F(TestGraphDescriptorCustomOp, FinalizeSucceedsWithZeroInputTensors)
 
 TEST_F(TestGraphDescriptorCustomOp, FinalizeSucceedsWithZeroOutputTensors)
 {
+<<<<<<< HEAD
     auto input0Desc = createFinalizedTensor(
         K_CUSTOM_OP_INPUT_UID_0, toVec(K_CUSTOM_OP_TENSOR_DIMS), toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+    auto input0Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto graphT = buildAndSerializeZeroPortCustomOp(
         input0Desc.get(), HIPDNN_ATTR_OPERATION_CUSTOM_OP_INPUTS_EXT, *this);
 
@@ -254,6 +285,7 @@ TEST_F(TestGraphDescriptorCustomOp, FinalizeSucceedsWithZeroOutputTensors)
 
 TEST_F(TestGraphDescriptorCustomOp, ComputeDataTypePreserved)
 {
+<<<<<<< HEAD
     auto input0Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0,
                                             toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                             toVec(K_CUSTOM_OP_TENSOR_STRIDES),
@@ -266,6 +298,14 @@ TEST_F(TestGraphDescriptorCustomOp, ComputeDataTypePreserved)
                                              toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                              toVec(K_CUSTOM_OP_TENSOR_STRIDES),
                                              HIPDNN_DATA_HALF);
+=======
+    auto input0Desc
+        = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1}, HIPDNN_DATA_HALF);
+    auto input1Desc
+        = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_1, {2, 3}, {3, 1}, HIPDNN_DATA_HALF);
+    auto output0Desc
+        = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1}, HIPDNN_DATA_HALF);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto customOp = createFinalizedCustomOp(
         input0Desc.get(), input1Desc.get(), output0Desc.get(), HIPDNN_DATA_HALF);
@@ -296,6 +336,7 @@ TEST_F(TestGraphDescriptorCustomOp, ComputeDataTypePreserved)
 
 TEST_F(TestGraphDescriptorCustomOp, OperationNamePreservedInGraph)
 {
+<<<<<<< HEAD
     auto input0Desc = createFinalizedTensor(
         K_CUSTOM_OP_INPUT_UID_0, toVec(K_CUSTOM_OP_TENSOR_DIMS), toVec(K_CUSTOM_OP_TENSOR_STRIDES));
     auto input1Desc = createFinalizedTensor(
@@ -303,6 +344,11 @@ TEST_F(TestGraphDescriptorCustomOp, OperationNamePreservedInGraph)
     auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0,
                                              toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                              toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+    auto input0Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1});
+    auto input1Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_1, {2, 3}, {3, 1});
+    auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto customOp = createFinalizedCustomOp(
         input0Desc.get(), input1Desc.get(), output0Desc.get(), HIPDNN_DATA_FLOAT, "test_custom_op");
@@ -326,6 +372,7 @@ TEST_F(TestGraphDescriptorCustomOp, OperationNamePreservedInGraph)
 
 TEST_F(TestGraphDescriptorCustomOp, OperationNameRoundTripThroughLifting)
 {
+<<<<<<< HEAD
     auto input0Desc = createFinalizedTensor(
         K_CUSTOM_OP_INPUT_UID_0, toVec(K_CUSTOM_OP_TENSOR_DIMS), toVec(K_CUSTOM_OP_TENSOR_STRIDES));
     auto input1Desc = createFinalizedTensor(
@@ -333,6 +380,11 @@ TEST_F(TestGraphDescriptorCustomOp, OperationNameRoundTripThroughLifting)
     auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0,
                                              toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                              toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+    auto input0Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1});
+    auto input1Desc = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_1, {2, 3}, {3, 1});
+    auto output0Desc = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto customOp = createFinalizedCustomOp(input0Desc.get(),
                                             input1Desc.get(),

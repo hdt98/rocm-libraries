@@ -17,7 +17,12 @@ inline Error createBlockScaleQuantizeOperation(
     std::vector<ScopedHipdnnBackendDescriptor>& operations)
 {
     // Create operation descriptor
+<<<<<<< HEAD
     ScopedHipdnnBackendDescriptor opDesc(HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR);
+=======
+    ScopedHipdnnBackendDescriptor opDesc(
+        HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR_EXT);
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(!opDesc.valid())
     {
         return {ErrorCode::HIPDNN_BACKEND_ERROR,
@@ -26,17 +31,29 @@ inline Error createBlockScaleQuantizeOperation(
 
     // Create tensor descriptors (if needed) and set them on the operation
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
+<<<<<<< HEAD
                                              HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_XDESC,
+=======
+                                             HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                              attributes.get_x(),
                                              tensorDescs,
                                              "blockscalequantize X_EXT"));
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
+<<<<<<< HEAD
                                              HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_YDESC,
+=======
+                                             HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_Y_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                              attributes.get_y(),
                                              tensorDescs,
                                              "blockscalequantize Y_EXT"));
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
+<<<<<<< HEAD
                                              HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_SCALE_DESC,
+=======
+                                             HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                              attributes.get_scale(),
                                              tensorDescs,
                                              "blockscalequantize SCALE_EXT"));
@@ -49,7 +66,11 @@ inline Error createBlockScaleQuantizeOperation(
     const int32_t blockSize = attributes.get_block_size().value();
     HIPDNN_CHECK_ERROR(
         setDescriptorAttrScalar(opDesc.get(),
+<<<<<<< HEAD
                                 HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_BLOCK_SIZE,
+=======
+                                HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                 HIPDNN_TYPE_INT32,
                                 blockSize,
                                 "blockscalequantize block_size"));
@@ -73,11 +94,18 @@ inline Error createBlockScaleQuantizeOperation(
                                 transpose,
                                 "blockscalequantize transpose"));
 
+<<<<<<< HEAD
     HIPDNN_CHECK_ERROR(
         setDescriptorAttrDataType(opDesc.get(),
                                   HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_MATH_PREC,
                                   attributes.compute_data_type,
                                   "blockscalequantize MATH_PREC"));
+=======
+    HIPDNN_CHECK_ERROR(setDescriptorAttrDataType(opDesc.get(),
+                                                 HIPDNN_ATTR_BLOCK_SCALE_QUANTIZE_MATH_PREC_EXT,
+                                                 attributes.compute_data_type,
+                                                 "blockscalequantize MATH_PREC"));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Set operation name
     const auto& opName = attributes.get_name();

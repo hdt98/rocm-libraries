@@ -3,6 +3,10 @@
 #pragma once
 
 #include "Node.hpp"
+<<<<<<< HEAD
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/ConvolutionWgradAttributes.hpp>

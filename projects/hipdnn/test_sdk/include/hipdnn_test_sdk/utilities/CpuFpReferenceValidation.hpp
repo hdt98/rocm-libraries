@@ -67,7 +67,11 @@ public:
                 return result.load(std::memory_order_relaxed);
             }
 
+<<<<<<< HEAD
             auto absDiff = fabs(static_cast<float>(implValue) - static_cast<float>(refValue));
+=======
+            auto absDiff = static_cast<float>(fabs(implValue - refValue));
+>>>>>>> d9e199e220 (merge b-shi branch)
             auto threshold
                 = _absoluteTolerance + _relativeTolerance * fabs(static_cast<float>(refValue));
 

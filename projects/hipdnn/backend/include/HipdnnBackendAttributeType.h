@@ -123,7 +123,11 @@ typedef enum
     HIPDNN_TYPE_FLATBUFFER_DATA_STRUCT_EXT = 10000,
 
     /**
+<<<<<<< HEAD
      * @brief Operation type enumeration (hipdnnOperationType_ext_t, extension)
+=======
+     * @brief Operation type enumeration (hipdnnOperationType_t, extension)
+>>>>>>> d9e199e220 (merge b-shi branch)
      *
      * Used for querying the operation type of an operation descriptor
      * via HIPDNN_ATTR_OPERATION_TYPE_EXT.

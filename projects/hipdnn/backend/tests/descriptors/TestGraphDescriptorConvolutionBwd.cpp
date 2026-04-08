@@ -14,9 +14,15 @@
 
 #include <flatbuffers/flatbuffers.h>
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_bwd_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/convolution_bwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/ConvDgradConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
@@ -27,11 +33,19 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 namespace
 {
 
 using namespace hipdnn_tests::constants;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+namespace
+{
+
+namespace dgrad = hipdnn_tests::constants::dgrad;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // Helper: create a finalized ConvolutionBwdOperationDescriptor from tensor descriptors
 inline std::unique_ptr<HipdnnBackendDescriptor>
@@ -44,6 +58,7 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
     auto wrapper = createDescriptor<ConvolutionBwdOperationDescriptor>();
     auto desc = wrapper->asDescriptor<ConvolutionBwdOperationDescriptor>();
 
+<<<<<<< HEAD
     desc->setAttribute(HIPDNN_ATTR_OPERATION_CONVOLUTION_BWD_DATA_DY,
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
@@ -53,6 +68,17 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
                        1,
                        static_cast<const void*>(&wDesc));
     desc->setAttribute(HIPDNN_ATTR_OPERATION_CONVOLUTION_BWD_DATA_DX,
+=======
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_CONVOLUTION_BACKWARD_DY,
+                       HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                       1,
+                       static_cast<const void*>(&dyDesc));
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_CONVOLUTION_BACKWARD_W,
+                       HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                       1,
+                       static_cast<const void*>(&wDesc));
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_CONVOLUTION_BACKWARD_DX,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        static_cast<const void*>(&dxDesc));
@@ -123,6 +149,7 @@ protected:
 
 TEST_F(TestGraphDescriptorConvolutionBwd, BuildFromSingleOperation)
 {
+<<<<<<< HEAD
     auto dyDesc = createFinalizedTensor(K_DGRAD_TENSOR_DY_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_STRIDES));
@@ -132,6 +159,17 @@ TEST_F(TestGraphDescriptorConvolutionBwd, BuildFromSingleOperation)
     auto dxDesc = createFinalizedTensor(K_DGRAD_TENSOR_DX_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_STRIDES));
+=======
+    auto dyDesc = createFinalizedTensor(dgrad::K_TENSOR_DY_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_STRIDES));
+    auto wDesc = createFinalizedTensor(dgrad::K_TENSOR_W_UID,
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_DIMS),
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_STRIDES));
+    auto dxDesc = createFinalizedTensor(dgrad::K_TENSOR_DX_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto opDesc = createFinalizedConvolutionBwdOp(dyDesc.get(), wDesc.get(), dxDesc.get());
 
     auto desc = getDescriptor();
@@ -164,13 +202,20 @@ TEST_F(TestGraphDescriptorConvolutionBwd, BuildFromSingleOperation)
     ASSERT_NE(attrs, nullptr);
 
     // Verify tensor UID references
+<<<<<<< HEAD
     EXPECT_EQ(attrs->dy_tensor_uid, K_DGRAD_TENSOR_DY_UID);
     EXPECT_EQ(attrs->w_tensor_uid, K_DGRAD_TENSOR_W_UID);
     EXPECT_EQ(attrs->dx_tensor_uid, K_DGRAD_TENSOR_DX_UID);
+=======
+    EXPECT_EQ(attrs->dy_tensor_uid, dgrad::K_TENSOR_DY_UID);
+    EXPECT_EQ(attrs->w_tensor_uid, dgrad::K_TENSOR_W_UID);
+    EXPECT_EQ(attrs->dx_tensor_uid, dgrad::K_TENSOR_DX_UID);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestGraphDescriptorConvolutionBwd, ComputeDataTypePreserved)
 {
+<<<<<<< HEAD
     auto dyDesc = createFinalizedTensor(K_DGRAD_TENSOR_DY_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_STRIDES));
@@ -180,6 +225,17 @@ TEST_F(TestGraphDescriptorConvolutionBwd, ComputeDataTypePreserved)
     auto dxDesc = createFinalizedTensor(K_DGRAD_TENSOR_DX_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_STRIDES));
+=======
+    auto dyDesc = createFinalizedTensor(dgrad::K_TENSOR_DY_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_STRIDES));
+    auto wDesc = createFinalizedTensor(dgrad::K_TENSOR_W_UID,
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_DIMS),
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_STRIDES));
+    auto dxDesc = createFinalizedTensor(dgrad::K_TENSOR_DX_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto opDesc = createFinalizedConvolutionBwdOp(
         dyDesc.get(), wDesc.get(), dxDesc.get(), HIPDNN_DATA_HALF);
 
@@ -202,6 +258,7 @@ TEST_F(TestGraphDescriptorConvolutionBwd, ComputeDataTypePreserved)
 
 TEST_F(TestGraphDescriptorConvolutionBwd, OperationNamePreservedInSerialization)
 {
+<<<<<<< HEAD
     auto dyDesc = createFinalizedTensor(K_DGRAD_TENSOR_DY_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_STRIDES));
@@ -211,6 +268,17 @@ TEST_F(TestGraphDescriptorConvolutionBwd, OperationNamePreservedInSerialization)
     auto dxDesc = createFinalizedTensor(K_DGRAD_TENSOR_DX_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_STRIDES));
+=======
+    auto dyDesc = createFinalizedTensor(dgrad::K_TENSOR_DY_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_STRIDES));
+    auto wDesc = createFinalizedTensor(dgrad::K_TENSOR_W_UID,
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_DIMS),
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_STRIDES));
+    auto dxDesc = createFinalizedTensor(dgrad::K_TENSOR_DX_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto opDesc = createFinalizedConvolutionBwdOp(
         dyDesc.get(), wDesc.get(), dxDesc.get(), HIPDNN_DATA_FLOAT, "test_conv_bwd_op");
 
@@ -233,6 +301,7 @@ TEST_F(TestGraphDescriptorConvolutionBwd, OperationNamePreservedInSerialization)
 
 TEST_F(TestGraphDescriptorConvolutionBwd, OperationNameRoundTripThroughLifting)
 {
+<<<<<<< HEAD
     auto dyDesc = createFinalizedTensor(K_DGRAD_TENSOR_DY_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DY_STRIDES));
@@ -242,6 +311,17 @@ TEST_F(TestGraphDescriptorConvolutionBwd, OperationNameRoundTripThroughLifting)
     auto dxDesc = createFinalizedTensor(K_DGRAD_TENSOR_DX_UID,
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_DIMS),
                                         hipdnn_tests::toVec(K_DGRAD_TENSOR_DX_STRIDES));
+=======
+    auto dyDesc = createFinalizedTensor(dgrad::K_TENSOR_DY_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DY_STRIDES));
+    auto wDesc = createFinalizedTensor(dgrad::K_TENSOR_W_UID,
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_DIMS),
+                                       hipdnn_tests::toVec(dgrad::K_TENSOR_W_STRIDES));
+    auto dxDesc = createFinalizedTensor(dgrad::K_TENSOR_DX_UID,
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_DIMS),
+                                        hipdnn_tests::toVec(dgrad::K_TENSOR_DX_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto opDesc = createFinalizedConvolutionBwdOp(
         dyDesc.get(), wDesc.get(), dxDesc.get(), HIPDNN_DATA_FLOAT, "bwd_round_trip_name");
 

@@ -157,7 +157,10 @@ TEST_F(TestGraphDescriptor, WillCorrectlySetGraph)
                                             HIPDNN_TYPE_HANDLE,
                                             1,
                                             static_cast<const void*>(&handle)));
+<<<<<<< HEAD
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     ASSERT_NO_THROW(descriptor.finalize());
 }
 
@@ -200,11 +203,20 @@ TEST_F(TestGraphDescriptor, GetAttributeWorksOnDeserializedUnfinalizedGraph)
     GraphDescriptor descriptor;
     descriptor.deserializeGraph(serializedGraph.data(), serializedGraph.size());
 
+<<<<<<< HEAD
     // Querying OPS on a deserialized graph returns the number of unpacked nodes
     int64_t elementCount = -1;
     ASSERT_NO_THROW(descriptor.getAttribute(
         HIPDNN_ATTR_OPERATIONGRAPH_OPS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 0, &elementCount, nullptr));
     EXPECT_EQ(elementCount, 1);
+=======
+    // Querying OPS on a FlatBuffer-flow graph with no nodes returns count 0
+    // (lazy unpack finds zero nodes in _graph and produces an empty _operations)
+    int64_t elementCount = -1;
+    ASSERT_NO_THROW(descriptor.getAttribute(
+        HIPDNN_ATTR_OPERATIONGRAPH_OPS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 0, &elementCount, nullptr));
+    EXPECT_EQ(elementCount, 0);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Query compute data type without finalization - should succeed
     int64_t computeCount = 0;
@@ -224,8 +236,18 @@ TEST_F(TestGraphDescriptor, GetAttributeUnsupportedReturnsNotSupported)
 
     GraphDescriptor descriptor;
     descriptor.deserializeGraph(serializedGraph.data(), serializedGraph.size());
+<<<<<<< HEAD
 
     // getAttribute with an unsupported attribute name does not require finalization
+=======
+    const auto handle = reinterpret_cast<hipdnnHandle_t>(0x12345678);
+    descriptor.setAttribute(HIPDNN_ATTR_OPERATIONGRAPH_HANDLE,
+                            HIPDNN_TYPE_HANDLE,
+                            1,
+                            static_cast<const void*>(&handle));
+    descriptor.finalize();
+
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t elementCount = 0;
     ASSERT_THROW_HIPDNN_STATUS(
         descriptor.getAttribute(

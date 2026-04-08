@@ -285,8 +285,13 @@ TEST_F(TestGpuConvFwdPlan, ThrowsOnInvalidDims)
 TEST_F(TestGpuConvFwdPlan, PlanUsesDefaultWorkspaceSizeWhenNoLimitSet)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_ConvolutionFwdAttributes();
@@ -305,8 +310,13 @@ TEST_F(TestGpuConvFwdPlan, PlanUsesDefaultWorkspaceSizeWhenNoLimitSet)
 TEST_F(TestGpuConvFwdPlan, PlanUsesKnobLimitOverDefault)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const auto& node = graph.getNode(0);
     auto* attrs = node.attributes_as_ConvolutionFwdAttributes();

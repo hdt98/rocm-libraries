@@ -37,7 +37,11 @@
 
 namespace hiptensor
 {
+<<<<<<< HEAD
     struct HIPTENSOR_EXPORT HiptensorOptions
+=======
+    struct HIPTENSOR_EXPORT HiptensorOptions : public LazySingleton<HiptensorOptions>
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         // For static initialization
         friend std::unique_ptr<HiptensorOptions> std::make_unique<HiptensorOptions>();

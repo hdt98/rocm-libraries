@@ -51,7 +51,11 @@ public:
 
 private:
     std::string _knobId;
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion _value;
+=======
+    hipdnn_data_sdk::data_objects::KnobValueUnion _value;
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 } // namespace hipdnn_backend

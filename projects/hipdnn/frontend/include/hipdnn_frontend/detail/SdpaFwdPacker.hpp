@@ -51,12 +51,20 @@ inline Error
 
     // Optional input tensors
     HIPDNN_CHECK_ERROR(ensureAndSetOptionalTensorRef(opDesc.get(),
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/detail/SdpaFwdPacker.hpp
                                                      HIPDNN_ATTR_OPERATION_SDPA_FWD_ATTN_MASK_EXT,
+=======
+                                                     HIPDNN_ATTR_OPERATION_SDPA_FPROP_ATTN_MASK_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/detail/SdpaFpropPacker.hpp
                                                      attributes.get_bias(),
                                                      tensorDescs,
                                                      "SDPA fprop ATTN_MASK"));
     HIPDNN_CHECK_ERROR(ensureAndSetOptionalTensorRef(opDesc.get(),
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/detail/SdpaFwdPacker.hpp
                                                      HIPDNN_ATTR_OPERATION_SDPA_FWD_SCALEDESC,
+=======
+                                                     HIPDNN_ATTR_OPERATION_SDPA_FPROP_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/detail/SdpaFpropPacker.hpp
                                                      attributes.get_attn_scale(),
                                                      tensorDescs,
                                                      "SDPA fprop SCALE"));

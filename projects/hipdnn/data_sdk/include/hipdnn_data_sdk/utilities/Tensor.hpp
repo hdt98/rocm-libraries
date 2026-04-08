@@ -63,8 +63,11 @@ inline const TensorLayout TensorLayout::NCHW{"NCHW", {3, 2, 1, 0}};
 inline const TensorLayout TensorLayout::NHWC{"NHWC", strideOrderNhwc(4)};
 inline const TensorLayout TensorLayout::NCDHW{"NCDHW", {4, 3, 2, 1, 0}};
 inline const TensorLayout TensorLayout::NDHWC{"NDHWC", strideOrderNhwc(5)};
+<<<<<<< HEAD
 inline const TensorLayout TensorLayout::BHSD{"BHSD", {3, 2, 1, 0}};
 inline const TensorLayout TensorLayout::BSHD{"BSHD", {3, 1, 2, 0}};
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 // NOLINTEND(bugprone-throwing-static-initialization)
 
 inline std::ostream& operator<<(std::ostream& os, const TensorLayout& layout)

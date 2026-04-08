@@ -263,6 +263,13 @@ public:
     {
         return detail::createBatchnormOperation(attributes, tensorDescs, operations);
     }
+
+    Error create_operation(
+        std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& tensorDescs,
+        std::vector<detail::ScopedHipdnnBackendDescriptor>& operations) const override
+    {
+        return detail::createBatchnormOperation(attributes, tensorDescs, operations);
+    }
 };
 
 typedef BatchnormNode BatchNormNode;

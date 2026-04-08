@@ -256,8 +256,12 @@ TEST_F(IntegrationBatchnormInferenceDescriptorLowering, AutoAssignedUidsPreserve
                                                   bnInf->scale_tensor_uid,
                                                   bnInf->bias_tensor_uid,
                                                   bnInf->y_tensor_uid};
+<<<<<<< HEAD
     EXPECT_EQ(nodeUids.size(), 6u)
         << "Batchnorm inference node tensor UIDs are not distinct"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    EXPECT_EQ(nodeUids.size(), 6u) << "Batchnorm inference node tensor UIDs are not distinct";
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 } // namespace

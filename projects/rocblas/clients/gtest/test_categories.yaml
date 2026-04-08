@@ -43,7 +43,10 @@ test_categories:
     exclude:
       - "*known_bug*"
     labels:
+<<<<<<< HEAD
       - "full"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
       - "stress"
       - "weekly"
 
@@ -51,7 +54,11 @@ test_categories:
 # exclude_gpu:
 #   exclude_gpu_gfxXXXX:
 #     test_patterns: [...]
+<<<<<<< HEAD
 #     labels: ["quick", "standard", "comprehensive", "full", "ex_gpu_gfxXXXX"]
+=======
+#     labels: ["quick", "standard", "comprehensive", "stress", "ex_gpu_gfxXXXX"]
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 execution_settings:
   default_timeout: 300

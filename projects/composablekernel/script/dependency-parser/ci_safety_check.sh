@@ -18,8 +18,13 @@
 #   CHANGE_TARGET - Base branch for PR builds (set by Jenkins Multibranch Pipeline)
 #
 # Note: CHANGE_ID may not be set even for PR builds if Jenkins job is not
+<<<<<<< HEAD
 # configured as Multibranch Pipeline. Script uses two-dot git diff syntax
 # to detect PR changes regardless of CHANGE_ID availability.
+=======
+# configured as Multibranch Pipeline. Script uses three-dot git diff syntax
+# to correctly detect PR changes regardless of CHANGE_ID availability.
+>>>>>>> d9e199e220 (merge b-shi branch)
 #
 # Manual override (set by developer/admin if needed):
 #   DISABLE_SMART_BUILD - Set to "true" to force full build
@@ -48,6 +53,7 @@ fi
 
 # 3. Force full build if CMakeLists.txt or cmake/ configuration changed
 # Always compare against base branch (not consecutive commits) to avoid false positives from merge commits
+<<<<<<< HEAD
 # Two-dot syntax (..) compares current state against base branch
 # Note: This includes merged changes from develop, which is conservative but safe (catches all potentially affected files)
 CHANGED_FILES=$(git diff --name-only origin/${BASE_BRANCH}..HEAD 2>/dev/null || echo "")
@@ -71,6 +77,21 @@ BUILD_INFRA_PATTERN="${BUILD_INFRA_PATTERN}|setup\.py|pyproject\.toml|requiremen
 if echo "$CHANGED_FILES" | grep -qE "${BUILD_INFRA_PATTERN}"; then
     FORCE_FULL_BUILD=true
     REASON="build system configuration changed"
+=======
+# Three-dot syntax (...) only shows changes actually made in the PR, not changes from merged develop branch
+if [ -n "$CHANGE_ID" ]; then
+    # This is a PR build (CHANGE_ID set by Jenkins Multibranch Pipeline)
+    CHANGED_FILES=$(git diff --name-only origin/${BASE_BRANCH}...HEAD 2>/dev/null || echo "")
+else
+    # Fallback: Works for both branch builds and PRs without CHANGE_ID
+    # Use three-dot syntax to avoid including merge commit changes from develop
+    CHANGED_FILES=$(git diff --name-only origin/${BASE_BRANCH}...HEAD 2>/dev/null || echo "")
+fi
+
+if echo "$CHANGED_FILES" | grep -qE "(CMakeLists\.txt|cmake/.*\.cmake)"; then
+    FORCE_FULL_BUILD=true
+    REASON="build system configuration changed (CMakeLists.txt or cmake/*.cmake)"
+>>>>>>> d9e199e220 (merge b-shi branch)
 fi
 
 # 4. Force full build if dependency cache is older than 7 days

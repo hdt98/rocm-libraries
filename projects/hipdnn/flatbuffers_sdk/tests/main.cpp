@@ -3,6 +3,10 @@
 
 #include <gtest/gtest.h>
 
+<<<<<<< HEAD
+=======
+#include <hipdnn_data_sdk/logging/Logger.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/LogRecorder.hpp>
 
 int main(int argc, char** argv)

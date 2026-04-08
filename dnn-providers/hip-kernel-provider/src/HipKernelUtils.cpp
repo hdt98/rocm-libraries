@@ -9,10 +9,16 @@
 namespace hip_kernel_provider::hip_kernel_utils
 {
 
+<<<<<<< HEAD
 ActivationParams
     parseActivation(const hipdnn_flatbuffers_sdk::data_objects::PointwiseAttributes& attrs)
 {
     using PM = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+ActivationParams parseActivation(const hipdnn_data_sdk::data_objects::PointwiseAttributes& attrs)
+{
+    using PM = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     switch(attrs.operation())
     {
@@ -99,9 +105,14 @@ hipdnnPluginDeviceBuffer_t findDeviceBuffer(int64_t uid,
             + " not found in the provided device buffers.");
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& findTensorAttributes(
     const std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes& findTensorAttributes(
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+>>>>>>> d9e199e220 (merge b-shi branch)
         tensorMap,
     int64_t uid)
 {
@@ -115,7 +126,11 @@ const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& findTensorAttribut
                                                        + std::to_string(uid));
 }
 
+<<<<<<< HEAD
 bool isChannelLastLayout(const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* tensor)
+=======
+bool isChannelLastLayout(const hipdnn_data_sdk::data_objects::TensorAttributes* tensor)
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     const auto* strides = tensor->strides();
     const auto* dims = tensor->dims();

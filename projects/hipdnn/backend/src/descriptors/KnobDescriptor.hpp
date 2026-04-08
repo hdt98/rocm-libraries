@@ -4,7 +4,11 @@
 #pragma once
 
 #include "BackendDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/knob_value_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/knob_value_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <optional>
 #include <string>
@@ -38,11 +42,14 @@ public:
     /// Maximum length of a string default value (characters, excluding null terminator).
     static constexpr int64_t MAX_STRING_VALUE_LENGTH = 65536;
 
+<<<<<<< HEAD
     /// Construct a finalized KnobDescriptor from a deserialized KnobT.
     /// Returns nullptr if the knob has an unsupported default value type.
     static std::shared_ptr<KnobDescriptor>
         fromKnobT(const hipdnn_flatbuffers_sdk::data_objects::KnobT& knobNative);
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     void finalize() override;
 
     void getAttribute(hipdnnBackendAttributeName_t attributeName,
@@ -57,7 +64,11 @@ public:
                       const void* arrayOfElements) override;
 
     /// Convert to a KnobT for consumption by other components
+<<<<<<< HEAD
     std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::KnobT> toKnobT() const;
+=======
+    std::unique_ptr<hipdnn_data_sdk::data_objects::KnobT> toKnobT() const;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     static hipdnnBackendDescriptorType_t getStaticType();
 
@@ -69,7 +80,11 @@ private:
     std::string _description;
 
     // Default value (polymorphic: int64, double, or string); NONE until set
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::KnobValueUnion _defaultValue;
+=======
+    hipdnn_data_sdk::data_objects::KnobValueUnion _defaultValue;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Deprecation flag
     bool _deprecated = false;

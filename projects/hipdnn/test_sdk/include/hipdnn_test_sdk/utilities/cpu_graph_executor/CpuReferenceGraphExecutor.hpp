@@ -4,7 +4,11 @@
 #pragma once
 
 #include <cstring>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/BatchnormFwdInferencePlan.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/BatchnormFwdInferenceWithVarianceSignatureKey.hpp>

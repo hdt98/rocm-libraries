@@ -3,7 +3,10 @@
 
 #include "RMSnormFwdPlan.hpp"
 #include "../PlanUtils.hpp"
+<<<<<<< HEAD
 #include "hip/HipKernelCompileOptions.hpp"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include "HipKernelUtils.hpp"
 #include "hip/IKernelCompiler.hpp"
@@ -11,8 +14,13 @@
 #include <cstdint>
 #include <hipdnn_data_sdk/logging/Logger.hpp>
 #include <hipdnn_data_sdk/utilities/Constants.hpp>
+<<<<<<< HEAD
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
+=======
+#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 
@@ -20,9 +28,14 @@ namespace hip_kernel_provider::rmsnorm
 {
 
 RMSnormFwdParams::RMSnormFwdParams(
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::RMSNormAttributes& attributes,
     const std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
+=======
+    const hipdnn_data_sdk::data_objects::RMSNormAttributes& attributes,
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+>>>>>>> d9e199e220 (merge b-shi branch)
         tensorMap)
     : _x(tensorMap.at(attributes.x_tensor_uid()))
     , _scale(tensorMap.at(attributes.scale_tensor_uid()))
@@ -38,32 +51,56 @@ RMSnormFwdParams::RMSnormFwdParams(
 {
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::x() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::x() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _x;
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::scale() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::scale() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _scale;
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::epsilon() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::epsilon() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _epsilon;
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::bias() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::bias() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _bias;
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::y() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::y() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _y;
 }
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* RMSnormFwdParams::invRMS() const
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes* RMSnormFwdParams::invRMS() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return _invRMS;
 }
@@ -110,6 +147,7 @@ void RMSnormFwdPlan::compile(const IKernelCompiler& kernelCompiler,
     const unsigned int zlocalsize = 1;
     const unsigned int zgridsize = 1;
 
+<<<<<<< HEAD
     // Determine input/output data type configuration
     auto ioDataType = _params.x()->data_type();
     std::string ioTypeString = getKernelParamTypeString(ioDataType);
@@ -120,6 +158,37 @@ void RMSnormFwdPlan::compile(const IKernelCompiler& kernelCompiler,
     options.add("HIP_PLUGIN_RMSNORM_C_SIZE", cSize);
     options.add("HIP_PLUGIN_RMSNORM_IO_TYPE", ioTypeString);
     options.add("HIP_PLUGIN_RMSNORM_LOCAL_SIZE", xlocalsize);
+=======
+    // Prepare compilation options
+    std::vector<std::string> options;
+    auto rocmPath
+        = hipdnn_data_sdk::utilities::trim(hipdnn_data_sdk::utilities::getEnv("ROCM_PATH"));
+    if(!rocmPath.empty())
+    {
+        auto rocmIncludeArg = "-I" + rocmPath + "/include";
+        options.emplace_back(rocmIncludeArg);
+        HIPDNN_PLUGIN_LOG_INFO(
+            "RMSnormFwdPlan: HIPRTC compile ROCm include path: " << rocmIncludeArg);
+    }
+
+    // Determine input/output data type configuration
+    auto ioDataType = _params.x()->data_type();
+    const bool useFp16 = ioDataType == hipdnn_data_sdk::data_objects::DataType::HALF;
+    const bool useBfp16 = ioDataType == hipdnn_data_sdk::data_objects::DataType::BFLOAT16;
+    const bool useFp32 = !useFp16 && !useBfp16;
+    std::string ioTypeString = getKernelParamTypeString(ioDataType);
+
+    options.emplace_back(std::string("-DHIP_PLUGIN_USE_FP32=") + (useFp32 ? "1" : "0"));
+    options.emplace_back(std::string("-DHIP_PLUGIN_USE_FP16=") + (useFp16 ? "1" : "0"));
+    options.emplace_back(std::string("-DHIP_PLUGIN_USE_BFP16=") + (useBfp16 ? "1" : "0"));
+    options.emplace_back("-DHIP_PLUGIN_USE_RNE_BFLOAT16=1");
+    options.emplace_back(std::string("-DHIP_PLUGIN_RMSNORM_C_STRIDE=") + std::to_string(cStride));
+    options.emplace_back(std::string("-DHIP_PLUGIN_RMSNORM_C_SIZE=") + std::to_string(cSize));
+    options.emplace_back(std::string("-DHIP_PLUGIN_RMSNORM_IO_TYPE=") + ioTypeString);
+    options.emplace_back(std::string("-DHIP_PLUGIN_RMSNORM_LOCAL_SIZE=")
+                         + std::to_string(xlocalsize));
+    options.emplace_back(std::string("--offload-arch=") + deviceProperties.gcnArchName);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Compile kernel and configure launch dimensions
     _compiledProgram = kernelCompiler.compile("RMSNormFwd.cpp", options);
@@ -159,10 +228,17 @@ void RMSnormFwdPlan::execute(const HipKernelHandle& handle,
                                       _params.invRMS()->uid(), deviceBuffers, numDeviceBuffers)
                                       .ptr;
 
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT epsilonTensor;
     _params.epsilon()->UnPackTo(&epsilonTensor);
     double epsilon
         = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(epsilonTensor, "Epsilon");
+=======
+    hipdnn_data_sdk::data_objects::TensorAttributesT epsilonTensor;
+    _params.epsilon()->UnPackTo(&epsilonTensor);
+    double epsilon
+        = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(epsilonTensor, "Epsilon");
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     _runnableKernel->launch(handle.getStream(),
                             xBuffer.ptr,

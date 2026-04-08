@@ -5,7 +5,11 @@
 
 #include <gmock/gmock.h>
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_plugin_sdk/interfaces/IPlanBuilder.hpp>
 
 #include "HipKernelContext.hpp"
@@ -22,26 +26,40 @@ public:
     MOCK_METHOD(bool,
                 isApplicable,
                 (const HipKernelHandle& handle,
+<<<<<<< HEAD
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph),
+=======
+                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph),
+>>>>>>> d9e199e220 (merge b-shi branch)
                 (const, override));
     MOCK_METHOD(size_t,
                 getMaxWorkspaceSize,
                 (const HipKernelHandle& handle,
+<<<<<<< HEAD
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
+=======
+                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+>>>>>>> d9e199e220 (merge b-shi branch)
                  const HipKernelSettings& executionSettings),
                 (const, override));
 
     MOCK_METHOD(void,
                 initializeExecutionSettings,
                 (const HipKernelHandle& handle,
+<<<<<<< HEAD
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+=======
+                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+                 const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
                  HipKernelSettings& executionSettings),
                 (const, override));
 
     MOCK_METHOD(void,
                 buildPlan,
                 (const HipKernelHandle& handle,
+<<<<<<< HEAD
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
                  HipKernelContext& executionContext),
@@ -51,6 +69,17 @@ public:
                 getCustomKnobs,
                 (const HipKernelHandle& handle,
                  const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph),
+=======
+                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+                 const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+                 HipKernelContext& executionContext),
+                (const, override));
+
+    MOCK_METHOD((std::vector<hipdnn_data_sdk::data_objects::KnobT>),
+                getCustomKnobs,
+                (const HipKernelHandle& handle,
+                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph),
+>>>>>>> d9e199e220 (merge b-shi branch)
                 (const, override));
 };
 

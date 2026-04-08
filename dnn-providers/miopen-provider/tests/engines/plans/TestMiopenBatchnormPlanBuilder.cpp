@@ -2100,8 +2100,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueFor3dNclInference)
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -2112,8 +2117,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueFor3dNlcBackward)
     std::vector<int64_t> strides3D = {42, 1, 3};
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormBwdGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -2125,8 +2135,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueFor3dNclVarianceIn
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormWithVarianceInferenceGraph(
         strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -2138,8 +2153,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueFor3dNlcFusedTwoNo
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormFwdInferActGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -2151,8 +2171,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, IsApplicableReturnsTrueFor3dNclFusedThree
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormInferActBwdGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -2164,8 +2189,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, BuildPlanSetsPlanFor3dNclInference)
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnMiopenContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));
@@ -2178,8 +2208,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, BuildPlanSetsPlanFor3dNlcBackward)
     std::vector<int64_t> strides3D = {42, 1, 3};
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormBwdGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnMiopenContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));
@@ -2193,8 +2228,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, BuildPlanSetsPlanFor3dNclVarianceInferenc
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormWithVarianceInferenceGraph(
         strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnMiopenContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));
@@ -2208,8 +2248,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, BuildPlanSetsPlanFor3dNlcFusedTwoNodeGrap
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormFwdInferActGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnMiopenContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));
@@ -2223,8 +2268,13 @@ TEST_F(TestMiopenBatchnormPlanBuilder, BuildPlanSetsPlanFor3dNclFusedThreeNodeGr
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormInferActBwdGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnMiopenContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));

@@ -737,6 +737,7 @@ TYPED_TEST(MathFloatTypes, MaxWithInfinity)
     using Traits = PortableTypeTraits<T>;
 
     const T a(1.0f);
+<<<<<<< HEAD
     const T inf = Traits::fromBits(Traits::INF_BITS);
     const T negInf = Traits::fromBits(Traits::NEG_INF_BITS);
 
@@ -813,6 +814,12 @@ TYPED_TEST(MathFloatTypes, FmaxWithNaN)
     EXPECT_EQ(fmax(a, nan), a);
     EXPECT_EQ(fmax(nan, a), a);
     EXPECT_TRUE(isnan(fmax(nan, nan)));
+=======
+    const T nan = Traits::fromBits(Traits::NAN_BITS);
+    EXPECT_EQ(max(a, nan), a);
+    EXPECT_EQ(max(nan, a), a);
+    EXPECT_TRUE(isnan(max(nan, nan)));
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TYPED_TEST(MathFloatTypes, Min)
@@ -859,6 +866,7 @@ TYPED_TEST(MathFloatTypes, MinWithInfinity)
     using Traits = PortableTypeTraits<T>;
 
     const T a(1.0f);
+<<<<<<< HEAD
     const T inf = Traits::fromBits(Traits::INF_BITS);
     const T negInf = Traits::fromBits(Traits::NEG_INF_BITS);
 
@@ -992,6 +1000,12 @@ TYPED_TEST(MathFloatTypes, FminZeroSigns)
     // fmin uses `a < b ? a : b`, so returns second arg when equal
     EXPECT_EQ(Traits::toBits(fmin(posZero, negZero)), Traits::NEG_ZERO_BITS);
     EXPECT_EQ(Traits::toBits(fmin(negZero, posZero)), Traits::ZERO_BITS);
+=======
+    const T nan = Traits::fromBits(Traits::NAN_BITS);
+    EXPECT_EQ(min(a, nan), a);
+    EXPECT_EQ(min(nan, a), a);
+    EXPECT_TRUE(isnan(min(nan, nan)));
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TYPED_TEST(MathFloatTypes, Sqrt)

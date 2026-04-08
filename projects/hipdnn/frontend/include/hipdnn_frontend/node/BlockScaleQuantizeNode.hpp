@@ -209,5 +209,12 @@ public:
     {
         return detail::createBlockScaleQuantizeOperation(attributes, tensorDescs, operations);
     }
+
+    Error create_operation(
+        std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& tensorDescs,
+        std::vector<detail::ScopedHipdnnBackendDescriptor>& operations) const override
+    {
+        return detail::createBlockScaleQuantizeOperation(attributes, tensorDescs, operations);
+    }
 };
 } // namespace hipdnn_frontend::graph

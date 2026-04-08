@@ -22,6 +22,7 @@ public:
 
     int64_t id() const override;
 
+<<<<<<< HEAD
     bool isApplicable(
         HipKernelHandle& handle,
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const override;
@@ -37,6 +38,22 @@ public:
         const HipKernelHandle& handle,
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+=======
+    bool isApplicable(HipKernelHandle& handle,
+                      const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const override;
+    void getDetails(HipKernelHandle& handle,
+                    const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+                    hipdnnPluginConstData_t& detailsOut) const override;
+    size_t getMaxWorkspaceSize(
+        const HipKernelHandle& handle,
+        const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+        const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig) const override;
+
+    void initializeExecutionContext(
+        const HipKernelHandle& handle,
+        const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+        const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
         HipKernelContext& executionContext) const override;
 
     void addPlanBuilder(

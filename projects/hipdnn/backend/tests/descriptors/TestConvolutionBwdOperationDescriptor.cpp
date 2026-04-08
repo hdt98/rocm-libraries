@@ -11,10 +11,16 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_bwd_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
 #include <hipdnn_test_sdk/constants/ConvDgradConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/convolution_bwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_test_sdk/constants/ConvDgradConstants.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 
@@ -24,8 +30,12 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_tests::constants;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using hipdnn_tests::toVec;
 
 class TestConvolutionBwdOperationDescriptor : public ::testing::Test
@@ -99,12 +109,24 @@ protected:
     void SetUp() override
     {
         _wrapper = createDescriptor<ConvolutionBwdOperationDescriptor>();
+<<<<<<< HEAD
         _dyDesc = createFinalizedTensor(
             K_DGRAD_TENSOR_DY_UID, toVec(K_DGRAD_TENSOR_DY_DIMS), toVec(K_DGRAD_TENSOR_DY_STRIDES));
         _wDesc = createFinalizedTensor(
             K_DGRAD_TENSOR_W_UID, toVec(K_DGRAD_TENSOR_W_DIMS), toVec(K_DGRAD_TENSOR_W_STRIDES));
         _dxDesc = createFinalizedTensor(
             K_DGRAD_TENSOR_DX_UID, toVec(K_DGRAD_TENSOR_DX_DIMS), toVec(K_DGRAD_TENSOR_DX_STRIDES));
+=======
+        namespace dgrad = hipdnn_tests::constants::dgrad;
+        _dyDesc = createFinalizedTensor(dgrad::K_TENSOR_DY_UID,
+                                        toVec(dgrad::K_TENSOR_DY_DIMS),
+                                        toVec(dgrad::K_TENSOR_DY_STRIDES));
+        _wDesc = createFinalizedTensor(
+            dgrad::K_TENSOR_W_UID, toVec(dgrad::K_TENSOR_W_DIMS), toVec(dgrad::K_TENSOR_W_STRIDES));
+        _dxDesc = createFinalizedTensor(dgrad::K_TENSOR_DX_UID,
+                                        toVec(dgrad::K_TENSOR_DX_DIMS),
+                                        toVec(dgrad::K_TENSOR_DX_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
         _unfinalizedTensor = createDescriptor<TensorDescriptor>();
     }
 

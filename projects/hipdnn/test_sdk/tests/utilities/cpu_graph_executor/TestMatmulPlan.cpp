@@ -90,7 +90,11 @@ TEST(TestMatmulPlanBuilder, IsApplicable)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Correct case
     const MatmulPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
@@ -125,11 +129,18 @@ TEST(TestMatmulPlanBuilder, IsApplicable)
                                                         1,
                                                         TensorLayout::NCHW);
 
+<<<<<<< HEAD
     auto [serializedGraphPointwise, serErrPointwise]
         = std::get<0>(graphPointwiseTuple)->to_binary();
     ASSERT_TRUE(serErrPointwise.is_good()) << serErrPointwise.get_message();
     const GraphWrapper graphWrapPointwise(serializedGraphPointwise.data(),
                                           serializedGraphPointwise.size());
+=======
+    auto flatbufferGraphPointwise
+        = std::get<0>(graphPointwiseTuple)->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapPointwise(flatbufferGraphPointwise.data(),
+                                          flatbufferGraphPointwise.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_FALSE(floatPlanBuilder.isApplicable(graphWrapPointwise.getNode(0),
                                                graphWrapPointwise.getTensorMap()));
 }
@@ -154,7 +165,11 @@ TEST(TestMatmulPlanBuilder, BuildNodePlan)
         auto [serializedGraph, serErr] = graph->to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
         const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+=======
+        const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
         EXPECT_NO_THROW(patient.buildNodePlan(graphWrap, graphWrap.getNode(0)));
     }
 
@@ -171,9 +186,14 @@ TEST(TestMatmulPlanBuilder, BuildNodePlan)
                                                    TensorLayout::NCHW);
 
         auto& graph = std::get<0>(graphTuple);
+<<<<<<< HEAD
         auto [serializedGraph, serErr] = graph->to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
         const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+=======
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+        const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
         EXPECT_THROW(patient.buildNodePlan(graphWrap, graphWrap.getNode(0)), std::runtime_error);
     }
 }
@@ -192,7 +212,11 @@ TEST(TestMatmulPlanBuilder, PlanConstruction)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const MatmulPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;

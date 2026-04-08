@@ -4,14 +4,22 @@
 #pragma once
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
+<<<<<<< HEAD
 #include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
@@ -122,9 +130,13 @@ protected:
             _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createAllCloseValidator(
+<<<<<<< HEAD
                      hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
                      absoluteTolerance,
                      relativeTolerance)});
+=======
+                     toSdkType(attr->get_data_type()), absoluteTolerance, relativeTolerance)});
+>>>>>>> d9e199e220 (merge b-shi branch)
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -159,11 +171,14 @@ protected:
         }
     }
 
+<<<<<<< HEAD
     virtual hipStream_t stream() const
     {
         return _stream;
     }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 private:
     void executeGpuGraph(hipdnnHandle_t handle,
                          hipdnn_frontend::graph::Graph& graph,
@@ -183,11 +198,18 @@ private:
     void executeCpuGraph(hipdnn_frontend::graph::Graph& graph,
                          hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
     {
+<<<<<<< HEAD
         auto [serializedGraph, serErr] = graph.to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
         hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
             serializedGraph.data(), serializedGraph.size(), bundle.toHostVariantPack());
+=======
+        auto flatbufferGraph = graph.buildFlatbufferOperationGraph();
+
+        hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
+            flatbufferGraph.data(), flatbufferGraph.size(), bundle.toHostVariantPack());
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     bool tryAddTensorToBundles(
@@ -204,9 +226,15 @@ private:
         }
 
         cpuBundle.tensors.insert(
+<<<<<<< HEAD
             {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
         gpuBundle.tensors.insert(
             {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
+=======
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
+        gpuBundle.tensors.insert(
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
+>>>>>>> d9e199e220 (merge b-shi branch)
         _tensorIdToNameMap.insert({tensorId, tensorAttr->get_name()});
 
         return true;

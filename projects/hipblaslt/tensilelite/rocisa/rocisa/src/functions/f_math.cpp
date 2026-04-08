@@ -328,6 +328,160 @@ namespace rocisa
     template std::shared_ptr<Module>
         scalarMultiply64Bpe<std::string, std::string, int>(std::string, std::string, float, int, const std::string&);
 
+    std::shared_ptr<Module> vectorMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                                              const std::shared_ptr<RegisterContainer>& operand,
+                                              double                                    bpe,
+                                              const std::string&                        comment)
+    {
+        std::string dComment = comment + " (multiply bpe " + std::to_string(bpe) + ")";
+        auto        module   = std::make_shared<Module>("vectorMultiplyBpe");
+
+        if(bpe == 0.5)
+        {
+            module->addT<VLShiftRightB32>(product, 1, operand, dComment);
+        }
+        else if(bpe == 0.75)
+        {
+            module->addT<VMulLOU32>(product, 6, operand, dComment);
+            module->addT<VLShiftRightB32>(product, 3, product, dComment);
+        }
+        else
+        {
+            int bpe_log2 = static_cast<int>(std::log2(static_cast<int>(bpe)));
+            if(bpe_log2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(dComment + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<VLShiftLeftB32>(product, bpe_log2, operand, dComment);
+            }
+        }
+        return module;
+    }
+
+    std::shared_ptr<Module> vectorMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                                                const std::shared_ptr<RegisterContainer>& operand,
+                                                double                                    bpe,
+                                                const std::optional<ContinuousRegister>& tmpVgprRes,
+                                                const std::string&                       comment)
+    {
+        std::string dComment = comment + " (multiply bpe " + std::to_string(bpe) + ")";
+        auto        module   = std::make_shared<Module>("vectorMultiply64Bpe");
+
+        if(bpe == 0.5)
+        {
+            module->addT<VLShiftRightB64>(product, 1, operand, dComment);
+        }
+        else if(bpe == 0.75)
+        {
+            if(!tmpVgprRes || tmpVgprRes->size < 1)
+            {
+                throw std::runtime_error("Invalid tmpVgprRes, must be at least 1");
+            }
+            auto tmpVgpr  = vgpr(tmpVgprRes->idx);
+            auto product1 = vgpr(product->regIdx + 1);
+            auto operand1 = vgpr(operand->regIdx + 1);
+
+            module->addT<VMovB32>(tmpVgpr, operand1, std::nullopt, dComment);
+            module->addT<VMulHIU32>(product1, 6, operand, dComment);
+            module->addT<VMulLOU32>(product, 6, operand, dComment);
+            module->addT<VMulLOU32>(tmpVgpr, 6, tmpVgpr, dComment);
+            module->addT<VAddU32>(product1, product1, tmpVgpr, dComment);
+            module->addT<VLShiftRightB64>(product, 3, product, dComment);
+        }
+        else
+        {
+            int bpe_log2 = static_cast<int>(std::log2(static_cast<int>(bpe)));
+            if(bpe_log2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(dComment + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<VLShiftLeftB64>(product, bpe_log2, operand, dComment);
+            }
+        }
+        return module;
+    }
+
+    std::shared_ptr<Module> scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                                              const std::shared_ptr<RegisterContainer>& operand,
+                                              double                                    bpe,
+                                              const std::string&                        comment)
+    {
+        std::string dComment = comment + " (multiply bpe " + std::to_string(bpe) + ")";
+        auto        module   = std::make_shared<Module>("scalarMultiplyBpe");
+
+        if(bpe == 0.5)
+        {
+            module->addT<SLShiftRightB32>(product, 1, operand, dComment);
+        }
+        else if(bpe == 0.75)
+        {
+            module->addT<SMulI32>(product, 6, operand, dComment);
+            module->addT<SLShiftRightB32>(product, 3, product, dComment);
+        }
+        else
+        {
+            int bpe_log2 = static_cast<int>(std::log2(static_cast<int>(bpe)));
+            if(bpe_log2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(dComment + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<SLShiftLeftB32>(product, bpe_log2, operand, dComment);
+            }
+        }
+        return module;
+    }
+
+    std::shared_ptr<Module> scalarMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                                                const std::shared_ptr<RegisterContainer>& operand,
+                                                double                                    bpe,
+                                                const std::optional<ContinuousRegister>& tmpSgprRes,
+                                                const std::string&                       comment)
+    {
+        std::string dComment = comment + " (multiply bpe " + std::to_string(bpe) + ")";
+        auto        module   = std::make_shared<Module>("scalarMultiply64Bpe");
+
+        if(bpe == 0.5)
+        {
+            module->addT<SLShiftRightB64>(product, 1, operand, dComment);
+        }
+        else if(bpe == 0.75)
+        {
+            if(!tmpSgprRes || tmpSgprRes->size < 1)
+            {
+                throw std::runtime_error("Invalid tmpSgprRes, must be at least 1");
+            }
+            auto tmpSgpr  = sgpr(tmpSgprRes->idx);
+            auto product1 = sgpr(product->regIdx + 1);
+            auto operand1 = sgpr(operand->regIdx + 1);
+
+            module->addT<SMovB32>(tmpSgpr, operand1, dComment);
+            module->addT<SMulHIU32>(product1, 6, operand, dComment);
+            module->addT<SMulI32>(product, 6, operand, dComment);
+            module->addT<SMulI32>(tmpSgpr, 6, tmpSgpr, dComment);
+            module->addT<SAddU32>(product1, product1, tmpSgpr, dComment);
+            module->addT<SLShiftRightB64>(product, 3, product, dComment);
+        }
+        else
+        {
+            int bpe_log2 = static_cast<int>(std::log2(static_cast<int>(bpe)));
+            if(bpe_log2 == 0 && (*product == *operand))
+            {
+                module->addCommentAlign(dComment + " (bpe is 1, do nothing)");
+            }
+            else
+            {
+                module->addT<SLShiftLeftB64>(product, bpe_log2, operand, dComment);
+            }
+        }
+        return module;
+    }
+
 } // namespace rocisa
 
 void math_func(nb::module_ m)
@@ -696,6 +850,13 @@ void math_func(nb::module_ m)
         nb::arg("src"),
         nb::arg("bpe"),
         nb::arg("comment")    = "");
+    m.def("vectorMultiplyBpe",
+          nb::overload_cast<const std::shared_ptr<RegisterContainer>&, const std::shared_ptr<RegisterContainer>&, double, const std::string&>(
+              &rocisa::vectorMultiplyBpe),
+          nb::arg("product"),
+          nb::arg("operand"),
+          nb::arg("bpe"),
+          nb::arg("comment")    = "");
     m.def("vectorMultiply64Bpe",
           nb::overload_cast<int, int, float, int, const std::string&>(
               &rocisa::vectorMultiply64Bpe<int, int, int>),
@@ -703,6 +864,14 @@ void math_func(nb::module_ m)
           nb::arg("src"),
           nb::arg("bpe"),
           nb::arg("tmp"),
+          nb::arg("comment")    = "");
+    m.def("vectorMultiply64Bpe",
+          nb::overload_cast<const std::shared_ptr<RegisterContainer>&, const std::shared_ptr<RegisterContainer>&, double, const std::optional<ContinuousRegister>&, const std::string&>(
+              &rocisa::vectorMultiply64Bpe),
+          nb::arg("product"),
+          nb::arg("operand"),
+          nb::arg("bpe"),
+          nb::arg("tmpVgprRes") = std::nullopt,
           nb::arg("comment")    = "");
     m.def("scalarMultiplyBpe",
         nb::overload_cast<int, int, float, const std::string&>(
@@ -725,6 +894,13 @@ void math_func(nb::module_ m)
         nb::arg("src"),
         nb::arg("bpe"),
         nb::arg("comment")    = "");
+    m.def("scalarMultiplyBpe",
+          nb::overload_cast<const std::shared_ptr<RegisterContainer>&, const std::shared_ptr<RegisterContainer>&, double, const std::string&>(
+              &rocisa::scalarMultiplyBpe),
+          nb::arg("product"),
+          nb::arg("operand"),
+          nb::arg("bpe"),
+          nb::arg("comment")    = "");
     m.def("scalarMultiply64Bpe",
           nb::overload_cast<int, int, float, int, const std::string&>(
               &rocisa::scalarMultiply64Bpe<int, int, int>),
@@ -741,4 +917,12 @@ void math_func(nb::module_ m)
         nb::arg("bpe"),
         nb::arg("tmp"),
         nb::arg("comment")    = "");
+    m.def("scalarMultiply64Bpe",
+          nb::overload_cast<const std::shared_ptr<RegisterContainer>&, const std::shared_ptr<RegisterContainer>&, double, const std::optional<ContinuousRegister>&, const std::string&>(
+              &rocisa::scalarMultiply64Bpe),
+          nb::arg("product"),
+          nb::arg("operand"),
+          nb::arg("bpe"),
+          nb::arg("tmpSgprRes") = std::nullopt,
+          nb::arg("comment")    = "");
 }

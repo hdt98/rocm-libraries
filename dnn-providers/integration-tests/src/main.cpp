@@ -20,17 +20,31 @@
 namespace
 {
 
+<<<<<<< HEAD
 bool engineIsLoaded(hipdnnHandle_t handle, std::string_view targetEngineName)
+=======
+std::set<std::string> getLoadedPluginNames(hipdnnHandle_t handle)
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     size_t numEngines = 0;
     if(hipdnnGetEngineCount_ext(handle, &numEngines) != HIPDNN_STATUS_SUCCESS || numEngines == 0)
     {
+<<<<<<< HEAD
         return false;
     }
 
     for(size_t i = 0; i < numEngines; ++i)
     {
         // Two-call pattern: first call queries required buffer sizes
+=======
+        return {};
+    }
+
+    std::set<std::string> pluginNames;
+    for(size_t i = 0; i < numEngines; ++i)
+    {
+        // Two-call pattern: query required buffer sizes
+>>>>>>> d9e199e220 (merge b-shi branch)
         size_t engineNameLen = 0;
         size_t pluginNameLen = 0;
         size_t versionLen = 0;
@@ -66,14 +80,36 @@ bool engineIsLoaded(hipdnnHandle_t handle, std::string_view targetEngineName)
                                 &typeLen);
 
         // Trim null terminator
+<<<<<<< HEAD
         if(!engineName.empty() && engineName.back() == '\0')
         {
             engineName.pop_back();
+=======
+        if(!pluginName.empty() && pluginName.back() == '\0')
+        {
+            pluginName.pop_back();
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
 
+<<<<<<< HEAD
         if(engineName == targetEngineName)
         {
             return true;
+=======
+std::string formatPluginSet(const std::set<std::string>& plugins)
+{
+    std::string result = "[";
+    bool first = true;
+    for(const auto& plugin : plugins)
+    {
+        if(!first)
+        {
+            result += ", ";
+        }
+        else
+        {
+            first = false;
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
     }
     return false;
@@ -85,6 +121,7 @@ int main(int argc, char** argv) noexcept
 {
     try
     {
+<<<<<<< HEAD
         // Parse custom arguments before InitGoogleTest to avoid unknown flag warnings
         argparse::ArgumentParser parser(
             "hipdnn_integration_tests", "", argparse::default_arguments::help);
@@ -205,6 +242,25 @@ int main(int argc, char** argv) noexcept
         auto handle = hipdnn_integration_tests::getSharedHandle();
 
         // Set stream on shared handle
+=======
+        ::testing::InitGoogleTest(&argc, argv);
+
+        // Initialize test logging infrastructure to forward logs to std::cerr based
+        // on the current environment HIPDNN_LOG_LEVEL value when this function is called.
+        auto recordingCallback = hipdnn_test_sdk::utilities::initializeTestLogRecordingShared();
+
+        // Initialize plugin logger with test recording callback so that plugin logs
+        // are routed to the log recorder for capture.
+        hipdnn_plugin_sdk::logging::initializeCallbackLogging("hipdnn_integration_tests",
+                                                              recordingCallback);
+
+        // Register HipErrorHandler to check and clear HIP errors after each test
+        testing::TestEventListeners& listeners = testing::UnitTest::GetInstance()->listeners();
+        listeners.Append(new hipdnn_test_sdk::utilities::HipErrorHandler);
+
+        // Set stream on shared handle
+        auto handle = hipdnn_integration_tests::getSharedHandle();
+>>>>>>> d9e199e220 (merge b-shi branch)
         hipStream_t stream;
         if(hipStreamCreate(&stream) != hipSuccess)
         {
@@ -217,6 +273,7 @@ int main(int argc, char** argv) noexcept
             return 1;
         }
 
+<<<<<<< HEAD
         // Verify target engine is loaded (only when --test-engine was provided)
         if(hipdnn_integration_tests::TestConfig::get().hasEngineName()
            && !engineIsLoaded(handle, hipdnn_integration_tests::TestConfig::get().getEngineName()))
@@ -224,6 +281,16 @@ int main(int argc, char** argv) noexcept
             std::cerr << "Error: Engine '"
                       << hipdnn_integration_tests::TestConfig::get().getEngineName()
                       << "' is not loaded. Check the plugin path.\n";
+=======
+        // Verify loaded plugins match expected plugins
+        auto expectedPlugins = hipdnn_integration_tests::TestConfig::get().getExpectedPluginNames();
+        auto loadedPlugins = getLoadedPluginNames(handle);
+        if(expectedPlugins != loadedPlugins)
+        {
+            std::cerr << "Plugin mismatch!\n"
+                      << "  Expected: " << formatPluginSet(expectedPlugins) << "\n"
+                      << "  Loaded:   " << formatPluginSet(loadedPlugins) << '\n';
+>>>>>>> d9e199e220 (merge b-shi branch)
             return 1;
         }
 

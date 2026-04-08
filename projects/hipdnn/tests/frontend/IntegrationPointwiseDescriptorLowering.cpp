@@ -12,8 +12,11 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/pointwise_attributes_generated.h>
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/constants/PointwiseConstants.hpp>
+<<<<<<< HEAD
 #include <hipdnn_test_sdk/utilities/IntegrationTestFixture.hpp>
 #include <hipdnn_test_sdk/utilities/LoweringTestHelpers.hpp>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/TestableGraph.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
@@ -23,6 +26,7 @@
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 using hipdnn_tests::toVec;
+<<<<<<< HEAD
 using namespace hipdnn_tests::constants;
 using DataTypeSdk = hipdnn_flatbuffers_sdk::data_objects::DataType;
 using NodeAttrType = hipdnn_flatbuffers_sdk::data_objects::NodeAttributes;
@@ -31,10 +35,27 @@ using hipdnn_tests::buildTensorMap;
 using hipdnn_tests::IntegrationTestFixture;
 using hipdnn_tests::lowerAndDeserialize;
 using hipdnn_tests::TestableGraphLowering;
+=======
+using namespace hipdnn_tests::constants::integration;
+using DataTypeSdk = hipdnn_data_sdk::data_objects::DataType;
+using NodeAttrType = hipdnn_data_sdk::data_objects::NodeAttributes;
+using PointwiseModeSdk = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 namespace
 {
 
+<<<<<<< HEAD
+=======
+// Exposes protected Graph methods for testing
+class TestableGraph : public Graph
+{
+public:
+    using Graph::build_operation_graph_via_descriptors;
+    using Graph::get_raw_graph_descriptor;
+};
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 // Lowers a frontend graph via build_operation_graph_via_descriptors, then
 // retrieves the serialized graph and deserializes it for verification.
 class IntegrationPointwiseDescriptorLowering : public IntegrationTestFixture

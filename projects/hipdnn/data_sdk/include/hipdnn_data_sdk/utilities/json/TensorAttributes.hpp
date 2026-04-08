@@ -18,7 +18,11 @@ inline void to_json(nlohmann::json& tensorAttrJson,
     tensorAttrJson["data_type"] = tensorAttr.data_type();
     tensorAttrJson["dims"] = tensorAttr.dims();
     tensorAttrJson["strides"] = tensorAttr.strides();
+<<<<<<< HEAD
     tensorAttrJson["name"] = flatbuffers::safeStr(tensorAttr.name());
+=======
+    tensorAttrJson["name"] = tensorAttr.name();
+>>>>>>> d9e199e220 (merge b-shi branch)
     tensorAttrJson["virtual"] = tensorAttr.virtual_();
 
     // Serialize TensorValue union if present

@@ -16,7 +16,11 @@ operation:
   data_fields_section_label: "Convolution Parameters"
   build_node_attrs_var: "convAttrs"
 
+<<<<<<< HEAD
   operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT"
+=======
+  operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
   frontend:
     packer_function: "createConvFpropOperation"
@@ -98,7 +102,11 @@ operation:
       frontend_getter: "get_pre_padding()"
       test_label: "Convolution"
       test_value: [2, 3]
+<<<<<<< HEAD
       test_constant_name: "K_FPROP_CONV_PADDING"
+=======
+      test_constant_name: "K_CONV_PADDING"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     - name: "post_padding"
       fbs_field: "post_padding"
@@ -109,7 +117,11 @@ operation:
       test_label: "Convolution"
       test_value: [4, 5]
       build_node_check: false
+<<<<<<< HEAD
       test_constant_name: "K_FPROP_CONV_PADDING"
+=======
+      test_constant_name: "K_CONV_PADDING"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     - name: "stride"
       fbs_field: "stride"
@@ -119,7 +131,10 @@ operation:
       frontend_getter: "get_stride()"
       test_label: "Convolution"
       test_value: [2, 2]
+<<<<<<< HEAD
       test_constant_name: "K_FPROP_CONV_STRIDE"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     - name: "dilation"
       fbs_field: "dilation"
@@ -129,7 +144,10 @@ operation:
       frontend_getter: "get_dilation()"
       test_label: "Convolution"
       test_value: [3, 3]
+<<<<<<< HEAD
       test_constant_name: "K_FPROP_CONV_DILATION"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     - name: "conv_mode"
       fbs_field: "conv_mode"
@@ -147,14 +165,24 @@ operation:
       backend_type_name: "HIPDNN_TYPE_CONVOLUTION_MODE"
       test_enum_value: "CROSS_CORRELATION"
       test_alt_enum_value: "CONVOLUTION"
+<<<<<<< HEAD
       test_backend_value: "HIPDNN_CROSS_CORRELATION"
       test_c_type: "hipdnnConvolutionMode_t"
       test_default_value: "HIPDNN_CONVOLUTION"
+=======
+      test_backend_value: "HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION"
+      test_c_type: "hipdnnConvolutionMode_t"
+      test_default_value: "HIPDNN_CONVOLUTION_MODE_CONVOLUTION"
+>>>>>>> d9e199e220 (merge b-shi branch)
       # Verification: enum_def for ConvMode (matches existing hand-written code)
       # Note: ConvMode has no UNSET in the backend C-API, but the frontend has NOT_SET = 0
       enum_def:
         backend_header: "HipdnnConvolutionMode.h"
+<<<<<<< HEAD
         backend_prefix: "HIPDNN_"
+=======
+        backend_prefix: "HIPDNN_CONVOLUTION_MODE_"
+>>>>>>> d9e199e220 (merge b-shi branch)
         values:
           - { name: "UNSET", value: 0, sentinel: true }
           - { name: "CONVOLUTION", value: 0, frontend_value: 2, description: "Mathematical convolution (filter is flipped)" }
@@ -162,19 +190,26 @@ operation:
 
   tensor_array_fields: []
 
+<<<<<<< HEAD
   data_fields_helper:
     pack_function: "packConvolutionParams"
     unpack_function: "unpackConvolutionParams"
     include: "ConvolutionPackerHelpers"
     label: "convolution"
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
   has_compute_data_type: true
   compute_data_type_attr: "HIPDNN_ATTR_CONVOLUTION_COMP_TYPE"
 
   test_data:
     constants_include: "ConvFpropConstants"
+<<<<<<< HEAD
     tensor_const_prefix: "K_FPROP_"
     tensor_uids: { x: 1000, w: 1001, y: 1002 }
+=======
+    tensor_uids: { x: 1, w: 2, y: 3 }
+>>>>>>> d9e199e220 (merge b-shi branch)
     tensor_configs:
       x: { dims: [1, 3, 32, 32], strides: [3072, 1024, 32, 1] }
       w: { dims: [64, 3, 3, 3], strides: [27, 9, 3, 1] }

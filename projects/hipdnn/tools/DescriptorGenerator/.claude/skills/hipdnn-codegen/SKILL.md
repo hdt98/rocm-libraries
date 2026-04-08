@@ -1,13 +1,21 @@
 ---
 name: hipdnn-codegen
+<<<<<<< HEAD
 description: Generate hipDNN operation boilerplate from a YAML config. Use when the user wants to add a new operation type to hipDNN, or generate descriptor/packer/unpacker code.
+=======
+description: Generate hipDNN operation boilerplate from a FlatBuffer schema. Use when the user wants to add a new operation type to hipDNN, or generate descriptor/packer/unpacker code.
+>>>>>>> d9e199e220 (merge b-shi branch)
 argument-hint: "<schema-path-or-op-name> [mode: backend|frontend|full|lift-only]"
 allowed-tools: Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion
 ---
 
 # hipDNN Code Generator Skill
 
+<<<<<<< HEAD
 Generate all boilerplate code needed to add a new operation to hipDNN from a YAML config.
+=======
+Generate all boilerplate code needed to add a new operation to hipDNN from a FlatBuffer schema.
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 ## Philosophy
 
@@ -152,7 +160,11 @@ The generator automatically produces all mode enum plumbing:
   - `BackendEnumStringUtils.hpp` (string case)
   - `hipdnn_backend.h` (#include directive)
 - `fragments/mode_frontend_plumbing_<field>.txt` — Combined frontend fragment with sections for:
+<<<<<<< HEAD
   - `Types.hpp` (frontend enum class, toBackend, fromHipdnn converters)
+=======
+  - `Types.hpp` (frontend enum class, toSdkType, fromSdkType, toBackend, fromHipdnn converters)
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 Insert each section from the fragment files into the corresponding target file, just like other fragments. The type tag `PLACEHOLDER_VALUE` must be replaced with the next available value in `HipdnnBackendAttributeType.h`.
 
@@ -273,7 +285,11 @@ Read each fragment file from the output and insert it into the correct shared fi
 | Fragment | Target Files | Insertion |
 |----------|-------------|-----------|
 | `fragments/mode_backend_plumbing_<field>.txt` | Multiple backend files | Read the fragment — it has clearly labeled sections for each target file. Insert each section into the corresponding file. Replace `PLACEHOLDER_VALUE` in the type tag section. |
+<<<<<<< HEAD
 | `fragments/mode_frontend_plumbing_<field>.txt` | `$HIPDNN_SRC/frontend/include/hipdnn_frontend/Types.hpp` | Read the fragment — it has sections for the enum class, toBackend, and fromHipdnn. Insert each near existing similar code. |
+=======
+| `fragments/mode_frontend_plumbing_<field>.txt` | `$HIPDNN_SRC/frontend/include/hipdnn_frontend/Types.hpp` | Read the fragment — it has sections for the enum class, toSdkType, fromSdkType, toBackend, and fromHipdnn. Insert each near existing similar code. |
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 The generated `backend/include/<header>.h` file is a complete file — copy it directly to `$HIPDNN_SRC/backend/include/`.
 
@@ -283,6 +299,10 @@ The generated `backend/include/<header>.h` file is a complete file — copy it d
 |----------|-------------|----------------|
 | `fragments/graph_method.txt` | `$HIPDNN_SRC/frontend/include/hipdnn_frontend/Graph.hpp` | After the last operation method (find the pattern `_sub_nodes.emplace_back`). |
 | `fragments/graph_includes.txt` | `$HIPDNN_SRC/frontend/include/hipdnn_frontend/Graph.hpp` | In the includes section at the top, grouped with other operation includes. |
+<<<<<<< HEAD
+=======
+| `fragments/deserialize_case.txt` | `$HIPDNN_SRC/frontend/include/hipdnn_frontend/Graph.hpp` | In the `deserializeFromFlatBuffer()` switch. |
+>>>>>>> d9e199e220 (merge b-shi branch)
 | `fragments/frontend_cmake_entries.txt` | `$HIPDNN_SRC/frontend/tests/CMakeLists.txt` | Add test files to the test target source list. |
 
 ### 8. Add Enum Test Coverage
@@ -338,7 +358,11 @@ The generator now produces complete integration tests for both lowering and lift
 **Lifting** (`Integration<Op>DescriptorLifting.cpp`):
 - `Basic<Op>RoundTrip` — Full lifting round-trip with field-by-field validation
 - `<Op>TensorSharingPreserved` — Pointer equality verification
+<<<<<<< HEAD
 - `<Op>LiftWithoutFinalization` — Backend binary serialization path
+=======
+- `<Op>LiftWithoutFinalization` — FlatBuffer-direct path
+>>>>>>> d9e199e220 (merge b-shi branch)
 - `AutoAssignedUidsPreservedInLiftingRoundTrip` — Auto-assigned UID distinctness and round-trip
 - Per-optional-scalar preservation tests
 

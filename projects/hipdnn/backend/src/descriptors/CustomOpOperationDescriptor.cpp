@@ -17,7 +17,11 @@ void CustomOpOperationDescriptor::finalize()
     THROW_IF_TRUE(_data.custom_op_id.empty(),
                   HIPDNN_STATUS_BAD_PARAM,
                   "CustomOpOperationDescriptor::finalize() failed: custom_op_id not set");
+<<<<<<< HEAD
     THROW_IF_TRUE(_computeDataType == hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET,
+=======
+    THROW_IF_TRUE(_computeDataType == hipdnn_data_sdk::data_objects::DataType::UNSET,
+>>>>>>> d9e199e220 (merge b-shi branch)
                   HIPDNN_STATUS_BAD_PARAM,
                   "CustomOpOperationDescriptor::finalize() failed: compute data type not set");
 
@@ -155,7 +159,11 @@ void CustomOpOperationDescriptor::getAttribute(hipdnnBackendAttributeName_t attr
                   "CustomOpOperationDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_OPERATION_TYPE_EXT:
+<<<<<<< HEAD
         getOperationType(HIPDNN_OPERATION_TYPE_CUSTOM_OP_EXT,
+=======
+        getOperationType(HIPDNN_OPERATION_TYPE_CUSTOM_OP,
+>>>>>>> d9e199e220 (merge b-shi branch)
                          attributeType,
                          requestedElementCount,
                          elementCount,
@@ -183,6 +191,7 @@ std::vector<std::shared_ptr<TensorDescriptor>>
     return result;
 }
 
+<<<<<<< HEAD
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     CustomOpOperationDescriptor::buildNode() const
 {
@@ -190,11 +199,23 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     node->name = _name;
     node->compute_data_type = _computeDataType;
     node->attributes.Set(hipdnn_flatbuffers_sdk::data_objects::CustomOpAttributesT(_data));
+=======
+std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT> CustomOpOperationDescriptor::buildNode() const
+{
+    auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
+    node->name = _name;
+    node->compute_data_type = _computeDataType;
+    node->attributes.Set(hipdnn_data_sdk::data_objects::CustomOpAttributesT(_data));
+>>>>>>> d9e199e220 (merge b-shi branch)
     return node;
 }
 
 std::shared_ptr<CustomOpOperationDescriptor> CustomOpOperationDescriptor::fromNode(
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+    const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
     const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     const auto* attrs = nodeT.attributes.AsCustomOpAttributes();
@@ -242,7 +263,11 @@ std::string CustomOpOperationDescriptor::toString() const
     str += ", outputs=" + vecToString(_data.output_tensor_uids);
     str += ", data_size=" + std::to_string(_data.data.size());
     str += ", compute_data_type=";
+<<<<<<< HEAD
     str += hipdnn_flatbuffers_sdk::data_objects::EnumNameDataType(_computeDataType);
+=======
+    str += hipdnn_data_sdk::data_objects::EnumNameDataType(_computeDataType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     str += "}";
     return str;
 }

@@ -1984,7 +1984,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 9
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM1_GRVWA8_GSU1_LPB0_LPM0_MIWT1_1_PLR1_SU0_SUS0_SVW1_TLDS0_VWA1_VWB1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM1_GRVWA8_GSU1_LPB0_LPM0_MIWT1_1_PLR3_SU0_SUS0_SVW1_TLDS0_VWA1_VWB1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 0
     StaggerUMapping: 0
@@ -2180,7 +2184,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 10
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM1_GRVWA8_GSU1_LPB16_LPM0_MIWT1_1_PLR1_SU0_SUS0_SVW1_TLDS1_VWA1_VWB1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM1_GRVWA8_GSU1_LPB16_LPM0_MIWT1_1_PLR3_SU0_SUS0_SVW1_TLDS1_VWA1_VWB1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 0
     StaggerUMapping: 0
@@ -2572,7 +2580,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 12
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GRVWA8_GSU1_LPB0_LPM0_MIWT1_1_PLR1_SU0_SUS0_SVW1_TLDS0_VWA1_VWB1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GRVWA8_GSU1_LPB0_LPM0_MIWT1_1_PLR3_SU0_SUS0_SVW1_TLDS0_VWA1_VWB1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 0
     StaggerUMapping: 0
@@ -3748,7 +3760,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 18
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC0_AFEM1_GRVWA8_GSU2_LPB16_LPM0_MIWT1_1_PLR1_SU4_SUS256_SVW1_TLDS1_VWA1_VWB1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Ailk_Bljk_I8I8S_BH_Bias_FDMN_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC0_AFEM1_GRVWA8_GSU2_LPB16_LPM0_MIWT1_1_PLR3_SU4_SUS256_SVW1_TLDS1_VWA1_VWB1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 4
     StaggerUMapping: 0

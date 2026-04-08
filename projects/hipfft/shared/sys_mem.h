@@ -30,6 +30,11 @@
 #include <string>
 #include <utility>
 
+<<<<<<< HEAD
+=======
+#include "device_properties.h"
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -144,6 +149,7 @@ public:
 
     std::string get_details(bool double_tab = false)
     {
+<<<<<<< HEAD
         const auto        usable_bytes = get_usable_bytes();
         std::shared_lock  lock(sys_memory_mutex);
         std::stringstream ss;
@@ -188,6 +194,9 @@ private:
     {
         static_assert(mem_label == sys_mem_label::TOTAL || mem_label == sys_mem_label::FREE);
         size_t ret = 0;
+=======
+        std::unique_lock lock(host_memory_mutex);
+>>>>>>> d9e199e220 (merge b-shi branch)
 #ifdef _WIN32
         MEMORYSTATUSEX info;
         info.dwLength = sizeof(info);

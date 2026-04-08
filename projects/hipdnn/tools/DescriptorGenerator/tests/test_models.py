@@ -1533,6 +1533,7 @@ class TestTensorConstPrefix:
         cfg = make_minimal_config(test_data=td)
         assert cfg.tensor_const_prefix == "K_"
 
+<<<<<<< HEAD
     def test_explicit_override_takes_precedence(self):
         """Explicit override beats the generic constants_include fallback."""
         td = make_test_data(
@@ -1541,6 +1542,8 @@ class TestTensorConstPrefix:
         cfg = make_minimal_config(test_data=td)
         assert cfg.tensor_const_prefix == "K_FPROP_"
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     def test_without_constants_include(self):
         """No constants_include derives prefix from operation name."""
         cfg = make_minimal_config()

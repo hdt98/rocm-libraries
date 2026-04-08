@@ -153,7 +153,11 @@ TEST(TestJson, GraphToJsonAndBack)
             context = "(valid block scale quantize graph)";
             break;
         case hipdnn_data_sdk::data_objects::NodeAttributes::SdpaBackwardAttributes:
+<<<<<<< HEAD
             graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaBwdGraph();
+=======
+            graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaBpropGraph();
+>>>>>>> d9e199e220 (merge b-shi branch)
             graph = hipdnn_data_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
             context = "(valid sdpa backward graph)";
             break;

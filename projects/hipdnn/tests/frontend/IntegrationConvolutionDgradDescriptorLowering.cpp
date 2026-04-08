@@ -18,7 +18,10 @@
 
 #include "test_plugins/TestPluginConstants.hpp"
 #include <hipdnn_test_sdk/constants/ConvDgradConstants.hpp>
+<<<<<<< HEAD
 #include <hipdnn_test_sdk/utilities/TestableGraph.hpp>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
@@ -34,7 +37,19 @@ using hipdnn_tests::TestableGraphLowering;
 namespace
 {
 
+<<<<<<< HEAD
 using namespace hipdnn_tests::constants;
+=======
+// Exposes protected Graph methods for testing
+class TestableGraph : public Graph
+{
+public:
+    using Graph::build_operation_graph_via_descriptors;
+    using Graph::get_raw_graph_descriptor;
+};
+
+using namespace hipdnn_tests::constants::dgrad::integration;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // -- Test constants for AutoAssignedUidsPreservedInRoundTrip --
 

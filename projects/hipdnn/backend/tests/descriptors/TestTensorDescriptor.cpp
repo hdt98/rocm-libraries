@@ -785,7 +785,11 @@ TEST_F(TestTensorDescriptor, IsByValueReturnsFalseWhenNoValueSet)
     bool isByValue = true;
     int64_t count = 0;
     ASSERT_NO_THROW(desc->getAttribute(
+<<<<<<< HEAD
         HIPDNN_ATTR_TENSOR_IS_BY_VALUE, HIPDNN_TYPE_BOOLEAN, 1, &count, &isByValue));
+=======
+        HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, &count, &isByValue));
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_FALSE(isByValue);
 }
 
@@ -800,7 +804,11 @@ TEST_F(TestTensorDescriptor, IsByValueReturnsTrueWhenValueSet)
     bool isByValue = false;
     int64_t count = 0;
     ASSERT_NO_THROW(desc->getAttribute(
+<<<<<<< HEAD
         HIPDNN_ATTR_TENSOR_IS_BY_VALUE, HIPDNN_TYPE_BOOLEAN, 1, &count, &isByValue));
+=======
+        HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, &count, &isByValue));
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_TRUE(isByValue);
 }
 

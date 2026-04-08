@@ -172,10 +172,18 @@ MiopenTensor createTensor(
 /// @param uid The tensor UID to look up
 /// @return MiopenTensor with potentially padded descriptor
 MiopenTensor createBatchnormTensor(
+<<<<<<< HEAD
     const std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
         tensorMap,
     int64_t uid);
+=======
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        tensorMap,
+    int64_t uid);
+
+size_t getSpatialDimCount(const hipdnn_data_sdk::data_objects::TensorAttributes& attr);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 size_t getSpatialDimCount(const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& attr);
 

@@ -6,7 +6,11 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/pointwise_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -68,12 +72,20 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    static std::shared_ptr<PointwiseOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
 
 private:
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::PointwiseAttributesT _data;
+=======
+    hipdnn_data_sdk::data_objects::PointwiseAttributesT _data;
+>>>>>>> d9e199e220 (merge b-shi branch)
     std::string _name;
 
     // Store tensor descriptor references for validation and graph building

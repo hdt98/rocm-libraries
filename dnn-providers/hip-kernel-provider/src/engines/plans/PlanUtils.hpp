@@ -3,7 +3,11 @@
 
 #pragma once
 
+<<<<<<< HEAD
 #include "hipdnn_flatbuffers_sdk/data_objects/data_types_generated.h"
+=======
+#include "hipdnn_data_sdk/data_objects/data_types_generated.h"
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include "hipdnn_plugin_sdk/PluginException.hpp"
 #include <cstddef>
 
@@ -15,6 +19,7 @@ namespace hip_kernel_provider
 * it as a kernel argument. Intended to be used when kernel source code supports
 * multiple tensors type which are instantiated via a preprocessor definition.
 */
+<<<<<<< HEAD
 inline const char* getKernelParamTypeString(hipdnn_flatbuffers_sdk::data_objects::DataType type)
 {
     switch(type)
@@ -24,12 +29,27 @@ inline const char* getKernelParamTypeString(hipdnn_flatbuffers_sdk::data_objects
     case hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16:
         return "ushort";
     case hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT:
+=======
+inline const char* getKernelParamTypeString(hipdnn_data_sdk::data_objects::DataType type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::DataType::HALF:
+        return "half";
+    case hipdnn_data_sdk::data_objects::DataType::BFLOAT16:
+        return "ushort";
+    case hipdnn_data_sdk::data_objects::DataType::FLOAT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         return "float";
     default:
         throw hipdnn_plugin_sdk::HipdnnPluginException(
             HIPDNN_PLUGIN_STATUS_BAD_PARAM,
             std::string("Unsupported data type: ")
+<<<<<<< HEAD
                 + hipdnn_flatbuffers_sdk::data_objects::EnumNameDataType(type));
+=======
+                + hipdnn_data_sdk::data_objects::EnumNameDataType(type));
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 }
 

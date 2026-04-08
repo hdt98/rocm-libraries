@@ -9,10 +9,16 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/custom_op_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/constants/CustomOpConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/custom_op_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_test_sdk/constants/CustomOpConstants.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <algorithm>
 #include <array>
@@ -24,9 +30,14 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_tests::constants;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 class TestCustomOpOperationDescriptor : public ::testing::Test
 {
@@ -102,6 +113,7 @@ protected:
     void SetUp() override
     {
         _wrapper = createDescriptor<CustomOpOperationDescriptor>();
+<<<<<<< HEAD
         _input0 = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0,
                                         toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                         toVec(K_CUSTOM_OP_TENSOR_STRIDES));
@@ -114,6 +126,12 @@ protected:
         _output1 = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_1,
                                          toVec(K_CUSTOM_OP_TENSOR_DIMS),
                                          toVec(K_CUSTOM_OP_TENSOR_STRIDES));
+=======
+        _input0 = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_0, {2, 3}, {3, 1});
+        _input1 = createFinalizedTensor(K_CUSTOM_OP_INPUT_UID_1, {2, 3}, {3, 1});
+        _output0 = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_0, {2, 3}, {3, 1});
+        _output1 = createFinalizedTensor(K_CUSTOM_OP_OUTPUT_UID_1, {2, 3}, {3, 1});
+>>>>>>> d9e199e220 (merge b-shi branch)
         _unfinalizedTensor = createDescriptor<TensorDescriptor>();
     }
 

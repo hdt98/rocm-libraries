@@ -426,10 +426,17 @@ public:
                     "No engines available - cannot create execution context");
             }
 
+<<<<<<< HEAD
             const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper opGraphWrapper(
                 opGraph->ptr, opGraph->size);
             const hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineConfigWrapper
                 engineConfigWrapper(engineConfig->ptr, engineConfig->size);
+=======
+            const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper opGraphWrapper(opGraph->ptr,
+                                                                                     opGraph->size);
+            const hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper engineConfigWrapper(
+                engineConfig->ptr, engineConfig->size);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
             *executionContext = new HipdnnEnginePluginExecutionContext();
 

@@ -109,7 +109,11 @@ namespace hipdnn_frontend::detail
 
     // Unpack compute data type
     auto [dt, dtErr] = unpackGraphDataType(
+<<<<<<< HEAD
         opDesc, HIPDNN_ATTR_LAYERNORM_COMP_TYPE_EXT, "layernorm compute data type");
+=======
+        opDesc, HIPDNN_ATTR_LAYERNORM_MATH_PREC_EXT, "layernorm compute data type");
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(dtErr.is_bad())
     {
         return dtErr;

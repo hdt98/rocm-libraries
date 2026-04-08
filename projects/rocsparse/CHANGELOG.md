@@ -12,6 +12,7 @@ Documentation for rocSPARSE is available at
 * Added the `rocsparse_sptrsv_output_singularity` and the `rocsparse_sptrsv_output_singularity_position` in `rocsparse_sptrsv_output`.
 * Added the strided batched computations for `rocsparse_sptrsv`.
 
+<<<<<<< HEAD
 ### Optimized
 * Significant performance improvement for `rocsparse_Xgtsv_no_pivot_strided_batch`.
 * Significant performance improvement for `rocsparse_Xgtsv_no_pivot`.
@@ -21,6 +22,10 @@ Documentation for rocSPARSE is available at
 * Fixed incorrect usage of `__syncthreads` in `csx2dense`, `dense2csx`, `prune_dense2csr`, `csrcolor`, and `csrmm` (nnz_split)
 * Fix `rocsparse_[s|d|c|z]csric0` where `rocsparse_status_invalid_value` was being returned when the maximum number of non-zeros in any row is between 513 and 1024.
 * Fix compilation when using `--rocsparse_ILP64`
+=======
+### Resolved issues
+* Fix `rocsparse_[s|d|c|z]csric0` where `rocsparse_status_invalid_value` was being returned when the maximum number of non-zeros in any row is between 513 and 1024.
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 ### Removed
 * The deprecated C++14 support, which is no longer supported by the rocPRIM dependency.

@@ -57,8 +57,13 @@ add_executable(
     TestOperationUnpacker.cpp
     TestSdpaAttributes.cpp
     TestSdpaBackwardAttributes.cpp
+<<<<<<< HEAD
     TestSdpaBwdNode.cpp
     TestSdpaFwdNode.cpp
+=======
+    TestSdpaBpropNode.cpp
+    TestSdpaFpropNode.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
     TestPointwiseAttributes.cpp
     TestPointwiseNode.cpp
     TestReductionAttributes.cpp

@@ -477,8 +477,13 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder, IsApplicableReturnsTrueFo
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -490,6 +495,7 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder,
     std::vector<int64_t> strides3D = {42, 1, 3};
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingActivGraph(
+<<<<<<< HEAD
         true,
         false,
         hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD,
@@ -497,6 +503,11 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder,
         dims3D);
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+        true, false, hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, strides3D, dims3D);
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -508,8 +519,13 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder, BuildPlanSetsPlanFor3dNcl
 
     auto builder
         = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingGraph(strides3D, dims3D);
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     MockEngineConfig mockEngineConfig;
     HipdnnMiopenContext ctx;
 
@@ -523,6 +539,7 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder, BuildPlanSetsPlanFor3dNlc
     std::vector<int64_t> strides3D = {42, 1, 3};
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingActivGraph(
+<<<<<<< HEAD
         true,
         false,
         hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_FWD,
@@ -530,6 +547,11 @@ TEST_F(TestMiopenBatchnormFwdTrainingActivPlanBuilder, BuildPlanSetsPlanFor3dNlc
         dims3D);
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+        true, false, hipdnn_data_sdk::data_objects::PointwiseMode::RELU_FWD, strides3D, dims3D);
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     MockEngineConfig mockEngineConfig;
     HipdnnMiopenContext ctx;
 

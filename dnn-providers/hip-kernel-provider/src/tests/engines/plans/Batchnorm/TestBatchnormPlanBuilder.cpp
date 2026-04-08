@@ -6,23 +6,37 @@
 
 #include "HipKernelContext.hpp"
 #include "HipKernelHandle.hpp"
+<<<<<<< HEAD
 #include "engines/plans/batchnorm/BatchnormPlanBuilder.hpp"
+=======
+#include "engines/plans/BatchnormPlanBuilder.hpp"
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include "mocks/MockCompiledProgram.hpp"
 #include "mocks/MockDevicePropertyProvider.hpp"
 #include "mocks/MockKernelCompiler.hpp"
 #include "mocks/MockRunnableKernel.hpp"
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 #include <hipdnn_test_sdk/utilities/MockEngineConfig.hpp>
 #include <hipdnn_test_sdk/utilities/MockGraph.hpp>
 #include <hipdnn_test_sdk/utilities/MockNode.hpp>
 
+<<<<<<< HEAD
 using hipdnn_test_sdk::utilities::MockEngineConfig;
 
 namespace hip_kernel_provider::batchnorm::test
 {
 
+=======
+using namespace hip_kernel_provider;
+using hipdnn_test_sdk::utilities::MockEngineConfig;
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 class TestBatchnormPlanBuilder : public ::testing::Test
 {
 protected:
@@ -62,6 +76,7 @@ protected:
 TEST_F(TestBatchnormPlanBuilder, IsApplicableReturnsTrueForValidInferenceGraph)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
 
@@ -73,6 +88,10 @@ TEST_F(TestBatchnormPlanBuilder, IsApplicableReturnsTrueForValidFwdTrainingGraph
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingGraph();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_TRUE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -84,8 +103,13 @@ TEST_F(TestBatchnormPlanBuilder, IsApplicableReturnsTrueForValidFwdTrainingGraph
 TEST_F(TestBatchnormPlanBuilder, IsApplicableReturnsFalseForThreeNodeGraph)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferActBwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_FALSE(_planBuilder.isApplicable(_dummyHandle, graph));
 }
@@ -99,6 +123,7 @@ TEST_F(TestBatchnormPlanBuilder, BuildPlanSetsPlanForSingleNodeInference)
     setupMockCompileChain();
 
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
     HipKernelContext ctx;
@@ -114,6 +139,10 @@ TEST_F(TestBatchnormPlanBuilder, BuildPlanSetsPlanForSingleNodeFwdTraining)
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingGraph();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipKernelContext ctx;
 
     EXPECT_NO_THROW(_planBuilder.buildPlan(_dummyHandle, graph, _mockEngineConfig, ctx));
@@ -127,6 +156,7 @@ TEST_F(TestBatchnormPlanBuilder, BuildPlanSetsPlanForSingleNodeFwdTraining)
 TEST_F(TestBatchnormPlanBuilder, GetMaxWorkspaceSizeReturnsZero)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
     HipKernelSettings settings;
@@ -139,6 +169,10 @@ TEST_F(TestBatchnormPlanBuilder, GetMaxWorkspaceSizeReturnsZeroForFwdTrainingGra
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormFwdTrainingGraph();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipKernelSettings settings;
 
     EXPECT_EQ(_planBuilder.getMaxWorkspaceSize(_dummyHandle, graph, settings), 0u);
@@ -151,12 +185,18 @@ TEST_F(TestBatchnormPlanBuilder, GetMaxWorkspaceSizeReturnsZeroForFwdTrainingGra
 TEST_F(TestBatchnormPlanBuilder, GetCustomKnobsReturnsEmpty)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidBatchnormInferenceGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto knobs = _planBuilder.getCustomKnobs(_dummyHandle, graph);
     EXPECT_TRUE(knobs.empty());
 }
+<<<<<<< HEAD
 
 TEST_F(TestBatchnormPlanBuilder, GetCustomKnobsReturnsEmptyForFwdTrainingGraph)
 {
@@ -169,3 +209,5 @@ TEST_F(TestBatchnormPlanBuilder, GetCustomKnobsReturnsEmptyForFwdTrainingGraph)
 }
 
 } // namespace hip_kernel_provider::batchnorm::test
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)

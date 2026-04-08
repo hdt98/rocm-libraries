@@ -11,10 +11,17 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/batchnorm_backward_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_fwd_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/batchnorm_backward_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/BatchnormBackwardConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
@@ -25,7 +32,11 @@
 #include <vector>
 
 using namespace hipdnn_backend;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
 
@@ -431,12 +442,20 @@ TEST_F(TestBatchnormBackwardOperationFromNode, GetAttributeWorksAfterFromNode)
     EXPECT_EQ(computeType, HIPDNN_DATA_FLOAT);
 
     // Verify operation type
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t opTypeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType);
     ASSERT_EQ(opTypeCount, 1);
+<<<<<<< HEAD
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_BATCHNORM_BACKWARD_EXT);
+=======
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_BATCHNORM_BACKWARD);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify name
     int64_t nameCount = 0;

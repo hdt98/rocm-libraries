@@ -10,9 +10,13 @@
 #include "HipdnnException.hpp"
 #include "NodeFactory.hpp"
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/utilities/json/Graph.hpp>
 #include <logging/GraphLogger.hpp>
 #include <nlohmann/json.hpp>
+=======
+#include <logging/GraphLogger.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -27,6 +31,7 @@ void GraphDescriptor::finalize()
 {
     THROW_IF_NULL(_handle, HIPDNN_STATUS_BAD_PARAM, "GraphDescriptor::finalize: handle is null");
 
+<<<<<<< HEAD
     THROW_IF_TRUE(_operations.empty(),
                   HIPDNN_STATUS_BAD_PARAM,
                   "GraphDescriptor::finalize: no operations set");
@@ -34,6 +39,35 @@ void GraphDescriptor::finalize()
     invalidateCache();
     buildSerializedGraph();
 
+=======
+    if(_graphSerializedBuffer.size() > 0)
+    {
+        // Serialized buffer already cached (from deserializeGraph or previous finalize)
+    }
+    else if(!_operations.empty())
+    {
+        // C-API flow: build graph from operation descriptors, then serialize
+        auto graph = buildGraphFromOperations();
+        THROW_IF_NULL(graph, HIPDNN_STATUS_BAD_PARAM, "GraphDescriptor::finalize: graph is null");
+
+        flatbuffers::FlatBufferBuilder builder;
+        builder.Finish(hipdnn_data_sdk::data_objects::Graph::Pack(builder, graph.get()));
+        _graphSerializedBuffer = builder.Release();
+    }
+    else
+    {
+        throw HipdnnException(HIPDNN_STATUS_BAD_PARAM,
+                              "GraphDescriptor::finalize: no operations set and no graph "
+                              "deserialized");
+    }
+
+    // Verify the serialized buffer
+    flatbuffers::Verifier verifier(_graphSerializedBuffer.data(), _graphSerializedBuffer.size());
+    THROW_IF_FALSE(hipdnn_data_sdk::data_objects::VerifyGraphBuffer(verifier),
+                   HIPDNN_STATUS_INTERNAL_ERROR,
+                   "GraphDescriptor::finalize: serialized graph failed verification");
+
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnBackendDescriptorImpl<GraphDescriptor>::finalize();
 
     if(logging::GraphLogger::isEnabled())
@@ -44,10 +78,16 @@ void GraphDescriptor::finalize()
     }
 }
 
+<<<<<<< HEAD
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::GraphT>
     GraphDescriptor::buildGraphFromOperations() const
 {
     auto graph = std::make_unique<hipdnn_flatbuffers_sdk::data_objects::GraphT>();
+=======
+std::unique_ptr<hipdnn_data_sdk::data_objects::GraphT> GraphDescriptor::buildGraphFromOperations()
+{
+    auto graph = std::make_unique<hipdnn_data_sdk::data_objects::GraphT>();
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Apply graph-level attributes
     graph->compute_data_type = _computeDataType;
@@ -79,7 +119,11 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::GraphT>
             {
                 seenTensors[uid] = tensorDesc;
                 graph->tensors.push_back(
+<<<<<<< HEAD
                     std::make_unique<hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT>(
+=======
+                    std::make_unique<hipdnn_data_sdk::data_objects::TensorAttributesT>(
+>>>>>>> d9e199e220 (merge b-shi branch)
                         tensorDesc->getData()));
             }
         }
@@ -218,6 +262,25 @@ void GraphDescriptor::getOperations(hipdnnBackendAttributeType_t attributeType,
 {
     checkGetArgs(HIPDNN_TYPE_BACKEND_DESCRIPTOR, attributeType, "GraphDescriptor::getAttribute()");
 
+<<<<<<< HEAD
+=======
+    // Lazy unpack: if the serialized buffer is populated and _operations is empty,
+    // re-parse the buffer and unpack nodes into operations.
+    // Build into a temporary vector so _operations is only populated on full success.
+    if(_graphSerializedBuffer.size() > 0 && _operations.empty())
+    {
+        auto graphT = hipdnn_data_sdk::data_objects::UnPackGraph(_graphSerializedBuffer.data());
+        auto tensorMap = NodeFactory::buildTensorMap(graphT->tensors);
+        std::vector<std::shared_ptr<IBackendDescriptor>> unpacked;
+        unpacked.reserve(graphT->nodes.size());
+        for(const auto& nodeT : graphT->nodes)
+        {
+            unpacked.push_back(NodeFactory::createOperationFromNode(*nodeT, tensorMap));
+        }
+        _operations = std::move(unpacked);
+    }
+
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto count = static_cast<int64_t>(_operations.size());
 
     if(arrayOfElements == nullptr || requestedElementCount == 0)
@@ -238,8 +301,33 @@ void GraphDescriptor::getOperations(hipdnnBackendAttributeType_t attributeType,
         *elementCount = count;
     }
 
+<<<<<<< HEAD
     HipdnnBackendDescriptor::packDescriptorArray(
         _operations, static_cast<HipdnnBackendDescriptor**>(arrayOfElements));
+=======
+    auto outputArray = static_cast<HipdnnBackendDescriptor**>(arrayOfElements);
+
+    // Build into a local vector so no pointers leak if a later iteration fails.
+    std::vector<HipdnnBackendDescriptor*> packed;
+    packed.reserve(_operations.size());
+    try
+    {
+        for(const auto& operation : _operations)
+        {
+            packed.push_back(HipdnnBackendDescriptor::packDescriptor(operation));
+        }
+    }
+    catch(...)
+    {
+        for(auto* p : packed)
+        {
+            delete p;
+        }
+        throw;
+    }
+
+    std::copy(packed.begin(), packed.end(), outputArray);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 void GraphDescriptor::getPreferredEngineId(hipdnnBackendAttributeType_t attributeType,
@@ -267,6 +355,14 @@ void GraphDescriptor::setOperations(hipdnnBackendAttributeType_t attributeType,
     THROW_IF_NULL(arrayOfElements,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "GraphDescriptor::setOperations: arrayOfElements is null");
+
+    // The FlatBuffer and C-API flows are mutually exclusive. Setting operations on a
+    // descriptor that was populated via deserializeGraph() is not supported.
+    THROW_IF_TRUE(_graphSerializedBuffer.size() > 0,
+                  HIPDNN_STATUS_NOT_SUPPORTED,
+                  "GraphDescriptor::setOperations: cannot set operations on a graph populated "
+                  "via deserializeGraph(). The FlatBuffer and C-API flows are mutually "
+                  "exclusive.");
 
     auto descriptors = static_cast<HipdnnBackendDescriptor* const*>(arrayOfElements);
 
@@ -341,7 +437,11 @@ void GraphDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
     // Non-mutating attributes (e.g., HANDLE) set invalidate = false.
     if(invalidate)
     {
+<<<<<<< HEAD
         invalidateCache();
+=======
+        _graphSerializedBuffer = flatbuffers::DetachedBuffer();
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 }
 
@@ -353,11 +453,21 @@ void GraphDescriptor::deserializeGraph(const uint8_t* serializedGraph, size_t gr
     THROW_IF_TRUE(graphByteSize == 0,
                   HIPDNN_STATUS_BAD_PARAM,
                   "GraphDescriptor::deserializeGraph: graphByteSize is 0");
+    THROW_IF_FALSE(_operations.empty(),
+                   HIPDNN_STATUS_NOT_SUPPORTED,
+                   "GraphDescriptor::deserializeGraph: cannot deserialize into a graph with "
+                   "existing operations. The FlatBuffer and C-API flows are mutually exclusive.");
 
+<<<<<<< HEAD
     invalidateCache();
 
     // Parse FlatBuffer and eagerly unpack into _operations
     std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::GraphT> graph;
+=======
+    // Parse FlatBuffer into a local GraphT to extract attributes, then re-serialize into
+    // _graphSerializedBuffer. When getOperations() is called, the buffer is re-parsed on demand.
+    std::unique_ptr<hipdnn_data_sdk::data_objects::GraphT> graph;
+>>>>>>> d9e199e220 (merge b-shi branch)
     flatbuffer_utilities::convertSerializedGraphToGraph(serializedGraph, graphByteSize, graph);
 
     // Extract graph-level attributes
@@ -367,6 +477,7 @@ void GraphDescriptor::deserializeGraph(const uint8_t* serializedGraph, size_t gr
     _preferredEngineId = graph->preferred_engine_id;
     _name = graph->name;
 
+<<<<<<< HEAD
     // Populate _operations from the deserialized graph nodes
     auto tensorMap = NodeFactory::buildTensorMap(graph->tensors);
     std::vector<std::shared_ptr<IBackendDescriptor>> unpacked;
@@ -398,14 +509,40 @@ void GraphDescriptor::buildSerializedGraph()
     THROW_IF_FALSE(hipdnn_flatbuffers_sdk::data_objects::VerifyGraphBuffer(verifier),
                    HIPDNN_STATUS_INTERNAL_ERROR,
                    "GraphDescriptor::buildSerializedGraph: serialized graph failed verification");
+=======
+    // Cache the serialized bytes for getSerializedGraph() by re-serializing from the parsed GraphT
+    flatbuffers::FlatBufferBuilder builder;
+    builder.Finish(hipdnn_data_sdk::data_objects::Graph::Pack(builder, graph.get()));
+    _graphSerializedBuffer = builder.Release();
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 hipdnnPluginConstData_t GraphDescriptor::getSerializedGraph() const
 {
+<<<<<<< HEAD
     THROW_IF_TRUE(_graphSerializedBuffer.size() == 0,
                   HIPDNN_STATUS_BAD_PARAM,
                   "GraphDescriptor::getSerializedGraph: serialized buffer not populated. "
                   "Call finalize() or buildSerializedGraph() first.");
+=======
+    // For the FlatBuffer flow, the serialized buffer is populated during deserializeGraph()
+    // and can be returned without requiring finalize(). This enables lazy serialization for
+    // graphs that were deserialized and not modified.
+    if(_graphSerializedBuffer.size() > 0)
+    {
+        return {_graphSerializedBuffer.data(), _graphSerializedBuffer.size()};
+    }
+
+    THROW_IF_FALSE(isFinalized(),
+                   HIPDNN_STATUS_BAD_PARAM_NOT_FINALIZED,
+                   "GraphDescriptor::getSerializedGraph: graph is not finalized");
+
+    // After finalization, the buffer should always be populated
+    THROW_IF_TRUE(_graphSerializedBuffer.size() == 0,
+                  HIPDNN_STATUS_INTERNAL_ERROR,
+                  "GraphDescriptor::getSerializedGraph: serialized buffer is empty after "
+                  "finalization");
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     return {_graphSerializedBuffer.data(), _graphSerializedBuffer.size()};
 }

@@ -25,7 +25,10 @@
  *******************************************************************************/
 
 #include "contraction_solution.hpp"
+<<<<<<< HEAD
 #include "hash.hpp"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include "hiptensor_options.hpp"
 
 namespace hiptensor

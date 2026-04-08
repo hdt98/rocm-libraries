@@ -88,7 +88,11 @@ public:
         auto shallowVarianceTensor = createShallowTensor<MeanVarianceDataType>(
             _params.varianceTensor, variantPack.at(_params.varianceTensor.uid));
 
+<<<<<<< HEAD
         const double epsilonVal = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
+=======
+        const double epsilonVal = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+>>>>>>> d9e199e220 (merge b-shi branch)
             _params.epsilonTensor, "Epsilon");
 
         utilities::CpuFpReferenceBatchnorm::fwdInferenceWithVariance(*shallowXTensor,

@@ -89,7 +89,11 @@ namespace ck_tile::core::arch::mma {
  *
  * (logical correctness). Applies to scale MFMA fp8, which due to the index matrix layout does not
  * allow arbitrary K perms to simplify layouts. This means the layout can only properly be described
+<<<<<<< HEAD
  * with a Num Access value which is a multiple of 2.
+=======
+ * with a Num Access value of at least 2.
+>>>>>>> d9e199e220 (merge b-shi branch)
  *
  * (load / store manipulation). It seems like the load and store tile functions end up looking for
  * the size of the smallest unmerged K dimension (K0) to determine how many elements should be
@@ -104,16 +108,24 @@ namespace ck_tile::core::arch::mma {
  *
  * -- CMPerLane --
  * The number of M dim elements in each lane. In terms of unmerge sizes, it's equal to M0 * M2, i.e
+<<<<<<< HEAD
  * the product of the sizes of the outermost and innermost dimensions after a double M unmerge. This
  * does not count a potential increased M dimension size from block hiding. In this case, we have M
  * = kCMBlock * M2 * M1 * M0 instead.
+=======
+ * the product of the sizes of the outermost and innermost dimensions after a double M unmerge.
+>>>>>>> d9e199e220 (merge b-shi branch)
  *
  * -- CNumAccess --
  * Same as A / B NumAccess but for the M dim (so M2), but the mid-level code doesn't care about this
  * and will not try to request a specific value. Absolutely needed for logical correctness of
  * register mappings since we can not perform arbitrary M permutations without messing up the A
+<<<<<<< HEAD
  * layout. This does not count a potential increased M dimension size from block hiding. In this
  * case, we have M = kCMBlock * M2 * M1 * M0 instead.
+=======
+ * layout.
+>>>>>>> d9e199e220 (merge b-shi branch)
  */
 
 /**
@@ -149,7 +161,11 @@ struct amdgcn_mma_base
     using CDataType = CDataType_;
 
     // Fragment (MmaTile) sizes, check description above.
+<<<<<<< HEAD
     static constexpr index_t kM = FragM; // M = M2 * M1 * M0 (* kCMBlocks when block-hiding)
+=======
+    static constexpr index_t kM = FragM; // M = M2 * M1 * M0
+>>>>>>> d9e199e220 (merge b-shi branch)
     static constexpr index_t kN = FragN;
     static constexpr index_t kK = FragK; // K = K2 * K1 * K0
 
@@ -162,6 +178,7 @@ struct amdgcn_mma_base
     static constexpr index_t kCMPerLane   = kCMPerLane_;   // M2 * M0
     static constexpr index_t kCMNumAccess = kCMNumAccess_; // M2
 
+<<<<<<< HEAD
     // K-dimension compression ratio for A matrix, always 2 for sparse intrinsics.
     static constexpr index_t kCompressionRatio = (OpFamily == MmaOpFamily::SPARSE) ? 2 : 1;
 
@@ -193,6 +210,17 @@ struct amdgcn_mma_base
     // dimension. We can tell which by checking if we get the right Vector size.
     static constexpr bool CBlockDimInVecDim =
         kCMBlocks * kCNBlocks * kCMPerLane == vector_traits<CVecType>::vector_size;
+=======
+    // Register types (derived)
+    static constexpr index_t WaveSize = WaveSize_;
+    static_assert((kM * kK * kARepeat) % WaveSize == 0);
+    static_assert((kN * kK * kBRepeat) % WaveSize == 0);
+    static_assert((kM * kN) % WaveSize == 0);
+
+    using AVecType = ext_vector_t<ADataType, kM * kK * kARepeat / WaveSize>;
+    using BVecType = ext_vector_t<BDataType, kN * kK * kBRepeat / WaveSize>;
+    using CVecType = ext_vector_t<CDataType, kM * kN / WaveSize>;
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 /**
@@ -227,7 +255,11 @@ template <typename MmaOp>
 concept MmaOpI = requires(MmaOp op) {
     // Requires an op context
     typename MmaOp::OpType;
+<<<<<<< HEAD
     { MmaOp::OpFamily } -> std::convertible_to<MmaOpFamily>;
+=======
+    typename MmaOp::OpFamily;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Captures types for inputs / outputs to mma function
     typename MmaOp::ADataType;
@@ -244,8 +276,18 @@ concept MmaOpI = requires(MmaOp op) {
     { MmaOp::kBRepeat } -> std::convertible_to<unsigned int>;
     { MmaOp::kCMPerLane } -> std::convertible_to<unsigned int>;
     { MmaOp::kCMNumAccess } -> std::convertible_to<unsigned int>;
+<<<<<<< HEAD
     { MmaOp::kCompressionRatio } -> std::convertible_to<unsigned int>;
 } && (HasExecSignature<MmaOp> || HasExecSignature<MmaOp, int> || HasExecSignature<MmaOp, int, int>);
+=======
+
+    // Static exec function
+    {
+        MmaOp::exec(
+            typename MmaOp::AVecType{}, typename MmaOp::BVecType{}, typename MmaOp::CVecType{})
+    } -> std::convertible_to<typename MmaOp::CVecType>;
+};
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #endif // CK_TILE_CONCEPTS && CK_TILE_CONCEPTS_HEADER
 

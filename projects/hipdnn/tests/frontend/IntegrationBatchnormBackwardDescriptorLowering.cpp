@@ -228,8 +228,12 @@ TEST_F(IntegrationBatchnormBackwardDescriptorLowering, AutoAssignedUidsPreserved
                                                   bnBwd->dx_tensor_uid,
                                                   bnBwd->dscale_tensor_uid,
                                                   bnBwd->dbias_tensor_uid};
+<<<<<<< HEAD
     EXPECT_EQ(nodeUids.size(), 6u)
         << "BatchnormBackward node tensor UIDs are not distinct"; // NOLINT(readability-implicit-bool-conversion)
+=======
+    EXPECT_EQ(nodeUids.size(), 6u) << "BatchnormBackward node tensor UIDs are not distinct";
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 } // namespace

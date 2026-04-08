@@ -34,7 +34,11 @@ constexpr int64_t K_RMSNORM_TENSOR_BIAS_UID = 1604;
 constexpr std::array<int64_t, 4> K_RMSNORM_TENSOR_BIAS_DIMS = {1, 64, 1, 1};
 constexpr std::array<int64_t, 4> K_RMSNORM_TENSOR_BIAS_STRIDES = {64, 1, 1, 1};
 
+<<<<<<< HEAD
 constexpr int64_t K_RMSNORM_TENSOR_INV_RMS_UID = 1605;
+=======
+constexpr int64_t K_RMSNORM_TENSOR_INV_RMS_UID = 45;
+>>>>>>> d9e199e220 (merge b-shi branch)
 constexpr std::array<int64_t, 4> K_RMSNORM_TENSOR_INV_RMS_DIMS = {1, 1, 32, 32};
 constexpr std::array<int64_t, 4> K_RMSNORM_TENSOR_INV_RMS_STRIDES = {1024, 1024, 32, 1};
 

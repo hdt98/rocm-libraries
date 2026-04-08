@@ -3,30 +3,59 @@
 
 #pragma once
 
+<<<<<<< HEAD
 #include <filesystem>
+=======
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 
+<<<<<<< HEAD
 #include "harness/TestSettings.hpp"
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 namespace hipdnn_integration_tests
 {
 
 // Methods for determining acceptable tolerance when comparing reference
 // implementation output to the selected engine's output.
+<<<<<<< HEAD
+=======
+//
+// Example:
+//   [plugins.miopen]
+//   name = "miopen_provider_plugin"
+//   engines = ["MIOPEN_PLUGIN"]
+//
+//   [engines.MIOPEN_PLUGIN]
+//   tolerance = "gh_12678_tolerance_workaround"
+//
+// The example config would map to ToleranceMode::GH_12678_TOLERANCE_WORKAROUND
+// which uses default tolerance for all graphs besides batch norm backwards
+// operating on bfloat16 where it returns a wider tolerance.
+>>>>>>> d9e199e220 (merge b-shi branch)
 enum class ToleranceMode
 {
     DEFAULT,
 };
 
+<<<<<<< HEAD
 // Singleton class for storing CLI-based test configuration.
 // All arguments are independently optional:
 //   - articlePath: omit to use hipDNN's default plugin discovery
 //   - engineName: omit to let hipDNN select the engine
 //   - failOnUnsupported: when true, FAIL instead of SKIP for unsupported graphs
+=======
+// Singleton class for reading test configuration from JSON file.
+>>>>>>> d9e199e220 (merge b-shi branch)
 class TestConfig
 {
 public:
@@ -42,6 +71,7 @@ public:
     TestConfig(TestConfig&&) = delete;
     TestConfig& operator=(TestConfig&&) = delete;
 
+<<<<<<< HEAD
     // Initialize with CLI arguments. Must be called before any get() access.
     static void initialize(std::optional<std::filesystem::path> articlePath,
                            std::optional<std::string> engineName,
@@ -98,10 +128,55 @@ public:
         if(!_articlePath.has_value())
         {
             throw std::runtime_error("getArticlePath() called but --test-article was not provided");
+=======
+    // Get tolerance mode for a given engine ID.
+    ToleranceMode getToleranceMode(int64_t engineId) const
+    {
+        std::string engineName;
+        try
+        {
+            engineName = std::string(hipdnn_data_sdk::utilities::getEngineNameFromId(engineId));
+        }
+        catch(const std::out_of_range&)
+        {
+            engineName = "Engine" + std::to_string(engineId);
+        }
+
+        if(auto it = _engineTolerances.find(engineName); it != _engineTolerances.end())
+        {
+            return it->second;
+        }
+        return ToleranceMode::DEFAULT;
+    }
+
+    // Check if a full GTest test name is in the expected failures list.
+    // Test name format: "TestSuite/Prefix.TestName/ParamName"
+    bool isExpectedFailure(const std::string& testName)
+    {
+        return _expectedFailures.contains(testName);
+    }
+
+    // Get expected plugin names from config (e.g., {"fusilli_plugin",
+    // "miopen_provider_plugin"})
+    const std::set<std::string>& getExpectedPluginNames() const
+    {
+        return _expectedPluginNames;
+    }
+
+private:
+    TestConfig()
+    {
+        // Get config path
+        const char* configPathEnv = std::getenv("HIPDNN_TEST_CONFIG_PATH");
+        if(configPathEnv == nullptr || std::strlen(configPathEnv) == 0)
+        {
+            throw std::runtime_error("HIPDNN_TEST_CONFIG_PATH environment variable not set");
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
         return _articlePath.value();
     }
 
+<<<<<<< HEAD
     // Get the engine name string. Throws if not provided.
     std::string_view getEngineName() const
     {
@@ -158,6 +233,63 @@ private:
         if(!_initialized)
         {
             throw std::runtime_error("TestConfig not initialized");
+=======
+        // Parse config
+        const std::filesystem::path configPath = std::filesystem::weakly_canonical(configPathEnv);
+        std::ifstream configFile(configPath);
+        if(!configFile.is_open())
+        {
+            throw std::runtime_error("Failed to open config file: " + configPath.string());
+        }
+        try
+        {
+            auto config = nlohmann::json::parse(configFile);
+
+            // Populate expected failures set from flattened list
+            if(config.contains("expected_failures"))
+            {
+                for(const auto& name : config["expected_failures"])
+                {
+                    _expectedFailures.insert(name.get<std::string>());
+                }
+            }
+
+            // Populate expected plugin names from plugin definitions
+            if(config.contains("plugins"))
+            {
+                for(const auto& [name, info] : config["plugins"].items())
+                {
+                    if(info.contains("name"))
+                    {
+                        _expectedPluginNames.insert(info["name"].get<std::string>());
+                    }
+                }
+            }
+
+            // Populate engine tolerance modes
+            if(config.contains("engines"))
+            {
+                for(const auto& [engineName, engineConfig] : config["engines"].items())
+                {
+                    if(engineConfig.contains("tolerance"))
+                    {
+                        auto val = engineConfig["tolerance"].get<std::string>();
+                        if(val == "default")
+                        {
+                            _engineTolerances[engineName] = ToleranceMode::DEFAULT;
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Unknown tolerance mode: " + val);
+                        }
+                    }
+                }
+            }
+        }
+        catch(const nlohmann::json::parse_error& e)
+        {
+            throw std::runtime_error("Failed to parse config JSON: " + std::string(e.what()));
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
     }
 

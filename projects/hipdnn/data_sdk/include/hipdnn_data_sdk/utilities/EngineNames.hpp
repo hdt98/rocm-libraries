@@ -173,7 +173,10 @@ HIPDNN_REGISTER_ENGINE(HIP_KERNEL_ENGINE)
 HIPDNN_REGISTER_ENGINE(HIPBLASLT_ENGINE)
 HIPDNN_REGISTER_ENGINE(MIOPEN_ENGINE)
 HIPDNN_REGISTER_ENGINE(MIOPEN_ENGINE_DETERMINISTIC)
+<<<<<<< HEAD
 HIPDNN_REGISTER_ENGINE(ASM_SDPA_ENGINE)
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // NOLINTEND(bugprone-throwing-static-initialization)
 ////////////////////////////////////////////////////////////////////////////////////////////

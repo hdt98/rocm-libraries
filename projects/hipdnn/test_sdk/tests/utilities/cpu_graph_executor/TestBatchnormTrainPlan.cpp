@@ -100,7 +100,11 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
 
 TEST(TestBatchnormTrainPlanBuilder, PlanConstruction)
 {
+<<<<<<< HEAD
     const std::vector<int64_t> dims = {2, 1, 1, 1};
+=======
+    const std::vector<int64_t> dims = {1, 1, 1, 1};
+>>>>>>> d9e199e220 (merge b-shi branch)
     BatchnormTrainTensorBundle<float, float, float> tensorBundle(dims, 1, TensorLayout::NCHW);
 
     auto graphTuple = buildBatchnormTrainGraph(
@@ -130,7 +134,11 @@ TEST(TestBatchnormTrainPlanBuilder, PlanConstruction)
 
 TEST(TestBatchnormTrainPlanBuilder, IsApplicable)
 {
+<<<<<<< HEAD
     const std::vector<int64_t> dims = {2, 1, 1, 1};
+=======
+    const std::vector<int64_t> dims = {1, 1, 1, 1};
+>>>>>>> d9e199e220 (merge b-shi branch)
     BatchnormTrainTensorBundle<float, float, float> tensorBundle(dims, 1, TensorLayout::NCHW);
 
     auto graphTuple = buildBatchnormTrainGraph(

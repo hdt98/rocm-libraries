@@ -12,8 +12,11 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/constants/ConvWgradConstants.hpp>
+<<<<<<< HEAD
 #include <hipdnn_test_sdk/utilities/IntegrationTestFixture.hpp>
 #include <hipdnn_test_sdk/utilities/LoweringTestHelpers.hpp>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/TestableGraph.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
@@ -22,7 +25,11 @@
 
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
+<<<<<<< HEAD
 using namespace hipdnn_tests::constants;
+=======
+using namespace hipdnn_tests::constants::conv_wgrad::integration;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using hipdnn_tests::toVec;
 using DataTypeSdk = hipdnn_flatbuffers_sdk::data_objects::DataType;
 using NodeAttrType = hipdnn_flatbuffers_sdk::data_objects::NodeAttributes;
@@ -35,6 +42,17 @@ using hipdnn_tests::TestableGraphLowering;
 namespace
 {
 
+<<<<<<< HEAD
+=======
+// Exposes protected Graph methods for testing
+class TestableGraph : public Graph
+{
+public:
+    using Graph::build_operation_graph_via_descriptors;
+    using Graph::get_raw_graph_descriptor;
+};
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 // -- Test constants for AutoAssignedUidsPreservedInRoundTrip --
 
 constexpr std::array<int64_t, 4> K_AUTO_X_DIMS = {1, 3, 8, 8};

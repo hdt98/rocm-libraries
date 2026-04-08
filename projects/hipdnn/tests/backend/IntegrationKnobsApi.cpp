@@ -817,7 +817,36 @@ TEST_F(IntegrationConstraintValidationApi, IntValueToFloatConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, FloatValueToIntConstraint)
@@ -835,7 +864,36 @@ TEST_F(IntegrationConstraintValidationApi, FloatValueToIntConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, StringValueToIntConstraint)
@@ -853,7 +911,36 @@ TEST_F(IntegrationConstraintValidationApi, StringValueToIntConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, IntValueToStringConstraint)
@@ -871,7 +958,36 @@ TEST_F(IntegrationConstraintValidationApi, IntValueToStringConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, FloatValueToStringConstraint)
@@ -889,7 +1005,36 @@ TEST_F(IntegrationConstraintValidationApi, FloatValueToStringConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, StringValueToFloatConstraint)
@@ -907,7 +1052,36 @@ TEST_F(IntegrationConstraintValidationApi, StringValueToFloatConstraint)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_PLUGIN_ERROR);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_PLUGIN_ERROR);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, CorrectTypesSucceed)
@@ -932,7 +1106,36 @@ TEST_F(IntegrationConstraintValidationApi, CorrectTypesSucceed)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_SUCCESS);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_SUCCESS);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, UnknownKnobIsIgnored)
@@ -950,7 +1153,36 @@ TEST_F(IntegrationConstraintValidationApi, UnknownKnobIsIgnored)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(hipdnnBackendFinalize(_engineConfig), HIPDNN_STATUS_SUCCESS);
+<<<<<<< HEAD
     expectExecutionPlanFinalize(HIPDNN_STATUS_SUCCESS);
+=======
+
+    hipdnnBackendDescriptor_t executionPlan = nullptr;
+    ASSERT_EQ(
+        hipdnnBackendCreateDescriptor(HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR, &executionPlan),
+        HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_ENGINE_CONFIG,
+                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+              HIPDNN_STATUS_SUCCESS);
+
+    EXPECT_EQ(hipdnnBackendFinalize(executionPlan), HIPDNN_STATUS_SUCCESS);
+
+    if(executionPlan != nullptr)
+    {
+        hipdnnBackendDestroyDescriptor(executionPlan);
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(IntegrationConstraintValidationApi, MixedValidAndInvalidKnobs)
@@ -979,17 +1211,31 @@ TEST_F(IntegrationConstraintValidationApi, MixedValidAndInvalidKnobs)
 // Engine Knob Info via Descriptor API (HIPDNN_ATTR_ENGINE_KNOB_INFO)
 // =============================================================================
 
+<<<<<<< HEAD
 TEST_F(IntegrationKnobsApi, GetKnobInfoDescriptorCount)
 {
     createFinalizedEngine();
+=======
+    ASSERT_EQ(hipdnnBackendSetAttribute(executionPlan,
+                                        HIPDNN_ATTR_EXECUTION_PLAN_HANDLE,
+                                        HIPDNN_TYPE_HANDLE,
+                                        1,
+                                        static_cast<const void*>(&_handle)),
+              HIPDNN_STATUS_SUCCESS);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     int64_t knobCount = -1;
     EXPECT_EQ(hipdnnBackendGetAttribute(_engine,
                                         HIPDNN_ATTR_ENGINE_KNOB_INFO,
                                         HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+<<<<<<< HEAD
                                         0,
                                         &knobCount,
                                         nullptr),
+=======
+                                        1,
+                                        static_cast<const void*>(&_engineConfig)),
+>>>>>>> d9e199e220 (merge b-shi branch)
               HIPDNN_STATUS_SUCCESS);
 
     EXPECT_EQ(knobCount, 5);

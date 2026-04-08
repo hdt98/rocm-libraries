@@ -52,6 +52,14 @@ This table provides the current status of the migration of specific components a
 | `rocwmma`           | Completed   | [![Math-CI](https://pcue-math-rocm-ci-apim.azure-api.net/buildstatus?job=/rocm-libraries/precheckin/rocwmma/develop&subject=MathCI)](http://math-ci.amd.com/job/rocm-libraries/job/precheckin/job/rocwmma/job/develop/lastBuild/) |
 | `hiptensor`           | Completed  | [![Math-CI](https://pcue-math-rocm-ci-apim.azure-api.net/buildstatus?job=/rocm-libraries/precheckin/hiptensor/develop&subject=MathCI)](http://math-ci.amd.com/job/rocm-libraries/job/precheckin/job/hiptensor/job/develop/lastBuild/) |
 
+# TheRock CI Status
+
+Note TheRock CI performs multi-component testing on top of builds leveraging [TheRock](https://github.com/ROCm/TheRock) build system.
+
+[![TheRock CI Nightly](https://github.com/ROCm/rocm-libraries/actions/workflows/therock-ci-nightly.yml/badge.svg)](https://github.com/ROCm/rocm-libraries/actions/workflows/therock-ci-nightly.yml)
+
+---
+
 ## Nomenclature
 
 Project names have been standardized to match the casing and punctuation of released packages. This removes inconsistent camel-casing and underscores used in legacy repositories.

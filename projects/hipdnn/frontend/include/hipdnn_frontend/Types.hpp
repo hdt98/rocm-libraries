@@ -32,11 +32,26 @@
 #include <HipdnnDiagonalAlignment.h>
 #include <HipdnnNormFwdPhase.h>
 #include <HipdnnPointwiseMode.h>
+<<<<<<< HEAD
 #include <HipdnnReduceTensorOp.h>
+=======
+#include <hipdnn_data_sdk/data_objects/convolution_fwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_data_sdk/data_objects/knob_value_generated.h>
+#include <hipdnn_data_sdk/data_objects/norm_common_generated.h>
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/reduction_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/rmsnorm_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/sdpa_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/types.hpp>
 
 #include <hipdnn_frontend/Error.hpp>
 
+<<<<<<< HEAD
+=======
+#include <bitset>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <optional>
 #include <ostream>
 #include <string>
@@ -367,9 +382,15 @@ inline std::pair<ConvolutionMode, Error> fromHipdnnConvMode(hipdnnConvolutionMod
 {
     switch(mode)
     {
+<<<<<<< HEAD
     case HIPDNN_CROSS_CORRELATION:
         return {ConvolutionMode::CROSS_CORRELATION, {}};
     case HIPDNN_CONVOLUTION:
+=======
+    case HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION:
+        return {ConvolutionMode::CROSS_CORRELATION, {}};
+    case HIPDNN_CONVOLUTION_MODE_CONVOLUTION:
+>>>>>>> d9e199e220 (merge b-shi branch)
         return {ConvolutionMode::CONVOLUTION, {}};
     default:
         return {
@@ -513,9 +534,15 @@ inline std::pair<NormFwdPhase, Error> fromHipdnnNormFwdPhase(hipdnnNormFwdPhase_
 {
     switch(phase)
     {
+<<<<<<< HEAD
     case HIPDNN_NORM_FWD_INFERENCE:
         return {NormFwdPhase::INFERENCE, {}};
     case HIPDNN_NORM_FWD_TRAINING:
+=======
+    case HIPDNN_NORM_FWD_PHASE_INFERENCE:
+        return {NormFwdPhase::INFERENCE, {}};
+    case HIPDNN_NORM_FWD_PHASE_TRAINING:
+>>>>>>> d9e199e220 (merge b-shi branch)
         return {NormFwdPhase::TRAINING, {}};
     default:
         return {NormFwdPhase::NOT_SET,
@@ -636,6 +663,167 @@ inline std::optional<hipdnnPointwiseMode_t> toBackendPointwiseMode(const Pointwi
     }
 }
 
+<<<<<<< HEAD
+=======
+/// @brief Convert SDK ConvMode to frontend ConvolutionMode
+inline hipdnn_frontend::ConvolutionMode
+    fromSdkType(const hipdnn_data_sdk::data_objects::ConvMode& type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::ConvMode::CROSS_CORRELATION:
+        return hipdnn_frontend::ConvolutionMode::CROSS_CORRELATION;
+    case hipdnn_data_sdk::data_objects::ConvMode::CONVOLUTION:
+        return hipdnn_frontend::ConvolutionMode::CONVOLUTION;
+    default:
+        return hipdnn_frontend::ConvolutionMode::NOT_SET;
+    }
+}
+
+/// @brief Convert frontend DataType to SDK DataType
+inline hipdnn_data_sdk::data_objects::DataType toSdkType(const DataType& type)
+{
+    switch(type)
+    {
+    case DataType::FLOAT:
+        return hipdnn_data_sdk::data_objects::DataType::FLOAT;
+    case DataType::HALF:
+        return hipdnn_data_sdk::data_objects::DataType::HALF;
+    case DataType::BFLOAT16:
+        return hipdnn_data_sdk::data_objects::DataType::BFLOAT16;
+    case DataType::DOUBLE:
+        return hipdnn_data_sdk::data_objects::DataType::DOUBLE;
+    case DataType::UINT8:
+        return hipdnn_data_sdk::data_objects::DataType::UINT8;
+    case DataType::INT32:
+        return hipdnn_data_sdk::data_objects::DataType::INT32;
+    case DataType::INT8:
+        return hipdnn_data_sdk::data_objects::DataType::INT8;
+    case DataType::FP8_E4M3:
+        return hipdnn_data_sdk::data_objects::DataType::FP8_E4M3;
+    case DataType::FP8_E5M2:
+        return hipdnn_data_sdk::data_objects::DataType::FP8_E5M2;
+    case DataType::FP8_E8M0:
+        return hipdnn_data_sdk::data_objects::DataType::FP8_E8M0;
+    case DataType::FP4_E2M1:
+        return hipdnn_data_sdk::data_objects::DataType::FP4_E2M1;
+    case DataType::INT4:
+        return hipdnn_data_sdk::data_objects::DataType::INT4;
+    case DataType::FP6_E2M3:
+        return hipdnn_data_sdk::data_objects::DataType::FP6_E2M3;
+    case DataType::FP6_E3M2:
+        return hipdnn_data_sdk::data_objects::DataType::FP6_E3M2;
+    case DataType::INT64:
+        return hipdnn_data_sdk::data_objects::DataType::INT64;
+    default:
+        return hipdnn_data_sdk::data_objects::DataType::UNSET;
+    }
+}
+
+/// @brief Convert SDK DataType to frontend DataType
+inline hipdnn_frontend::DataType fromSdkType(const hipdnn_data_sdk::data_objects::DataType& type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::DataType::FLOAT:
+        return hipdnn_frontend::DataType::FLOAT;
+    case hipdnn_data_sdk::data_objects::DataType::HALF:
+        return hipdnn_frontend::DataType::HALF;
+    case hipdnn_data_sdk::data_objects::DataType::BFLOAT16:
+        return hipdnn_frontend::DataType::BFLOAT16;
+    case hipdnn_data_sdk::data_objects::DataType::DOUBLE:
+        return hipdnn_frontend::DataType::DOUBLE;
+    case hipdnn_data_sdk::data_objects::DataType::UINT8:
+        return hipdnn_frontend::DataType::UINT8;
+    case hipdnn_data_sdk::data_objects::DataType::INT32:
+        return hipdnn_frontend::DataType::INT32;
+    case hipdnn_data_sdk::data_objects::DataType::INT8:
+        return hipdnn_frontend::DataType::INT8;
+    case hipdnn_data_sdk::data_objects::DataType::FP8_E4M3:
+        return hipdnn_frontend::DataType::FP8_E4M3;
+    case hipdnn_data_sdk::data_objects::DataType::FP8_E5M2:
+        return hipdnn_frontend::DataType::FP8_E5M2;
+    case hipdnn_data_sdk::data_objects::DataType::FP8_E8M0:
+        return hipdnn_frontend::DataType::FP8_E8M0;
+    case hipdnn_data_sdk::data_objects::DataType::FP4_E2M1:
+        return hipdnn_frontend::DataType::FP4_E2M1;
+    case hipdnn_data_sdk::data_objects::DataType::INT4:
+        return hipdnn_frontend::DataType::INT4;
+    case hipdnn_data_sdk::data_objects::DataType::FP6_E2M3:
+        return hipdnn_frontend::DataType::FP6_E2M3;
+    case hipdnn_data_sdk::data_objects::DataType::FP6_E3M2:
+        return hipdnn_frontend::DataType::FP6_E3M2;
+    case hipdnn_data_sdk::data_objects::DataType::INT64:
+        return hipdnn_frontend::DataType::INT64;
+    default:
+        return hipdnn_frontend::DataType::NOT_SET;
+    }
+}
+
+/// @brief Convert frontend DiagonalAlignment to SDK DiagonalAlignment
+inline hipdnn_data_sdk::data_objects::DiagonalAlignment toSdkType(const DiagonalAlignment& type)
+{
+    switch(type)
+    {
+    case DiagonalAlignment::TOP_LEFT:
+        return hipdnn_data_sdk::data_objects::DiagonalAlignment::TOP_LEFT;
+    case DiagonalAlignment::BOTTOM_RIGHT:
+        return hipdnn_data_sdk::data_objects::DiagonalAlignment::BOTTOM_RIGHT;
+    default:
+        return hipdnn_data_sdk::data_objects::DiagonalAlignment::TOP_LEFT;
+    }
+}
+
+/// @brief Convert SDK DiagonalAlignment to frontend DiagonalAlignment
+inline hipdnn_frontend::DiagonalAlignment
+    fromSdkType(const hipdnn_data_sdk::data_objects::DiagonalAlignment& type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::DiagonalAlignment::TOP_LEFT:
+        return hipdnn_frontend::DiagonalAlignment::TOP_LEFT;
+    case hipdnn_data_sdk::data_objects::DiagonalAlignment::BOTTOM_RIGHT:
+        return hipdnn_frontend::DiagonalAlignment::BOTTOM_RIGHT;
+    default:
+        return hipdnn_frontend::DiagonalAlignment::TOP_LEFT;
+    }
+}
+
+/// @brief Convert frontend AttentionImplementation to SDK AttentionImplementation
+inline hipdnn_data_sdk::data_objects::AttentionImplementation
+    toSdkType(const AttentionImplementation& type)
+{
+    switch(type)
+    {
+    case AttentionImplementation::AUTO:
+        return hipdnn_data_sdk::data_objects::AttentionImplementation::AUTO;
+    case AttentionImplementation::COMPOSITE:
+        return hipdnn_data_sdk::data_objects::AttentionImplementation::COMPOSITE;
+    case AttentionImplementation::UNIFIED:
+        return hipdnn_data_sdk::data_objects::AttentionImplementation::UNIFIED;
+    default:
+        return hipdnn_data_sdk::data_objects::AttentionImplementation::AUTO;
+    }
+}
+
+/// @brief Convert SDK AttentionImplementation to frontend AttentionImplementation
+inline hipdnn_frontend::AttentionImplementation
+    fromSdkType(const hipdnn_data_sdk::data_objects::AttentionImplementation& type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::AttentionImplementation::AUTO:
+        return hipdnn_frontend::AttentionImplementation::AUTO;
+    case hipdnn_data_sdk::data_objects::AttentionImplementation::COMPOSITE:
+        return hipdnn_frontend::AttentionImplementation::COMPOSITE;
+    case hipdnn_data_sdk::data_objects::AttentionImplementation::UNIFIED:
+        return hipdnn_frontend::AttentionImplementation::UNIFIED;
+    default:
+        return hipdnn_frontend::AttentionImplementation::AUTO;
+    }
+}
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 /**
  * @brief Convert frontend DataType to backend hipdnnDataType_t
  *
@@ -671,9 +859,15 @@ inline std::optional<hipdnnDataType_t> toHipdnnDataType(const DataType& type)
     case DataType::INT4:
         return HIPDNN_DATA_INT4;
     case DataType::FP6_E2M3:
+<<<<<<< HEAD
         return HIPDNN_DATA_FP6_E2M3_EXT;
     case DataType::FP6_E3M2:
         return HIPDNN_DATA_FP6_E3M2_EXT;
+=======
+        return HIPDNN_DATA_FP6_E2M3;
+    case DataType::FP6_E3M2:
+        return HIPDNN_DATA_FP6_E3M2;
+>>>>>>> d9e199e220 (merge b-shi branch)
     case DataType::INT64:
         return HIPDNN_DATA_INT64;
     case DataType::NOT_SET:
@@ -691,6 +885,51 @@ inline std::optional<hipdnnDataType_t> toHipdnnDataType(const DataType& type)
  * @return A pair of the corresponding DataType and an Error (set if the type is unknown)
  */
 inline std::pair<DataType, Error> fromHipdnnDataType(hipdnnDataType_t type)
+<<<<<<< HEAD
+=======
+{
+    switch(type)
+    {
+    case HIPDNN_DATA_FLOAT:
+        return {DataType::FLOAT, {}};
+    case HIPDNN_DATA_DOUBLE:
+        return {DataType::DOUBLE, {}};
+    case HIPDNN_DATA_HALF:
+        return {DataType::HALF, {}};
+    case HIPDNN_DATA_INT8:
+        return {DataType::INT8, {}};
+    case HIPDNN_DATA_INT32:
+        return {DataType::INT32, {}};
+    case HIPDNN_DATA_UINT8:
+        return {DataType::UINT8, {}};
+    case HIPDNN_DATA_BFLOAT16:
+        return {DataType::BFLOAT16, {}};
+    case HIPDNN_DATA_FP8_E4M3:
+        return {DataType::FP8_E4M3, {}};
+    case HIPDNN_DATA_FP8_E5M2:
+        return {DataType::FP8_E5M2, {}};
+    case HIPDNN_DATA_FP8_E8M0:
+        return {DataType::FP8_E8M0, {}};
+    case HIPDNN_DATA_FP4_E2M1:
+        return {DataType::FP4_E2M1, {}};
+    case HIPDNN_DATA_INT4:
+        return {DataType::INT4, {}};
+    case HIPDNN_DATA_FP6_E2M3:
+        return {DataType::FP6_E2M3, {}};
+    case HIPDNN_DATA_FP6_E3M2:
+        return {DataType::FP6_E3M2, {}};
+    case HIPDNN_DATA_INT64:
+        return {DataType::INT64, {}};
+    default:
+        return {DataType::NOT_SET,
+                {ErrorCode::HIPDNN_BACKEND_ERROR,
+                 "Unknown hipdnnDataType_t value: " + std::to_string(static_cast<int>(type))}};
+    }
+}
+
+/// @brief Convert frontend PointwiseMode to SDK PointwiseMode
+inline hipdnn_data_sdk::data_objects::PointwiseMode toSdkType(const PointwiseMode& type)
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     switch(type)
     {
@@ -728,6 +967,112 @@ inline std::pair<DataType, Error> fromHipdnnDataType(hipdnnDataType_t type)
         return {DataType::NOT_SET,
                 {ErrorCode::HIPDNN_BACKEND_ERROR,
                  "Unknown hipdnnDataType_t value: " + std::to_string(static_cast<int>(type))}};
+    }
+}
+
+/// @brief Convert backend C-API hipdnnPointwiseMode_t to frontend PointwiseMode
+inline std::pair<PointwiseMode, Error> fromHipdnnPointwiseMode(hipdnnPointwiseMode_t mode)
+{
+    switch(mode)
+    {
+    case HIPDNN_POINTWISE_ABS:
+        return {PointwiseMode::ABS, {}};
+    case HIPDNN_POINTWISE_ADD:
+        return {PointwiseMode::ADD, {}};
+    case HIPDNN_POINTWISE_ADD_SQUARE:
+        return {PointwiseMode::ADD_SQUARE, {}};
+    case HIPDNN_POINTWISE_BINARY_SELECT:
+        return {PointwiseMode::BINARY_SELECT, {}};
+    case HIPDNN_POINTWISE_CEIL:
+        return {PointwiseMode::CEIL, {}};
+    case HIPDNN_POINTWISE_CMP_EQ:
+        return {PointwiseMode::CMP_EQ, {}};
+    case HIPDNN_POINTWISE_CMP_GE:
+        return {PointwiseMode::CMP_GE, {}};
+    case HIPDNN_POINTWISE_CMP_GT:
+        return {PointwiseMode::CMP_GT, {}};
+    case HIPDNN_POINTWISE_CMP_LE:
+        return {PointwiseMode::CMP_LE, {}};
+    case HIPDNN_POINTWISE_CMP_LT:
+        return {PointwiseMode::CMP_LT, {}};
+    case HIPDNN_POINTWISE_CMP_NEQ:
+        return {PointwiseMode::CMP_NEQ, {}};
+    case HIPDNN_POINTWISE_DIV:
+        return {PointwiseMode::DIV, {}};
+    case HIPDNN_POINTWISE_ELU_BWD:
+        return {PointwiseMode::ELU_BWD, {}};
+    case HIPDNN_POINTWISE_ELU_FWD:
+        return {PointwiseMode::ELU_FWD, {}};
+    case HIPDNN_POINTWISE_ERF:
+        return {PointwiseMode::ERF, {}};
+    case HIPDNN_POINTWISE_EXP:
+        return {PointwiseMode::EXP, {}};
+    case HIPDNN_POINTWISE_FLOOR:
+        return {PointwiseMode::FLOOR, {}};
+    case HIPDNN_POINTWISE_GELU_APPROX_TANH_BWD:
+        return {PointwiseMode::GELU_APPROX_TANH_BWD, {}};
+    case HIPDNN_POINTWISE_GELU_APPROX_TANH_FWD:
+        return {PointwiseMode::GELU_APPROX_TANH_FWD, {}};
+    case HIPDNN_POINTWISE_GELU_BWD:
+        return {PointwiseMode::GELU_BWD, {}};
+    case HIPDNN_POINTWISE_GELU_FWD:
+        return {PointwiseMode::GELU_FWD, {}};
+    case HIPDNN_POINTWISE_GEN_INDEX:
+        return {PointwiseMode::GEN_INDEX, {}};
+    case HIPDNN_POINTWISE_IDENTITY:
+        return {PointwiseMode::IDENTITY, {}};
+    case HIPDNN_POINTWISE_LOG:
+        return {PointwiseMode::LOG, {}};
+    case HIPDNN_POINTWISE_LOGICAL_AND:
+        return {PointwiseMode::LOGICAL_AND, {}};
+    case HIPDNN_POINTWISE_LOGICAL_NOT:
+        return {PointwiseMode::LOGICAL_NOT, {}};
+    case HIPDNN_POINTWISE_LOGICAL_OR:
+        return {PointwiseMode::LOGICAL_OR, {}};
+    case HIPDNN_POINTWISE_MAX:
+        return {PointwiseMode::MAX, {}};
+    case HIPDNN_POINTWISE_MIN:
+        return {PointwiseMode::MIN, {}};
+    case HIPDNN_POINTWISE_MUL:
+        return {PointwiseMode::MUL, {}};
+    case HIPDNN_POINTWISE_NEG:
+        return {PointwiseMode::NEG, {}};
+    case HIPDNN_POINTWISE_RECIPROCAL:
+        return {PointwiseMode::RECIPROCAL, {}};
+    case HIPDNN_POINTWISE_RELU_BWD:
+        return {PointwiseMode::RELU_BWD, {}};
+    case HIPDNN_POINTWISE_RELU_FWD:
+        return {PointwiseMode::RELU_FWD, {}};
+    case HIPDNN_POINTWISE_RSQRT:
+        return {PointwiseMode::RSQRT, {}};
+    case HIPDNN_POINTWISE_SIGMOID_BWD:
+        return {PointwiseMode::SIGMOID_BWD, {}};
+    case HIPDNN_POINTWISE_SIGMOID_FWD:
+        return {PointwiseMode::SIGMOID_FWD, {}};
+    case HIPDNN_POINTWISE_SIN:
+        return {PointwiseMode::SIN, {}};
+    case HIPDNN_POINTWISE_SOFTPLUS_BWD:
+        return {PointwiseMode::SOFTPLUS_BWD, {}};
+    case HIPDNN_POINTWISE_SOFTPLUS_FWD:
+        return {PointwiseMode::SOFTPLUS_FWD, {}};
+    case HIPDNN_POINTWISE_SQRT:
+        return {PointwiseMode::SQRT, {}};
+    case HIPDNN_POINTWISE_SUB:
+        return {PointwiseMode::SUB, {}};
+    case HIPDNN_POINTWISE_SWISH_BWD:
+        return {PointwiseMode::SWISH_BWD, {}};
+    case HIPDNN_POINTWISE_SWISH_FWD:
+        return {PointwiseMode::SWISH_FWD, {}};
+    case HIPDNN_POINTWISE_TAN:
+        return {PointwiseMode::TAN, {}};
+    case HIPDNN_POINTWISE_TANH_BWD:
+        return {PointwiseMode::TANH_BWD, {}};
+    case HIPDNN_POINTWISE_TANH_FWD:
+        return {PointwiseMode::TANH_FWD, {}};
+    default:
+        return {PointwiseMode::NOT_SET,
+                {ErrorCode::HIPDNN_BACKEND_ERROR,
+                 "Unknown hipdnnPointwiseMode_t value: " + std::to_string(static_cast<int>(mode))}};
     }
 }
 
@@ -1169,6 +1514,63 @@ inline const char* to_string(const ReductionMode& mode)
 inline std::ostream& operator<<(std::ostream& os, const ReductionMode& mode)
 {
     return os << to_string(mode);
+}
+
+/// @brief Convert frontend ReductionMode to SDK ReductionMode
+inline hipdnn_data_sdk::data_objects::ReductionMode toSdkType(const ReductionMode& type)
+{
+    switch(type)
+    {
+    case ReductionMode::ADD:
+        return hipdnn_data_sdk::data_objects::ReductionMode::ADD;
+    case ReductionMode::MUL:
+        return hipdnn_data_sdk::data_objects::ReductionMode::MUL;
+    case ReductionMode::MIN:
+        return hipdnn_data_sdk::data_objects::ReductionMode::MIN_OP;
+    case ReductionMode::MAX:
+        return hipdnn_data_sdk::data_objects::ReductionMode::MAX_OP;
+    case ReductionMode::AMAX:
+        return hipdnn_data_sdk::data_objects::ReductionMode::AMAX;
+    case ReductionMode::AVG:
+        return hipdnn_data_sdk::data_objects::ReductionMode::AVG;
+    case ReductionMode::NORM1:
+        return hipdnn_data_sdk::data_objects::ReductionMode::NORM1;
+    case ReductionMode::NORM2:
+        return hipdnn_data_sdk::data_objects::ReductionMode::NORM2;
+    case ReductionMode::MUL_NO_ZEROS:
+        return hipdnn_data_sdk::data_objects::ReductionMode::MUL_NO_ZEROS;
+    default:
+        return hipdnn_data_sdk::data_objects::ReductionMode::NOT_SET;
+    }
+}
+
+/// @brief Convert SDK ReductionMode to frontend ReductionMode
+inline hipdnn_frontend::ReductionMode
+    fromSdkType(const hipdnn_data_sdk::data_objects::ReductionMode& type)
+{
+    switch(type)
+    {
+    case hipdnn_data_sdk::data_objects::ReductionMode::ADD:
+        return hipdnn_frontend::ReductionMode::ADD;
+    case hipdnn_data_sdk::data_objects::ReductionMode::MUL:
+        return hipdnn_frontend::ReductionMode::MUL;
+    case hipdnn_data_sdk::data_objects::ReductionMode::MIN_OP:
+        return hipdnn_frontend::ReductionMode::MIN;
+    case hipdnn_data_sdk::data_objects::ReductionMode::MAX_OP:
+        return hipdnn_frontend::ReductionMode::MAX;
+    case hipdnn_data_sdk::data_objects::ReductionMode::AMAX:
+        return hipdnn_frontend::ReductionMode::AMAX;
+    case hipdnn_data_sdk::data_objects::ReductionMode::AVG:
+        return hipdnn_frontend::ReductionMode::AVG;
+    case hipdnn_data_sdk::data_objects::ReductionMode::NORM1:
+        return hipdnn_frontend::ReductionMode::NORM1;
+    case hipdnn_data_sdk::data_objects::ReductionMode::NORM2:
+        return hipdnn_frontend::ReductionMode::NORM2;
+    case hipdnn_data_sdk::data_objects::ReductionMode::MUL_NO_ZEROS:
+        return hipdnn_frontend::ReductionMode::MUL_NO_ZEROS;
+    default:
+        return hipdnn_frontend::ReductionMode::NOT_SET;
+    }
 }
 
 /// @brief Get a human-readable string for a KnobValueType value

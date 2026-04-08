@@ -325,7 +325,11 @@ size_t getMaxWorkspaceSizeFwd(const HipdnnMiopenHandle& handle,
     {
         const auto& attr
             = opGraph.getNodeWrapper(0)
+<<<<<<< HEAD
                   .attributesAs<hipdnn_flatbuffers_sdk::data_objects::ConvolutionFwdAttributes>();
+=======
+                  .attributesAs<hipdnn_data_sdk::data_objects::ConvolutionFwdAttributes>();
+>>>>>>> d9e199e220 (merge b-shi branch)
         ConvFwdParams params(attr, opGraph.getTensorMap(), deterministicEnabled);
         THROW_ON_MIOPEN_FAILURE(
             miopenConvolutionForwardGetWorkSpaceSize(handle.miopenHandle,
@@ -350,7 +354,11 @@ size_t getMaxWorkspaceSizeBwd(const HipdnnMiopenHandle& handle,
     {
         const auto& attr
             = opGraph.getNodeWrapper(0)
+<<<<<<< HEAD
                   .attributesAs<hipdnn_flatbuffers_sdk::data_objects::ConvolutionBwdAttributes>();
+=======
+                  .attributesAs<hipdnn_data_sdk::data_objects::ConvolutionBwdAttributes>();
+>>>>>>> d9e199e220 (merge b-shi branch)
         ConvBwdParams params(attr, opGraph.getTensorMap(), deterministicEnabled);
 
         THROW_ON_MIOPEN_FAILURE(
@@ -376,7 +384,11 @@ size_t getMaxWorkspaceSizeWrw(const HipdnnMiopenHandle& handle,
     {
         const auto& attr
             = opGraph.getNodeWrapper(0)
+<<<<<<< HEAD
                   .attributesAs<hipdnn_flatbuffers_sdk::data_objects::ConvolutionWrwAttributes>();
+=======
+                  .attributesAs<hipdnn_data_sdk::data_objects::ConvolutionWrwAttributes>();
+>>>>>>> d9e199e220 (merge b-shi branch)
         ConvWrwParams params(attr, opGraph.getTensorMap(), deterministicEnabled);
 
         THROW_ON_MIOPEN_FAILURE(

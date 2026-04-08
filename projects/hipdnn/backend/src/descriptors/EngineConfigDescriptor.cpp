@@ -265,7 +265,11 @@ void EngineConfigDescriptor::setKnobChoice(hipdnnBackendAttributeType_t attribut
                     "EngineConfigDescriptor failed to set knob choice: "
                     "Flatbuffer data size must be > 0.");
 
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::KnobSettingWrapper wrapper(
+=======
+        const hipdnn_data_sdk::flatbuffer_utilities::KnobSettingWrapper wrapper(
+>>>>>>> d9e199e220 (merge b-shi branch)
             flatbufferData.ptr, flatbufferData.size);
 
         THROW_IF_FALSE(wrapper.isValid(),

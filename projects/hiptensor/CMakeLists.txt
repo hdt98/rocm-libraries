@@ -74,7 +74,10 @@ if(CMAKE_PROJECT_NAME STREQUAL "hiptensor")
     option(HIPTENSOR_DEFAULT_STRIDES_COL_MAJOR "Set hiptensor default strides to column major" ON)
     option(BUILD_OFFLOAD_COMPRESS "Build hiptensor with offload compression" ON)
     option(HIPTENSOR_CODE_COVERAGE "Build with code coverage flags (clang only)" OFF)
+<<<<<<< HEAD
     option(HIPTENSOR_INLINE_UNARY_OPS "Inline all unary ops for best runtime performance (slower compilation)" OFF)
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 endif()
 
 # Setup output paths

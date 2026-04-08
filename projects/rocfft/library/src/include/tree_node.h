@@ -375,6 +375,7 @@ struct NodeMetaData
     size_t                  iDist = 0, oDist = 0;
     size_t                  iDistBlue = 0, oDistBlue = 0;
     size_t                  iOffset = 0, oOffset = 0;
+<<<<<<< HEAD
     int                     direction         = -1;
     rocfft_result_placement placement         = rocfft_placement_inplace;
     rocfft_precision        precision         = rocfft_precision_single;
@@ -382,6 +383,15 @@ struct NodeMetaData
     rocfft_array_type       outArrayType      = rocfft_array_type_unset;
     rocfft_transform_type   rootTransformType = rocfft_transform_type_complex_forward;
     hipDeviceProp_t         deviceProp        = {};
+=======
+    int                     direction    = -1;
+    rocfft_result_placement placement    = rocfft_placement_inplace;
+    rocfft_precision        precision    = rocfft_precision_single;
+    rocfft_array_type       inArrayType  = rocfft_array_type_unset;
+    rocfft_array_type       outArrayType = rocfft_array_type_unset;
+    hipDeviceProp_t         deviceProp   = {};
+    bool                    rootIsC2C;
+>>>>>>> d9e199e220 (merge b-shi branch)
     BufferPtr               input_buffer, output_buffer;
 
     // TODO: `batch`, `dimension`, `length`, `outputLength` `inStride`,
@@ -400,6 +410,7 @@ struct NodeMetaData
                                         + ROCFFT_CURRENT_FUNCTION);
         }
     };
+<<<<<<< HEAD
 
     inline bool is_using_default_contiguous_layout_for(io_data_label io) const
     {
@@ -407,6 +418,8 @@ struct NodeMetaData
                == data_layout_t::default_full_layout(
                    io == io_data_label::INPUT ? length : outputLength, batch);
     };
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     explicit NodeMetaData(TreeNode* refNode);
 };

@@ -20,7 +20,11 @@ void KnobSettingDescriptor::finalize()
                   HIPDNN_STATUS_BAD_PARAM,
                   "KnobSettingDescriptor::finalize() failed: Knob ID is not set.");
 
+<<<<<<< HEAD
     THROW_IF_TRUE(_value.type == hipdnn_flatbuffers_sdk::data_objects::KnobValue::NONE,
+=======
+    THROW_IF_TRUE(_value.type == hipdnn_data_sdk::data_objects::KnobValue::NONE,
+>>>>>>> d9e199e220 (merge b-shi branch)
                   HIPDNN_STATUS_BAD_PARAM,
                   "KnobSettingDescriptor::finalize() failed: Value is not set.");
 
@@ -42,7 +46,11 @@ void KnobSettingDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeN
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_CHOICE_KNOB_TYPE:
+=======
+    case HIPDNN_ATTR_KNOB_CHOICE_KNOB_TYPE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundedString(_knobId,
                          attributeType,
                          elementCount,
@@ -51,7 +59,11 @@ void KnobSettingDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeN
                          MAX_KNOB_ID_LENGTH,
                          1);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_CHOICE_KNOB_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_CHOICE_KNOB_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setKnobValueUnion(_value,
                           attributeType,
                           elementCount,
@@ -83,7 +95,11 @@ void KnobSettingDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeN
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_CHOICE_KNOB_TYPE:
+=======
+    case HIPDNN_ATTR_KNOB_CHOICE_KNOB_TYPE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getString(_knobId,
                   attributeType,
                   requestedElementCount,
@@ -91,7 +107,11 @@ void KnobSettingDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeN
                   arrayOfElements,
                   "KnobSettingDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_CHOICE_KNOB_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_CHOICE_KNOB_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getKnobValueUnion(_value,
                           attributeType,
                           requestedElementCount,

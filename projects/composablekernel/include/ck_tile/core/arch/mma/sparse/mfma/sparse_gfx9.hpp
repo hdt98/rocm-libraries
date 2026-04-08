@@ -32,6 +32,22 @@ struct amdgcn_mma<fp16_t, fp16_t, fp32_t, 16u, 16u, 32u, CtrlFlags, CompilerTarg
     CK_TILE_DEVICE static auto
     exec(AVecType const& aVec, BVecType const& bVec, CVecType const& cVec, int32_t idx) -> CVecType
     {
+<<<<<<< HEAD
+=======
+        static constexpr index_t ABVecN            = vector_traits<AVecType>::vector_size;
+        static constexpr index_t kCompressionRatio = 2;
+        static constexpr index_t CompressedSize    = ABVecN / kCompressionRatio;
+        using AVecCompressed                       = ext_vector_t<fp16_t, CompressedSize>;
+
+        static_assert(CompressedSize == 4);
+        // TODO: Compressing A on-the-fly should be OK for now, but we need to validate
+        // and evaluate changing this to a transform at a higher level.
+        // aVec not being const can cause problems when running multiple intrinsics.
+        const uint32_t idx = ck_tile::compress_a_impl<fp16_t, CompressedSize>(aVec);
+
+        const AVecCompressed a_vec_pruned = {aVec[0], aVec[1], aVec[2], aVec[3]};
+
+>>>>>>> d9e199e220 (merge b-shi branch)
         using namespace sparse::detail;
         static constexpr BuiltinParams PARAMS = getBuiltinParams<CtrlFlags::CompressionIndex>();
         return {__builtin_amdgcn_smfmac_f32_16x16x32_f16(

@@ -15,6 +15,7 @@
 #define FUSILLI_PLUGIN_SRC_GRAPH_IMPORT_H
 
 #include <fusilli.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_bwd_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/convolution_wrw_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/custom_op_attributes_generated.h>
@@ -27,6 +28,16 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/sdpa_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/convolution_bwd_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/convolution_wrw_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_data_sdk/data_objects/matmul_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/sdpa_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 
 #include <format>
@@ -34,6 +45,7 @@
 #include <optional>
 #include <unordered_map>
 
+#include "custom_ops.h"
 #include "hipdnn_engine_plugin_execution_context.h"
 
 // Convert from hipDNN DataType to fusilli DataType.
@@ -197,13 +209,21 @@ private:
       FUSILLI_CHECK_ERROR(
           importConvWGradAttr(node.attributes_as_ConvolutionWrwAttributes()));
       break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::
+=======
+    case hipdnn_data_sdk::data_objects::NodeAttributes::
+>>>>>>> d9e199e220 (merge b-shi branch)
         ConvolutionBwdAttributes:
       FUSILLI_CHECK_ERROR(
           importConvDGradAttr(node.attributes_as_ConvolutionBwdAttributes()));
       break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::
         PointwiseAttributes:
+=======
+    case hipdnn_data_sdk::data_objects::NodeAttributes::PointwiseAttributes:
+>>>>>>> d9e199e220 (merge b-shi branch)
       FUSILLI_CHECK_ERROR(
           importPointwiseAttr(node.attributes_as_PointwiseAttributes()));
       break;
@@ -211,6 +231,7 @@ private:
       FUSILLI_CHECK_ERROR(
           importMatmulAttr(node.attributes_as_MatmulAttributes()));
       break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::SdpaAttributes:
       FUSILLI_CHECK_ERROR(importSdpaAttr(node.attributes_as_SdpaAttributes()));
       break;
@@ -229,6 +250,11 @@ private:
       FUSILLI_CHECK_ERROR(
           importCustomOpAttr(node.attributes_as_CustomOpAttributes()));
       break;
+=======
+    case hipdnn_data_sdk::data_objects::NodeAttributes::SdpaAttributes:
+      FUSILLI_CHECK_ERROR(importSdpaAttr(node.attributes_as_SdpaAttributes()));
+      break;
+>>>>>>> d9e199e220 (merge b-shi branch)
     default:
       return fusilli::error(fusilli::ErrorCode::NotImplemented,
                             "Unsupported node type.");
@@ -301,7 +327,11 @@ private:
   }
 
   fusilli::ErrorObject importConvDGradAttr(
+<<<<<<< HEAD
       const hipdnn_flatbuffers_sdk::data_objects::ConvolutionBwdAttributes
+=======
+      const hipdnn_data_sdk::data_objects::ConvolutionBwdAttributes
+>>>>>>> d9e199e220 (merge b-shi branch)
           *hipDnnConvBwdAttr) {
     // Import node inputs.
     FUSILLI_ASSIGN_OR_RETURN(
@@ -402,6 +432,7 @@ private:
     return fusilli::ok();
   }
 
+<<<<<<< HEAD
   fusilli::ErrorObject
   importSdpaAttr(const hipdnn_flatbuffers_sdk::data_objects::SdpaAttributes
                      *hipDnnSdpaAttr) {
@@ -495,6 +526,25 @@ private:
             fusilli::ErrorCode::NotImplemented,
             "SDPA mma_core_mode must match query tensor dtype.");
       }
+=======
+  fusilli::ErrorObject importSdpaAttr(
+      const hipdnn_data_sdk::data_objects::SdpaAttributes *hipDnnSdpaAttr) {
+    // Are available SDPA templates applicable?
+    FUSILLI_CHECK_ERROR(SdpaImport::validateTemplate(hipDnnSdpaAttr));
+
+    // mma_core_mode requests a specific accumulator precision. Our MLIR path
+    // accumulates in the query element type, so reject if the requested mode
+    // doesn't match. UNSET (the default) is always fine.
+    auto mmaCoreMode = hipDnnSdpaAttr->mma_core_mode();
+    if (mmaCoreMode != hipdnn_data_sdk::data_objects::DataType::UNSET) {
+      auto qDataType = opGraphWrapper.getTensorMap()
+                           .at(hipDnnSdpaAttr->q_tensor_uid())
+                           ->data_type();
+      if (mmaCoreMode != qDataType)
+        return fusilli::error(
+            fusilli::ErrorCode::NotImplemented,
+            "SDPA mma_core_mode must match query tensor dtype.");
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     bool hasAttnMask = hipDnnSdpaAttr->attn_mask_tensor_uid().has_value();
@@ -511,12 +561,27 @@ private:
         std::shared_ptr<fusilli::TensorAttr> v,
         importNodeInput(hipDnnSdpaAttr->v_tensor_uid(), "v"));
 
+<<<<<<< HEAD
     // Import optional attn_mask tensor.
     std::shared_ptr<fusilli::TensorAttr> mask = nullptr;
     if (hasAttnMask) {
       FUSILLI_ASSIGN_OR_RETURN(
           mask, importNodeInput(*hipDnnSdpaAttr->attn_mask_tensor_uid(),
                                 "attn_mask"));
+=======
+    // Validate inputs to graph
+    FUSILLI_CHECK_ERROR(SdpaImport::validateInputs(q, k, v));
+
+    std::vector<std::shared_ptr<fusilli::TensorAttr>> inputs = {q, k, v};
+
+    // Import optional attn_mask tensor.
+    if (hasAttnMask) {
+      FUSILLI_ASSIGN_OR_RETURN(
+          std::shared_ptr<fusilli::TensorAttr> mask,
+          importNodeInput(*hipDnnSdpaAttr->attn_mask_tensor_uid(),
+                          "attn_mask"));
+      inputs.push_back(mask);
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     // Read optional attention scale.
@@ -534,7 +599,11 @@ private:
                               "SDPA scale must be a pass-by-value scalar, "
                               "not a device tensor.");
       if (scaleTensor->value_type() !=
+<<<<<<< HEAD
           hipdnn_flatbuffers_sdk::data_objects::TensorValue::Float32Value)
+=======
+          hipdnn_data_sdk::data_objects::TensorValue::Float32Value)
+>>>>>>> d9e199e220 (merge b-shi branch)
         return fusilli::error(fusilli::ErrorCode::NotImplemented,
                               "SDPA scale tensor must be Float32.");
       scaleValue = scaleTensor->value_as_Float32Value()->value();
@@ -543,6 +612,7 @@ private:
     // GQA: enable when Q has more heads than K/V.
     bool enableGqa = q->getDim()[1] != k->getDim()[1];
 
+<<<<<<< HEAD
     // #TODO(iree/issues/21858) GQA with f32 triggers an IREE distribution
     // failure. SdpaNode does not check this, so we must reject here.
     if (enableGqa && q->getDataType() == fusilli::DataType::Float)
@@ -689,6 +759,19 @@ private:
           outputUids->Get(static_cast<flatbuffers::uoffset_t>(i)), "custom_out",
           outputTensors[i]));
     }
+=======
+    // Build MLIR template and create CustomOp.
+    std::string mlir = SdpaImport::buildMLIR(hasAttnMask, /*dropoutP=*/0.0f,
+                                             isCausal, scaleValue, enableGqa);
+    fusilli::CustomOpAttr sdpaAttr;
+    sdpaAttr.setName("sdpa_fprop").setMlir(mlir).setNumOutputs(1);
+    auto outs = fusilliGraph.customOp(inputs, sdpaAttr);
+
+    // Import output tensor. importNodeOutput sets dim/stride/dtype from the
+    // flatbuffer tensor attributes.
+    FUSILLI_CHECK_ERROR(
+        importNodeOutput(hipDnnSdpaAttr->o_tensor_uid(), "o", outs[0]));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     return fusilli::ok();
   }

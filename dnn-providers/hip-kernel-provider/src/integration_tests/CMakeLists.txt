@@ -13,9 +13,13 @@ add_executable(
     Batchnorm/IntegrationGpuBatchnormForwardInferenceWithVariance.cpp
     Batchnorm/IntegrationGpuBatchnormForwardInferenceAndActivation.cpp
     Batchnorm/IntegrationGpuBatchnormForwardInferenceWithVarianceAndActivation.cpp
+<<<<<<< HEAD
     Batchnorm/IntegrationGpuBatchnormForwardTraining.cpp
     RMSnorm/IntegrationGpuRMSnormForward.cpp
     Layernorm/IntegrationGpuLayernormForward.cpp
+=======
+    RMSnorm/IntegrationGpuRMSnormForward.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
 )
 
 target_compile_options(hip_kernel_provider_integration_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
@@ -26,10 +30,13 @@ target_compile_definitions(
     hip_kernel_provider_integration_tests
     PRIVATE
         PLUGIN_PATH="../$<IF:$<PLATFORM_ID:Windows>,bin,lib>/${HIPDNN_PLUGIN_ENGINE_SUBDIR}/hip_kernel_provider"
+<<<<<<< HEAD
 )
 
 target_include_directories(hip_kernel_provider_integration_tests PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../../include
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 )
 
 target_link_libraries(
@@ -39,6 +46,7 @@ target_link_libraries(
 # Ensure that the hip_kernel_plugin is built before the integration tests
 add_dependencies(hip_kernel_provider_integration_tests hip_kernel_provider)
 
+<<<<<<< HEAD
 if(ENABLE_ASM_SDPA_ENGINE)
     if(NOT HIPDNN_ENABLE_SDPA)
         message(WARNING
@@ -77,3 +85,8 @@ if(ENABLE_ASM_SDPA_ENGINE)
         endif()
     endif()
 endif()
+=======
+clang_tidy_check(hip_kernel_provider_integration_tests)
+
+add_integration_test_target(hip_kernel_provider_integration_tests ${CMAKE_CURRENT_BINARY_DIR})
+>>>>>>> d9e199e220 (merge b-shi branch)

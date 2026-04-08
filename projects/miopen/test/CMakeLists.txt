@@ -576,7 +576,11 @@ endfunction()
 #   These attributes can be enabled or disabled by using '_ENABLED' and '_DISABLED' suffix.
 #   Defaults: FLOAT_ENABLED HALF_DISABLED BF16_DISABLED INT8_DISABLED
 #
+<<<<<<< HEAD
 # GPU types: GFX900, GFX906, GFX908, GFX90A, GFX94X, GFX1030/31, GFX1100/02, GFX115X
+=======
+# GPU types: GFX900, GFX906, GFX908, GFX90A, GFX94X, GFX1030/31, GFX1100/03
+>>>>>>> d9e199e220 (merge b-shi branch)
 #   These attributes can be enabled or disabled by using '_ENABLED' and '_DISABLED' suffix.
 #   Defaults: GFX900_ENABLED, GFX906_ENABLED, GFX908_ENABLED, GFX90A_ENABLED, GFX94X_DISABLED, GFX103X_DISABLED, GFX110X_DISABLED, GFX115X_DISABLED
 #

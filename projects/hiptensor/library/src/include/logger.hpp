@@ -27,6 +27,7 @@
 #pragma once
 
 #include <cstdio>
+<<<<<<< HEAD
 #include <memory>
 #include <mutex>
 
@@ -35,6 +36,16 @@
 namespace hiptensor
 {
     class HIPTENSOR_EXPORT Logger
+=======
+#include <mutex>
+
+#include "platform.hpp"
+#include "singleton.hpp"
+
+namespace hiptensor
+{
+    class HIPTENSOR_EXPORT Logger : public LazySingleton<Logger>
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
     private:
         using Callback_t = void (*)(int32_t logLevel, const char* funcName, const char* msg);

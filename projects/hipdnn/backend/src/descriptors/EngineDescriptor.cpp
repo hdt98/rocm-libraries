@@ -50,7 +50,11 @@ void EngineDescriptor::finalize()
     auto engineDetailsPtr = _engineDetails->get();
     if(engineDetailsPtr != nullptr)
     {
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineDetailsWrapper detailsWrapper(
+=======
+        const hipdnn_data_sdk::flatbuffer_utilities::EngineDetailsWrapper detailsWrapper(
+>>>>>>> d9e199e220 (merge b-shi branch)
             engineDetailsPtr);
         auto knobCount = detailsWrapper.knobCount();
 

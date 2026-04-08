@@ -65,9 +65,14 @@ public:
         auto result = graph->validate();
         ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
 
+<<<<<<< HEAD
         auto [serializedGraph, serErr] = graph->to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
         const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+        const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         BatchnormFwdTensorBundle tensorBundle(
             graphWrapper.getNodeWrapper(0), graphWrapper.getTensorMap(), seed);

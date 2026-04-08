@@ -22,6 +22,7 @@ struct LayernormFpropParams
 {
     LayernormFpropParams() = default;
     LayernormFpropParams(
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& xAttributes,
         const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& yAttributes,
         const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& epsilonAttributes,
@@ -31,6 +32,16 @@ struct LayernormFpropParams
         const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* meanAttributes = nullptr,
         const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* invVarianceAttributes
         = nullptr)
+=======
+        const hipdnn_data_sdk::data_objects::TensorAttributes& xAttributes,
+        const hipdnn_data_sdk::data_objects::TensorAttributes& yAttributes,
+        const hipdnn_data_sdk::data_objects::TensorAttributes& epsilonAttributes,
+        const hipdnn_data_sdk::data_objects::TensorAttributes& scaleAttributes,
+        const hipdnn_data_sdk::data_objects::TensorAttributes& biasAttributes,
+        const int64_t normalizedDimCount,
+        const hipdnn_data_sdk::data_objects::TensorAttributes* meanAttributes = nullptr,
+        const hipdnn_data_sdk::data_objects::TensorAttributes* invVarianceAttributes = nullptr)
+>>>>>>> d9e199e220 (merge b-shi branch)
         : xTensor(unpackTensorAttributes(xAttributes))
         , yTensor(unpackTensorAttributes(yAttributes))
         , epsilonTensor(unpackTensorAttributes(epsilonAttributes))
@@ -46,6 +57,7 @@ struct LayernormFpropParams
     {
     }
 
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT xTensor;
     hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT yTensor;
     hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT epsilonTensor;
@@ -54,6 +66,16 @@ struct LayernormFpropParams
     int64_t normalizedDimCount;
     std::optional<hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT> meanTensor;
     std::optional<hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT> invVarianceTensor;
+=======
+    hipdnn_data_sdk::data_objects::TensorAttributesT xTensor;
+    hipdnn_data_sdk::data_objects::TensorAttributesT yTensor;
+    hipdnn_data_sdk::data_objects::TensorAttributesT epsilonTensor;
+    hipdnn_data_sdk::data_objects::TensorAttributesT scaleTensor;
+    hipdnn_data_sdk::data_objects::TensorAttributesT biasTensor;
+    int64_t normalizedDimCount;
+    std::optional<hipdnn_data_sdk::data_objects::TensorAttributesT> meanTensor;
+    std::optional<hipdnn_data_sdk::data_objects::TensorAttributesT> invVarianceTensor;
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 template <typename XDataType,
@@ -92,7 +114,11 @@ public:
             _params.yTensor, variantPack.at(_params.yTensor.uid));
 
         // Extract epsilon from pass-by-value tensor (cast to double)
+<<<<<<< HEAD
         const double epsilon = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
+=======
+        const double epsilon = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+>>>>>>> d9e199e220 (merge b-shi branch)
             _params.epsilonTensor, "Epsilon");
 
         // Scale tensor (required)

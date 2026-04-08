@@ -6,8 +6,13 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/custom_op_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/custom_op_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <memory>
 #include <string>
@@ -34,7 +39,11 @@ public:
                       int64_t elementCount,
                       const void* arrayOfElements) override;
 
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::CustomOpAttributesT& getData() const
+=======
+    const hipdnn_data_sdk::data_objects::CustomOpAttributesT& getData() const
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         return _data;
     }
@@ -49,20 +58,32 @@ public:
         return _outputDescs;
     }
 
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType getComputeDataType() const
+=======
+    hipdnn_data_sdk::data_objects::DataType getComputeDataType() const
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         return _computeDataType;
     }
 
     // IGraphOperation interface
     std::vector<std::shared_ptr<TensorDescriptor>> getTensorDescriptors() const override;
+<<<<<<< HEAD
     std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT> buildNode() const override;
+=======
+    std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT> buildNode() const override;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Creates a finalized CustomOpOperationDescriptor directly from a FlatBuffer NodeT.
     // Casts nodeT.attributes to CustomOpAttributesT internally, then directly assigns
     // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
     static std::shared_ptr<CustomOpOperationDescriptor>
+<<<<<<< HEAD
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
     static hipdnnBackendDescriptorType_t getStaticType();
@@ -70,13 +91,22 @@ public:
     std::string toString() const override;
 
 private:
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::CustomOpAttributesT _data;
+=======
+    hipdnn_data_sdk::data_objects::CustomOpAttributesT _data;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::vector<std::shared_ptr<TensorDescriptor>> _inputDescs;
     std::vector<std::shared_ptr<TensorDescriptor>> _outputDescs;
 
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType _computeDataType
         = hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET;
+=======
+    hipdnn_data_sdk::data_objects::DataType _computeDataType
+        = hipdnn_data_sdk::data_objects::DataType::UNSET;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::string _name;
 };

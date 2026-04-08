@@ -4,10 +4,17 @@
 #include <gtest/gtest.h>
 
 #include "BatchnormGraphUtils.hpp"
+<<<<<<< HEAD
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_data_sdk/utilities/TensorView.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_data_sdk/types.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/utilities/TensorView.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
 
 using namespace hipdnn_test_sdk::utilities;
@@ -73,9 +80,14 @@ TEST_F(TestGraphTensorBundle, ConstructorSkipsVirtualTensors)
                                                  TensorLayout::NCHW,
                                                  true);
 
+<<<<<<< HEAD
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto& tensorMap = graphWrapper.getTensorMap();
 
     GraphTensorBundle bundle(tensorMap);

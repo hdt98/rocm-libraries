@@ -4,6 +4,7 @@
 #include "HipKernelContainer.hpp"
 #include "CurrentDevicePropertyProvider.hpp"
 #include "engines/HipKernelEngine.hpp"
+<<<<<<< HEAD
 #include "engines/plans/RMSnorm/RMSnormBwdPlanBuilder.hpp"
 #include "engines/plans/RMSnorm/RMSnormPlanBuilder.hpp"
 #include "engines/plans/batchnorm/BatchnormPlanBuilder.hpp"
@@ -16,6 +17,12 @@
 #include "engines/asm_sdpa_engine/plans/SdpaFwdPlanBuilder.hpp"
 #endif
 
+=======
+#include "engines/plans/BatchnormPlanBuilder.hpp"
+#include "engines/plans/RMSnorm/RMSnormPlanBuilder.hpp"
+#include "hip/HipKernelCompiler.hpp"
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/logging/Logger.hpp>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
@@ -35,6 +42,7 @@ const std::vector<HipKernelContainer::EngineDefinition>& HipKernelContainer::get
              -> std::unique_ptr<
                  hipdnn_plugin_sdk::IEngine<HipKernelHandle, HipKernelSettings, HipKernelContext>> {
              auto engine = std::make_unique<HipKernelEngine>(HIP_KERNEL_ENGINE_ID);
+<<<<<<< HEAD
              engine->addPlanBuilder(std::make_unique<batchnorm::BatchnormPlanBuilder>(
                  kernelCompiler, devicePropertyProvider));
              engine->addPlanBuilder(std::make_unique<rmsnorm::RMSnormPlanBuilder>(
@@ -59,6 +67,14 @@ const std::vector<HipKernelContainer::EngineDefinition>& HipKernelContainer::get
          }},
 #endif
     };
+=======
+             engine->addPlanBuilder(
+                 std::make_unique<BatchnormPlanBuilder>(kernelCompiler, devicePropertyProvider));
+             engine->addPlanBuilder(std::make_unique<rmsnorm::RMSnormPlanBuilder>(
+                 kernelCompiler, devicePropertyProvider));
+             return engine;
+         }}};
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     return s_engineDefinitions;
 }

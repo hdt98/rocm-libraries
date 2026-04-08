@@ -758,12 +758,20 @@ TEST_F(TestConvolutionFwdOperationDescriptor, GetAttributeOperationTypeReturnsCo
     makeFinalized();
     auto desc = getDescriptor();
 
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t elementCount = 0;
     ASSERT_NO_THROW(desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &elementCount, &opType));
     ASSERT_EQ(elementCount, 1);
+<<<<<<< HEAD
     ASSERT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT);
+=======
+    ASSERT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestConvolutionFwdOperationDescriptor, GetAttributeOperationTypeQueryReturnsOne)

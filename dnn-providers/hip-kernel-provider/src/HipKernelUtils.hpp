@@ -5,6 +5,7 @@
 
 #include <unordered_map>
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/pointwise_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
 #include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
@@ -24,6 +25,12 @@
         }                                                                         \
     } while(0)
 
+=======
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 namespace hip_kernel_provider::hip_kernel_utils
 {
 
@@ -50,13 +57,18 @@ struct ActivationParams
     double gamma;
 };
 
+<<<<<<< HEAD
 ActivationParams
     parseActivation(const hipdnn_flatbuffers_sdk::data_objects::PointwiseAttributes& attrs);
+=======
+ActivationParams parseActivation(const hipdnn_data_sdk::data_objects::PointwiseAttributes& attrs);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 hipdnnPluginDeviceBuffer_t findDeviceBuffer(int64_t uid,
                                             const hipdnnPluginDeviceBuffer_t* deviceBuffers,
                                             uint32_t numDeviceBuffers);
 
+<<<<<<< HEAD
 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& findTensorAttributes(
     const std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
@@ -64,5 +76,13 @@ const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& findTensorAttribut
     int64_t uid);
 
 bool isChannelLastLayout(const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* tensor);
+=======
+const hipdnn_data_sdk::data_objects::TensorAttributes& findTensorAttributes(
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        tensorMap,
+    int64_t uid);
+
+bool isChannelLastLayout(const hipdnn_data_sdk::data_objects::TensorAttributes* tensor);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 }

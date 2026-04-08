@@ -7,13 +7,22 @@
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
 #include <hipdnn_frontend/attributes/SdpaAttributes.hpp>
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFwdNode.hpp
 #include <hipdnn_frontend/detail/SdpaFwdPacker.hpp>
 #include <hipdnn_frontend/detail/SdpaFwdUnpacker.hpp>
+=======
+#include <hipdnn_frontend/detail/SdpaFpropPacker.hpp>
+#include <hipdnn_frontend/detail/SdpaFpropUnpacker.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFpropNode.hpp
 #include <hipdnn_frontend/node/detail/Utilities.hpp>
 
 namespace hipdnn_frontend::graph
 {
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFwdNode.hpp
 class SdpaFwdNode : public BaseNode<SdpaFwdNode, NodeType::SDPA_FWD>
+=======
+class SdpaFpropNode : public BaseNode<SdpaFpropNode, NodeType::SDPA_FPROP>
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFpropNode.hpp
 {
 
 public:
@@ -97,21 +106,37 @@ public:
         const auto numHeadsV = vDims[1];
         HIPDNN_RETURN_IF_TRUE(numHeadsK <= 0,
                               ErrorCode::INVALID_VALUE,
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFwdNode.hpp
                               "SdpaFwdNode: num_heads_k must be positive, got "
                                   + std::to_string(numHeadsK));
         HIPDNN_RETURN_IF_TRUE(numHeads % numHeadsK != 0,
                               ErrorCode::INVALID_VALUE,
                               "SdpaFwdNode: num_heads must be divisible by num_heads_k for "
+=======
+                              "SdpaFpropNode: num_heads_k must be positive, got "
+                                  + std::to_string(numHeadsK));
+        HIPDNN_RETURN_IF_TRUE(numHeads % numHeadsK != 0,
+                              ErrorCode::INVALID_VALUE,
+                              "SdpaFpropNode: num_heads must be divisible by num_heads_k for "
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFpropNode.hpp
                               "GQA/MQA. num_heads="
                                   + std::to_string(numHeads)
                                   + ", num_heads_k=" + std::to_string(numHeadsK));
         HIPDNN_RETURN_IF_TRUE(numHeadsV <= 0,
                               ErrorCode::INVALID_VALUE,
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFwdNode.hpp
                               "SdpaFwdNode: num_heads_v must be positive, got "
                                   + std::to_string(numHeadsV));
         HIPDNN_RETURN_IF_TRUE(numHeads % numHeadsV != 0,
                               ErrorCode::INVALID_VALUE,
                               "SdpaFwdNode: num_heads must be divisible by num_heads_v for "
+=======
+                              "SdpaFpropNode: num_heads_v must be positive, got "
+                                  + std::to_string(numHeadsV));
+        HIPDNN_RETURN_IF_TRUE(numHeads % numHeadsV != 0,
+                              ErrorCode::INVALID_VALUE,
+                              "SdpaFpropNode: num_heads must be divisible by num_heads_v for "
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFpropNode.hpp
                               "GQA/MQA. num_heads="
                                   + std::to_string(numHeads)
                                   + ", num_heads_v=" + std::to_string(numHeadsV));
@@ -248,7 +273,11 @@ public:
         std::unordered_map<int64_t, std::shared_ptr<TensorAttributes>>& tensorMap) override
     {
         SdpaAttributes attrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFwdNode.hpp
         HIPDNN_CHECK_ERROR(detail::unpackSdpaFwdOperation(opDesc, tensorMap, attrs));
+=======
+        HIPDNN_CHECK_ERROR(detail::unpackSdpaFpropOperation(opDesc, tensorMap, attrs));
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/include/hipdnn_frontend/node/SdpaFpropNode.hpp
         attributes = std::move(attrs);
         return {};
     }

@@ -13,6 +13,10 @@
 
 #include "Attributes.hpp"
 #include "TensorAttributes.hpp"
+<<<<<<< HEAD
+=======
+#include <hipdnn_data_sdk/data_objects/reduction_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_frontend/Types.hpp>
 #include <memory>
 #include <optional>
@@ -44,8 +48,11 @@ namespace hipdnn_frontend::graph
 class ReductionAttributes : public Attributes<ReductionAttributes>
 {
 public:
+<<<<<<< HEAD
     ReductionAttributes() = default;
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     /// Input tensor identifiers
     // NOLINTNEXTLINE(readability-identifier-naming)
     enum class input_names
@@ -143,6 +150,37 @@ public:
     {
         return setOutput(output_names::Y, std::move(y));
     }
+<<<<<<< HEAD
+=======
+
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::ReductionAttributes>
+        pack_attributes(flatbuffers::FlatBufferBuilder& builder) const // NOLINT
+    {
+        auto x = get_x();
+        auto y = get_y();
+
+        return hipdnn_data_sdk::data_objects::CreateReductionAttributes(
+            builder,
+            mode ? toSdkType(*mode) : hipdnn_data_sdk::data_objects::ReductionMode::NOT_SET,
+            x->get_uid(),
+            y->get_uid(),
+            is_deterministic);
+    }
+
+    static ReductionAttributes fromFlatBuffer(
+        const hipdnn_data_sdk::data_objects::ReductionAttributes* fb,
+        const std::unordered_map<int64_t, std::shared_ptr<TensorAttributes>>& tensorMap)
+    {
+        ReductionAttributes attr;
+
+        attr.set_mode(fromSdkType(fb->mode()));
+        attr.set_x(tensorMap.at(fb->in_tensor_uid()));
+        attr.set_y(tensorMap.at(fb->out_tensor_uid()));
+        attr.set_is_deterministic(fb->is_deterministic());
+
+        return attr;
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 
 typedef ReductionAttributes Reduction_attributes; // NOLINT(readability-identifier-naming)

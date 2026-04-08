@@ -65,9 +65,13 @@ run_grouped_conv_backward_data_tile_algs(const ckt::Args<SIGNATURE>& args,
                                          const ckt::Outputs<SIGNATURE>& outputs,
                                          const ck_tile::stream_config& s_conf)
 {
+<<<<<<< HEAD
     // Run first instance as dummy to get proper time from the first instance
     bool dummy_run_executed = false;
     float best_avg_time     = std::numeric_limits<float>::max();
+=======
+    float best_avg_time = std::numeric_limits<float>::max();
+>>>>>>> d9e199e220 (merge b-shi branch)
     std::string best_op_name, op_name;
     int best_split_k                = 0;
     ck::index_t best_instance_index = -1;
@@ -123,6 +127,7 @@ run_grouped_conv_backward_data_tile_algs(const ckt::Args<SIGNATURE>& args,
                 run_alg_func(args_k_batch, inputs, outputs, s_conf);
             if(is_supported)
             {
+<<<<<<< HEAD
                 if((s_conf.time_kernel_ || s_conf.flush_cache_) && !dummy_run_executed)
                 {
                     // Run first instance twice
@@ -130,6 +135,8 @@ run_grouped_conv_backward_data_tile_algs(const ckt::Args<SIGNATURE>& args,
                         run_alg_func(args_k_batch, inputs, outputs, s_conf);
                     dummy_run_executed = true;
                 }
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
                 ckt::ValidationReport report;
                 auto&& [rtol, atol] =
                     get_rtol_atol<SIGNATURE>(num_accums, k_batch, max_accumulated_value);

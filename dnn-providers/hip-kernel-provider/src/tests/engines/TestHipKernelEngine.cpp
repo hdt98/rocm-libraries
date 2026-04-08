@@ -4,8 +4,13 @@
 #include <gtest/gtest.h>
 #include <memory>
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_config_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/EngineDetailsWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/engine_config_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/EngineDetailsWrapper.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/utilities/MockEngineConfig.hpp>
 #include <hipdnn_test_sdk/utilities/MockGraph.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
@@ -15,7 +20,11 @@
 
 using namespace hip_kernel_provider;
 using namespace hipdnn_test_sdk::utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::flatbuffer_utilities;
+=======
+using namespace hipdnn_data_sdk::flatbuffer_utilities;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 TEST(TestHipKernelEngine, ConstructorAndId)
 {
@@ -190,6 +199,7 @@ TEST(TestHipKernelEngine, GetDetailsOnlyUsesFirstPlanBuilderCustomKnobs)
     auto mockPlanBuilder2 = std::make_unique<MockPlanBuilder>();
 
     // Set up first plan builder to return a custom knob
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::KnobT knob1;
     knob1.knob_id = "custom.knob1";
     knob1.description = "First custom knob";
@@ -198,6 +208,16 @@ TEST(TestHipKernelEngine, GetDetailsOnlyUsesFirstPlanBuilderCustomKnobs)
     knob1.default_value.Set(defaultValue1);
 
     std::vector<hipdnn_flatbuffers_sdk::data_objects::KnobT> customKnobs1;
+=======
+    hipdnn_data_sdk::data_objects::KnobT knob1;
+    knob1.knob_id = "custom.knob1";
+    knob1.description = "First custom knob";
+    hipdnn_data_sdk::data_objects::IntValueT defaultValue1;
+    defaultValue1.value = 1;
+    knob1.default_value.Set(defaultValue1);
+
+    std::vector<hipdnn_data_sdk::data_objects::KnobT> customKnobs1;
+>>>>>>> d9e199e220 (merge b-shi branch)
     customKnobs1.push_back(knob1);
 
     EXPECT_CALL(*mockPlanBuilder1, getCustomKnobs(::testing::_, ::testing::_))

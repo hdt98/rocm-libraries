@@ -732,6 +732,7 @@ TEST_F(TestGpuMiopenConvPlanBuilder,
 TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorkspaceSize)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
 
@@ -743,6 +744,18 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
     auto buffer = configBuilder.Release();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
                                                                                     buffer.size());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+
+    flatbuffers::FlatBufferBuilder configBuilder;
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(configBuilder, 1, 0);
+    configBuilder.Finish(engineConfig);
+
+    auto buffer = configBuilder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     HipdnnMiopenSettings settings;
     _planBuilder.initializeExecutionSettings(_handle, graph, configWrapper, settings);
@@ -759,13 +772,19 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
 TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetDefaultWhenLimitIsSet)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const auto range = _planBuilder.getWorkspaceSizeRange(_handle, graph);
 
     flatbuffers::FlatBufferBuilder configBuilder;
     auto knobIdOffset = configBuilder.CreateString("global.workspace_size_limit");
+<<<<<<< HEAD
     auto knobValue = hipdnn_flatbuffers_sdk::data_objects::CreateIntValue(
         configBuilder, static_cast<int64_t>(range.max));
     hipdnn_flatbuffers_sdk::data_objects::KnobSettingBuilder knobSettingBuilder(configBuilder);
@@ -785,6 +804,26 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetDefaultWhenLi
     auto buffer = configBuilder.Release();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
                                                                                     buffer.size());
+=======
+    auto knobValue = hipdnn_data_sdk::data_objects::CreateIntValue(configBuilder,
+                                                                   static_cast<int64_t>(range.max));
+    hipdnn_data_sdk::data_objects::KnobSettingBuilder knobSettingBuilder(configBuilder);
+    knobSettingBuilder.add_knob_id(knobIdOffset);
+    knobSettingBuilder.add_value_type(hipdnn_data_sdk::data_objects::KnobValue::IntValue);
+    knobSettingBuilder.add_value(knobValue.Union());
+    auto knobSetting = knobSettingBuilder.Finish();
+
+    std::vector<flatbuffers::Offset<hipdnn_data_sdk::data_objects::KnobSetting>> knobsVector;
+    knobsVector.push_back(knobSetting);
+    auto knobs = configBuilder.CreateVector(knobsVector);
+
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(configBuilder, 1, knobs);
+    configBuilder.Finish(engineConfig);
+
+    auto buffer = configBuilder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     HipdnnMiopenSettings settings;
     _planBuilder.initializeExecutionSettings(_handle, graph, configWrapper, settings);
@@ -795,8 +834,13 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetDefaultWhenLi
 TEST_F(TestGpuMiopenConvPlanBuilder, GetMaxWorkspaceSizeReturnsCachedDefault)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvFwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const size_t cachedValue = 42;
     HipdnnMiopenSettings settings;
@@ -837,6 +881,7 @@ TEST(TestHipdnnMiopenSettings, SelectedWorkspaceSizeReturnsLimitWhenBothSet)
 TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorkspaceSizeBwd)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvBwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
 
@@ -848,6 +893,18 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
     auto buffer = configBuilder.Release();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
                                                                                     buffer.size());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+
+    flatbuffers::FlatBufferBuilder configBuilder;
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(configBuilder, 1, 0);
+    configBuilder.Finish(engineConfig);
+
+    auto buffer = configBuilder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     HipdnnMiopenSettings settings;
     _planBuilder.initializeExecutionSettings(_handle, graph, configWrapper, settings);
@@ -864,6 +921,7 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
 TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorkspaceSizeWrw)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvWrwGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
 
@@ -875,6 +933,18 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
     auto buffer = configBuilder.Release();
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
                                                                                     buffer.size());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+
+    flatbuffers::FlatBufferBuilder configBuilder;
+    auto engineConfig = hipdnn_data_sdk::data_objects::CreateEngineConfig(configBuilder, 1, 0);
+    configBuilder.Finish(engineConfig);
+
+    auto buffer = configBuilder.Release();
+    hipdnn_data_sdk::flatbuffer_utilities::EngineConfigWrapper configWrapper(buffer.data(),
+                                                                             buffer.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     HipdnnMiopenSettings settings;
     _planBuilder.initializeExecutionSettings(_handle, graph, configWrapper, settings);
@@ -891,8 +961,13 @@ TEST_F(TestGpuMiopenConvPlanBuilder, InitializeExecutionSettingsSetsDefaultWorks
 TEST_F(TestGpuMiopenConvPlanBuilder, GetMaxWorkspaceSizeReturnsCachedDefaultBwd)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvBwdGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const size_t cachedValue = 42;
     HipdnnMiopenSettings settings;
@@ -905,8 +980,13 @@ TEST_F(TestGpuMiopenConvPlanBuilder, GetMaxWorkspaceSizeReturnsCachedDefaultBwd)
 TEST_F(TestGpuMiopenConvPlanBuilder, GetMaxWorkspaceSizeReturnsCachedDefaultWrw)
 {
     auto builder = hipdnn_test_sdk::utilities::createValidConvWrwGraph();
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
                                                                      builder.GetSize());
+=======
+    hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graph(builder.GetBufferPointer(),
+                                                              builder.GetSize());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const size_t cachedValue = 42;
     HipdnnMiopenSettings settings;

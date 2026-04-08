@@ -6,7 +6,11 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.hpp
 #include <hipdnn_flatbuffers_sdk/data_objects/sdpa_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/sdpa_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.hpp
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -166,12 +170,22 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    // Creates a finalized SdpaFpropOperationDescriptor directly from a FlatBuffer NodeT.
+    // Casts nodeT.attributes to SdpaAttributesT internally, then directly assigns
+    // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
+    static std::shared_ptr<SdpaFpropOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
 
 private:
     hipdnn_flatbuffers_sdk::data_objects::SdpaAttributesT _data;
+
+    // Optional human-readable name for this operation
+    std::string _name;
 
     // Optional human-readable name for this operation
     std::string _name;

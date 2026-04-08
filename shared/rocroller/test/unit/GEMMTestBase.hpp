@@ -421,6 +421,7 @@ namespace GEMMTests
                                                   ? std::vector<size_t>({(size_t)0, (size_t)1})
                                                   : std::vector<size_t>({});
 
+<<<<<<< HEAD
             auto stridesA   = gemm.transA == "N" ? oneStridesN : oneStridesT;
             auto tagTensorA = command->addOperation(
                 rocRoller::Operations::Tensor(2, dataTypeA, {}, stridesA)); // A
@@ -437,6 +438,30 @@ namespace GEMMTests
             auto tagLoadA = command->addOperation(rocRoller::Operations::T_Load_Tiled(loadInputA));
 
             auto stridesB   = gemm.transB == "N" ? oneStridesN : oneStridesT;
+=======
+            bool pretileA = !gemm.pretileA.empty();
+            if(pretileA)
+                AssertFatal(gemm.pretileA.size() == 2,
+                            "pretileA must have size 2 (MxK tile dimensions).",
+                            ShowValue(gemm.pretileA.size()));
+            auto stridesA   = pretileA ? std::vector<size_t>{}
+                                       : (gemm.transA == "N" ? oneStridesN : oneStridesT);
+            auto tagTensorA = command->addOperation(
+                rocRoller::Operations::Tensor(2, dataTypeA, {}, stridesA)); // A
+            auto loadInputA = tagTensorA;
+            if(pretileA)
+                loadInputA = command->addOperation(
+                    rocRoller::Operations::SubTileTranspose(loadInputA, gemm.pretileA, true));
+            auto tagLoadA = command->addOperation(rocRoller::Operations::T_Load_Tiled(loadInputA));
+
+            bool pretileB = !gemm.pretileB.empty();
+            if(pretileB)
+                AssertFatal(gemm.pretileB.size() == 2,
+                            "pretileB must have size 2 (KxN tile dimensions).",
+                            ShowValue(gemm.pretileB.size()));
+            auto stridesB   = pretileB ? std::vector<size_t>{}
+                                       : (gemm.transB == "N" ? oneStridesN : oneStridesT);
+>>>>>>> d9e199e220 (merge b-shi branch)
             auto tagTensorB = command->addOperation(
                 rocRoller::Operations::Tensor(2, dataTypeB, {}, stridesB)); // B
             auto loadInputB = tagTensorB;
@@ -798,6 +823,35 @@ namespace GEMMTests
 
             CommandArguments commandArgs = command->createArguments();
 
+<<<<<<< HEAD
+=======
+            // When pretileA is set, use the same tensor descriptor as the client: explicit
+            // strides for the pre-tiled layout (see DataParallelGEMMSolution.hpp).
+            if(!gemm.pretileA.empty() && gemm.pretileA.size() == 2)
+            {
+                AssertFatal(gemm.transA == "T", "Pre-tiling A only supported for TransposeType::T");
+                auto const tileM = gemm.pretileA[0];
+                auto const tileK = gemm.pretileA[1];
+                descA            = TensorDescriptor(dataTypeA,
+                                         {static_cast<size_t>(M), static_cast<size_t>(K)},
+                                         {static_cast<size_t>((K / tileK) * tileM * tileK),
+                                          static_cast<size_t>(tileM * tileK)});
+            }
+
+            // When pretileB is set, use the same tensor descriptor as the client: explicit
+            // strides for the pre-tiled layout (see DataParallelGEMMSolution.hpp).
+            if(!gemm.pretileB.empty() && gemm.pretileB.size() == 2)
+            {
+                AssertFatal(gemm.transB == "N", "Pre-tiling B only supported for TransposeType::N");
+                auto const tileK = gemm.pretileB[0];
+                auto const tileN = gemm.pretileB[1];
+                descB            = TensorDescriptor(dataTypeB,
+                                         {static_cast<size_t>(K), static_cast<size_t>(N)},
+                                         {static_cast<size_t>(tileK * tileN),
+                                          static_cast<size_t>((K / tileK) * tileK * tileN)});
+            }
+
+>>>>>>> d9e199e220 (merge b-shi branch)
             setCommandTensorArg(commandArgs, tagTensorA, descA, deviceA.get());
             setCommandTensorArg(commandArgs, tagTensorB, descB, deviceB.get());
             setCommandTensorArg(commandArgs, tagTensorC, descC, deviceC.get());

@@ -66,6 +66,58 @@ void ConvolutionBwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_
                             arrayOfElements,
                             "ConvolutionBwdOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
+=======
+    case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
+        setInt64Vector(_data.pre_padding,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
+        setInt64Vector(_data.post_padding,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
+        setInt64Vector(_data.stride,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
+        setInt64Vector(_data.dilation,
+                       attributeType,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_CONV_MODE:
+        setConvMode(_data.conv_mode,
+                    attributeType,
+                    elementCount,
+                    arrayOfElements,
+                    "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_COMP_TYPE:
+        setDataType(_computeDataType,
+                    attributeType,
+                    elementCount,
+                    arrayOfElements,
+                    "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+    case HIPDNN_ATTR_OPERATION_NAME_EXT:
+        setString(_name,
+                  attributeType,
+                  elementCount,
+                  arrayOfElements,
+                  "ConvolutionBwdOperationDescriptor::setAttribute()");
+        break;
+>>>>>>> d9e199e220 (merge b-shi branch)
     default:
         setConvolutionAttribute(_data,
                                 _computeDataType,
@@ -119,6 +171,73 @@ void ConvolutionBwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_
                             arrayOfElements,
                             "ConvolutionBwdOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
+=======
+    case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
+        getInt64Vector(_data.pre_padding,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
+        getInt64Vector(_data.post_padding,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
+        getInt64Vector(_data.stride,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
+        getInt64Vector(_data.dilation,
+                       attributeType,
+                       requestedElementCount,
+                       elementCount,
+                       arrayOfElements,
+                       "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_CONV_MODE:
+        getConvMode(_data.conv_mode,
+                    attributeType,
+                    requestedElementCount,
+                    elementCount,
+                    arrayOfElements,
+                    "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_CONVOLUTION_COMP_TYPE:
+        getDataType(_computeDataType,
+                    attributeType,
+                    requestedElementCount,
+                    elementCount,
+                    arrayOfElements,
+                    "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_OPERATION_NAME_EXT:
+        getString(_name,
+                  attributeType,
+                  requestedElementCount,
+                  elementCount,
+                  arrayOfElements,
+                  "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_OPERATION_TYPE_EXT:
+        getOperationType(HIPDNN_OPERATION_TYPE_CONVOLUTION_BACKWARD_DATA,
+                         attributeType,
+                         requestedElementCount,
+                         elementCount,
+                         arrayOfElements,
+                         "ConvolutionBwdOperationDescriptor::getAttribute()");
+        break;
+>>>>>>> d9e199e220 (merge b-shi branch)
     default:
         getConvolutionAttribute(_data,
                                 _computeDataType,
@@ -147,7 +266,11 @@ std::vector<std::shared_ptr<TensorDescriptor>>
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     ConvolutionBwdOperationDescriptor::buildNode() const
 {
+<<<<<<< HEAD
     auto node = std::make_unique<hipdnn_flatbuffers_sdk::data_objects::NodeT>();
+=======
+    auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     node->name = _name;
     node->compute_data_type = _computeDataType;
     node->attributes.Set(hipdnn_flatbuffers_sdk::data_objects::ConvolutionBwdAttributesT(_data));
@@ -180,7 +303,11 @@ std::string ConvolutionBwdOperationDescriptor::toString() const
 }
 
 std::shared_ptr<ConvolutionBwdOperationDescriptor> ConvolutionBwdOperationDescriptor::fromNode(
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+    const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
     const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     const auto* attrs = nodeT.attributes.AsConvolutionBwdAttributes();

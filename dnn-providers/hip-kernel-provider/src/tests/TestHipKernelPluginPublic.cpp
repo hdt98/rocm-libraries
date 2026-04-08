@@ -3,7 +3,10 @@
 
 #include <gtest/gtest.h>
 
+<<<<<<< HEAD
 #include "version.h"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/logging/LogLevel.hpp>
 #include <hipdnn_plugin_sdk/PluginApi.h>
 
@@ -21,6 +24,7 @@ TEST(TestHipKernelPluginPublic, HipdnnPluginSetLogLevelFiltersLowerSeverity)
     EXPECT_TRUE(hipdnn_data_sdk::logging::isLogLevelEnabled(HIPDNN_SEV_WARN));
     EXPECT_FALSE(hipdnn_data_sdk::logging::isLogLevelEnabled(HIPDNN_SEV_INFO));
 }
+<<<<<<< HEAD
 
 TEST(TestHipKernelPluginPublic, HipdnnPluginGetVersionSuccess)
 {
@@ -36,3 +40,5 @@ TEST(TestHipKernelPluginPublic, HipdnnPluginGetVersionNullPtr)
     auto status = hipdnnPluginGetVersion(nullptr);
     EXPECT_EQ(status, hipdnnPluginStatus_t::HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)

@@ -6,8 +6,13 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/rmsnorm_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/rmsnorm_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -79,12 +84,21 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    // Creates a finalized RMSNormOperationDescriptor directly from a FlatBuffer NodeT.
+    // Casts nodeT.attributes to RMSNormAttributesT internally, then directly assigns
+    // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
+    static std::shared_ptr<RMSNormOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
 
 private:
     hipdnn_flatbuffers_sdk::data_objects::RMSNormAttributesT _data;
+
+    std::string _name;
 
     std::string _name;
 

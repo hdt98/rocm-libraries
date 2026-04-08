@@ -6,7 +6,10 @@
 #include "DescriptorAttributeUtils.hpp"
 #include "HipdnnBackendDescriptorType.h"
 #include "HipdnnException.hpp"
+<<<<<<< HEAD
 #include "logging/Logging.hpp"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <algorithm>
 
@@ -27,7 +30,11 @@ void KnobDescriptor::finalize()
                   HIPDNN_STATUS_BAD_PARAM,
                   "KnobDescriptor::finalize() failed: Knob ID is not set.");
 
+<<<<<<< HEAD
     THROW_IF_TRUE(_defaultValue.type == hipdnn_flatbuffers_sdk::data_objects::KnobValue::NONE,
+=======
+    THROW_IF_TRUE(_defaultValue.type == hipdnn_data_sdk::data_objects::KnobValue::NONE,
+>>>>>>> d9e199e220 (merge b-shi branch)
                   HIPDNN_STATUS_BAD_PARAM,
                   "KnobDescriptor::finalize() failed: Default value is not set.");
 
@@ -35,7 +42,11 @@ void KnobDescriptor::finalize()
     // Reject mixed-type constraint sets that do not correspond to the default value type.
     switch(_defaultValue.type)
     {
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::IntValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         THROW_IF_TRUE(_minValueDouble.has_value() || _maxValueDouble.has_value(),
                       HIPDNN_STATUS_BAD_PARAM,
                       "KnobDescriptor::finalize() failed: "
@@ -49,7 +60,11 @@ void KnobDescriptor::finalize()
                       "KnobDescriptor::finalize() failed: "
                       "STRING_MAX_LENGTH set on INT64 knob.");
         break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::FloatValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         THROW_IF_TRUE(_minValueInt.has_value() || _maxValueInt.has_value(),
                       HIPDNN_STATUS_BAD_PARAM,
                       "KnobDescriptor::finalize() failed: "
@@ -71,7 +86,11 @@ void KnobDescriptor::finalize()
                       "KnobDescriptor::finalize() failed: "
                       "STRING_MAX_LENGTH set on DOUBLE knob.");
         break;
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         THROW_IF_TRUE(_minValueInt.has_value() || _maxValueInt.has_value(),
                       HIPDNN_STATUS_BAD_PARAM,
                       "KnobDescriptor::finalize() failed: "
@@ -123,7 +142,11 @@ void KnobDescriptor::finalize()
     // Validate that the default value satisfies declared constraints.
     switch(_defaultValue.type)
     {
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::IntValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         auto defaultVal = _defaultValue.AsIntValue()->value;
         if(_minValueInt.has_value())
@@ -162,7 +185,11 @@ void KnobDescriptor::finalize()
         }
         break;
     }
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::FloatValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         auto defaultVal = _defaultValue.AsFloatValue()->value;
         if(_minValueDouble.has_value())
@@ -178,7 +205,11 @@ void KnobDescriptor::finalize()
         }
         break;
     }
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         const auto& defaultVal = _defaultValue.AsStringValue()->value;
         if(_stringMaxLength.has_value())
@@ -208,6 +239,7 @@ void KnobDescriptor::finalize()
     HipdnnBackendDescriptorImpl<KnobDescriptor>::finalize();
 }
 
+<<<<<<< HEAD
 // ============================================================================
 // fromKnobT
 // ============================================================================
@@ -340,6 +372,8 @@ std::shared_ptr<KnobDescriptor>
     return knobDesc;
 }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 namespace
 {
 
@@ -423,7 +457,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_TYPE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_TYPE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundedString(_knobId,
                          attributeType,
                          elementCount,
@@ -432,7 +470,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                          MAX_KNOB_ID_LENGTH,
                          1);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_MAXIMUM_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_MAXIMUM_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundValue(_maxValueInt,
                       _maxValueDouble,
                       "MAXIMUM_VALUE",
@@ -440,7 +482,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                       elementCount,
                       arrayOfElements);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_MINIMUM_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_MINIMUM_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundValue(_minValueInt,
                       _minValueDouble,
                       "MINIMUM_VALUE",
@@ -448,7 +494,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                       elementCount,
                       arrayOfElements);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_STRIDE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_STRIDE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         std::optional<int64_t> temp;
         setOptionalScalar<HIPDNN_TYPE_INT64>(
@@ -459,7 +509,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
         _stride = temp;
         break;
     }
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DESCRIPTION:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DESCRIPTION_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setBoundedString(_description,
                          attributeType,
                          elementCount,
@@ -467,7 +521,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                          "KnobDescriptor::setAttribute()",
                          MAX_DESCRIPTION_LENGTH);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setKnobValueUnion(_defaultValue,
                           attributeType,
                           elementCount,
@@ -475,7 +533,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                           "KnobDescriptor::setAttribute()",
                           MAX_STRING_VALUE_LENGTH);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DEPRECATED:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DEPRECATED_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalar(_deprecated,
                   HIPDNN_TYPE_BOOLEAN,
                   attributeType,
@@ -483,7 +545,11 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                   arrayOfElements,
                   "KnobDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_INT:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_INT_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalarVector(_validValuesInt,
                         HIPDNN_TYPE_INT64,
                         attributeType,
@@ -491,10 +557,17 @@ void KnobDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                         arrayOfElements,
                         "KnobDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_STRING:
         setValidValuesString(attributeType, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_KNOB_INFO_STRING_MAX_LENGTH:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_STRING_EXT:
+        setValidValuesString(attributeType, elementCount, arrayOfElements);
+        break;
+    case HIPDNN_ATTR_KNOB_INFO_STRING_MAX_LENGTH_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         std::optional<int32_t> temp;
         setOptionalScalar<HIPDNN_TYPE_INT32>(
@@ -561,7 +634,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_TYPE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_TYPE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getString(_knobId,
                   attributeType,
                   requestedElementCount,
@@ -569,7 +646,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                   arrayOfElements,
                   "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_MAXIMUM_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_MAXIMUM_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getBoundValue(_maxValueInt,
                       _maxValueDouble,
                       "MAXIMUM_VALUE",
@@ -578,7 +659,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                       elementCount,
                       arrayOfElements);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_MINIMUM_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_MINIMUM_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getBoundValue(_minValueInt,
                       _minValueDouble,
                       "MINIMUM_VALUE",
@@ -587,7 +672,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                       elementCount,
                       arrayOfElements);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_STRIDE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_STRIDE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getOptionalScalar<HIPDNN_TYPE_INT64>(_stride,
                                              attributeType,
                                              requestedElementCount,
@@ -595,7 +684,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                                              arrayOfElements,
                                              "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DESCRIPTION:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DESCRIPTION_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getString(_description,
                   attributeType,
                   requestedElementCount,
@@ -603,7 +696,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                   arrayOfElements,
                   "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getKnobValueUnion(_defaultValue,
                           attributeType,
                           requestedElementCount,
@@ -611,7 +708,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                           arrayOfElements,
                           "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DEPRECATED:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DEPRECATED_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalar(_deprecated,
                   HIPDNN_TYPE_BOOLEAN,
                   attributeType,
@@ -620,7 +721,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                   arrayOfElements,
                   "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_INT:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_INT_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalarVector(_validValuesInt,
                         HIPDNN_TYPE_INT64,
                         attributeType,
@@ -629,10 +734,17 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                         arrayOfElements,
                         "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_STRING:
         getValidValuesString(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     case HIPDNN_ATTR_KNOB_INFO_STRING_MAX_LENGTH:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_VALID_VALUES_STRING_EXT:
+        getValidValuesString(attributeType, requestedElementCount, elementCount, arrayOfElements);
+        break;
+    case HIPDNN_ATTR_KNOB_INFO_STRING_MAX_LENGTH_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getOptionalScalar<HIPDNN_TYPE_INT32>(_stringMaxLength,
                                              attributeType,
                                              requestedElementCount,
@@ -640,7 +752,11 @@ void KnobDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                                              arrayOfElements,
                                              "KnobDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE_TYPE:
+=======
+    case HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE_TYPE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getDefaultValueType(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
     default:
@@ -718,6 +834,7 @@ void KnobDescriptor::getDefaultValueType(hipdnnBackendAttributeType_t attributeT
                                          void* arrayOfElements) const
 {
     // Map the internal KnobValue discriminator to the corresponding attribute type
+<<<<<<< HEAD
     // that callers should use when reading HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE.
     int64_t valueType;
     switch(_defaultValue.type)
@@ -729,6 +846,19 @@ void KnobDescriptor::getDefaultValueType(hipdnnBackendAttributeType_t attributeT
         valueType = static_cast<int64_t>(HIPDNN_TYPE_DOUBLE);
         break;
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
+=======
+    // that callers should use when reading HIPDNN_ATTR_KNOB_INFO_DEFAULT_VALUE_EXT.
+    int64_t valueType;
+    switch(_defaultValue.type)
+    {
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+        valueType = static_cast<int64_t>(HIPDNN_TYPE_INT64);
+        break;
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+        valueType = static_cast<int64_t>(HIPDNN_TYPE_DOUBLE);
+        break;
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+>>>>>>> d9e199e220 (merge b-shi branch)
         valueType = static_cast<int64_t>(HIPDNN_TYPE_CHAR);
         break;
     default:
@@ -750,13 +880,21 @@ void KnobDescriptor::getDefaultValueType(hipdnnBackendAttributeType_t attributeT
 // Other methods
 // ============================================================================
 
+<<<<<<< HEAD
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::KnobT> KnobDescriptor::toKnobT() const
+=======
+std::unique_ptr<hipdnn_data_sdk::data_objects::KnobT> KnobDescriptor::toKnobT() const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     THROW_IF_FALSE(isFinalized(),
                    HIPDNN_STATUS_NOT_INITIALIZED,
                    "KnobDescriptor::toKnobT() failed: Not finalized.");
 
+<<<<<<< HEAD
     auto knob = std::make_unique<hipdnn_flatbuffers_sdk::data_objects::KnobT>();
+=======
+    auto knob = std::make_unique<hipdnn_data_sdk::data_objects::KnobT>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     knob->knob_id = _knobId;
     knob->description = _description;
     knob->deprecated = _deprecated;
@@ -766,11 +904,19 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::KnobT> KnobDescriptor::toK
     // Build constraint based on default value type and set constraint fields
     switch(_defaultValue.type)
     {
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::IntValue:
         if(_minValueInt.has_value() || _maxValueInt.has_value() || _stride.has_value()
            || !_validValuesInt.empty())
         {
             hipdnn_flatbuffers_sdk::data_objects::IntConstraintT intConstraint;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::IntValue:
+        if(_minValueInt.has_value() || _maxValueInt.has_value() || _stride.has_value()
+           || !_validValuesInt.empty())
+        {
+            hipdnn_data_sdk::data_objects::IntConstraintT intConstraint;
+>>>>>>> d9e199e220 (merge b-shi branch)
             intConstraint.min_value = _minValueInt.value_or(0);
             intConstraint.max_value = _maxValueInt.value_or(0);
             intConstraint.step = _stride.value_or(1);
@@ -779,20 +925,34 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::KnobT> KnobDescriptor::toK
         }
         break;
 
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::FloatValue:
         if(_minValueDouble.has_value() || _maxValueDouble.has_value())
         {
             hipdnn_flatbuffers_sdk::data_objects::FloatConstraintT floatConstraint;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::FloatValue:
+        if(_minValueDouble.has_value() || _maxValueDouble.has_value())
+        {
+            hipdnn_data_sdk::data_objects::FloatConstraintT floatConstraint;
+>>>>>>> d9e199e220 (merge b-shi branch)
             floatConstraint.min_value = _minValueDouble.value_or(0.0);
             floatConstraint.max_value = _maxValueDouble.value_or(0.0);
             knob->constraint.Set(floatConstraint);
         }
         break;
 
+<<<<<<< HEAD
     case hipdnn_flatbuffers_sdk::data_objects::KnobValue::StringValue:
         if(!_validValuesString.empty() || _stringMaxLength.has_value())
         {
             hipdnn_flatbuffers_sdk::data_objects::StringConstraintT stringConstraint;
+=======
+    case hipdnn_data_sdk::data_objects::KnobValue::StringValue:
+        if(!_validValuesString.empty() || _stringMaxLength.has_value())
+        {
+            hipdnn_data_sdk::data_objects::StringConstraintT stringConstraint;
+>>>>>>> d9e199e220 (merge b-shi branch)
             stringConstraint.max_length = _stringMaxLength.value_or(0);
             stringConstraint.valid_values = _validValuesString;
             knob->constraint.Set(std::move(stringConstraint));

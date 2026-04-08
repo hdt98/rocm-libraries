@@ -3,11 +3,18 @@
 #pragma once
 
 #include "Node.hpp"
+<<<<<<< HEAD
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
 #include <hipdnn_frontend/attributes/ReductionAttributes.hpp>
 #include <hipdnn_frontend/detail/ReductionPacker.hpp>
 #include <hipdnn_frontend/detail/ReductionUnpacker.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_frontend/Error.hpp>
+#include <hipdnn_frontend/attributes/GraphAttributes.hpp>
+#include <hipdnn_frontend/attributes/ReductionAttributes.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 namespace hipdnn_frontend::graph
 {
@@ -91,6 +98,7 @@ public:
         return {};
     }
 
+<<<<<<< HEAD
     Error create_operation(
         std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& tensorDescs,
         std::vector<detail::ScopedHipdnnBackendDescriptor>& operations) const override
@@ -106,6 +114,17 @@ public:
         HIPDNN_CHECK_ERROR(detail::unpackReductionOperation(opDesc, tensorMap, attrs));
         attributes = std::move(attrs);
         return {};
+=======
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>
+        pack_node(flatbuffers::FlatBufferBuilder& builder) const override
+    {
+        return hipdnn_data_sdk::data_objects::CreateNodeDirect(
+            builder,
+            attributes.get_name().c_str(),
+            toSdkType(attributes.compute_data_type),
+            hipdnn_data_sdk::data_objects::NodeAttributes::ReductionAttributes,
+            attributes.pack_attributes(builder).Union());
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 };
 } // namespace hipdnn_frontend::graph

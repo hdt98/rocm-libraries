@@ -7,6 +7,12 @@
 #include <flatbuffers/flatbuffer_builder.h>
 #include <fusilli.h>
 #include <gtest/gtest.h>
+<<<<<<< HEAD
+=======
+#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_data_sdk/data_objects/engine_config_generated.h>
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_data_sdk/logging/LogLevel.hpp>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/data_types_generated.h>
@@ -782,7 +788,11 @@ TEST(TestFusilliPluginApi, GetApplicableEngineIdsSdpa) {
                                            1};
 
   // Basic SDPA (Q, K, V -> O) should be supported.
+<<<<<<< HEAD
   auto builder = hipdnn_test_sdk::utilities::createValidSdpaFwdGraph(
+=======
+  auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(
+>>>>>>> d9e199e220 (merge b-shi branch)
       qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims,
       qkvStrides);
   hipdnnPluginConstData_t opGraph;
@@ -796,9 +806,15 @@ TEST(TestFusilliPluginApi, GetApplicableEngineIdsSdpa) {
   ASSERT_EQ(engineIDs[0], hipdnn_data_sdk::utilities::FUSILLI_ENGINE_ID);
 
   // SDPA with attn_mask should be supported.
+<<<<<<< HEAD
   builder = hipdnn_test_sdk::utilities::createValidSdpaFwdGraph(
       qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims,
       qkvStrides, hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+=======
+  builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(
+      qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims,
+      qkvStrides, hipdnn_data_sdk::data_objects::DataType::HALF,
+>>>>>>> d9e199e220 (merge b-shi branch)
       /*withAttnMask=*/true);
   opGraph.ptr = builder.GetBufferPointer();
   opGraph.size = builder.GetSize();
@@ -809,9 +825,15 @@ TEST(TestFusilliPluginApi, GetApplicableEngineIdsSdpa) {
   ASSERT_EQ(numEngines, 1);
 
   // SDPA with stats output is NOT supported (yet).
+<<<<<<< HEAD
   builder = hipdnn_test_sdk::utilities::createValidSdpaFwdGraph(
       qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims,
       qkvStrides, hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+=======
+  builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph(
+      qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims, qkvStrides, qkvDims,
+      qkvStrides, hipdnn_data_sdk::data_objects::DataType::HALF,
+>>>>>>> d9e199e220 (merge b-shi branch)
       /*withAttnMask=*/false, /*withScale=*/false, /*withStats=*/true);
   opGraph.ptr = builder.GetBufferPointer();
   opGraph.size = builder.GetSize();
@@ -824,6 +846,7 @@ TEST(TestFusilliPluginApi, GetApplicableEngineIdsSdpa) {
   EXPECT_EQ(hipdnnEnginePluginDestroy(handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
+<<<<<<< HEAD
 TEST(TestFusilliPluginApi, GetApplicableEngineIdsRmsnorm) {
   hipdnnEnginePluginHandle_t handle = nullptr;
   ASSERT_EQ(hipdnnEnginePluginCreate(&handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
@@ -871,6 +894,8 @@ TEST(TestFusilliPluginApi, GetApplicableEngineIdsRmsnormTrainingUnsupported) {
   EXPECT_EQ(hipdnnEnginePluginDestroy(handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 TEST(TestFusilliPluginApi, SetLogLevelSuccess) {
   EXPECT_EQ(hipdnnPluginSetLogLevel(HIPDNN_SEV_INFO),
             HIPDNN_PLUGIN_STATUS_SUCCESS);

@@ -14,7 +14,11 @@ namespace test_activation_common
 
 struct ActivTestCase
 {
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::PointwiseMode mode;
+=======
+    hipdnn_data_sdk::data_objects::PointwiseMode mode;
+>>>>>>> d9e199e220 (merge b-shi branch)
     std::optional<float> reluLowerClip;
     std::optional<float> reluUpperClip;
     std::optional<float> reluLowerClipSlope;
@@ -37,7 +41,11 @@ struct ActivTestCase
         , eluAlpha(eluAlphaLocal)
         , softplusBeta(softplusBetaLocal)
     {
+<<<<<<< HEAD
         using PointwiseMode = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+        using PointwiseMode = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         switch(mode)
         {
@@ -94,7 +102,11 @@ struct ActivTestCase
 
 inline std::vector<ActivTestCase> createFwdActivationSmokeCases()
 {
+<<<<<<< HEAD
     using PM = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+    using PM = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::vector<ActivTestCase> cases;
 
@@ -113,7 +125,11 @@ inline std::vector<ActivTestCase> createFwdActivationSmokeCases()
 
 inline std::vector<ActivTestCase> createFwdActivationFullCases()
 {
+<<<<<<< HEAD
     using PM = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+    using PM = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::vector<ActivTestCase> cases;
 
@@ -163,7 +179,11 @@ inline std::vector<ActivTestCase> createFwdActivationFullCases()
 inline std::vector<ActivTestCase> createBatchnormBwdActivationTestCases()
 {
     return {// ReLU Backward: d/dx Max(0, x) = 1 * (x > 0)
+<<<<<<< HEAD
             ActivTestCase(hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_BWD,
+=======
+            ActivTestCase(hipdnn_data_sdk::data_objects::PointwiseMode::RELU_BWD,
+>>>>>>> d9e199e220 (merge b-shi branch)
                           0.0f,
                           std::nullopt,
                           std::nullopt,
@@ -171,7 +191,11 @@ inline std::vector<ActivTestCase> createBatchnormBwdActivationTestCases()
                           std::nullopt,
                           std::nullopt),
             // Clipped ReLU Backward: d/dx Clamp(x, -inf, upper)
+<<<<<<< HEAD
             ActivTestCase(hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_BWD,
+=======
+            ActivTestCase(hipdnn_data_sdk::data_objects::PointwiseMode::RELU_BWD,
+>>>>>>> d9e199e220 (merge b-shi branch)
                           std::nullopt,
                           0.5f,
                           std::nullopt,
@@ -179,7 +203,11 @@ inline std::vector<ActivTestCase> createBatchnormBwdActivationTestCases()
                           std::nullopt,
                           std::nullopt),
             // CLAMP Backward: d/dx Clamp(x, lower, upper)
+<<<<<<< HEAD
             ActivTestCase(hipdnn_flatbuffers_sdk::data_objects::PointwiseMode::RELU_BWD,
+=======
+            ActivTestCase(hipdnn_data_sdk::data_objects::PointwiseMode::RELU_BWD,
+>>>>>>> d9e199e220 (merge b-shi branch)
                           0.1f,
                           0.5f,
                           std::nullopt,

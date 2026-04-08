@@ -38,8 +38,13 @@ add_executable(
     IntegrationFrontendUserLogging.cpp
     IntegrationGraphEngineFiltering.cpp
     IntegrationGraphKnobsApi.cpp
+<<<<<<< HEAD
     IntegrationGraphKnobSettingsDescriptorLowering.cpp
     IntegrationGraphKnobsDescriptorLifting.cpp
+=======
+    IntegrationCustomOpDescriptorLifting.cpp
+    IntegrationCustomOpDescriptorLowering.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
     IntegrationGraphLifting.cpp
     IntegrationGraphSupportCheck.cpp
     IntegrationLayerNormDescriptorLifting.cpp
@@ -50,16 +55,26 @@ add_executable(
     IntegrationMatmulDescriptorLowering.cpp
     IntegrationPointwiseDescriptorLifting.cpp
     IntegrationPointwiseDescriptorLowering.cpp
+<<<<<<< HEAD
     IntegrationReductionDescriptorLifting.cpp
     IntegrationReductionDescriptorLowering.cpp
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     IntegrationRMSNormDescriptorLifting.cpp
     IntegrationRMSNormDescriptorLowering.cpp
     IntegrationRMSNormForward.cpp
     IntegrationSetPluginPathsExt.cpp
+<<<<<<< HEAD
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdDescriptorLowering.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaBwdLifting.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLifting.cpp>
     $<$<BOOL:${HIPDNN_ENABLE_SDPA}>:IntegrationSdpaFwdDescriptorLowering.cpp>
+=======
+    IntegrationSdpaBpropDescriptorLowering.cpp
+    IntegrationSdpaBpropLifting.cpp
+    IntegrationSdpaFpropDescriptorLifting.cpp
+    IntegrationSdpaFpropDescriptorLowering.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
 )
 
 target_compile_options(hipdnn_public_frontend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})

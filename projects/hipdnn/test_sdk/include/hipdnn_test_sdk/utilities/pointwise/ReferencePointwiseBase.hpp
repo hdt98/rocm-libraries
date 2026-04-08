@@ -289,8 +289,11 @@ private:
         }
 
         const PointwiseMode operation = attrs->operation();
+<<<<<<< HEAD
         const auto dataSdkOperation
             = static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(operation);
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         if(hipdnn_flatbuffers_sdk::utilities::isImplementedUnaryPointwiseMode(dataSdkOperation))
         {

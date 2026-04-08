@@ -401,7 +401,11 @@ void TestLogBufferEnvEnabled()
         }
     }
 
+<<<<<<< HEAD
     // test log dump after 2nd error
+=======
+    // test log dump after throw
+>>>>>>> d9e199e220 (merge b-shi branch)
     MIOPEN_LOG_W("warn 2nd");
     MIOPEN_LOG_I("info 2nd");
     MIOPEN_LOG_I2("info2 2nd");

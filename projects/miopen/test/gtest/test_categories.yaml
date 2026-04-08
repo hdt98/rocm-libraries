@@ -64,7 +64,10 @@ positive_patterns: &positive_patterns
   - "*/GPU_MhaForward_*"
   - "*GPU_TestMhaFind20*"
   - "*/GPU_MIOpenDriver*"
+<<<<<<< HEAD
   - "*/GPU_HipGraphExist*"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 
 test_categories:
@@ -201,6 +204,7 @@ test_categories:
     test_patterns: *positive_patterns
 
     exclude:
+<<<<<<< HEAD
     # Excluding slower tests for faster PR validation
       - "*DeepBench*"
       - "*MIOpenTestConv*"
@@ -236,6 +240,8 @@ test_categories:
       - "*GPU_TestMhaFind20_FP16*" #rocm-1016 fixed in develop. Re-enable once bumped
       # Only exclude explicitly disabled tests
       - "*DISABLED*"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
       - "*GPU_TestMhaFind20_FP32*" #rocm-1016 fixed in develop. Re-enable once bumped
       - "*GPU_TestMhaFind20_FP16*" #rocm-1016 fixed in develop. Re-enable once bumped
 

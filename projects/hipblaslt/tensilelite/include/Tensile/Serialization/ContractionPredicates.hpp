@@ -132,7 +132,9 @@ namespace TensileLite
                      Base::template Pair<Predicates::Contraction::MXBlockA>(),
                      Base::template Pair<Predicates::Contraction::MXBlockB>(),
                      Base::template Pair<Predicates::Contraction::DataTypeMXSA>(),
-                     Base::template Pair<Predicates::Contraction::DataTypeMXSB>()});
+                     Base::template Pair<Predicates::Contraction::DataTypeMXSB>(),
+                     Base::template Pair<Predicates::Contraction::MXBlockACheck>(),
+                     Base::template Pair<Predicates::Contraction::MXBlockBCheck>()});
 
                 auto gmap = Generic::GetSubclasses();
                 rv.insert(gmap.begin(), gmap.end());
@@ -568,6 +570,18 @@ namespace TensileLite
         template <typename IO>
         struct MappingTraits<Predicates::Contraction::SwizzleTensorB, IO>
             : public AutoMappingTraits<Predicates::Contraction::SwizzleTensorB, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::MXBlockACheck, IO>
+            : public AutoMappingTraits<Predicates::Contraction::MXBlockACheck, IO>
+        {
+        };
+
+        template <typename IO>
+        struct MappingTraits<Predicates::Contraction::MXBlockBCheck, IO>
+            : public AutoMappingTraits<Predicates::Contraction::MXBlockBCheck, IO>
         {
         };
 

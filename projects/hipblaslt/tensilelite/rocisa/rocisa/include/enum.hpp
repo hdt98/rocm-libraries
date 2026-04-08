@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2025-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -59,11 +59,12 @@ namespace rocisa
         Float4,
         E8,
         E5M3,
+        MXScale,
         Count,
         None = Count
     };
 
-    inline int dataTypeToBytes(DataType type)
+    inline float dataTypeToBytes(DataType type)
     {
         switch(type)
         {
@@ -105,6 +106,12 @@ namespace rocisa
             return 1;
         case DataType::BFloat8Float8:
             return 1;
+        case DataType::Float6:
+            return 0.75;
+        case DataType::BFloat6:
+            return 0.75;
+        case DataType::Float4:
+            return 0.5;
         default:
             return -1; // Invalid type
         }
@@ -162,6 +169,8 @@ namespace rocisa
             return "E8";
         case DataType::E5M3:
             return "E5M3";
+        case DataType::MXScale:
+            return "MXScale";
         default:
             return "Invalid";
         }

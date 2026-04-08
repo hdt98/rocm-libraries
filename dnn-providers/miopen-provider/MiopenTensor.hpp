@@ -19,6 +19,11 @@ public:
                  const std::vector<int64_t>& inputDims,
                  const std::vector<int64_t>& inputStrides);
 
+    MiopenTensor(int64_t uid,
+                 hipdnn_data_sdk::data_objects::DataType dataType,
+                 const std::vector<int64_t>& inputDims,
+                 const std::vector<int64_t>& inputStrides);
+
     MiopenTensor(const MiopenTensor&) = delete;
     MiopenTensor& operator=(const MiopenTensor&) = delete;
 

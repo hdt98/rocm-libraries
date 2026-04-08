@@ -54,6 +54,14 @@ inline Error createConvDgradOperation(
             opDesc.get(), HIPDNN_ATTR_OPERATION_NAME_EXT, opName, "convolutionbwd operation name"));
     }
 
+    // Set operation name if provided
+    auto& opName = attributes.get_name();
+    if(!opName.empty())
+    {
+        HIPDNN_CHECK_ERROR(setDescriptorAttrString(
+            opDesc.get(), HIPDNN_ATTR_OPERATION_NAME_EXT, opName, "convolutionbwd operation name"));
+    }
+
     // Finalize operation descriptor
     HIPDNN_CHECK_ERROR(finalizeDescriptor(opDesc.get(), "conv dgrad operation descriptor"));
 

@@ -73,36 +73,18 @@ namespace rocisa
             return "F8B8N";
         case rocisa::DataType::BFloat8Float8_fnuz:
             return "B8F8N";
-#ifdef TENSILE_USE_FP6
         case rocisa::DataType::Float6:
             return "F6";
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
         case rocisa::DataType::BFloat6:
             return "B6";
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
         case rocisa::DataType::Float4:
             return "F4";
-#endif // #ifdef TENSILE_USE_FP4
-#ifndef TENSILE_USE_FP6
-        case rocisa::DataType::Float6:
-            return "F6";
-#endif
-#ifndef TENSILE_USE_BF6
-        case rocisa::DataType::BFloat6:
-            return "B6";
-#endif
-#ifndef TENSILE_USE_FP4
-        case rocisa::DataType::Float4:
-            return "F4";
-#endif
         case rocisa::DataType::E8:
             return "E8";
         case rocisa::DataType::E5M3:
             return "E5M3";
         case rocisa::DataType::Count:
-        ;
+            return "Invalid";
         }
         return "Invalid";
     }
@@ -178,7 +160,7 @@ namespace rocisa
         case rocisa::DataType::E5M3:
             return TensileLite::TypeInfo<TensileLite::E5M3>::ElementSize;
         case rocisa::DataType::Count:
-        ;
+            return 1;
         }
         return 1;
     }

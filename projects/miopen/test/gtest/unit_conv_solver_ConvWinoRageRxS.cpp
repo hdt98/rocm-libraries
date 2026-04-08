@@ -67,6 +67,18 @@ const auto& GetTestParams()
     static const auto params = [] {
         auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::gfx94X);
         p.CheckXnackDisabled();
+<<<<<<< HEAD
+=======
+        return p;
+    }();
+    return params;
+}
+
+const auto& GetTestParamsFP16()
+{
+    static const auto params = [] {
+        auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::gfx94X | Gpu::gfx120X);
+>>>>>>> d9e199e220 (merge b-shi branch)
         return p;
     }();
     return params;

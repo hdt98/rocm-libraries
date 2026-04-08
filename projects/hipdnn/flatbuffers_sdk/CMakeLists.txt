@@ -9,6 +9,7 @@ hipdnn_setup_version(hipdnn_flatbuffers_sdk)
 # Set project with version
 project(hipdnn_flatbuffers_sdk VERSION ${HIPDNN_FLATBUFFERS_SDK_VERSION} LANGUAGES CXX)
 
+<<<<<<< HEAD
 # Read data_sdk version for minimum requirement (needed for types.hpp shared type definitions)
 hipdnn_get_component_version(hipdnn_data_sdk HIPDNN_FLATBUFFERS_SDK_DATA_SDK_MIN_VERSION)
 
@@ -48,11 +49,19 @@ set(_hipdnn_flatbuffers_sdk_local_export_targets)
 set(_hipdnn_flatbuffers_sdk_local_export_includes)
 
 # --- Create the library target ---
+=======
+# Read data_sdk version for minimum requirement
+hipdnn_get_component_version(hipdnn_data_sdk HIPDNN_FLATBUFFERS_SDK_DATA_SDK_MIN_VERSION)
+
+set(HIP_DNN_FLATBUFFERS_SDK_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 add_library(hipdnn_flatbuffers_sdk INTERFACE)
 
 # Generate version header
 hipdnn_generate_version_header(hipdnn_flatbuffers_sdk)
 
+<<<<<<< HEAD
 # Link to data_sdk for shared type definitions (types.hpp) and the
 # hipdnn_add_dependency_includes() function provided by data_sdk's CMake config.
 target_link_libraries(hipdnn_flatbuffers_sdk INTERFACE hipdnn_data_sdk)
@@ -124,14 +133,45 @@ install(TARGETS hipdnn_flatbuffers_sdk ${_hipdnn_flatbuffers_sdk_local_export_ta
         EXPORT hipdnn_flatbuffers_sdk_targets COMPONENT Development
 )
 
+=======
+target_link_libraries(hipdnn_flatbuffers_sdk INTERFACE hipdnn_data_sdk)
+
+set(HIP_DNN_FLATBUFFERS_SDK_INSTALL_INCLUDE_DIR "${CMAKE_INSTALL_INCLUDEDIR}/hipdnn/flatbuffers_sdk")
+
+target_include_directories(
+    hipdnn_flatbuffers_sdk INTERFACE $<BUILD_INTERFACE:${HIP_DNN_FLATBUFFERS_SDK_INCLUDE_DIR}>
+                                     $<INSTALL_INTERFACE:${HIP_DNN_FLATBUFFERS_SDK_INSTALL_INCLUDE_DIR}>
+)
+
+# Generate the config file from template
+configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/hipdnn_flatbuffers_sdkConfig.cmake.in"
+    "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/cmake/hipdnn_flatbuffers_sdk/hipdnn_flatbuffers_sdkConfig.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hipdnn_flatbuffers_sdk
+)
+
+export(
+    TARGETS hipdnn_flatbuffers_sdk
+    FILE "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/cmake/hipdnn_flatbuffers_sdk/hipdnn_flatbuffers_sdkTargets.cmake"
+)
+
+install(TARGETS hipdnn_flatbuffers_sdk EXPORT hipdnn_flatbuffers_sdk_targets COMPONENT Development)
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 # cmake-lint: disable=E1122
 install(
     DIRECTORY ${HIP_DNN_FLATBUFFERS_SDK_INCLUDE_DIR}/
     DESTINATION ${HIP_DNN_FLATBUFFERS_SDK_INSTALL_INCLUDE_DIR}
     COMPONENT Development
     FILES_MATCHING
+<<<<<<< HEAD
     PATTERN "*.h"
     PATTERN "*.hpp"
+=======
+    PATTERN "*.inl"
+    PATTERN "*.hpp"
+    PATTERN "*.h"
+>>>>>>> d9e199e220 (merge b-shi branch)
     PATTERN "*.h.in" EXCLUDE
 )
 
@@ -146,6 +186,7 @@ install(EXPORT hipdnn_flatbuffers_sdk_targets DESTINATION ${CMAKE_INSTALL_LIBDIR
         FILE hipdnn_flatbuffers_sdkTargets.cmake COMPONENT Development
 )
 
+<<<<<<< HEAD
 # Install behavior depends on local vs imported dependencies
 if(_hipdnn_flatbuffers_sdk_local_export_includes)
     # cmake-lint: disable=E1122
@@ -171,6 +212,8 @@ else()
     )
 endif()
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 # Generate package version file for find_package version checking
 write_basic_package_version_file(
     "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/cmake/hipdnn_flatbuffers_sdk/hipdnn_flatbuffers_sdkConfigVersion.cmake"

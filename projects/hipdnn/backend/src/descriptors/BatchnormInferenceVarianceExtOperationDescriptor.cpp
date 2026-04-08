@@ -236,7 +236,11 @@ void BatchnormInferenceVarianceExtOperationDescriptor::getAttribute(
                   "BatchnormInferenceVarianceExtOperationDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_OPERATION_TYPE_EXT:
+<<<<<<< HEAD
         getOperationType(HIPDNN_OPERATION_TYPE_BATCHNORM_INFERENCE_VARIANCE_EXT,
+=======
+        getOperationType(HIPDNN_OPERATION_TYPE_BATCHNORM_INFERENCE_VARIANCE,
+>>>>>>> d9e199e220 (merge b-shi branch)
                          attributeType,
                          requestedElementCount,
                          elementCount,
@@ -264,7 +268,11 @@ std::vector<std::shared_ptr<TensorDescriptor>>
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     BatchnormInferenceVarianceExtOperationDescriptor::buildNode() const
 {
+<<<<<<< HEAD
     auto node = std::make_unique<hipdnn_flatbuffers_sdk::data_objects::NodeT>();
+=======
+    auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
+>>>>>>> d9e199e220 (merge b-shi branch)
     node->name = _name;
     node->compute_data_type = _computeDataType;
     node->attributes.Set(
@@ -296,7 +304,11 @@ std::string BatchnormInferenceVarianceExtOperationDescriptor::toString() const
 
 std::shared_ptr<BatchnormInferenceVarianceExtOperationDescriptor>
     BatchnormInferenceVarianceExtOperationDescriptor::fromNode(
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+        const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
         const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     const auto* attrs = nodeT.attributes.AsBatchnormInferenceAttributesVarianceExt();

@@ -49,6 +49,7 @@ void EnginePluginResourceManager::setPluginLogLevel(hipdnnSeverity_t level)
     {
         for(const auto& plugin : pm->getPlugins())
         {
+<<<<<<< HEAD
             auto status = plugin->setLogLevel(level);
             if(status != HIPDNN_PLUGIN_STATUS_SUCCESS)
             {
@@ -56,6 +57,9 @@ void EnginePluginResourceManager::setPluginLogLevel(hipdnnSeverity_t level)
                                         plugin->name(),
                                         static_cast<int>(status));
             }
+=======
+            plugin->setLogLevel(level);
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
     }
 }

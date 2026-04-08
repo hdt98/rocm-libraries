@@ -812,7 +812,9 @@ namespace TensileLite
                                           autoStaggerUStrideShift,
                                           autoGsuVal);
 
-        if(!problemType.useScaleAB.empty()) //kernel input data
+	// NOTE: an assumption here is A & B must be both MX data types or non-MX data types.
+	//       Mixing is not supported.
+        if(!problemType.useScaleAB.empty())
         {
             args.template append<void const*>("scaleA", inputs.scaleA);
             args.template append<void const*>("scaleB", inputs.scaleB);
@@ -3076,7 +3078,9 @@ namespace TensileLite
         spm.memReadBytesC = multiplyElementSize((NumBatches * M * N) * betaReads, cInfo.elementSize);
 
         if(GlobalSplitU == 1)
+        {
             spm.memWriteBytesD = multiplyElementSize((NumBatches * M * N) * (1 + betaWrites), dInfo.elementSize);
+        }
         else
         {
             bool   hardwareAtomic   = false; // TODO-model

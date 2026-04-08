@@ -134,7 +134,7 @@ class ProblemType:
         rv.transA = bool(d['TransposeA'])
         rv.transB = bool(d['TransposeB'])
         # it will either be set as d['MacDataType'] or a specified input
-        if 'MacDataTypeA' in d: 
+        if 'MacDataTypeA' in d:
             rv.computeInputTypeA = DataType(d['MacDataTypeA'])
         else:
             rv.computeInputTypeA = srcType
@@ -288,6 +288,7 @@ class ProblemType:
         rv.metadataLayout = 0
         if 'MetadataLayout' in d:
             rv.metadataLayout = d['MetadataLayout']
+
         return rv
 
     def __init__(self, freeIndices=None, batchIndices=None, boundIndices=None, aDims=None, bDims=None, cDims=None, dDims=None):

@@ -7,10 +7,17 @@
 #include <atomic>
 #include <flatbuffers/flatbuffers.h>
 #include <fstream>
+<<<<<<< HEAD
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/utilities/json/Graph.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+#include <hipdnn_data_sdk/utilities/StringUtil.hpp>
+#include <hipdnn_data_sdk/utilities/json/Graph.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <iomanip>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -108,8 +115,12 @@ void GraphLogger::logGraph(const uint8_t* serializedGraph, size_t size)
         return;
     }
 
+<<<<<<< HEAD
     auto* graph
         = flatbuffers::GetRoot<hipdnn_flatbuffers_sdk::data_objects::Graph>(serializedGraph);
+=======
+    auto* graph = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::Graph>(serializedGraph);
+>>>>>>> d9e199e220 (merge b-shi branch)
     const nlohmann::json j = *graph;
 
     std::ofstream file(fullPath);

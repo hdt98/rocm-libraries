@@ -28,7 +28,10 @@ add_executable(
     utilities/TestCpuFpReferenceUtilities.cpp
     utilities/TestCpuFpReferenceValidation.cpp
     utilities/TestCpuTypeUtilities.cpp
+<<<<<<< HEAD
     utilities/TestSdkFrontendTypeConversions.cpp
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     utilities/TestCpuReferencePointwise.cpp
     utilities/TestDynamicTolerancesCommon.cpp
     utilities/TestDynamicTolerancesConv.cpp

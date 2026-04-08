@@ -3,6 +3,7 @@
 
 #pragma once
 
+<<<<<<< HEAD
 // FlatBuffer utility wrappers
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/EngineConfigWrapper.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/EngineDetailsWrapper.hpp>
@@ -18,3 +19,7 @@
 
 // Serialization utilities
 #include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
+=======
+// Stub header for hipdnn_flatbuffers_sdk.
+// FlatBuffers-generated headers and utilities will be moved here from data_sdk.
+>>>>>>> d9e199e220 (merge b-shi branch)

@@ -1200,7 +1200,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 5
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GSU1_LPA16_MIWT1_1_PLR1_SU0_SUS0_TLDS1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GSU1_LPA16_MIWT1_1_PLR3_SU0_SUS0_TLDS1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 0
     StaggerUMapping: 0
@@ -1396,7 +1400,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 6
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GSU1_LPA16_MIWT1_1_PLR1_SU4_SUS256_TLDS1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC1_AFEM8_GSU1_LPA16_MIWT1_1_PLR3_SU4_SUS256_TLDS1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 4
     StaggerUMapping: 0
@@ -1592,7 +1600,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 7
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC0_AFEM1_GSU2_LPA16_MIWT1_1_PLR1_SU0_SUS0_TLDS1_WG32_2_1
+=======
+    SolutionNameMin: Cijk_Alik_Bjlk_I8HS_BH_BiasS_SPB_AS_SAV_MT32x32x128_MI32x32x1_SN_LDSB0_AFC0_AFEM1_GSU2_LPA16_MIWT1_1_PLR3_SU0_SUS0_TLDS1_WG32_2_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: true
     StaggerU: 0
     StaggerUMapping: 0

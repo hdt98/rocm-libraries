@@ -55,8 +55,13 @@ auto GetConvTestCasesWrw(miopenDataType_t datatype)
 const auto& GetTestParams()
 {
     static const auto params = [] {
+<<<<<<< HEAD
         auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::gfx110X | Gpu::gfx115X |
                                                               Gpu::gfx120X);
+=======
+        auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::gfx110X | Gpu::gfx120X |
+                                                              Gpu::gfx115X);
+>>>>>>> d9e199e220 (merge b-shi branch)
         p.ExcludeDevice("gfx1103"); // WORKAROUND_ISSUE_3044
         return p;
     }();

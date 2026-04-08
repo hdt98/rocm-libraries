@@ -7,7 +7,10 @@
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceSdpa.hpp>
 #include <hipdnn_test_sdk/utilities/detail/CpuFpReferenceUtilities.hpp>
+<<<<<<< HEAD
 #include <hipdnn_test_sdk/utilities/detail/GradientCheckUtilities.hpp>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_data_sdk::utilities;

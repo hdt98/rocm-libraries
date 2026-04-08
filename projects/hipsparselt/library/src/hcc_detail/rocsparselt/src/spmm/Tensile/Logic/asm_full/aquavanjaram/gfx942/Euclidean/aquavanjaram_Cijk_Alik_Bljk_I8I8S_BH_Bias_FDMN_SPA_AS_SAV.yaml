@@ -3571,7 +3571,11 @@
     ScheduleIterAlg: 3
     ScheduleLocalWrite: 1
     SolutionIndex: 18
+<<<<<<< HEAD
     SolutionNameMin: Cijk_Alik_Bljk_I8I8S_BH_Bias_FDMN_SPA_AS_SAV_MT128x128x128_MI32x32x32x1_SN_1LDSB0_AFC0_AF0EM8_GRVWB16_GSU3_LPB16_MIWT4_1_PLR1_SUS128_WG32_8_1
+=======
+    SolutionNameMin: Cijk_Alik_Bljk_I8I8S_BH_Bias_FDMN_SPA_AS_SAV_MT128x128x128_MI32x32x32x1_SN_1LDSB0_AFC0_AF0EM8_GRVWB16_GSU3_LPB16_MIWT4_1_PLR3_SUS128_WG32_8_1
+>>>>>>> d9e199e220 (merge b-shi branch)
     SourceSwap: false
     StaggerU: 4
     StaggerUMapping: 0

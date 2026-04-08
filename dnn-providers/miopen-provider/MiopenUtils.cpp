@@ -70,8 +70,12 @@ MiopenTensor createTensor(
 }
 
 MiopenTensor createBatchnormTensor(
+<<<<<<< HEAD
     const std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
+=======
+    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+>>>>>>> d9e199e220 (merge b-shi branch)
         tensorMap,
     int64_t uid)
 {
@@ -112,7 +116,11 @@ MiopenTensor createBatchnormTensor(
     return {uid, tensorAttr.data_type(), dims, strides};
 }
 
+<<<<<<< HEAD
 size_t getSpatialDimCount(const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& attr)
+=======
+size_t getSpatialDimCount(const hipdnn_data_sdk::data_objects::TensorAttributes& attr)
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     if(attr.dims()->size() < 3)
     {

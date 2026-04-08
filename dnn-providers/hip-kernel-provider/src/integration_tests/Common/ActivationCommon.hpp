@@ -3,15 +3,24 @@
 
 #pragma once
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/pointwise_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
+=======
+#include <hipdnn_data_sdk/data_objects/pointwise_attributes_generated.h>
+#include <hipdnn_data_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 namespace test_activation_common
 {
 
 struct ActivTestCase
 {
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::PointwiseMode mode;
+=======
+    hipdnn_data_sdk::data_objects::PointwiseMode mode;
+>>>>>>> d9e199e220 (merge b-shi branch)
     std::optional<float> reluLowerClip;
     std::optional<float> reluUpperClip;
     std::optional<float> reluLowerClipSlope;
@@ -19,7 +28,11 @@ struct ActivTestCase
     std::optional<float> eluAlpha;
     std::optional<float> softplusBeta;
 
+<<<<<<< HEAD
     ActivTestCase(hipdnn_flatbuffers_sdk::data_objects::PointwiseMode modeLocal,
+=======
+    ActivTestCase(hipdnn_data_sdk::data_objects::PointwiseMode modeLocal,
+>>>>>>> d9e199e220 (merge b-shi branch)
                   std::optional<float> reluLowerClipLocal = std::nullopt,
                   std::optional<float> reluUpperClipLocal = std::nullopt,
                   std::optional<float> reluLowerClipSlopeLocal = std::nullopt,
@@ -34,7 +47,11 @@ struct ActivTestCase
         , eluAlpha(eluAlphaLocal)
         , softplusBeta(softplusBetaLocal)
     {
+<<<<<<< HEAD
         using PointwiseMode = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+        using PointwiseMode = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         switch(mode)
         {
@@ -93,7 +110,11 @@ struct ActivTestCase
 
 inline std::vector<ActivTestCase> createFwdActivationSmokeCases()
 {
+<<<<<<< HEAD
     using PM = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+    using PM = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::vector<ActivTestCase> cases;
 
@@ -112,7 +133,11 @@ inline std::vector<ActivTestCase> createFwdActivationSmokeCases()
 
 inline std::vector<ActivTestCase> createFwdActivationFullCases()
 {
+<<<<<<< HEAD
     using PM = hipdnn_flatbuffers_sdk::data_objects::PointwiseMode;
+=======
+    using PM = hipdnn_data_sdk::data_objects::PointwiseMode;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::vector<ActivTestCase> cases;
 

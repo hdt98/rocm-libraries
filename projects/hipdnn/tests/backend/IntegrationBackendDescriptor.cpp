@@ -45,8 +45,12 @@ TEST_F(IntegrationBackendDescriptor, WillNotCreateDescriptorIfTypeNotSupported)
 {
     hipdnnBackendDescriptor_t descriptor = nullptr;
 
+<<<<<<< HEAD
     const hipdnnStatus_t status
         = hipdnnBackendCreateDescriptor(HIPDNN_INVALID_TYPE_EXT, &descriptor);
+=======
+    const hipdnnStatus_t status = hipdnnBackendCreateDescriptor(HIPDNN_INVALID_TYPE, &descriptor);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(status, HIPDNN_STATUS_NOT_SUPPORTED);
 }

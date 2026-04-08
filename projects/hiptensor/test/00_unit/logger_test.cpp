@@ -143,9 +143,16 @@ bool hiptensorLoggerOpenFileTest()
     std::string fname   = hiptensor::test::generateTempFilename();
     const char* fname_c = fname.c_str();
 
+<<<<<<< HEAD
     // Create the file to verify write permissions, then close it immediately.
     // On Windows, fopen("w") holds an exclusive lock; we must not keep it open
     // while calling hiptensorLoggerOpenFile, which opens the same path internally.
+=======
+    long fileSizeOrig = 0, fileSizeAfter = 0;
+
+    FILE* fp = hiptensor::test::safeFopen(fname_c, "w");
+    if(fp == NULL)
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         FILE* fp = hiptensor::test::safeFopen(fname_c, "w");
         if(fp == NULL)

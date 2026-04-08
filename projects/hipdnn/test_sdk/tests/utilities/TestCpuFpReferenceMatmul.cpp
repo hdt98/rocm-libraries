@@ -77,8 +77,13 @@ TEST_F(TestCpuFpReferenceMatmul, IsApplicable)
         auto [serializedGraph, serErr] = graph->to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrap(
             serializedGraph.data(), serializedGraph.size());
+=======
+        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(flatbufferGraph.data(),
+                                                                            flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
         EXPECT_TRUE(CpuFpReferenceMatmul::isApplicable(graphWrap.getNode(0)));
     }
 
@@ -99,8 +104,13 @@ TEST_F(TestCpuFpReferenceMatmul, IsApplicable)
         auto [serializedGraph, serErr] = graph->to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper graphWrap(
             serializedGraph.data(), serializedGraph.size());
+=======
+        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(flatbufferGraph.data(),
+                                                                            flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
         EXPECT_FALSE(CpuFpReferenceMatmul::isApplicable(graphWrap.getNode(0)));
     }
 }

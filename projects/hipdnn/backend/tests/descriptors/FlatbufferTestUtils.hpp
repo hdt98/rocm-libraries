@@ -17,9 +17,15 @@ namespace hipdnn_backend::test_utilities
 /// Graph with metadata but no tensors or nodes, for testing empty-graph error paths.
 inline flatbuffers::FlatBufferBuilder createEmptyGraph()
 {
+<<<<<<< HEAD
     const std::vector<::flatbuffers::Offset<hipdnn_flatbuffers_sdk::data_objects::TensorAttributes>>
         tensorAttributes;
     const std::vector<::flatbuffers::Offset<hipdnn_flatbuffers_sdk::data_objects::Node>> nodes;
+=======
+    const std::vector<::flatbuffers::Offset<hipdnn_data_sdk::data_objects::TensorAttributes>>
+        tensorAttributes;
+    const std::vector<::flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>> nodes;
+>>>>>>> d9e199e220 (merge b-shi branch)
     flatbuffers::FlatBufferBuilder builder;
     auto graphOffset = hipdnn_flatbuffers_sdk::data_objects::CreateGraphDirect(
         builder,

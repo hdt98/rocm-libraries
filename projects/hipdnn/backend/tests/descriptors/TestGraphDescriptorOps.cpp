@@ -1192,7 +1192,11 @@ public:
 
         auto flatbufferBuffer
             = buildGraphViaFlatBuffer(xTensor, wTensor, yTensor, convAttrs, sdkComputeDt);
+<<<<<<< HEAD
         auto serializedGraphT = UnPackGraph(flatbufferBuffer.data());
+=======
+        auto flatbufferGraphT = UnPackGraph(flatbufferBuffer.data());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         // Build via descriptor path
         auto descriptorGraphT = buildGraphViaDescriptors(p.xUid,
@@ -1600,11 +1604,19 @@ TEST_F(TestGraphDescriptorOps, GetAttributeReturnsOperationCountMultiple)
     auto conv1 = createDefaultConvOp();
 
     auto xDesc2 = createFinalizedTensor(
+<<<<<<< HEAD
         K_FPROP_TENSOR_X2_UID, toVec(K_FPROP_TENSOR_X2_DIMS), toVec(K_FPROP_TENSOR_X2_STRIDES));
     auto wDesc2 = createFinalizedTensor(
         K_FPROP_TENSOR_W2_UID, toVec(K_FPROP_TENSOR_W2_DIMS), toVec(K_FPROP_TENSOR_W2_STRIDES));
     auto yDesc2 = createFinalizedTensor(
         K_FPROP_TENSOR_Y2_UID, toVec(K_FPROP_TENSOR_Y2_DIMS), toVec(K_FPROP_TENSOR_Y2_STRIDES));
+=======
+        K_TENSOR_X2_UID, toVec(K_TENSOR_X2_DIMS), toVec(K_TENSOR_X2_STRIDES));
+    auto wDesc2 = createFinalizedTensor(
+        K_TENSOR_W2_UID, toVec(K_TENSOR_W2_DIMS), toVec(K_TENSOR_W2_STRIDES));
+    auto yDesc2 = createFinalizedTensor(
+        K_TENSOR_Y2_UID, toVec(K_TENSOR_Y2_DIMS), toVec(K_TENSOR_Y2_STRIDES));
+>>>>>>> d9e199e220 (merge b-shi branch)
     auto convOp2 = createFinalizedConvOp(xDesc2.get(), wDesc2.get(), yDesc2.get());
 
     auto desc = getDescriptor();
@@ -1650,10 +1662,17 @@ TEST_F(TestGraphDescriptorOps, GetAttributeReturnsOperations)
 
     // Verify the returned operation is a conv forward operation
     int64_t opTypeCount = 0;
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
     ASSERT_NO_THROW(returnedOps[0]->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType));
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT);
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+    ASSERT_NO_THROW(returnedOps[0]->getAttribute(
+        HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType));
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto returnedOp0 = std::unique_ptr<HipdnnBackendDescriptor>(returnedOps[0]);
     EXPECT_TRUE(returnedOp0->isFinalized());
@@ -1838,10 +1857,17 @@ TEST_F(TestGraphDescriptorOps, OperationsPreservedAfterFinalize)
 
     // Verify the returned operation is a conv forward operation
     int64_t opTypeCount = 0;
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
     ASSERT_NO_THROW(returnedOps[0]->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType));
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT);
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+    ASSERT_NO_THROW(returnedOps[0]->getAttribute(
+        HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType));
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto returnedOp0 = std::unique_ptr<HipdnnBackendDescriptor>(returnedOps[0]);
     EXPECT_TRUE(returnedOp0->isFinalized());
@@ -1973,6 +1999,7 @@ TEST_F(TestGraphDescriptorOps, GetAttributeNameCountWhenUnset)
     EXPECT_EQ(elementCount, 1);
 }
 
+<<<<<<< HEAD
 TEST_F(TestGraphDescriptorOps, AppendOpsAfterSerialization)
 {
     // Set a single op, build the serialized buffer, then append more ops
@@ -2025,6 +2052,8 @@ TEST_F(TestGraphDescriptorOps, AppendOpsAfterSerialization)
     ASSERT_EQ(graphT->tensors.size(), 6);
 }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 TEST_F(TestGraphDescriptorOps, GetAttributeWrongTypeForName)
 {
     auto conv = createDefaultConvOp();

@@ -549,12 +549,17 @@ TEST_F(IntegrationBackendUserLoggingApis, ConcurrentLoggingWithCallbackToggle)
         registerIsolatedCallback(HIPDNN_SEV_INFO, mode);
 
         const size_t countBefore = recorder.getRecordedLogCount();
+<<<<<<< HEAD
         uint64_t iterSnapshot;
         {
             const std::lock_guard<std::mutex> lock(mutex);
             iterSnapshot = iterationCount;
         }
         waitForIterations(iterSnapshot);
+=======
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        const size_t countAfterEnabled = recorder.getRecordedLogCount();
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         // For async mode, wait for logs to be delivered from the queue.
         // For sync mode, logs are immediate so no wait needed.
@@ -575,12 +580,17 @@ TEST_F(IntegrationBackendUserLoggingApis, ConcurrentLoggingWithCallbackToggle)
         registerIsolatedCallback(HIPDNN_SEV_OFF, mode);
 
         const size_t countBeforeDisabled = recorder.getRecordedLogCount();
+<<<<<<< HEAD
         uint64_t iterSnapshotDisabled;
         {
             const std::lock_guard<std::mutex> lock(mutex);
             iterSnapshotDisabled = iterationCount;
         }
         waitForIterations(iterSnapshotDisabled);
+=======
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        const size_t countAfterDisabled = recorder.getRecordedLogCount();
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         // For async mode, a short wait for any potential logs to arrive.
         if(mode == HIPDNN_LOG_CALLBACK_ASYNC)

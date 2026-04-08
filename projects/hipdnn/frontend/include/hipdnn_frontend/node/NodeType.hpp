@@ -23,8 +23,13 @@ enum class NodeType
     MATMUL = 9,
     LAYER_NORM = 10,
     RMS_NORM = 11,
+<<<<<<< HEAD
     SDPA_FWD = 12,
     SDPA_BWD = 13,
+=======
+    SDPA_FPROP = 12,
+    SDPA_BPROP = 13,
+>>>>>>> d9e199e220 (merge b-shi branch)
     BLOCK_SCALE_QUANTIZE = 14,
     BLOCK_SCALE_DEQUANTIZE = 15,
     CUSTOM_OP = 16,

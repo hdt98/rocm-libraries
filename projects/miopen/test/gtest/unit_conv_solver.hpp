@@ -154,7 +154,10 @@ struct UnitTestConvSolverParams
     void SetConvAttrFp16Alt(uint64_t value);
     void SetTolerance(Gpu gpu, miopenDataType_t type, float value);
     void ExcludeDevice(std::string_view name);
+<<<<<<< HEAD
     void UsesCKDynamicLib();
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     friend std::ostream& operator<<(std::ostream& os, const UnitTestConvSolverParams& p);
 

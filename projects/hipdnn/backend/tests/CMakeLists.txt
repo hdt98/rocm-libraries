@@ -63,12 +63,17 @@ add_executable(
     descriptors/TestGraphDescriptorLifting.cpp
     descriptors/TestGraphDescriptorPointwise.cpp
     descriptors/TestGraphDescriptorRMSNorm.cpp
+<<<<<<< HEAD
     descriptors/TestGraphDescriptorSdpaFwd.cpp
+=======
+    descriptors/TestGraphDescriptorSdpaFprop.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
     descriptors/TestConvolutionBwdOperationFromNode.cpp
     descriptors/TestLayernormOperationDescriptor.cpp
     descriptors/TestLayernormOperationFromNode.cpp
     descriptors/TestPointwiseOperationDescriptor.cpp
     descriptors/TestPointwiseOperationFromNode.cpp
+<<<<<<< HEAD
     descriptors/TestReductionOperationDescriptor.cpp
     descriptors/TestReductionOperationFromNode.cpp
     descriptors/TestGraphDescriptorReduction.cpp
@@ -79,6 +84,15 @@ add_executable(
     descriptors/TestSdpaFwdOperationDescriptor.cpp
     descriptors/TestSdpaFwdOperationFromNode.cpp
     descriptors/TestGraphDescriptorSdpaBwd.cpp
+=======
+    descriptors/TestRMSNormOperationDescriptor.cpp
+    descriptors/TestRMSNormOperationFromNode.cpp
+    descriptors/TestSdpaBpropOperationDescriptor.cpp
+    descriptors/TestSdpaBpropOperationFromNode.cpp
+    descriptors/TestSdpaFpropOperationDescriptor.cpp
+    descriptors/TestSdpaFpropOperationFromNode.cpp
+    descriptors/TestGraphDescriptorSdpaBprop.cpp
+>>>>>>> d9e199e220 (merge b-shi branch)
     descriptors/TestDescriptorAttributeUtils.cpp
     descriptors/TestDataTypeConversion.cpp
     descriptors/TestDescriptorFromFlatBuffer.cpp

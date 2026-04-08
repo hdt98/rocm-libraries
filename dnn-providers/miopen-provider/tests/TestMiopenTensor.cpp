@@ -3,7 +3,11 @@
 
 #include "MiopenTensor.hpp"
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_plugin_sdk/PluginException.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 
@@ -52,8 +56,12 @@ TEST(TestMiopenTensor, ConstructorWithDimsAndStridesSucceeds)
     const std::vector<int64_t> strides = {static_cast<int64_t>(16) * 224, 224, 1};
 
     EXPECT_NO_THROW({
+<<<<<<< HEAD
         MiopenTensor tensor(
             UID, hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, dims, strides);
+=======
+        MiopenTensor tensor(UID, hipdnn_data_sdk::data_objects::DataType::FLOAT, dims, strides);
+>>>>>>> d9e199e220 (merge b-shi branch)
         EXPECT_NE(tensor.tensorDescriptor(), nullptr);
     });
 }
@@ -64,9 +72,14 @@ TEST(TestMiopenTensor, ConstructorThrowsOnDimsStridesSizeMismatch)
     const std::vector<int64_t> dims = {2, 16, 224};
     const std::vector<int64_t> strides = {224, 1}; // Wrong size
 
+<<<<<<< HEAD
     EXPECT_THROW(
         MiopenTensor(UID, hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, dims, strides),
         hipdnn_plugin_sdk::HipdnnPluginException);
+=======
+    EXPECT_THROW(MiopenTensor(UID, hipdnn_data_sdk::data_objects::DataType::FLOAT, dims, strides),
+                 hipdnn_plugin_sdk::HipdnnPluginException);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestMiopenTensor, ConstructorThrowsOnNegativeDimension)
@@ -75,9 +88,14 @@ TEST(TestMiopenTensor, ConstructorThrowsOnNegativeDimension)
     const std::vector<int64_t> dims = {2, -16, 224}; // Negative dimension
     const std::vector<int64_t> strides = {static_cast<int64_t>(16) * 224, 224, 1};
 
+<<<<<<< HEAD
     EXPECT_THROW(
         MiopenTensor(UID, hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, dims, strides),
         hipdnn_plugin_sdk::HipdnnPluginException);
+=======
+    EXPECT_THROW(MiopenTensor(UID, hipdnn_data_sdk::data_objects::DataType::FLOAT, dims, strides),
+                 hipdnn_plugin_sdk::HipdnnPluginException);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestMiopenTensor, ConstructorThrowsOnNegativeStride)
@@ -87,9 +105,14 @@ TEST(TestMiopenTensor, ConstructorThrowsOnNegativeStride)
     const std::vector<int64_t> strides
         = {static_cast<int64_t>(16) * 224, -224, 1}; // Negative stride
 
+<<<<<<< HEAD
     EXPECT_THROW(
         MiopenTensor(UID, hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, dims, strides),
         hipdnn_plugin_sdk::HipdnnPluginException);
+=======
+    EXPECT_THROW(MiopenTensor(UID, hipdnn_data_sdk::data_objects::DataType::FLOAT, dims, strides),
+                 hipdnn_plugin_sdk::HipdnnPluginException);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestMiopenTensor, ConstructorSetsCorrectUid)
@@ -99,7 +122,11 @@ TEST(TestMiopenTensor, ConstructorSetsCorrectUid)
     const std::vector<int64_t> strides = {16, 1};
 
     MiopenTensor tensor(
+<<<<<<< HEAD
         EXPECTED_UID, hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, dims, strides);
+=======
+        EXPECTED_UID, hipdnn_data_sdk::data_objects::DataType::FLOAT, dims, strides);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     EXPECT_EQ(tensor.uid(), EXPECTED_UID);
 }

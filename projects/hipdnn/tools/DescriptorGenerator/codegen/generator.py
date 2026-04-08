@@ -50,6 +50,10 @@ class DescriptorGenerator:
             "fragments/operation_type_enum.j2": "operation_type_enum.txt",
             "fragments/node_unpack_override.j2": "node_unpack_override.txt",
             "fragments/packer_name_addition.j2": "packer_name_addition.txt",
+<<<<<<< HEAD
+=======
+            "fragments/packer_name_test.j2": "packer_name_test.txt",
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
 
         fragments_dir = output_dir / "fragments"
@@ -328,6 +332,10 @@ class DescriptorGenerator:
         fragment_templates = {
             "fragments/graph_method.j2": "graph_method.txt",
             "fragments/graph_includes.j2": "graph_includes.txt",
+<<<<<<< HEAD
+=======
+            "fragments/deserialize_case.j2": "deserialize_case.txt",
+>>>>>>> d9e199e220 (merge b-shi branch)
             "fragments/frontend_cmake_entries.j2": "frontend_cmake_entries.txt",
             "fragments/node_type_enum.j2": "node_type_enum.txt",
         }

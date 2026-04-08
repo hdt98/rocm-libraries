@@ -64,7 +64,7 @@ class UserArgumentsInfo:
 
 def getSrcValueType(kernel, isTypeA):
     # special cases for F8 datatypes
-    tc='A' if isTypeA else 'B'
+    tc = 'A' if isTypeA else 'B'
     if kernel["ProblemType"]["MacDataType%s"%tc].isAnyFloat8():
         srcValueType = "FP8"
     elif kernel["ProblemType"]["MacDataType%s"%tc].isAnyBFloat8():
@@ -235,7 +235,6 @@ class SignatureDefault(Signature):
             signature.addArg("AddressScaleAlphaVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
             if kernel["ProblemType"]["UseScaleAlphaVec"] == 3:
                 userArgumentsInfo.factorDimSize =4
-
         userArgumentsInfo.scaleAlphaVecSize += 8
 
         if writer.states.useBias != DataDirection.NONE:

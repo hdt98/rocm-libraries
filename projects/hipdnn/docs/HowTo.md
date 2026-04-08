@@ -156,9 +156,12 @@ The code generator (`tools/DescriptorGenerator/`) produces backend descriptors, 
 
 #### Step 1: Define the FlatBuffer Schema
 
+<<<<<<< HEAD
 > [!NOTE]
 > The FBS schema is used by the **backend** and **Data SDK** for serialization and internal data representation. The frontend does not depend on FlatBuffers directly — it uses the backend C API descriptors to build and inspect operation graphs.
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 Start by defining the operation's data structures:
 
 1. **Create Attribute Schema**

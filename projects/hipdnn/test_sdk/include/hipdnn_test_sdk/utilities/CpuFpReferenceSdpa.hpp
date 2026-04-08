@@ -114,6 +114,7 @@ public:
                 "CpuFpReferenceSdpa: numHeads must be divisible by numHeadsK");
         }
 
+<<<<<<< HEAD
         // Validate LSE tensor if provided
         if(lse != nullptr)
         {
@@ -130,6 +131,10 @@ public:
                     + std::to_string(lse->dims()[2]) + "]");
             }
         }
+=======
+        const auto headsPerHeadK = numHeads / numHeadsK;
+        const auto headsPerHeadV = numHeads / numHeadsV;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         const auto headsPerHeadK = numHeads / numHeadsK;
         const auto headsPerHeadV = numHeads / numHeadsV;
@@ -155,9 +160,14 @@ public:
                 auto dot = static_cast<ComputeDataType>(0.0);
                 for(int64_t d = 0; d < headDim; ++d)
                 {
+<<<<<<< HEAD
                     dot += static_cast<ComputeDataType>(
                                q.getHostValue(std::vector<int64_t>{b, h, sq, d}))
                            * static_cast<ComputeDataType>(
+=======
+                    dot += static_cast<float>(q.getHostValue(std::vector<int64_t>{b, h, sq, d}))
+                           * static_cast<float>(
+>>>>>>> d9e199e220 (merge b-shi branch)
                                k.getHostValue(std::vector<int64_t>{b, kvHeadK, skv, d}));
                 }
                 scores[static_cast<size_t>(skv)] = dot * scale;
@@ -216,7 +226,11 @@ public:
                 for(int64_t skv = 0; skv < seqKv; ++skv)
                 {
                     acc += probs[static_cast<size_t>(skv)]
+<<<<<<< HEAD
                            * static_cast<ComputeDataType>(
+=======
+                           * static_cast<float>(
+>>>>>>> d9e199e220 (merge b-shi branch)
                                v.getHostValue(std::vector<int64_t>{b, kvHeadV, skv, dv}));
                 }
                 o.setHostValue(hipdnn_test_sdk::detail::safeConvert<ODataType>(acc),

@@ -59,6 +59,7 @@ inline TargetType safeConvert(const SourceType& value)
         // For bfloat16/half, explicitly convert through float to avoid precision warnings
         // These types lack direct constructors from double, only from float
         return static_cast<TargetType>(static_cast<float>(value));
+<<<<<<< HEAD
     }
     else if constexpr(std::is_same_v<TargetType, fp4_e2m1> || std::is_same_v<TargetType, fp6_e2m3>
                       || std::is_same_v<TargetType, fp6_e3m2>
@@ -68,6 +69,8 @@ inline TargetType safeConvert(const SourceType& value)
     {
         // For FP8 types, convert through float
         return TargetType(static_cast<float>(value));
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
     else
     {

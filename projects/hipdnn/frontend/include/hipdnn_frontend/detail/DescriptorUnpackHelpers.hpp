@@ -332,7 +332,11 @@ template <typename T>
     // Restore pass-by-value scalar if present.
     bool isByValue = false;
     HIPDNN_CHECK_ERROR(getDescriptorAttrScalar(tensorDesc,
+<<<<<<< HEAD
                                                HIPDNN_ATTR_TENSOR_IS_BY_VALUE,
+=======
+                                               HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                                HIPDNN_TYPE_BOOLEAN,
                                                isByValue,
                                                "tensor is_by_value"));

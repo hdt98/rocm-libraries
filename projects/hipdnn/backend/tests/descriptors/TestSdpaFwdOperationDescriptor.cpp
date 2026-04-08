@@ -1081,7 +1081,11 @@ TEST_F(TestSdpaFwdOperationDescriptor, ToStringContainsExpectedInfo)
     auto desc = getDescriptor();
 
     const std::string str = desc->toString();
+<<<<<<< HEAD:projects/hipdnn/backend/tests/descriptors/TestSdpaFwdOperationDescriptor.cpp
     ASSERT_NE(str.find("SdpaFwdOperationDescriptor"), std::string::npos);
+=======
+    ASSERT_NE(str.find("SdpaFpropOperationDescriptor"), std::string::npos);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/tests/descriptors/TestSdpaFpropOperationDescriptor.cpp
     ASSERT_NE(str.find("q_uid=" + std::to_string(K_SDPA_TENSOR_Q_UID)), std::string::npos);
     ASSERT_NE(str.find("k_uid=" + std::to_string(K_SDPA_TENSOR_K_UID)), std::string::npos);
     ASSERT_NE(str.find("v_uid=" + std::to_string(K_SDPA_TENSOR_V_UID)), std::string::npos);

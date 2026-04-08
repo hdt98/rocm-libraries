@@ -2,10 +2,17 @@
 // SPDX-License-Identifier:  MIT
 
 #include "HipKernelEngine.hpp"
+<<<<<<< HEAD
 #include "hipdnn_flatbuffers_sdk/flatbuffer_utilities/EngineConfigWrapper.hpp"
 
 #include <hipdnn_data_sdk/logging/Logger.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
+=======
+#include "hipdnn_data_sdk/flatbuffer_utilities/EngineConfigWrapper.hpp"
+
+#include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
+#include <hipdnn_data_sdk/logging/Logger.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_plugin_sdk/KnobFactory.hpp>
 
 namespace hip_kernel_provider
@@ -22,15 +29,23 @@ int64_t HipKernelEngine::id() const
 }
 
 void initializeHipKernelSettings(
+<<<<<<< HEAD
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig&
         engineConfig,
+=======
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
     [[maybe_unused]] HipKernelSettings& executionSettings)
 {
 }
 
 bool HipKernelEngine::isApplicable(
+<<<<<<< HEAD
     HipKernelHandle& handle,
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const
+=======
+    HipKernelHandle& handle, const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     // This is wrong if we ever have more than 1 plan builder thats applicable.
     // If this is the case, we should split plan builders accross multiple engines.
@@ -44,6 +59,7 @@ bool HipKernelEngine::isApplicable(
     return false;
 }
 
+<<<<<<< HEAD
 void HipKernelEngine::getDetails(
     HipKernelHandle& handle,
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
@@ -52,6 +68,15 @@ void HipKernelEngine::getDetails(
     flatbuffers::FlatBufferBuilder builder;
 
     std::vector<flatbuffers::Offset<hipdnn_flatbuffers_sdk::data_objects::Knob>> knobsVector;
+=======
+void HipKernelEngine::getDetails(HipKernelHandle& handle,
+                                 const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+                                 hipdnnPluginConstData_t& detailsOut) const
+{
+    flatbuffers::FlatBufferBuilder builder;
+
+    std::vector<flatbuffers::Offset<hipdnn_data_sdk::data_objects::Knob>> knobsVector;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Collect custom knobs from plan builders
     for(const auto& planBuilder : _planBuilders)
@@ -65,7 +90,11 @@ void HipKernelEngine::getDetails(
 
         for(const auto& knobT : customKnobs)
         {
+<<<<<<< HEAD
             auto knobOffset = hipdnn_flatbuffers_sdk::data_objects::Knob::Pack(builder, &knobT);
+=======
+            auto knobOffset = hipdnn_data_sdk::data_objects::Knob::Pack(builder, &knobT);
+>>>>>>> d9e199e220 (merge b-shi branch)
             knobsVector.push_back(knobOffset);
         }
 
@@ -76,8 +105,12 @@ void HipKernelEngine::getDetails(
 
     auto knobs = builder.CreateVector(knobsVector);
 
+<<<<<<< HEAD
     auto engineDetails
         = hipdnn_flatbuffers_sdk::data_objects::CreateEngineDetails(builder, _id, knobs);
+=======
+    auto engineDetails = hipdnn_data_sdk::data_objects::CreateEngineDetails(builder, _id, knobs);
+>>>>>>> d9e199e220 (merge b-shi branch)
     builder.Finish(engineDetails);
     auto detachedBuffer = std::make_unique<flatbuffers::DetachedBuffer>(builder.Release());
     detailsOut.ptr = detachedBuffer->data();
@@ -88,8 +121,13 @@ void HipKernelEngine::getDetails(
 
 size_t HipKernelEngine::getMaxWorkspaceSize(
     const HipKernelHandle& handle,
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig& engineConfig) const
+=======
+    const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+    const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig) const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     HipKernelSettings baseExecutionSettings;
     initializeHipKernelSettings(engineConfig, baseExecutionSettings);
@@ -111,8 +149,13 @@ size_t HipKernelEngine::getMaxWorkspaceSize(
 
 void HipKernelEngine::initializeExecutionContext(
     const HipKernelHandle& handle,
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+=======
+    const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+    const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipKernelContext& executionContext) const
 {
     HipKernelSettings executionSettings;

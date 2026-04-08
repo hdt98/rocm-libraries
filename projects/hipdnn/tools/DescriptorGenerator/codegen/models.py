@@ -19,7 +19,11 @@ class EnumValue:
 
     Attributes:
         name: Backend C-API suffix appended to ``EnumDef.backend_prefix``
+<<<<<<< HEAD
             (e.g., ``"CROSS_CORRELATION"`` → ``HIPDNN_CROSS_CORRELATION``).
+=======
+            (e.g., ``"CROSS_CORRELATION"`` → ``HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION``).
+>>>>>>> d9e199e220 (merge b-shi branch)
         value: Numeric value in the backend C-API enum typedef.
         sentinel: If True, this value (typically UNSET/NOT_SET) is excluded from the
             backend C-API enum but appears as ``NOT_SET = 0`` in the frontend enum class.
@@ -332,6 +336,7 @@ class DataField:
 
 
 @dataclass
+<<<<<<< HEAD
 class DataFieldsHelper:
     """Configuration for shared data field packing/unpacking helpers.
 
@@ -346,6 +351,8 @@ class DataFieldsHelper:
 
 
 @dataclass
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 class TensorArrayField:
     """A tensor array field (e.g., peer_stats_tensor_uid: [long])."""
 
@@ -379,7 +386,10 @@ class TestData:
     tensor_configs: dict[str, TensorConfig] = field(default_factory=dict)
     field_values: dict[str, list] = field(default_factory=dict)
     constants_include: str = ""
+<<<<<<< HEAD
     tensor_const_prefix: Optional[str] = None
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 
 @dataclass
@@ -548,8 +558,11 @@ class OperationConfig:
     data_fields: list[DataField] = field(default_factory=list)
     tensor_array_fields: list[TensorArrayField] = field(default_factory=list)
 
+<<<<<<< HEAD
     data_fields_helper: Optional[DataFieldsHelper] = None
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
     has_compute_data_type: bool = True
     compute_data_type_attr: str = ""
     compute_data_type_shared: bool = False
@@ -913,12 +926,18 @@ class OperationConfig:
     def tensor_const_prefix(self) -> str:
         """Prefix for tensor constant names.
 
+<<<<<<< HEAD
         Returns the explicit override from test_data if set, otherwise
         'K_' for pre-existing constants headers (backward compatible),
         'K_{NAME}_' for new operations (avoids collisions).
         """
         if self.test_data and self.test_data.tensor_const_prefix:
             return self.test_data.tensor_const_prefix
+=======
+        Returns 'K_' for pre-existing constants headers (backward compatible),
+        'K_{NAME}_' for new operations (avoids collisions).
+        """
+>>>>>>> d9e199e220 (merge b-shi branch)
         if self.test_data and self.test_data.constants_include:
             return "K_"
         return f"K_{self.name.upper()}_"

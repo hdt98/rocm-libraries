@@ -79,8 +79,17 @@ set(__clang_cxx_compile_options
     -Wno-documentation
     -Wno-enum-constexpr-conversion
     -Wno-unused-parameter
+<<<<<<< HEAD
     -Wmissing-noreturn)
 
+=======
+    -Wmissing-noreturn
+    -Wno-nrvo
+    -Wno-lifetime-safety
+    -Wno-lifetime-safety-suggestion
+    -Wno-lifetime-safety-intra-tu-suggestions
+    -Wno-lifetime-safety-cross-tu-suggestions)
+>>>>>>> d9e199e220 (merge b-shi branch)
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19")
     list(APPEND __clang_cxx_compile_options
         -Wno-unique-object-duplication

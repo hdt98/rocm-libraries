@@ -917,139 +917,39 @@ namespace rocisa
                             float bpe,
                             const std::string&  comment = "");
 
-    template<typename DST, typename SRC>
+    // Multiply by bpe (bytes per element)
+    // Handles fractional bpe values like 0.5, 0.75 for sub-byte data types
+    // product vgpr, operand vgpr, bpe
     std::shared_ptr<Module>
-        vectorMultiplyBpe(DST dst,
-                          SRC src,
-                          float bpe,
-                          const std::string&  comment     = "")
-    {
-        auto module = std::make_shared<Module>("vectorMultiplyBpe");
-        std::string mcomment = comment + " (multiple bpe)";
-        auto dstVgpr  = vgpr(dst);
-        auto srcVgpr  = vgpr(src);
-        if (bpe == 0.5) {
-            module->addT<VLShiftRightB32>(dstVgpr, 1, srcVgpr, mcomment);
-        } else if (bpe == 0.75) {
-            module->addT<VMulLOU32>(dstVgpr, 6, srcVgpr, mcomment);
-            module->addT<VLShiftRightB32>(dstVgpr, 3, dstVgpr, mcomment);
-        } else {
-            int bpe_log2 = static_cast<int>(std::log2(bpe));
-            std::string dst_str = to_string_flexible<DST>(dst);
-            std::string src_str = to_string_flexible<SRC>(src);
-            if ((bpe_log2 == 0) && (dst_str == src_str)) {
-                module->addCommentAlign(comment + " (bpe is 1, do nothing)");
-            } else {
-                module->addT<VLShiftLeftB32>(dstVgpr, bpe_log2, srcVgpr, mcomment);
-            }
-        }
-        return module;
-    }
+        vectorMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                          const std::shared_ptr<RegisterContainer>& operand,
+                          double                                    bpe,
+                          const std::string&                        comment = "");
 
-    template<typename DST, typename SRC, typename TMP>
+    // Multiply by bpe for 64-bit
+    // product vgpr, operand vgpr, bpe, tmpVgpr for 0.75 case
     std::shared_ptr<Module>
-        vectorMultiply64Bpe(DST dst,
-                            SRC src,
-                            float bpe,
-                            TMP tmp,
-                            const std::string&  comment     = "")
-    {
-        auto module = std::make_shared<Module>("vectorMultiply64Bpe");
-        std::string mcomment = comment + " (multiple bpe)";
-        auto dstVgpr  = vgpr(dst, 2);
-        auto srcVgpr  = vgpr(src, 2);
-        auto tmpVgpr  = vgpr(tmp);
-        if (bpe == 0.5) {
-            module->addT<VLShiftRightB64>(dstVgpr, 1, srcVgpr, mcomment);
-        } else if (bpe == 0.75) {
-            auto dstVgpr0 = vgpr(dst);
-            auto dstVgpr1 = getVgpr(dst,1);
-            auto srcVgpr0 = vgpr(src);
-            auto srcVgpr1 = getVgpr(src,1);
-            module->addT<VMovB32>(tmpVgpr, srcVgpr1, std::nullopt, mcomment);
-            module->addT<VMulHIU32>(dstVgpr1, 6, srcVgpr0, mcomment);
-            module->addT<VMulLOU32>(dstVgpr0, 6, srcVgpr0, mcomment);
-            module->addT<VMulLOU32>(tmpVgpr, 6, tmpVgpr, mcomment);
-            module->addT<VAddU32>(dstVgpr1, dstVgpr1, tmpVgpr, mcomment);
-            module->addT<VLShiftRightB64>(dstVgpr, 3, dstVgpr, mcomment);
-        } else {
-            int bpe_log2 = static_cast<int>(std::log2(bpe));
-            std::string dst_str = to_string_flexible<DST>(dst);
-            std::string src_str = to_string_flexible<SRC>(src);
-            if ((bpe_log2 == 0) && (dst_str == src_str)) {
-                module->addCommentAlign(comment + " (bpe is 1, do nothing)");
-            } else {
-                module->addT<VLShiftLeftB64>(dstVgpr, bpe_log2, srcVgpr, mcomment);
-            }
-        }
-        return module;
-    }
+        vectorMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpVgprRes = std::nullopt,
+                            const std::string&                        comment    = "");
 
-    template<typename DST, typename SRC>
+    // Scalar multiply by bpe (bytes per element)
+    // Handles fractional bpe values like 0.5, 0.75 for sub-byte data types
+    // product sgpr, operand sgpr, bpe
     std::shared_ptr<Module>
-        scalarMultiplyBpe(DST dst,
-                          SRC src,
-                          float bpe,
-                          const std::string&  comment     = "")
-    {
-        auto module = std::make_shared<Module>("scalarMultiplyBpe");
-        std::string mcomment = comment + " (multiple bpe)";
-        auto dstSgpr = sgpr(dst);
-        auto srcSgpr = sgpr(src);
-        if (bpe == 0.5) {
-            module->addT<SLShiftRightB32>(dstSgpr, 1, srcSgpr, mcomment);
-        } else if (bpe == 0.75) {
-            module->addT<SMulI32>(dstSgpr, 6, srcSgpr, mcomment);
-            module->addT<SLShiftRightB32>(dstSgpr, 3, dstSgpr, mcomment);
-        } else {
-            int bpe_log2 = static_cast<int>(std::log2(bpe));
-            std::string dst_str = to_string_flexible<DST>(dst);
-            std::string src_str = to_string_flexible<SRC>(src);
-            if ((bpe_log2 == 0) && (dst_str == src_str)) {
-                module->addCommentAlign(comment + " (bpe is 1, do nothing)");
-            } else {
-                module->addT<SLShiftLeftB32>(dstSgpr, bpe_log2, srcSgpr, mcomment);
-            }
-        }
-        return module;
-    }
+        scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
+                          const std::shared_ptr<RegisterContainer>& operand,
+                          double                                    bpe,
+                          const std::string&                        comment = "");
 
-    template<typename DST, typename SRC, typename TMP>
+    // Scalar multiply by bpe for 64-bit
+    // product sgpr, operand sgpr, bpe, tmpSgpr for 0.75 case
     std::shared_ptr<Module>
-        scalarMultiply64Bpe(DST dst,
-                            SRC src,
-                            float bpe,
-                            TMP tmp,
-                            const std::string&  comment     = "")
-    {
-        auto module = std::make_shared<Module>("scalarMultiply64Bpe");
-        std::string mcomment = comment + " (multiple bpe)";
-        auto dstSgpr = sgpr(dst, 2);
-        auto srcSgpr = sgpr(src, 2);
-        auto tmpSgpr = sgpr(tmp);
-        if (bpe == 0.5) {
-            module->addT<SLShiftRightB64>(dstSgpr, 1, srcSgpr, mcomment);
-        } else if (bpe == 0.75) {
-            auto dstSgpr0 = sgpr(dst);
-            auto dstSgpr1 = getSgpr(dst,1);
-            auto srcSgpr0 = sgpr(src);
-            auto srcSgpr1 = getSgpr(src,1);
-            module->addT<SMovB32>(tmpSgpr, srcSgpr1, mcomment);
-            module->addT<SMulHIU32>(dstSgpr1, 6, srcSgpr0, mcomment);
-            module->addT<SMulI32>(dstSgpr0, 6, srcSgpr0, mcomment);
-            module->addT<SMulI32>(tmpSgpr, 6, tmpSgpr, mcomment);
-            module->addT<SAddU32>(dstSgpr1, dstSgpr1, tmpSgpr, mcomment);
-            module->addT<SLShiftRightB64>(dstSgpr, 3, dstSgpr, mcomment);
-        } else {
-            int bpe_log2 = static_cast<int>(std::log2(bpe));
-            std::string dst_str = to_string_flexible<DST>(dst);
-            std::string src_str = to_string_flexible<SRC>(src);
-            if ((bpe_log2 == 0) && (dst_str == src_str)) {
-                module->addCommentAlign(comment + " (bpe is 1, do nothing)");
-            } else {
-                module->addT<SLShiftLeftB64>(dstSgpr, bpe_log2, srcSgpr, mcomment);
-            }
-        }
-        return module;
-    }
+        scalarMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
+                            const std::shared_ptr<RegisterContainer>& operand,
+                            double                                    bpe,
+                            const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
+                            const std::string&                        comment    = "");
 } // namespace rocisa

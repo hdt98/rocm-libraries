@@ -182,7 +182,11 @@ Handle destruction (implicit via RAII)
          -> Backend: hipdnnBackendSetAttribute(engine, ENGINE_ID, engineId)
          -> Backend: hipdnnBackendFinalize(engine)
             -> Plugin: hipdnnEnginePluginGetEngineDetails(handle, engineId, graph, details*)
+<<<<<<< HEAD
       -> detail::unpackKnobsFromDescriptors(engineDesc, knobs)
+=======
+      -> detail::getKnobsForEngine(knobs, engineDesc)
+>>>>>>> d9e199e220 (merge b-shi branch)
          -> Backend: hipdnnBackendGetAttribute(engine, KNOB_INFO, ...)
 
 ``get_ranked_engine_ids()``

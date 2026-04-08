@@ -88,11 +88,16 @@ public:
             return;
         }
 
+<<<<<<< HEAD
         {
             const std::lock_guard<std::mutex> lock(_logsMutex);
             _recordedLogs.push_back({severity, message});
         }
         _cvLogRecorded.notify_all();
+=======
+        const std::lock_guard<std::mutex> lock(_logsMutex);
+        _recordedLogs.push_back({severity, message});
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     void clearLogs()
@@ -377,6 +382,7 @@ public:
         LogRecording::instance(_recordingId).clearLogs();
     }
 
+<<<<<<< HEAD
     /**
      * @brief Wait until log count reaches target, with timeout
      * @param targetCount The target log count to wait for
@@ -388,6 +394,8 @@ public:
         return LogRecording::instance(_recordingId).waitForLogCount(targetCount, timeout);
     }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 protected:
     /**
      * @brief Protected constructor - use factory methods in derived classes

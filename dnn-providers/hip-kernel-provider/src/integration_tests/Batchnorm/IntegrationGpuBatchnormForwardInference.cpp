@@ -14,6 +14,7 @@
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 using namespace hipdnn_data_sdk::utilities;
+<<<<<<< HEAD
 using namespace hipdnn_test_sdk::utilities::batchnorm;
 using namespace hip_kernel_provider::test_utilities;
 
@@ -21,6 +22,11 @@ namespace hip_kernel_provider::batchnorm::test
 {
 
 using namespace common;
+=======
+using namespace hipdnn_test_sdk::utilities;
+using namespace hip_kernel_provider::test_utilities;
+using namespace hip_kernel_provider::test_bn_common;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 namespace
 {
@@ -122,7 +128,11 @@ using IntegrationGpuBatchnormForwardInferenceNdhwcFp16 = BatchnormForwardInferen
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNchwFp32, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<float>(), TensorLayout::NCHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NCHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -139,7 +149,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNchwBfp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NCHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NCHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -156,7 +170,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNchwFp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<half>(), TensorLayout::NCHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NCHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -173,7 +191,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNhwcFp32, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<float>(), TensorLayout::NHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -190,7 +212,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNhwcBfp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -207,7 +233,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNhwcFp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<half>(), TensorLayout::NHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -224,7 +254,11 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNcdhwFp32, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<float>(), TensorLayout::NCDHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NCDHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -237,7 +271,11 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNcdhwBfp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NCDHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NCDHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -250,7 +288,11 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNcdhwFp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<half>(), TensorLayout::NCDHW);
+=======
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NCDHW);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -263,7 +305,11 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNdhwcFp32, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<float>(), TensorLayout::NDHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NDHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -276,7 +322,11 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNdhwcBfp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NDHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NDHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -289,10 +339,17 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceNdhwcFp16, Correctness)
 {
+<<<<<<< HEAD
     runGraphTest(getToleranceInference<half>(), TensorLayout::NDHWC);
+=======
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NDHWC);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          IntegrationGpuBatchnormForwardInferenceNdhwcFp16,
                          testing::ValuesIn(getBnFwdInference3dTestCases()));
+<<<<<<< HEAD
 } // namespace hip_kernel_provider::batchnorm::test
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)

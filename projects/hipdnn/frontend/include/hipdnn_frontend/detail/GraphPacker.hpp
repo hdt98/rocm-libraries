@@ -17,8 +17,14 @@
 namespace hipdnn_frontend::detail
 {
 
+<<<<<<< HEAD
 /// Assembles a GraphDescriptor from pre-built operation descriptors without
 /// setting a handle or finalizing. Unset data types are skipped.
+=======
+// Assembles a GraphDescriptor from pre-built operation descriptors.
+// Sets the handle, operations, graph-level data types, preferred engine ID,
+// graph name, then finalizes and returns the scoped descriptor.
+>>>>>>> d9e199e220 (merge b-shi branch)
 inline Error assembleGraphDescriptor(const std::vector<ScopedHipdnnBackendDescriptor>& operations,
                                      std::optional<hipdnnDataType_t> computeDataType,
                                      std::optional<hipdnnDataType_t> intermediateDataType,
@@ -33,6 +39,18 @@ inline Error assembleGraphDescriptor(const std::vector<ScopedHipdnnBackendDescri
         return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to create GraphDescriptor"};
     }
 
+<<<<<<< HEAD
+=======
+    // Set handle on graph
+    HIPDNN_RETURN_ON_BACKEND_FAILURE(
+        hipdnnBackend()->backendSetAttribute(graphDesc.get(),
+                                             HIPDNN_ATTR_OPERATIONGRAPH_HANDLE,
+                                             HIPDNN_TYPE_HANDLE,
+                                             1,
+                                             static_cast<const void*>(&handle)),
+        "Failed to set handle on GraphDescriptor");
+
+>>>>>>> d9e199e220 (merge b-shi branch)
     // Set operations on graph
     std::vector<hipdnnBackendDescriptor_t> opDescPtrs;
     opDescPtrs.reserve(operations.size());
@@ -95,6 +113,12 @@ inline Error assembleGraphDescriptor(const std::vector<ScopedHipdnnBackendDescri
         HIPDNN_CHECK_ERROR(setDescriptorAttrString(
             graphDesc.get(), HIPDNN_ATTR_OPERATIONGRAPH_NAME_EXT, name, "graph name"));
     }
+<<<<<<< HEAD
+=======
+
+    // Finalize the graph
+    HIPDNN_CHECK_ERROR(finalizeDescriptor(graphDesc.get(), "GraphDescriptor"));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     outGraphDesc = std::make_unique<ScopedHipdnnBackendDescriptor>(std::move(graphDesc));
     return {};

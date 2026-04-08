@@ -6,7 +6,11 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/batchnorm_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/batchnorm_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -31,7 +35,11 @@ public:
                       const void* arrayOfElements) override;
 
     // Direct access to the underlying T struct for OperationGraphBuilder
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::data_objects::BatchnormAttributesT& getData() const
+=======
+    const hipdnn_data_sdk::data_objects::BatchnormAttributesT& getData() const
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         return _data;
     }
@@ -87,20 +95,32 @@ public:
     }
 
     // Get compute data type for the operation (used when building graph nodes)
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType getComputeDataType() const
+=======
+    hipdnn_data_sdk::data_objects::DataType getComputeDataType() const
+>>>>>>> d9e199e220 (merge b-shi branch)
     {
         return _computeDataType;
     }
 
     // IGraphOperation interface
     std::vector<std::shared_ptr<TensorDescriptor>> getTensorDescriptors() const override;
+<<<<<<< HEAD
     std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT> buildNode() const override;
+=======
+    std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT> buildNode() const override;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Creates a finalized BatchnormOperationDescriptor directly from a FlatBuffer NodeT.
     // Casts nodeT.attributes to BatchnormAttributesT internally, then directly assigns
     // the data struct, looks up tensor descriptors from the tensor map, and calls finalize().
     static std::shared_ptr<BatchnormOperationDescriptor>
+<<<<<<< HEAD
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
     static hipdnnBackendDescriptorType_t getStaticType();
@@ -108,7 +128,11 @@ public:
     std::string toString() const override;
 
 private:
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::BatchnormAttributesT _data;
+=======
+    hipdnn_data_sdk::data_objects::BatchnormAttributesT _data;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Required tensor descriptor references
     std::shared_ptr<TensorDescriptor> _xDesc;
@@ -130,8 +154,13 @@ private:
     std::vector<std::shared_ptr<TensorDescriptor>> _peerStatsDescs;
 
     // Compute data type for this operation (stored at node level in graph)
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType _computeDataType
         = hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET;
+=======
+    hipdnn_data_sdk::data_objects::DataType _computeDataType
+        = hipdnn_data_sdk::data_objects::DataType::UNSET;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::string _name;
 };

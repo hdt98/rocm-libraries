@@ -10,7 +10,10 @@
 #include <memory>
 #include <spdlog/fmt/fmt.h>
 #include <type_traits>
+<<<<<<< HEAD
 #include <vector>
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // NOLINTBEGIN(portability-template-virtual-member-function)
 
@@ -65,6 +68,11 @@ private:
 
     friend T;
 
+<<<<<<< HEAD
+=======
+    friend T;
+
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipdnnBackendDescriptorImpl()
         : _type(getStaticType())
     {

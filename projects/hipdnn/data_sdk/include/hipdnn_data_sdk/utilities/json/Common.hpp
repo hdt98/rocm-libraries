@@ -46,11 +46,14 @@ inline void to_json(nlohmann::json& json, const String* str)
     json = str->str();
 }
 
+<<<<<<< HEAD
 inline const char* safeStr(const String* s)
 {
     return s != nullptr ? s->c_str() : "";
 }
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 template <class T>
 // NOLINTNEXTLINE(readability-identifier-naming)
 void to_json(nlohmann::json& vectorList, const Vector<T>* vec)

@@ -10,16 +10,26 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/layernorm_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/layernorm_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/LayernormConstants.hpp>
 
 #include <memory>
 #include <vector>
 
 using namespace hipdnn_backend;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using namespace hipdnn_tests::constants;
 
 // =============================================================================
@@ -359,7 +369,11 @@ TEST_F(TestLayernormOperationFromNode, GetAttributeWorksAfterFromNode)
     hipdnnDataType_t computeType = {};
     int64_t dtCount = 0;
     desc->getAttribute(
+<<<<<<< HEAD
         HIPDNN_ATTR_LAYERNORM_COMP_TYPE_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &dtCount, &computeType);
+=======
+        HIPDNN_ATTR_LAYERNORM_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &dtCount, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     ASSERT_EQ(computeType, HIPDNN_DATA_FLOAT);
 
     // Verify forward phase
@@ -370,7 +384,11 @@ TEST_F(TestLayernormOperationFromNode, GetAttributeWorksAfterFromNode)
                        1,
                        &fwdCount,
                        &fwdPhase);
+<<<<<<< HEAD
     ASSERT_EQ(fwdPhase, HIPDNN_NORM_FWD_TRAINING);
+=======
+    ASSERT_EQ(fwdPhase, HIPDNN_NORM_FWD_PHASE_TRAINING);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify normalized dim count
     int64_t normalizedDimCount = 0;
@@ -415,12 +433,20 @@ TEST_F(TestLayernormOperationFromNode, GetAttributeWorksAfterFromNode)
     EXPECT_EQ(yUid, K_LAYERNORM_TENSOR_Y_UID);
 
     // Verify operation type
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t opTypeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType);
     ASSERT_EQ(opTypeCount, 1);
+<<<<<<< HEAD
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_LAYERNORM_EXT);
+=======
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_LAYERNORM);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestLayernormOperationFromNode, NamePreservedFromNode)

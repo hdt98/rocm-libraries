@@ -82,8 +82,14 @@ public:
             detail::validateTensorShapesMatchIfSet(x, y, "Input tensor (x)", "Output tensor (y)"));
 
         // SECTION 4: Validate Channel Dimensions and Scale Tensor Shape
+<<<<<<< HEAD
         // Scale is per-channel with shape [1, C, D, H, ...]
         HIPDNN_CHECK_ERROR(detail::validateNonBatchShapeMatch(scale, x, "Scale tensor"));
+=======
+        // Scale is per-channel with shape [1, C, 1, 1, ...]
+        auto& xDims = x->get_dim();
+        const int64_t channels = xDims[1];
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         // Validate optional bias tensor (per-channel with shape [1, C, D, H, ...])
         auto bias = attributes.get_bias();

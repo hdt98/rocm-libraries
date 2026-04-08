@@ -9,6 +9,7 @@ add_library(
     HipKernelPluginPublic.cpp
     HipKernelUtils.cpp
     engines/HipKernelEngine.cpp
+<<<<<<< HEAD
     hip/HipKernel.cpp
     hip/HipProgram.cpp
     ${KERNEL_GENERATED_SOURCES}
@@ -39,6 +40,25 @@ target_include_directories(hip_kernel_provider_impl PUBLIC
 )
 dnn_provider_generate_version_header(hip_kernel_provider hip_kernel_provider_impl ${CMAKE_CURRENT_LIST_DIR}/..)
 target_link_libraries(hip_kernel_provider_impl PUBLIC hip::host hipdnn_data_sdk hipdnn_flatbuffers_sdk hipdnn_plugin_sdk hiprtc::hiprtc)
+=======
+    hip/HipProgram.cpp
+    hip/HipKernel.cpp
+    ${KERNEL_GENERATED_SOURCES}
+    engines/plans/BatchnormPlanBuilder.cpp
+    engines/plans/BatchnormFwdInferencePlan.cpp
+    engines/plans/BatchnormFwdInferenceWithVariancePlan.cpp
+    engines/plans/BatchnormApplicabilityChecks.cpp
+    engines/plans/RMSnorm/RMSnormPlanBuilder.cpp
+    engines/plans/RMSnorm/RMSnormFwdPlan.cpp
+    engines/plans/RMSnorm/RMSnormApplicabilityChecks.cpp
+)
+target_include_directories(hip_kernel_provider_impl PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_BINARY_DIR}
+    ${CMAKE_CURRENT_BINARY_DIR}/../kernels
+)
+target_link_libraries(hip_kernel_provider_impl PUBLIC hip::host hipdnn_data_sdk hipdnn_plugin_sdk hiprtc::hiprtc)
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 target_compile_options(hip_kernel_provider_impl PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 set_target_properties(hip_kernel_provider_impl PROPERTIES
@@ -50,6 +70,7 @@ add_clang_tidy_custom_target()
 
 # Static library for unit tests to link against (provides access to internal implementation)
 add_library(hip_kernel_provider_private STATIC $<TARGET_OBJECTS:hip_kernel_provider_impl>)
+<<<<<<< HEAD
 target_include_directories(hip_kernel_provider_private PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/include
@@ -67,6 +88,19 @@ if(NOT WIN32)
     target_link_libraries(hip_kernel_provider PRIVATE "-Xlinker --exclude-libs=ALL")
 endif()
 
+=======
+target_include_directories(hip_kernel_provider_private PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(hip_kernel_provider_private PUBLIC hipdnn_data_sdk hipdnn_plugin_sdk hiprtc::hiprtc)
+
+# hip_kernel_provider - SHARED library (the actual plugin)
+add_library(hip_kernel_provider SHARED $<TARGET_OBJECTS:hip_kernel_provider_impl>)
+target_link_libraries(hip_kernel_provider PRIVATE hipdnn_data_sdk hipdnn_plugin_sdk hiprtc::hiprtc hip::host)
+
+if(NOT WIN32)
+    target_link_libraries(hip_kernel_provider PRIVATE "-Xlinker --exclude-libs=ALL")
+endif()
+
+>>>>>>> d9e199e220 (merge b-shi branch)
 target_compile_options(hip_kernel_provider PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
 set_target_properties(
     hip_kernel_provider

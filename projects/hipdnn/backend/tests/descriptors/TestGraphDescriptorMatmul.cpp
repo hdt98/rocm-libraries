@@ -41,6 +41,7 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
     auto wrapper = createDescriptor<MatmulOperationDescriptor>();
     auto desc = wrapper->asDescriptor<MatmulOperationDescriptor>();
 
+<<<<<<< HEAD
     desc->setAttribute(HIPDNN_ATTR_OPERATION_MATMUL_ADESC,
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
@@ -54,6 +55,21 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
                        1,
                        static_cast<const void*>(&cDesc));
     desc->setAttribute(HIPDNN_ATTR_MATMUL_COMP_TYPE, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+=======
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_MATMUL_A_EXT,
+                       HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                       1,
+                       static_cast<const void*>(&aDesc));
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_MATMUL_B_EXT,
+                       HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                       1,
+                       static_cast<const void*>(&bDesc));
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_MATMUL_C_EXT,
+                       HIPDNN_TYPE_BACKEND_DESCRIPTOR,
+                       1,
+                       static_cast<const void*>(&cDesc));
+    desc->setAttribute(HIPDNN_ATTR_MATMUL_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(!name.empty())
     {
         desc->setAttribute(HIPDNN_ATTR_OPERATION_NAME_EXT,

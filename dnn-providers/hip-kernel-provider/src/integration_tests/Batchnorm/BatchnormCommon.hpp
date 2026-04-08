@@ -10,7 +10,11 @@
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
 #include <hipdnn_test_sdk/utilities/Seeds.hpp>
 
+<<<<<<< HEAD
 namespace hip_kernel_provider::batchnorm::test::common
+=======
+namespace hip_kernel_provider::test_bn_common
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
 
 struct BatchnormTestCase
@@ -74,6 +78,7 @@ inline std::vector<BatchnormTestCase> getBnFwdInference3dTestCases()
     };
 }
 
+<<<<<<< HEAD
 inline std::vector<BatchnormTestCase> getBnFwdTrainingSmoke2dTestCases()
 {
     unsigned seed = hipdnn_test_sdk::utilities::getGlobalTestSeed();
@@ -118,3 +123,6 @@ inline std::vector<BatchnormTestCase> getBnFwdTrainingFull3dTestCases()
 }
 
 } // namespace hip_kernel_provider::batchnorm::test::common
+=======
+} // namespace hip_kernel_provider::test_bn_common
+>>>>>>> d9e199e220 (merge b-shi branch)

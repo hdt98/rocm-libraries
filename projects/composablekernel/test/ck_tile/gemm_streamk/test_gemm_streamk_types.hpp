@@ -18,6 +18,7 @@ using F32  = float;
 using Row = ck_tile::tensor_layout::gemm::RowMajor;
 using Col = ck_tile::tensor_layout::gemm::ColumnMajor;
 
+<<<<<<< HEAD
 // Persistence
 using Persistent    = std::true_type;
 using NonPersistent = std::false_type;
@@ -26,6 +27,14 @@ using NonPersistent = std::false_type;
 using Mem    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::Mem>;
 using CompV3 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV3>;
 using CompV4 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV4>;
+=======
+using Mem    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::Mem>;
+using CompV3 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV3>;
+using CompV4 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV4>;
+
+using Persistent    = std::true_type;
+using NonPersistent = std::false_type;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // Reduction Strategies
 using Atomic = ck_tile::integral_constant<ck_tile::StreamKReductionStrategy,
@@ -91,9 +100,73 @@ using KernelTypesStreamKFp8NonPersistentAtomicCompV3 = ::testing::Types<
     std::tuple<    Col,     Row,     Row,       F8,         F8,        F32,        F16,         I128,        I128,        I32,         I32,       I32,       I16,    NonPersistent,   CompV3,   Atomic>
 >;
 
+<<<<<<< HEAD
 // Linear
 using KernelTypesStreamKFp16PersistentLinearCompV3 = ::testing::Types<
 //                ALayout  BLayout  CLayout   ADataType  BDataType  AccDataType  CDataType  M_MacroTile  N_MacroTile  K_MacroTile  M_WaveTile  N_WaveTile  K_WaveTile  Persistent    Pipeline  ReductionStrategy
+=======
+// ========================== CompV4 Pipeline ==========================
+
+using KernelTypesStreamKFp16PersistentCompV4 = ::testing::Types<
+//                ALayout  BLayout  CLayout   ADataType  BDataType  AccDataType  CDataType  M_MacroTile  N_MacroTile  K_MacroTile  Persistent    Pipeline
+
+    std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     Persistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     Persistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     Persistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     Persistent,   CompV4>
+>;
+
+using KernelTypesStreamKBf16PersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    Persistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    Persistent,   CompV4>
+>;
+
+using KernelTypesStreamKBf8PersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    Persistent,   CompV4>
+>;
+
+using KernelTypesStreamKFp8PersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       F8,        F8,        F32,        F16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       F8,        F8,        F32,        F16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       F8,        F8,        F32,        F16,         I128,        I128,        I32,    Persistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       F8,        F8,        F32,        F16,         I128,        I128,        I32,    Persistent,   CompV4>
+>;
+
+using KernelTypesStreamKFp16NonPersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     NonPersistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     NonPersistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     NonPersistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,     NonPersistent,   CompV4>
+>;
+
+using KernelTypesStreamKBf16NonPersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       BF16,      BF16,        F32,       BF16,         I256,        I256,        I32,    NonPersistent,   CompV4>
+>;
+
+using KernelTypesStreamKBf8NonPersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,        BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,        BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,        BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,        BF8,      BF8,        F32,       BF16,         I128,        I128,        I32,    NonPersistent,   CompV4>
+>;
+
+using KernelTypesStreamKFp8NonPersistentCompV4 = ::testing::Types<
+    std::tuple<    Row,     Row,     Row,       F8,         F8,        F32,        F16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Row,     Col,     Row,       F8,         F8,        F32,        F16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Col,     Row,       F8,         F8,        F32,        F16,         I128,        I128,        I32,    NonPersistent,   CompV4>,
+    std::tuple<    Col,     Row,     Row,       F8,         F8,        F32,        F16,         I128,        I128,        I32,    NonPersistent,   CompV4>
+>;
+
+// ============================= Mem Pipeline =============================
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,         I32,       I32,       I16,     Persistent,   CompV3,   Linear>,
     std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,         I256,        I256,        I32,         I16,       I16,       I16,     Persistent,   CompV3,   Linear>,

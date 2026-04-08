@@ -380,6 +380,13 @@ void SdpaFwdOperationDescriptor::setAttribute(hipdnnBackendAttributeName_t attri
                   arrayOfElements,
                   "SdpaFwdOperationDescriptor::setAttribute()");
         break;
+    case HIPDNN_ATTR_OPERATION_NAME_EXT:
+        setString(_name,
+                  attributeType,
+                  elementCount,
+                  arrayOfElements,
+                  "SdpaFpropOperationDescriptor::setAttribute()");
+        break;
     default:
         throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
                               "SdpaFwdOperationDescriptor::setAttribute: attributeName not "
@@ -759,6 +766,22 @@ void SdpaFwdOperationDescriptor::getAttribute(hipdnnBackendAttributeName_t attri
                          arrayOfElements,
                          "SdpaFwdOperationDescriptor::getAttribute()");
         break;
+    case HIPDNN_ATTR_OPERATION_NAME_EXT:
+        getString(_name,
+                  attributeType,
+                  requestedElementCount,
+                  elementCount,
+                  arrayOfElements,
+                  "SdpaFpropOperationDescriptor::getAttribute()");
+        break;
+    case HIPDNN_ATTR_OPERATION_TYPE_EXT:
+        getOperationType(HIPDNN_OPERATION_TYPE_SDPA_FORWARD,
+                         attributeType,
+                         requestedElementCount,
+                         elementCount,
+                         arrayOfElements,
+                         "SdpaFpropOperationDescriptor::getAttribute()");
+        break;
     default:
         throw HipdnnException(HIPDNN_STATUS_NOT_SUPPORTED,
                               "SdpaFwdOperationDescriptor::getAttribute: attributeName not "
@@ -813,7 +836,11 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     auto node = std::make_unique<hipdnn_flatbuffers_sdk::data_objects::NodeT>();
     node->compute_data_type = _computeDataType;
     node->name = _name;
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.cpp
     node->attributes.Set(hipdnn_flatbuffers_sdk::data_objects::SdpaAttributesT(_data));
+=======
+    node->attributes.Set(hipdnn_data_sdk::data_objects::SdpaAttributesT(_data));
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.cpp
     return node;
 }
 
@@ -824,7 +851,11 @@ hipdnnBackendDescriptorType_t SdpaFwdOperationDescriptor::getStaticType()
 
 std::string SdpaFwdOperationDescriptor::toString() const
 {
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.cpp
     std::string str = "SdpaFwdOperationDescriptor: {";
+=======
+    std::string str = "SdpaFpropOperationDescriptor: {";
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.cpp
     str += "name=" + _name;
     str += ", q_uid=" + std::to_string(_data.q_tensor_uid);
     str += ", k_uid=" + std::to_string(_data.k_tensor_uid);
@@ -877,22 +908,34 @@ std::string SdpaFwdOperationDescriptor::toString() const
     return str;
 }
 
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.cpp
 std::shared_ptr<SdpaFwdOperationDescriptor> SdpaFwdOperationDescriptor::fromNode(
     const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+std::shared_ptr<SdpaFpropOperationDescriptor> SdpaFpropOperationDescriptor::fromNode(
+    const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.cpp
     const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     const auto* attrs = nodeT.attributes.AsSdpaAttributes();
     THROW_IF_NULL(attrs,
                   HIPDNN_STATUS_INTERNAL_ERROR,
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.cpp
                   "SdpaFwdOperationDescriptor::fromNode: SdpaAttributes is null");
 
     auto desc = std::make_shared<SdpaFwdOperationDescriptor>();
+=======
+                  "SdpaFpropOperationDescriptor::fromNode: SdpaAttributes is null");
+
+    auto desc = std::make_shared<SdpaFpropOperationDescriptor>();
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.cpp
     desc->_data = *attrs;
     desc->_computeDataType = nodeT.compute_data_type;
     desc->_name = nodeT.name;
 
     // Required tensors
     desc->_qDesc = findTensorInMap(
+<<<<<<< HEAD:projects/hipdnn/backend/src/descriptors/SdpaFwdOperationDescriptor.cpp
         tensorMap, attrs->q_tensor_uid, "SdpaFwdOperationDescriptor::fromNode: Q");
     desc->_kDesc = findTensorInMap(
         tensorMap, attrs->k_tensor_uid, "SdpaFwdOperationDescriptor::fromNode: K");
@@ -900,6 +943,15 @@ std::shared_ptr<SdpaFwdOperationDescriptor> SdpaFwdOperationDescriptor::fromNode
         tensorMap, attrs->v_tensor_uid, "SdpaFwdOperationDescriptor::fromNode: V");
     desc->_oDesc = findTensorInMap(
         tensorMap, attrs->o_tensor_uid, "SdpaFwdOperationDescriptor::fromNode: O");
+=======
+        tensorMap, attrs->q_tensor_uid, "SdpaFpropOperationDescriptor::fromNode: Q");
+    desc->_kDesc = findTensorInMap(
+        tensorMap, attrs->k_tensor_uid, "SdpaFpropOperationDescriptor::fromNode: K");
+    desc->_vDesc = findTensorInMap(
+        tensorMap, attrs->v_tensor_uid, "SdpaFpropOperationDescriptor::fromNode: V");
+    desc->_oDesc = findTensorInMap(
+        tensorMap, attrs->o_tensor_uid, "SdpaFpropOperationDescriptor::fromNode: O");
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/backend/src/descriptors/SdpaFpropOperationDescriptor.cpp
 
     // Optional tensors
     desc->_attnMaskDesc = findOptionalTensor(tensorMap, attrs->attn_mask_tensor_uid);

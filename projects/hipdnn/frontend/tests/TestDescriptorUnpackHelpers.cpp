@@ -111,9 +111,15 @@ void expectFullTensorMocksForDesc(Mock_hipdnn_backend& mock,
                         }),
                         Return(HIPDNN_STATUS_SUCCESS)));
 
+<<<<<<< HEAD
     EXPECT_CALL(
         mock,
         backendGetAttribute(fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+=======
+    EXPECT_CALL(mock,
+                backendGetAttribute(
+                    fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+>>>>>>> d9e199e220 (merge b-shi branch)
         .WillOnce(DoAll(SetArgPointee<4>(int64_t{1}),
                         Invoke([](hipdnnBackendDescriptor_t,
                                   hipdnnBackendAttributeName_t,
@@ -216,9 +222,15 @@ void expectScalarByValueTensorMocks(Mock_hipdnn_backend& mock,
                         }),
                         Return(HIPDNN_STATUS_SUCCESS)));
 
+<<<<<<< HEAD
     EXPECT_CALL(
         mock,
         backendGetAttribute(fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+=======
+    EXPECT_CALL(mock,
+                backendGetAttribute(
+                    fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+>>>>>>> d9e199e220 (merge b-shi branch)
         .WillOnce(DoAll(SetArgPointee<4>(int64_t{1}),
                         Invoke([](hipdnnBackendDescriptor_t,
                                   hipdnnBackendAttributeName_t,
@@ -394,7 +406,11 @@ TEST_F(TestDescriptorUnpackHelpers, GetDescriptorAttrVecInt32Success)
     hipdnnBackendDescriptor_t desc = nullptr;
     std::vector<int32_t> values;
     auto err = getDescriptorAttrVec(desc,
+<<<<<<< HEAD
                                     HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+                                    HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                     HIPDNN_TYPE_INT32,
                                     values,
                                     "test block_size");
@@ -414,7 +430,11 @@ TEST_F(TestDescriptorUnpackHelpers, GetDescriptorAttrVecInt32ZeroCount)
     hipdnnBackendDescriptor_t desc = nullptr;
     std::vector<int32_t> values;
     auto err = getDescriptorAttrVec(desc,
+<<<<<<< HEAD
                                     HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+                                    HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                     HIPDNN_TYPE_INT32,
                                     values,
                                     "test block_size");
@@ -436,7 +456,11 @@ TEST_F(TestDescriptorUnpackHelpers, GetDescriptorAttrVecInt32CountMismatch)
     hipdnnBackendDescriptor_t desc = nullptr;
     std::vector<int32_t> values;
     auto err = getDescriptorAttrVec(desc,
+<<<<<<< HEAD
                                     HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+                                    HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                     HIPDNN_TYPE_INT32,
                                     values,
                                     "test block_size");
@@ -673,7 +697,11 @@ TEST_F(TestUnpackTensorAttributes, UnpackTensorAttributesPassByValuePreserves4dD
     // IS_BY_VALUE: true
     EXPECT_CALL(*_mockBackend,
                 backendGetAttribute(
+<<<<<<< HEAD
                     _fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+=======
+                    _fakeDesc, HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT, HIPDNN_TYPE_BOOLEAN, 1, _, _))
+>>>>>>> d9e199e220 (merge b-shi branch)
         .WillOnce(DoAll(SetArgPointee<4>(int64_t{1}),
                         Invoke([](hipdnnBackendDescriptor_t,
                                   hipdnnBackendAttributeName_t,

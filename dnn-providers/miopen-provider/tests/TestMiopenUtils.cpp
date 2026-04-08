@@ -122,6 +122,7 @@ TEST(TestMiopenUtils, CreateBatchnormTensor4dPassthrough)
     std::vector<int64_t> strides = {588, 196, 14, 1};
 
     flatbuffers::FlatBufferBuilder builder;
+<<<<<<< HEAD
     auto attrOffset = hipdnn_flatbuffers_sdk::data_objects::CreateTensorAttributesDirect(
         builder, 42, "", hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, &strides, &dims);
     builder.Finish(attrOffset);
@@ -132,6 +133,17 @@ TEST(TestMiopenUtils, CreateBatchnormTensor4dPassthrough)
     auto tensorMap
         = std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>{
+=======
+    auto attrOffset = hipdnn_data_sdk::data_objects::CreateTensorAttributesDirect(
+        builder, 42, "", hipdnn_data_sdk::data_objects::DataType::FLOAT, &strides, &dims);
+    builder.Finish(attrOffset);
+
+    auto attrPtr = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::TensorAttributes>(
+        builder.GetBufferPointer());
+
+    auto tensorMap
+        = std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>{
+>>>>>>> d9e199e220 (merge b-shi branch)
             {42, attrPtr}};
 
     auto result = miopen_utils::createBatchnormTensor(tensorMap, 42);
@@ -167,6 +179,7 @@ TEST(TestMiopenUtils, CreateBatchnormTensor5dPassthrough)
     std::vector<int64_t> strides = {2352, 784, 196, 14, 1};
 
     flatbuffers::FlatBufferBuilder builder;
+<<<<<<< HEAD
     auto attrOffset = hipdnn_flatbuffers_sdk::data_objects::CreateTensorAttributesDirect(
         builder, 42, "", hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, &strides, &dims);
     builder.Finish(attrOffset);
@@ -177,6 +190,17 @@ TEST(TestMiopenUtils, CreateBatchnormTensor5dPassthrough)
     auto tensorMap
         = std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>{
+=======
+    auto attrOffset = hipdnn_data_sdk::data_objects::CreateTensorAttributesDirect(
+        builder, 42, "", hipdnn_data_sdk::data_objects::DataType::FLOAT, &strides, &dims);
+    builder.Finish(attrOffset);
+
+    auto attrPtr = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::TensorAttributes>(
+        builder.GetBufferPointer());
+
+    auto tensorMap
+        = std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>{
+>>>>>>> d9e199e220 (merge b-shi branch)
             {42, attrPtr}};
 
     auto result = miopen_utils::createBatchnormTensor(tensorMap, 42);
@@ -215,6 +239,7 @@ TEST(TestMiopenUtils, CreateBatchnormTensor3dNclPadsToNchw)
     std::vector<int64_t> strides = {42, 14, 1};
 
     flatbuffers::FlatBufferBuilder builder;
+<<<<<<< HEAD
     auto attrOffset = hipdnn_flatbuffers_sdk::data_objects::CreateTensorAttributesDirect(
         builder, 42, "", hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, &strides, &dims);
     builder.Finish(attrOffset);
@@ -225,6 +250,17 @@ TEST(TestMiopenUtils, CreateBatchnormTensor3dNclPadsToNchw)
     auto tensorMap
         = std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>{
+=======
+    auto attrOffset = hipdnn_data_sdk::data_objects::CreateTensorAttributesDirect(
+        builder, 42, "", hipdnn_data_sdk::data_objects::DataType::FLOAT, &strides, &dims);
+    builder.Finish(attrOffset);
+
+    auto attrPtr = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::TensorAttributes>(
+        builder.GetBufferPointer());
+
+    auto tensorMap
+        = std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>{
+>>>>>>> d9e199e220 (merge b-shi branch)
             {42, attrPtr}};
 
     auto result = miopen_utils::createBatchnormTensor(tensorMap, 42);
@@ -256,6 +292,7 @@ TEST(TestMiopenUtils, CreateBatchnormTensor3dNlcPadsToNhwc)
     std::vector<int64_t> strides = {42, 1, 3};
 
     flatbuffers::FlatBufferBuilder builder;
+<<<<<<< HEAD
     auto attrOffset = hipdnn_flatbuffers_sdk::data_objects::CreateTensorAttributesDirect(
         builder, 42, "", hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, &strides, &dims);
     builder.Finish(attrOffset);
@@ -266,6 +303,17 @@ TEST(TestMiopenUtils, CreateBatchnormTensor3dNlcPadsToNhwc)
     auto tensorMap
         = std::unordered_map<int64_t,
                              const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>{
+=======
+    auto attrOffset = hipdnn_data_sdk::data_objects::CreateTensorAttributesDirect(
+        builder, 42, "", hipdnn_data_sdk::data_objects::DataType::FLOAT, &strides, &dims);
+    builder.Finish(attrOffset);
+
+    auto attrPtr = flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::TensorAttributes>(
+        builder.GetBufferPointer());
+
+    auto tensorMap
+        = std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>{
+>>>>>>> d9e199e220 (merge b-shi branch)
             {42, attrPtr}};
 
     auto result = miopen_utils::createBatchnormTensor(tensorMap, 42);

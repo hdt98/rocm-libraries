@@ -105,22 +105,38 @@ TEST(TestDataTypeConversion, FromSdkDataTypeInt4)
 
 TEST(TestDataTypeConversion, ToSdkDataTypeFp6E2M3)
 {
+<<<<<<< HEAD
     ASSERT_EQ(toSdkDataType(HIPDNN_DATA_FP6_E2M3_EXT), DataType::FP6_E2M3);
+=======
+    ASSERT_EQ(toSdkDataType(HIPDNN_DATA_FP6_E2M3), DataType::FP6_E2M3);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestDataTypeConversion, FromSdkDataTypeFp6E2M3)
 {
+<<<<<<< HEAD
     ASSERT_EQ(fromSdkDataType(DataType::FP6_E2M3), HIPDNN_DATA_FP6_E2M3_EXT);
+=======
+    ASSERT_EQ(fromSdkDataType(DataType::FP6_E2M3), HIPDNN_DATA_FP6_E2M3);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestDataTypeConversion, ToSdkDataTypeFp6E3M2)
 {
+<<<<<<< HEAD
     ASSERT_EQ(toSdkDataType(HIPDNN_DATA_FP6_E3M2_EXT), DataType::FP6_E3M2);
+=======
+    ASSERT_EQ(toSdkDataType(HIPDNN_DATA_FP6_E3M2), DataType::FP6_E3M2);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestDataTypeConversion, FromSdkDataTypeFp6E3M2)
 {
+<<<<<<< HEAD
     ASSERT_EQ(fromSdkDataType(DataType::FP6_E3M2), HIPDNN_DATA_FP6_E3M2_EXT);
+=======
+    ASSERT_EQ(fromSdkDataType(DataType::FP6_E3M2), HIPDNN_DATA_FP6_E3M2);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST(TestDataTypeConversion, GetDataTypeByteSizeThrowsForLowPrecisionTypes)

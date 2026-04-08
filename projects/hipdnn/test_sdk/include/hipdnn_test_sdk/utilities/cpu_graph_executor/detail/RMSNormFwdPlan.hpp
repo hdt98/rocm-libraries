@@ -83,7 +83,11 @@ public:
         auto shallowScaleTensor = createShallowTensor<ScaleDataType>(
             _params.scaleTensor, variantPack.at(_params.scaleTensor.uid));
 
+<<<<<<< HEAD
         const double epsilon = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
+=======
+        const double epsilon = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+>>>>>>> d9e199e220 (merge b-shi branch)
             _params.epsilonTensor, "Epsilon");
 
         std::unique_ptr<hipdnn_data_sdk::utilities::TensorBase<ScaleDataType>> shallowBiasTensor;

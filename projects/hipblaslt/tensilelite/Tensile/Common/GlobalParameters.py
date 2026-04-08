@@ -138,6 +138,7 @@ globalParameters["CMakeBuildType"] = (
 )
 globalParameters["LogicFormat"] = "yaml"  # set library backend (yaml, or json)
 globalParameters["LibraryFormat"] = "yaml"  # set library backend (yaml, or msgpack)
+globalParameters["MXScaleFormat"] = 0  # MX scale data format (0=none, 1=pre-swizzle for GPU kernel layout)
 
 # True/False: CSV will/won't export WinnerGFlops, WinnerTimeUS, WinnerIdx, WinnerName.
 # TODO - if no side-effect, we can set default to True. This can make analyzing "LibraryLogic" (AddFromCSV) faster
@@ -178,6 +179,8 @@ globalParameters["DataInitTypeScaleB"] = 2
 globalParameters["DataInitTypeScaleC"] = 2
 globalParameters["DataInitTypeScaleD"] = 2
 globalParameters["DataInitTypeScaleAlphaVec"] = 3
+globalParameters["DataInitTypeMXSA"] = 1
+globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
 globalParameters["DataInitTypeMXSA"] = 1
 globalParameters["DataInitTypeMXSB"] = 1
@@ -431,6 +434,7 @@ defaultBenchmarkCommonParameters = [
     {"BAddrInterleave": [False]},
     {"KRingShift": [False]},
     {"DirectToLds": [0]},
+    {"UseSubtileImpl": [False]},
     {"UseSgprForGRO": [-1]},
     {"UseInstOffsetForGRO": [0]},
     {"AssertSummationElementMultiple": [1]},
@@ -454,6 +458,7 @@ defaultBenchmarkCommonParameters = [
     {"GlobalSplitUCoalesced": [False]},
     {"GlobalSplitUWorkGroupMappingRoundRobin": [False]},
     {"Use64bShadowLimit": [True]},
+    {"Use64bShadowLimitMX": [False]}, # Disable Use64bShadowLimit for MXSA/B by default
     {"NumLoadsCoalescedA": [1]},
     {"NumLoadsCoalescedB": [1]},
     {"WorkGroup": [[16, 16, 1]]},

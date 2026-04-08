@@ -38,7 +38,9 @@
 #include "hipblaslt_random.hpp"
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
 #include "mxDataGen.hpp"
+#endif
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -2123,11 +2125,20 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         hipblaslt_seedrand();
 
+<<<<<<< HEAD
         size_t scaleA_row = ((transA == HIPBLAS_OP_T) ? blockSize(arg.scaleA) : 1);
         size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
         if(isBlockScaling(arg.scaleA))
         {
 #ifdef HIPBLASLT_USE_ROCROLLER
+=======
+        if(isBlockScaling(arg.scaleA))
+        {
+#if !HIPBLASLT_ENABLE_MXDATAGENERATOR
+            hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
+            return;
+#else
+>>>>>>> d9e199e220 (merge b-shi branch)
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2167,6 +2178,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             // Copy data and scale to device buffers
             CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
             CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
+<<<<<<< HEAD
 #else
             hipblaslt_init_device(ABC_dims::A,
                                   arg.initialization,
@@ -2189,6 +2201,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleA),
                                   stride_a[i] / scaleA_row / scaleA_col,
                                   num_batches[i]);
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #endif
         }
         else
@@ -2210,7 +2224,14 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
+<<<<<<< HEAD
 #ifdef HIPBLASLT_USE_ROCROLLER
+=======
+#if !HIPBLASLT_ENABLE_MXDATAGENERATOR
+            hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
+            return;
+#else
+>>>>>>> d9e199e220 (merge b-shi branch)
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2248,6 +2269,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             // Copy data and scale to device buffers
             CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
             CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
+<<<<<<< HEAD
 #else
             hipblaslt_init_device(ABC_dims::B,
                                   arg.initialization,
@@ -2270,6 +2292,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleB),
                                   stride_b[i] / scaleB_row / scaleB_col,
                                   num_batches[i]);
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 #endif
         }
         else
@@ -2319,7 +2343,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         realDataTypeSize(TiA),
                                         do_swizzle_a,
                                         stream));
+<<<<<<< HEAD
             // B is always stored as K×N in memory; use (K, N, ldb) not (B_row, B_col) to avoid row > lda when transB=T
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
             CHECK_HIP_ERROR(synchronize(hB[i],
                                         dB[i],
                                         num_batches[i],
@@ -2330,6 +2357,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         do_swizzle_b,
                                         stream));
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i], 0, 0, 0, 0, 1, false, stream));
+<<<<<<< HEAD
 #ifndef HIPBLASLT_USE_ROCROLLER
             if(isBlockScaling(arg.scaleA))
             {
@@ -2342,6 +2370,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 refB.emplace_back(mx_type_to_f32(TiB, scaleDataType(arg.scaleB), hB[i], hScaleB[i], B_row[i], B_col[i], scaleB_row, scaleB_col));
             }
 #endif
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
             if(arg.dump_matrix)
             {

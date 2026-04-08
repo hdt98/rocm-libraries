@@ -11,9 +11,15 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/block_scale_quantize_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/block_scale_quantize_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_test_sdk/constants/BlockScaleQuantizeConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
@@ -22,7 +28,11 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
 
@@ -110,7 +120,11 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, CreatesValidFinalizedDescriptor)
 
     ASSERT_NE(desc, nullptr);
     ASSERT_TRUE(desc->isFinalized());
+<<<<<<< HEAD
     ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR);
+=======
+    ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_QUANTIZE_DESCRIPTOR_EXT);
+>>>>>>> d9e199e220 (merge b-shi branch)
     EXPECT_EQ(desc->getData().x_tensor_uid, K_BSQ_TENSOR_X_UID);
 }
 
@@ -285,7 +299,11 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify compute type
     hipdnnDataType_t computeType = {};
     int64_t dtCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_MATH_PREC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_BLOCK_SCALE_QUANTIZE_MATH_PREC_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_DATA_TYPE,
                        1,
                        &dtCount,
@@ -296,7 +314,11 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify block_size
     int32_t blockSize = 0;
     int64_t bsCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_BLOCK_SIZE,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_INT32,
                        1,
                        &bsCount,
@@ -316,17 +338,29 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, GetAttributeWorksAfterFromNode)
     EXPECT_FALSE(transpose);
 
     // Verify operation type
+<<<<<<< HEAD
     hipdnnOperationType_ext_t opType = HIPDNN_OPERATION_TYPE_NOT_SET_EXT;
+=======
+    hipdnnOperationType_t opType = HIPDNN_OPERATION_TYPE_NOT_SET;
+>>>>>>> d9e199e220 (merge b-shi branch)
     int64_t opTypeCount = 0;
     desc->getAttribute(
         HIPDNN_ATTR_OPERATION_TYPE_EXT, HIPDNN_TYPE_OPERATION_TYPE_EXT, 1, &opTypeCount, &opType);
     ASSERT_EQ(opTypeCount, 1);
+<<<<<<< HEAD
     EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_BLOCK_SCALE_QUANTIZE_EXT);
+=======
+    EXPECT_EQ(opType, HIPDNN_OPERATION_TYPE_BLOCK_SCALE_QUANTIZE);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Verify X tensor — deep check: UID, data type, dims, strides
     ScopedDescriptor xScoped;
     int64_t xCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_XDESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &xCount,
@@ -342,7 +376,11 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify Y tensor — deep check: UID, data type, dims, strides
     ScopedDescriptor yScoped;
     int64_t yCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_YDESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_Y_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &yCount,
@@ -358,7 +396,11 @@ TEST_F(TestBlockScaleQuantizeOperationFromNode, GetAttributeWorksAfterFromNode)
     // Verify Scale tensor — deep check: UID, data type, dims, strides
     ScopedDescriptor scaleScoped;
     int64_t scaleCount = 0;
+<<<<<<< HEAD
     desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_SCALE_DESC,
+=======
+    desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_QUANTIZE_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                        1,
                        &scaleCount,

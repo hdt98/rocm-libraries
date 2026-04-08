@@ -45,7 +45,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsMinimal)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -59,7 +63,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsGQA)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -73,12 +81,20 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsMQA)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateSucceedsGQADifferentKVHeads)
+=======
+TEST(TestSdpaFpropNode, PreValidateSucceedsGQADifferentKVHeads)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     // Q=32 heads, K=8, V=4 — independent GQA broadcast
     auto q = makeTensor4D(2, 32, 128, 64);
@@ -86,12 +102,20 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsGQADifferentKVHeads)
     auto v = makeTensor4D(2, 4, 128, 64);
     auto attrs = makeMinimalAttrs(q, k, v);
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateFailsInvalidGQAVHeads)
+=======
+TEST(TestSdpaFpropNode, PreValidateFailsInvalidGQAVHeads)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     // Q=8 heads, K=2 (valid), V=3 (8%3!=0)
     auto q = makeTensor4D(2, 8, 16, 64);
@@ -99,12 +123,20 @@ TEST(TestSdpaFwdNode, PreValidateFailsInvalidGQAVHeads)
     auto v = makeTensor4D(2, 3, 32, 64);
     auto attrs = makeMinimalAttrs(q, k, v);
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateFailsZeroKvHeads)
+=======
+TEST(TestSdpaFpropNode, PreValidateFailsZeroKvHeads)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     // K has 0 heads — should fail positivity check before divisibility
     auto q = makeTensor4D(2, 8, 16, 64);
@@ -112,12 +144,20 @@ TEST(TestSdpaFwdNode, PreValidateFailsZeroKvHeads)
     auto v = makeTensor4D(2, 8, 32, 64);
     auto attrs = makeMinimalAttrs(q, k, v);
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateFailsZeroVHeads)
+=======
+TEST(TestSdpaFpropNode, PreValidateFailsZeroVHeads)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     // V has 0 heads — should fail positivity check
     auto q = makeTensor4D(2, 8, 16, 64);
@@ -125,12 +165,20 @@ TEST(TestSdpaFwdNode, PreValidateFailsZeroVHeads)
     auto v = makeTensor4D(2, 0, 32, 64);
     auto attrs = makeMinimalAttrs(q, k, v);
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateFailsInvalidGQAKHeads)
+=======
+TEST(TestSdpaFpropNode, PreValidateFailsInvalidGQAKHeads)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     // Q=8 heads, K=3 (8%3!=0), V=4 (8%4==0) — K invalid, V valid
     auto q = makeTensor4D(2, 8, 16, 64);
@@ -138,12 +186,20 @@ TEST(TestSdpaFwdNode, PreValidateFailsInvalidGQAKHeads)
     auto v = makeTensor4D(2, 4, 32, 64);
     auto attrs = makeMinimalAttrs(q, k, v);
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, PreValidateFailsMissingQ)
+=======
+TEST(TestSdpaFpropNode, PreValidateFailsMissingQ)
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 {
     SdpaAttributes attrs;
     attrs.set_k(makeTensor4D(2, 8, 32, 64));
@@ -151,7 +207,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsMissingQ)
     attrs.set_o(std::make_shared<TensorAttributes>());
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::ATTRIBUTE_NOT_SET);
 }
@@ -164,7 +224,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsMissingK)
     attrs.set_o(std::make_shared<TensorAttributes>());
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::ATTRIBUTE_NOT_SET);
 }
@@ -177,7 +241,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsMissingV)
     attrs.set_o(std::make_shared<TensorAttributes>());
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::ATTRIBUTE_NOT_SET);
 }
@@ -192,7 +260,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsRankLessThan4)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -207,7 +279,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsRankGreaterThan4)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -221,7 +297,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsDifferentHeadDimV)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -235,7 +315,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsHeadDimMismatch)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -255,7 +339,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsOutputShapeMismatch)
     attrs.set_o(o);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -275,7 +363,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsCorrectOutputShape)
     attrs.set_o(o);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -289,7 +381,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsSeqKvMismatch)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -303,7 +399,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsInvalidGQA)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -321,7 +421,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsWithAttnMask)
     attrs.set_bias(mask);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -339,7 +443,11 @@ TEST(TestSdpaFwdNode, PreValidateSucceedsWithBroadcastAttnMask)
     attrs.set_bias(mask);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 }
@@ -357,7 +465,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsAttnMaskRankTooLarge)
     attrs.set_bias(mask);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -372,7 +484,11 @@ TEST(TestSdpaFwdNode, InferPropertiesSetsOutputShape)
     auto o = attrs.get_o();
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
@@ -394,7 +510,11 @@ TEST(TestSdpaFwdNode, InferPropertiesSetsOutputShapeDifferentHeadDimV)
     auto o = attrs.get_o();
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
@@ -417,7 +537,11 @@ TEST(TestSdpaFwdNode, InferPropertiesSetsStatsShape)
     attrs.set_stats(stats);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
@@ -442,7 +566,11 @@ TEST(TestSdpaFwdNode, InferPropertiesSetsOutputStrides)
     auto o = attrs.get_o();
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
@@ -473,7 +601,11 @@ TEST(TestSdpaFwdNode, InferPropertiesPreservesExplicitOutputShape)
     attrs.set_o(o);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.infer_properties_node();
     EXPECT_EQ(err.code, error_code_t::OK) << err.err_msg;
 
@@ -492,7 +624,11 @@ TEST(TestSdpaFwdNode, PreValidateFailsBatchMismatchQK)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
@@ -506,14 +642,26 @@ TEST(TestSdpaFwdNode, PreValidateFailsBatchMismatchQV)
     auto attrs = makeMinimalAttrs(q, k, v);
 
     const GraphAttributes graphAttrs;
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
     const SdpaFwdNode node(std::move(attrs), graphAttrs);
+=======
+    const SdpaFpropNode node(std::move(attrs), graphAttrs);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
     auto err = node.pre_validate_node();
     EXPECT_EQ(err.code, error_code_t::INVALID_VALUE);
 }
 
+<<<<<<< HEAD:projects/hipdnn/frontend/tests/TestSdpaFwdNode.cpp
 TEST(TestSdpaFwdNode, GetNodeTypeReturnsSdpaFwd)
 {
     const GraphAttributes graphAttrs;
     const SdpaFwdNode node(SdpaAttributes{}, graphAttrs);
     EXPECT_EQ(node.getNodeType(), NodeType::SDPA_FWD);
+=======
+TEST(TestSdpaFpropNode, GetNodeTypeReturnsSdpaFprop)
+{
+    const GraphAttributes graphAttrs;
+    const SdpaFpropNode node(SdpaAttributes{}, graphAttrs);
+    EXPECT_EQ(node.getNodeType(), NodeType::SDPA_FPROP);
+>>>>>>> d9e199e220 (merge b-shi branch):projects/hipdnn/frontend/tests/TestSdpaFpropNode.cpp
 }

@@ -102,7 +102,11 @@ class TestLoadConvolutionFwd:
     def test_operation_type_enum(self, convolution_fwd_config):
         assert (
             convolution_fwd_config.operation_type_enum
+<<<<<<< HEAD
             == "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT"
+=======
+            == "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD"
+>>>>>>> d9e199e220 (merge b-shi branch)
         )
 
     def test_infer_properties(self, convolution_fwd_config):
@@ -169,7 +173,11 @@ class TestLoadBatchnorm:
         assert len(batchnorm_config.tensor_array_fields) == 1
         taf = batchnorm_config.tensor_array_fields[0]
         assert taf.name == "peer_stats"
+<<<<<<< HEAD
         assert taf.test_uids == [515, 516]
+=======
+        assert taf.test_uids == [100, 101]
+>>>>>>> d9e199e220 (merge b-shi branch)
         assert taf.test_label == "PeerStats"
 
     def test_many_optional_tensors(self, batchnorm_config):
@@ -267,7 +275,11 @@ class TestDataFieldParsing:
         )
         assert padding.test_value == [2, 3]
         assert padding.test_label == "Convolution"
+<<<<<<< HEAD
         assert padding.test_constant_name == "K_FPROP_CONV_PADDING"
+=======
+        assert padding.test_constant_name == "K_CONV_PADDING"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 
 class TestTensorArrayFieldParsing:
@@ -287,7 +299,11 @@ class TestTensorArrayFieldParsing:
 
     def test_tensor_array_test_uids(self, batchnorm_config):
         taf = batchnorm_config.tensor_array_fields[0]
+<<<<<<< HEAD
         assert taf.test_uids == [515, 516]
+=======
+        assert taf.test_uids == [100, 101]
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     def test_tensor_array_test_label(self, batchnorm_config):
         taf = batchnorm_config.tensor_array_fields[0]
@@ -303,7 +319,11 @@ class TestTestDataParsing:
 
     def test_tensor_uids(self, convolution_fwd_config):
         uids = convolution_fwd_config.test_data.tensor_uids
+<<<<<<< HEAD
         assert uids == {"x": 1000, "w": 1001, "y": 1002}
+=======
+        assert uids == {"x": 1, "w": 2, "y": 3}
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     def test_tensor_configs(self, convolution_fwd_config):
         configs = convolution_fwd_config.test_data.tensor_configs
@@ -321,9 +341,12 @@ class TestTestDataParsing:
             convolution_fwd_config.test_data.constants_include == "ConvFpropConstants"
         )
 
+<<<<<<< HEAD
     def test_tensor_const_prefix(self, convolution_fwd_config):
         assert convolution_fwd_config.test_data.tensor_const_prefix == "K_FPROP_"
 
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 # ---------------------------------------------------------------------------
 # Task 2B.3: _parse_frontend_config() and _parse_frontend_tensors()

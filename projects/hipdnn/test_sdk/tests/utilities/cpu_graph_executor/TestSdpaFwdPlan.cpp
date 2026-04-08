@@ -35,7 +35,11 @@ TEST(TestSdpaFwdPlan, ExecutePlan)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
     const auto* nodeAttributes = graphWrapper.getNode(0).attributes_as_SdpaAttributes();
     const auto& tensorMap = graphWrapper.getTensorMap();
 
@@ -82,7 +86,11 @@ TEST(TestSdpaFwdPlan, ExecutePlanWithCausalMask)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
     const auto* nodeAttributes = graphWrapper.getNode(0).attributes_as_SdpaAttributes();
     const auto& tensorMap = graphWrapper.getTensorMap();
 
@@ -130,7 +138,11 @@ TEST(TestSdpaFwdPlanBuilder, PlanConstruction)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const SdpaFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;
@@ -154,7 +166,11 @@ TEST(TestSdpaFwdPlanBuilder, IsApplicable)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
+<<<<<<< HEAD
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     // Correct data types: applicable
     const SdpaFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>

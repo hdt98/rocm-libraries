@@ -208,6 +208,11 @@ public:
     /// @cond INTERNAL
     // NOLINTNEXTLINE(readability-identifier-naming)
     LayernormAttributes& set_normalized_dim_count(int64_t value)
+<<<<<<< HEAD
+    {
+        _normalizedDimCount = value;
+        return *this;
+=======
     {
         _normalizedDimCount = value;
         return *this;
@@ -217,6 +222,58 @@ public:
     int64_t get_normalized_dim_count() const
     {
         return _normalizedDimCount;
+    }
+    /// @endcond
+
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::LayernormAttributes>
+        pack_attributes(flatbuffers::FlatBufferBuilder& builder) const // NOLINT
+    {
+        const auto mean = get_mean();
+        const auto invVariance = get_inv_variance();
+
+        return hipdnn_data_sdk::data_objects::CreateLayernormAttributes(
+            builder,
+            get_x()->get_uid(),
+            get_scale()->get_uid(),
+            get_bias()->get_uid(),
+            get_epsilon()->get_uid(),
+            get_y()->get_uid(),
+            _normalizedDimCount,
+            mean ? flatbuffers::Optional<int64_t>(mean->get_uid())
+                 : flatbuffers::Optional<int64_t>(flatbuffers::nullopt),
+            invVariance ? flatbuffers::Optional<int64_t>(invVariance->get_uid())
+                        : flatbuffers::Optional<int64_t>(flatbuffers::nullopt),
+            toSdkType(_forwardPhase));
+>>>>>>> d9e199e220 (merge b-shi branch)
+    }
+
+    // NOLINTNEXTLINE(readability-identifier-naming)
+    int64_t get_normalized_dim_count() const
+    {
+<<<<<<< HEAD
+        return _normalizedDimCount;
+=======
+        LayernormAttributes attr;
+
+        attr.set_x(tensorMap.at(fb->x_tensor_uid()));
+        attr.set_scale(tensorMap.at(fb->scale_tensor_uid()));
+        attr.set_bias(tensorMap.at(fb->bias_tensor_uid()));
+        attr.set_epsilon(tensorMap.at(fb->epsilon_tensor_uid()));
+        attr.set_y(tensorMap.at(fb->y_tensor_uid()));
+        attr.set_normalized_dim_count(fb->normalized_dim_count());
+        attr.set_forward_phase(fromSdkType(fb->forward_phase()));
+
+        if(fb->mean_tensor_uid().has_value())
+        {
+            attr.set_mean(tensorMap.at(fb->mean_tensor_uid().value()));
+        }
+        if(fb->inv_variance_tensor_uid().has_value())
+        {
+            attr.set_inv_variance(tensorMap.at(fb->inv_variance_tensor_uid().value()));
+        }
+
+        return attr;
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
     /// @endcond
 

@@ -140,7 +140,11 @@ Use `ConvolutionFpropNode.hpp` as the reference for this pattern. The `create_op
 
 ## Step 7: Add Lifting Support
 
+<<<<<<< HEAD
 For operations that need lifting (reconstructing frontend graph attributes from backend C API descriptors), use the `--lift-only` flag:
+=======
+For operations that need lifting (reconstructing frontend graph attributes from serialized FlatBuffer data), use the `--lift-only` flag:
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 ```bash
 .venv/bin/python generate.py --config configs/<op>.yaml --output-dir /tmp/lift-output --lift-only
@@ -155,7 +159,11 @@ This generates lifting-related files including the unpacker, fromNode tests, lif
 | `tests/frontend/Integration<Op>DescriptorLifting.cpp` | Lifting round-trip integration tests |
 | `fragments/node_factory_case.txt` | NodeFactory switch case for this operation |
 | `fragments/operation_unpacker_case.txt` | OperationUnpacker switch case |
+<<<<<<< HEAD
 | `fragments/operation_type_enum.txt` | hipdnnOperationType_ext_t enum entry |
+=======
+| `fragments/operation_type_enum.txt` | hipdnnOperationType_t enum entry |
+>>>>>>> d9e199e220 (merge b-shi branch)
 | `fragments/node_unpack_override.txt` | Node class unpack_from_descriptor override |
 | `fragments/descriptor_lifting_additions.txt` | Manual changes for existing descriptor files |
 
@@ -185,6 +193,10 @@ Insert the content from each fragment into the corresponding shared file:
 | `operation_unpacker_test.txt` | `frontend/tests/TestOperationUnpacker.cpp` | Uncomment existing test or insert generated test in the `createNodeForType` tests section. Also uncomment the corresponding `#include` for the node header. |
 | `operation_type_enum.txt` | `backend/include/HipdnnOperationType.h` | Enum entry for this operation |
 | `node_unpack_override.txt` | Frontend node header (e.g., `ConvolutionFpropNode.hpp`) | `unpack_from_descriptor` override |
+<<<<<<< HEAD
+=======
+| `packer_name_test.txt` | `frontend/tests/Test<NodeClass>.cpp` | Add after existing PackNode tests |
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 ### 7d. Wire `unpack_from_descriptor` in the Frontend Node
 
@@ -392,7 +404,11 @@ operation:
   # attr_name values. Do NOT create new per-operation copies.
   has_compute_data_type: true
   compute_data_type_attr: "HIPDNN_ATTR_CONVOLUTION_COMP_TYPE"  # Shared across conv ops
+<<<<<<< HEAD
   operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD_EXT"  # For HIPDNN_ATTR_OPERATION_TYPE_EXT
+=======
+  operation_type_enum: "HIPDNN_OPERATION_TYPE_CONVOLUTION_FORWARD"  # For HIPDNN_ATTR_OPERATION_TYPE_EXT
+>>>>>>> d9e199e220 (merge b-shi branch)
 
   # Test data — UIDs should be distinct across operations to avoid confusion
   test_data:
@@ -443,7 +459,11 @@ Mode fields (data fields with `type: mode`) require additional properties to wir
 | `backend_converter` | string | Yes | Frontend-to-backend converter (e.g., `toBackendConvMode`) |
 | `frontend_inverse_converter` | string | Yes (for lifting) | Backend-to-frontend converter (e.g., `fromHipdnnConvMode`) |
 | `test_c_type` | string | Yes | C-API typedef name (e.g., `hipdnnConvolutionMode_t`) |
+<<<<<<< HEAD
 | `test_backend_value` | string | Yes | C-API constant for test default (e.g., `HIPDNN_CROSS_CORRELATION`) |
+=======
+| `test_backend_value` | string | Yes | C-API constant for test default (e.g., `HIPDNN_CONVOLUTION_MODE_CROSS_CORRELATION`) |
+>>>>>>> d9e199e220 (merge b-shi branch)
 | `test_default_value` | string | No | Alternative C-API constant for default-value tests |
 | `test_alt_enum_value` | string | No | Alternative SDK enum value for round-trip tests (e.g., `CONVOLUTION`) |
 | `default_value` | string | No | Frontend default value expression (e.g., `ConvolutionMode::CROSS_CORRELATION`) |
@@ -492,8 +512,13 @@ Every enum field in a new operation MUST use the `mode` type. The `mode` pattern
 All enums on develop already follow this pattern:
 - ConvMode — `HIPDNN_TYPE_CONVOLUTION_MODE` (= 24)
 - PointwiseMode — `HIPDNN_TYPE_POINTWISE_MODE` (= 25)
+<<<<<<< HEAD
 - DiagonalAlignment — `HIPDNN_TYPE_DIAGONAL_ALIGNMENT_EXT` (= 26)
 - AttentionImplementation — `HIPDNN_TYPE_ATTENTION_IMPLEMENTATION_EXT` (= 27)
+=======
+- DiagonalAlignment — `HIPDNN_TYPE_DIAGONAL_ALIGNMENT` (= 26)
+- AttentionImplementation — `HIPDNN_TYPE_ATTENTION_IMPLEMENTATION` (= 27)
+>>>>>>> d9e199e220 (merge b-shi branch)
 - NormFwdPhase — `HIPDNN_TYPE_NORM_FWD_PHASE`
 
 ### `enum` Type — LEGACY, Do NOT Use for New Operations

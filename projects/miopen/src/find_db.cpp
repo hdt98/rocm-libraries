@@ -145,7 +145,11 @@ fs::path FindDbRecord_t<TDb>::GetInstalledPathFile(const Handle& handle,
         {
             MIOPEN_LOG_I("Database directory does not exist");
             file_path = fs::path{};
+<<<<<<< HEAD
             return std::move(file_path);
+=======
+            return file_path;
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
 
         MIOPEN_LOG_I2("Iterating over find db directory " << root_path);
@@ -172,12 +176,20 @@ fs::path FindDbRecord_t<TDb>::GetInstalledPathFile(const Handle& handle,
             if(fname.starts_with(base_name))
             {
                 file_path = entry;
+<<<<<<< HEAD
                 return std::move(file_path);
+=======
+                return file_path;
+>>>>>>> d9e199e220 (merge b-shi branch)
             }
             if(db_id.empty() || !miopen::StartsWith(db_id, "gfx") || real_cu_count == 0)
             {
                 file_path = fs::path{};
+<<<<<<< HEAD
                 return std::move(file_path); // empty
+=======
+                return file_path; // empty
+>>>>>>> d9e199e220 (merge b-shi branch)
             }
             // Check for alternate ASIC any back end
             if(fname.starts_with(db_id))
@@ -195,7 +207,11 @@ fs::path FindDbRecord_t<TDb>::GetInstalledPathFile(const Handle& handle,
                 }
             }
         }
+<<<<<<< HEAD
         return std::move(file_path);
+=======
+        return file_path;
+>>>>>>> d9e199e220 (merge b-shi branch)
     }();
 
     return installed_path;

@@ -312,6 +312,10 @@ namespace
                                                        boundIndex,
                                                        static_cast<double>(*prob.beta),
                                                        prob.workspaceSize);
+<<<<<<< HEAD
+=======
+
+>>>>>>> d9e199e220 (merge b-shi branch)
         tensileProblem.setComputeInputTypeA(Tensile_Ti);
         tensileProblem.setComputeInputTypeB(Tensile_Ti);
         tensileProblem.setAlphaType(Tensile_Tc);

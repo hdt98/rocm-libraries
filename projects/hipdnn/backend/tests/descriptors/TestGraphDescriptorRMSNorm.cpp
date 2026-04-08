@@ -39,7 +39,11 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
                              HipdnnBackendDescriptor* biasDesc,
                              HipdnnBackendDescriptor* invRmsDesc,
                              hipdnnDataType_t computeType = HIPDNN_DATA_FLOAT,
+<<<<<<< HEAD
                              hipdnnNormFwdPhase_t forwardPhase = HIPDNN_NORM_FWD_TRAINING,
+=======
+                             hipdnnNormFwdPhase_t forwardPhase = HIPDNN_NORM_FWD_PHASE_TRAINING,
+>>>>>>> d9e199e220 (merge b-shi branch)
                              const std::string& name = "")
 {
     auto wrapper = createDescriptor<RMSNormOperationDescriptor>();
@@ -78,7 +82,11 @@ inline std::unique_ptr<HipdnnBackendDescriptor>
 
     desc->setAttribute(
         HIPDNN_ATTR_OPERATION_RMSNORM_FWD_PHASE_EXT, HIPDNN_TYPE_NORM_FWD_PHASE, 1, &forwardPhase);
+<<<<<<< HEAD
     desc->setAttribute(HIPDNN_ATTR_RMSNORM_COMP_TYPE_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+=======
+    desc->setAttribute(HIPDNN_ATTR_RMSNORM_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(!name.empty())
     {
         desc->setAttribute(HIPDNN_ATTR_OPERATION_NAME_EXT,
@@ -319,7 +327,11 @@ TEST_F(TestGraphDescriptorRMSNorm, BuildFromOperationWithoutOptionalTensors)
                                               nullptr,
                                               nullptr,
                                               HIPDNN_DATA_FLOAT,
+<<<<<<< HEAD
                                               HIPDNN_NORM_FWD_INFERENCE);
+=======
+                                              HIPDNN_NORM_FWD_PHASE_INFERENCE);
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     auto desc = getDescriptor();
     setHandle();
@@ -378,7 +390,11 @@ TEST_F(TestGraphDescriptorRMSNorm, NamePreservedInFlatBuffer)
                                               nullptr,
                                               invRmsDesc.get(),
                                               HIPDNN_DATA_FLOAT,
+<<<<<<< HEAD
                                               HIPDNN_NORM_FWD_TRAINING,
+=======
+                                              HIPDNN_NORM_FWD_PHASE_TRAINING,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                               opName);
 
     auto desc = getDescriptor();

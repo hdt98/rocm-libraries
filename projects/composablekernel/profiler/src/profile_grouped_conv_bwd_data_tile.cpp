@@ -89,8 +89,12 @@ int call_profiler(const ckt::Args<SIGNATURE>& args,
                                    0 /*log_level*/,
                                    5 /*cold_iters*/,
                                    50 /*nrepeat_*/,
+<<<<<<< HEAD
                                    true /*is_gpu_timer_*/,
                                    time_kernel /*flush_cache*/});
+=======
+                                   true /*is_gpu_timer_*/});
+>>>>>>> d9e199e220 (merge b-shi branch)
     if(time_kernel)
     {
         std::cout << "\nBest configuration parameters:" << "\n\tname: " << op_name << " (instance "

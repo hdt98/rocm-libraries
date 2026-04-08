@@ -94,7 +94,11 @@ inline Error createBatchnormOperation(
 
     // Compute data type
     HIPDNN_CHECK_ERROR(setDescriptorAttrDataType(opDesc.get(),
+<<<<<<< HEAD
                                                  HIPDNN_ATTR_BATCHNORM_COMP_TYPE_EXT,
+=======
+                                                 HIPDNN_ATTR_BATCHNORM_MATH_PREC_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                                  attributes.compute_data_type,
                                                  "batchnorm compute data type"));
 

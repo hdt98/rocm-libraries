@@ -199,6 +199,7 @@ add_fusilli_plugin_test(
   COMPILE_DEFS
     FUSILLI_PLUGIN_PATH="../${FUSILLI_PLUGIN_RELATIVE_PATH}"
 )
+<<<<<<< HEAD
 
 add_fusilli_plugin_test(
   NAME fusilli_plugin_simple_reduction_test
@@ -244,3 +245,5 @@ add_fusilli_plugin_test(
   COMPILE_DEFS
     FUSILLI_PLUGIN_PATH="../${FUSILLI_PLUGIN_RELATIVE_PATH}"
 )
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)

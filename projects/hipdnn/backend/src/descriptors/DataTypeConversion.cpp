@@ -36,9 +36,15 @@ hipdnn_flatbuffers_sdk::data_objects::DataType toSdkDataType(hipdnnDataType_t ty
         return DataType::FP4_E2M1;
     case HIPDNN_DATA_INT4:
         return DataType::INT4;
+<<<<<<< HEAD
     case HIPDNN_DATA_FP6_E2M3_EXT:
         return DataType::FP6_E2M3;
     case HIPDNN_DATA_FP6_E3M2_EXT:
+=======
+    case HIPDNN_DATA_FP6_E2M3:
+        return DataType::FP6_E2M3;
+    case HIPDNN_DATA_FP6_E3M2:
+>>>>>>> d9e199e220 (merge b-shi branch)
         return DataType::FP6_E3M2;
     case HIPDNN_DATA_INT64:
         return DataType::INT64;
@@ -78,9 +84,15 @@ hipdnnDataType_t fromSdkDataType(hipdnn_flatbuffers_sdk::data_objects::DataType 
     case DataType::INT4:
         return HIPDNN_DATA_INT4;
     case DataType::FP6_E2M3:
+<<<<<<< HEAD
         return HIPDNN_DATA_FP6_E2M3_EXT;
     case DataType::FP6_E3M2:
         return HIPDNN_DATA_FP6_E3M2_EXT;
+=======
+        return HIPDNN_DATA_FP6_E2M3;
+    case DataType::FP6_E3M2:
+        return HIPDNN_DATA_FP6_E3M2;
+>>>>>>> d9e199e220 (merge b-shi branch)
     case DataType::INT64:
         return HIPDNN_DATA_INT64;
     default:

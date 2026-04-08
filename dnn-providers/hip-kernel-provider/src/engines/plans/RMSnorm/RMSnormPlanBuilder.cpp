@@ -1,7 +1,11 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
+=======
+#include <hipdnn_data_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
 #include "RMSnormApplicabilityChecks.hpp"
@@ -23,14 +27,22 @@ RMSnormPlanBuilder::RMSnormPlanBuilder(const IKernelCompiler& kernelCompiler,
 
 bool RMSnormPlanBuilder::isApplicable(
     [[maybe_unused]] const HipKernelHandle& handle,
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const
+=======
+    const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
 
     auto anyNodeIsNotF32Compute = [&]() {
         return !std::all_of(
             opGraph.nodeWrappers().begin(), opGraph.nodeWrappers().end(), [](const auto& node) {
+<<<<<<< HEAD
                 return node->computeDataType()
                        == hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT;
+=======
+                return node->computeDataType() == hipdnn_data_sdk::data_objects::DataType::FLOAT;
+>>>>>>> d9e199e220 (merge b-shi branch)
             });
     };
 
@@ -47,8 +59,13 @@ bool RMSnormPlanBuilder::isApplicable(
         }
 
         if(!opGraph.hasOnlySupportedAttributes(
+<<<<<<< HEAD
                std::set<hipdnn_flatbuffers_sdk::data_objects::NodeAttributes>{
                    hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::RMSNormAttributes}))
+=======
+               std::set<hipdnn_data_sdk::data_objects::NodeAttributes>{
+                   hipdnn_data_sdk::data_objects::NodeAttributes::RMSNormAttributes}))
+>>>>>>> d9e199e220 (merge b-shi branch)
         {
             HIPDNN_PLUGIN_LOG_INFO("RMSnorm plan builder is not applicable for this graph");
             return false;
@@ -58,8 +75,13 @@ bool RMSnormPlanBuilder::isApplicable(
 
         try
         {
+<<<<<<< HEAD
             rmsnorm::RMSnormValidator validator(opGraph.getTensorMap());
             validator.checkTensorConfigSupported(*node.attributes_as_RMSNormAttributes());
+=======
+            rmsnorm::checkRMSnormTensorConfigSupported(*node.attributes_as_RMSNormAttributes(),
+                                                       opGraph.getTensorMap());
+>>>>>>> d9e199e220 (merge b-shi branch)
         }
         catch(const std::exception& e)
         {
@@ -81,7 +103,11 @@ bool RMSnormPlanBuilder::isApplicable(
 
 size_t RMSnormPlanBuilder::getMaxWorkspaceSize(
     [[maybe_unused]] const HipKernelHandle& handle,
+<<<<<<< HEAD
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
+=======
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+>>>>>>> d9e199e220 (merge b-shi branch)
     [[maybe_unused]] const HipKernelSettings& executionSettings) const
 {
     // RMS norm plan builder does not require workspace size
@@ -91,6 +117,7 @@ size_t RMSnormPlanBuilder::getMaxWorkspaceSize(
 namespace
 {
 
+<<<<<<< HEAD
 void buildPlanFwdSingleNode(
     [[maybe_unused]] const HipKernelHandle& handle,
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
@@ -101,6 +128,16 @@ void buildPlanFwdSingleNode(
 {
     const auto& attr
         = nodeWrapper.attributesAs<hipdnn_flatbuffers_sdk::data_objects::RMSNormAttributes>();
+=======
+void buildPlanFwdSingleNode([[maybe_unused]] const HipKernelHandle& handle,
+                            const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+                            const hipdnn_data_sdk::flatbuffer_utilities::INodeWrapper& nodeWrapper,
+                            const IKernelCompiler& kernelCompiler,
+                            const IDevicePropertyProvider& devicePropertyProvider,
+                            HipKernelContext& executionContext)
+{
+    const auto& attr = nodeWrapper.attributesAs<hipdnn_data_sdk::data_objects::RMSNormAttributes>();
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     RMSnormFwdParams params(attr, opGraph.getTensorMap());
     auto plan = std::make_unique<RMSnormFwdPlan>(std::move(params));
@@ -112,18 +149,28 @@ void buildPlanFwdSingleNode(
 
 void RMSnormPlanBuilder::initializeExecutionSettings(
     [[maybe_unused]] const HipKernelHandle& handle,
+<<<<<<< HEAD
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig&
         engineConfig,
+=======
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
     [[maybe_unused]] HipKernelSettings& executionSettings) const
 {
 }
 
 void RMSnormPlanBuilder::buildPlan(
     const HipKernelHandle& handle,
+<<<<<<< HEAD
     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph,
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IEngineConfig&
         engineConfig,
+=======
+    const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph,
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IEngineConfig& engineConfig,
+>>>>>>> d9e199e220 (merge b-shi branch)
     HipKernelContext& executionContext) const
 {
     const auto& nodeWrapper = opGraph.getNodeWrapper(0);
@@ -134,9 +181,15 @@ void RMSnormPlanBuilder::buildPlan(
         handle, opGraph, nodeWrapper, _kernelCompiler, _devicePropertyProvider, executionContext);
 }
 
+<<<<<<< HEAD
 std::vector<hipdnn_flatbuffers_sdk::data_objects::KnobT> RMSnormPlanBuilder::getCustomKnobs(
     [[maybe_unused]] const HipKernelHandle& handle,
     [[maybe_unused]] const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const
+=======
+std::vector<hipdnn_data_sdk::data_objects::KnobT> RMSnormPlanBuilder::getCustomKnobs(
+    [[maybe_unused]] const HipKernelHandle& handle,
+    [[maybe_unused]] const hipdnn_data_sdk::flatbuffer_utilities::IGraph& opGraph) const
+>>>>>>> d9e199e220 (merge b-shi branch)
 {
     return {};
 }

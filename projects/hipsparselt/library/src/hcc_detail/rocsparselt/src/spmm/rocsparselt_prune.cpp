@@ -345,6 +345,7 @@ __global__
 #pragma unroll 5 //log2(THREADS_PER_SG)
             for(int tidxs = THREADS_PER_SG >> 1; tidxs > 0; tidxs >>= 1)
             {
+<<<<<<< HEAD
                 Tc   other_norm = __shfl_down(max_norm, tidxs, THREADS_PER_SG);
                 int  other_idx  = __shfl_down(max_norm_idx_, tidxs, THREADS_PER_SG);
                 bool update     = max_norm < other_norm;
@@ -353,6 +354,19 @@ __global__
             }
             // Broadcast the winning pattern index from lane 0 to all lanes in the sub-group
             int best_pattern_idx = __shfl(max_norm_idx_, 0, THREADS_PER_SG);
+=======
+                if(serial_gt < tidxs)
+                {
+                    Tc   a                      = norm_res[c_norm_res_offset];
+                    Tc   b                      = norm_res[c_norm_res_offset + tidxs];
+                    int  b_idx                  = norm_idx[c_norm_res_offset + tidxs];
+                    bool update                 = a < b;
+                    norm_res[c_norm_res_offset] = update ? b : norm_res[c_norm_res_offset];
+                    norm_idx[c_norm_res_offset] = update ? b_idx : norm_idx[c_norm_res_offset];
+                }
+                __syncthreads(); //wait until norm_res[], norm_idx[] ready
+            };
+>>>>>>> d9e199e220 (merge b-shi branch)
 
             // write 4x4 to the out matrix.
             {

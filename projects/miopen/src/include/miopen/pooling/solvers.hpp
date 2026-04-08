@@ -311,16 +311,24 @@ struct PoolingFwdNCHWTransposingSolver
             {
                 &Problem::GetXDesc,
                 &InvokeParams::xDesc,
+<<<<<<< HEAD
                 &InvokeParams::x, // x is input
                 nullptr,
+=======
+                {.as_input = &InvokeParams::x},
+>>>>>>> d9e199e220 (merge b-shi branch)
                 "NCDHW",
                 true,
             },
             {
                 &Problem::GetYDesc,
                 &InvokeParams::yDesc,
+<<<<<<< HEAD
                 nullptr,
                 &InvokeParams::y, // y is output
+=======
+                {.as_output = &InvokeParams::y},
+>>>>>>> d9e199e220 (merge b-shi branch)
                 "NCDHW",
                 false,
             },
@@ -455,16 +463,24 @@ struct PoolingBwdNCHWTransposingSolver
             {
                 &Problem::GetXDesc,
                 &InvokeParams::dxDesc,
+<<<<<<< HEAD
                 nullptr,
                 &InvokeParams::dx, // dx is output
+=======
+                {.as_output = &InvokeParams::dx},
+>>>>>>> d9e199e220 (merge b-shi branch)
                 "NCDHW",
                 false,
             },
             {
                 &Problem::GetYDesc,
                 &InvokeParams::dyDesc,
+<<<<<<< HEAD
                 &InvokeParams::dy, // dy is input
                 nullptr,
+=======
+                {.as_input = &InvokeParams::dy},
+>>>>>>> d9e199e220 (merge b-shi branch)
                 "NCDHW",
                 true,
             },

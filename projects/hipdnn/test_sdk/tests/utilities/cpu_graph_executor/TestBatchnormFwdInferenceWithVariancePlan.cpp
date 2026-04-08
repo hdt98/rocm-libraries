@@ -40,9 +40,14 @@ TEST_F(TestBatchnormFwdWithVariancePlan, ExecutePlan)
                                                              DataType::FLOAT,
                                                              dims,
                                                              TensorLayout::NHWC);
+<<<<<<< HEAD
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
     const INodeWrapper& node = graphWrapper.getNodeWrapper(0);
     BatchnormFwdWithVarianceTensorBundle planTensorBundle(node, graphWrapper.getTensorMap(), seed);
     BatchnormFwdWithVarianceTensorBundle directTensorBundle(
@@ -76,8 +81,13 @@ TEST_F(TestBatchnormFwdWithVariancePlan, ExecutePlan)
     auto shallowYTensor = createShallowTensor<float>(
         params.yTensor, directTensorBundle.tensors[attributes.y_tensor_uid()]->rawHostData());
 
+<<<<<<< HEAD
     const double epsilon = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
         params.epsilonTensor, "Epsilon");
+=======
+    const double epsilon
+        = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(params.epsilonTensor, "Epsilon");
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     CpuFpReferenceBatchnorm::fwdInferenceWithVariance(*shallowXTensor,
                                                       *shallowScaleTensor,
@@ -106,9 +116,14 @@ TEST(TestBatchnormFwdWithVariancePlanBuilder, PlanConstruction)
                                                              DataType::FLOAT,
                                                              dims,
                                                              TensorLayout::NHWC);
+<<<<<<< HEAD
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const BatchnormFwdInferenceWithVariancePlanBuilder<DataType::FLOAT,
                                                        DataType::FLOAT,
@@ -135,9 +150,14 @@ TEST(TestBatchnormFwdWithVariancePlanBuilder, IsApplicable)
                                                              DataType::FLOAT,
                                                              dims,
                                                              TensorLayout::NHWC);
+<<<<<<< HEAD
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
     const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+=======
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     const BatchnormFwdInferenceWithVariancePlanBuilder<DataType::FLOAT,
                                                        DataType::FLOAT,

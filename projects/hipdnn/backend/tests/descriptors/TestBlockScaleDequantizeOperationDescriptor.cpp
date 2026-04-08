@@ -11,12 +11,21 @@
 #include "hipdnn_backend.h"
 
 #include <gtest/gtest.h>
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/block_scale_dequantize_attributes_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/tensor_attributes_generated.h>
 #include <hipdnn_test_sdk/constants/BlockScaleDequantizeConstants.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/block_scale_dequantize_attributes_generated.h>
+#include <hipdnn_data_sdk/data_objects/tensor_attributes_generated.h>
+#include <hipdnn_test_sdk/constants/BlockScaleDequantizeConstants.hpp>
+#include <hipdnn_test_sdk/utilities/ToVec.hpp>
+
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 #include <algorithm>
 #include <memory>
@@ -24,7 +33,11 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::test_utilities;
+<<<<<<< HEAD
 using namespace hipdnn_flatbuffers_sdk::data_objects;
+=======
+using namespace hipdnn_data_sdk::data_objects;
+>>>>>>> d9e199e220 (merge b-shi branch)
 using namespace hipdnn_tests::constants;
 using hipdnn_tests::toVec;
 
@@ -45,6 +58,7 @@ public:
                 desc->setAttribute(attr, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, &tensor);
             }
         };
+<<<<<<< HEAD
         setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC, _xDesc);
         setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_DESC, _scaleDesc);
         setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC, _yDesc);
@@ -55,16 +69,37 @@ public:
         {
             std::vector<int32_t> blockSize = {K_BSD_BLOCK_SIZE};
             desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+        setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT, _xDesc);
+        setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT, _scaleDesc);
+        setIf(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT, _yDesc);
+
+        if(std::find(skip.begin(),
+                     skip.end(),
+                     HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT)
+           == skip.end())
+        {
+            std::vector<int32_t> blockSize = {K_BSD_BLOCK_SIZE};
+            desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                HIPDNN_TYPE_INT32,
                                1,
                                blockSize.data());
         }
+<<<<<<< HEAD
         if(std::find(
                skip.begin(), skip.end(), HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC)
            == skip.end())
         {
             auto computeType = HIPDNN_DATA_FLOAT;
             desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
+=======
+        if(std::find(skip.begin(), skip.end(), HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT)
+           == skip.end())
+        {
+            auto computeType = HIPDNN_DATA_FLOAT;
+            desc->setAttribute(HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                HIPDNN_TYPE_DATA_TYPE,
                                1,
                                &computeType);
@@ -116,7 +151,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, CreateDescriptor)
     auto desc = getDescriptor();
     ASSERT_NE(desc, nullptr);
     ASSERT_FALSE(desc->isFinalized());
+<<<<<<< HEAD
     ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR);
+=======
+    ASSERT_EQ(desc->getType(), HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR_EXT);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, FinalizeWithRequiredAttributes)
@@ -142,6 +181,7 @@ TEST_P(TestBlockScaleDequantizeOperationDescriptorFinalizeFailsWithout, Finalize
     ASSERT_THROW_HIPDNN_STATUS(getDescriptor()->finalize(), HIPDNN_STATUS_BAD_PARAM);
 }
 
+<<<<<<< HEAD
 INSTANTIATE_TEST_SUITE_P(RequiredAttributes,
                          TestBlockScaleDequantizeOperationDescriptorFinalizeFailsWithout,
                          ::testing::Values(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
@@ -149,6 +189,16 @@ INSTANTIATE_TEST_SUITE_P(RequiredAttributes,
                                            HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC,
                                            HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
                                            HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC));
+=======
+INSTANTIATE_TEST_SUITE_P(
+    RequiredAttributes,
+    TestBlockScaleDequantizeOperationDescriptorFinalizeFailsWithout,
+    ::testing::Values(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+                      HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT,
+                      HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT,
+                      HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+                      HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 // =============================================================================
 // SetAttribute Tests - Tensor Descriptors
@@ -157,7 +207,11 @@ INSTANTIATE_TEST_SUITE_P(RequiredAttributes,
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorDescriptorX)
 {
     auto desc = getDescriptor();
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+    ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                        1,
                                        &_xDesc));
@@ -169,7 +223,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorDescriptorX)
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorDescriptorScale)
 {
     auto desc = getDescriptor();
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_DESC,
+=======
+    ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                        1,
                                        &_scaleDesc));
@@ -181,7 +239,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorDescriptorScale)
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorDescriptorY)
 {
     auto desc = getDescriptor();
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC,
+=======
+    ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                                        1,
                                        &_yDesc));
@@ -194,7 +256,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorFailsNotFinalized)
 {
     auto desc = getDescriptor();
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            1,
                            &_unfinalizedTensor),
@@ -206,7 +272,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorFailsWrongType)
     auto desc = getDescriptor();
     ASSERT_THROW_HIPDNN_STATUS(
         desc->setAttribute(
+<<<<<<< HEAD
             HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC, HIPDNN_TYPE_INT64, 1, &_xDesc),
+=======
+            HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT, HIPDNN_TYPE_INT64, 1, &_xDesc),
+>>>>>>> d9e199e220 (merge b-shi branch)
         HIPDNN_STATUS_BAD_PARAM);
 }
 
@@ -214,7 +284,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorFailsWrongElementCo
 {
     auto desc = getDescriptor();
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            2,
                            &_xDesc),
@@ -225,7 +299,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetTensorFailsNullPointer)
 {
     auto desc = getDescriptor();
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            1,
                            nullptr),
@@ -241,18 +319,30 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetBlockSize)
     auto desc = getDescriptor();
     std::vector<int32_t> blockSize = {K_BSD_BLOCK_SIZE};
 
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        1,
                                        blockSize.data()));
 
     // Verify round-trip via getAttribute after finalize
+<<<<<<< HEAD
     setAllAttributesExcept({HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE});
+=======
+    setAllAttributesExcept({HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT});
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->finalize();
 
     std::vector<int32_t> retrieved(1);
     int64_t count = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        1,
                                        &count,
@@ -266,10 +356,18 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetIsNegativeScale)
     auto desc = getDescriptor();
     bool isNegativeScale = true;
 
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
                                        HIPDNN_TYPE_BOOLEAN,
                                        1,
                                        &isNegativeScale));
+=======
+    ASSERT_NO_THROW(
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+                           HIPDNN_TYPE_BOOLEAN,
+                           1,
+                           &isNegativeScale));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     ASSERT_EQ(desc->getData().is_negative_scale, true);
 }
@@ -279,10 +377,15 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetComputeDataType)
     auto desc = getDescriptor();
     auto computeType = HIPDNN_DATA_FLOAT;
 
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
                                        HIPDNN_TYPE_DATA_TYPE,
                                        1,
                                        &computeType));
+=======
+    ASSERT_NO_THROW(desc->setAttribute(
+        HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     ASSERT_EQ(desc->getComputeDataType(), DataType::FLOAT);
 }
@@ -292,12 +395,20 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetComputeDataTypeWrongEleme
     auto desc = getDescriptor();
     auto computeType = HIPDNN_DATA_FLOAT;
 
+<<<<<<< HEAD
     ASSERT_THROW_HIPDNN_STATUS(
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
                            HIPDNN_TYPE_DATA_TYPE,
                            2,
                            &computeType),
         HIPDNN_STATUS_BAD_PARAM);
+=======
+    ASSERT_THROW_HIPDNN_STATUS(desc->setAttribute(HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT,
+                                                  HIPDNN_TYPE_DATA_TYPE,
+                                                  2,
+                                                  &computeType),
+                               HIPDNN_STATUS_BAD_PARAM);
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetBlockSizeParamsWrongType)
@@ -306,7 +417,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetBlockSizeParamsWrongType)
     std::vector<int64_t> padding = {1, 1};
 
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_CHAR,
                            2,
                            padding.data()),
@@ -323,7 +438,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, SetAttributeFailsAfterFinali
     auto desc = getDescriptor();
 
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            1,
                            &_xDesc),
@@ -401,12 +520,21 @@ INSTANTIATE_TEST_SUITE_P(
     AllTensors,
     TestBlockScaleDequantizeOperationDescriptorGetTensor,
     ::testing::Values(
+<<<<<<< HEAD
         TensorAttrCase{HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC, "X", K_BSD_TENSOR_X_UID},
         TensorAttrCase{HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_DESC,
                        "Scale",
                        K_BSD_TENSOR_SCALE_UID},
         TensorAttrCase{
             HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC, "Y", K_BSD_TENSOR_Y_UID}),
+=======
+        TensorAttrCase{HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT, "X", K_BSD_TENSOR_X_UID},
+        TensorAttrCase{HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT,
+                       "Scale",
+                       K_BSD_TENSOR_SCALE_UID},
+        TensorAttrCase{
+            HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT, "Y", K_BSD_TENSOR_Y_UID}),
+>>>>>>> d9e199e220 (merge b-shi branch)
     [](const ::testing::TestParamInfo<TensorAttrCase>& info) { return info.param.name; });
 
 // =============================================================================
@@ -420,7 +548,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeBlockSize)
 
     std::vector<int32_t> blockSize(1);
     int64_t blockSizeCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        1,
                                        &blockSizeCount,
@@ -438,11 +570,20 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeIsNegativeScaleD
 
     bool isNegativeScale = true; // initialise to wrong value to confirm it is overwritten
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
                                        HIPDNN_TYPE_BOOLEAN,
                                        1,
                                        &elementCount,
                                        &isNegativeScale));
+=======
+    ASSERT_NO_THROW(
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+                           HIPDNN_TYPE_BOOLEAN,
+                           1,
+                           &elementCount,
+                           &isNegativeScale));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     ASSERT_EQ(elementCount, 1);
     EXPECT_FALSE(isNegativeScale);
@@ -453,7 +594,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeIsNegativeScaleW
     setAllAttributesExcept();
     auto desc = getDescriptor();
     bool isNegativeScale = true;
+<<<<<<< HEAD
     desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
+=======
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BOOLEAN,
                        1,
                        &isNegativeScale);
@@ -461,11 +606,20 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeIsNegativeScaleW
 
     bool retrieved = false;
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
                                        HIPDNN_TYPE_BOOLEAN,
                                        1,
                                        &elementCount,
                                        &retrieved));
+=======
+    ASSERT_NO_THROW(
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+                           HIPDNN_TYPE_BOOLEAN,
+                           1,
+                           &elementCount,
+                           &retrieved));
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     ASSERT_EQ(elementCount, 1);
     EXPECT_TRUE(retrieved);
@@ -474,17 +628,28 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeIsNegativeScaleW
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeComputeType)
 {
     auto desc = getDescriptor();
+<<<<<<< HEAD
     setAllAttributesExcept({HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC});
     auto computeType = HIPDNN_DATA_HALF;
     desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
                        HIPDNN_TYPE_DATA_TYPE,
                        1,
                        &computeType);
+=======
+    setAllAttributesExcept({HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT});
+    auto computeType = HIPDNN_DATA_HALF;
+    desc->setAttribute(
+        HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->finalize();
 
     hipdnnDataType_t retrieved = HIPDNN_DATA_FLOAT;
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_DATA_TYPE,
                                        1,
                                        &elementCount,
@@ -500,7 +665,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeBlockSizeQueryRe
     auto desc = getDescriptor();
 
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        0,
                                        &elementCount,
@@ -514,11 +683,20 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeIsNegativeScaleQ
     auto desc = getDescriptor();
 
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
                                        HIPDNN_TYPE_BOOLEAN,
                                        0,
                                        &elementCount,
                                        nullptr));
+=======
+    ASSERT_NO_THROW(
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+                           HIPDNN_TYPE_BOOLEAN,
+                           0,
+                           &elementCount,
+                           nullptr));
+>>>>>>> d9e199e220 (merge b-shi branch)
     ASSERT_EQ(elementCount, 1);
 }
 
@@ -528,7 +706,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeComputeTypeQuery
     auto desc = getDescriptor();
 
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_DATA_TYPE,
                                        0,
                                        &elementCount,
@@ -543,7 +725,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeBlockSizeQueryTh
 
     // Query: get the element count
     int64_t elementCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        0,
                                        &elementCount,
@@ -553,7 +739,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeBlockSizeQueryTh
     // Retrieve: use the queried count to allocate and fetch
     std::vector<int32_t> blockSize(static_cast<size_t>(elementCount));
     int64_t retrievedCount = 0;
+<<<<<<< HEAD
     ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE,
+=======
+    ASSERT_NO_THROW(desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                                        HIPDNN_TYPE_INT32,
                                        elementCount,
                                        &retrievedCount,
@@ -573,7 +763,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeFailsBeforeFinal
 
     HipdnnBackendDescriptor* dummy = nullptr;
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            1,
                            nullptr,
@@ -587,7 +781,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeFailsNullPointer
     auto desc = getDescriptor();
 
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            1,
                            nullptr,
@@ -612,7 +810,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, GetAttributeTensorQueryFails
     auto desc = getDescriptor();
 
     ASSERT_THROW_HIPDNN_STATUS(
+<<<<<<< HEAD
         desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC,
+=======
+        desc->getAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                            HIPDNN_TYPE_BACKEND_DESCRIPTOR,
                            0,
                            nullptr,
@@ -685,7 +887,11 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, BuildNodeWithIsNegativeScale
     setAllAttributesExcept();
     auto desc = getDescriptor();
     bool isNegativeScale = true;
+<<<<<<< HEAD
     desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE,
+=======
+    desc->setAttribute(HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT,
+>>>>>>> d9e199e220 (merge b-shi branch)
                        HIPDNN_TYPE_BOOLEAN,
                        1,
                        &isNegativeScale);
@@ -701,6 +907,7 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, BuildNodeWithIsNegativeScale
 
 TEST_F(TestBlockScaleDequantizeOperationDescriptor, BuildNodeWithHalfComputeType)
 {
+<<<<<<< HEAD
     setAllAttributesExcept({HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC});
     auto desc = getDescriptor();
     auto computeType = HIPDNN_DATA_HALF;
@@ -708,6 +915,13 @@ TEST_F(TestBlockScaleDequantizeOperationDescriptor, BuildNodeWithHalfComputeType
                        HIPDNN_TYPE_DATA_TYPE,
                        1,
                        &computeType);
+=======
+    setAllAttributesExcept({HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT});
+    auto desc = getDescriptor();
+    auto computeType = HIPDNN_DATA_HALF;
+    desc->setAttribute(
+        HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT, HIPDNN_TYPE_DATA_TYPE, 1, &computeType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     desc->finalize();
 
     auto node = desc->buildNode();

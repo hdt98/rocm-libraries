@@ -178,6 +178,7 @@ function(add_hiptensor_test BINARY_NAME YAML_CONFIG_FILE TEST_SOURCES)
     set_property(TEST ${BINARY_NAME} PROPERTY SKIP_REGULAR_EXPRESSION "HIPTENSOR_STATUS_ARCH_MISMATCH" "unsupported host device")
     # Set working directory to bin/ for proper DLL/resource loading on Windows
     set_property(TEST ${BINARY_NAME} PROPERTY WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+<<<<<<< HEAD
 
     # On Windows, ensure the ROCm/HIP DLLs (amdhip64_7.dll, etc.) are discoverable by ctest.
     # ctest may not inherit the user's PATH that includes the ROCm bin directory, causing
@@ -186,6 +187,8 @@ function(add_hiptensor_test BINARY_NAME YAML_CONFIG_FILE TEST_SOURCES)
         set_property(TEST ${BINARY_NAME} PROPERTY ENVIRONMENT
             "PATH=${CMAKE_INSTALL_PREFIX}/bin$<SEMICOLON>${CMAKE_RUNTIME_OUTPUT_DIRECTORY}$<SEMICOLON>$ENV{PATH}")
     endif()
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     # Install with rocm pkg
     rocm_install_targets(
@@ -248,6 +251,7 @@ function(add_hiptensor_unit_test)
     set_property(TEST ${BINARY_NAME} PROPERTY SKIP_REGULAR_EXPRESSION "HIPTENSOR_STATUS_ARCH_MISMATCH" "unsupported host device")
     # Set working directory to bin/ for proper DLL/resource loading on Windows
     set_property(TEST ${BINARY_NAME} PROPERTY WORKING_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+<<<<<<< HEAD
 
     # On Windows, ensure the ROCm/HIP DLLs (amdhip64_7.dll, etc.) are discoverable by ctest.
     # ctest may not inherit the user's PATH that includes the ROCm bin directory, causing
@@ -256,6 +260,8 @@ function(add_hiptensor_unit_test)
         set_property(TEST ${BINARY_NAME} PROPERTY ENVIRONMENT
             "PATH=${CMAKE_INSTALL_PREFIX}/bin$<SEMICOLON>${CMAKE_RUNTIME_OUTPUT_DIRECTORY}$<SEMICOLON>$ENV{PATH}")
     endif()
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     # Install with rocm pkg
     rocm_install_targets(

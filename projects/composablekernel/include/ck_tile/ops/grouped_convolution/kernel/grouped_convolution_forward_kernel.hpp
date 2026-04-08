@@ -898,7 +898,11 @@ struct GroupedConvolutionForwardKernel
                 pad_tensor_view(a_tensor_view,
                                 make_tuple(number<TilePartitioner::MPerBlock>{},
                                            number<TilePartitioner::KPerBlock>{}),
+<<<<<<< HEAD
                                 sequence<false, true>{});
+=======
+                                sequence<true, true>{});
+>>>>>>> d9e199e220 (merge b-shi branch)
 
             // Step 3: Create tile window
             return make_tile_window(a_pad_view,
@@ -924,7 +928,11 @@ struct GroupedConvolutionForwardKernel
                 pad_tensor_view(a_tensor_view,
                                 make_tuple(number<TilePartitioner::KPerBlock>{},
                                            number<TilePartitioner::MPerBlock>{}),
+<<<<<<< HEAD
                                 sequence<false, true>{});
+=======
+                                sequence<true, true>{});
+>>>>>>> d9e199e220 (merge b-shi branch)
 
             // Step 3: Create tile window
             return make_tile_window(a_pad_view,

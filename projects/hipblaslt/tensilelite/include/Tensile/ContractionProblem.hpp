@@ -1092,6 +1092,20 @@ namespace TensileLite
             m_swizzleTensorB = swizzle;
         }
 
+        void setMXScaleA(int mxBlock, std::vector<size_t> saStride = {});
+
+        size_t mxBlockA() const
+        {
+            return m_mxBlockA;
+        }
+
+        void setMXScaleB(int mxBlock, std::vector<size_t> sbStride = {});
+
+        size_t mxBlockB() const
+        {
+            return m_mxBlockB;
+        }
+
         /// Allocated elements excluding batch dimensions
         /// Used in assembly kernels to determine buffer limits, if batch dimes not
         /// packed
@@ -1150,6 +1164,14 @@ namespace TensileLite
         TensorDescriptor const& amaxd() const
         {
             return m_tensors[ContractionProblemGemm::TENSOR::AMAXD];
+        }
+        TensorDescriptor const& mxsa() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSA];
+        }
+        TensorDescriptor const& mxsb() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSB];
         }
         TensorOps const& aOps() const
         {

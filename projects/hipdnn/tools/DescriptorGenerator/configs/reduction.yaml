@@ -5,7 +5,11 @@ operation:
   fbs_generated_header: "reduction_attributes_generated.h"
 
   descriptor_type:
+<<<<<<< HEAD
     enum_name: "HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR"
+=======
+    enum_name: "HIPDNN_BACKEND_OPERATION_REDUCTION_DESCRIPTOR_EXT"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
   operation_attr_prefix: "HIPDNN_ATTR_OPERATION_REDUCTION"
 
@@ -43,20 +47,32 @@ operation:
   tensor_fields:
     - name: "x"
       fbs_field: "in_tensor_uid"
+<<<<<<< HEAD
       attr_suffix: "XDESC"
+=======
+      attr_suffix: "X_EXT"
+>>>>>>> d9e199e220 (merge b-shi branch)
       required: true
       frontend_getter: "get_x()"
 
     - name: "y"
       fbs_field: "out_tensor_uid"
+<<<<<<< HEAD
       attr_suffix: "YDESC"
+=======
+      attr_suffix: "Y_EXT"
+>>>>>>> d9e199e220 (merge b-shi branch)
       required: true
       frontend_getter: "get_y()"
 
   data_fields:
     - name: "mode"
       fbs_field: "mode"
+<<<<<<< HEAD
       attr_name: "HIPDNN_ATTR_REDUCTION_OPERATOR"
+=======
+      attr_name: "HIPDNN_ATTR_REDUCTION_MODE_EXT"
+>>>>>>> d9e199e220 (merge b-shi branch)
       type: "mode"
       cpp_enum: "hipdnn_data_sdk::data_objects::ReductionMode"
       frontend_type: "ReductionMode"
@@ -67,6 +83,7 @@ operation:
       backend_setter: "setReductionMode"
       backend_getter: "getReductionMode"
       backend_converter: "toBackendReductionMode"
+<<<<<<< HEAD
       frontend_inverse_converter: "fromHipdnnReduceTensorOp"
       backend_type_name: "HIPDNN_TYPE_REDUCTION_OPERATOR_TYPE"
       test_enum_value: "ADD"
@@ -77,6 +94,18 @@ operation:
       enum_def:
         backend_header: "HipdnnReduceTensorOp.h"
         backend_prefix: "HIPDNN_REDUCE_TENSOR_"
+=======
+      frontend_inverse_converter: "fromHipdnnReductionMode"
+      backend_type_name: "HIPDNN_TYPE_REDUCTION_MODE"
+      test_enum_value: "ADD"
+      test_alt_enum_value: "AMAX"
+      test_backend_value: "HIPDNN_REDUCTION_ADD"
+      test_c_type: "hipdnnReductionMode_t"
+      test_default_value: "HIPDNN_REDUCTION_ADD"
+      enum_def:
+        backend_header: "HipdnnReductionMode.h"
+        backend_prefix: "HIPDNN_REDUCTION_"
+>>>>>>> d9e199e220 (merge b-shi branch)
         values:
           - { name: "NOT_SET", value: 0, sentinel: true }
           - { name: "ADD", value: 1, description: "Sum reduction" }
@@ -91,7 +120,11 @@ operation:
 
     - name: "is_deterministic"
       fbs_field: "is_deterministic"
+<<<<<<< HEAD
       attr_name: "HIPDNN_ATTR_REDUCTION_IS_DETERMINISTIC"
+=======
+      attr_name: "HIPDNN_ATTR_REDUCTION_IS_DETERMINISTIC_EXT"
+>>>>>>> d9e199e220 (merge b-shi branch)
       type: "bool"
       required: false
       frontend_getter: "get_is_deterministic()"
@@ -99,6 +132,7 @@ operation:
   tensor_array_fields: []
 
   has_compute_data_type: true
+<<<<<<< HEAD
   compute_data_type_attr: "HIPDNN_ATTR_REDUCTION_COMP_TYPE"
 
   operation_type_enum: "HIPDNN_OPERATION_TYPE_REDUCTION_EXT"
@@ -107,6 +141,14 @@ operation:
     constants_include: "ReductionConstants"
     tensor_const_prefix: "K_REDUCTION_"
     tensor_uids: { x: 1700, y: 1701 }
+=======
+  compute_data_type_attr: "HIPDNN_ATTR_REDUCTION_MATH_PREC_EXT"
+
+  operation_type_enum: "HIPDNN_OPERATION_TYPE_REDUCTION"
+
+  test_data:
+    tensor_uids: { x: 90, y: 91 }
+>>>>>>> d9e199e220 (merge b-shi branch)
     tensor_configs:
       x: { dims: [2, 3, 4, 4], strides: [48, 16, 4, 1] }
       y: { dims: [2, 3, 1, 1], strides: [3, 1, 1, 1] }

@@ -28,7 +28,11 @@
 
 .PARAMETER GpuTarget
     GPU architecture target for the CMake example.
+<<<<<<< HEAD
     Default: gfx1151
+=======
+    Default: gfx1103
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 .EXAMPLE
     .\wheel_build_setup.ps1
@@ -39,7 +43,11 @@
     Installs specific wheels from S3 staging.
 
 .EXAMPLE
+<<<<<<< HEAD
     .\wheel_build_setup.ps1 -VenvPath "C:\my_venv" -ClangPath "C:\clang\bin" -GpuTarget "gfx1151"
+=======
+    .\wheel_build_setup.ps1 -VenvPath "C:\my_venv" -ClangPath "C:\clang\bin" -GpuTarget "gfx1100"
+>>>>>>> d9e199e220 (merge b-shi branch)
     Installs from nightlies with custom paths and GPU target.
 #>
 
@@ -47,6 +55,7 @@ param(
     [string]$SHA = "",
     [string]$VenvPath = "D:\develop\latest_wheels",
     [string]$ClangPath = "D:\develop\dist\clang\bin",
+<<<<<<< HEAD
     [string]$GpuTarget = "gfx1151"
 )
 
@@ -72,6 +81,12 @@ $VerifiedGpuTarget = $GpuTarget.ToLower() -match "^(gfx115[0-9]|gfx(120[0-9]|110
 if (-not $VerifiedGpuTarget) {
     Write-Warning "GPU target '$GpuTarget' is not in the verified list (gfx115x, gfx120x[-all], gfx110x[-all], gfx103x[-all], gfx90x[-all]). Wheel install may not work."
 }
+=======
+    [string]$GpuTarget = "gfx1103"
+)
+
+$ErrorActionPreference = "Stop"
+>>>>>>> d9e199e220 (merge b-shi branch)
 
 # --- Display configuration ---
 
@@ -85,7 +100,10 @@ if ($SHA) {
 Write-Host "  Venv Path:  $VenvPath"
 Write-Host "  Clang Path: $ClangPath"
 Write-Host "  GPU Target: $GpuTarget"
+<<<<<<< HEAD
 Write-Host "  Wheel Group: $RocmArtifactGroup"
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)
 Write-Host ""
 
 # --- Create or reuse virtual environment ---
@@ -121,6 +139,7 @@ if (-not $SkipInstall) {
     Write-Host "Installing ROCm wheels..." -ForegroundColor Yellow
 
     if ($SHA) {
+<<<<<<< HEAD
         $BaseUrl = "https://therock-dev-python.s3.amazonaws.com/v2-staging/$RocmArtifactGroup"
 
         Write-Host "  Source: S3 staging (SHA: $SHA, group: $RocmArtifactGroup)" -ForegroundColor Yellow
@@ -132,6 +151,19 @@ if (-not $SkipInstall) {
     } else {
         Write-Host "  Source: ROCm nightlies (group: $RocmArtifactGroup)" -ForegroundColor Yellow
         pip install --index-url "https://rocm.nightlies.amd.com/v2/$RocmArtifactGroup/" "rocm[libraries,devel]"
+=======
+        $BaseUrl = "https://therock-dev-python.s3.amazonaws.com/v2-staging/gfx110X-all"
+
+        Write-Host "  Source: S3 staging (SHA: $SHA)" -ForegroundColor Yellow
+        pip install `
+            "$BaseUrl/rocm-7.12.0.dev0%2B$SHA.tar.gz" `
+            "$BaseUrl/rocm_sdk_core-7.12.0.dev0%2B$SHA-py3-none-win_amd64.whl" `
+            "$BaseUrl/rocm_sdk_libraries_gfx110x_all-7.12.0.dev0%2B$SHA-py3-none-win_amd64.whl" `
+            "$BaseUrl/rocm_sdk_devel-7.12.0.dev0%2B$SHA-py3-none-win_amd64.whl"
+    } else {
+        Write-Host "  Source: ROCm nightlies" -ForegroundColor Yellow
+        pip install --index-url https://rocm.nightlies.amd.com/v2/gfx110X-all/ "rocm[libraries,devel]"
+>>>>>>> d9e199e220 (merge b-shi branch)
     }
 
     if ($LASTEXITCODE -ne 0) {
@@ -175,6 +207,7 @@ Write-Host "=== Sample CMake command for hipDNN ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "cmake -GNinja -DGPU_TARGETS=$GpuTarget -DCMAKE_PREFIX_PATH=$RocmDevelUnix -DCMAKE_PROGRAM_PATH=$ClangPathUnix .." -ForegroundColor White
 Write-Host ""
+<<<<<<< HEAD
 Write-Host "=== Sample CMake command for rocm-libraries superbuild ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "# Run from the rocm-libraries repository root" -ForegroundColor DarkGray
@@ -215,3 +248,5 @@ foreach ($pathEntry in $CurrentPathParts) {
 if (-not $HasRocmBinInCurrentPath) {
     $env:PATH = "$RocmBin;$env:PATH"
 }
+=======
+>>>>>>> d9e199e220 (merge b-shi branch)

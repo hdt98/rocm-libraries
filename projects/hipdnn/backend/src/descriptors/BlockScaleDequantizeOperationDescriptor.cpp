@@ -27,7 +27,11 @@ void BlockScaleDequantizeOperationDescriptor::finalize()
                   HIPDNN_STATUS_BAD_PARAM,
                   "BlockScaleDequantizeOperationDescriptor::finalize() failed: block_size not set");
     THROW_IF_TRUE(
+<<<<<<< HEAD
         _computeDataType == hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET,
+=======
+        _computeDataType == hipdnn_data_sdk::data_objects::DataType::UNSET,
+>>>>>>> d9e199e220 (merge b-shi branch)
         HIPDNN_STATUS_BAD_PARAM,
         "BlockScaleDequantizeOperationDescriptor::finalize() failed: compute data type not "
         "set");
@@ -52,7 +56,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setTensorDescriptor(_xDesc,
                             _data.x_tensor_uid,
                             attributeType,
@@ -60,7 +68,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_DESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setTensorDescriptor(_scaleDesc,
                             _data.scale_tensor_uid,
                             attributeType,
@@ -68,7 +80,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setTensorDescriptor(_yDesc,
                             _data.y_tensor_uid,
                             attributeType,
@@ -76,7 +92,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalarVector(_data.block_size,
                         HIPDNN_TYPE_INT32,
                         attributeType,
@@ -84,7 +104,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
                         arrayOfElements,
                         "BlockScaleDequantizeOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setScalar(_data.is_negative_scale,
                   HIPDNN_TYPE_BOOLEAN,
                   attributeType,
@@ -92,7 +116,11 @@ void BlockScaleDequantizeOperationDescriptor::setAttribute(
                   arrayOfElements,
                   "BlockScaleDequantizeOperationDescriptor::setAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC:
+=======
+    case HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         setDataType(_computeDataType,
                     attributeType,
                     elementCount,
@@ -132,7 +160,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
 
     switch(attributeName)
     {
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_XDESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_X_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getTensorDescriptor(_xDesc,
                             attributeType,
                             requestedElementCount,
@@ -140,7 +172,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_DESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_SCALE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getTensorDescriptor(_scaleDesc,
                             attributeType,
                             requestedElementCount,
@@ -148,7 +184,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_YDESC:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_Y_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getTensorDescriptor(_yDesc,
                             attributeType,
                             requestedElementCount,
@@ -156,7 +196,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                             arrayOfElements,
                             "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_BLOCK_SIZE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalarVector(_data.block_size,
                         HIPDNN_TYPE_INT32,
                         attributeType,
@@ -165,7 +209,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                         arrayOfElements,
                         "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_NEG_SCALE:
+=======
+    case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_IS_NEGATIVE_SCALE_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalar(_data.is_negative_scale,
                   HIPDNN_TYPE_BOOLEAN,
                   attributeType,
@@ -174,7 +222,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                   arrayOfElements,
                   "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_OPERATION_BLOCK_SCALE_DEQUANTIZE_MATH_PREC:
+=======
+    case HIPDNN_ATTR_BLOCK_SCALE_DEQUANTIZE_MATH_PREC_EXT:
+>>>>>>> d9e199e220 (merge b-shi branch)
         getDataType(_computeDataType,
                     attributeType,
                     requestedElementCount,
@@ -191,7 +243,11 @@ void BlockScaleDequantizeOperationDescriptor::getAttribute(
                   "BlockScaleDequantizeOperationDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_OPERATION_TYPE_EXT:
+<<<<<<< HEAD
         getOperationType(HIPDNN_OPERATION_TYPE_BLOCK_SCALE_DEQUANTIZE_EXT,
+=======
+        getOperationType(HIPDNN_OPERATION_TYPE_BLOCK_SCALE_DEQUANTIZE,
+>>>>>>> d9e199e220 (merge b-shi branch)
                          attributeType,
                          requestedElementCount,
                          elementCount,
@@ -216,6 +272,7 @@ std::vector<std::shared_ptr<TensorDescriptor>>
     return {_xDesc, _scaleDesc, _yDesc};
 }
 
+<<<<<<< HEAD
 std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
     BlockScaleDequantizeOperationDescriptor::buildNode() const
 {
@@ -225,12 +282,26 @@ std::unique_ptr<hipdnn_flatbuffers_sdk::data_objects::NodeT>
 
     node->attributes.Set(
         hipdnn_flatbuffers_sdk::data_objects::BlockScaleDequantizeAttributesT(_data));
+=======
+std::unique_ptr<hipdnn_data_sdk::data_objects::NodeT>
+    BlockScaleDequantizeOperationDescriptor::buildNode() const
+{
+    auto node = std::make_unique<hipdnn_data_sdk::data_objects::NodeT>();
+    node->name = _name;
+    node->compute_data_type = _computeDataType;
+
+    node->attributes.Set(hipdnn_data_sdk::data_objects::BlockScaleDequantizeAttributesT(_data));
+>>>>>>> d9e199e220 (merge b-shi branch)
     return node;
 }
 
 hipdnnBackendDescriptorType_t BlockScaleDequantizeOperationDescriptor::getStaticType()
 {
+<<<<<<< HEAD
     return HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR;
+=======
+    return HIPDNN_BACKEND_OPERATION_BLOCK_SCALE_DEQUANTIZE_DESCRIPTOR_EXT;
+>>>>>>> d9e199e220 (merge b-shi branch)
 }
 
 std::string BlockScaleDequantizeOperationDescriptor::toString() const
@@ -244,14 +315,22 @@ std::string BlockScaleDequantizeOperationDescriptor::toString() const
     str += ", block_size=" + vecToString(_data.block_size);
     str += ", is_negative_scale=" + std::to_string(static_cast<int>(_data.is_negative_scale));
     str += ", compute_data_type=";
+<<<<<<< HEAD
     str += hipdnn_flatbuffers_sdk::data_objects::EnumNameDataType(_computeDataType);
+=======
+    str += hipdnn_data_sdk::data_objects::EnumNameDataType(_computeDataType);
+>>>>>>> d9e199e220 (merge b-shi branch)
     str += "}";
     return str;
 }
 
 std::shared_ptr<BlockScaleDequantizeOperationDescriptor>
     BlockScaleDequantizeOperationDescriptor::fromNode(
+<<<<<<< HEAD
         const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
+=======
+        const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+>>>>>>> d9e199e220 (merge b-shi branch)
         const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap)
 {
     const auto* attrs = nodeT.attributes.AsBlockScaleDequantizeAttributes();

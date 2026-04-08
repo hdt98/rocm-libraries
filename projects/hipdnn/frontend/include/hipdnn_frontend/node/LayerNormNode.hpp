@@ -307,6 +307,12 @@ public:
                     static_cast<int64_t>(attributes.get_scale()->get_dim().size()));
             }
         }
+<<<<<<< HEAD
+=======
+
+        return {};
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 
         return {};
     }

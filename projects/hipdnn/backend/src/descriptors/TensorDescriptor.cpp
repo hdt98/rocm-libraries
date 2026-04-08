@@ -97,10 +97,16 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
     case HIPDNN_ATTR_TENSOR_VALUE_EXT:
         getTensorValue(attributeType, requestedElementCount, elementCount, arrayOfElements);
         break;
+<<<<<<< HEAD
     case HIPDNN_ATTR_TENSOR_IS_BY_VALUE:
     {
         const bool isByValue
             = _data.value.type != hipdnn_flatbuffers_sdk::data_objects::TensorValue::NONE;
+=======
+    case HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT:
+    {
+        const bool isByValue = _data.value.type != hipdnn_data_sdk::data_objects::TensorValue::NONE;
+>>>>>>> d9e199e220 (merge b-shi branch)
         getScalar(isByValue,
                   HIPDNN_TYPE_BOOLEAN,
                   attributeType,

@@ -116,8 +116,32 @@ inline TensorAttributes makeTensorAttributes(const std::string& name,
 
 /**
  * @brief Create TensorAttributes from a single constant value
+<<<<<<< HEAD
  *
  * The data type will be set from the type of the value. Useful for tensors that contain single constants, for example an epsilon.
+=======
+ *
+ * The data type will be set from the type of the value. Useful for tensors that contain single constants, for example an epsilon.
+ *
+ * @param name Human-readable name for debugging and serialization
+ * @param value Constant value to be inserted into the tensor
+ * @return Configured TensorAttributes ready to pass to Graph operations
+ */
+template <typename T>
+inline TensorAttributes makeTensorAttributes(const std::string& name, const T value)
+{
+    return TensorAttributes().set_name(name).set_value(value);
+}
+
+/**
+ * @brief Allocate a Data SDK ITensor that matches the given attributes
+ *
+ * Creates an actual tensor object from a descriptor. Host memory is
+ * allocated immediately; device memory is allocated lazily on first
+ * access. Primarily used in tests and utilities — in production code
+ * you typically manage your own device memory and just pass pointers
+ * via the variant pack.
+>>>>>>> d9e199e220 (merge b-shi branch)
  *
  * @param name Human-readable name for debugging and serialization
  * @param value Constant value to be inserted into the tensor

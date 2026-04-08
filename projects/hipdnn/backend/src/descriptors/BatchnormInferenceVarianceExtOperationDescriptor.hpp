@@ -6,8 +6,13 @@
 #include "BackendDescriptor.hpp"
 #include "IGraphOperation.hpp"
 #include "TensorDescriptor.hpp"
+<<<<<<< HEAD
 #include <hipdnn_flatbuffers_sdk/data_objects/batchnorm_inference_attributes_variance_ext_generated.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+=======
+#include <hipdnn_data_sdk/data_objects/batchnorm_inference_attributes_variance_ext_generated.h>
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <unordered_map>
 
 namespace hipdnn_backend
@@ -83,6 +88,11 @@ public:
         fromNode(const hipdnn_flatbuffers_sdk::data_objects::NodeT& nodeT,
                  const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
 
+    /// Reconstructs a descriptor from a FlatBuffer NodeT and a pre-built tensor map.
+    static std::shared_ptr<BatchnormInferenceVarianceExtOperationDescriptor>
+        fromNode(const hipdnn_data_sdk::data_objects::NodeT& nodeT,
+                 const std::unordered_map<int64_t, std::shared_ptr<TensorDescriptor>>& tensorMap);
+
     static hipdnnBackendDescriptorType_t getStaticType();
 
     std::string toString() const override;
@@ -100,8 +110,13 @@ private:
     std::shared_ptr<TensorDescriptor> _epsilonDesc;
 
     // Compute data type for this operation (stored at node level in graph)
+<<<<<<< HEAD
     hipdnn_flatbuffers_sdk::data_objects::DataType _computeDataType
         = hipdnn_flatbuffers_sdk::data_objects::DataType::UNSET;
+=======
+    hipdnn_data_sdk::data_objects::DataType _computeDataType
+        = hipdnn_data_sdk::data_objects::DataType::UNSET;
+>>>>>>> d9e199e220 (merge b-shi branch)
 
     std::string _name;
 };

@@ -3,6 +3,10 @@
 #pragma once
 
 #include "Node.hpp"
+<<<<<<< HEAD
+=======
+#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+>>>>>>> d9e199e220 (merge b-shi branch)
 #include <hipdnn_frontend/Error.hpp>
 #include <hipdnn_frontend/attributes/CustomOpAttributes.hpp>
 #include <hipdnn_frontend/attributes/GraphAttributes.hpp>
@@ -147,5 +151,19 @@ public:
     {
         return detail::createCustomOpOperation(attributes, tensorDescs, operations);
     }
+<<<<<<< HEAD
+=======
+
+    flatbuffers::Offset<hipdnn_data_sdk::data_objects::Node>
+        pack_node(flatbuffers::FlatBufferBuilder& builder) const override
+    {
+        return hipdnn_data_sdk::data_objects::CreateNodeDirect(
+            builder,
+            attributes.get_name().c_str(),
+            toSdkType(attributes.compute_data_type),
+            hipdnn_data_sdk::data_objects::NodeAttributes::CustomOpAttributes,
+            attributes.pack_attributes(builder).Union());
+    }
+>>>>>>> d9e199e220 (merge b-shi branch)
 };
 } // namespace hipdnn_frontend::graph
