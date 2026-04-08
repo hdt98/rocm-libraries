@@ -2691,7 +2691,7 @@ ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
 }
 
 template <int MAX_THDS, typename T, typename I, typename S, typename U>
-ROCSOLVER_KERNEL void __launch_bounds__(MAX_THDS)
+__global__ void // __launch_bounds__(MAX_THDS)
     latrd_lower_kernel_naive(const I n,
                              const rocblas_int nb,
                              U AA,
@@ -3160,20 +3160,23 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             /*                         shiftA + idx2D(j, j, lda), lda, strideA, E + j, strideE, */
             /*                         tau + j, strideP, W, shiftW, ldw, strideW, work); */
 
-            int supports_coop_launch = 0;
-            auto status = hipDeviceGetAttribute(&supports_coop_launch,
-                                                hipDeviceAttributeCooperativeLaunch, 0);
+            rocblas_int device_id = 0;
+            HIP_CHECK(hipGetDevice(&device_id));
+            rocblas_int supports_coop_launch = 0;
+            HIP_CHECK(hipDeviceGetAttribute(&supports_coop_launch,
+                                            hipDeviceAttributeCooperativeLaunch, 0));
             if(!supports_coop_launch)
             {
-                // Device does not support cooperative launch
-                /* return hipErrorIllegalState; */
                 std::cout << "::: Device does not support cooperative launch" << std::endl;
+                /* return hipErrorIllegalState; */
                 abort();
             }
 
             rocblas_int shiftA_ = shiftA + idx2D(j, j, lda);
-            void* kernelArgs[] = {&n,      &j,       &A, &shiftA_, &lda, &strideA, &E[j], &strideE,
-                                  &tau[j], &strideP, &W, &shiftW,  &ldw, &strideW, &work};
+            void* kernelArgs[] = {(void*)&n,      (void*)&j,       (void*)&A,    (void*)&shiftA_,
+                                  (void*)&lda,    (void*)&strideA, (void*)&E[j], (void*)&strideE,
+                                  (void*)&tau[j], (void*)&strideP, (void*)&W,    (void*)&shiftW,
+                                  (void*)&ldw,    (void*)&strideW, (void*)&work};
 
             HIP_CHECK(hipLaunchCooperativeKernel(
                 (void*)(latrd_lower_kernel_naive<256, T, rocblas_int, S, U>),
