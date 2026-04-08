@@ -1180,7 +1180,7 @@ namespace KernelGraphTest
         T_LOAD_TILED 6 Source 5
         Tensor.E8M0.d2 7, (base=&120, sizes={&128 &136 }, strides={&144 &152 })
         T_LOAD_TILED 8 Source 7
-        BlockScale(Separate, {32, 1}): Data: 6, Scale: 8
+        BlockScale(Separate, {1, 32}): Data: 6, Scale: 8
         T_Mul 4 9 Value: Float
         Tensor.Float.d2 11, (base=&160, sizes={&168 &176 }, strides={&184 &192 })
         T_STORE_TILED 12 Source 10 Dest 11

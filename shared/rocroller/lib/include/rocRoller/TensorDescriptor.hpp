@@ -97,6 +97,8 @@ namespace rocRoller
 
         inline void calculate();
 
+        inline void assertStridesOrdered() const;
+
         const size_t size(size_t index) const;
 
         const std::vector<size_t>& sizes() const;

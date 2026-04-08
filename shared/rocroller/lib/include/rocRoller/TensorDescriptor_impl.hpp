@@ -90,6 +90,7 @@ namespace rocRoller
         , m_offset(offset)
     {
         this->calculate();
+        this->assertStridesOrdered();
     }
 
     template <typename Iter>
@@ -130,6 +131,7 @@ namespace rocRoller
         , m_offset(offset)
     {
         this->calculate();
+        this->assertStridesOrdered();
     }
 
     inline TensorDescriptor::TensorDescriptor(DataType            t,
@@ -142,6 +144,7 @@ namespace rocRoller
         , m_offset(offset)
     {
         this->calculate();
+        this->assertStridesOrdered();
     }
 
     inline TensorDescriptor TensorDescriptor::ShuffledNoPadding(DataType            t,
@@ -159,7 +162,13 @@ namespace rocRoller
             stride *= sizes.at(idx);
         }
 
-        return TensorDescriptor(t, std::move(sizes), std::move(strides));
+        // Bypass assertStridesOrdered — shuffled layouts intentionally have non-ordered strides
+        TensorDescriptor desc;
+        desc.m_sizes    = std::move(sizes);
+        desc.m_strides  = std::move(strides);
+        desc.m_dataType = t;
+        desc.calculate();
+        return desc;
     }
 
     inline TensorDescriptor TensorDescriptor::ShuffledNoPadding(DataType                      t,
@@ -184,6 +193,16 @@ namespace rocRoller
         std::vector<size_t> theDimOrder(std::move(dimOrder));
 
         return ShuffledNoPadding(t, std::move(theSizes), std::move(theDimOrder));
+    }
+
+    inline void TensorDescriptor::assertStridesOrdered() const
+    {
+        for(size_t i = 1; i < m_strides.size(); i++)
+        {
+            AssertFatal(m_strides[i - 1] <= m_strides[i],
+                        "TensorDescriptor strides must be in fastest-to-slowest order.",
+                        ShowValue(m_strides));
+        }
     }
 
     inline void TensorDescriptor::calculate()
@@ -211,13 +230,6 @@ namespace rocRoller
             {
                 m_strides[i] = m_strides[i - 1] * m_sizes[i - 1];
             }
-        }
-
-        for(size_t i = 1; i < m_strides.size(); i++)
-        {
-            AssertFatal(m_strides[i - 1] <= m_strides[i],
-                        "TensorDescriptor strides must be in fastest-to-slowest order.",
-                        ShowValue(m_strides));
         }
 
         m_totalAllocatedElements = 1;

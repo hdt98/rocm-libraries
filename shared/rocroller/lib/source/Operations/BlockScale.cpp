@@ -22,6 +22,15 @@ namespace rocRoller
                 m_strides = std::move(strides);
             }
 
+            // Enforce fastest-to-slowest ordering on user-provided strides
+            // (before default fill-in which may append 1s)
+            for(size_t i = 1; i < m_strides.size(); i++)
+            {
+                AssertFatal(m_strides[i - 1] <= m_strides[i],
+                            "BlockScale strides must be in fastest-to-slowest order.",
+                            ShowValue(m_strides));
+            }
+
             if(m_strides.empty())
             {
                 // Default value for first stride based on hardware arch
@@ -31,13 +40,6 @@ namespace rocRoller
             if(m_strides.size() != dimensions)
             {
                 m_strides.resize(dimensions, 1);
-            }
-
-            for(size_t i = 1; i < m_strides.size(); i++)
-            {
-                AssertFatal(m_strides[i - 1] <= m_strides[i],
-                            "BlockScale strides must be in fastest-to-slowest order.",
-                            ShowValue(m_strides));
             }
         }
 
