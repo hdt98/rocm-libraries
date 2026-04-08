@@ -187,10 +187,11 @@ Scaled-add test (alpha=2, beta=0.5):
 GPU threads equals the wavefront count times the wavefront size (64 on AMD CDNA).
 Each wavefront iterates `kRepeatM` times to cover its share of the block tile.
 
-**Archive metadata.** `pack.py` writes a `variant_metadata` section in the
-kpack TOC containing each variant's tuning parameters (in_dtype, out_dtype,
-block_tile, block_waves, wave_tile, pad). This is ignored by the kpack reader
-but available for tooling that inspects archives.
+**Archive metadata.** `pack.py` writes a `variant_specs` section in the
+kpack TOC containing each variant's tuning parameters (tensors, dtypes,
+block_tile, block_waves, wave_tile, pad). The runtime reads these specs for
+dispatch, and they can be inspected with `kpack spec build/kernels.kpack`.
+Archives use zstd-per-kernel compression by default (~94% size reduction).
 
 **Unified Signature.** All operations share the same `Signature` struct. The
 operation type is determined by the operator structs in the `ops` array

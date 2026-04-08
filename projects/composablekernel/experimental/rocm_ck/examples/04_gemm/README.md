@@ -201,7 +201,7 @@ Notable variants:
 | `gemm_*.hip` | Device only | Variant instantiations (~12 lines each) — include `gemm_variants.hpp` and `gemm_dev.hpp` |
 | `gemm_dev.hpp` | Device only (`include/rocm_ck/`) | **CK Tile bridge** — `run<S>`, `CkTypeMap`, `CkLayoutMap`, `EpilogueTypes`, `ComposedCDEOp`. Guards with `#error` on host compilation. |
 | `cpu_ref.{hpp,cpp}` | Host only | CPU reference GEMM for verification |
-| `pack.py` | — | Archive packer with per-variant dtype, epilogue, and tile metadata |
+| `pack.py` | — | Archive packer (`--zstd` for compression) with per-variant dtype, epilogue, and tile metadata |
 | `CMakeLists.txt` | — | Build system (variant × arch nested loop) |
 
 ### Compilation Boundary

@@ -319,8 +319,8 @@ Kpack (kernel pack) is the binary archive format for multiarch distribution. Ins
 ### Archive Pipeline
 
 1. **Compile**: `clang++ --cuda-device-only` compiles `.hip` sources into per-architecture `.hsaco` code objects
-2. **Pack**: `pack.py` concatenates the `.hsaco` blobs after a 16-byte KPAK header, then appends a MessagePack table of contents (TOC) recording each blob's offset, size, and architecture
-3. **Load**: The host binary opens the archive via the kpack C API, queries the detected GPU's architecture, extracts the matching code object, and loads it via `hipModuleLoadData`
+2. **Pack**: `pack.py` packages `.hsaco` blobs into a KPAK archive with a MessagePack TOC. With `--zstd`, blobs are compressed as independent zstd frames (~96% size reduction)
+3. **Load**: The host binary opens the archive via the kpack C API, queries the detected GPU's architecture, decompresses and extracts the matching code object, and loads it via `hipModuleLoadData`
 
 ### Binary Format
 
@@ -328,28 +328,29 @@ Kpack (kernel pack) is the binary archive format for multiarch distribution. Ins
 [0x00]  "KPAK"              4 bytes   Magic
 [0x04]  version             4 bytes   Little-endian uint32 (currently 1)
 [0x08]  toc_offset          8 bytes   Little-endian uint64
-[0x10]  blob_0              variable  Raw .hsaco for first arch
-        blob_1              variable  Raw .hsaco for second arch
-        ...
-[toc_offset]  MessagePack TOC     variable  Compression scheme, arch list, blob metadata, nested TOC
+[0x10]  data                variable  Raw blobs (noop) or zstd-compressed blob
+[toc_offset]  MessagePack TOC     variable  Compression scheme, arch list, blob/zstd metadata, variant specs
 ```
 
-The TOC can also carry optional `variant_metadata` sections (used by example 03) containing tuning parameters for each kernel variant.
+Two compression schemes are supported:
+
+- **`none`** — `.hsaco` blobs stored as raw bytes, each at its own offset. TOC records per-blob `offset` and `size`.
+- **`zstd-per-kernel`** — all kernels concatenated into a single zstd blob. Each kernel is an independent zstd frame, decompressed on demand. TOC records `zstd_offset` and `zstd_size`.
+
+The TOC also carries `variant_specs` — structured metadata (tensors, tile geometry, pipeline, epilogue) for each kernel variant, used by the runtime for dispatch and by tooling for inspection.
 
 ### Inspect the Archive
 
+The `kpack-cli/kpack` tool inspects kpack archives:
+
 ```bash
-python3 -c "
-import msgpack, struct
-f = open('build/kernels.kpack', 'rb')
-magic, version, toc_offset = struct.unpack('<4sIQ', f.read(16))
-print(f'Magic: {magic}, Version: {version}, TOC offset: {toc_offset}')
-f.seek(toc_offset)
-toc = msgpack.unpack(f, raw=False)
-for binary, archs in toc['toc'].items():
-    for arch, meta in archs.items():
-        print(f'  {binary}/{arch}: {meta[\"original_size\"]} bytes')
-"
+kpack info build/gemm.kpack           # header, sizes, architectures
+kpack list build/gemm.kpack           # table of all kernels
+kpack spec build/gemm.kpack gemm_fp16 # detailed variant spec
+kpack blobs build/gemm.kpack          # blob layout with file offsets
+kpack header build/gemm.kpack         # raw header hex dump
+kpack toc build/gemm.kpack            # full TOC as JSON
+kpack diff a.kpack b.kpack            # compare two archives
 ```
 
 ### Vendored Runtime
