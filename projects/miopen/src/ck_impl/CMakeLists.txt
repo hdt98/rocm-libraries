@@ -38,6 +38,8 @@ function(ck_impl_base_arch ARCH OUT_VAR)
     set(${OUT_VAR} "${_base}" PARENT_SCOPE)
 endfunction()
 
+# Collect plugin target names for the MIOpen_with_plugins proxy (see src/CMakeLists.txt).
+set(CK_PLUGIN_TARGETS)
 foreach(gpu_target IN LISTS GPU_TARGETS)
     ck_impl_base_arch("${gpu_target}" arch_base)
     if(MIOPEN_CK_UNBUNDLE_PER_ARCH)
@@ -50,6 +52,7 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
         continue()
     endif()
 
+    list(APPEND CK_PLUGIN_TARGETS ${lib_name})
     add_library(${lib_name} SHARED ${CK_IMPL_SOURCES})
 
     # Place the library alongside MIOpen in the build tree so the
@@ -114,3 +117,7 @@ foreach(gpu_target IN LISTS GPU_TARGETS)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 endforeach()
+
+# Propagate the list to the parent scope so src/CMakeLists.txt can wire
+# build-order dependencies into the MIOpen_with_plugins proxy target.
+set(CK_PLUGIN_TARGETS "${CK_PLUGIN_TARGETS}" PARENT_SCOPE)
