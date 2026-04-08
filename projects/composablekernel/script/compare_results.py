@@ -187,11 +187,11 @@ def plot_comparison(baseline_results, improved_results, bin_width=0, output_file
     
     # Plot 1: TFLOPS comparison
     bars1 = ax1.bar(x - width/2, baseline_tflops, width, label='Baseline', color='steelblue')
-    bars2 = ax1.bar(x + width/2, improved_tflops, width, label='Double buf added', color='darkorange')
+    bars2 = ax1.bar(x + width/2, improved_tflops, width, label='New kernels', color='darkorange')
     
     ax1.set_xlabel('Test Case')
     ax1.set_ylabel('TFLOPS')
-    ax1.set_title('TFLOPS: Baseline vs Double buffered kernels added')
+    ax1.set_title('TFLOPS: Baseline vs new kernels')
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
     ax1.legend()
@@ -199,11 +199,11 @@ def plot_comparison(baseline_results, improved_results, bin_width=0, output_file
     
     # Plot 2: Average time comparison
     bars4 = ax2.bar(x - width/2, baseline_times, width, label='Baseline', color='steelblue')
-    bars5 = ax2.bar(x + width/2, improved_times, width, label='Double buf added', color='darkorange')
+    bars5 = ax2.bar(x + width/2, improved_times, width, label='New kernels added', color='darkorange')
     
     ax2.set_xlabel('Test Case')
     ax2.set_ylabel('Average Time (ms)')
-    ax2.set_title('Average Time: Baseline vs Double buffered kernels added')
+    ax2.set_title('Average Time: Baseline vs new kernels added')
     ax2.set_xticks(x)
     ax2.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
     ax2.legend()

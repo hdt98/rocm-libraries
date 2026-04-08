@@ -38,21 +38,22 @@ def filter_to_best_config(output):
     # Valid prefixes for best config section
     valid_prefixes = ('Best configuration parameters:', 'name:', 'avg_time:', 'tflops:', 'GB/s:')
     
-    for line in lines:
-        if 'Best configuration parameters:' in line:
-            in_best_config = True
-        
-        if in_best_config:
-            stripped = line.strip()
-            # Stop if we hit an error line, empty line after content, or other unexpected content
-            if stripped.startswith('Error:') or stripped.startswith('max err:'):
-                continue
-            # Only include lines that are part of the best config or empty
-            if stripped == '' or any(stripped.startswith(p) for p in valid_prefixes):
-                result_lines.append(line)
-            elif stripped and not any(stripped.startswith(p) for p in valid_prefixes):
-                # Unknown line after best config section - stop
-                continue
+    if len(lines) > 1:
+        for line in lines:
+            if 'Best configuration parameters:' in line:
+                in_best_config = True
+            
+            if in_best_config:
+                stripped = line.strip()
+                # Stop if we hit an error line, empty line after content, or other unexpected content
+                if stripped.startswith('Error:') or stripped.startswith('max err:'):
+                    continue
+                # Only include lines that are part of the best config or empty
+                if stripped == '' or any(stripped.startswith(p) for p in valid_prefixes):
+                    result_lines.append(line)
+                elif stripped and not any(stripped.startswith(p) for p in valid_prefixes):
+                    # Unknown line after best config section - stop
+                    continue
     
     # Remove trailing empty lines
     while result_lines and not result_lines[-1].strip():
@@ -198,7 +199,11 @@ def run_ck_grouped_conv_fwd(args, capture_output=False):
     # use int32 by default
     args.index_type = 0
 
-    cmd = [str(args.ck_profiler_cmd), str(args.ck_profier_op)]
+    profiler_path = args.profiler_path
+    if profiler_path is None:
+        profiler_path = str(args.ck_profiler_cmd)
+
+    cmd = [profiler_path, str(args.ck_profier_op)]
     cmd += [str(args.data_type), str(args.layout), str(args.index_type)]
     cmd += [str(args.verify), str(args.init_method)]
     cmd += [str(args.log_value), str(args.time)]
@@ -290,7 +295,7 @@ def process_miopen_driver_name(args, unknown):
         exit(1)
 
 
-def run_ck_profiler(args, capture_output=False):
+def run_ck_profiler(args, capture_output=False, direction=None):
     """Run the CK profiler for the given args.
     
     Args:
@@ -309,31 +314,44 @@ def run_ck_profiler(args, capture_output=False):
     outputs = []
     any_errors = False
     
+    run_fwd = (direction == None or direction == "forward" or direction == "all")
+    run_bwd_data = (direction == None or direction == "backward_data" or direction == "all")
+    run_bwd_weight = (direction == None or direction == "backward_weight" or direction == "all")
+
     if args.forw == 0 or args.forw == 1 or args.forw == 3 or args.forw == 5:
-        result = run_ck_grouped_conv_fwd(args, capture_output)
-        if result:
-            if capture_output:
-                outputs.append(result[0])
-                any_errors = any_errors or result[1]
-            else:
-                outputs.append(result)
+        if run_fwd:
+            result = run_ck_grouped_conv_fwd(args, capture_output)
+            if result:
+                if capture_output:
+                    outputs.append(result[0])
+                    any_errors = any_errors or result[1]
+                else:
+                    outputs.append(result)
+        else:
+            outputs.append("Skipping forward convolution.")
     if args.forw == 0 or args.forw == 2 or args.forw == 3 or args.forw == 6:
-        result = run_ck_grouped_conv_bwd_data(args, capture_output)
-        if result:
-            if capture_output:
-                outputs.append(result[0])
-                any_errors = any_errors or result[1]
-            else:
-                outputs.append(result)
+        if run_bwd_data:
+            result = run_ck_grouped_conv_bwd_data(args, capture_output)
+            if result:
+                if capture_output:
+                    outputs.append(result[0])
+                    any_errors = any_errors or result[1]
+                else:
+                    outputs.append(result)
+        else:
+            outputs.append("Skipping backward data convolution.")
     if args.forw == 0 or args.forw == 4 or args.forw == 5 or args.forw == 6:
-        result = run_ck_grouped_conv_bwd_weight(args, capture_output)
-        if result:
-            if capture_output:
-                outputs.append(result[0])
-                any_errors = any_errors or result[1]
-            else:
-                outputs.append(result)
-    
+        if run_bwd_weight:
+            result = run_ck_grouped_conv_bwd_weight(args, capture_output)
+            if result:
+                if capture_output:
+                    outputs.append(result[0])
+                    any_errors = any_errors or result[1]
+                else:
+                    outputs.append(result)
+        else:
+            outputs.append("Skipping backward weight convolution.")
+
     if capture_output:
         return ("\n".join(outputs), any_errors)
     return None
@@ -382,6 +400,21 @@ def create_conv_parser():
         default=False,
         help="Show full profiler output. Default shows only best configuration.",
     )
+    parser.add_argument("--continue-from", 
+                        type=int, 
+                        required=False, 
+                        default=0,
+                        help="Line number to continue from in batch mode (default: 0, meaning start from the beginning)." 
+                        )
+    parser.add_argument("--direction",
+                        type=str,
+                        required=False,
+                        default="all",
+                        choices=["forward", "backward_data", "backward_weight", "all"],
+                        help="Direction of convolution to run (default: all). "
+                        "Options: forward, backward_data, backward_weight, all.",
+                        )
+
     # Convolution arguments (for single command mode)
     parser.add_argument(
         "-in_layout",
@@ -649,7 +682,7 @@ def create_conv_parser():
     return parser
 
 
-def process_single_command(command_line, parser, capture_output=False, profiler_path=None, verbose=False):
+def process_single_command(command_line, parser, capture_output=False, profiler_path=None, verbose=False, direction=None):
     """Process a single MIOpen driver command line.
     
     Args:
@@ -681,7 +714,7 @@ def process_single_command(command_line, parser, capture_output=False, profiler_
         print("Ignored args:")
         print(unknown)
     
-    result = run_ck_profiler(args, capture_output)
+    result = run_ck_profiler(args, capture_output, direction)
     
     # Handle captured output
     if capture_output and result:
@@ -698,7 +731,7 @@ def process_single_command(command_line, parser, capture_output=False, profiler_
     return result
 
 
-def process_batch_file(input_file, output_file, parser, profiler_path=None, verbose=False):
+def process_batch_file(input_file, output_file, parser, profiler_path=None, verbose=False, start_line=0, direction=None):
     """Process a batch file of MIOpen driver commands.
     
     Args:
@@ -730,13 +763,19 @@ def process_batch_file(input_file, output_file, parser, profiler_path=None, verb
         sys.exit(1)
     
     try:
-        for i, line in enumerate(lines, 1):
+
+        if start_line > 1:
+            print(f"Continuing from command {start_line} (skipping first {start_line-1} commands)")
+            lines = lines[start_line-1:]
+            total_lines -= (start_line-1)
+
+        for i, line in enumerate(lines, 0):
             line = line.strip()
             
             # Skip empty lines and comments
             if not line or line.startswith('#'):
                 continue
-            
+
             print(f"Processing command {i}/{total_lines}: {line[:80]}...")
             
             # Write separator for readability
@@ -745,7 +784,7 @@ def process_batch_file(input_file, output_file, parser, profiler_path=None, verb
             f_out.write(f"{'='*80}\n")
             
             # Process the command and capture output
-            output = process_single_command(line, parser, capture_output=True, profiler_path=profiler_path, verbose=verbose)
+            output = process_single_command(line, parser, capture_output=True, profiler_path=profiler_path, verbose=verbose, direction=direction)
             if output:
                 f_out.write(output)
                 f_out.write("\n")
@@ -784,11 +823,18 @@ if __name__ == "__main__":
             preliminary_args.output_file,
             parser,
             profiler_path,
-            verbose
+            verbose,
+            preliminary_args.continue_from,
+            preliminary_args.direction
         )
     else:
         # Single command mode (original behavior)
         args, unknown = parser.parse_known_args()
+
+        profiler_path = args.profiler_path
+        if profiler_path:
+            print(f"Using profiler: '{profiler_path}'")
+
         init_const_args(args)
         process_miopen_driver_name(args, unknown)
         print("Ignored args:")

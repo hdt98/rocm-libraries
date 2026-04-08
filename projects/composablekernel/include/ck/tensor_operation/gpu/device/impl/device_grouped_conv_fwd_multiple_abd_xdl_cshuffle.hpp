@@ -361,6 +361,10 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle
 
     static_assert(NumGroupsToMerge >= 1);
 
+    // The double buffer pipeline requires two thread scratch slots.
+    static_assert(!DoubleBuffer || NumGemmKPrefetchStage >= 2,
+                  "Double buffer pipeline requires at least 2 prefetch stages.");
+
     static constexpr bool isMultiA  = is_detected<is_tuple, ADataType>::value;
     static constexpr bool isMultiB  = is_detected<is_tuple, BDataType>::value;
     static constexpr bool isMultiAB = isMultiA || isMultiB;
