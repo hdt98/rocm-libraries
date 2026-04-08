@@ -85,7 +85,11 @@ namespace rocRoller
                             ShowValue(elementBits));
                 auto elems = 128u / elementBits; // elements per dwordx4
                 auto cols  = tileK / elems; // dwordx4 chunks per tile row
-                AssertFatal(cols > 0 && (cols & (cols - 1)) == 0,
+                AssertFatal(tileK % elems == 0,
+                            "tileK must be a multiple of elements per dwordx4 chunk",
+                            ShowValue(tileK),
+                            ShowValue(elems));
+                AssertFatal(cols > 0 && (cols & (cols - 1)) == 0 && columnsPerBankRow % cols == 0,
                             "LDS swizzle requires power-of-2 numColumns",
                             ShowValue(cols));
                 return {cols, columnsPerBankRow / cols, elems};
@@ -94,7 +98,7 @@ namespace rocRoller
             /// Compute from a pre-computed column count (GR path).
             static LDSSwizzleParams fromColumnCount(unsigned int numCols)
             {
-                AssertFatal(numCols > 0 && (numCols & (numCols - 1)) == 0,
+                AssertFatal(numCols > 0 && (numCols & (numCols - 1)) == 0 && columnsPerBankRow % numCols == 0,
                             "LDS swizzle requires power-of-2 numColumns",
                             ShowValue(numCols));
                 return {numCols, columnsPerBankRow / numCols, 0u};

@@ -59,7 +59,8 @@ namespace rocRoller::KernelGraph
                         a.forLoop,
                         a.replaceWithScope,
                         a.isStorePartOfGlobalToLDSOp,
-                        a.inlineUnrollValue)
+                        a.inlineUnrollValue,
+                        a.inlineUnrollCoord)
                < std::tie(b.target,
                           b.coords,
                           b.location,
@@ -67,7 +68,8 @@ namespace rocRoller::KernelGraph
                           b.forLoop,
                           b.replaceWithScope,
                           b.isStorePartOfGlobalToLDSOp,
-                          b.inlineUnrollValue);
+                          b.inlineUnrollValue,
+                          b.inlineUnrollCoord);
     }
 
     /**
