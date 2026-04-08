@@ -130,10 +130,10 @@ def make_plot(records, title, out_path):
 
 base = '/home/AMD/vpietila/git/rocm-libraries-ck2/projects/composablekernel/build-gfx950/data'
 
-t2v = parse_file(f'{base}/t2v_improved_vs_trace_lens.txt')
-i2v = parse_file(f'{base}/i2v_improved_vs_trace_lens.txt')
+t2v = parse_file(f'{base}/t2v_ck_final_vs_trace_lens.txt')
+i2v = parse_file(f'{base}/i2v_ck_final_vs_trace_lens.txt')
 
-make_plot(t2v, 'T2V: CK benchmark vs TraceLens baseline (matched cases)',
-          f'{base}/t2v_vs_tracelens.png')
-make_plot(i2v, 'I2V: CK benchmark vs TraceLens baseline (matched cases)',
-          f'{base}/i2v_vs_tracelens.png')
+make_plot(t2v, 'T2V: CK vs TraceLens baseline',
+          f'{base}/t2v_ck_final_vs_tracelens.png')
+make_plot(i2v, 'I2V: CK vs TraceLens baseline',
+          f'{base}/i2v_ck_final_vs_tracelens.png')
