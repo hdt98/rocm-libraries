@@ -537,14 +537,22 @@ rocblas_status getrf_panelLU(rocblas_handle handle,
 }
 
 /** Return the sizes of the different workspace arrays **/
-template <bool BATCHED, bool STRIDED, typename T, typename I>
-void rocsolver_getrf_getMemorySize(const I m,
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename U>
+void rocsolver_getrf_getMemorySize(rocblas_handle handle,
+                                   const I m,
                                    const I n,
-                                   const bool pivot,
+                                   U A,
+                                   const rocblas_stride shiftA,
+                                   const I inca,
+                                   const I lda,
+                                   const rocblas_stride strideA,
+                                   I* ipiv,
+                                   const rocblas_stride shiftP,
+                                   const rocblas_stride strideP,
+                                   INFO* info,
                                    const I batch_count,
                                    rocsolver_workspace_helper* work_helper,
-                                   const I lda = 1,
-                                   const I inca = 1)
+                                   const bool pivot)
 {
     static constexpr bool ISBATCHED = BATCHED || STRIDED;
 
@@ -558,8 +566,9 @@ void rocsolver_getrf_getMemorySize(const I m,
     if(blk == 0)
     {
         // requirements for one single GETF2
-        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, n, pivot, batch_count, work_helper, false,
-                                                    inca);
+        rocsolver_getf2_getMemorySize<ISBATCHED, T>(handle, m, n, A, shiftA, inca, lda, strideA,
+                                                    ipiv, shiftP, strideP, info, batch_count,
+                                                    work_helper, pivot, false);
         return;
     }
     else
@@ -575,8 +584,9 @@ void rocsolver_getrf_getMemorySize(const I m,
 
         // requirements for largest possible GETF2 for the sub blocks
         rocsolver_workspace_helper* getf2_work = work_helper->add_nested("getf2");
-        rocsolver_getf2_getMemorySize<ISBATCHED, T>(m, dim, pivot, batch_count, getf2_work, true,
-                                                    inca);
+        rocsolver_getf2_getMemorySize<ISBATCHED, T>(handle, m, dim, A, shiftA, inca, lda, strideA,
+                                                    ipiv, shiftP, strideP, info, batch_count,
+                                                    getf2_work, pivot, true);
 
         // extra workspace for calling largest possible TRSM
         size_t size_work1, size_work2, size_work3, size_work4;

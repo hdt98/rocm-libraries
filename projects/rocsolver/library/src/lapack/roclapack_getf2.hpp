@@ -469,14 +469,23 @@ inline void getf2_get_ger_blksize(const I m, const I n, I* dimx, I* dimy)
 }
 
 /** Return the sizes of the different workspace arrays **/
-template <bool ISBATCHED, typename T, typename I>
-void rocsolver_getf2_getMemorySize(const I m,
+template <bool ISBATCHED, typename T, typename I, typename INFO, typename U>
+void rocsolver_getf2_getMemorySize(rocblas_handle handle,
+                                   const I m,
                                    const I n,
-                                   const bool pivot,
+                                   U A,
+                                   const rocblas_stride shiftA,
+                                   const I inca,
+                                   const I lda,
+                                   const rocblas_stride strideA,
+                                   I* ipiv,
+                                   const rocblas_stride shiftP,
+                                   const rocblas_stride strideP,
+                                   INFO* info,
                                    const I batch_count,
                                    rocsolver_workspace_helper* work_helper,
-                                   bool inblocked = false,
-                                   const I inca = 1)
+                                   const bool pivot,
+                                   bool inblocked = false)
 {
     // if quick return no workspace needed
     if(m == 0 || n == 0 || batch_count == 0)

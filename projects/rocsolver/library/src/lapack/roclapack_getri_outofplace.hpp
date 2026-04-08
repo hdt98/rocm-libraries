@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,8 +35,21 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_getri_outofplace_getMemorySize(const rocblas_int n,
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void rocsolver_getri_outofplace_getMemorySize(rocblas_handle handle,
+                                              const rocblas_int n,
+                                              U A,
+                                              const rocblas_int shiftA,
+                                              const rocblas_int lda,
+                                              const rocblas_stride strideA,
+                                              rocblas_int* ipiv,
+                                              const rocblas_int shiftP,
+                                              const rocblas_stride strideP,
+                                              U C,
+                                              const rocblas_int shiftC,
+                                              const rocblas_int ldc,
+                                              const rocblas_stride strideC,
+                                              rocblas_int* info,
                                               const rocblas_int batch_count,
                                               rocsolver_workspace_helper* work_helper)
 {
@@ -45,8 +58,9 @@ void rocsolver_getri_outofplace_getMemorySize(const rocblas_int n,
         return;
 
     // requirements for calling GETRS
-    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, n, batch_count,
-                                                       work_helper);
+    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
+        handle, rocblas_operation_none, n, n, A, shiftA, 1, lda, strideA, ipiv, strideP, C, shiftC,
+        1, ldc, strideC, batch_count, work_helper);
 }
 
 template <typename T>

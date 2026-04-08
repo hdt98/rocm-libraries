@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,24 +35,42 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_geblttrs_npvt_getMemorySize(const rocblas_int nb,
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void rocsolver_geblttrs_npvt_getMemorySize(rocblas_handle handle,
+                                           const rocblas_int nb,
                                            const rocblas_int nblocks,
                                            const rocblas_int nrhs,
+                                           U A,
+                                           const rocblas_int shiftA,
+                                           const rocblas_int inca,
+                                           const rocblas_int lda,
+                                           const rocblas_stride strideA,
+                                           U B,
+                                           const rocblas_int shiftB,
+                                           const rocblas_int incb,
+                                           const rocblas_int ldb,
+                                           const rocblas_stride strideB,
+                                           U C,
+                                           const rocblas_int shiftC,
+                                           const rocblas_int incc,
+                                           const rocblas_int ldc,
+                                           const rocblas_stride strideC,
+                                           U X,
+                                           const rocblas_int shiftX,
+                                           const rocblas_int incx,
+                                           const rocblas_int ldx,
+                                           const rocblas_stride strideX,
                                            const rocblas_int batch_count,
-                                           rocsolver_workspace_helper* work_helper,
-                                           const rocblas_int ldb = 1,
-                                           const rocblas_int ldx = 1,
-                                           const rocblas_int incb = 1,
-                                           const rocblas_int incx = 1)
+                                           rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no need of workspace
     if(nb == 0 || nblocks == 0 || nrhs == 0 || batch_count == 0)
         return;
 
     // size requirements for getrs
-    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nrhs, batch_count,
-                                                       work_helper, ldb, ldx, incb, incx);
+    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
+        handle, rocblas_operation_none, nb, nrhs, B, shiftB, incb, ldb, strideB,
+        (rocblas_int*)nullptr, 0, X, shiftX, incx, ldx, strideX, batch_count, work_helper);
 }
 
 template <typename T>

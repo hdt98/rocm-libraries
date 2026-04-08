@@ -49,15 +49,28 @@ ROCSOLVER_KERNEL void
     }
 }
 
-template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void rocsolver_geblttrf_npvt_getMemorySize(rocblas_handle handle,
+                                           const rocblas_int nb,
                                            const rocblas_int nblocks,
+                                           U A,
+                                           const rocblas_int shiftA,
+                                           const rocblas_int inca,
+                                           const rocblas_int lda,
+                                           const rocblas_stride strideA,
+                                           U B,
+                                           const rocblas_int shiftB,
+                                           const rocblas_int incb,
+                                           const rocblas_int ldb,
+                                           const rocblas_stride strideB,
+                                           U C,
+                                           const rocblas_int shiftC,
+                                           const rocblas_int incc,
+                                           const rocblas_int ldc,
+                                           const rocblas_stride strideC,
+                                           rocblas_int* info,
                                            const rocblas_int batch_count,
-                                           rocsolver_workspace_helper* work_helper,
-                                           const rocblas_int ldb = 1,
-                                           const rocblas_int ldc = 1,
-                                           const rocblas_int incb = 1,
-                                           const rocblas_int incc = 1)
+                                           rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no need of workspace
     if(nb == 0 || nblocks == 0 || batch_count == 0)
@@ -70,13 +83,15 @@ void rocsolver_geblttrf_npvt_getMemorySize(const rocblas_int nb,
 
     // size requirements for getrf
     rocsolver_workspace_helper* getrf_work = work_helper->add_nested("getrf");
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(nb, nb, false, batch_count, getrf_work, ldb,
-                                                       incb);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(handle, nb, nb, B, shiftB, incb, ldb,
+                                                       strideB, (rocblas_int*)nullptr, 0, 0, info,
+                                                       batch_count, getrf_work, false);
 
     // size requirements for getrs
     rocsolver_workspace_helper* getrs_work = work_helper->add_nested("getrs");
-    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, nb, nb, batch_count,
-                                                       getrs_work, ldb, ldc, incb, incc);
+    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
+        handle, rocblas_operation_none, nb, nb, B, shiftB, incb, ldb, strideB,
+        (rocblas_int*)nullptr, 0, C, shiftC, incc, ldc, strideC, batch_count, getrs_work);
 
     work_helper->assign_sizes({{"iinfo", size_iinfo}});
 }

@@ -72,9 +72,21 @@ rocblas_status rocsolver_gesv_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-template <bool BATCHED, bool STRIDED, typename T>
-void rocsolver_gesv_getMemorySize(const rocblas_int n,
+template <bool BATCHED, bool STRIDED, typename T, typename U>
+void rocsolver_gesv_getMemorySize(rocblas_handle handle,
+                                  const rocblas_int n,
                                   const rocblas_int nrhs,
+                                  U A,
+                                  const rocblas_int shiftA,
+                                  const rocblas_int lda,
+                                  const rocblas_stride strideA,
+                                  rocblas_int* ipiv,
+                                  const rocblas_stride strideP,
+                                  U B,
+                                  const rocblas_int shiftB,
+                                  const rocblas_int ldb,
+                                  const rocblas_stride strideB,
+                                  rocblas_int* info,
                                   const rocblas_int batch_count,
                                   rocsolver_workspace_helper* work_helper)
 {
@@ -87,7 +99,9 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
     // PHASE 1
     // workspace required for calling GETRF
     rocsolver_workspace_helper* getrf_work = work_helper->add_nested("getrf");
-    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(n, n, true, batch_count, getrf_work);
+    rocsolver_getrf_getMemorySize<BATCHED, STRIDED, T>(handle, n, n, A, shiftA, 1, lda, strideA,
+                                                       ipiv, 0, strideP, info, batch_count,
+                                                       getrf_work, true);
 
     // PHASE 2
     rocsolver_workspace_helper* phase2_work = work_helper->add_nested("phase2");
@@ -95,8 +109,9 @@ void rocsolver_gesv_getMemorySize(const rocblas_int n,
 
     // workspace required for calling GETRS
     rocsolver_workspace_helper* getrs_work = phase2_work->add_nested("getrs");
-    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(rocblas_operation_none, n, nrhs, batch_count,
-                                                       getrs_work);
+    rocsolver_getrs_getMemorySize<BATCHED, STRIDED, T>(
+        handle, rocblas_operation_none, n, nrhs, A, shiftA, 1, lda, strideA, ipiv, strideP, B,
+        shiftB, 1, ldb, strideB, batch_count, getrs_work);
 
     // extra space to copy B
     size_t size_copyB = sizeof(T) * n * nrhs * batch_count;

@@ -74,16 +74,25 @@ rocblas_status rocsolver_getrs_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename I>
-void rocsolver_getrs_getMemorySize(rocblas_operation trans,
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename U>
+void rocsolver_getrs_getMemorySize(rocblas_handle handle,
+                                   const rocblas_operation trans,
                                    const I n,
                                    const I nrhs,
+                                   U A,
+                                   const rocblas_stride shiftA,
+                                   const I inca,
+                                   const I lda,
+                                   const rocblas_stride strideA,
+                                   const I* ipiv,
+                                   const rocblas_stride strideP,
+                                   U B,
+                                   const rocblas_stride shiftB,
+                                   const I incb,
+                                   const I ldb,
+                                   const rocblas_stride strideB,
                                    const I batch_count,
-                                   rocsolver_workspace_helper* work_helper,
-                                   const I lda = 1,
-                                   const I ldb = 1,
-                                   const I inca = 1,
-                                   const I incb = 1)
+                                   rocsolver_workspace_helper* work_helper)
 {
     // if quick return, no workspace is needed
     if(n == 0 || nrhs == 0 || batch_count == 0)
