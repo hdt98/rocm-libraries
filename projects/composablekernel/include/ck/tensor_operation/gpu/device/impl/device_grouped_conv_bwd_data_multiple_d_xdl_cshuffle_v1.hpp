@@ -1314,7 +1314,9 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                         // Build flat descriptors for group_count=1 fast path
                         if constexpr(NDimSpatial == 2 && !CTranspose)
                         {
-                            if(num_group_ == 1)
+                            // K must be >= AK1 to ensure K0 = K/AK1 >= 1; otherwise
+                            // the flat descriptor would have K0=0 which is invalid.
+                            if(num_group_ == 1 && a_g_n_k_wos_lengths[2] >= AK1)
                             {
                                 const auto flat_descs = MakeFlatABCGridDescriptor<2>(
                                     conv_N_per_block_,
