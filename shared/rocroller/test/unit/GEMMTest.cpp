@@ -513,10 +513,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // LDS swizzle uses XOR-based permutation; verify v_xor_b32 is present.
+        // LDS swizzle uses XOR-based permutation; expect exactly 12 v_xor_b32.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_GT(countSubstring(generatedCode, "v_xor_b32"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_xor_b32"), 12);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle)
@@ -529,10 +529,10 @@ namespace GEMMTests
 
         basicGEMM<FP4, FP4, float>(gemm);
 
-        // LDS swizzle uses XOR-based permutation; verify v_xor_b32 is present.
+        // LDS swizzle uses XOR-based permutation; expect exactly 12 v_xor_b32.
         std::string generatedCode = m_context->instructions()->toString();
         EXPECT_EQ(countSubstring(generatedCode, "ds_write"), 0);
-        EXPECT_GT(countSubstring(generatedCode, "v_xor_b32"), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "v_xor_b32"), 12);
     }
 
     TEST_P(GEMMTestSuite, GPU_GEMM_FP4_MI16x16x128_MT64x64x256_LDSSwizzle_ViaVGPR)
