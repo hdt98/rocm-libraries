@@ -252,6 +252,8 @@ def runBuildDocsCommand(platform, project)
 def runPerformanceCommand (platform, project)
 {
     String masterURL = env.CHANGE_ID ? env.JOB_URL.replace("PR-${env.CHANGE_ID}", env.CHANGE_TARGET) : env.JOB_URL
+    String gitCommitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(10) : "unknown"
+    String gitBranchName = env.CHANGE_BRANCH ?: env.BRANCH_NAME
 
     withSSH(platform){
         sshBlock ->
@@ -391,10 +393,6 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
-                # Get branch name and commit hash from git
-                GIT_BRANCH_NAME=\$(git rev-parse --abbrev-ref HEAD)
-                GIT_COMMIT_HASH=\$(git rev-parse --short=10 HEAD)
-
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -426,9 +424,9 @@ def runPerformanceCommand (platform, project)
                         --csv \$CSV_FILE \\
                         --arch ${platform.gpu} \\
                         --repo github.com/ROCm/rocm-libraries \\
-                        --branch \$GIT_BRANCH_NAME \\
+                        --branch ${gitBranchName} \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit \$GIT_COMMIT_HASH \\
+                        --commit ${gitCommitHash} \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
@@ -613,10 +611,6 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
-                # Get branch name and commit hash from git
-                GIT_BRANCH_NAME=\$(git rev-parse --abbrev-ref HEAD)
-                GIT_COMMIT_HASH=\$(git rev-parse --short=10 HEAD)
-
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -648,9 +642,9 @@ def runPerformanceCommand (platform, project)
                         --csv \$CSV_FILE \\
                         --arch ${platform.gpu} \\
                         --repo github.com/ROCm/rocm-libraries \\
-                        --branch develop \\
+                        --branch ${gitBranchName} \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit \$GIT_COMMIT_HASH \\
+                        --commit ${gitCommitHash} \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
