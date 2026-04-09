@@ -124,13 +124,13 @@ struct BlockGemmPipelineAGmemBGmemCRegPolicy
     //   M0 = 256 / (16*4) = 4  -- times each warp repeats over M to cover all kMPerBlock rows
     //
     // Sanity check (with the default parameters kMPerBlock=256, kKPerBlock=32, kBlockSize=256):
-    //   M: M0 * M1 * M2 = 4 * 4 * 16 = 256 = kMPerBlock  v
-    //   K: K0 * K1      = 4 * 8      = 32  = kKPerBlock   v
-    //   Threads: M1 * M2 * K0 = 4 * 16 * 4 = 256 = kBlockSize  v
-    //   Per thread: M0 * K1 = 4 * 8 = 32 elements = 4 x 128-bit loads  v
+    //   M: M0 * M1 * M2 = 4 * 4 * 16 = 256 = kMPerBlock
+    //   K: K0 * K1      = 4 * 8      = 32  = kKPerBlock
+    //   Threads: M1 * M2 * K0 = 4 * 16 * 4 = 256 = kBlockSize
+    //   Per thread: M0 * K1 = 4 * 8 = 32 elements = 4 x 128-bit loads
     //
     // Why coalescing works: within each wavefront instruction cycle, the 4 threads
-    // covering the K dimension load 4 * 8 = 32 consecutive fp16 values (64 bytes = 1 cache line).
+    // covering the K dimension load 4 * 8 = 32 consecutive fp16 values, fitting on a cache line.
     // The 16 threads covering M load from different cache lines but collectively span a
     // perfectly contiguous range -- zero wasted bytes per wavefront instruction.
     template <typename Problem>

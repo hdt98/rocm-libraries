@@ -38,8 +38,8 @@ struct GridGemm
         const auto N = c_grid.get_tensor_descriptor().get_length(number<1>{});
         const auto K = a_grid.get_tensor_descriptor().get_length(number<1>{});
 
-        // get_block_id(): AMD GPU intrinsic for the linear thread block index within the grid.
-        // Equivalent to blockIdx.x in CUDA. The grid is 1D here (kGridSize blocks total).
+        // get_block_id(): returns the linear thread block index within the grid (blockIdx.x).
+        // The grid is 1D here (kGridSize blocks total).
         const auto id_block = get_block_id();
 
         // Number of tiles needed to cover the M and N dimensions of C.
@@ -48,10 +48,8 @@ struct GridGemm
         const auto num_tile_n = integer_divide_ceil(N, kNPerBlock);
 
         // MakeBlock2TileMap returns a lambda that converts a linear block_id to a 2D tile index.
-        // N-first ordering: adjacent block IDs map to adjacent N tiles (same M row).
-        // Rationale: adjacent blocks in the same M strip reuse the same A rows, while B is read
-        // once per block for different N tiles. Keeping adjacent blocks on the same M row can
-        // therefore improve L2 cache reuse for A.
+        // N-first ordering: adjacent block IDs map to adjacent N tiles (same M row),
+        // so they access the same A rows but different B columns.
         const auto block2tile = Policy::template MakeBlock2TileMap<Problem>(num_tile_m, num_tile_n);
 
         const auto id_tile = block2tile(id_block);
