@@ -301,6 +301,7 @@ constexpr builder::ConvSpecialization conv_spec()
         case Filter1x1Stride1Pad0: return FILTER_1X1_STRIDE1_PAD0;
         case Filter3x3: return FILTER_3x3;
         case OddC: return ODD_C;
+        case Filter3x3Stride1Pad0: return FILTER_3X3_STRIDE1_PAD0;
         }
     }
     else if constexpr(requires { InstTraits::kConvBwdDataSpecialization; })
