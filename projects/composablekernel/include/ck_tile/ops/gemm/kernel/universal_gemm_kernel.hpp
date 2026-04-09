@@ -1076,6 +1076,30 @@ struct UniversalGemmKernel
         return MakeCBlockWindows<DstInMemOp>(e_ptr, i_m, i_n, e_tensor_desc);
     }
 
+    CK_TILE_DEVICE static void RunGemm(const std::array<const ADataType*, NumATensor>& as_ptr,
+                                       const std::array<const BDataType*, NumBTensor>& bs_ptr,
+                                       const std::array<const void*, NumDTensor>& ds_ptr,
+                                       EDataType* e_ptr,
+                                       void* smem_ptr,
+                                       const KernelArgs& kargs,
+                                       const SplitKBatchOffset& splitk_batch_offset,
+                                       const index_t block_idx_m,
+                                       const index_t block_idx_n)
+    {
+        const index_t k_size   = amd_wave_read_first_lane(splitk_batch_offset.splitted_k);
+        const index_t num_loop = TilePartitioner::GetLoopNum(k_size);
+        RunGemm(as_ptr,
+                bs_ptr,
+                ds_ptr,
+                e_ptr,
+                smem_ptr,
+                kargs,
+                num_loop,
+                block_idx_m,
+                block_idx_n,
+                k_size);
+    }
+
     /**
      * @brief Runs single GEMM problem cooperatively by whole workgroup.
      *
@@ -1106,9 +1130,6 @@ struct UniversalGemmKernel
         const auto& as_block_window = MakeABlockWindows(as_ptr, kargs, k_size, block_idx_m);
         const auto& bs_block_window = MakeBBlockWindows(bs_ptr, kargs, k_size, block_idx_n);
         const auto& ds_block_window = MakeDBlockWindows(ds_ptr, kargs, block_idx_m, block_idx_n);
-
-        // const index_t num_loop =
-        //     amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
 
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile = GemmPipeline{}.template operator()(
@@ -1226,19 +1247,8 @@ struct UniversalGemmKernel
         // allocate LDS
         __shared__ char smem_ptr[GetSmemSize()];
 
-        const index_t num_loop =
-            amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
-
-        RunGemm(as_ptr,
-                bs_ptr,
-                kargs.ds_ptr,
-                e_ptr,
-                smem_ptr,
-                kargs,
-                num_loop,
-                i_m,
-                i_n,
-                splitk_batch_offset.splitted_k);
+        RunGemm(
+            as_ptr, bs_ptr, kargs.ds_ptr, e_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
     }
 
     // Persistent kernel entry point
@@ -1320,19 +1330,15 @@ struct UniversalGemmKernel
             __shared__ char smem_ptr[GetSmemSize()];
             // Run the GEMM
 
-            const index_t num_loop = amd_wave_read_first_lane(
-                TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
-
             RunGemm(as_ptr,
                     bs_ptr,
                     kargs.ds_ptr,
                     e_ptr,
                     smem_ptr,
                     kargs,
-                    num_loop,
+                    splitk_batch_offset,
                     i_m,
-                    i_n,
-                    splitk_batch_offset.splitted_k);
+                    i_n);
 
             // Advance to the next work item
             block_id += grid_size;
