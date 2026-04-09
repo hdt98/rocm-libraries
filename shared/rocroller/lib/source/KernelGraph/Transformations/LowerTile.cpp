@@ -1011,12 +1011,12 @@ namespace rocRoller
                     auto swappedCol
                         = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColSwap{params.rowsPerBankRow}, {swappedCol}, {nThrX, nThrY});
+                        PairSwap{params.rowsPerBankRow}, {swappedCol}, {nThrX, nThrY});
 
                     grSwizzleNThrX
                         = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColRotate{params.numColumns, params.rowsPerBankRow, false},
+                        Rotate{params.numColumns, params.rowsPerBankRow, false},
                         {grSwizzleNThrX},
                         {swappedCol, nThrY});
 
@@ -1070,12 +1070,12 @@ namespace rocRoller
                     auto swappedCol
                         = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColSwap{params.rowsPerBankRow}, {swappedCol}, {nThrY, nThrX});
+                        PairSwap{params.rowsPerBankRow}, {swappedCol}, {nThrY, nThrX});
 
                     grSwizzleNThrY
                         = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColRotate{params.numColumns, params.rowsPerBankRow, false},
+                        Rotate{params.numColumns, params.rowsPerBankRow, false},
                         {grSwizzleNThrY},
                         {swappedCol, nThrX});
 
@@ -2271,12 +2271,12 @@ namespace rocRoller
                                         false);
                 }
 
-                // LR swizzle: insert LDSColRotate(inv) + LDSColSwap edges
+                // LR swizzle: insert Rotate(inv) + PairSwap edges
                 // that un-permute the K-column so the wave reads the
                 // correct logical element.
                 //   {colChunk, elemInChunk} --Flatten--> {colCoord}
-                //   {rotatedCol} --LDSColRotate(inv)--> {colChunk, rowCoord}
-                //   {rawColChunk} --LDSColSwap--> {rotatedCol, rowCoord}
+                //   {rotatedCol} --Rotate(inv)--> {colChunk, rowCoord}
+                //   {rawColChunk} --PairSwap--> {rotatedCol, rowCoord}
                 //   {rawColElem} --Tile--> {rawColChunk, elemInChunk}
                 //   ldsTag --Tile--> {rawColElem, non-K-dim}
                 auto tileIMacY = iMacY;
@@ -2314,14 +2314,14 @@ namespace rocRoller
                             auto rotatedCol = graph.coordinates.addElement(
                                 MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
                             graph.coordinates.addElement(
-                                LDSColRotate{params.numColumns, params.rowsPerBankRow, true},
+                                Rotate{params.numColumns, params.rowsPerBankRow, true},
                                 {rotatedCol},
                                 {colChunk, rowCoord});
 
                             // Swap (self-inverse, chunk-level)
                             auto rawColChunk = graph.coordinates.addElement(
                                 MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
-                            graph.coordinates.addElement(LDSColSwap{params.rowsPerBankRow},
+                            graph.coordinates.addElement(PairSwap{params.rowsPerBankRow},
                                                          {rawColChunk},
                                                          {rotatedCol, rowCoord});
 

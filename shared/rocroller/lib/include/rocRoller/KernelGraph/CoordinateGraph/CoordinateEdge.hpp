@@ -262,23 +262,24 @@ namespace rocRoller
         RR_EMPTY_STRUCT_WITH_NAME(PassThrough);
 
         /**
-         * LDS bank-conflict swap: XOR adjacent dwordx4 column pairs
-         * based on LDS bank-row parity.
+         * Swap adjacent pairs of the first coordinate based on a
+         * grouping of the second coordinate.
          *
-         * Self-inverse: applying the swap twice returns the original col.
-         * Used on both GR (write) and LR (read) sides of LDS swizzle.
+         * Self-inverse: applying the swap twice returns the original
+         * value.  rowsPerGroup controls how many rows share the same
+         * parity (bankRowIdx = row >> log2(rowsPerGroup)).
          *
-         * Graph: addElement(edge, {outCol}, {inCol, row})
-         * Reverse: outCol = inCol ^ ((bankRowIdx ^ 1) & 1)
+         * Graph: addElement(edge, {out}, {in, groupCoord})
+         * Reverse: out = in ^ ((groupIdx ^ 1) & 1)
          */
-        struct LDSColSwap
+        struct PairSwap
         {
-            unsigned int rowsPerBankRow;
+            unsigned int rowsPerGroup;
 
-            LDSColSwap() = default;
+            PairSwap() = default;
 
-            explicit LDSColSwap(unsigned int rowsPerBankRow)
-                : rowsPerBankRow(rowsPerBankRow)
+            explicit PairSwap(unsigned int rowsPerGroup)
+                : rowsPerGroup(rowsPerGroup)
             {
             }
 
@@ -289,33 +290,33 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSColSwap";
+                return "PairSwap";
             }
         };
 
         /**
-         * LDS bank-conflict rotate: circular column rotation based on
-         * LDS bank-row index.
+         * Circular rotation of the first coordinate based on a
+         * grouping of the second coordinate.
          *
-         * Forward (inverse=false, GR side):
-         *   col = (col + numColumns - bankRowIdx/2*2) & (numColumns-1)
-         * Inverse (inverse=true, LR side):
-         *   col = (col + bankRowIdx/2*2) & (numColumns-1)
+         * Forward (inverse=false):
+         *   out = (in + numPositions - groupIdx/2*2) & (numPositions-1)
+         * Inverse (inverse=true):
+         *   out = (in + groupIdx/2*2) & (numPositions-1)
          *
-         * Graph: addElement(edge, {outCol}, {inCol, row})
-         * Reverse: given inCol and row, compute rotated outCol.
+         * Graph: addElement(edge, {out}, {in, groupCoord})
+         * Reverse: given in and groupCoord, compute rotated out.
          */
-        struct LDSColRotate
+        struct Rotate
         {
-            unsigned int numColumns;
-            unsigned int rowsPerBankRow;
+            unsigned int numPositions;
+            unsigned int rowsPerGroup;
             bool         inverse;
 
-            LDSColRotate() = default;
+            Rotate() = default;
 
-            LDSColRotate(unsigned int numColumns, unsigned int rowsPerBankRow, bool inverse)
-                : numColumns(numColumns)
-                , rowsPerBankRow(rowsPerBankRow)
+            Rotate(unsigned int numPositions, unsigned int rowsPerGroup, bool inverse)
+                : numPositions(numPositions)
+                , rowsPerGroup(rowsPerGroup)
                 , inverse(inverse)
             {
             }
@@ -327,7 +328,7 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSColRotate";
+                return "Rotate";
             }
         };
 

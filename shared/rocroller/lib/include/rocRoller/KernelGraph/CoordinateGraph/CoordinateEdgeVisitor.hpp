@@ -198,35 +198,35 @@ namespace rocRoller
                 return {result};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColSwap const& e)
+            std::vector<Expression::ExpressionPtr> operator()(PairSwap const& e)
             {
                 using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                auto col     = indexes[0]; // chunk index (dwordx4)
-                auto row     = indexes[1];
-                auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
-                auto bankRowIdx = row >> logRows;
+                auto col      = indexes[0];
+                auto row      = indexes[1];
+                auto logGrp   = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerGroup)));
+                auto groupIdx = row >> logGrp;
 
-                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-                col                = col ^ swapOnEvenRow;
+                auto swapBit = (groupIdx ^ literal(1u)) & literal(1u);
+                col          = col ^ swapBit;
                 return {col};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColRotate const& e)
+            std::vector<Expression::ExpressionPtr> operator()(Rotate const& e)
             {
                 using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                auto col     = indexes[0]; // chunk index (dwordx4)
-                auto row     = indexes[1];
-                auto numCol  = literal(e.numColumns);
-                auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
-                auto bankRowIdx = row >> logRows;
+                auto col      = indexes[0];
+                auto row      = indexes[1];
+                auto numPos   = literal(e.numPositions);
+                auto logGrp   = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerGroup)));
+                auto groupIdx = row >> logGrp;
 
-                auto halfRotation = (bankRowIdx >> literal(1u)) << literal(1u);
+                auto halfRotation = (groupIdx >> literal(1u)) << literal(1u);
                 if(e.inverse)
-                    col = (col + halfRotation) & (numCol - literal(1u));
+                    col = (col + halfRotation) & (numPos - literal(1u));
                 else
-                    col = (col + numCol - halfRotation) & (numCol - literal(1u));
+                    col = (col + numPos - halfRotation) & (numPos - literal(1u));
                 return {col};
             }
 
@@ -537,7 +537,7 @@ namespace rocRoller
                 return {index};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColSwap const& e)
+            std::vector<Expression::ExpressionPtr> operator()(PairSwap const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);
@@ -548,7 +548,7 @@ namespace rocRoller
                 return rev(e);
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColRotate const& e)
+            std::vector<Expression::ExpressionPtr> operator()(Rotate const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);

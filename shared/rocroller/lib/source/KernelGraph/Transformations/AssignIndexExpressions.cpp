@@ -1161,8 +1161,8 @@ namespace rocRoller::KernelGraph
                 for(auto edgeTag :
                     kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
                 {
-                    if(kgraph.coordinates.get<LDSColSwizzle>(edgeTag).has_value()
-                       || kgraph.coordinates.get<LDSColUnswizzle>(edgeTag).has_value())
+                    if(kgraph.coordinates.get<PairSwap>(edgeTag).has_value()
+                       || kgraph.coordinates.get<Rotate>(edgeTag).has_value())
                     {
                         hasLDSSwizzle = true;
                         break;
