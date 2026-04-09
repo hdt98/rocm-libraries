@@ -1155,24 +1155,30 @@ namespace rocRoller::KernelGraph
             if(kUnrollCoord < 0)
                 return {-1, -1};
 
-            bool hasLDSSwizzle = false;
+            // Check if any edge in the transform path is non-affine.
+            bool hasNonAffine = false;
             for(auto nodeTag : path)
             {
                 for(auto edgeTag :
                     kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
                 {
-                    if(kgraph.coordinates.get<PairSwap>(edgeTag).has_value()
-                       || kgraph.coordinates.get<Rotate>(edgeTag).has_value())
+                    if(kgraph.coordinates.getEdgeType(edgeTag)
+                       != EdgeType::CoordinateTransform)
+                        continue;
+                    auto const& elem = kgraph.coordinates.getElement(edgeTag);
+                    auto const& edge
+                        = std::get<CoordinateTransformEdge>(std::get<Edge>(elem));
+                    if(!isAffine(edge))
                     {
-                        hasLDSSwizzle = true;
+                        hasNonAffine = true;
                         break;
                     }
                 }
-                if(hasLDSSwizzle)
+                if(hasNonAffine)
                     break;
             }
 
-            if(!hasLDSSwizzle)
+            if(!hasNonAffine)
                 return {-1, -1};
 
             int current = candidate;
