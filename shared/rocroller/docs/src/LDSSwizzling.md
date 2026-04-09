@@ -1,8 +1,8 @@
 # LDS Swizzle for Bank Conflict Elimination
 
-Intra-wave column rotation + pair-swap to eliminate 4x LDS bank conflict
-serialization during Local Read (`ds_read_b128`). Only column indices
-are permuted; row assignments are unchanged.
+Column-level pair-swap + circular rotation to eliminate 4x LDS bank
+conflict serialization during Local Read (`ds_read_b128`). Only column
+indices are permuted; row assignments are unchanged.
 
 See the LDS swizzling presentation for background on bank conflicts,
 `ds_read_b128` phases, and correctness proofs.
@@ -72,77 +72,82 @@ hit the same bank group, causing 4x serialization. The swizzle permutes
 column assignments so that the 16 threads in each phase spread across all
 16 bank groups.
 
-## Permutation: Swap-then-Rotate
+## Permutation: PairSwap + Rotate
 
-Both GR and LR use a swap-then-rotate permutation within `numColumns`:
+The swizzle is decomposed into two composable coordinate graph edges:
 
-```
-bankRowIdx   = row / rowsPerBankRow
-swapOnEvenRow = (bankRowIdx ^ 1) & 1           -- 1 on even, 0 on odd
-swappedCol   = col ^ swapOnEvenRow
-rotation     = numColumns - (bankRowIdx / 2) * 2
-swizzledCol  = (swappedCol + rotation) & (numColumns - 1)
-```
-
-The LR side applies the inverse (un-rotate then un-swap):
+**PairSwap**: XORs the column with 1 on even bank rows (self-inverse).
 
 ```
-invRotation    = (bankRowIdx / 2) * 2
-unrotatedCol   = (col + invRotation) & (numColumns - 1)
-swizzledCol    = unrotatedCol ^ swapOnEvenRow
+bankRowIdx    = row / rowsPerBankRow
+swapOnEvenRow = (bankRowIdx ^ 1) & 1
+swappedCol    = col ^ swapOnEvenRow
 ```
 
-This produces `numColumns` distinct permutations, enough to differentiate
-all tile rows sharing a bank row.
+**Rotate**: Circular rotation of the column based on bank row index.
+
+```
+-- Forward (GR side):
+rotation    = numColumns - (bankRowIdx / 2) * 2
+rotatedCol  = (col + rotation) & (numColumns - 1)
+
+-- Inverse (LR side):
+invRotation = (bankRowIdx / 2) * 2
+rotatedCol  = (col + invRotation) & (numColumns - 1)
+```
+
+Together, PairSwap then Rotate produces `numColumns` distinct column
+permutations, enough to differentiate all tile rows sharing a bank row.
 
 ## Implementation in rocRoller
 
-Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle). GR and LR
-transforms use dedicated `LDSSwizzleGR` and `LDSSwizzleLR` coordinate
-graph edges. No new instruction emission or cross-lane operations needed.
+Gated by `LDSBankSwizzleMode` kernel option (None, Swizzle). The GR and
+LR sides each insert `PairSwap` and `Rotate` coordinate graph edges. No
+new instruction emission or cross-lane operations are needed.
 
-### LDSSwizzleGR edge
+### GR side (Global Read / LDS write)
 
-Coordinate transform edge for the Global Read (write) side. Takes a
-column index and row index as inputs, and produces the swizzled column.
-The `swizzle()` method computes the permuted column from the two inputs
-at visitor traversal time.
+On the GR side, the column coordinate is permuted before being used
+in the Tile decomposition, so each lane fetches from a different global
+column, producing a swizzled layout in LDS.
 
 Graph topology (MATRIX_B, swizzle enabled):
 
 ```
   Workitem --Flatten--> {nThrX, nThrY}
-  {nThrX, nThrY} --LDSSwizzleGR--> grSwizzleNThrX
+  {nThrX, nThrY} --PairSwap--> swappedCol
+  {swappedCol, nThrY} --Rotate(fwd)--> grSwizzleNThrX
   grSwizzleNThrX, iThrX --Tile--> iMacX
 ```
 
 For MATRIX_A, the roles of X/Y are swapped (K is dim 1).
 
-### LDSSwizzleLR edge
+### LR side (Local Read)
 
-Coordinate transform edge for the Local Read side. Un-permutes the
-element-granularity K-column index based on tile row so the wave reads
-the correct logical element from the swizzled LDS layout. The
-`unswizzle()` method decomposes the element index into dwordx4 chunk
-and sub-element offset, applies the inverse permutation, then
-reassembles:
-
-```
-fullChunk      = elemIdx / elementsPerChunk
-subElement     = elemIdx % elementsPerChunk
-chunkInGroup   = fullChunk % numColumns
-chunkGroupIdx  = fullChunk / numColumns
-// ... apply inverse permutation to chunkInGroup ...
-swizzledElem   = (chunkGroupIdx * numColumns + swizzledInGroup)
-                 * elementsPerChunk + subElement
-```
+On the LR side, the element-granularity K-column index is decomposed
+into a dwordx4 chunk index and sub-element offset. The chunk index is
+un-permuted (inverse Rotate, then PairSwap) so the wave reads the
+correct logical element from the swizzled LDS layout.
 
 Graph topology (swizzle enabled):
 
 ```
-  ldsTag --Tile--> {iMacX, rawIMacY}
-  {rawIMacY} --LDSSwizzleLR--> {colCoord, rowCoord}
+  colCoord --Flatten--> {colChunk, elemInChunk}
+  {colChunk, rowCoord} --Rotate(inv)--> rotatedCol
+  {rotatedCol, rowCoord} --PairSwap--> rawColChunk
+  {rawColChunk, elemInChunk} --Tile--> rawColElem
+  ldsTag --Tile--> {rawColElem, rowDim}
 ```
+
+### Multi-wave workgroups
+
+The row coordinate used by PairSwap and Rotate (`nThrY` for MATRIX_B,
+`nThrX` for MATRIX_A) is derived from `Workitem(0)`, which spans the
+entire workgroup. In a multi-wave workgroup, lanes from different waves
+naturally get different row values, producing different `bankRowIdx`
+values and therefore different column permutations. No separate
+inter-wave rotation step is needed -- the swizzle handles multiple
+waves by construction.
 
 ### Verification tables
 
@@ -164,24 +169,8 @@ GR verification (numColumns=8, rowsPerBankRow=2):
 | 56   | 0        | 3 (odd)    | 0        | 6           | 6      | K6 at L56  |
 | 63   | 7        | 3 (odd)    | 7        | 6           | 5      | K5 at L63  |
 
-### Follow-up: Inter-wave rotation
-
-For certain wave group configurations (e.g., 2x2 `MIWaveGroup` where multiple waves
-contribute to the same LDS region), an additional per-wave column rotation may be
-needed on the GR side:
-
-```
-wave_rotation = (waveId & 1) * (2 * numRowsPerBankRow)
-col = (col + intra_rotation - wave_rotation) % numColumns
-```
-This applies when the GR load ratio is not 0.5 (i.e., when each wave
-does not load exactly half of the tile rows). For the primary target
-(256x256x256 with 4x1 wave group, load ratio = 0.5), intra-wave
-rotation alone is sufficient.
-
-### Follow-up: Non-FP4 data types
+### Non-FP4 data types
 
 The swizzle logic is data-type agnostic -- `numColumns = tileK / (128 / elementBits)`
 generalizes across FP4, FP8, FP16, etc. The `noConflicts()` check automatically
-skips swizzle when `numColumns >= 16` (e.g., FP16 macK=128). Testing with non-FP4
-data types is the next step.
+skips swizzle when `numColumns >= 16` (e.g., FP16 macK=128).
