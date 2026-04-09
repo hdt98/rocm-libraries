@@ -303,7 +303,7 @@ namespace rocRoller
                     }
 
                     if(rv.dataType == DataType::None
-                       && (rec.rw == Tracer::READ or rec.rw == Tracer::READWRITE))
+                       && (rec.rw == Tracer::WRITE or rec.rw == Tracer::READWRITE))
                     {
                         auto  op       = kgraph.control.getNode(rec.control);
                         auto* assignOp = std::get_if<ControlGraph::Assign>(&op);
