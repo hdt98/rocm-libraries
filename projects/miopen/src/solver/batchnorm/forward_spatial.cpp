@@ -240,7 +240,7 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
             xlocalsize = 256;
         }
         xgridsize = c * xlocalsize;
-        ldsgcn    = xlocalsize / 64;
+        ldsgcn    = xlocalsize / context.GetStream().GetWavefrontWidth();
         ldsnogcn  = xlocalsize;
     }
     else
