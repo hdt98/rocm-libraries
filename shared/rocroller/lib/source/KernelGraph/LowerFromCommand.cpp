@@ -271,7 +271,10 @@ namespace rocRoller
                         = std::vector<uint32_t>{1, static_cast<uint32_t>(tileSizes[0])};
                     if(subTile->isTranspose())
                     {
-                        tileStrides = {static_cast<uint32_t>(tileSizes[1]), 1};
+                        // Reorder to fastest-first: fast dim (stride 1) first,
+                        // slow dim (stride = fast dim size) second.
+                        tileStrides = {1, static_cast<uint32_t>(tileSizes[1])};
+                        std::swap(tileSizes[0], tileSizes[1]);
                     }
 
                     dims.push_back(m_graph.coordinates.addElement(
