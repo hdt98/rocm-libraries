@@ -39,6 +39,7 @@
 #include <miopen/generic_search_controls.hpp>
 #include <miopen/utility/modified_z.hpp>
 #include <miopen/conv/problem_description.hpp>
+#include <miopen/bayesian_search.hpp>
 
 #include <algorithm>
 #include <cassert>
@@ -430,6 +431,12 @@ auto GenericSearch(const Solver s,
                    std::vector<SolutionPerf>* perf_solsp = nullptr)
     -> decltype(s.GetDefaultPerformanceConfig(context_, problem))
 {
+    if(env::value(MIOPEN_TUNING_SEARCH_METHOD) == 1)
+    {
+        MIOPEN_LOG_I("GenericSearch: routing to BayesianSearch");
+        return BayesianSearch(s, context_, problem, invoke_ctx_);
+    }
+
     auto context                  = context_;
     context.is_for_generic_search = true;
 

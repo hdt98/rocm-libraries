@@ -101,6 +101,7 @@ set( MIOpen_Source
     fused_api.cpp
     fusion.cpp
     fusion/problem_description.cpp
+    bayesian_search.cpp
     generic_search.cpp
     getitem_api.cpp
     glu/problem_description.cpp
