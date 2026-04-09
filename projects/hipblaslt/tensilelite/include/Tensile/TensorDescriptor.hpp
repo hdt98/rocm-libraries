@@ -509,14 +509,14 @@ namespace TensileLite
             {
                 coord[0] = 0;
 
-                auto const* localPtr = data + (desc.index(coord) / TypeInfo<T>::Packing);
+                auto const* localPtr = data + desc.index(coord);
 
                 if(sizes[0] > 0)
                     stream << localPtr[0];
 
-                for(coord[0] = TypeInfo<T>::Packing; coord[0] < sizes[0]; coord[0]+=TypeInfo<T>::Packing)
+                for(coord[0] = 1; coord[0] < sizes[0]; coord[0]++)
                 {
-                    stream << " " << localPtr[coord[0] * stride0 / TypeInfo<T>::Packing];
+                    stream << " " << localPtr[coord[0] * stride0];
                 }
 
                 stream << std::endl;
@@ -524,7 +524,7 @@ namespace TensileLite
 
             if(decorated)
             {
-                stream << "]" << std::endl;
+                stream << std::endl << "]" << std::endl;
             }
         }
     }
