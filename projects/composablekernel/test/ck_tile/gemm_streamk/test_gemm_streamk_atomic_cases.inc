@@ -15,9 +15,9 @@ TYPED_TEST(TEST_SUITE_NAME, StreamK_EdgeCase)
 TYPED_TEST(TEST_SUITE_NAME, StreamK_DPOnly)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
-    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<9, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
+    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<20, TypeParam>::value;
 
     // For DP only, we ensure that the number of tiles is a multiple of the number of CUs. This
     // assumes tile sizes are large enough such that occupancy is 1.
@@ -31,9 +31,9 @@ TYPED_TEST(TEST_SUITE_NAME, StreamK_DPOnly)
 TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
-    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<9, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
+    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<20, TypeParam>::value;
 
     // For SK only, we have 4 macro tiles in C. But, we need to make sure there is enough work along
     // the K dimension to avoid falling into the edge case. Thus, we always have at least num_cu

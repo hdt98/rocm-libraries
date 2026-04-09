@@ -79,36 +79,36 @@ template <typename Tuple>
 class TestCkTileStreamK : public ::testing::Test
 {
     protected:
-    // Original elements from develop (positions 0-15)
-    using A0Layout                                = std::tuple_element_t<0, Tuple>; // ALayout
-    using B0Layout                                = std::tuple_element_t<1, Tuple>; // BLayout
-    using CLayout                                 = std::tuple_element_t<2, Tuple>;
-    using A0DataType                              = std::tuple_element_t<3, Tuple>; // ADataType
-    using B0DataType                              = std::tuple_element_t<4, Tuple>; // BDataType
-    using AccDataType                             = std::tuple_element_t<5, Tuple>;
-    using CDataType                               = std::tuple_element_t<6, Tuple>;
-    static constexpr ck_tile::index_t M_Tile      = std::tuple_element_t<7, Tuple>::value;
-    static constexpr ck_tile::index_t N_Tile      = std::tuple_element_t<8, Tuple>::value;
-    static constexpr ck_tile::index_t K_Tile      = std::tuple_element_t<9, Tuple>::value;
-    static constexpr ck_tile::index_t M_Warp_Tile = std::tuple_element_t<10, Tuple>::value;
-    static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<11, Tuple>::value;
-    static constexpr ck_tile::index_t K_Warp_Tile = std::tuple_element_t<12, Tuple>::value;
-    static constexpr bool Persistent              = std::tuple_element_t<13, Tuple>::value;
-    static constexpr auto PipelineType            = std::tuple_element_t<14, Tuple>::value;
-    static constexpr auto ReductionStrategy       = std::tuple_element_t<15, Tuple>::value;
+    // Elements matching Multi-ABD order (positions 0-17)
+    using A0Layout        = std::tuple_element_t<0, Tuple>;
+    using A1Layout        = std::tuple_element_t<1, Tuple>;
+    using B0Layout        = std::tuple_element_t<2, Tuple>;
+    using B1Layout        = std::tuple_element_t<3, Tuple>;
+    using CLayout         = std::tuple_element_t<4, Tuple>;
+    using D0Layout        = std::tuple_element_t<5, Tuple>;
+    using D0DataType      = std::tuple_element_t<6, Tuple>;
+    using D1Layout        = std::tuple_element_t<7, Tuple>;
+    using D1DataType      = std::tuple_element_t<8, Tuple>;
+    using A0DataType      = std::tuple_element_t<9, Tuple>;
+    using A1DataType      = std::tuple_element_t<10, Tuple>;
+    using B0DataType      = std::tuple_element_t<11, Tuple>;
+    using B1DataType      = std::tuple_element_t<12, Tuple>;
+    using AccDataType     = std::tuple_element_t<13, Tuple>;
+    using CDataType       = std::tuple_element_t<14, Tuple>; // EDataType in multi-ABD
+    using AElementWiseFn  = std::tuple_element_t<15, Tuple>;
+    using BElementWiseFn  = std::tuple_element_t<16, Tuple>;
+    using CDElementWiseFn = std::tuple_element_t<17, Tuple>;
 
-    // Multi-ABD elements (positions 16-26)
-    using A1Layout        = std::tuple_element_t<16, Tuple>;
-    using A1DataType      = std::tuple_element_t<17, Tuple>;
-    using B1Layout        = std::tuple_element_t<18, Tuple>;
-    using B1DataType      = std::tuple_element_t<19, Tuple>;
-    using D0Layout        = std::tuple_element_t<20, Tuple>;
-    using D0DataType      = std::tuple_element_t<21, Tuple>;
-    using D1Layout        = std::tuple_element_t<22, Tuple>;
-    using D1DataType      = std::tuple_element_t<23, Tuple>;
-    using AElementWiseFn  = std::tuple_element_t<24, Tuple>;
-    using BElementWiseFn  = std::tuple_element_t<25, Tuple>;
-    using CDElementWiseFn = std::tuple_element_t<26, Tuple>;
+    // Stream-K specific elements (positions 18-26)
+    static constexpr ck_tile::index_t M_Tile      = std::tuple_element_t<18, Tuple>::value;
+    static constexpr ck_tile::index_t N_Tile      = std::tuple_element_t<19, Tuple>::value;
+    static constexpr ck_tile::index_t K_Tile      = std::tuple_element_t<20, Tuple>::value;
+    static constexpr ck_tile::index_t M_Warp_Tile = std::tuple_element_t<21, Tuple>::value;
+    static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<22, Tuple>::value;
+    static constexpr ck_tile::index_t K_Warp_Tile = std::tuple_element_t<23, Tuple>::value;
+    static constexpr bool Persistent              = std::tuple_element_t<24, Tuple>::value;
+    static constexpr auto PipelineType            = std::tuple_element_t<25, Tuple>::value;
+    static constexpr auto ReductionStrategy       = std::tuple_element_t<26, Tuple>::value;
 
     using AsLayout   = ck_tile::tuple<A0Layout, A1Layout>;
     using AsDataType = ck_tile::tuple<A0DataType, A1DataType>;

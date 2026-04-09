@@ -6,8 +6,8 @@
 TYPED_TEST(TEST_SUITE_NAME, StreamK_DP2TSK)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
 
     // For DP 2-Tile SK, there are 2 important terms:
     // Term 1: (M_Tile * num_cu * 2) - This ensures we have at least 2 cycles that will fully

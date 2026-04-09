@@ -6,9 +6,9 @@
 TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly_OneTile)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
-    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<9, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
+    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<20, TypeParam>::value;
 
     ck_tile::index_t M = M_Tile;
     ck_tile::index_t N = N_Tile;
@@ -20,9 +20,9 @@ TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly_OneTile)
 TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly_4Tiles_Reduction)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
-    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<9, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
+    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<20, TypeParam>::value;
 
     ck_tile::index_t M = M_Tile * 4;
     ck_tile::index_t N = N_Tile;
@@ -34,9 +34,9 @@ TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly_4Tiles_Reduction)
 TYPED_TEST(TEST_SUITE_NAME, StreamK_SKOnly_21Tiles)
 {
     const ck_tile::index_t num_cu     = get_cu_count();
-    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<7, TypeParam>::value;
-    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<8, TypeParam>::value;
-    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<9, TypeParam>::value;
+    constexpr ck_tile::index_t M_Tile = std::tuple_element_t<18, TypeParam>::value;
+    constexpr ck_tile::index_t N_Tile = std::tuple_element_t<19, TypeParam>::value;
+    constexpr ck_tile::index_t K_Tile = std::tuple_element_t<20, TypeParam>::value;
 
     ck_tile::index_t M = M_Tile * 3;
     ck_tile::index_t N = N_Tile * 7;

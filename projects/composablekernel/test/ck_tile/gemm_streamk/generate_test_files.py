@@ -125,7 +125,7 @@ def parse_types_header(header_path: str, target: str) -> list[dict]:
     """Return a list of dicts with keys: type_alias, class_name, file_tag, suffix."""
     target_def = TARGETS[target]
     # Pattern matches lines like: using KernelTypesStreamKFp16PersistentAtomicCompV3 = ...
-    pattern = re.compile(r"using\s+(KernelTypesStreamK(\w+))\s*=")
+    pattern = re.compile(r"^using\s+(KernelTypesStreamK(\w+))\s*=")
     entries: list[dict] = []
     with open(header_path) as f:
         for line in f:
