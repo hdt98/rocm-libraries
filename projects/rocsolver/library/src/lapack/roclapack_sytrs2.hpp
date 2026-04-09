@@ -1465,7 +1465,7 @@ static inline rocblas_status rocsolver_sytrs2_argCheck(rocblas_handle handle,
         bool const has_work = (n >= 1) && (nrhs >= 1) && (batch_count >= 1);
         if(!has_work)
         {
-            return (rocblas_status_success);
+            return (rocblas_status_continue);
         }
     }
 

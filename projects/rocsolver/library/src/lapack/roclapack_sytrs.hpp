@@ -1292,6 +1292,14 @@ rocblas_status rocsolver_sytrs_argCheck(rocblas_handle handle,
 {
     // order is important for unit tests:
 
+    {
+        bool const is_valid_handle = (handle != nullptr);
+        if(!is_valid_handle)
+        {
+            return (rocblas_status_invalid_handle);
+        }
+    }
+
     // 1. invalid/non-supported values
     {
         bool const is_uplo_ok = (uplo == rocblas_fill_upper) || (uplo == rocblas_fill_lower);
