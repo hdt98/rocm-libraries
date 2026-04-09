@@ -123,7 +123,8 @@ protected:
     {
         Arguments arg = sytrs_setup_arguments(GetParam());
 
-        if(arg.peek<rocblas_int>("n") == 0 && arg.peek<rocblas_int>("nrhs") == 0)
+        if(arg.peek<rocblas_int>("n") == 0 && arg.peek<rocblas_int>("nrhs") == 0
+           && arg.peek<char>("uplo") == 'U')
             testing_sytrs_bad_arg<BATCHED, STRIDED, T, I>();
 
         arg.batch_count = (BATCHED || STRIDED ? 3 : 1);

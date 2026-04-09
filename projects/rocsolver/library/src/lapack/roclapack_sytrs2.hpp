@@ -1377,7 +1377,7 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                rocblas_status const istat = rocblasCall_trsm_mem<BATCHED, T, I>(
+                (void)rocblasCall_trsm_mem<BATCHED, T, I>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
 
                     &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
@@ -1397,7 +1397,7 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                rocblas_status const istat = rocblasCall_trsm_mem<BATCHED, T>(
+                (void)rocblasCall_trsm_mem<BATCHED, T>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
 
                     &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
