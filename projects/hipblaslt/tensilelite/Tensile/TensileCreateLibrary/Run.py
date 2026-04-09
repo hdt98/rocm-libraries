@@ -80,6 +80,9 @@ from Tensile.Toolchain.Component import Assembler
 from Tensile.Utilities.Decorators.Profile import profile
 from Tensile.Utilities.Decorators.Timing import timing
 
+from rocasm.setparse import parse_set_directives
+from rocasm.asm_to_rocasm import asm_to_rocasm
+
 from .ParseArguments import parseArguments
 
 
@@ -279,9 +282,10 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
     """Extract the label_LoopBeginL main loop, write a Python mainloop file, and splice back.
 
     Searches for label_LoopBeginL: and label_LoopEndL: in the source text.
-    Writes a Python file at mainloopPath with a get_main_loop() function returning the
-    extracted text. Then imports that module, calls get_main_loop(), and splices the result
-    back into the source. The returned source should be identical to the input.
+    Writes a Python file at mainloopPath containing:
+      1. get_main_loop() — returns the original assembly text (for round-trip)
+      2. rocasm_main_loop() — the rocasm Python translation of the assembly,
+         which serves as a starting point for programmatic modification
 
     If either label is not found, returns src unchanged (graceful skip).
     """
@@ -306,10 +310,29 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
     main_loop_text = src[line_start:end_line_start]
     suffix = src[end_line_start:]
 
-    # Write the mainloop Python file using repr() for safe string escaping
+    # Parse .set directives from everything before the main loop to build symbol table
+    symbols = parse_set_directives(prefix)
+
+    # Translate assembly to rocasm Python code
+    rocasm_code = asm_to_rocasm(main_loop_text, symbols)
+
+    # Write the mainloop Python file
     with open(mainloopPath, "w", encoding="utf-8") as f:
+        # Original assembly round-trip function
         f.write("def get_main_loop():\n")
         f.write(f"    return {repr(main_loop_text)}\n")
+        f.write("\n\n")
+
+        # Rocasm translation as a reference function
+        f.write("def rocasm_main_loop(block):\n")
+        f.write('    """ROCasm translation of the main loop.\n')
+        f.write("\n")
+        f.write("    This is an auto-generated translation of the assembly main loop\n")
+        f.write("    into rocasm Python API calls. To use a modified version, edit this\n")
+        f.write("    function and set UseROCasmMainLoop to point to this file.\n")
+        f.write('    """\n')
+        for line in rocasm_code.splitlines():
+            f.write(f"    {line}\n")
 
     # Import and call get_main_loop() to prove the round-trip
     spec = importlib.util.spec_from_file_location("_rocasm_mainloop", str(mainloopPath))
