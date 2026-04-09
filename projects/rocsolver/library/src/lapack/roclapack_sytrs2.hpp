@@ -1592,19 +1592,19 @@ static inline rocblas_status rocsolver_sytrs2_template(rocblas_handle handle,
 
         size_t const size_remain = (pwork + size_work) - pfree;
         bool is_convert = false;
-        auto const istat = rocsolver_syconv_template<T, I>(handle,
+        istat_syconv = rocsolver_syconv_template<T, I>(handle,
 
-                                                           is_upper, is_convert = false, n,
+                                                       is_upper, is_convert = false, n,
 
-                                                           A, shiftA, lda, strideA,
+                                                       A, shiftA, lda, strideA,
 
-                                                           ipiv, strideP,
+                                                       ipiv, strideP,
 
-                                                           E, strideE,
+                                                       E, strideE,
 
-                                                           batch_count,
+                                                       batch_count,
 
-                                                           (void*)pfree, size_remain);
+                                                       (void*)pfree, size_remain);
 
         pfree = pfree_save;
     }
