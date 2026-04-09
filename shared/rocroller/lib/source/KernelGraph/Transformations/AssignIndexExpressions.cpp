@@ -1305,7 +1305,7 @@ namespace rocRoller::KernelGraph
                 return {-1, -1};
 
             // Check if any node in the transform path has an
-            // LDS swizzle edge (LDSSwizzleGR or LDSSwizzleLR).
+            // LDS swizzle edge (LDSColSwizzle or LDSColUnswizzle).
             // `path` contains coordinate node tags; getNeighbours
             // returns incident edge tags in the hypergraph.
             bool hasLDSSwizzle = false;
@@ -1314,8 +1314,8 @@ namespace rocRoller::KernelGraph
                 for(auto edgeTag :
                     kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
                 {
-                    if(kgraph.coordinates.get<LDSSwizzleGR>(edgeTag).has_value()
-                       || kgraph.coordinates.get<LDSSwizzleLR>(edgeTag).has_value())
+                    if(kgraph.coordinates.get<LDSColSwizzle>(edgeTag).has_value()
+                       || kgraph.coordinates.get<LDSColUnswizzle>(edgeTag).has_value())
                     {
                         hasLDSSwizzle = true;
                         break;

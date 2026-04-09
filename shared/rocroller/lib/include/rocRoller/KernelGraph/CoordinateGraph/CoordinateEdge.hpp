@@ -261,7 +261,6 @@ namespace rocRoller
          */
         RR_EMPTY_STRUCT_WITH_NAME(PassThrough);
 
-
         /**
          * LDS bank swizzle for Global Read (write) side.
          *
@@ -272,14 +271,14 @@ namespace rocRoller
          * Graph: addElement(edge, {swizzledCol}, {col, row})
          * Reverse: given col and row indexes, compute swizzled col.
          */
-        struct LDSSwizzleGR
+        struct LDSColSwizzle
         {
             unsigned int numColumns;
             unsigned int rowsPerBankRow;
 
-            LDSSwizzleGR() = default;
+            LDSColSwizzle() = default;
 
-            LDSSwizzleGR(unsigned int numColumns, unsigned int rowsPerBankRow)
+            LDSColSwizzle(unsigned int numColumns, unsigned int rowsPerBankRow)
                 : numColumns(numColumns)
                 , rowsPerBankRow(rowsPerBankRow)
             {
@@ -313,7 +312,7 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSSwizzleGR";
+                return "LDSColSwizzle";
             }
         };
 
@@ -327,17 +326,17 @@ namespace rocRoller
          * Graph: addElement(edge, {rawCol}, {col, row})
          * Reverse: given col and row indexes, compute un-swizzled col.
          */
-        struct LDSSwizzleLR
+        struct LDSColUnswizzle
         {
             unsigned int numColumns;
             unsigned int rowsPerBankRow;
             unsigned int elementsPerChunk;
 
-            LDSSwizzleLR() = default;
+            LDSColUnswizzle() = default;
 
-            LDSSwizzleLR(unsigned int numColumns,
-                         unsigned int rowsPerBankRow,
-                         unsigned int elementsPerChunk)
+            LDSColUnswizzle(unsigned int numColumns,
+                            unsigned int rowsPerBankRow,
+                            unsigned int elementsPerChunk)
                 : numColumns(numColumns)
                 , rowsPerBankRow(rowsPerBankRow)
                 , elementsPerChunk(elementsPerChunk)
@@ -379,7 +378,7 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSSwizzleLR";
+                return "LDSColUnswizzle";
             }
         };
 

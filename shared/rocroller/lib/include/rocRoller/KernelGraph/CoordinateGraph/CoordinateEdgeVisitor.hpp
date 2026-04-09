@@ -60,7 +60,6 @@ namespace rocRoller
                 return {result};
             }
 
-
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
                 AssertFatal(srcs.size() == e.strides.first.size(),
@@ -199,14 +198,13 @@ namespace rocRoller
                 return {result};
             }
 
-
-            std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleGR const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColSwizzle const& e)
             {
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
                 return {e.swizzle(indexes[0], indexes[1])};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleLR const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
             {
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
                 return {e.unswizzle(indexes[0], indexes[1])};
@@ -376,7 +374,6 @@ namespace rocRoller
                 return {index};
             }
 
-
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
             {
                 AssertFatal(srcs.size() == e.strides.first.size(),
@@ -520,8 +517,7 @@ namespace rocRoller
                 return {index};
             }
 
-
-            std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleGR const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColSwizzle const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);
@@ -530,7 +526,7 @@ namespace rocRoller
                 return {e.swizzle(indexes[0], indexes[1])};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSSwizzleLR const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);

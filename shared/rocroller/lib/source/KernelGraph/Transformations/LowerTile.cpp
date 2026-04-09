@@ -98,7 +98,8 @@ namespace rocRoller
             /// Compute from a pre-computed column count (GR path).
             static LDSSwizzleParams fromColumnCount(unsigned int numCols)
             {
-                AssertFatal(numCols > 0 && (numCols & (numCols - 1)) == 0 && columnsPerBankRow % numCols == 0,
+                AssertFatal(numCols > 0 && (numCols & (numCols - 1)) == 0
+                                && columnsPerBankRow % numCols == 0,
                             "LDS swizzle requires power-of-2 numColumns",
                             ShowValue(numCols));
                 return {numCols, columnsPerBankRow / numCols, 0u};
@@ -1010,7 +1011,7 @@ namespace rocRoller
                     grSwizzleNThrX
                         = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSSwizzleGR{params.numColumns, params.rowsPerBankRow},
+                        LDSColSwizzle{params.numColumns, params.rowsPerBankRow},
                         {grSwizzleNThrX},
                         {nThrX, nThrY});
 
@@ -1064,7 +1065,7 @@ namespace rocRoller
                     grSwizzleNThrY
                         = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSSwizzleGR{params.numColumns, params.rowsPerBankRow},
+                        LDSColSwizzle{params.numColumns, params.rowsPerBankRow},
                         {grSwizzleNThrY},
                         {nThrY, nThrX});
 
@@ -2260,10 +2261,10 @@ namespace rocRoller
                                         false);
                 }
 
-                // LR swizzle: insert LDSSwizzleLR edge that un-permutes
+                // LR swizzle: insert LDSColUnswizzle edge that un-permutes
                 // the K-column so the wave reads the correct logical element.
                 //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --LDSSwizzleLR--> {colCoord, rowCoord}
+                //   {rawIMacY} --LDSColUnswizzle--> {colCoord, rowCoord}
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
                 {
@@ -2286,9 +2287,9 @@ namespace rocRoller
                             int colCoord = isA ? iMacY : iMacX;
 
                             auto rawCol = graph.coordinates.addElement(tile.tileIndex(kDim));
-                            graph.coordinates.addElement(LDSSwizzleLR{params.numColumns,
-                                                                      params.rowsPerBankRow,
-                                                                      params.elementsPerChunk},
+                            graph.coordinates.addElement(LDSColUnswizzle{params.numColumns,
+                                                                         params.rowsPerBankRow,
+                                                                         params.elementsPerChunk},
                                                          {rawCol},
                                                          {colCoord, rowCoord});
                             if(isA)

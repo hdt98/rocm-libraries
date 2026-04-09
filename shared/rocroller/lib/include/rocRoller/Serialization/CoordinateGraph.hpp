@@ -219,20 +219,19 @@ namespace rocRoller
         {
         };
 
-
         template <typename IO, typename Context>
-        struct MappingTraits<KernelGraph::CoordinateGraph::LDSSwizzleGR, IO, Context>
+        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColSwizzle, IO, Context>
         {
             using iot = IOTraits<IO>;
 
             static void
-                mapping(IO& io, KernelGraph::CoordinateGraph::LDSSwizzleGR& edge, Context& ctx)
+                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwizzle& edge, Context& ctx)
             {
                 iot::mapRequired(io, "numColumns", edge.numColumns);
                 iot::mapRequired(io, "rowsPerBankRow", edge.rowsPerBankRow);
             }
 
-            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSSwizzleGR& edge)
+            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwizzle& edge)
             {
                 AssertFatal((std::same_as<EmptyContext, Context>));
                 Context ctx;
@@ -241,19 +240,19 @@ namespace rocRoller
         };
 
         template <typename IO, typename Context>
-        struct MappingTraits<KernelGraph::CoordinateGraph::LDSSwizzleLR, IO, Context>
+        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColUnswizzle, IO, Context>
         {
             using iot = IOTraits<IO>;
 
             static void
-                mapping(IO& io, KernelGraph::CoordinateGraph::LDSSwizzleLR& edge, Context& ctx)
+                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColUnswizzle& edge, Context& ctx)
             {
                 iot::mapRequired(io, "numColumns", edge.numColumns);
                 iot::mapRequired(io, "rowsPerBankRow", edge.rowsPerBankRow);
                 iot::mapRequired(io, "elementsPerChunk", edge.elementsPerChunk);
             }
 
-            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSSwizzleLR& edge)
+            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColUnswizzle& edge)
             {
                 AssertFatal((std::same_as<EmptyContext, Context>));
                 Context ctx;
