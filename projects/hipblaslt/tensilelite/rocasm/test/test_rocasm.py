@@ -68,9 +68,48 @@ class TestRegisterArrays:
         """Slicing a sub-array composes: Acc[16:32][0:4] maps to phys 16-19."""
         Acc = AccArray("Acc", base=0, count=64)
         sub = Acc[16:32]
-        # sub is a RegisterSlice, not an array, so we test the phys_base math
         assert sub.phys_base == 16
         assert sub.count == 16
+
+    def test_sub_slice(self):
+        """RegisterSlice supports further slicing: Acc[16:32][0:4] → phys 16-19."""
+        Acc = AccArray("Acc", base=0, count=64)
+        sub = Acc[16:32]
+        sub_sub = sub[0:4]
+        assert sub_sub.phys_base == 16
+        assert sub_sub.count == 4
+
+    def test_sub_slice_offset(self):
+        """Sub-slicing with offset: Acc[16:32][8:12] → phys 24-27."""
+        Acc = AccArray("Acc", base=0, count=64)
+        sub = Acc[16:32][8:12]
+        assert sub.phys_base == 24
+        assert sub.count == 4
+
+    def test_sub_slice_with_base(self):
+        """Sub-slicing with non-zero array base: A(base=24)[0:8][4:8] → phys 28-31."""
+        A = VgprArray("A", base=24, count=8)
+        sub = A[0:8][4:8]
+        assert sub.phys_base == 28
+        assert sub.count == 4
+
+    def test_sub_slice_container(self):
+        """Sub-sliced RegisterSlice produces correct rocisa container."""
+        Acc = AccArray("Acc", base=0, count=64)
+        c = Acc[16:32][0:4].container()
+        assert str(c) == "acc[16:19]"
+
+    def test_sub_slice_out_of_bounds(self):
+        Acc = AccArray("Acc", base=0, count=64)
+        sub = Acc[16:32]
+        with pytest.raises(IndexError, match="exceeds slice size"):
+            sub[0:20]
+
+    def test_sub_slice_empty(self):
+        Acc = AccArray("Acc", base=0, count=64)
+        sub = Acc[16:32]
+        with pytest.raises(IndexError, match="empty"):
+            sub[4:4]
 
     def test_out_of_bounds(self):
         A = VgprArray("A", base=0, count=8)
@@ -161,7 +200,7 @@ class TestBlock:
 
     def test_unknown_attr(self):
         block = Block(Acc=AccArray("Acc", base=0, count=16))
-        with pytest.raises(AttributeError, match="no register array"):
+        with pytest.raises(AttributeError, match="no register array or side-effect"):
             block.X
 
     def test_repr(self):
@@ -312,3 +351,194 @@ class TestBodyCloning:
         fresh.Acc[4:8] = vmfma_f32_16x16x32_bf16(fresh.B[0:4], fresh.A[4:8], fresh.Acc[4:8])
         assert len(fresh) == 1
         assert len(block) == 1  # original unchanged
+
+
+# ---------- Side-effect instructions ----------
+
+class TestSideEffectInstructions:
+
+    def _make_block(self):
+        return Block(
+            Acc=AccArray("Acc", base=0, count=64),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+        )
+
+    def test_s_waitcnt_dscnt(self):
+        block = self._make_block()
+        block.s_waitcnt(dscnt=0)
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "s_waitcnt"
+        assert op.dst is None
+        assert op.srcs == []
+        assert "lgkmcnt(0)" in str(op.rocisa_inst)
+
+    def test_s_waitcnt_vlcnt(self):
+        block = self._make_block()
+        block.s_waitcnt(vlcnt=0)
+        assert "vmcnt(0)" in block.emit()
+
+    def test_s_barrier(self):
+        block = self._make_block()
+        block.s_barrier()
+        assert len(block) == 1
+        assert "s_barrier" in block.emit()
+
+    def test_s_nop(self):
+        block = self._make_block()
+        block.s_nop(0)
+        assert "s_nop 0" in block.emit()
+
+    def test_s_nop_with_count(self):
+        block = self._make_block()
+        block.s_nop(3)
+        assert "s_nop 3" in block.emit()
+
+    def test_side_effect_closure_unpacked(self):
+        """Side-effect closures can be unpacked at module scope (LEGB pattern)."""
+        block = self._make_block()
+        s_waitcnt = block.s_waitcnt
+        s_barrier = block.s_barrier
+
+        s_waitcnt(dscnt=0)
+        s_barrier()
+
+        assert len(block) == 2
+        asm = block.emit()
+        assert "lgkmcnt(0)" in asm
+        assert "s_barrier" in asm
+
+    def test_side_effect_on_new_body(self):
+        block = self._make_block()
+        block.s_barrier()
+
+        new = block.new_body()
+        new.s_waitcnt(dscnt=0)
+
+        assert len(block) == 1
+        assert len(new) == 1
+        assert "s_barrier" in block.emit()
+        assert "lgkmcnt(0)" in new.emit()
+
+
+# ---------- Sub-slice assignment protocol ----------
+
+class TestSubSliceAssignment:
+
+    def _make_block(self):
+        return Block(
+            Acc=AccArray("Acc", base=0, count=64),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+        )
+
+    def test_setitem_on_sub_slice(self):
+        """Assignment through a sub-slice: sub[0:4] = vmfma(...)."""
+        block = self._make_block()
+        sub_acc = block.Acc[16:32]
+        sub_acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], sub_acc[0:4])
+
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.dst.phys_base == 16  # 16 + 0
+        assert "acc[16:19]" in block.emit()
+
+    def test_composable_helper_function(self):
+        """Prove the matmul_16x16 pattern from the design doc works."""
+        block = self._make_block()
+
+        def matmul_16x16(Acc, A, B):
+            Acc[0:4] = vmfma_f32_16x16x32_bf16(B[0:4], A[0:4], Acc[0:4])
+            Acc[4:8] = vmfma_f32_16x16x32_bf16(B[0:4], A[4:8], Acc[4:8])
+            Acc[8:12] = vmfma_f32_16x16x32_bf16(B[0:4], A[0:4], Acc[8:12])
+            Acc[12:16] = vmfma_f32_16x16x32_bf16(B[0:4], A[4:8], Acc[12:16])
+
+        # Call with sub-slices: first 16 accumulators
+        matmul_16x16(block.Acc[0:16], block.A[0:8], block.B[0:8])
+
+        assert len(block) == 4
+        asm = block.emit()
+        # First MFMA should write to acc[0:3]
+        assert "acc[0:3]" in asm
+        # Last MFMA should write to acc[12:15]
+        assert "acc[12:15]" in asm
+
+    def test_composable_helper_offset(self):
+        """Helper called with offset sub-slices writes to correct physical registers."""
+        block = self._make_block()
+
+        def matmul_4(Acc, A, B):
+            Acc[0:4] = vmfma_f32_16x16x32_bf16(B[0:4], A[0:4], Acc[0:4])
+
+        # Call targeting acc[48:52] via Acc[48:64][0:4]
+        matmul_4(block.Acc[48:64], block.A[0:8], block.B[0:8])
+
+        assert len(block) == 1
+        assert "acc[48:51]" in block.emit()
+
+    def test_bad_assignment_on_sub_slice(self):
+        block = self._make_block()
+        sub = block.Acc[0:16]
+        with pytest.raises(TypeError, match="Cannot assign"):
+            sub[0:4] = 42
+
+
+# ---------- Combined calling conventions ----------
+
+class TestCombinedCallingConventions:
+
+    def test_mfma_and_side_effects_interleaved(self):
+        """Both calling conventions work together in one function body."""
+        block = Block(
+            Acc=AccArray("Acc", base=0, count=16),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+        )
+
+        # Unpack closures (LEGB pattern from design doc)
+        s_waitcnt = block.s_waitcnt
+        s_barrier = block.s_barrier
+
+        # Simulate a main loop fragment
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        block.Acc[4:8] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[4:8], block.Acc[4:8])
+        s_waitcnt(dscnt=0)
+        block.Acc[8:12] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[8:12])
+        s_barrier()
+        block.Acc[12:16] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[4:8], block.Acc[12:16])
+
+        assert len(block) == 6
+        asm = block.emit()
+        lines = [l for l in asm.split("\n") if l.strip()]
+        assert len(lines) == 6
+        assert "v_mfma" in lines[0]
+        assert "v_mfma" in lines[1]
+        assert "lgkmcnt(0)" in lines[2]
+        assert "v_mfma" in lines[3]
+        assert "s_barrier" in lines[4]
+        assert "v_mfma" in lines[5]
+
+    def test_function_with_register_args_and_closures(self):
+        """The full design doc pattern: register args + module-scope closures."""
+        block = Block(
+            Acc=AccArray("Acc", base=0, count=64),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+        )
+
+        # Module scope: unpack closures
+        s_waitcnt = block.s_waitcnt
+
+        # Function takes register arrays as arguments
+        def label_LoopBeginL(Acc, A, B):
+            Acc[0:4] = vmfma_f32_16x16x32_bf16(B[0:4], A[0:4], Acc[0:4])
+            Acc[4:8] = vmfma_f32_16x16x32_bf16(B[0:4], A[4:8], Acc[4:8])
+            s_waitcnt(dscnt=0)
+
+        label_LoopBeginL(block.Acc, block.A, block.B)
+
+        assert len(block) == 3
+        asm = block.emit()
+        assert asm.count("v_mfma") == 2
+        assert "lgkmcnt(0)" in asm

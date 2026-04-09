@@ -33,10 +33,20 @@ It has two parts:
 from __future__ import annotations
 
 from copy import copy
+from functools import partial
 from typing import Any
+
+from rocisa.instruction import SWaitCnt, SBarrier, SNop
 
 from rocasm.ops import Op
 from rocasm.regs import VgprArray, AccArray, SgprArray, _RegArray
+
+# Side-effect instructions have no destination register.
+_SIDE_EFFECT_INSTRUCTIONS: dict[str, type] = {
+    "s_waitcnt": SWaitCnt,
+    "s_barrier": SBarrier,
+    "s_nop": SNop,
+}
 
 
 class Block:
@@ -76,7 +86,10 @@ class Block:
         regs = object.__getattribute__(self, "_regs")
         if name in regs:
             return regs[name]
-        raise AttributeError(f"Block has no register array '{name}'")
+        if name in _SIDE_EFFECT_INSTRUCTIONS:
+            return partial(self._side_effect, name)
+        raise AttributeError(
+            f"Block has no register array or side-effect instruction '{name}'")
 
     @property
     def ops(self) -> list[Op]:
@@ -85,6 +98,21 @@ class Block:
 
     def _append_op(self, op: Op):
         """Append an Op. Called by PendingOp.resolve()."""
+        self._ops.append(op)
+
+    def _side_effect(self, inst_name: str, *args, **kwargs):
+        """Create and append an Op for a side-effect instruction (no destination).
+
+        Called via closures: block.s_waitcnt(dscnt=0) → self._side_effect("s_waitcnt", dscnt=0)
+        """
+        cls = _SIDE_EFFECT_INSTRUCTIONS[inst_name]
+        rocisa_inst = cls(*args, **kwargs)
+        op = Op(
+            inst=inst_name,
+            dst=None,
+            srcs=[],
+            rocisa_inst=rocisa_inst,
+        )
         self._ops.append(op)
 
     def new_body(self) -> Block:

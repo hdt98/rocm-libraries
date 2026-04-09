@@ -41,7 +41,15 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class RegisterSlice:
-    """A contiguous slice of a register array: base + count + type info."""
+    """A contiguous slice of a register array: base + count + type info.
+
+    Supports sub-slicing for composability:
+        Acc[16:32][0:4]  →  physical registers 16-19
+
+    Also supports __setitem__ for the assignment protocol:
+        sub = Acc[16:32]
+        sub[0:4] = vmfma(...)  →  writes to physical 16-19
+    """
     array: _RegArray
     start: int  # offset within the array
     count: int
@@ -53,6 +61,49 @@ class RegisterSlice:
     def container(self):
         """Return the rocisa RegisterContainer for this slice."""
         return self.array._make_container(self.phys_base, self.count)
+
+    def _parse_sub_key(self, key) -> tuple[int, int]:
+        """Parse a slice key into (start, count) within this sub-slice."""
+        if isinstance(key, slice):
+            start = key.start if key.start is not None else 0
+            stop = key.stop if key.stop is not None else self.count
+            if key.step is not None:
+                raise IndexError("Register slices do not support step")
+            if start < 0 or stop < 0:
+                raise IndexError("Negative indices not supported for register slices")
+            if stop > self.count:
+                raise IndexError(
+                    f"{self!r}[{start}:{stop}] exceeds slice size {self.count}")
+            if start >= stop:
+                raise IndexError(
+                    f"{self!r}[{start}:{stop}] is empty (start >= stop)")
+            return start, stop - start
+        raise TypeError(f"Register slices require slice indexing, got {type(key).__name__}")
+
+    def __getitem__(self, key) -> RegisterSlice:
+        """Sub-slice: Acc[16:32][0:4] → RegisterSlice(array, start=16, count=4)."""
+        sub_start, sub_count = self._parse_sub_key(key)
+        return RegisterSlice(
+            array=self.array,
+            start=self.start + sub_start,
+            count=sub_count,
+        )
+
+    def __setitem__(self, key, value):
+        """Assignment protocol on sub-slices: sub[0:4] = vmfma(...)."""
+        from rocasm.ops import PendingOp
+        sub_start, sub_count = self._parse_sub_key(key)
+        dst = RegisterSlice(
+            array=self.array,
+            start=self.start + sub_start,
+            count=sub_count,
+        )
+        if isinstance(value, PendingOp):
+            value.resolve(dst)
+        else:
+            raise TypeError(
+                f"Cannot assign {type(value).__name__} to register slice. "
+                "Use an instruction function (e.g. vmfma_f32_16x16x32_bf16(...))")
 
     def __repr__(self):
         end = self.start + self.count
