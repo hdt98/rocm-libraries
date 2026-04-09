@@ -1747,6 +1747,9 @@ class Solution(collections.abc.Mapping):
       if (state["MacroTile0"] == 16 and state["MacroTile1"] == 16 and state["DepthU"] == 512):
         state["UseDirect32XEmulation"] = False
 
+    # Trial: disable TF32 CMS
+    if state["UseF32XEmulation"]:
+      state["UseCustomMainLoopSchedule"] = 0
     # backup UsePLRPack from yaml before calling hasCustomSchedule
     backup_UsePLRPack = state["UsePLRPack"] 
     # Check if CMS is available for this solution
