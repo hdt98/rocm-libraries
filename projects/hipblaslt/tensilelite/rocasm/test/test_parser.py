@@ -30,6 +30,7 @@ from textwrap import dedent
 from rocasm.setparse import parse_set_directives
 from rocasm.asm_to_rocasm import (
     asm_to_rocasm,
+    parse_register_counts,
     _resolve_expr,
     _parse_reg_operand,
     _parse_scalar_operand,
@@ -295,7 +296,43 @@ class TestStripComment:
         assert _strip_comment("s_barrier") == "s_barrier"
 
 
+class TestParseRegisterCounts:
+
+    def test_parse_all_three(self):
+        text = dedent("""\
+            /* Num VGPR   =256 */
+            /* Num AccVGPR=192 */
+            /* Num SGPR   =88 */
+        """)
+        result = parse_register_counts(text)
+        assert result == {"vgpr": 256, "accvgpr": 192, "sgpr": 88}
+
+    def test_different_spacing(self):
+        text = "/* Num VGPR=128 */\n/* Num AccVGPR =64 */\n/* Num SGPR= 32 */"
+        result = parse_register_counts(text)
+        assert result == {"vgpr": 128, "accvgpr": 64, "sgpr": 32}
+
+    def test_missing_counts_returns_partial(self):
+        result = parse_register_counts("/* Num VGPR =256 */")
+        assert result == {"vgpr": 256}
+        assert "accvgpr" not in result
+
+    def test_no_matches(self):
+        assert parse_register_counts("no register info here") == {}
+
+
 # ─── asm_to_rocasm integration tests ────────────────────────────────────────
+
+
+def _body(result: str) -> str:
+    """Extract the instruction body from asm_to_rocasm output, skipping the alias preamble."""
+    lines = result.split("\n")
+    # Find the blank line separating preamble from body
+    for i, line in enumerate(lines):
+        if line == "":
+            return "\n".join(lines[i + 1:])
+    # No preamble (e.g. only unhandled lines) — return as-is
+    return result
 
 
 class TestAsmToRocasm:
@@ -320,103 +357,111 @@ class TestAsmToRocasm:
         "vgprGlobalReadOffsetA": 0,
     }
 
+    def test_preamble_has_register_aliases(self):
+        asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[64:67], v[16:19], acc[0:3]"
+        result = asm_to_rocasm(asm, {})
+        assert "Acc = block.Acc" in result
+        assert "V = block.V" in result
+
+    def test_preamble_has_method_aliases(self):
+        asm = "s_waitcnt lgkmcnt(0)"
+        result = asm_to_rocasm(asm, {})
+        assert "s_waitcnt = block.s_waitcnt" in result
+
     def test_mfma(self):
         asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[vgprValuB_X0_I0+0+0+0:vgprValuB_X0_I0+0+0+0+3], v[vgprValuA_X0_I0+0+0+0:vgprValuA_X0_I0+0+0+0+3], acc[0:3]"
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert result == (
-            "block.Acc[0:4] = vmfma_f32_16x16x32_bf16("
-            "block.V[64:68], block.V[16:20], block.Acc[0:4])"
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert body == (
+            "Acc[0:4] = vmfma_f32_16x16x32_bf16("
+            "V[64:68], V[16:20], Acc[0:4])"
         )
 
     def test_ds_read_b128_with_offset(self):
         asm = "ds_read_b128 v[vgprValuA_X1_I0+0:vgprValuA_X1_I0+0+3], v[vgprLocalReadAddrA] offset:64"
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert result == (
-            "block.V[40:44] = ds_read_b128("
-            "block.V[14:15], ds=DSModifiers(offset=64))"
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert body == (
+            "V[40:44] = ds_read_b128("
+            "V[14:15], ds=DSModifiers(offset=64))"
         )
 
     def test_ds_read_b128_no_offset(self):
         asm = "ds_read_b128 v[vgprValuA_X0_I0+0:vgprValuA_X0_I0+0+3], v[vgprLocalReadAddrA] offset:0"
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        # offset:0 should be omitted
-        assert result == (
-            "block.V[16:20] = ds_read_b128(block.V[14:15])"
-        )
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert body == "V[16:20] = ds_read_b128(V[14:15])"
 
     def test_buffer_load_lds(self):
         asm = "buffer_load_dwordx4 v[vgprGlobalReadOffsetA+0], s[sgprSrdA:sgprSrdA+3], 0 offen offset:0 lds"
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert "buffer_load_lds" in result
-        assert "block.V[0:1]" in result
-        assert "block.S[64:68]" in result
-        assert "offen=True" in result
-        assert "lds=True" in result
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert "buffer_load_lds(" in body
+        assert "V[0:1]" in body
+        assert "S[64:68]" in body
+        assert "offen=True" in body
+        assert "lds=True" in body
 
     def test_s_waitcnt_lgkmcnt(self):
-        result = asm_to_rocasm("s_waitcnt lgkmcnt(7)", self.SYMBOLS)
-        assert result == "block.s_waitcnt(dscnt=7)"
+        body = _body(asm_to_rocasm("s_waitcnt lgkmcnt(7)", self.SYMBOLS))
+        assert body == "s_waitcnt(dscnt=7)"
 
     def test_s_waitcnt_vmcnt(self):
-        result = asm_to_rocasm("s_waitcnt vmcnt(14)", self.SYMBOLS)
-        assert result == "block.s_waitcnt(vlcnt=14)"
+        body = _body(asm_to_rocasm("s_waitcnt vmcnt(14)", self.SYMBOLS))
+        assert body == "s_waitcnt(vlcnt=14)"
 
     def test_s_barrier(self):
-        result = asm_to_rocasm("s_barrier", self.SYMBOLS)
-        assert result == "block.s_barrier()"
+        body = _body(asm_to_rocasm("s_barrier", self.SYMBOLS))
+        assert body == "s_barrier()"
 
     def test_s_nop(self):
-        result = asm_to_rocasm("s_nop 0", self.SYMBOLS)
-        assert result == "block.s_nop(0)"
+        body = _body(asm_to_rocasm("s_nop 0", self.SYMBOLS))
+        assert body == "s_nop(0)"
 
     def test_s_mov_b32(self):
-        result = asm_to_rocasm("s_mov_b32 m0, s[sgprLocalWriteAddrA]", self.SYMBOLS)
-        assert result == "block.s_mov_b32(dst=m0, src=sgpr(53))"
+        body = _body(asm_to_rocasm("s_mov_b32 m0, s[sgprLocalWriteAddrA]", self.SYMBOLS))
+        assert body == "s_mov_b32(dst=m0, src=sgpr(53))"
 
     def test_s_add_u32(self):
-        result = asm_to_rocasm("s_add_u32 s[sgprSrdA+0], s[sgprSrdA+0], s60", self.SYMBOLS)
-        assert result == "block.s_add_u32(dst=sgpr(64), src0=sgpr(64), src1=sgpr(60))"
+        body = _body(asm_to_rocasm("s_add_u32 s[sgprSrdA+0], s[sgprSrdA+0], s60", self.SYMBOLS))
+        assert body == "s_add_u32(dst=sgpr(64), src0=sgpr(64), src1=sgpr(60))"
 
     def test_s_add_u32_m0(self):
-        result = asm_to_rocasm("s_add_u32 m0, m0, 4352", self.SYMBOLS)
-        assert result == "block.s_add_u32(dst=m0, src0=m0, src1=4352)"
+        body = _body(asm_to_rocasm("s_add_u32 m0, m0, 4352", self.SYMBOLS))
+        assert body == "s_add_u32(dst=m0, src0=m0, src1=4352)"
 
     def test_s_cmp_eq_u32(self):
-        result = asm_to_rocasm("s_cmp_eq_u32 s[sgprLoopCounterL], s[sgprStaggerUIter]", self.SYMBOLS)
-        assert result == "block.s_cmp_eq_u32(src0=sgpr(8), src1=sgpr(76))"
+        body = _body(asm_to_rocasm("s_cmp_eq_u32 s[sgprLoopCounterL], s[sgprStaggerUIter]", self.SYMBOLS))
+        assert body == "s_cmp_eq_u32(src0=sgpr(8), src1=sgpr(76))"
 
     def test_s_cmp_eq_i32(self):
-        result = asm_to_rocasm("s_cmp_eq_i32 s[sgprLoopCounterL], 0x2", self.SYMBOLS)
-        assert result == "block.s_cmp_eq_i32(src0=sgpr(8), src1=hex(2))"
+        body = _body(asm_to_rocasm("s_cmp_eq_i32 s[sgprLoopCounterL], 0x2", self.SYMBOLS))
+        assert body == "s_cmp_eq_i32(src0=sgpr(8), src1=hex(2))"
 
     def test_s_cselect_b32(self):
-        result = asm_to_rocasm(
+        body = _body(asm_to_rocasm(
             "s_cselect_b32 s[sgprSrdA+2], s[sgprShadowLimitA+0], BufferLimit",
             self.SYMBOLS,
-        )
-        assert result == "block.s_cselect_b32(dst=sgpr(66), src0=sgpr(72), src1=4294967295)"
+        ))
+        assert body == "s_cselect_b32(dst=sgpr(66), src0=sgpr(72), src1=4294967295)"
 
     def test_s_cbranch_scc0(self):
-        result = asm_to_rocasm("s_cbranch_scc0 label_LoopBeginL", self.SYMBOLS)
-        assert result == 'block.s_cbranch_scc0(labelName="label_LoopBeginL")'
+        body = _body(asm_to_rocasm("s_cbranch_scc0 label_LoopBeginL", self.SYMBOLS))
+        assert body == 's_cbranch_scc0(labelName="label_LoopBeginL")'
 
     def test_v_xor_b32(self):
-        result = asm_to_rocasm(
+        body = _body(asm_to_rocasm(
             "v_xor_b32 v[vgprLocalReadAddrA], 0x10000, v[vgprLocalReadAddrA]",
             self.SYMBOLS,
-        )
-        assert result == "block.v_xor_b32(dst=vgpr(14), src0=hex(65536), src1=vgpr(14))"
+        ))
+        assert body == "v_xor_b32(dst=vgpr(14), src0=hex(65536), src1=vgpr(14))"
 
     def test_s_xor_b32(self):
-        result = asm_to_rocasm(
+        body = _body(asm_to_rocasm(
             "s_xor_b32 s[sgprLocalWriteAddrA], 0x10000, s[sgprLocalWriteAddrA]",
             self.SYMBOLS,
-        )
-        assert result == "block.s_xor_b32(dst=sgpr(53), src0=hex(65536), src1=sgpr(53))"
+        ))
+        assert body == "s_xor_b32(dst=sgpr(53), src0=hex(65536), src1=sgpr(53))"
 
     def test_label(self):
-        result = asm_to_rocasm("label_LoopBeginL:", self.SYMBOLS)
-        assert result == 'block.label("label_LoopBeginL")'
+        body = _body(asm_to_rocasm("label_LoopBeginL:", self.SYMBOLS))
+        assert body == 'label("label_LoopBeginL")'
 
     def test_comments_skipped(self):
         asm = dedent("""\
@@ -424,25 +469,24 @@ class TestAsmToRocasm:
             /* block comment */
             s_barrier
         """)
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert result == "block.s_barrier()"
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert body == "s_barrier()"
 
     def test_trailing_comment_stripped(self):
-        asm = "s_barrier // sync threads"
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert result == "block.s_barrier()"
+        body = _body(asm_to_rocasm("s_barrier // sync threads", self.SYMBOLS))
+        assert body == "s_barrier()"
 
     def test_set_directives_skipped(self):
         asm = dedent("""\
             .set vgprBase, 16
             s_barrier
         """)
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        assert result == "block.s_barrier()"
+        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        assert body == "s_barrier()"
 
     def test_unhandled_instruction(self):
         result = asm_to_rocasm("v_unknown_op v0, v1, v2", self.SYMBOLS)
-        assert result.startswith("# UNHANDLED:")
+        assert "# UNHANDLED:" in result
 
     def test_multi_instruction_snippet(self):
         """Verify a realistic multi-instruction sequence produces correct output."""
@@ -454,13 +498,21 @@ class TestAsmToRocasm:
             s_cbranch_scc0 label_LoopBeginL
         """)
         result = asm_to_rocasm(asm, self.SYMBOLS)
-        lines = result.strip().split("\n")
+        body = _body(result)
+        lines = body.strip().split("\n")
         assert len(lines) == 5
-        assert lines[0] == "block.s_waitcnt(dscnt=0)"
-        assert lines[1] == "block.s_barrier()"
-        assert lines[2].startswith("block.Acc[0:4] = vmfma")
-        assert lines[3] == "block.s_sub_u32(dst=sgpr(8), src0=sgpr(8), src1=1)"
-        assert lines[4] == 'block.s_cbranch_scc0(labelName="label_LoopBeginL")'
+        assert lines[0] == "s_waitcnt(dscnt=0)"
+        assert lines[1] == "s_barrier()"
+        assert lines[2].startswith("Acc[0:4] = vmfma")
+        assert lines[3] == "s_sub_u32(dst=sgpr(8), src0=sgpr(8), src1=1)"
+        assert lines[4] == 's_cbranch_scc0(labelName="label_LoopBeginL")'
+        # Check preamble has all needed aliases
+        assert "Acc = block.Acc" in result
+        assert "V = block.V" in result
+        assert "s_barrier = block.s_barrier" in result
+        assert "s_cbranch_scc0 = block.s_cbranch_scc0" in result
+        assert "s_sub_u32 = block.s_sub_u32" in result
+        assert "s_waitcnt = block.s_waitcnt" in result
 
     def test_symbols_auto_parsed(self):
         """When symbols=None, .set directives in the text are parsed automatically."""
@@ -468,5 +520,5 @@ class TestAsmToRocasm:
             .set myReg, 10
             s_mov_b32 s[myReg], s[myReg]
         """)
-        result = asm_to_rocasm(asm)
-        assert result == "block.s_mov_b32(dst=sgpr(10), src=sgpr(10))"
+        body = _body(asm_to_rocasm(asm))
+        assert body == "s_mov_b32(dst=sgpr(10), src=sgpr(10))"

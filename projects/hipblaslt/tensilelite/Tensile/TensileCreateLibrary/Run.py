@@ -81,7 +81,7 @@ from Tensile.Utilities.Decorators.Profile import profile
 from Tensile.Utilities.Decorators.Timing import timing
 
 from rocasm.setparse import parse_set_directives
-from rocasm.asm_to_rocasm import asm_to_rocasm
+from rocasm.asm_to_rocasm import asm_to_rocasm, parse_register_counts
 
 from .ParseArguments import parseArguments
 
@@ -279,14 +279,13 @@ def passPostKernelInfoToLibrary(results, kernels, masterLibraries, splitGSU: boo
                         raise
 
 def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
-    """Extract the label_LoopBeginL main loop, write a Python mainloop file, and splice back.
+    """Extract the main loop and write a rocasm Python translation alongside the .s file.
 
     Searches for label_LoopBeginL: and label_LoopEndL: in the source text.
-    Writes a Python file at mainloopPath containing:
-      1. get_main_loop() — returns the original assembly text (for round-trip)
-      2. rocasm_main_loop() — the rocasm Python translation of the assembly,
-         which serves as a starting point for programmatic modification
+    Writes a Python file at mainloopPath containing a ``rocasm_main_loop(block)``
+    function with the rocasm translation of the assembly.
 
+    The .s source is returned unchanged; only the _mainloop.py file is generated.
     If either label is not found, returns src unchanged (graceful skip).
     """
     begin_marker = "label_LoopBeginL:"
@@ -308,39 +307,43 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
 
     prefix = src[:line_start]
     main_loop_text = src[line_start:end_line_start]
-    suffix = src[end_line_start:]
 
     # Parse .set directives from everything before the main loop to build symbol table
     symbols = parse_set_directives(prefix)
+
+    # Parse register counts from the kernel header comments
+    reg_counts = parse_register_counts(prefix)
+    num_vgprs = reg_counts.get("vgpr", 256)
+    num_accvgprs = reg_counts.get("accvgpr", 192)
+    num_sgprs = reg_counts.get("sgpr", 88)
 
     # Translate assembly to rocasm Python code
     rocasm_code = asm_to_rocasm(main_loop_text, symbols)
 
     # Write the mainloop Python file
     with open(mainloopPath, "w", encoding="utf-8") as f:
-        # Original assembly round-trip function
-        f.write("def get_main_loop():\n")
-        f.write(f"    return {repr(main_loop_text)}\n")
+        f.write("from rocasm.block import Block\n")
+        f.write("from rocasm.regs import VgprArray, AccArray, SgprArray\n")
+        f.write("from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4\n")
         f.write("\n\n")
-
-        # Rocasm translation as a reference function
-        f.write("def rocasm_main_loop(block):\n")
+        f.write("def rocasm_main_loop():\n")
         f.write('    """ROCasm translation of the main loop.\n')
         f.write("\n")
-        f.write("    This is an auto-generated translation of the assembly main loop\n")
-        f.write("    into rocasm Python API calls. To use a modified version, edit this\n")
-        f.write("    function and set UseROCasmMainLoop to point to this file.\n")
+        f.write("    Auto-generated from the assembly main loop by asm_to_rocasm.\n")
+        f.write("    Edit this function to modify the main loop programmatically.\n")
         f.write('    """\n')
+        f.write(f"    block = Block(\n")
+        f.write(f"        Acc=AccArray(base=0, count={num_accvgprs}),\n")
+        f.write(f"        V=VgprArray(base=0, count={num_vgprs}),\n")
+        f.write(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
+        f.write(f"    )\n")
+        f.write("\n")
         for line in rocasm_code.splitlines():
             f.write(f"    {line}\n")
+        f.write("\n")
+        f.write("    return block\n")
 
-    # Import and call get_main_loop() to prove the round-trip
-    spec = importlib.util.spec_from_file_location("_rocasm_mainloop", str(mainloopPath))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    spliced_main_loop = mod.get_main_loop()
-
-    return prefix + spliced_main_loop + suffix
+    return src
 
 def _useROCasmMainloop(src: str, mainloopPath: str) -> str:
     """Replace the main loop in src with the output of a user-supplied rocasm module.

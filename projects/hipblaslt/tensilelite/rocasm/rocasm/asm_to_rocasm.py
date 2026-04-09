@@ -27,6 +27,10 @@
 Takes raw assembly instructions (as emitted by Tensile's code generator)
 and produces equivalent rocasm Python code that, when executed, reconstructs
 the same assembly.
+
+The generated code uses local aliases (e.g. ``Acc = block.Acc``,
+``s_waitcnt = block.s_waitcnt``) so that instruction lines read cleanly
+without ``block.`` everywhere.
 """
 
 from __future__ import annotations
@@ -126,15 +130,18 @@ def _parse_scalar_operand(operand: str, symbols: dict[str, int]) -> str:
     return operand
 
 
-def _reg_to_block(reg_type: str, start: int, count: int) -> str:
-    """Convert a physical register reference to a block array slice expression."""
-    if reg_type == "acc":
-        return f"block.Acc[{start}:{start + count}]"
-    elif reg_type == "v":
-        return f"block.V[{start}:{start + count}]"
-    elif reg_type == "s":
-        return f"block.S[{start}:{start + count}]"
-    raise ValueError(f"Unknown register type: {reg_type}")
+_REG_TYPE_ALIAS = {"acc": "Acc", "v": "V", "s": "S"}
+
+
+def _reg_ref(reg_type: str, start: int, count: int) -> str:
+    """Convert a physical register reference to an alias-based slice expression.
+
+    Returns e.g. 'Acc[0:4]', 'V[16:20]', 'S[64:68]'.
+    """
+    alias = _REG_TYPE_ALIAS.get(reg_type)
+    if alias is None:
+        raise ValueError(f"Unknown register type: {reg_type}")
+    return f"{alias}[{start}:{start + count}]"
 
 
 def _split_operands(operand_str: str) -> list[str]:
@@ -157,6 +164,28 @@ def _split_operands(operand_str: str) -> list[str]:
     return operands
 
 
+def parse_register_counts(text: str) -> dict[str, int]:
+    """Parse register count comments from a generated .s file.
+
+    Looks for lines like:
+        /* Num VGPR   =256 */
+        /* Num AccVGPR=192 */
+        /* Num SGPR   =88 */
+
+    Returns dict with keys 'vgpr', 'accvgpr', 'sgpr'.
+    """
+    counts = {}
+    for m in re.finditer(r'/\*\s*Num\s+(VGPR|AccVGPR|SGPR)\s*=\s*(\d+)\s*\*/', text):
+        key = m.group(1).lower()
+        if key == "accvgpr":
+            counts["accvgpr"] = int(m.group(2))
+        elif key == "vgpr":
+            counts["vgpr"] = int(m.group(2))
+        elif key == "sgpr":
+            counts["sgpr"] = int(m.group(2))
+    return counts
+
+
 def _strip_comment(line: str) -> str:
     """Strip trailing // comment from an instruction line."""
     idx = line.find("//")
@@ -173,55 +202,79 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
 
     Returns:
         Python source code string that uses rocasm to reconstruct the assembly.
+        The output uses local aliases (Acc, V, S, s_waitcnt, etc.) and includes
+        a preamble that binds them from a ``block`` variable.
     """
     if symbols is None:
         symbols = parse_set_directives(asm_text)
 
-    lines = []
+    # Collect instruction lines and track what aliases are needed
+    used_reg_types: set[str] = set()       # e.g. {"acc", "v", "s"}
+    used_block_methods: set[str] = set()   # e.g. {"s_waitcnt", "s_barrier", ...}
+    used_inst_funcs: set[str] = set()      # e.g. {"vmfma_f32_16x16x32_bf16", ...}
+
+    body_lines = []
     for raw_line in asm_text.splitlines():
         stripped = raw_line.strip()
 
-        # Skip empty lines
         if not stripped:
             continue
-
-        # Skip block comments
         if stripped.startswith("/*") or stripped.startswith("*"):
             continue
-
-        # Skip line comments
         if stripped.startswith("//"):
             continue
-
-        # Skip .set directives
         if stripped.startswith(".set"):
             continue
 
-        # Labels → emit as raw text
+        # Labels
         if stripped.endswith(":"):
-            lines.append(f'block.label("{stripped[:-1]}")')
+            used_block_methods.add("label")
+            body_lines.append(f'label("{stripped[:-1]}")')
             continue
 
-        # Strip trailing comment for instruction parsing
         inst_line = _strip_comment(stripped)
         if not inst_line:
             continue
 
-        code = _convert_instruction(inst_line, symbols)
+        code = _convert_instruction(inst_line, symbols, used_reg_types,
+                                     used_block_methods, used_inst_funcs)
         if code is not None:
-            lines.append(code)
+            body_lines.append(code)
         else:
-            lines.append(f"# UNHANDLED: {stripped}")
+            body_lines.append(f"# UNHANDLED: {stripped}")
 
-    return "\n".join(lines)
+    # Build preamble: register aliases, then block method aliases
+    preamble = []
+
+    for reg_type in ("acc", "v", "s"):
+        if reg_type in used_reg_types:
+            alias = _REG_TYPE_ALIAS[reg_type]
+            preamble.append(f"{alias} = block.{alias}")
+
+    for method in sorted(used_block_methods):
+        preamble.append(f"{method} = block.{method}")
+
+    parts = []
+    if preamble:
+        parts.append("\n".join(preamble))
+        parts.append("")  # blank separator line
+    parts.append("\n".join(body_lines))
+
+    return "\n".join(parts)
 
 
-def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
+def _convert_instruction(inst_line: str, symbols: dict[str, int],
+                         used_reg_types: set[str],
+                         used_block_methods: set[str],
+                         used_inst_funcs: set[str]) -> str | None:
     """Convert a single assembly instruction line to rocasm Python code."""
-    # Split into mnemonic and operands
     parts = inst_line.split(None, 1)
     mnemonic = parts[0]
     operand_str = parts[1] if len(parts) > 1 else ""
+
+    def _reg(reg_type, start, count):
+        used_reg_types.add(reg_type)
+        return _reg_ref(reg_type, start, count)
 
     # --- MFMA ---
     if mnemonic == "v_mfma_f32_16x16x32_bf16":
@@ -234,12 +287,12 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
         acc2 = _parse_reg_operand(operands[3], symbols)
         if not all([dst, src_b, src_a, acc2]):
             return None
-        return (f"{_reg_to_block(*dst)} = vmfma_f32_16x16x32_bf16("
-                f"{_reg_to_block(*src_b)}, {_reg_to_block(*src_a)}, {_reg_to_block(*acc2)})")
+        used_inst_funcs.add("vmfma_f32_16x16x32_bf16")
+        return (f"{_reg(*dst)} = vmfma_f32_16x16x32_bf16("
+                f"{_reg(*src_b)}, {_reg(*src_a)}, {_reg(*acc2)})")
 
     # --- ds_read_b128 / ds_load_b128 ---
     if mnemonic in ("ds_read_b128", "ds_load_b128"):
-        # Extract offset modifier if present
         offset = None
         clean = operand_str
         m = re.search(r'\boffset:(\S+)', operand_str)
@@ -258,21 +311,19 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
         ds_arg = ""
         if offset is not None and offset != 0:
             ds_arg = f", ds=DSModifiers(offset={offset})"
-        return (f"{_reg_to_block(*dst)} = ds_read_b128("
-                f"{_reg_to_block(*src)}{ds_arg})")
+        used_inst_funcs.add("ds_read_b128")
+        return (f"{_reg(*dst)} = ds_read_b128("
+                f"{_reg(*src)}{ds_arg})")
 
     # --- buffer_load_dwordx4 / buffer_load_b128 ---
     if mnemonic in ("buffer_load_dwordx4", "buffer_load_b128"):
-        # Extract modifiers: offen, offset:N, lds
         offen = "offen" in operand_str
         lds = " lds" in operand_str
         offset = 0
         m = re.search(r'\boffset:(\S+)', operand_str)
         if m:
-            offset_str = m.group(1)
-            offset = int(offset_str, 0)
+            offset = int(m.group(1), 0)
 
-        # Remove modifiers from operand string to parse registers
         clean = re.sub(r'\s+offen\b', '', operand_str)
         clean = re.sub(r'\s+lds\b', '', clean)
         clean = re.sub(r'\s+offset:\S+', '', clean)
@@ -293,7 +344,6 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
             mubuf_arg = f", mubuf=MUBUFModifiers({', '.join(mubuf_parts)})"
 
         if lds:
-            # LDS direct load: only 3 operands (vaddr, saddr, soffset) — no dst
             if len(operands) < 3:
                 return None
             vaddr = _parse_reg_operand(operands[0], symbols)
@@ -301,11 +351,11 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
             soffset_str = _parse_scalar_operand(operands[2], symbols)
             if not vaddr or not saddr:
                 return None
-            return (f"block.buffer_load_lds("
-                    f"{_reg_to_block(*vaddr)}, {_reg_to_block(*saddr)}, "
+            used_block_methods.add("buffer_load_lds")
+            return (f"buffer_load_lds("
+                    f"{_reg(*vaddr)}, {_reg(*saddr)}, "
                     f"{soffset_str}{mubuf_arg})")
         else:
-            # Normal load: 4 operands (dst, vaddr, saddr, soffset)
             if len(operands) < 4:
                 return None
             dst = _parse_reg_operand(operands[0], symbols)
@@ -314,35 +364,33 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
             soffset_str = _parse_scalar_operand(operands[3], symbols)
             if not dst or not vaddr or not saddr:
                 return None
-            return (f"{_reg_to_block(*dst)} = buffer_load_dwordx4("
-                    f"{_reg_to_block(*vaddr)}, {_reg_to_block(*saddr)}, "
+            used_inst_funcs.add("buffer_load_dwordx4")
+            return (f"{_reg(*dst)} = buffer_load_dwordx4("
+                    f"{_reg(*vaddr)}, {_reg(*saddr)}, "
                     f"{soffset_str}{mubuf_arg})")
 
     # --- s_waitcnt ---
     if mnemonic == "s_waitcnt":
-        # Parse waitcnt arguments like lgkmcnt(0), vmcnt(0)
         waits = re.findall(r'(\w+)\((\d+)\)', operand_str)
-        # Map to rocisa keyword args
-        kwmap = {
-            "lgkmcnt": "dscnt",
-            "vmcnt": "vlcnt",
-        }
+        kwmap = {"lgkmcnt": "dscnt", "vmcnt": "vlcnt"}
         kwargs = []
         for name, val in waits:
             kw = kwmap.get(name, name)
             kwargs.append(f"{kw}={val}")
-        return f"block.s_waitcnt({', '.join(kwargs)})"
+        used_block_methods.add("s_waitcnt")
+        return f"s_waitcnt({', '.join(kwargs)})"
 
     # --- s_barrier ---
     if mnemonic == "s_barrier":
-        return "block.s_barrier()"
+        used_block_methods.add("s_barrier")
+        return "s_barrier()"
 
     # --- s_nop ---
     if mnemonic == "s_nop":
-        return f"block.s_nop({operand_str.strip()})"
+        used_block_methods.add("s_nop")
+        return f"s_nop({operand_str.strip()})"
 
-    # --- Scalar 3-operand: s_add_u32, s_addc_u32, s_sub_u32, s_subb_u32,
-    #     s_cselect_b32, s_xor_b32 ---
+    # --- Scalar 3-operand ---
     scalar_3op = {
         "s_add_u32", "s_addc_u32", "s_sub_u32", "s_subb_u32",
         "s_cselect_b32", "s_xor_b32",
@@ -354,7 +402,8 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
         dst = _parse_scalar_operand(operands[0], symbols)
         src0 = _parse_scalar_operand(operands[1], symbols)
         src1 = _parse_scalar_operand(operands[2], symbols)
-        return f"block.{mnemonic}(dst={dst}, src0={src0}, src1={src1})"
+        used_block_methods.add(mnemonic)
+        return f"{mnemonic}(dst={dst}, src0={src0}, src1={src1})"
 
     # --- s_mov_b32 ---
     if mnemonic == "s_mov_b32":
@@ -363,7 +412,8 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
             return None
         dst = _parse_scalar_operand(operands[0], symbols)
         src = _parse_scalar_operand(operands[1], symbols)
-        return f"block.s_mov_b32(dst={dst}, src={src})"
+        used_block_methods.add("s_mov_b32")
+        return f"s_mov_b32(dst={dst}, src={src})"
 
     # --- s_cmp_* (2-operand scalar comparisons) ---
     scalar_cmp = {
@@ -377,12 +427,14 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
             return None
         src0 = _parse_scalar_operand(operands[0], symbols)
         src1 = _parse_scalar_operand(operands[1], symbols)
-        return f"block.{mnemonic}(src0={src0}, src1={src1})"
+        used_block_methods.add(mnemonic)
+        return f"{mnemonic}(src0={src0}, src1={src1})"
 
     # --- s_cbranch_scc0 / s_cbranch_scc1 ---
     if mnemonic in ("s_cbranch_scc0", "s_cbranch_scc1"):
         label = operand_str.strip()
-        return f'block.{mnemonic}(labelName="{label}")'
+        used_block_methods.add(mnemonic)
+        return f'{mnemonic}(labelName="{label}")'
 
     # --- v_xor_b32 ---
     if mnemonic == "v_xor_b32":
@@ -392,6 +444,7 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int]) -> str | None:
         dst = _parse_scalar_operand(operands[0], symbols)
         src0 = _parse_scalar_operand(operands[1], symbols)
         src1 = _parse_scalar_operand(operands[2], symbols)
-        return f"block.v_xor_b32(dst={dst}, src0={src0}, src1={src1})"
+        used_block_methods.add("v_xor_b32")
+        return f"v_xor_b32(dst={dst}, src0={src0}, src1={src1})"
 
     return None
