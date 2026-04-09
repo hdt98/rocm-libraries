@@ -140,28 +140,6 @@ struct BlockReduce2d
                                            ReducePacksPerXDim{});
     }
 
-#if 0
-        constexpr auto I0 = number<0>{};
-        constexpr auto I1 = number<1>{};
-        constexpr auto spans = XDistributedTensor_::get_distributed_spans();
-
-        // FIXME: hard coded to reduce 2nd axis
-        sweep_tile_span(spans[I0], [&](auto dstr_idx_i0) {
-            constexpr auto y_dstr_idx = make_tuple(dstr_idx_i0);
-
-            auto y = y_tensor[y_dstr_idx];
-
-            sweep_tile_span(spans[I1], [&](auto dstr_idx_i1) {
-                constexpr auto in_dstr_idx = make_tuple(dstr_idx_i0, dstr_idx_i1);
-                const auto x = ck_tile::type_convert<ComputeDataType>(x_tensor[in_dstr_idx]);
-
-                y = reduce_func(y, x);
-            });
-
-            y_tensor(y_dstr_idx) = y;
-        });
-#endif
-
     template <typename XDistributedTensor_>
     CK_TILE_DEVICE static auto MakeYBlockTile()
     {
