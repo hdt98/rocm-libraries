@@ -77,6 +77,7 @@ namespace rocRoller
             template <CHasVarTypeMember Op>
             DataType operator()(Op const& op)
             {
+                static_assert(not std::is_same_v<Op, Assign>);
                 return op.varType.dataType;
             }
 

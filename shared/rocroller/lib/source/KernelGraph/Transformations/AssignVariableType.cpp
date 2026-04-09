@@ -19,12 +19,13 @@ namespace rocRoller
             for(auto tag : kgraph.control.getNodes<CG::Assign>())
             {
                 auto node = kgraph.control.get<CG::Assign>(tag);
-                if(node.has_value() && node->variableType.has_value())
+                if(node.has_value() && !node->variableType.has_value())
                 {
                     auto vt = Expression::resultVariableType(node->expression);
                     if(vt.dataType != DataType::None && vt.dataType != DataType::Count)
                     {
                         node->variableType = vt;
+                        kgraph.control.setElement(tag, std::move(*node));
                     }
                 }
             }
