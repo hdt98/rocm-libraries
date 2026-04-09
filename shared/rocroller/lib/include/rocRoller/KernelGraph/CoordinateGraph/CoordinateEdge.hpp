@@ -298,27 +298,24 @@ namespace rocRoller
         /**
          * LDS bank swizzle for Local Read side.
          *
-         * Un-permutes element-granularity K-column index based on tile
-         * row so the wave reads the correct logical element from the
-         * swizzled LDS layout.
+         * Un-permutes dwordx4-chunk K-column index based on tile row
+         * so the wave reads the correct logical chunk from the
+         * swizzled LDS layout.  Element-to-chunk decomposition is
+         * handled by surrounding Flatten/Tile edges in the graph.
          *
-         * Graph: addElement(edge, {rawCol}, {col, row})
-         * Reverse: given col and row indexes, compute un-swizzled col.
+         * Graph: addElement(edge, {rawColChunk}, {colChunk, row})
+         * Reverse: given colChunk and row indexes, compute un-swizzled chunk col.
          */
         struct LDSColUnswizzle
         {
             unsigned int numColumns;
             unsigned int rowsPerBankRow;
-            unsigned int elementsPerChunk;
 
             LDSColUnswizzle() = default;
 
-            LDSColUnswizzle(unsigned int numColumns,
-                            unsigned int rowsPerBankRow,
-                            unsigned int elementsPerChunk)
+            LDSColUnswizzle(unsigned int numColumns, unsigned int rowsPerBankRow)
                 : numColumns(numColumns)
                 , rowsPerBankRow(rowsPerBankRow)
-                , elementsPerChunk(elementsPerChunk)
             {
             }
 

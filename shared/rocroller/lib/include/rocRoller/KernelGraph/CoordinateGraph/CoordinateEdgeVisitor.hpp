@@ -224,30 +224,21 @@ namespace rocRoller
             {
                 using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                auto col    = indexes[0];
-                auto row    = indexes[1];
-                auto numCol = literal(e.numColumns);
-                auto logElems
-                    = literal(static_cast<unsigned int>(__builtin_ctz(e.elementsPerChunk)));
-                auto elems   = literal(e.elementsPerChunk);
+                auto col     = indexes[0]; // chunk index (dwordx4)
+                auto row     = indexes[1];
+                auto numCol  = literal(e.numColumns);
                 auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
-
-                // Decompose element index into dwordx4 chunk and sub-element offset
-                auto colChunk       = col >> logElems;
-                auto elementInChunk = col & (elems - literal(1u));
-
-                // Convert tile row to LDS bank row index
                 auto bankRowIdx = row >> logRows;
 
                 // Inverse rotation: invRotation = (bankRowIdx / 2) * 2
                 auto invRotation = (bankRowIdx >> literal(1u)) << literal(1u);
-                colChunk         = (colChunk + invRotation) & (numCol - literal(1u));
+                col              = (col + invRotation) & (numCol - literal(1u));
 
                 // On even bank rows, swap adjacent column pairs
                 auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-                colChunk           = colChunk ^ swapOnEvenRow;
+                col                = col ^ swapOnEvenRow;
 
-                return {colChunk * elems + elementInChunk};
+                return {col};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)

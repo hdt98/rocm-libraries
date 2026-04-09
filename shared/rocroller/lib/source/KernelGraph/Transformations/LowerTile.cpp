@@ -2263,8 +2263,10 @@ namespace rocRoller
 
                 // LR swizzle: insert LDSColUnswizzle edge that un-permutes
                 // the K-column so the wave reads the correct logical element.
-                //   ldsTag --Tile--> {iMacX, rawIMacY}
-                //   {rawIMacY} --LDSColUnswizzle--> {colCoord, rowCoord}
+                //   {colChunk, elemInChunk} --Flatten--> {colCoord}
+                //   {rawColChunk} --LDSColUnswizzle--> {colChunk, rowCoord}
+                //   {rawColElem} --Tile--> {rawColChunk, elemInChunk}
+                //   ldsTag --Tile--> {rawColElem, non-K-dim}
                 auto tileIMacY = iMacY;
                 auto tileIMacX = iMacX;
                 {
@@ -2286,16 +2288,33 @@ namespace rocRoller
                             int rowCoord = isA ? iMacX : iMacY;
                             int colCoord = isA ? iMacY : iMacX;
 
-                            auto rawCol = graph.coordinates.addElement(tile.tileIndex(kDim));
-                            graph.coordinates.addElement(LDSColUnswizzle{params.numColumns,
-                                                                         params.rowsPerBankRow,
-                                                                         params.elementsPerChunk},
-                                                         {rawCol},
-                                                         {colCoord, rowCoord});
+                            auto ePC = params.elementsPerChunk;
+
+                            // Decompose element col into chunk + sub-element offset
+                            auto colChunk = graph.coordinates.addElement(
+                                MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
+                            auto elemInChunk = graph.coordinates.addElement(
+                                MacroTileIndex(kDim, literal(ePC), literal(1u)));
+                            graph.coordinates.addElement(
+                                Flatten(), {colChunk, elemInChunk}, {colCoord});
+
+                            // Chunk-level inverse swizzle (same units as LDSColSwizzle)
+                            auto rawColChunk = graph.coordinates.addElement(
+                                MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
+                            graph.coordinates.addElement(
+                                LDSColUnswizzle{params.numColumns, params.rowsPerBankRow},
+                                {rawColChunk},
+                                {colChunk, rowCoord});
+
+                            // Reconstruct element-level raw col from chunk + sub-element
+                            auto rawColElem = graph.coordinates.addElement(tile.tileIndex(kDim));
+                            graph.coordinates.addElement(
+                                Tile(), {rawColElem}, {rawColChunk, elemInChunk});
+
                             if(isA)
-                                tileIMacY = rawCol;
+                                tileIMacY = rawColElem;
                             else
-                                tileIMacX = rawCol;
+                                tileIMacX = rawColElem;
                         }
 
                         logger->debug("LR swizzle {}: K={} E={} R={}",

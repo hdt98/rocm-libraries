@@ -249,7 +249,6 @@ namespace rocRoller
             {
                 iot::mapRequired(io, "numColumns", edge.numColumns);
                 iot::mapRequired(io, "rowsPerBankRow", edge.rowsPerBankRow);
-                iot::mapRequired(io, "elementsPerChunk", edge.elementsPerChunk);
             }
 
             static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColUnswizzle& edge)
