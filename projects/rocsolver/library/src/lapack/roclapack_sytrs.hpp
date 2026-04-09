@@ -131,7 +131,7 @@ __device__ static T reduce_sum_shfl_wsize(I const wsize, T val)
 /** thread-block size for calling the sytrs kernel.
     (MAX_THDS sizes must be one of 128, 256, 512, or 1024) **/
 #ifndef SYTRS_MAX_THDS
-#define SYTRS_MAX_THDS 128
+#define SYTRS_MAX_THDS 256
 #endif
 
 // ------------------------------------------------
@@ -1417,7 +1417,10 @@ rocblas_status rocsolver_sytrs_template(rocblas_handle handle,
 
     I const lrhs = ceildiv(nrhs, nbx);
 
-    I const nthreads = std::max(I(warp_size), std::min(lrhs, I(SYTRS_MAX_THDS)));
+    I const nthreads = (lrhs >= SYTRS_MAX_THDS) ? SYTRS_MAX_THDS
+        : (lrhs >= SYTRS_MAX_THDS / 2)          ? SYTRS_MAX_THDS / 2
+        : (lrhs >= SYTRS_MAX_THDS / 4)          ? SYTRS_MAX_THDS / 4
+                                                : warp_size;
 
     size_t const lds_size_max = get_lds_size();
 
