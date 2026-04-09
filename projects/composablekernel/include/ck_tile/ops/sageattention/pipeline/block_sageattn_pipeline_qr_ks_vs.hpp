@@ -25,6 +25,16 @@ struct BlockSageAttentionPipelineQRKSVS
     using SaccDataType        = remove_cvref_t<typename Problem::SaccDataType>;
     using SMPLComputeDataType = remove_cvref_t<typename Problem::SMPLComputeDataType>;
     using PDataType           = remove_cvref_t<typename Problem::PDataType>;
+    // fp16/bf16 example configs use P=V=fp16/bf16 (qscale=no). Quantized Sage paths use fp8 P/V; FP8
+    // softmax shift, v_descale, and PV-gemm LDS layout assume fp8_t for those cases.
+    static_assert(std::is_same_v<PDataType, VDataType>,
+                  "SageAttention pipeline requires PDataType == VDataType for the PV gemm");
+    static_assert(std::is_same_v<QDataType, half_t> || std::is_same_v<QDataType, bf16_t> ||
+                      std::is_same_v<PDataType, fp8_t>,
+                  "SageAttention pipeline requires PDataType = fp8_t");
+    static_assert(std::is_same_v<QDataType, half_t> || std::is_same_v<QDataType, bf16_t> ||
+                      std::is_same_v<VDataType, fp8_t>,
+                  "SageAttention pipeline requires VDataType = fp8_t");
     using OaccDataType        = remove_cvref_t<typename Problem::OaccDataType>;
     using ODataType           = remove_cvref_t<typename Problem::ODataType>;
     using AttentionVariant    = remove_cvref_t<typename Problem::AttentionVariant>;
@@ -455,16 +465,6 @@ struct BlockSageAttentionPipelineQRKSVS
                 }
             }();
 
-            // dequant: combine q_descale (in s_acc_element_func) with k_descale
-            auto s_acc_element_func_ = [&]() {
-                if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::BLOCKSCALE)
-                {
-                    return s_acc_element_func * k_descale;
-                }
-                else
-                    return s_acc_element_func;
-            }();
-
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
                 float combined_scales_reg[kNumKScalesPT] = {};
@@ -499,6 +499,15 @@ struct BlockSageAttentionPipelineQRKSVS
             }
             else
             {
+                // dequant: combine q_descale (in s_acc_element_func) with k_descale
+                auto s_acc_element_func_ = [&]() {
+                    if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::BLOCKSCALE)
+                    {
+                        return s_acc_element_func * k_descale;
+                    }
+                    else
+                        return s_acc_element_func;
+                }();
                 s_acc = tile_elementwise_in(s_acc_element_func_, s_acc);
             }
             // STAGE 2, scale_s, mask, softmax

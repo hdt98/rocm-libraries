@@ -2,11 +2,8 @@
 # SPDX-License-Identifier: MIT
 # generate kernel instances to speed up compilation
 FWD_DTYPE_MAP = {
-    "fp32": "SageAttentionFwdFp32",
     "fp16": "SageAttentionFwdFp16",
     "bf16": "SageAttentionFwdBf16",
-    "fp8": "SageAttentionFwdFp8",
-    "fp8fp16": "SageAttentionFwdFp8Fp16",
     "fp8bf16": "SageAttentionFwdFp8Bf16",
     "i8fp8bf16": "SageAttentionFwdI8Fp8Bf16",
     "i4fp8bf16": "SageAttentionFwdI4Fp8Bf16",

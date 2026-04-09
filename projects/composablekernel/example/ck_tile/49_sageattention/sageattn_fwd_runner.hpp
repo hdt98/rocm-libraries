@@ -46,17 +46,6 @@ auto get_elimit<SageAttentionFwdBf16>(std::string /*init_method*/)
 }
 
 template <>
-auto get_elimit<SageAttentionFwdFp8>(std::string /*init_method*/)
-{
-    using TypeConfig  = SageAttentionFwdTypeConfig<SageAttentionFwdFp8>;
-    using ODataType   = typename TypeConfig::ODataType;
-    float o_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<ODataType>::max());
-    double rtol       = 0;
-    double atol       = 16 * (o_dtype_max > 240 ? 2 : 1);
-    return ck_tile::make_tuple(rtol, atol);
-}
-
-template <>
 auto get_elimit<SageAttentionFwdFp8Bf16>(std::string /*init_method*/)
 {
     double rtol = 1e-2;
@@ -106,12 +95,10 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                             std::optional<std::string> json = std::nullopt)
 {
     const std::string data_type = []() {
-        if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdBf16>)
+        if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp16>)
+            return "fp16";
+        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdBf16>)
             return "bf16";
-        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp8>)
-            return "fp8";
-        else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdBf8>)
-            return "bf8";
         else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdFp8Bf16>)
             return "fp8bf16";
         else if constexpr(std::is_same_v<DataTypeConfig, SageAttentionFwdI8Fp8Bf16>)
@@ -819,7 +806,6 @@ fwd_result sageattn_fwd_run(mode_enum mode,
         o_buf.FromDevice(o_host.data());
 
         constexpr bool supports_qscale =
-            std::is_same_v<DataTypeConfig, SageAttentionFwdFp8> ||
             std::is_same_v<DataTypeConfig, SageAttentionFwdFp8Bf16> ||
             std::is_same_v<DataTypeConfig, SageAttentionFwdI8Fp8Bf16> ||
             std::is_same_v<DataTypeConfig, SageAttentionFwdI4Fp8Bf16>;

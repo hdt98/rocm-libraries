@@ -31,11 +31,9 @@ from codegen.utils import check_duplicates_and_paddings, if_, indent, update_fil
 DTYPE_BITS = {
     "fp16": 16,
     "bf16": 16,
-    "fp8": 8,
     "fp8bf16": 8,
     "i8fp8bf16": 8,
     "i4fp8bf16": 4,
-    "bf8": 8,
 }
 
 K0_MAX_SUBMAX_MAP = {
@@ -271,10 +269,7 @@ class SageAttnFwdApiTrait:
         if self.mode == "group":
             return "true/*group mode spad always true*/"  # group mode only generate spad/skpad == true
         if self.pipeline_tag == "qr_async":
-            if self.spad == "t":
-                return "true"  # always support
-            else:
-                return "true"
+            return "true"
         elif self.pipeline_tag in ["qr", "qs"]:
             if self.spad == "t":
                 return f"true /*a.seqlen_q % {self.bm0} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
@@ -705,17 +700,7 @@ class CompatibilityRuleFactory:
                     return False
             return True
 
-        def check_hdim(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
-            # NOTE: this is used to speedup deepseek prefill case, we don't gen training
-            return True
-
-        def check_feature(
-            problem_ctx: ProblemContext, kernel_ctx: KernelContext
-        ) -> bool:
-            # logits_soft_cap is always false, so no check needed
-            return True
-
-        return [check_mode, check_hdim, check_feature]
+        return [check_mode]
 
 
 class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
@@ -725,27 +710,6 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
     def get_rules(cls) -> List[CompatibilityRule]:
         rules = CompatibilityRuleFactory.get_rules()
 
-        # NOTE: Temporarily disabled to allow bn0=64 configurations
-        # def check_hdim_tile(
-        #     problem_ctx: ProblemContext, kernel_ctx: KernelContext
-        # ) -> bool:
-        #     if problem_ctx.dtype != "fp32":
-        #         # TODO: update if >=gfx11 archs get qr_async support
-        #         if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
-        #             (
-        #                 (problem_ctx.hdim, problem_ctx.hdim_v) == (128, 128)
-        #                 and kernel_ctx.tile.F_bn0 != 128
-        #             )
-        #             or (
-        #                 (problem_ctx.hdim, problem_ctx.hdim_v) != (128, 128)
-        #                 and kernel_ctx.tile.F_bm0 != 128
-        #             )
-        #         ):
-        #             # qr_async only support kn0=128 tile size when hdim is 128
-        #             return False
-        #     return True
-
-        # rules.append(check_hdim_tile)
         return rules
 
 
@@ -759,7 +723,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     )
 
     _DT_FP16_BF16 = ("fp16", "bf16")
-    _DT_FP8 = ("fp8",)
     _DT_FP8BF16 = ("fp8bf16",)
     _DT_I8FP8BF16 = ("i8fp8bf16",)
     _DT_I4FP8BF16 = ("i4fp8bf16",)
@@ -768,7 +731,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     def supported_dtypes(cls) -> Tuple[str]:
         return (
             cls._DT_FP16_BF16
-            + cls._DT_FP8
             + cls._DT_FP8BF16
             + cls._DT_I8FP8BF16
             + cls._DT_I4FP8BF16
@@ -783,8 +745,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 (128, 128) : [SageAttnFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
             }  # fmt: skip
         elif (
-            dtype in cls._DT_FP8
-            or dtype in cls._DT_FP8BF16
+            dtype in cls._DT_FP8BF16
             or dtype in cls._DT_I8FP8BF16
             or dtype in cls._DT_I4FP8BF16
         ):
@@ -845,9 +806,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 else:
                     pipelines.append(SageAttnFwdPipeline("qr_async", vlayout, "t", "f", "t", "t", qscale, mask, skip))  # fmt: skip
                     pipelines.append(SageAttnFwdPipeline("qr_async", vlayout, "t", "t", "t", "t", qscale, mask, skip))  # fmt: skip
-        elif dtype in ["fp8", "fp8fp16", "bf8"]:
-            # TODO
-            pass
 
         # Packed types (int4) cannot use head-dim padding: the tile_window infrastructure
         # forces alignment=1 when padding is enabled, but packed types need alignment >= PackedSize.
@@ -890,8 +848,7 @@ class KernelComponentFactoryGfx942(KernelComponentFactoryGfx9):
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
         result = super().get_hdim_tile_size_dict(dtype)
         if (
-            dtype in cls._DT_FP8
-            or dtype in cls._DT_FP8BF16
+            dtype in cls._DT_FP8BF16
             or dtype in cls._DT_I8FP8BF16
             or dtype in cls._DT_I4FP8BF16
         ):
