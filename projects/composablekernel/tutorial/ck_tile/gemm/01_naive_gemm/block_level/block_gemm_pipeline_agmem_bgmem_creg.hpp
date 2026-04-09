@@ -13,8 +13,8 @@ namespace ck_tile {
 
 // BlockGemmPipelineAGmemBGmemCReg: non-prefetch GEMM pipeline.
 //
-// A (input):  tile window over global DRAM
-// B (input):  tile window over global DRAM
+// A (input):  tile window over global memory
+// B (input):  tile window over global memory
 // C (output): static distributed tensor in registers (VGPRs)
 //
 // This is the simplest correct pipeline: no double-buffering, no prefetching.
@@ -77,7 +77,8 @@ struct BlockGemmPipelineAGmemBGmemCReg
         // A tile in LDS: pointer to the A region of shared memory.
         ADataType* p_a_lds = static_cast<ADataType*>(p_smem);
 
-        // a_lds_block_desc: compile-time LDS layout descriptor (3D detour -> 2D merge).
+        // a_lds_block_desc: compile-time LDS layout descriptor built via an intermediate 3D
+        // form (explicit tile sub-dimensions) that is then merged into a 2D (K, M) view.
         // This same descriptor governs both the store path (DRAM->LDS) and the load path
         // (LDS->MFMA). Both must use the same descriptor to ensure physical address agreement.
         constexpr auto a_lds_block_desc = Policy::template MakeALdsBlockDescriptor<Problem>();
