@@ -4,7 +4,7 @@
 #pragma once
 #include "ck_tile/core.hpp"
 #include "ck_tile/core/tensor/tensor_descriptor_tiled.hpp"
-#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/im2col_coordinate.hpp"
 #include "ck_tile/core/tensor/tiled_im2col_descriptor.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 namespace ck_tile {
@@ -470,6 +470,7 @@ struct TransformConvFwdToGemm_V2
     template <typename ALayout,
               bool EnableTiledIm2Col = false,
               bool WaveUniformM      = false,
+              index_t KPerBlock_     = 1,
               typename std::enable_if<NDimSpatial == 1 &&
                                           std::is_same_v<ALayout, tensor_layout::convolution::NWGC>,
                                       bool>::type = false>
@@ -700,6 +701,7 @@ struct TransformConvFwdToGemm_V2
     template <typename ALayout,
               bool EnableTiledIm2Col = false,
               bool WaveUniformM      = false,
+              index_t KPerBlock_,
               typename std::enable_if<
                   NDimSpatial == 2 && std::is_same_v<ALayout, tensor_layout::convolution::NHWGC>,
                   bool>::type = false>
@@ -921,7 +923,7 @@ struct TransformConvFwdToGemm_V2
                     // prepare_coords can use amd_wave_read_first_lane() on m_gemm and run
                     // the 3 M divmods on the scalar unit (SALU).
                     return make_tiled_im2col_descriptor<WaveUniformM>(base_desc,
-                                                                      MakeATileMetadata<ALayout>());
+                                                                      MakeATileMetadata<ALayout, KPerBlock_>());
                 }
                 else
                 {
@@ -970,16 +972,17 @@ struct TransformConvFwdToGemm_V2
     // -------------------------------------------------------------------------
     // MakeATileMetadata — 2D NHWGC, Default specialization only.
     //
-    // Returns a TiledIm2ColMetadata struct with all constants needed for the
+    // Returns an Im2ColMetadata struct with all constants needed for the
     // tile-aware precomputed im2col index calculation. Available for any
     // ConvSpecialization, but the incremental formulas are most beneficial for
     // the Default case (general stride/dilation/padding).
     // -------------------------------------------------------------------------
     template <typename ALayout,
+              index_t KPerBlock_,
               typename std::enable_if<
                   NDimSpatial == 2 && std::is_same_v<ALayout, tensor_layout::convolution::NHWGC>,
                   bool>::type = false>
-    CK_TILE_HOST TiledIm2ColMetadata MakeATileMetadata() const
+    CK_TILE_HOST Im2ColMetadata MakeATileMetadata() const
     {
         const IndexType HiStride    = Wi_ * G_ * C_;
         const IndexType WiStride    = G_ * C_;
@@ -991,7 +994,7 @@ struct TransformConvFwdToGemm_V2
         const IndexType DH_HiStride = ConvDilationH_ * HiStride;
         const IndexType DW_WiStride = ConvDilationW_ * WiStride;
 
-        TiledIm2ColMetadata meta;
+        Im2ColMetadata meta;
         meta.NStride     = static_cast<index_t>(NStride);
         meta.HiStride    = static_cast<index_t>(HiStride);
         meta.WiStride    = static_cast<index_t>(WiStride);
@@ -1016,6 +1019,8 @@ struct TransformConvFwdToGemm_V2
         meta.PW          = static_cast<index_t>(InLeftPadW_);
         meta.M_gemm      = static_cast<index_t>(N_ * Ho_ * Wo_);
         meta.K_gemm      = static_cast<index_t>(Y_ * X_ * C_);
+        meta.KPerBlock   = static_cast<index_t>(KPerBlock_);
+        meta.KStride     = 0;  // unused for FwdInput
 
         // Precompute magic-division multipliers for the four runtime divisors.
         // These replace integer division in init_m / init_k with multiply+shift on device.
@@ -1030,6 +1035,7 @@ struct TransformConvFwdToGemm_V2
     template <typename ALayout,
               bool EnableTiledIm2Col = false,
               bool WaveUniformM      = false,
+              index_t KPerBlock_     = 1,
               typename std::enable_if<
                   NDimSpatial == 3 && std::is_same_v<ALayout, tensor_layout::convolution::NDHWGC>,
                   bool>::type = false>

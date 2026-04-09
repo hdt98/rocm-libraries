@@ -13,7 +13,7 @@
 #include "ck_tile/core/container/multi_index.hpp"
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
-#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/im2col_coordinate.hpp"
 
 namespace ck_tile {
 
@@ -58,10 +58,31 @@ struct tensor_coordinate
 };
 
 // ---------------------------------------------------------------------------
+// is_im2col_coordinate<T>
+//
+// True for any Im2ColCoordinate<Tensor> specialization.
+// Used in the fast paths of make/move_tensor_coordinate and validity checks.
+// ---------------------------------------------------------------------------
+template <typename T>
+struct is_im2col_coordinate : std::false_type
+{
+};
+
+template <Im2ColTensor Tensor>
+struct is_im2col_coordinate<Im2ColCoordinate<Tensor>> : std::true_type
+{
+};
+
+template <typename T>
+inline constexpr bool is_im2col_coordinate_v = is_im2col_coordinate<remove_cvref_t<T>>::value;
+
+// ---------------------------------------------------------------------------
 // make_tensor_coordinate
 //
 // Fast path: when the descriptor has im2col metadata (has_im2col_meta_v<>),
-// return a TiledIm2ColCoordinate initialized from (m_gemm, k_gemm) directly.
+// return an Im2ColCoordinate<Tensor> initialized from (m_gemm, k/n_gemm).
+// The tensor kind is read from the descriptor's im2col_tensor_kind static
+// member (defaults to FwdInput for backward compatibility).
 //
 // Generic path: delegate to the full transform-chain adaptor.
 // ---------------------------------------------------------------------------
@@ -72,8 +93,9 @@ CK_TILE_HOST_DEVICE constexpr auto make_tensor_coordinate(const TensorDesc& tens
     if constexpr(has_im2col_meta_v<TensorDesc>)
     {
         // Fast tiled path: use precomputed metadata for direct offset calculation.
-        // idx_top contains the absolute (m_gemm, k_gemm) indices.
-        TiledIm2ColCoordinate coord;
+        // idx_top contains the absolute (m_gemm, k_gemm / n_gemm) indices.
+        constexpr Im2ColTensor kind = im2col_tensor_kind_of_v<TensorDesc>;
+        Im2ColCoordinate<kind> coord;
         coord.init(static_cast<index_t>(idx_top[number<0>{}]),
                    static_cast<index_t>(idx_top[number<1>{}]),
                    tensor_desc.get_im2col_meta());
@@ -91,10 +113,10 @@ CK_TILE_HOST_DEVICE constexpr auto make_tensor_coordinate(const TensorDesc& tens
 // ---------------------------------------------------------------------------
 // move_tensor_coordinate
 //
-// Fast path: when the coordinate is a TiledIm2ColCoordinate, use its
-// move_step() method which separates M and K movements.
-//   - K-only step (dm==0): 2 divmod, M_base unchanged.
-//   - General step:        5 divmod (full reinit).
+// Fast path: when the coordinate is any Im2ColCoordinate<Tensor>, use its
+// move_step() method which separates M and K/N movements.
+//   - K/N-only step (dm==0): incremental update, 0 divmod for FwdOutput.
+//   - General step:          full reinit (3-5 divmod depending on tensor kind).
 //
 // Generic path: delegate to move_tensor_adaptor_coordinate.
 // ---------------------------------------------------------------------------
@@ -102,9 +124,9 @@ template <bool JudgeDoTransforms = true, typename TensorDesc, typename TensorCoo
 CK_TILE_HOST_DEVICE constexpr void
 move_tensor_coordinate(const TensorDesc& tensor_desc, TensorCoord& coord, const Index& coord_step)
 {
-    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    if constexpr(is_im2col_coordinate_v<TensorCoord>)
     {
-        // Fast tiled path: coord_step is the delta in (M, K) global space.
+        // Fast tiled path: coord_step is the delta in (M, K/N) global space.
         coord.move_step(static_cast<index_t>(coord_step[number<0>{}]),
                         static_cast<index_t>(coord_step[number<1>{}]),
                         tensor_desc.get_im2col_meta());
@@ -118,7 +140,7 @@ move_tensor_coordinate(const TensorDesc& tensor_desc, TensorCoord& coord, const 
 // ---------------------------------------------------------------------------
 // coordinate_has_valid_offset_assuming_top_index_is_valid
 //
-// Fast path: for TiledIm2ColCoordinate, the validity is precomputed in
+// Fast path: for any Im2ColCoordinate<Tensor>, validity is precomputed in
 // coord.valid during init() and move_step().
 //
 // Generic path: delegate to adaptor validity check.
@@ -128,7 +150,7 @@ CK_TILE_HOST_DEVICE constexpr bool
 coordinate_has_valid_offset_assuming_top_index_is_valid(const TensorDesc& tensor_desc,
                                                         const TensorCoord& coord)
 {
-    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    if constexpr(is_im2col_coordinate_v<TensorCoord>)
     {
         return coord.is_valid();
     }
@@ -142,7 +164,7 @@ template <typename TensorDesc, typename TensorCoord>
 CK_TILE_HOST_DEVICE constexpr bool coordinate_has_valid_offset(const TensorDesc& tensor_desc,
                                                                const TensorCoord& coord)
 {
-    if constexpr(std::is_same_v<remove_cvref_t<TensorCoord>, TiledIm2ColCoordinate>)
+    if constexpr(is_im2col_coordinate_v<TensorCoord>)
     {
         return coord.is_valid();
     }

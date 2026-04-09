@@ -13,7 +13,7 @@
 #include "ck_tile/core/tensor/static_distributed_tensor.hpp"
 #include "ck_tile/core/tensor/tensor_adaptor.hpp"
 #include "ck_tile/core/tensor/tensor_view.hpp"
-#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/im2col_coordinate.hpp"
 #include "ck_tile/core/tensor/tile_distribution.hpp"
 #include "ck_tile/core/tensor/tile_window_base.hpp"
 #include "ck_tile/core/utility/functional.hpp"
@@ -121,10 +121,10 @@ struct tile_window_with_static_distribution
         typename Base::BottomTensorIndex bottom_tensor_thread_origin_idx_tmp =
             window_origin + window_adaptor_thread_coord_tmp.get_bottom_index();
 
-        // Im2col fast path: split init into M part (potentially SALU) + K part (VALU).
+        // Im2col fast path: split init into M part (potentially SALU) + K/N part (VALU).
         // When the descriptor carries wave_uniform_m == true, all threads in a warp have
         // identical m_gemm, so amd_wave_read_first_lane() promotes the 3 M divmods to the
-        // scalar unit.  The K part (2 divmods) remains lane-specific (VALU).
+        // scalar unit.  The K/N part remains lane-specific (VALU).
         // For non-im2col descriptors we fall through to the existing generic path.
         using DescType = remove_cvref_t<decltype(bottom_tensor_view.get_tensor_descriptor())>;
         typename Base::BottomTensorCoord bottom_tensor_thread_coord_tmp;
@@ -136,14 +136,26 @@ struct tile_window_with_static_distribution
             const index_t m_raw = bottom_tensor_thread_origin_idx_tmp[number<0>{}];
             const index_t k_raw = bottom_tensor_thread_origin_idx_tmp[number<1>{}];
 
-            bottom_tensor_thread_coord_tmp.init_m(m_raw, meta); 
-            if(meta.C % meta.KPerBlock == 0) 
+            bottom_tensor_thread_coord_tmp.init_m(m_raw, meta);
+
+            // FwdInput: use aligned fast path when C is a multiple of KPerBlock
+            // (avoids C-boundary crossing within a tile — no per-lane modulo needed).
+            // FwdOutput: init_k is already trivially linear; always use it directly.
+            if constexpr(DescType::im2col_tensor_kind == Im2ColTensor::FwdInput)
             {
-                // SGPR after this
-                const index_t k_start = amd_wave_read_first_lane((k_raw / meta.KPerBlock) * meta.KPerBlock);
-                // VGPR, lane-specific
-                const index_t k_loc   = k_raw - k_start;
-                bottom_tensor_thread_coord_tmp.init_k_aligned(k_start, k_loc, meta);                     
+                if(meta.C % meta.KPerBlock == 0)
+                {
+                    // SGPR after this
+                    const index_t k_start =
+                        amd_wave_read_first_lane((k_raw / meta.KPerBlock) * meta.KPerBlock);
+                    // VGPR, lane-specific
+                    const index_t k_loc = k_raw - k_start;
+                    bottom_tensor_thread_coord_tmp.init_k_aligned(k_start, k_loc, meta);
+                }
+                else
+                {
+                    bottom_tensor_thread_coord_tmp.init_k(k_raw, meta);
+                }
             }
             else
             {

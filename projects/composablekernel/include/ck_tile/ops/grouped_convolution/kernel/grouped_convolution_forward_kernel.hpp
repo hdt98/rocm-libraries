@@ -94,7 +94,8 @@ struct GroupedConvFwdKernelArgs
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
                                                          GroupedConvTraitsType_::UseTiledIm2Col,
-                                                         GroupedConvTraitsType_::WaveUniformM>();
+                                                         GroupedConvTraitsType_::WaveUniformM,
+                                                         GroupedConvTraitsType_::KPerBlock>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -196,7 +197,8 @@ struct GroupedConvFwdKernelArgs
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
                                                          GroupedConvTraitsType_::UseTiledIm2Col,
-                                                         GroupedConvTraitsType_::WaveUniformM>();
+                                                         GroupedConvTraitsType_::WaveUniformM,
+                                                         GroupedConvTraitsType_::KPerBlock>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -310,7 +312,8 @@ struct GroupedConvFwdKernelArgs
         a_grid_desc_m_k =
             transformer_.template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
                                                          GroupedConvTraitsType_::UseTiledIm2Col,
-                                                         GroupedConvTraitsType_::WaveUniformM>();
+                                                         GroupedConvTraitsType_::WaveUniformM,
+                                                         GroupedConvTraitsType_::KPerBlock>();
         b_grid_desc_n_k =
             transformer_.template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>();
         c_grid_desc_m_n =
@@ -359,7 +362,8 @@ struct GroupedConvFwdKernelArgs
         decltype(ConvToGemmFwdTransformer{}
                      .template MakeADescriptor_M_K<typename GroupedConvTraitsType_::InLayout,
                                                    UseTiledIm2Col,
-                                                   WaveUniformM>())>;
+                                                   WaveUniformM,
+                                                   GroupedConvTraitsType_::KPerBlock>())>;
     using BGridDescNK = remove_cvref_t<
         decltype(ConvToGemmFwdTransformer{}
                      .template MakeBDescriptor_N_K<typename GroupedConvTraitsType_::WeiLayout>())>;
@@ -698,7 +702,7 @@ struct GroupedConvolutionForwardKernel
         // Optimized V2 im2col index calculation requires KPerBlock  < C
         if constexpr (GroupedConvTraitsType_::UseTiledIm2Col)
         {
-            if(GemmPipeline::KPerBlock >= ConvC)
+            if(GroupedConvTraitsType_::KPerBlock >= ConvC)
             {
                 if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
                 {
@@ -920,10 +924,10 @@ struct GroupedConvolutionForwardKernel
 
         if constexpr(has_im2col_meta_v<ADescType>)
         {
-            // Tiled im2col path: GEMM OOB is handled by TiledIm2ColCoordinate::is_valid()
+            // Tiled im2col path: GEMM OOB is handled by Im2ColCoordinate::is_valid()
             // (which checks m < M_gemm && k < K_gemm in addition to padding validity).
             // Skipping pad_tensor_view keeps the descriptor type as TiledIm2ColDescriptor so
-            // that make_tensor_coordinate returns a TiledIm2ColCoordinate and the fast path
+            // that make_tensor_coordinate returns an Im2ColCoordinate and the fast path
             // in move_tensor_coordinate / coordinate_has_valid_offset is actually reached.
             return make_tile_window(a_tensor_view, tile_shape, {block_idx_m, 0});
         }

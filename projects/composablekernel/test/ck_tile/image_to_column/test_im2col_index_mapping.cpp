@@ -20,7 +20,7 @@
 #include <vector>
 
 #include "ck_tile/core.hpp"
-#include "ck_tile/core/tensor/tiled_im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/im2col_coordinate.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm_v2.hpp"
@@ -817,17 +817,17 @@ TEST_F(Im2colPrecomputation, PrecomputedPlusKOffsetMatchesReference)
 }
 
 // ===========================================================================
-// TEST SUITE 8: TiledIm2ColMetadata and TiledIm2ColCoordinate
+// TEST SUITE 8: Im2ColMetadata and Im2ColCoordinate
 // ===========================================================================
 //
-// Tests for the new tile-aware coordinate types.  MakeATileMetadata() on the
-// V2 transformer produces a TiledIm2ColMetadata struct.  TiledIm2ColCoordinate
+// Tests for the tile-aware coordinate types.  MakeATileMetadata() on the
+// V2 transformer produces an Im2ColMetadata struct.  Im2ColCoordinate<FwdInput>
 // uses that metadata to compute offset(m, k) = M_base(m) + K_offset(k).
 //
 // These tests verify that:
 //   1. MakeATileMetadata() produces correct constants.
-//   2. TiledIm2ColCoordinate::init() gives the same offset as TransformConvFwdToGemm.
-//   3. TiledIm2ColCoordinate::move_k() updates K_offset correctly.
+//   2. Im2ColCoordinate<FwdInput>::init() gives the same offset as TransformConvFwdToGemm.
+//   3. Im2ColCoordinate<FwdInput>::move_step() updates K_offset correctly.
 //   4. Validity agrees with reference.
 
 using V2Transformer = TransformConvFwdToGemm_V2<
@@ -865,7 +865,7 @@ class Im2colTiledCoordinate : public ::testing::Test
 TEST_F(Im2colTiledCoordinate, MetadataConstants)
 {
     auto v2   = make_v2_transformer(p);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     // Verify derived constants match the analysis formulas
     EXPECT_EQ(meta.WiStride,    p.WiStride());
@@ -897,19 +897,19 @@ TEST_F(Im2colTiledCoordinate, MetadataConstantsWithPadding)
 {
     auto pp   = make_padded_params();
     auto v2   = make_v2_transformer(pp);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     EXPECT_EQ(meta.pad_offset, pp.PH * pp.HiStride() + pp.PW * pp.WiStride());
     EXPECT_EQ(meta.PH, pp.PH);
     EXPECT_EQ(meta.PW, pp.PW);
 }
 
-// ---- 8b. TiledIm2ColCoordinate::init() vs. reference ---
+// ---- 8b. Im2ColCoordinate<FwdInput>::init() vs. reference ---
 
 TEST_F(Im2colTiledCoordinate, InitOffsetMatchesReference)
 {
     auto v2   = make_v2_transformer(p);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < p.M_gemm(); ++m)
     {
@@ -918,7 +918,7 @@ TEST_F(Im2colTiledCoordinate, InitOffsetMatchesReference)
             int ref = reference_offset(p, m, k);
             if(ref == -1) continue; // padded
 
-            TiledIm2ColCoordinate coord;
+            Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
             coord.init(m, k, meta);
 
             EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
@@ -931,7 +931,7 @@ TEST_F(Im2colTiledCoordinate, InitValidityMatchesReference)
 {
     auto pp   = make_padded_params();
     auto v2   = make_v2_transformer(pp);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < pp.M_gemm(); ++m)
     {
@@ -939,7 +939,7 @@ TEST_F(Im2colTiledCoordinate, InitValidityMatchesReference)
         {
             int ref = reference_offset(pp, m, k);
 
-            TiledIm2ColCoordinate coord;
+            Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
             coord.init(m, k, meta);
 
             EXPECT_EQ(coord.is_valid(), ref != -1) << "m=" << m << " k=" << k;
@@ -953,14 +953,14 @@ TEST_F(Im2colTiledCoordinate, InitWithStride2)
 {
     auto ps   = make_stride2_params();
     auto v2   = make_v2_transformer(ps);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < ps.M_gemm(); ++m)
         for(int k = 0; k < ps.K_gemm(); ++k)
         {
             int ref = reference_offset(ps, m, k);
             if(ref == -1) continue;
-            TiledIm2ColCoordinate coord;
+            Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
             coord.init(m, k, meta);
             EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
         }
@@ -970,14 +970,14 @@ TEST_F(Im2colTiledCoordinate, InitWithDilation2)
 {
     auto pd   = make_dilation2_params();
     auto v2   = make_v2_transformer(pd);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < pd.M_gemm(); ++m)
         for(int k = 0; k < pd.K_gemm(); ++k)
         {
             int ref = reference_offset(pd, m, k);
             if(ref == -1) continue;
-            TiledIm2ColCoordinate coord;
+            Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
             coord.init(m, k, meta);
             EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
         }
@@ -985,45 +985,45 @@ TEST_F(Im2colTiledCoordinate, InitWithDilation2)
 
 // ---- 8b-extra. GEMM bounds: indices at/beyond M_gemm or K_gemm must be invalid ---
 // This covers the case where pad_tensor_view is bypassed and OOB is handled
-// entirely by TiledIm2ColCoordinate::is_valid().
+// entirely by Im2ColCoordinate<FwdInput>::is_valid().
 
 TEST_F(Im2colTiledCoordinate, GemmBoundsInvalid)
 {
     auto v2   = make_v2_transformer(p);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     // m == M_gemm (first padded M row) must be invalid
     {
-        TiledIm2ColCoordinate coord;
+        Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
         coord.init(p.M_gemm(), 0, meta);
         EXPECT_FALSE(coord.is_valid()) << "m=M_gemm should be invalid";
     }
     // k == K_gemm (first padded K column) must be invalid
     {
-        TiledIm2ColCoordinate coord;
+        Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
         coord.init(0, p.K_gemm(), meta);
         EXPECT_FALSE(coord.is_valid()) << "k=K_gemm should be invalid";
     }
     // After move_step(0, dk) that lands k >= K_gemm, must be invalid
     {
-        TiledIm2ColCoordinate coord;
+        Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
         coord.init(0, 0, meta);
         coord.move_step(0, p.K_gemm(), meta); // jump to k=K_gemm
         EXPECT_FALSE(coord.is_valid()) << "k=K_gemm after move_step should be invalid";
     }
 }
 
-// ---- 8c. TiledIm2ColCoordinate::move_step() for K-only moves ---
+// ---- 8c. Im2ColCoordinate<FwdInput>::move_step() for K-only moves ---
 
 TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
 {
     // init at k=0, then advance by +1 steps using move_step(0, 1, meta)
     auto v2   = make_v2_transformer(p);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < p.M_gemm(); m += p.Wo) // spot-check at ho-boundaries
     {
-        TiledIm2ColCoordinate coord;
+        Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
         coord.init(m, 0, meta);
         const int m_base = coord.M_base;
 
@@ -1046,11 +1046,11 @@ TEST_F(Im2colTiledCoordinate, MoveKUpdatesKOffset)
 TEST_F(Im2colTiledCoordinate, MBaseConstantAcrossKMoves)
 {
     auto v2   = make_v2_transformer(p);
-    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC>();
+    auto meta = v2.MakeATileMetadata<tensor_layout::convolution::NHWGC, 32>();
 
     for(int m = 0; m < p.M_gemm(); ++m)
     {
-        TiledIm2ColCoordinate coord;
+        Im2ColCoordinate<Im2ColTensor::FwdInput> coord;
         coord.init(m, 0, meta);
         const int m_base_ref = coord.M_base;
 

@@ -73,7 +73,8 @@ template <index_t NDimSpatial_,
           bool EnableSplitImage_    = false,
           bool ExplicitGemm_        = false,
           bool UseTiledIm2Col_      = false,
-          bool WaveUniformM_        = false>
+          bool WaveUniformM_        = false,
+          index_t KPerBlock_        = 1>
 struct GroupedConvTraits
 {
     private:
@@ -178,7 +179,8 @@ struct GroupedConvTraits
     static constexpr ck_tile::index_t NumDTensor  = DsLayout::size();
     // Wave-uniform M: true when KPerBlock/VecSizeA >= warp_size so that
     // prepare_coords can use amd_wave_read_first_lane() for the 3 M divmods (SALU).
-    static constexpr bool WaveUniformM = WaveUniformM_;
+    static constexpr bool    WaveUniformM = WaveUniformM_;
+    static constexpr index_t KPerBlock    = KPerBlock_;
     using ImplicitGemmDsLayout                    = decltype(generate_implicit_gemm_layout());
 };
 

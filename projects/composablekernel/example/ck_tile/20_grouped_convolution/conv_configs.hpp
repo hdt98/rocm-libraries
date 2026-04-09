@@ -264,7 +264,7 @@ struct ConvConfigComputeV3_merged_groups : public ConvConfigBase
 //
 // KPerBlock = 256 ensures X0 = min(warp_size, KPerBlock/VecSize) = min(64, 64) = 64,
 // meaning all 64 lanes in a warp map exclusively to K.  Consequently m_gemm is identical
-// for every thread in a warp (wave-uniform), so TiledIm2ColCoordinate::init()'s 3 M
+// for every thread in a warp (wave-uniform), so Im2ColCoordinate<FwdInput>::init()'s 3 M
 // divmods are computed with a wavefront-uniform value — a necessary condition for the
 // scalar-unit M_base optimisation.
 //

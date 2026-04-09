@@ -50,7 +50,8 @@ struct GroupedConvolutionForwardInvoker
                                                                  /*EnableSplitImage=*/false,
                                                                  /*ExplicitGemm=*/false,
                                                                  ConvConfig::UseTiledIm2Col,
-                                                                 ConvConfig::WaveUniformM>;
+                                                                 ConvConfig::WaveUniformM,
+                                                                 ConvConfig::K_Tile>;
 
         using TilePartitioner = ck_tile::GemmSpatiallyLocalTilePartitioner<
             GemmShape,
