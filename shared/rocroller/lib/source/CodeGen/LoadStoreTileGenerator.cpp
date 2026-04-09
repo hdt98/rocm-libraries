@@ -21,8 +21,6 @@
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager.hpp>
 #include <rocRoller/KernelGraph/ScopeManager.hpp>
-#include <rocRoller/KernelGraph/Transforms/AssignIndexExpressions_detail.hpp>
-#include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/KernelOptions_detail.hpp>
 #include <rocRoller/Scheduling/Scheduler.hpp>
@@ -37,7 +35,6 @@ namespace rocRoller
         using namespace ControlGraph;
         using namespace CoordinateGraph;
         using namespace Expression;
-        using namespace LowerTileDetails;
 
         std::string toString(LoadStoreTileGenerator::LoadStoreTileInfo const& info)
         {
