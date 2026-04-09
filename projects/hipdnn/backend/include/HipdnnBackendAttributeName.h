@@ -55,6 +55,7 @@
  * - 3000-3099: Custom op operation attributes
  * - 3100-3199: SDPA backward propagation operation attributes
  * - 3200-3299: Reduction operation attributes
+ * - 3300-3399: Layernorm backward operation attributes
  * - 60000+: Extension attributes
  */
 typedef enum
@@ -1089,6 +1090,47 @@ typedef enum
 
     /** @brief Whether reduction is deterministic (bool) */
     HIPDNN_ATTR_REDUCTION_IS_DETERMINISTIC = 3204,
+
+    /** @} */
+
+    /**
+     * @name Layernorm Backward Operation Attributes (3300-3399)
+     * Attributes for HIPDNN_BACKEND_OPERATION_LAYERNORM_BACKWARD_DESCRIPTOR
+     * @{
+     */
+
+    /** @brief Output gradient tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_DY = 3300,
+
+    /** @brief Input tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_X = 3301,
+
+    /** @brief Scale tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_SCALE = 3302,
+
+    /** @brief Mean tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_MEAN = 3303,
+
+    /** @brief Inverse variance tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_INV_VARIANCE = 3304,
+
+    /** @brief Epsilon tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_EPSILON = 3305,
+
+    /** @brief Input gradient tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_DX = 3306,
+
+    /** @brief Scale gradient tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_DSCALE = 3307,
+
+    /** @brief Bias gradient tensor for backward layernorm */
+    HIPDNN_ATTR_OPERATION_LAYERNORM_BACKWARD_DBIAS = 3308,
+
+    /** @brief Number of normalized dimensions for backward layernorm */
+    HIPDNN_ATTR_LAYERNORM_BACKWARD_NORMALIZED_DIM_COUNT = 3309,
+
+    /** @brief Compute type for backward layernorm */
+    HIPDNN_ATTR_LAYERNORM_BACKWARD_COMP_TYPE_EXT = 3310,
 
     /** @} */
 
