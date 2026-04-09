@@ -446,7 +446,7 @@ void testing_sytrs2(Arguments& argus)
         {
             EXPECT_ROCBLAS_STATUS(rocsolver_sytrs2(STRIDED, handle, uplo, n, nrhs, (T*)nullptr, lda,
                                                    stA, (I*)nullptr, stP, (T*)nullptr, ldb, stB, bc),
-                                  rocblas_status_invalid_valu);
+                                  rocblas_status_invalid_value);
         }
         if(argus.timing)
         {
