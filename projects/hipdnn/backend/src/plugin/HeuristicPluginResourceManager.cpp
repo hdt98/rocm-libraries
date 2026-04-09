@@ -219,13 +219,13 @@ hipdnnHeuristicHandle_t
 }
 
 void HeuristicPluginResourceManager::setDevicePropertiesOnAllHandles(
-    const uint8_t* devicePropsSerializedPtr, size_t devicePropsSerializedSize) const
+    const hipdnnPluginConstData_t* devicePropsSerialized) const
 {
     for(const auto& [handle, plugin] : _handleToPlugin)
     {
         try
         {
-            plugin->setDeviceProperties(handle, devicePropsSerializedPtr, devicePropsSerializedSize);
+            plugin->setDeviceProperties(handle, devicePropsSerialized);
         }
         catch(const HipdnnException& e)
         {

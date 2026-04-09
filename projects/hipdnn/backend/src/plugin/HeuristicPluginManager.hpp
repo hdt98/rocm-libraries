@@ -11,6 +11,7 @@
 #include "HipdnnException.hpp"
 #include "PluginCore.hpp"
 #include <hipdnn_backend/version.h>
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 
 namespace hipdnn_backend::plugin
 {
@@ -25,6 +26,7 @@ namespace hipdnn_backend::plugin
  * Validation includes:
  * - Heuristic C ABI major version compatibility
  * - Unique policy IDs across all loaded heuristic plugins
+ * - Policy ID ↔ policy name consistency (when GetPolicyName is provided)
  */
 class HeuristicPluginManager : public PluginManagerBase<HeuristicPlugin>
 {
@@ -59,6 +61,24 @@ protected:
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                                   "Policy ID " + std::to_string(policyId)
                                       + " already exists in the list of loaded heuristic plugins");
+        }
+
+        // Validate policy ID ↔ policy name consistency (RFC §11, §5.3.1)
+        // If GetPolicyName is provided, engineNameToId(name) MUST equal GetPolicyId()
+        auto policyNameView = plugin.policyName();
+        if(!policyNameView.empty())
+        {
+            std::string policyName(policyNameView);
+            int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(policyName);
+            if(expectedId != policyId)
+            {
+                throw HipdnnException(
+                    HIPDNN_STATUS_PLUGIN_ERROR,
+                    "Policy ID mismatch: GetPolicyId() returned " + std::to_string(policyId)
+                        + " but engineNameToId(\"" + policyName + "\") = "
+                        + std::to_string(expectedId)
+                        + ". Plugin must return consistent ID and name (RFC §11, §5.3.1)");
+            }
         }
     }
 

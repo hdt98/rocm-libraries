@@ -93,12 +93,12 @@ std::string_view HeuristicPlugin::policyName() const
 
     const char* name = nullptr;
     auto status      = _funcGetPolicyName(&name);
-    if(status == HIPDNN_HEURISTIC_STATUS_NOT_SUPPORTED)
+    if(status == HIPDNN_PLUGIN_STATUS_INVALID_VALUE)
     {
         return ""; // Plugin chose not to provide a name
     }
 
-    if(status != HIPDNN_HEURISTIC_STATUS_SUCCESS)
+    if(status != HIPDNN_PLUGIN_STATUS_SUCCESS)
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                               std::string("Heuristic plugin failed to get policy name. Status: ")
@@ -116,16 +116,16 @@ std::string_view HeuristicPlugin::pluginVersion() const
     return version;
 }
 
-hipdnnHeuristicStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
+hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
 {
     return _funcSetLoggingCallback(callback);
 }
 
-hipdnnHeuristicStatus_t HeuristicPlugin::setLogLevel(hipdnnSeverity_t level) const
+hipdnnPluginStatus_t HeuristicPlugin::setLogLevel(hipdnnSeverity_t level) const
 {
     if(_funcSetLogLevel == nullptr)
     {
-        return HIPDNN_HEURISTIC_STATUS_SUCCESS; // Optional function not implemented
+        return HIPDNN_PLUGIN_STATUS_SUCCESS; // Optional function not implemented
     }
     return _funcSetLogLevel(level);
 }
@@ -143,14 +143,10 @@ void HeuristicPlugin::destroyHandle(hipdnnHeuristicHandle_t handle) const
 }
 
 void HeuristicPlugin::setDeviceProperties(hipdnnHeuristicHandle_t handle,
-                                          const uint8_t* devicePropsSerializedPtr,
-                                          size_t devicePropsSerializedSize) const
+                                          const hipdnnPluginConstData_t* devicePropsSerialized) const
 {
-    invokeHeuristicFunction("set device properties",
-                            _funcHandleSetDeviceProperties,
-                            handle,
-                            devicePropsSerializedPtr,
-                            devicePropsSerializedSize);
+    invokeHeuristicFunction(
+        "set device properties", _funcHandleSetDeviceProperties, handle, devicePropsSerialized);
 }
 
 hipdnnHeuristicPolicyDescriptor_t
@@ -176,14 +172,10 @@ void HeuristicPlugin::setEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
 }
 
 void HeuristicPlugin::setSerializedGraph(hipdnnHeuristicPolicyDescriptor_t desc,
-                                         const uint8_t* serializedGraphPtr,
-                                         size_t serializedGraphSize) const
+                                         const hipdnnPluginConstData_t* serializedGraph) const
 {
-    invokeHeuristicFunction("set serialized graph",
-                            _funcPolicySetSerializedGraph,
-                            desc,
-                            serializedGraphPtr,
-                            serializedGraphSize);
+    invokeHeuristicFunction(
+        "set serialized graph", _funcPolicySetSerializedGraph, desc, serializedGraph);
 }
 
 bool HeuristicPlugin::finalize(hipdnnHeuristicPolicyDescriptor_t desc) const

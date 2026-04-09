@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include <hipdnn_data_sdk/logging/CallbackTypes.h>
+#include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 
 /**
  * @file HeuristicsPluginApi.h
@@ -18,6 +19,12 @@
  * IMPORTANT: This is a separate C ABI from the engine plugin API. A single .so is either an
  * engine plugin OR a heuristic plugin, never both. Heuristic plugins do NOT export
  * hipdnnPluginGetType, hipdnnPluginGetName, or any engine plugin entry points.
+ *
+ * Status codes: Heuristic plugins use hipdnnPluginStatus_t (same as engine plugins) for
+ * all return values. This includes HIPDNN_PLUGIN_STATUS_NOT_APPLICABLE for policy decline.
+ *
+ * Serialized data: Device properties and operation graphs cross the ABI as
+ * hipdnnPluginConstData_t* (same wrapper type as engine plugin APIs), not as raw pointers.
  */
 
 #ifdef _WIN32
@@ -48,25 +55,6 @@ extern "C" {
  * @brief Data types used in the Heuristics Plugin API.
  * @{
  */
-
-/**
- * @brief Enumeration for the status of heuristic plugin operations.
- *
- * This enumeration defines status codes returned by heuristic plugin API functions.
- * Numeric values match hipdnnStatus_t from the backend for shared semantics, but this
- * is a separate typedef to maintain ABI independence.
- */
-typedef enum
-{
-    HIPDNN_HEURISTIC_STATUS_SUCCESS = 0, ///< Operation completed successfully
-    HIPDNN_HEURISTIC_STATUS_NOT_INITIALIZED = 1, ///< Object not properly initialized
-    HIPDNN_HEURISTIC_STATUS_BAD_PARAM = 2, ///< Invalid parameter
-    HIPDNN_HEURISTIC_STATUS_BAD_PARAM_NULL_POINTER = 3, ///< NULL pointer provided
-    HIPDNN_HEURISTIC_STATUS_NOT_SUPPORTED = 8, ///< Operation not supported
-    HIPDNN_HEURISTIC_STATUS_INTERNAL_ERROR = 9, ///< Internal plugin error
-    HIPDNN_HEURISTIC_STATUS_ALLOC_FAILED = 10, ///< Memory allocation failed
-    HIPDNN_HEURISTIC_STATUS_NOT_APPLICABLE = 100, ///< Policy not applicable (declined selection)
-} hipdnnHeuristicStatus_t;
 
 /**
  * @brief Opaque handle for a heuristic plugin session.
@@ -106,9 +94,9 @@ typedef struct hipdnnHeuristicPolicyDescriptor_opaque* hipdnnHeuristicPolicyDesc
  * @param[out] version Pointer to receive the API version string (NUL-terminated).
  *                     The pointer remains valid for the plugin's lifetime.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicGetApiVersion(const char** version);
 
 /**
@@ -120,25 +108,29 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * @param[out] policy_id Pointer to receive the policy ID.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicGetPolicyId(int64_t* policy_id);
 
 /**
  * @brief Retrieves the canonical policy name (optional).
  *
  * Returns the NUL-terminated UTF-8 canonical name that users reference in configuration
- * (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"). Used for logging
- * and enumeration. If omitted, the host may derive display names from a static registry.
+ * (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"). Used for
+ * logging and enumeration.
+ *
+ * IMPORTANT: If this function is exported, the host validates at load time that
+ * engineNameToId(policy_name) == hipdnnHeuristicGetPolicyId() and REJECTS the module
+ * on mismatch. This catches mistaken or overlapping well-known implementations early.
  *
  * @param[out] policy_name Pointer to receive the policy name string (NUL-terminated).
  *                         The pointer remains valid for the plugin's lifetime.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success,
- *         HIPDNN_HEURISTIC_STATUS_NOT_SUPPORTED if not implemented.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_INVALID_VALUE if not implemented.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicGetPolicyName(const char** policy_name);
 
 /**
@@ -150,9 +142,9 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * @param[out] version Pointer to receive the version string (NUL-terminated).
  *                     The pointer remains valid for the plugin's lifetime.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicGetPluginVersion(const char** version);
 
 /**
@@ -163,9 +155,9 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * @param[in] callback The logging callback function to use.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback);
 
 /**
@@ -176,10 +168,10 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * @param[in] level The log level to set.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success,
- *         HIPDNN_HEURISTIC_STATUS_NOT_SUPPORTED if not implemented.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_INVALID_VALUE if not implemented.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicSetLogLevel(hipdnnSeverity_t level);
 
 /**
@@ -220,11 +212,11 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnHeuristicGetLastErrorString(const char
  *
  * @param[out] out_handle Pointer to receive the created handle.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  *
  * @note The caller must destroy the handle via hipdnnHeuristicHandleDestroy to avoid leaks.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* out_handle);
 
 /**
@@ -232,11 +224,11 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * @param[in] handle The handle to destroy.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  *
  * @note The handle becomes invalid after this call.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle);
 
 /**
@@ -244,24 +236,27 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * Provides serialized device properties (FlatBuffer) to the plugin. The host builds this
  * buffer from resolved DeviceProperties (via queryDeviceProperties() or descriptor override)
- * and passes it before finalize() on policy descriptors.
+ * and passes it ONCE PER DISTINCT hipdnnHeuristicHandle_t BEFORE calling Finalize on any
+ * policy descriptor created with that handle.
  *
  * The buffer contains a FlatBuffer-serialized device properties table (schema from data-SDK).
- * Plugins MUST verify the buffer with flatbuffers::Verifier and reject malformed/incompatible data.
- * Plugins MUST NOT call HIP APIs (hipGetDevice, hipGetDeviceProperties, etc.).
+ * Plugins MUST verify the buffer with flatbuffers::Verifier and reject malformed/incompatible
+ * data. Plugins MUST NOT call HIP APIs (hipGetDevice, hipGetDeviceProperties, etc.).
+ *
+ * Plugins query this handle state during Finalize (and as needed elsewhere on that session).
+ * The policy descriptor does NOT carry a parallel device-properties buffer.
  *
  * @param[in] handle The plugin handle.
- * @param[in] device_props_serialized Pointer to serialized device properties buffer.
- *                                    Must remain valid for the duration of this call.
- * @param[in] device_props_serialized_size Size of the buffer in bytes.
+ * @param[in] device_props_serialized Pointer to hipdnnPluginConstData_t containing serialized
+ *                                    device properties buffer. Must remain valid for the
+ *                                    duration of this call.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success,
- *         HIPDNN_HEURISTIC_STATUS_BAD_PARAM if buffer is malformed or incompatible.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if buffer is malformed or incompatible.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
-                                             const uint8_t* device_props_serialized,
-                                             size_t device_props_serialized_size);
+                                             const hipdnnPluginConstData_t* device_props_serialized);
 
 /** @} */ // End of HeuristicPluginHandleLifecycle group
 
@@ -278,15 +273,18 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * descriptor to the given plugin handle. The descriptor stores per-slot state:
  * candidate engine IDs, serialized graph, and finalize result.
  *
+ * This BINDS the policy to the handle BEFORE Finalize, so selection code can treat the
+ * handle as the source of device-properties session state (SetDeviceProperties).
+ *
  * Lifecycle: Owned by EngineHeuristicDescriptor, created when the policy list is established,
  * destroyed with the descriptor.
  *
  * @param[in] plugin_handle The plugin handle this descriptor is bound to.
  * @param[out] out_desc Pointer to receive the created policy descriptor.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t plugin_handle,
                                           hipdnnHeuristicPolicyDescriptor_t* out_desc);
 
@@ -295,11 +293,11 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *
  * @param[in] desc The policy descriptor to destroy.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  *
  * @note The descriptor becomes invalid after this call.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyDescriptorDestroy(hipdnnHeuristicPolicyDescriptor_t desc);
 
 /** @} */ // End of HeuristicPolicyDescriptorLifecycle group
@@ -320,9 +318,9 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * @param[in] engine_ids Array of candidate engine IDs.
  * @param[in] engine_id_count Number of engine IDs in the array.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicySetEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
                                       const int64_t* engine_ids,
                                       size_t engine_id_count);
@@ -337,17 +335,15 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * subject to schema version rules.
  *
  * @param[in] desc The policy descriptor.
- * @param[in] serialized_graph Pointer to serialized graph buffer.
- *                             Must remain valid for the duration of this call.
- * @param[in] serialized_graph_size Size of the buffer in bytes.
+ * @param[in] serialized_graph Pointer to hipdnnPluginConstData_t containing serialized graph
+ *                             buffer. Must remain valid for the duration of this call.
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success,
- *         HIPDNN_HEURISTIC_STATUS_BAD_PARAM if buffer is malformed or incompatible.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if buffer is malformed or incompatible.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicySetSerializedGraph(hipdnnHeuristicPolicyDescriptor_t desc,
-                                            const uint8_t* serialized_graph,
-                                            size_t serialized_graph_size);
+                                            const hipdnnPluginConstData_t* serialized_graph);
 
 /** @} */ // End of HeuristicPolicyInputs group
 
@@ -363,6 +359,11 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * Performs applicability checking and engine ordering based on the inputs previously set
  * via SetEngineIds, SetSerializedGraph, and HandleSetDeviceProperties.
  *
+ * IMPORTANT: This assumes current device-properties bytes were applied to this policy's
+ * hipdnnHeuristicHandle_t via hipdnnHeuristicHandleSetDeviceProperties earlier in the
+ * same EngineHeuristicDescriptor::finalize(). Plugins query that handle state as needed;
+ * the host does NOT pass device properties again on this call.
+ *
  * Two-phase design: This function performs the selection work; GetSortedEngineIds retrieves
  * the result. This allows future async implementations without changing function names.
  *
@@ -371,13 +372,13 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  *                         - Set to 1 if policy succeeded (host then calls GetSortedEngineIds)
  *                         - Set to 0 if not applicable or declined (host continues outer loop)
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success (check out_applied for applicability),
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success (check out_applied for applicability),
  *         error code on failure.
  *
  * @note Calls on descriptors bound to a given hipdnnHeuristicHandle_t must occur on a thread
  *       consistent with that handle's single-thread contract.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* out_applied);
 
 /**
@@ -395,14 +396,14 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * @param[out] out_count Pointer to receive the number of IDs written.
  *                       Set to min(full_sorted_length, out_capacity).
  *
- * @return HIPDNN_HEURISTIC_STATUS_SUCCESS on success (even if only a prefix was returned),
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success (even if only a prefix was returned),
  *         error code on failure.
  *
  * @note If out_capacity is smaller than the full sorted list, only a prefix is returned.
  *       This is NOT an error. Callers needing the full ordering must supply a buffer
  *       at least as large as the candidate count from SetEngineIds.
  */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristicStatus_t
+HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
                                             int64_t* out_ids,
                                             size_t out_capacity,

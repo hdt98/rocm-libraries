@@ -5,7 +5,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <vector>
+
+#include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
 
 namespace hipdnn_backend::plugin
 {
@@ -52,10 +55,14 @@ inline DeviceProperties queryDeviceProperties()
  * This is a temporary stub that will be replaced by the implementation from
  * RFC Section 13.2 (Serialized device properties - FlatBuffer).
  *
+ * The real implementation will use hipdnnPluginConstData_t wrapper and FlatBuffer
+ * schema from data-SDK. The buffer will be verified by plugins using
+ * flatbuffers::Verifier.
+ *
  * TODO: Replace with actual FlatBuffer serialization from Section 13.2
  *
  * @param props Device properties to serialize
- * @return Serialized FlatBuffer bytes
+ * @return Serialized FlatBuffer bytes in a vector (ownership retained by caller)
  */
 inline std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& props)
 {
@@ -78,6 +85,23 @@ inline std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& pr
     std::memcpy(buffer.data() + offset, &props.totalGlobalMem, sizeof(props.totalGlobalMem));
 
     return buffer;
+}
+
+/**
+ * @brief STUB: Helper to wrap serialized device properties in hipdnnPluginConstData_t.
+ *
+ * This helper creates a hipdnnPluginConstData_t wrapper pointing to the serialized
+ * buffer. The buffer must remain valid while the hipdnnPluginConstData_t is in use.
+ *
+ * @param serializedBuffer Reference to the serialized buffer (must outlive the returned wrapper)
+ * @return hipdnnPluginConstData_t wrapper pointing to the buffer
+ */
+inline hipdnnPluginConstData_t wrapSerializedDeviceProperties(const std::vector<uint8_t>& serializedBuffer)
+{
+    hipdnnPluginConstData_t wrapper;
+    wrapper.ptr  = serializedBuffer.data();
+    wrapper.size = serializedBuffer.size();
+    return wrapper;
 }
 
 } // namespace hipdnn_backend::plugin

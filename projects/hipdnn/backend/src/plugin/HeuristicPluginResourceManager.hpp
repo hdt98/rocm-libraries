@@ -95,11 +95,11 @@ public:
      * Calls hipdnnHeuristicHandleSetDeviceProperties on each loaded plugin handle
      * with the serialized device properties buffer.
      *
-     * @param devicePropsSerializedPtr Pointer to FlatBuffer-serialized device properties
-     * @param devicePropsSerializedSize Size of the buffer in bytes
+     * @param devicePropsSerialized Pointer to hipdnnPluginConstData_t containing
+     *                              FlatBuffer-serialized device properties
      */
-    virtual void setDevicePropertiesOnAllHandles(const uint8_t* devicePropsSerializedPtr,
-                                                 size_t devicePropsSerializedSize) const;
+    virtual void setDevicePropertiesOnAllHandles(
+        const hipdnnPluginConstData_t* devicePropsSerialized) const;
 
     /**
      * @brief Get information about all loaded heuristic policies.
