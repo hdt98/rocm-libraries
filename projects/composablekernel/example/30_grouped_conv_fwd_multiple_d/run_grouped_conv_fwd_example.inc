@@ -1,7 +1,6 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-/*
 template <ck::index_t NDimSpatial>
 using DeviceConvFwdInstance =
     ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
@@ -49,95 +48,12 @@ using DeviceConvFwdInstance =
         1,
         1,
         S<1, 32, 1, 8>,
-        4>;
-*/
-
-// Baseline
-/*
-template <ck::index_t NDimSpatial>
-using DeviceConvFwdInstance =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
-        NDimSpatial,
-        InputLayout<NDimSpatial>,
-        WeightLayout<NDimSpatial>,
-        ck::Tuple<>,
-        OutputLayout<NDimSpatial>,
-        InKernelDataType,
-        WeiKernelDataType,
-        AccDataType,
-        CShuffleDataType,
-        ck::Tuple<>,
-        OutKernelDataType,
-        InElementOp,
-        WeiElementOp,
-        OutElementOp,
-        ConvSpec,    // ConvForwardSpecialization
-        GemmSpec,    // GemmSpecialization
-        1,
-        64,    64,    32,    32,
-        8,   8,
-        32,   32,
-        2,    1,
-        S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8,
-1, S<4, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,             2,              8,              8, 1, 1,
-1,               S<1, 16, 1, 4>,               1>;
-*/
-
-template <ck::index_t NDimSpatial>
-using DeviceConvFwdInstance =
-    ck::tensor_operation::device::DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<
-        NDimSpatial,
-        InputLayout<NDimSpatial>,
-        WeightLayout<NDimSpatial>,
-        ck::Tuple<>,
-        OutputLayout<NDimSpatial>,
-        InKernelDataType,
-        WeiKernelDataType,
-        AccDataType,
-        CShuffleDataType,
-        ck::Tuple<>,
-        OutKernelDataType,
-        InElementOp,
-        WeiElementOp,
-        OutElementOp,
-        // ConvSpec,    // ConvForwardSpecialization
-        ck::tensor_operation::device::ConvolutionForwardSpecialization::Filter3x3Stride1Pad0,
-        GemmSpec, // GemmSpecialization
-        1,
-        256, // Block size (num threads per GEMM)
-        128,
-        64,
-        32, // Block size, M/N/K tile
-        8,
-        8, // Vector loads from global mem
-        32,
-        32, // MFMA size
-        2,
-        1,              // XDL per wave
-        S<4, 64, 1>,    // ABlockTransferThreadClusterLengths_AK0_M_AK1
-        S<1, 0, 2>,     // ABlockTransferThreadClusterArrangeOrder
-        S<1, 0, 2>,     // ABlockTransferSrcAccessOrder
-        2,              // ABlockTransferSrcVectorDim
-        8,              // ABlockTransferSrcScalarPerVector
-        8,              // ABlockTransferDstScalarPerVector_AK1
-        1,              // ABlockLdsExtraM
-        S<4, 64, 1>,    // BBlockTransferThreadClusterLengths_BK0_N_BK1
-        S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
-        S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
-        2,              // BBlockTransferSrcVectorDim
-        8,              // BBlockTransferSrcScalarPerVector
-        8,              // BBlockTransferDstScalarPerVector_BK1
-        1,              // BBlockLdsExtraN
-        1,              // CShuffleMXdlPerWavePerShuffle
-        1,              // CShuffleNXdlPerWavePerShuffle
-        S<1, 32, 1, 8>, // CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
-        1,              // CDEBlockTransferScalarPerVector_NPerBlock
+        4,
         InKernelDataType,
         WeiKernelDataType,
         ck::LoopScheduler::Default,
-        1,    // Num groups to merge
-        false // Double buffering
-        >;
+        1,      // Num groups to merge
+        false>; // Double buffering
 
 template <ck::index_t NDimSpatial>
 using HostConvFwdInstance = ck::tensor_operation::host::ReferenceConvFwd<NDimSpatial,
