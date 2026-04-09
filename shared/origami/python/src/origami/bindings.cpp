@@ -8,6 +8,7 @@
 #include <nanobind/stl/tuple.h>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
+#include "origami/attention.hpp"
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
 #include "origami/origami.hpp"
@@ -317,5 +318,64 @@ NB_MODULE(origami, m) {
   m.def("compute_number_of_output_tiles",
         &origami::streamk::compute_number_of_output_tiles,
         "Compute number of output tiles");
+
+  // Attention functions
+  m.def("att_compute_total_latency",
+        static_cast<double (*)(const origami::problem_t&,
+                               const origami::hardware_t&,
+                               const origami::config_t&,
+                               size_t max_cus)>(&origami::attention::compute_total_latency),
+        "Compute total latency for Flash Attention");
+  m.def("att_compute_number_matrix_instructions",
+        &origami::attention::compute_number_matrix_instructions,
+        "Compute the number of matrix instructions required for attention");
+  m.def("att_compute_mt_compute_latency",
+        &origami::attention::compute_mt_compute_latency,
+        "Compute the latency to process a single macro-tile for attention");
+  m.def("att_check_lds_capacity",
+        &origami::attention::check_lds_capacity,
+        "Check if attention MT fits in LDS");
+  m.def("att_estimate_l2_hit",
+        &origami::attention::estimate_l2_hit,
+        "Estimate L2 hit rate for attention");
+  m.def("att_estimate_mall_hit",
+        &origami::attention::estimate_mall_hit,
+        "Estimate MALL hit rate for attention");
+  m.def("att_compute_memory_latency",
+        &origami::attention::compute_memory_latency,
+        "Compute memory latency per macro tile for attention");
+  m.def("att_compute_tile_latency",
+        &origami::attention::compute_tile_latency,
+        "Compute latency to compute a K-complete tile for attention");
+  m.def("att_compute_timestep_latency",
+        &origami::attention::compute_timestep_latency,
+        "Compute latency per K-complete MT wave for attention");
+  m.def("att_calculate_work_utilization",
+        &origami::attention::calculate_work_utilization,
+        "Calculate work utilization for attention");
+  m.def("att_calculate_output_utilization",
+        &origami::attention::calculate_output_utilization,
+        "Calculate output utilization for attention");
+  m.def("att_compute_cu_occupancy",
+        &origami::attention::compute_cu_occupancy,
+        "Compute CU occupancy for attention");
+  m.def("att_arithmetic_intensity",
+        &origami::attention::arithmetic_intensity,
+        "Compute arithmetic intensity for attention");
+  m.def("att_emulated_tf32_arithmetic_intensity",
+        &origami::attention::emulated_tf32_arithmetic_intensity,
+        "Compute emulated TF32 arithmetic intensity for attention");
+  m.def("att_round_elements_to_128B",
+        &origami::attention::round_elements_to_128B,
+        "Round elements to 128B boundary for attention");
+  m.def("att_compute_cvt_overhead",
+        &origami::attention::compute_cvt_overhead,
+        "Compute conversion overhead for attention");
+  m.def("att_compute_mem_bw_from_occupancy",
+        &origami::attention::compute_mem_bw_from_occupancy,
+        "Compute memory bandwidth from occupancy for attention");
+  m.def("att_compute_l2_hit_rate_global",
+        &origami::attention::compute_l2_hit_rate_global,
+        "Compute global L2 hit rate for attention");
 
 }
