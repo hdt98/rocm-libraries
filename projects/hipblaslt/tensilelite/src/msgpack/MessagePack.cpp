@@ -29,9 +29,22 @@
 #include <Tensile/msgpack/Loading.hpp>
 
 #include <fstream>
+#include <iostream>
+#include <sstream>
 
 namespace TensileLite
 {
+    namespace
+    {
+        // Always log load failures to stderr so CI/users see mapping errors without TENSILE_DB=0x1000.
+        void logMsgpackLoadFailure(std::string const& filename, std::string const& detail)
+        {
+            std::cerr << "\nrocblaslt/tensilelite: failed to load Tensile msgpack library \"" << filename
+                      << "\":\n"
+                      << detail << std::endl;
+        }
+    } // namespace
+
     namespace Serialization
     {
         void objectToMap(const msgpack::object&                            object,
@@ -76,6 +89,7 @@ namespace TensileLite
             std::ifstream in(filename, std::ios::in | std::ios::binary);
             if(!in.is_open())
             {
+                logMsgpackLoadFailure(filename, "Failed to open file (check path and permissions).");
                 if(Debug::Instance().printDataInit())
                     std::cout << "Error loading " << filename << " (msgpack):\nFailed to open file"
                               << std::endl;
@@ -96,10 +110,12 @@ namespace TensileLite
 
             if(!finished_parsing)
             {
+                const char* const error_str
+                    = in.eof() ? "Incomplete msgpack stream (unexpected end of file)."
+                               : "Read failure while loading msgpack stream.";
+                logMsgpackLoadFailure(filename, error_str);
                 if(Debug::Instance().printDataInit())
                 {
-                    const char* const error_str
-                        = in.eof() ? "Unexpected end of file" : "Read failure";
                     std::cout << "Error loading " << filename << " (msgpack):\n"
                               << error_str << std::endl;
                 }
@@ -107,8 +123,9 @@ namespace TensileLite
                 return false;
             }
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            logMsgpackLoadFailure(filename, exc.what());
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading msgpack data:\n" << exc.what() << std::endl;
 
@@ -139,8 +156,9 @@ namespace TensileLite
                 libraryMapping[key] = value;
             }
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            logMsgpackLoadFailure(filename, std::string("library mapping: ") + exc.what());
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading library mapping: " << exc.what() << std::endl;
 
@@ -182,8 +200,9 @@ namespace TensileLite
 
             return rv;
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            logMsgpackLoadFailure(filename, exc.what());
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading msgpack data:\n" << exc.what() << std::endl;
 
@@ -218,8 +237,9 @@ namespace TensileLite
 
             return rv;
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            logMsgpackLoadFailure("(embedded buffer)", exc.what());
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading msgpack data:" << std::endl << exc.what() << std::endl;
 

@@ -27,6 +27,7 @@
 #include <Tensile/llvm/Loading.hpp>
 
 #include <fstream>
+#include <iostream>
 
 #include <Tensile/Debug.hpp>
 #include <Tensile/Tensile.hpp>
@@ -53,11 +54,17 @@ namespace TensileLite
 
             if(yin.error())
             {
+                std::cerr << "\nrocblaslt/tensilelite: failed to load Tensile YAML library \"" << filename
+                          << "\":\n"
+                          << yin.error().message() << std::endl;
                 return nullptr;
             }
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            std::cerr << "\nrocblaslt/tensilelite: failed to load Tensile YAML library \"" << filename
+                      << "\":\n"
+                      << exc.what() << std::endl;
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading " << filename << " (YAML):" << std::endl
                           << exc.what() << std::endl;
@@ -87,8 +94,10 @@ namespace TensileLite
                 throw std::runtime_error(yin.error().message());
             }
         }
-        catch(std::runtime_error const& exc)
+        catch(std::exception const& exc)
         {
+            std::cerr << "\nrocblaslt/tensilelite: failed to load Tensile YAML library data:\n"
+                      << exc.what() << std::endl;
             if(Debug::Instance().printDataInit())
                 std::cout << "Error loading YAML data:" << std::endl << exc.what() << std::endl;
 
