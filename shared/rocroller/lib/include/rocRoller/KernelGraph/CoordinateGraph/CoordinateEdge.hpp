@@ -262,25 +262,23 @@ namespace rocRoller
         RR_EMPTY_STRUCT_WITH_NAME(PassThrough);
 
         /**
-         * LDS bank swizzle for Global Read (write) side.
+         * LDS bank-conflict swap: XOR adjacent dwordx4 column pairs
+         * based on LDS bank-row parity.
          *
-         * Permutes K-column chunk index based on tile row to eliminate
-         * ds_read_b128 bank conflicts. Only the reverse visitor is used
-         * (the forward direction is never traversed for this edge).
+         * Self-inverse: applying the swap twice returns the original col.
+         * Used on both GR (write) and LR (read) sides of LDS swizzle.
          *
-         * Graph: addElement(edge, {swizzledCol}, {col, row})
-         * Reverse: given col and row indexes, compute swizzled col.
+         * Graph: addElement(edge, {outCol}, {inCol, row})
+         * Reverse: outCol = inCol ^ ((bankRowIdx ^ 1) & 1)
          */
-        struct LDSColSwizzle
+        struct LDSColSwap
         {
-            unsigned int numColumns;
             unsigned int rowsPerBankRow;
 
-            LDSColSwizzle() = default;
+            LDSColSwap() = default;
 
-            LDSColSwizzle(unsigned int numColumns, unsigned int rowsPerBankRow)
-                : numColumns(numColumns)
-                , rowsPerBankRow(rowsPerBankRow)
+            explicit LDSColSwap(unsigned int rowsPerBankRow)
+                : rowsPerBankRow(rowsPerBankRow)
             {
             }
 
@@ -291,31 +289,34 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSColSwizzle";
+                return "LDSColSwap";
             }
         };
 
         /**
-         * LDS bank swizzle for Local Read side.
+         * LDS bank-conflict rotate: circular column rotation based on
+         * LDS bank-row index.
          *
-         * Un-permutes dwordx4-chunk K-column index based on tile row
-         * so the wave reads the correct logical chunk from the
-         * swizzled LDS layout.  Element-to-chunk decomposition is
-         * handled by surrounding Flatten/Tile edges in the graph.
+         * Forward (inverse=false, GR side):
+         *   col = (col + numColumns - bankRowIdx/2*2) & (numColumns-1)
+         * Inverse (inverse=true, LR side):
+         *   col = (col + bankRowIdx/2*2) & (numColumns-1)
          *
-         * Graph: addElement(edge, {rawColChunk}, {colChunk, row})
-         * Reverse: given colChunk and row indexes, compute un-swizzled chunk col.
+         * Graph: addElement(edge, {outCol}, {inCol, row})
+         * Reverse: given inCol and row, compute rotated outCol.
          */
-        struct LDSColUnswizzle
+        struct LDSColRotate
         {
             unsigned int numColumns;
             unsigned int rowsPerBankRow;
+            bool         inverse;
 
-            LDSColUnswizzle() = default;
+            LDSColRotate() = default;
 
-            LDSColUnswizzle(unsigned int numColumns, unsigned int rowsPerBankRow)
+            LDSColRotate(unsigned int numColumns, unsigned int rowsPerBankRow, bool inverse)
                 : numColumns(numColumns)
                 , rowsPerBankRow(rowsPerBankRow)
+                , inverse(inverse)
             {
             }
 
@@ -326,7 +327,7 @@ namespace rocRoller
 
             std::string name() const
             {
-                return "LDSColUnswizzle";
+                return "LDSColRotate";
             }
         };
 

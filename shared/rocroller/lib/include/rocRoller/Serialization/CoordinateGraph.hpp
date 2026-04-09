@@ -220,18 +220,17 @@ namespace rocRoller
         };
 
         template <typename IO, typename Context>
-        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColSwizzle, IO, Context>
+        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColSwap, IO, Context>
         {
             using iot = IOTraits<IO>;
 
             static void
-                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwizzle& edge, Context& ctx)
+                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwap& edge, Context& ctx)
             {
-                iot::mapRequired(io, "numColumns", edge.numColumns);
                 iot::mapRequired(io, "rowsPerBankRow", edge.rowsPerBankRow);
             }
 
-            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwizzle& edge)
+            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColSwap& edge)
             {
                 AssertFatal((std::same_as<EmptyContext, Context>));
                 Context ctx;
@@ -240,18 +239,19 @@ namespace rocRoller
         };
 
         template <typename IO, typename Context>
-        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColUnswizzle, IO, Context>
+        struct MappingTraits<KernelGraph::CoordinateGraph::LDSColRotate, IO, Context>
         {
             using iot = IOTraits<IO>;
 
             static void
-                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColUnswizzle& edge, Context& ctx)
+                mapping(IO& io, KernelGraph::CoordinateGraph::LDSColRotate& edge, Context& ctx)
             {
                 iot::mapRequired(io, "numColumns", edge.numColumns);
                 iot::mapRequired(io, "rowsPerBankRow", edge.rowsPerBankRow);
+                iot::mapRequired(io, "inverse", edge.inverse);
             }
 
-            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColUnswizzle& edge)
+            static void mapping(IO& io, KernelGraph::CoordinateGraph::LDSColRotate& edge)
             {
                 AssertFatal((std::same_as<EmptyContext, Context>));
                 Context ctx;

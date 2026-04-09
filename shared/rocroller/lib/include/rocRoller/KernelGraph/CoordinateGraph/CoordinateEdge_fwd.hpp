@@ -15,8 +15,8 @@ namespace rocRoller
         struct Forget;
         struct Inherit;
         struct Join;
-        struct LDSColSwizzle;
-        struct LDSColUnswizzle;
+        struct LDSColSwap;
+        struct LDSColRotate;
         struct MakeOutput;
         struct PassThrough;
         struct PiecewiseAffineJoin;
@@ -30,8 +30,8 @@ namespace rocRoller
                                                      Forget,
                                                      Inherit,
                                                      Join,
-                                                     LDSColSwizzle,
-                                                     LDSColUnswizzle,
+                                                     LDSColSwap,
+                                                     LDSColRotate,
                                                      MakeOutput,
                                                      PassThrough,
                                                      PiecewiseAffineJoin,

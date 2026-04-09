@@ -198,29 +198,21 @@ namespace rocRoller
                 return {result};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColSwizzle const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColSwap const& e)
             {
                 using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                auto col     = indexes[0];
+                auto col     = indexes[0]; // chunk index (dwordx4)
                 auto row     = indexes[1];
-                auto numCol  = literal(e.numColumns);
                 auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
-
-                // Convert tile row to LDS bank row index
                 auto bankRowIdx = row >> logRows;
 
-                // On even bank rows, swap adjacent column pairs (0<->1, 2<->3, etc)
                 auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
                 col                = col ^ swapOnEvenRow;
-
-                // Rotate columns: rotation = numCol - (bankRowIdx / 2) * 2
-                auto rotation = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
-                col           = (col + rotation) & (numCol - literal(1u));
                 return {col};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColRotate const& e)
             {
                 using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
@@ -230,14 +222,11 @@ namespace rocRoller
                 auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
                 auto bankRowIdx = row >> logRows;
 
-                // Inverse rotation: invRotation = (bankRowIdx / 2) * 2
-                auto invRotation = (bankRowIdx >> literal(1u)) << literal(1u);
-                col              = (col + invRotation) & (numCol - literal(1u));
-
-                // On even bank rows, swap adjacent column pairs
-                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-                col                = col ^ swapOnEvenRow;
-
+                auto halfRotation = (bankRowIdx >> literal(1u)) << literal(1u);
+                if(e.inverse)
+                    col = (col + halfRotation) & (numCol - literal(1u));
+                else
+                    col = (col + numCol - halfRotation) & (numCol - literal(1u));
                 return {col};
             }
 
@@ -548,7 +537,7 @@ namespace rocRoller
                 return {index};
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColSwizzle const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColSwap const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);
@@ -559,7 +548,7 @@ namespace rocRoller
                 return rev(e);
             }
 
-            std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
+            std::vector<Expression::ExpressionPtr> operator()(LDSColRotate const& e)
             {
                 AssertFatal(srcs.size() == 1);
                 auto delta = getDelta(dstTags[0]);

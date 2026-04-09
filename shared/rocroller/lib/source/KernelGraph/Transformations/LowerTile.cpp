@@ -1008,12 +1008,17 @@ namespace rocRoller
                 if(!params.noConflicts())
                 {
 
+                    auto swappedCol
+                        = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
+                    graph.coordinates.addElement(
+                        LDSColSwap{params.rowsPerBankRow}, {swappedCol}, {nThrX, nThrY});
+
                     grSwizzleNThrX
                         = graph.coordinates.addElement(ThreadTileNumber(0, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColSwizzle{params.numColumns, params.rowsPerBankRow},
+                        LDSColRotate{params.numColumns, params.rowsPerBankRow, false},
                         {grSwizzleNThrX},
-                        {nThrX, nThrY});
+                        {swappedCol, nThrY});
 
                     Log::getLogger()->debug(
                         "GR swizzle B: K={} R={}", params.numColumns, params.rowsPerBankRow);
@@ -1062,12 +1067,17 @@ namespace rocRoller
                 if(!params.noConflicts())
                 {
 
+                    auto swappedCol
+                        = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
+                    graph.coordinates.addElement(
+                        LDSColSwap{params.rowsPerBankRow}, {swappedCol}, {nThrY, nThrX});
+
                     grSwizzleNThrY
                         = graph.coordinates.addElement(ThreadTileNumber(1, literal(numColumns)));
                     graph.coordinates.addElement(
-                        LDSColSwizzle{params.numColumns, params.rowsPerBankRow},
+                        LDSColRotate{params.numColumns, params.rowsPerBankRow, false},
                         {grSwizzleNThrY},
-                        {nThrY, nThrX});
+                        {swappedCol, nThrX});
 
                     Log::getLogger()->debug(
                         "GR swizzle (load): nThrY={} nThrX={} grSwizzleNThrY={} K={} R={}",
@@ -2261,10 +2271,12 @@ namespace rocRoller
                                         false);
                 }
 
-                // LR swizzle: insert LDSColUnswizzle edge that un-permutes
-                // the K-column so the wave reads the correct logical element.
+                // LR swizzle: insert LDSColRotate(inv) + LDSColSwap edges
+                // that un-permute the K-column so the wave reads the
+                // correct logical element.
                 //   {colChunk, elemInChunk} --Flatten--> {colCoord}
-                //   {rawColChunk} --LDSColUnswizzle--> {colChunk, rowCoord}
+                //   {rotatedCol} --LDSColRotate(inv)--> {colChunk, rowCoord}
+                //   {rawColChunk} --LDSColSwap--> {rotatedCol, rowCoord}
                 //   {rawColElem} --Tile--> {rawColChunk, elemInChunk}
                 //   ldsTag --Tile--> {rawColElem, non-K-dim}
                 auto tileIMacY = iMacY;
@@ -2298,13 +2310,20 @@ namespace rocRoller
                             graph.coordinates.addElement(
                                 Flatten(), {colChunk, elemInChunk}, {colCoord});
 
-                            // Chunk-level inverse swizzle (same units as LDSColSwizzle)
-                            auto rawColChunk = graph.coordinates.addElement(
+                            // Inverse rotation (chunk-level)
+                            auto rotatedCol = graph.coordinates.addElement(
                                 MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
                             graph.coordinates.addElement(
-                                LDSColUnswizzle{params.numColumns, params.rowsPerBankRow},
-                                {rawColChunk},
+                                LDSColRotate{params.numColumns, params.rowsPerBankRow, true},
+                                {rotatedCol},
                                 {colChunk, rowCoord});
+
+                            // Swap (self-inverse, chunk-level)
+                            auto rawColChunk = graph.coordinates.addElement(
+                                MacroTileIndex(kDim, literal(params.numColumns), literal(1u)));
+                            graph.coordinates.addElement(LDSColSwap{params.rowsPerBankRow},
+                                                         {rawColChunk},
+                                                         {rotatedCol, rowCoord});
 
                             // Reconstruct element-level raw col from chunk + sub-element
                             auto rawColElem = graph.coordinates.addElement(tile.tileIndex(kDim));
