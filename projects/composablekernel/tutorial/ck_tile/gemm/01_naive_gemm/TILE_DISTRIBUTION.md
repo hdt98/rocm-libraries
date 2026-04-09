@@ -142,9 +142,9 @@ tile_distribution_encoding<
 
 ### [1] Replication: `sequence<1>`
 
-Controls how many thread blocks replicate the same access pattern:
-- `1` = No replication — each block is independent, accessing different tile regions.
-- A value > 1 would mean multiple blocks share the same access pattern (useful in some reduction kernels, not needed here).
+Controls how many warps replicate the same access pattern within a block:
+- `1` = No replication — each warp has a unique access pattern.
+- A value > 1 would mean multiple warps share the same pattern (useful in some reduction kernels, not needed here).
 
 ---
 
@@ -253,7 +253,7 @@ the previous).
 
 ### 1. Memory Coalescing
 
-Within a single wavefront instruction, all 64 threads in a warp issue loads simultaneously.
+Within a single warp instruction, all 64 threads issue loads simultaneously.
 Consider K0=4 threads in a row, each loading K1=8 consecutive fp16 elements:
 - 4 × 8 = 32 fp16 = 64 bytes = 1 cache line
 - All 32 elements are contiguous in memory (K is the contiguous dimension)

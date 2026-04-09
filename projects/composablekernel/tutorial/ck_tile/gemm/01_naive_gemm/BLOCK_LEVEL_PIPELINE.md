@@ -9,7 +9,8 @@ computation happens for one block tile. It orchestrates:
 3. **Iteration** over the K dimension in slices of `kKPerBlock`
 
 This pipeline is called by `GridGemm` after it has mapped the current block to its `(iM, iN)`
-tile and created `a_block_window` and `b_block_window` over DRAM.
+tile and created `a_block_window` and `b_block_window` over global memory
+(passed in as `a_dram_block_window_tmp` and `b_dram_block_window_tmp`).
 
 ---
 
@@ -53,7 +54,7 @@ their type information at compile time — the warp layer builds its own windows
 
 ### Output:
 - Returns `c_block_tile`: a `static_distributed_tensor` containing the accumulated C tile
-  in `CDataType` (here `AccDataType=float`) distributed across per-thread VGPRs.
+  in `AccDataType` (float) distributed across per-thread VGPRs.
 
 ---
 

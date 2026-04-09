@@ -18,7 +18,7 @@ namespace ck_tile {
 // C (output): static distributed tensor in registers (VGPRs)
 //
 // This is the simplest correct pipeline: no double-buffering, no prefetching.
-// For each K iteration: load A and B from DRAM -> registers, store to LDS,
+// For each K iteration: load A and B from global memory -> registers, store to LDS,
 // synchronize, call block GEMM (MFMA), synchronize.
 template <typename Problem, typename Policy = BlockGemmPipelineAGmemBGmemCRegPolicy>
 struct BlockGemmPipelineAGmemBGmemCReg
