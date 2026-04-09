@@ -366,7 +366,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
         // ------------------------------------------------------------
         auto syconv_swap_rows
             = [=](I const row_k, I const row_kp, I const col_start, I const col_end) {
-                  __syncthreads();
                   for(I icol = gcol_start + ij_start; icol <= gcol_end; icol += ij_inc)
                   {
                       bool const is_in_range = (col_start <= icol) && (icol <= col_end);
@@ -377,7 +376,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                           A(row_kp, icol) = temp;
                       }
                   }
-                  __syncthreads();
               };
 
         if(is_upper)
@@ -454,8 +452,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                         }
                         i = i - 1;
                     } // end while
-
-                    __syncthreads();
                 }
             }
             else
@@ -525,8 +521,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                         }
                         i = i + 1;
                     } // end while
-
-                    __syncthreads();
                 }
 
                 // ----------------------
@@ -612,7 +606,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                         }
                         i = i + 1;
                     } // end while
-                    __syncthreads();
                 }
             }
             else
@@ -681,7 +674,6 @@ static __global__ __launch_bounds__(SYCONV_MAX_THDS) void syconv_kernel(
                         }
                         i = i - 1;
                     } // end while
-                    __syncthreads();
                 }
 
                 // ------------------------
