@@ -4,12 +4,12 @@
 #include <rocRoller/AssemblyKernel.hpp>
 
 #include <variant>
-#include <vector>
 
 #include <rocRoller/KernelGraph/ControlGraph/ControlFlowArgumentTracer.hpp>
 #include <rocRoller/KernelGraph/TopoVisitor.hpp>
 
 #include <rocRoller/ExpressionTransformations.hpp>
+#include <rocRoller/KernelGraph/CoordinateGraph/Dimension.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
@@ -175,8 +175,22 @@ namespace rocRoller::KernelGraph
 
             auto [coords, path] = findAllRequiredCoordinates(node, m_graph);
 
+            auto subDimensionCoordinates
+                = filterCoordinates<CoordinateGraph::SubDimension>(path, m_graph);
+            auto isPretiled = subDimensionCoordinates.size() > 2;
+
             for(auto coord : path)
+            {
                 incorporate(node, m_tracer.trace(coord, true));
+
+                auto isSubDimension
+                    = m_graph.coordinates.get<CoordinateGraph::SubDimension>(coord).has_value();
+                if(isSubDimension && isPretiled)
+                {
+                    Log::debug("Pretiled coordinate: {}", coord);
+                    incorporate(node, m_tracer.trace(coord, false));
+                }
+            }
         }
 
         void operator()(int node, CIsAnyOf<CG::LoadVGPR, CG::StoreVGPR> auto const& op)
