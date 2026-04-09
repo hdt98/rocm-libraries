@@ -457,101 +457,261 @@ namespace rocRoller
                 return groupedExtents;
             }
 
-            using namespace rocRoller::KernelGraph;
-            using TagExtent = AliasDataFlowTagsDetail::TagExtent;
-
-            void findMaxAliasesBacktrack(KernelGraph const&    kgraph,
-                                         std::list<TagExtent>& extents,
-                                         std::map<int, int>&   currentAliases,
-                                         std::map<int, int>&   bestAliases)
+            namespace
             {
-                // Update the best solution if the current one is superior.
-                if(currentAliases.size() > bestAliases.size())
-                    bestAliases = currentAliases;
-
-                // Pruning: even merging every remaining extent cannot beat the best.
-                if(extents.size() <= 1)
-                    return;
-                if(currentAliases.size() + extents.size() - 1 <= bestAliases.size())
-                    return;
-
-                // Collect all feasible (outer, inner) merge pairs, identified by
-                // baseTag to avoid iterator-invalidation issues across branches.
-                std::vector<std::pair<int, int>> candidates;
-                for(auto& outer : extents)
+                struct GapPlan
                 {
-                    for(auto& inner : extents)
+                    int count         = 0;
+                    int chosenBaseTag = -1;
+                };
+
+                struct RootPlan
+                {
+                    int           count       = 0;
+                    int           rootBaseTag = -1;
+                    std::set<int> descendants;
+                };
+
+                void appendNodeSet(std::ostringstream& oss, std::set<int> const& nodes)
+                {
+                    oss << "{";
+                    bool first = true;
+                    for(int node : nodes)
                     {
-                        if(&outer != &inner && inner.fitsWithin(kgraph, outer))
+                        if(!first)
+                            oss << ",";
+                        first = false;
+                        oss << node;
+                    }
+                    oss << "}";
+                }
+                std::string serializeGraphExtent(GraphExtent const& extent)
+                {
+                    std::ostringstream oss;
+                    appendNodeSet(oss, extent.begin);
+                    oss << "->";
+                    appendNodeSet(oss, extent.end);
+                    return oss.str();
+                }
+
+                int findIndexByBaseTag(std::vector<TagExtent> const& extents, int baseTag)
+                {
+                    for(size_t i = 0; i < extents.size(); ++i)
+                    {
+                        if(extents[i].baseTag == baseTag)
+                            return static_cast<int>(i);
+                    }
+
+                    AssertFatal(false, ShowValue(baseTag));
+                    return -1;
+                }
+
+                std::vector<GraphExtent> splitGap(GraphExtent const& gap, TagExtent const& inner)
+                {
+                    std::vector<GraphExtent> rv;
+
+                    rv.push_back(GraphExtent{gap.begin, inner.extent.begin});
+                    rv.insert(rv.end(), inner.gaps.begin(), inner.gaps.end());
+                    rv.push_back(GraphExtent{inner.extent.end, gap.end});
+
+                    return rv;
+                }
+
+                GapPlan bestInsideGap(KernelGraph const&              kgraph,
+                                      std::vector<TagExtent>&         extents,
+                                      std::vector<int> const&         candidateIndices,
+                                      GraphExtent const&              gap,
+                                      std::map<std::string, GapPlan>& memo)
+                {
+                    auto key = serializeGraphExtent(gap);
+                    auto it  = memo.find(key);
+                    if(it != memo.end())
+                        return it->second;
+
+                    GapPlan best;
+
+                    for(int idx : candidateIndices)
+                    {
+                        if(!extents[idx].extent.isWithin(kgraph, gap))
+                            continue;
+
+                        int total = 1;
+                        for(auto const& subgap : splitGap(gap, extents[idx]))
                         {
-                            candidates.emplace_back(outer.baseTag, inner.baseTag);
+                            total += bestInsideGap(kgraph, extents, candidateIndices, subgap, memo)
+                                         .count;
+                        }
+
+                        if(total > best.count)
+                        {
+                            best.count         = total;
+                            best.chosenBaseTag = extents[idx].baseTag;
                         }
                     }
+
+                    memo[key] = best;
+                    return best;
                 }
-                for(auto const& [outerTag, innerTag] : candidates)
+
+                void collectChosenDescendants(KernelGraph const&                    kgraph,
+                                              std::vector<TagExtent>&               extents,
+                                              GraphExtent const&                    gap,
+                                              std::map<std::string, GapPlan> const& memo,
+                                              std::set<int>&                        descendants)
                 {
-                    // Locate elements by baseTag. O(N) per lookup, acceptable for
-                    // small N. State is fully restored between iterations, so both
-                    // elements are guaranteed to be present.
-                    auto outerIt
-                        = std::find_if(extents.begin(), extents.end(), [outerTag](auto const& e) {
-                              return e.baseTag == outerTag;
-                          });
-                    auto innerIt
-                        = std::find_if(extents.begin(), extents.end(), [innerTag](auto const& e) {
-                              return e.baseTag == innerTag;
-                          });
+                    auto key = serializeGraphExtent(gap);
+                    auto it  = memo.find(key);
+                    AssertFatal(it != memo.end(), ShowValue(key));
 
-                    if(outerIt == extents.end() || innerIt == extents.end())
-                        continue;
-
-                    // Re-verify fitness after state restoration (defensive check).
-                    if(!innerIt->fitsWithin(kgraph, *outerIt))
-                        continue;
-
-                    // Save state before the merge.
-                    TagExtent outerSaved     = *outerIt;
-                    TagExtent innerSaved     = *innerIt;
-                    int       savedInnerBase = innerIt->baseTag;
-
-                    // Perform the merge.
-                    currentAliases[innerIt->baseTag] = outerIt->baseTag;
-                    innerIt->validate(kgraph);
-                    outerIt->merge(kgraph, *innerIt);
-                    outerIt->validate(kgraph);
-                    auto insertPos = extents.erase(innerIt);
-
-                    // Recurse to find the best continuation from this state.
-                    findMaxAliasesBacktrack(kgraph, extents, currentAliases, bestAliases);
-
-                    // Restore state: re-insert inner, restore outer, remove alias.
-                    extents.insert(insertPos, std::move(innerSaved));
-                    *outerIt = std::move(outerSaved);
-                    currentAliases.erase(savedInnerBase);
-
-                    // Post-restore pruning.
-                    if(currentAliases.size() + extents.size() - 1 <= bestAliases.size())
+                    if(it->second.chosenBaseTag == -1)
                         return;
+
+                    int childIdx = findIndexByBaseTag(extents, it->second.chosenBaseTag);
+                    descendants.insert(extents[childIdx].baseTag);
+
+                    for(auto const& subgap : splitGap(gap, extents[childIdx]))
+                    {
+                        collectChosenDescendants(kgraph, extents, subgap, memo, descendants);
+                    }
                 }
-            }
+
+                RootPlan computeBestRootPlan(KernelGraph const&      kgraph,
+                                             std::vector<TagExtent>& extents,
+                                             int                     rootIdx)
+                {
+                    RootPlan plan;
+                    plan.rootBaseTag = extents[rootIdx].baseTag;
+
+                    if(extents[rootIdx].gaps.empty())
+                        return plan;
+
+                    std::vector<int> candidateIndices;
+                    candidateIndices.reserve(extents.size());
+                    for(size_t i = 0; i < extents.size(); ++i)
+                    {
+                        if(static_cast<int>(i) != rootIdx)
+                            candidateIndices.push_back(static_cast<int>(i));
+                    }
+
+                    std::map<std::string, GapPlan> memo;
+                    for(auto const& gap : extents[rootIdx].gaps)
+                    {
+                        plan.count
+                            += bestInsideGap(kgraph, extents, candidateIndices, gap, memo).count;
+                    }
+
+                    for(auto const& gap : extents[rootIdx].gaps)
+                    {
+                        collectChosenDescendants(kgraph, extents, gap, memo, plan.descendants);
+                    }
+
+                    AssertFatal(static_cast<int>(plan.descendants.size()) == plan.count,
+                                ShowValue(plan.rootBaseTag),
+                                ShowValue(plan.count),
+                                ShowValue(plan.descendants.size()));
+
+                    return plan;
+                }
+
+                int findRootBaseTag(int childBaseTag, std::map<int, int> const& parent)
+                {
+                    int root = childBaseTag;
+                    while(parent.contains(root))
+                        root = parent.at(root);
+                    return root;
+                }
+
+                std::map<int, int> flattenParentMap(std::map<int, int> const& parent)
+                {
+                    std::map<int, int> aliases;
+                    for(auto const& [child, directParent] : parent)
+                    {
+                        aliases[child] = findRootBaseTag(directParent, parent);
+                    }
+                    return aliases;
+                }
+                std::map<int, int> findAliasCandidatesGreedyFlattened(KernelGraph const&   kgraph,
+                                                                      std::list<TagExtent> extents)
+                {
+                    std::map<int, int> parent;
+
+                    bool foundAny = false;
+                    do
+                    {
+                        foundAny = false;
+                        for(auto outer = extents.begin(); outer != extents.end(); ++outer)
+                        {
+                            for(auto inner = extents.begin(); inner != extents.end();)
+                            {
+                                if(outer != inner && inner->fitsWithin(kgraph, *outer))
+                                {
+                                    foundAny = true;
+
+                                    AssertFatal(!parent.contains(inner->baseTag),
+                                                ShowValue(inner->baseTag));
+                                    parent[inner->baseTag] = outer->baseTag;
+
+                                    inner->validate(kgraph);
+                                    outer->merge(kgraph, *inner);
+                                    outer->validate(kgraph);
+
+                                    inner = extents.erase(inner);
+                                }
+                                else
+                                {
+                                    ++inner;
+                                }
+                            }
+                        }
+                    } while(foundAny);
+
+                    return flattenParentMap(parent);
+                }
+            } // anonymous namespace
 
             std::map<int, int> findAliasCandidatesForExtents(KernelGraph const&   kgraph,
                                                              std::list<TagExtent> extents)
             {
-                std::map<int, int> bestAliases;
-                std::map<int, int> currentAliases;
+                auto baselineAliases = findAliasCandidatesGreedyFlattened(kgraph, extents);
 
-                findMaxAliasesBacktrack(kgraph, extents, currentAliases, bestAliases);
+                std::vector<TagExtent> vec(extents.begin(), extents.end());
+                RootPlan               bestPlan;
 
-                Log::debug("{} aliases found (backtracking optimal).", bestAliases.size());
-
-                for(auto const& ext : extents)
+                for(size_t rootIdx = 0; rootIdx < vec.size(); ++rootIdx)
                 {
-                    Log::debug("{}\n{}", ext.toString(), ext.orderInfo(kgraph));
-                    ext.validate(kgraph);
+                    auto plan = computeBestRootPlan(kgraph, vec, static_cast<int>(rootIdx));
+                    if(plan.count > bestPlan.count)
+                        bestPlan = std::move(plan);
                 }
 
-                return bestAliases;
+                if(bestPlan.count == 0)
+                    return baselineAliases;
+
+                std::set<int> removed = bestPlan.descendants;
+                removed.insert(bestPlan.rootBaseTag);
+
+                std::list<TagExtent> remainder;
+                for(auto const& ext : extents)
+                {
+                    if(!removed.contains(ext.baseTag))
+                        remainder.push_back(ext);
+                }
+
+                auto tailAliases = findAliasCandidatesGreedyFlattened(kgraph, remainder);
+
+                std::map<int, int> improvedAliases = tailAliases;
+                for(int childBaseTag : bestPlan.descendants)
+                {
+                    AssertFatal(!improvedAliases.contains(childBaseTag), ShowValue(childBaseTag));
+                    improvedAliases[childBaseTag] = bestPlan.rootBaseTag;
+                }
+
+                Log::debug("{} baseline aliases, {} improved aliases.",
+                           baselineAliases.size(),
+                           improvedAliases.size());
+
+                return improvedAliases.size() > baselineAliases.size() ? improvedAliases
+                                                                       : baselineAliases;
             }
 
             std::map<int, int> findAliasCandidates(KernelGraph const& kgraph)
