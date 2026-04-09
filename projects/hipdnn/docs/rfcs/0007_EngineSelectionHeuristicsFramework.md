@@ -13,7 +13,7 @@
 4. [Goals and non-goals](#4-goals-and-non-goals)
 5. [Design overview](#5-design-overview) (includes [5.4 Two-tier plugin objects](#54-two-tier-plugin-objects-handle-vs-policy-descriptor))
 6. [Device properties](#6-device-properties)
-7. [SelectionEngine interface](#7-selectionengine-interface)
+7. [SelectionHeuristic interface](#7-selectionheuristic-interface)
 8. [C ABI for heuristic plugins](#8-c-abi-for-heuristic-plugins)
 9. [Policy plugins and the outer loop](#9-policy-plugins-and-the-outer-loop)
 10. [HeuristicPluginManager and resource layer](#10-heuristicpluginmanager-and-resource-layer)
@@ -33,13 +33,13 @@
 
 This document proposes a **first-draft** design for an extensible **engine selection and heuristics** framework in hipDNN. The framework replaces the hard-coded ordering in `EngineHeuristicDescriptor::finalize()` with an **ordered outer loop** over **policy plugins**. Each policy is a distinct selection strategy (for example: machine-learning-based selector, rule-based selector, cache-driven selector, or a deterministic default selector).
 
-Device capabilities enter the system **only as explicit data** (`DeviceProperties`), not by probing HIP from inside plugins. Callers may later supply overrides via backend attributes (for example `HIPDNN_ATTR_ENGINEHEUR_DEVICEPROP`), aligned with the broader direction of **explicit device facts at the selection boundary**. Across the **stable C ABI**, those facts are passed as **FlatBuffer-serialized bytes** (same tooling as the operation graph—see [§13.2](#132-serialized-device-properties-flatbuffer)) via **`hipdnnHeuristicHandleSetDeviceProperties`** on the plugin session handle ([§8](#8-c-abi-for-heuristic-plugins)).
+Device capabilities enter the system **only as explicit data** (`DeviceProperties`), not by probing HIP from inside plugins. Callers may later supply overrides via backend attributes (for example `HIPDNN_ATTR_ENGINEHEUR_DEVICEPROP`), aligned with the broader direction of **explicit device facts at the selection boundary**. Across the **stable C ABI**, those facts are passed as a **FlatBuffer-serialized** payload in **`hipdnnPluginConstData_t`** (same tooling and buffer wrapper type as serialized graph data in **engine** plugins—see [§13.2](#132-serialized-device-properties-flatbuffer)) via **`hipdnnHeuristicHandleSetDeviceProperties`** on the plugin session handle ([§8](#8-c-abi-for-heuristic-plugins)); plugins **query** that handle state during **`Finalize`** (policy descriptors are **created with** the handle—[§8.7](#87-policy-descriptor-per-slot-graph--candidate-ids)), not via a separate device payload on the policy API.
 
 Heuristic plugins implement a **two-tier** **stable C ABI** ([§8](#8-c-abi-for-heuristic-plugins)): a long-lived **plugin handle** (**`hipdnnHeuristicHandle_t`**, **createHandle** / **destroyHandle** / **setDeviceProperties**) created with the same timing and storage pattern as other hipDNN plugin handles, and a **policy descriptor** (**`hipdnnHeuristicPolicyDescriptor_t`**, **createPolicyDescriptor** / **destroyPolicyDescriptor** / **setEngineIds** / **Finalize** / **getSortedIds**) whose **lifecycle is owned by** **`EngineHeuristicDescriptor`**—one per slot in the ordered policy list, destroyed with the heuristic descriptor. That ABI is **separate from the engine plugin ABI**—a `.so` is one or the other, never both.
 
-The **`SelectionEngine`** C++ type (or equivalent facade) wraps a **policy descriptor** and forwards to the C ABI; **stateful tracking** in the plugin lives behind the **plugin handle**. **HeuristicPluginManager** (and handle-scoped **HeuristicPluginResourceManager**) own discovery, loading, version validation, registration, and **plugin-handle** instances per **`hipdnnHandle`**. **`EngineHeuristicDescriptor::finalize()`** walks the **ordered policy list** using **descriptor-owned** policy objects, which is **user-configurable** with default **policy name** strings **`{ "SelectionEngine::Config", "SelectionEngine::StaticOrdering" }`** at the public/config surface; the backend resolves those names to **`int64_t` policy IDs** with the **same deterministic hash as engine IDs** ([RFC 0003](0003_EngineIdDesign.md), `hipdnn_data_sdk::utilities::engineNameToId`) before matching loaded plugins and running the outer loop ([§5.3](#53-ordered-policy-list-default-and-user-configuration)).
+The **`SelectionHeuristic`** C++ type (or equivalent facade) wraps a **policy descriptor** and forwards to the C ABI; **stateful tracking** in the plugin lives behind the **plugin handle**. **HeuristicPluginManager** (and handle-scoped **HeuristicPluginResourceManager**) own discovery, loading, version validation, registration, and **plugin-handle** instances per **`hipdnnHandle`**. **`EngineHeuristicDescriptor::finalize()`** walks the **ordered policy list** using **descriptor-owned** policy objects, which is **user-configurable** with default **policy name** strings **`{ "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" }`** at the public/config surface; the backend resolves those names to **`int64_t` policy IDs** with the **same deterministic hash as engine IDs** ([RFC 0003](0003_EngineIdDesign.md), `hipdnn_data_sdk::utilities::engineNameToId`) before matching loaded plugins and running the outer loop ([§5.3](#53-ordered-policy-list-default-and-user-configuration)).
 
-There is **no** separate post-loop step that applies **`utilities::sortEngineIds`** (or any other ordering) inside the backend. Legacy deterministic ordering is available **only** when a policy in **`orderedPolicyIds`** implements it—for example **`SelectionEngine::StaticOrdering`**. If every policy declines or the list is misconfigured so that no policy succeeds, **`finalize()`** fails using the **same error path as the rest of the hipDNN backend** (for example **`THROW_IF_FALSE`** / **`HipdnnException`** with an appropriate **`hipdnnStatus_t`** such as **`HIPDNN_STATUS_INTERNAL_ERROR`**, matching other descriptor **`finalize()`** failures when a required step does not complete—exact status TBD).
+There is **no** separate post-loop step that applies **`utilities::sortEngineIds`** (or any other ordering) inside the backend. Legacy deterministic ordering is available **only** when a policy in **`orderedPolicyIds`** implements it—for example **`SelectionHeuristic::StaticOrdering`**. If every policy declines or the list is misconfigured so that no policy succeeds, **`finalize()`** fails using the **same error path as the rest of the hipDNN backend** (for example **`THROW_IF_FALSE`** / **`HipdnnException`** with an appropriate **`hipdnnStatus_t`** such as **`HIPDNN_STATUS_INTERNAL_ERROR`**, matching other descriptor **`finalize()`** failures when a required step does not complete—exact status TBD).
 
 ---
 
@@ -69,7 +69,7 @@ This RFC preserves **equivalent deterministic ordering** as one **policy** (the 
 **Goals**
 
 - **Outer-loop-only** orchestration: try an ordered list of **policy** plugins until one succeeds.
-- **Explicit device facts** at the selection boundary: C++ **`DeviceProperties`** in the backend, **FlatBuffer bytes** across the heuristic C ABI ([§13.2](#132-serialized-device-properties-flatbuffer)); plugins do not call `hipGetDevice` / `hipGetDeviceProperties` themselves.
+- **Explicit device facts** at the selection boundary: C++ **`DeviceProperties`** in the backend, serialized to a FlatBuffer and carried in **`hipdnnPluginConstData_t`** across the heuristic C ABI ([§13.2](#132-serialized-device-properties-flatbuffer)); plugins do not call `hipGetDevice` / `hipGetDeviceProperties` themselves.
 - **Pluggable policies** loaded through a **`HeuristicPluginManager`** / **`HeuristicPluginResourceManager`** layer that mirrors **engine** plugin *mechanics* (paths, discovery, version checks, optional static path configuration) but uses the **heuristic-only** C ABI in [§8](#8-c-abi-for-heuristic-plugins).
 - **Stable C ABI** for heuristic `.so` files: module metadata, **plugin-handle** lifecycle, **policy-descriptor** lifecycle, and selection entry points as in [§8](#8-c-abi-for-heuristic-plugins) (to be codified in headers such as **`HeuristicsPluginApi.h`**).
 - **Aligned lifetimes:** **`hipdnnHeuristicHandle_t`** per loaded heuristic module per **`hipdnnHandle`** (with engine-plugin handles); **`hipdnnHeuristicPolicyDescriptor_t`** instances **owned by** **`EngineHeuristicDescriptor`** (one per policy slot), created when the policy list for that descriptor is established and destroyed with the descriptor.
@@ -82,6 +82,7 @@ This RFC preserves **equivalent deterministic ordering** as one **policy** (the 
 
 - Inner “stage chains” inside a single policy (for example PerEngine → Config → StaticOrdering as mandatory sub-steps). Policy composition is expressed by **ordering multiple policy plugins** in the outer list, not by nested pipelines inside one policy plugin implementation.
 - Mandating async selection in v1; the API is only **shaped** to allow it later (including **`Finalize`** + **`GetSortedEngineIds`** as a two-phase C selection API in [§8.9](#89-finalize-and-sorted-results)).
+- Tunning is not approached in this RFC. Including auto-tuning and exhaustive tuning (both of which will require device access). 
 
 ---
 
@@ -94,9 +95,10 @@ There is **one** primary control flow:
 1. Build the list of **candidate engine IDs** from existing **engine** plugins (unchanged).
 2. Obtain **serialized device properties** and the **serialized operation graph** (see [§6](#6-device-properties) and [§13](#13-serialized-graph-device-properties-and-graph-level-preferences)).
 3. Resolve the **ordered list of policy plugin IDs** (`int64_t`, from user **policy name** strings via the shared name→ID hash—[§5.3](#53-ordered-policy-list-default-and-user-configuration)).
-4. Ensure **`EngineHeuristicDescriptor`** owns one **plugin policy descriptor** per slot (see [§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)); each slot binds to the **`hipdnnHeuristicHandle_t`** for that policy’s loaded module (from **`HeuristicPluginResourceManager`**).
-5. For each slot in order: push **serialized device properties** (FlatBuffer bytes) to the module’s plugin handle (**`SetDeviceProperties`**), **setEngineIds** and **serialized graph** on that slot’s policy descriptor, call **Finalize**; if the policy **wins**, read **getSortedIds** and **stop**; otherwise continue.
-6. If no policy succeeds, **`finalize()`** **fails** using the same pattern as other backend descriptor logic errors (for example **`THROW_IF_FALSE(success, HIPDNN_STATUS_INTERNAL_ERROR, …)`** throwing **`HipdnnException`**, analogous to **`GraphDescriptor::finalize()`** when verification fails—exact message and status code are implementation details). There is **no** additional built-in sort after the loop.
+4. Ensure **`EngineHeuristicDescriptor`** owns one **plugin policy descriptor** per slot (see [§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)); each slot binds to the **`hipdnnHeuristicHandle_t`** for that policy’s loaded module (from **`HeuristicPluginResourceManager`**). The policy descriptor is **created with** that handle ([§8.7](#87-policy-descriptor-per-slot-graph--candidate-ids)); **Finalize** consumes device facts **from that handle’s session state**, not from separate per-call device arguments on the policy.
+5. After resolving **serialized device properties** (FlatBuffer bytes from **`DeviceProperties`**—[§6](#6-device-properties), [§13.2](#132-serialized-device-properties-flatbuffer)), call **`hipdnnHeuristicHandleSetDeviceProperties`** **once per distinct** **`hipdnnHeuristicHandle_t`** that appears among the policy slots (not once per slot iteration). That establishes the device context on the **handle**; heuristic code **queries** it as needed during **Finalize** (and any later selection work on that handle).
+6. For each slot in order: **setEngineIds** and **serialized graph** on that slot’s policy descriptor, call **Finalize**; if the policy **wins**, read **getSortedIds** and **stop**; otherwise continue.
+7. If no policy succeeds, **`finalize()`** **fails** using the same pattern as other backend descriptor logic errors (for example **`THROW_IF_FALSE(success, HIPDNN_STATUS_INTERNAL_ERROR, …)`** throwing **`HipdnnException`**, analogous to **`GraphDescriptor::finalize()`** when verification fails—exact message and status code are implementation details). There is **no** additional built-in sort after the loop.
 
 There is **no** separate inner registry of sub-stages inside a single policy plugin in this design. If a team wants “config then static ordering” inside one deliverable, they ship **one** policy plugin that implements that sequence internally, or they register two entries in the **outer** list.
 
@@ -115,28 +117,30 @@ These are **examples**; each plugin chooses a **canonical UTF-8 policy name** (f
 
 Policy order has **two representations**:
 
-- **User / public surface:** an ordered list of **UTF-8 policy name** strings (attributes, env vars, optional frontend helpers)—the same **human-readable names** vendors document for their plugins (for example **`SelectionEngine::StaticOrdering`**).
+- **User / public surface:** an ordered list of **UTF-8 policy name** strings (attributes, env vars, optional frontend helpers)—the same **human-readable names** vendors document for their plugins (for example **`SelectionHeuristic::StaticOrdering`**).
 - **Internal / loader / C ABI:** each name maps to a deterministic **`int64_t`** using **`hipdnn_data_sdk::utilities::engineNameToId`** (FNV-1a, same as computational **engine** IDs—[RFC 0003](0003_EngineIdDesign.md), `EngineNames.hpp`). The outer loop operates on **`std::vector<int64_t> orderedPolicyIds`**; each element must match **`hipdnnHeuristicGetPolicyId`** for a loaded heuristic plugin (or a **built-in** policy registered under the same **`int64_t`** without a separate `.so`).
 
-**Collision note:** Policy IDs and engine IDs are both `int64_t` hashes of **different string namespaces** in normal usage (policy names like `SelectionEngine::…` vs engine names like `MIOPEN_PLUGIN`). A numeric collision is theoretically possible; **context** (policy registry vs engine registry) keeps them separate.
+**Collision note:** Policy IDs and engine IDs are both `int64_t` hashes of **different string namespaces** in normal usage (policy names like `SelectionHeuristic::…` vs engine names like `MIOPEN_PLUGIN`). A numeric collision is theoretically possible; **context** (policy registry vs engine registry) keeps them separate.
 
 #### 5.3.1 Well-known policy names and IDs
 
-This draft standardizes two logical policies using **well-known UTF-8 names** (the `SelectionEngine::` prefix is a **naming convention** in the string itself, not C++ language linkage or a shared type with the C++ `SelectionEngine` class). Their **canonical `int64_t` IDs** are **`engineNameToId(name)`** for each name below (plugins **must** return that exact value from **`hipdnnHeuristicGetPolicyId`**):
+This draft standardizes two logical policies using **well-known UTF-8 names** (the `SelectionHeuristic::` prefix is a **naming convention** in the string itself, not C++ language linkage or a shared type with the C++ `SelectionHeuristic` class). Their **canonical `int64_t` IDs** are **`engineNameToId(name)`** for each name below (plugins **must** return that exact value from **`hipdnnHeuristicGetPolicyId`**):
 
 | Policy name string | Role |
 |--------------------|------|
-| **`SelectionEngine::Config`** | Applies user / graph configuration (for example honoring **`preferred_engine_id`**, env-based disables, future descriptor knobs). Typically runs **first** so explicit intent overrides later policies. |
-| **`SelectionEngine::StaticOrdering`** | Deterministic ordering aligned with today’s **`utilities::sortEngineIds`** (for example MIOPEN preference, deterministic engine last). Typically runs **after** Config in the **default** list; it is **not** invoked by the backend outside the resolved policy order. |
+| **`SelectionHeuristic::Config`** | Applies user / graph configuration (for example honoring **`preferred_engine_id`**, env-based disables, future descriptor knobs). Typically runs **first** so explicit intent overrides later policies. |
+| **`SelectionHeuristic::StaticOrdering`** | Deterministic ordering aligned with today’s **`utilities::sortEngineIds`** (for example MIOPEN preference, deterministic engine last). Typically runs **after** Config in the **default** list; it is **not** invoked by the backend outside the resolved policy order. |
 
-Shipped heuristic plugins (or built-in adapters) **must** return the **`int64_t`** equal to **`engineNameToId("SelectionEngine::Config")`** or **`engineNameToId("SelectionEngine::StaticOrdering")`** respectively when they implement those behaviors (and may expose the **same** name string via an optional **`hipdnnHeuristicGetPolicyName`** for logging—[§8.2](#82-plugin-module-metadata)).
+**Mandatory registration.** A shipped heuristic plugin (or built-in adapter) that implements **`SelectionHeuristic::Config`** or **`SelectionHeuristic::StaticOrdering`** **must** expose **`hipdnnHeuristicGetPolicyId`** returning exactly **`engineNameToId("SelectionHeuristic::Config")`** or **`engineNameToId("SelectionHeuristic::StaticOrdering")`** respectively—there is **no** alternate ID for those behaviors. Optional **`hipdnnHeuristicGetPolicyName`** ([§8.2](#82-plugin-module-metadata)) **should** report the same canonical UTF-8 string; when present, the host **validates at load time** that **`engineNameToId(hipdnnHeuristicGetPolicyName()) == hipdnnHeuristicGetPolicyId()`** and **rejects** the module on mismatch (same idea as keeping engine IDs and registered engine names consistent).
+
+**Overlapping IDs at load.** **`HeuristicPluginManager`** **must** reject a heuristic module whose **`hipdnnHeuristicGetPolicyId`** duplicates an **`int64_t`** already claimed by another **accepted** heuristic plugin, using the **same** duplicate-ID tracking as **`EnginePluginManager::validateBeforeAdding`** does for computational engine IDs ([§10.1](#101-heuristicpluginmanager), [§11](#11-versioning-and-compatibility-checks)).
 
 #### 5.3.2 Default policy order (user strings)
 
 If the user does **not** override the list, the **configured** names are:
 
 ```text
-{ "SelectionEngine::Config", "SelectionEngine::StaticOrdering" }
+{ "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" }
 ```
 
 The backend **hashes** each entry to build the internal **`orderedPolicyIds`** used in **`finalize()`**. So **Config** is tried first; if it does not win the outer loop (not applicable or the policy **`finalize()`** does not report success), **StaticOrdering** runs. **StaticOrdering** is expected to succeed for valid candidate sets when implemented correctly; if **no** listed policy succeeds (for example the user omits **StaticOrdering** and other policies all decline), **`EngineHeuristicDescriptor::finalize()`** fails per [§5.1](#51-single-orchestration-model-outer-loop)—there is **no** backend fallback sort.
@@ -148,7 +152,7 @@ Users configure **policy name** strings (UTF-8); the backend hashes them to **`i
 1. **Engine-heuristic descriptor (per finalize)** — User sets an explicit ordered list via a backend attribute (proposal: **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`** or extension equivalent: array of **UTF-8 policy name** strings). Applies only to that **`EngineHeuristicDescriptor`** instance.
 2. **hipDNN handle (per handle)** — Optional API on **`HeuristicPluginResourceManager`** or a handle extension (proposal: **`hipdnnSetHeuristicPolicyOrder_ext(handle, names, count)`** or C++ **`setDefaultHeuristicPolicyOrder`** taking **strings**). Used when the descriptor has no override.
 3. **Process environment (optional)** — Proposal: **`HIPDNN_HEURISTIC_POLICY_ORDER`** as a comma-separated list of **policy names**, applied when neither descriptor nor handle supplied a list. Exact syntax and escaping TBD.
-4. **Built-in default** — **`{ "SelectionEngine::Config", "SelectionEngine::StaticOrdering" }`** when nothing above applies.
+4. **Built-in default** — **`{ "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" }`** when nothing above applies.
 
 After merging, the implementation **hashes** each name with **`engineNameToId`** and **validates** each resulting **`int64_t`** against loaded/built-in policies (and logs or skips unknown IDs per policy TBD).
 
@@ -160,8 +164,8 @@ After merging, the implementation **hashes** each name with **`engineNameToId`**
 
 | Tier | C typedef (illustrative) | Lifetime | Holds |
 |------|---------------------------|----------|--------|
-| **Plugin handle** | **`hipdnnHeuristicHandle_t`** | Same pattern as other plugin handles on **`hipdnnHandle`**; created when the heuristic module is paired with the handle, destroyed with handle teardown | Plugin **session** state (caches, tuning, scratch); receives **`SetDeviceProperties`** (serialized device-properties FlatBuffer) |
-| **Policy descriptor** | **`hipdnnHeuristicPolicyDescriptor_t`** | **Owned by** **`EngineHeuristicDescriptor`**; one per entry in **`orderedPolicyIds`**; **created** when the descriptor’s policy list is established (**implementation choice:** on attribute set, bind, or lazy at first **`finalize()`**) and **destroyed** with the heuristic descriptor | **Candidate engine IDs** + **serialized graph** for the current selection; **Finalize** / **GetSortedEngineIds** result |
+| **Plugin handle** | **`hipdnnHeuristicHandle_t`** | Same pattern as other plugin handles on **`hipdnnHandle`**; created when the heuristic module is paired with the handle, destroyed with handle teardown | Plugin **session** state (caches, tuning, scratch, **parsed device facts** after **`SetDeviceProperties`**); receives **`SetDeviceProperties`** (serialized device-properties FlatBuffer in **`hipdnnPluginConstData_t`**), **queried** by heuristics during **`Finalize`** and related work |
+| **Policy descriptor** | **`hipdnnHeuristicPolicyDescriptor_t`** | **Owned by** **`EngineHeuristicDescriptor`**; one per entry in **`orderedPolicyIds`**; **created** when the descriptor’s policy list is established (**implementation choice:** on attribute set, bind, or lazy at first **`finalize()`**) and **destroyed** with the heuristic descriptor | **Candidate engine IDs** + **serialized graph** for the current selection; **Finalize** / **GetSortedEngineIds** result. **Created with** a **`hipdnnHeuristicHandle_t`** ([§8.7](#87-policy-descriptor-per-slot-graph--candidate-ids)); **device properties** for selection are read from **that handle’s** session state (**`SetDeviceProperties`** on the handle—[§8.6](#86-plugin-handle-lifecycle)), not passed again on the policy descriptor. |
 
 **Threading:** Plugin handles are **single-thread only** (**not** thread-safe). Parallelism uses **multiple** **`hipdnnHandle`** instances (each with its own heuristic plugin handles) or host-side serialization (policy TBD). All calls for a given **`hipdnnHeuristicHandle_t`** and its dependent policy descriptors on that thread must follow this contract.
 
@@ -185,7 +189,7 @@ struct DeviceProperties
 };
 ```
 
-The **stable C ABI** does **not** expose a fixed-layout struct for device facts. The backend fills **`DeviceProperties`**, **serializes** it with the **device-properties FlatBuffer schema** ([§13.2](#132-serialized-device-properties-flatbuffer)), and passes **`const uint8_t*`** + **`size_t`** via **`hipdnnHeuristicHandleSetDeviceProperties`** ([§8.6](#86-plugin-handle-lifecycle)). Plugins **parse** the buffer with the same data-SDK / codegen as the graph schema.
+The **stable C ABI** does **not** expose a fixed-layout struct for device facts. The backend fills **`DeviceProperties`**, **serializes** it with the **device-properties FlatBuffer schema** ([§13.2](#132-serialized-device-properties-flatbuffer)), and passes it using the **existing** **`hipdnnPluginConstData_t`** struct from **`PluginApiDataTypes.h`** (the same type the plugin SDK already uses for serialized graph bytes and other const buffers in **engine** plugins—not a separate **`const uint8_t*`** + **`size_t`** pair on the heuristic API). The host passes **`const hipdnnPluginConstData_t*`** to **`hipdnnHeuristicHandleSetDeviceProperties`** ([§8.6](#86-plugin-handle-lifecycle)). Plugins **parse** that payload from **handle** session state (for example when servicing **`Finalize`** on a policy descriptor **created with** that handle) with the same data-SDK / codegen as the graph schema.
 
 ### 6.2 Default acquisition: `queryDeviceProperties()`
 
@@ -216,7 +220,7 @@ DeviceProperties queryDeviceProperties()
 } // namespace
 ```
 
-**Important:** Plugins **must not** call this helper; they consume only the **serialized device-properties** buffer the host passes via **`hipdnnHeuristicHandleSetDeviceProperties`** ([§8.6](#86-plugin-handle-lifecycle)), after **verifying** and **parsing** it per [§13.2](#132-serialized-device-properties-flatbuffer).
+**Important:** Plugins **must not** call this helper; they consume only the **serialized device-properties** buffer the host installs on the session handle via **`hipdnnHeuristicHandleSetDeviceProperties`** ([§8.6](#86-plugin-handle-lifecycle)), after **verifying** and **parsing** it per [§13.2](#132-serialized-device-properties-flatbuffer) when **Finalize** (or other selection logic) **reads** it from handle state.
 
 ### 6.3 Proposed override: descriptor-level device properties
 
@@ -231,20 +235,20 @@ This keeps **one** logical pathway into heuristics (`DeviceProperties` in the ba
 
 ---
 
-## 7. SelectionEngine interface
+## 7. SelectionHeuristic interface
 
-`SelectionEngine` is a **C++ facade** used by the backend for **one policy slot** on an **`EngineHeuristicDescriptor`**. It wraps an opaque **`hipdnnHeuristicPolicyDescriptor_t`** ([§8.7](#87-policy-descriptor-per-slot-graph--candidate-ids)) created with the **`hipdnnHeuristicHandle_t`** for that policy’s module. **Session state** (caches, etc.) lives in the plugin **behind the handle**, not in this wrapper.
+`SelectionHeuristic` is a **C++ facade** used by the backend for **one policy slot** on an **`EngineHeuristicDescriptor`**. It wraps an opaque **`hipdnnHeuristicPolicyDescriptor_t`** ([§8.7](#87-policy-descriptor-per-slot-graph--candidate-ids)) created with the **`hipdnnHeuristicHandle_t`** for that policy’s module. **Session state** (caches, etc.) lives in the plugin **behind the handle**, not in this wrapper.
 
-Device properties are **not** set on the facade: the host **builds serialized device-properties bytes** (from resolved `DeviceProperties`—[§6](#6-device-properties), [§13.2](#132-serialized-device-properties-flatbuffer)) and calls **`hipdnnHeuristicHandleSetDeviceProperties`** on the plugin handle (typically once per **`finalize()`** attempt per module, or once per **`finalize()`** after resolving overrides—implementation detail) before **`Finalize`** on the policy descriptor.
+Device properties are **not** set on the facade: the host **builds the serialized device-properties FlatBuffer** (from resolved `DeviceProperties`—[§6](#6-device-properties), [§13.2](#132-serialized-device-properties-flatbuffer)), wraps it in **`hipdnnPluginConstData_t`**, and calls **`hipdnnHeuristicHandleSetDeviceProperties`** on each **distinct** plugin handle that will participate in this **`finalize()`**, **before** invoking **`Finalize`** on any policy descriptor **created with** that handle. The plugin **stores** or **parses** that payload on the handle; **`Finalize`** (and internal heuristic logic) **queries** device facts **via the bound handle**, not via extra device arguments on the policy API. Ordering relative to **`PolicyDescriptorCreate(..., plugin_handle)`** is: handle exists → **`SetDeviceProperties`** on that handle for this finalize’s device context → policy inputs (**`SetEngineIds`** / **`SetSerializedGraph`**) → **`Finalize`**.
 
 ```cpp
-class SelectionEngine
+class SelectionHeuristic
 {
 public:
     // Candidate engine IDs from EnginePluginResourceManager; mirrors setEngineIds ([§8.8](#88-policy-inputs-engine-ids-and-serialized-graph)).
     void setEngineIds(const std::vector<int64_t>& engineIds);
 
-    // FlatBuffer bytes + length from the operation graph ([§13.1](#131-serialized-graph)).
+    // Serialized operation graph as hipdnnPluginConstData_t (FlatBuffer; [§13.1](#131-serialized-graph)).
     void setSerializedGraph(const SerializedGraph& serializedGraph);
 
     // Runs applicability + selection inside the plugin; true => policy won the outer loop ([§8.9](#89-finalize-and-sorted-results)).
@@ -259,7 +263,7 @@ public:
 
 - **Logging** matches **engine** plugins: not part of these method signatures; see [§12](#12-logging).
 - **`finalize` + `getSortedEngineIds`** mirror the C ABI two-phase pattern so a future revision can perform async work in **`Finalize`** without changing names.
-- **`EngineHeuristicDescriptor`** owns **`SelectionEngine`** (or equivalent) instances **one per** resolved policy slot; lifetimes match [§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor).
+- **`EngineHeuristicDescriptor`** owns **`SelectionHeuristic`** (or equivalent) instances **one per** resolved policy slot; lifetimes match [§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor).
 
 ---
 
@@ -270,6 +274,7 @@ This section defines the **stable C-language ABI** for heuristic (selection poli
 ### 8.1 Design principles
 
 - All exported symbols use **C linkage** (`extern "C"` from C++ implementations). **`int64_t`** in signatures uses **`stdint.h`** / **`<cstdint>`** (same as engine plugin APIs).
+- Opaque serialized payloads (**device properties**, **operation graph**) cross the heuristic C ABI only as **`const hipdnnPluginConstData_t*`**, using the **existing** **`hipdnnPluginConstData_t`** definition in **`PluginApiDataTypes.h`** (same **`ptr`** / **`size`** fields as **`EnginePluginApi.h`** graph and config arguments). The ABI does **not** introduce parallel raw-buffer parameters (for example ad-hoc **`const uint8_t*`** plus **`size_t`**) for these payloads.
 - Versioning and rejection of incompatible plugins follow the same **ideas** as engine plugins (major API compatibility), but the **API version string** and **symbol set** are **heuristic-specific** ([§11](#11-versioning-and-compatibility-checks)).
 - Plugins **must not** call HIP, mutate hipDNN graph descriptors, or execute engines; they only **read** inputs described here and **write** reordered engine IDs.
 - The host (backend) owns output buffers unless the API explicitly transfers ownership.
@@ -283,7 +288,7 @@ Each heuristic `.so` exports the following (names are illustrative; implementati
 |----------|---------|
 | `hipdnnHeuristicGetApiVersion(const char** version)` | Semantic version of **this C ABI** (for example `"1.0.0"`). Host rejects load on **major** mismatch. |
 | `hipdnnHeuristicGetPolicyId(int64_t* policy_id)` | Stable **`int64_t`** policy identifier: **must** equal **`engineNameToId(canonical_utf8_name)`** for the plugin’s documented policy name (same hash as computational engine IDs—[§5.3](#53-ordered-policy-list-default-and-user-configuration), [RFC 0003](0003_EngineIdDesign.md)). The host matches this value against the resolved **`orderedPolicyIds`** after hashing user-supplied name strings. |
-| `hipdnnHeuristicGetPolicyName(const char** policy_name)` | Optional. **NUL-terminated UTF-8** canonical name (same string the vendor tells users to put in **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`**). For logging and enumeration; **not** required for matching if **`GetPolicyId`** is implemented correctly. Omit from minimal plugins if the host derives display names from a static registry. |
+| `hipdnnHeuristicGetPolicyName(const char** policy_name)` | Optional. **NUL-terminated UTF-8** canonical name (same string the vendor tells users to put in **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`**). For logging and enumeration; **not** required for matching if **`GetPolicyId`** is implemented correctly. When exported, the host **validates at load** that **`engineNameToId(*policy_name) ==`** the value from **`GetPolicyId`** ([§5.3.1](#531-well-known-policy-names-and-ids), [§11](#11-versioning-and-compatibility-checks)). Omit from minimal plugins if the host derives display names from a static registry. |
 | `hipdnnHeuristicGetPluginVersion(const char** version)` | Plugin implementation version (informational). |
 | `hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t cb)` | Registers the consumer logging callback; optional `hipdnnHeuristicSetLogLevel(hipdnnSeverity_t)` mirroring engine plugin behavior. |
 | `hipdnnHeuristicGetLastErrorString(const char** msg)` | Per-thread last error after a failed call; pointer valid only for immediate use (same contract as `hipdnnPluginGetLastErrorString`). |
@@ -302,7 +307,7 @@ typedef struct hipdnnHeuristicHandle_opaque* hipdnnHeuristicHandle_t;
 
 ### 8.4 Serialized device properties (no POD struct)
 
-Device facts cross the heuristic **C ABI** as **opaque serialized bytes**, not as a public C struct. That matches the **serialized graph** path ([§8.8](#88-policy-inputs-engine-ids-and-serialized-graph), [§13](#13-serialized-graph-device-properties-and-graph-level-preferences)): the **function signatures** stay stable while the **FlatBuffer schema** evolves (new optional fields, same buffer entry point).
+Device facts cross the heuristic **C ABI** as **opaque serialized bytes** carried in the **existing** **`hipdnnPluginConstData_t`** wrapper (**`const hipdnnPluginConstData_t*`** at the API boundary), not as a public C struct and not as a standalone **`const uint8_t*`** + **`size_t`** pair. That matches the **serialized graph** path ([§8.8](#88-policy-inputs-engine-ids-and-serialized-graph), [§13](#13-serialized-graph-device-properties-and-graph-level-preferences)) and existing engine plugin APIs: the **function signatures** stay stable while the **FlatBuffer schema** evolves (new optional fields, same **`hipdnnPluginConstData_t`** entry point).
 
 - **Schema:** A **device-properties table** (name TBD, for example `HeuristicDeviceProperties`) lives alongside the operation-graph schema in the **data-SDK**; exact `.fbs` definition and file identifier are implementation details. v1 fields align with the C++ **`DeviceProperties`** in [§6.1](#61-deviceproperties-struct) (for example `device_id`, `multi_processor_count`, `total_global_mem_bytes`); additional facts (architecture name, wavefront size, etc.) are **additive** in the schema without changing **`hipdnnHeuristicHandleSetDeviceProperties`**.
 - **Contract:** The host supplies a **complete FlatBuffer** rooted at that table; plugins **must** reject buffers that fail **`Verifier`** checks or use an **incompatible schema version** (per data-SDK / file-identifier rules—same class of checks as for the graph buffer).
@@ -310,32 +315,31 @@ Device facts cross the heuristic **C ABI** as **opaque serialized bytes**, not a
 
 ### 8.5 Status codes
 
-Define **`hipdnnHeuristicStatus_t`** as its **own** `typedef enum` in the heuristic plugin SDK header (for example **`HeuristicsPluginApi.h`**). Heuristic `.so` files **must not** include **`HipdnnStatus.h`** so the ABI stays free of backend layering, while the **meaning** of codes stays aligned with **`hipdnnStatus_t`** in **`backend/include/HipdnnStatus.h`**.
+Heuristic C entry points return **`hipdnnPluginStatus_t`**, the same typedef as **engine** plugin APIs (**`PluginApiDataTypes.h`** in the plugin SDK). **`HeuristicsPluginApi.h`** includes (or re-exports) that header; heuristic **`.so`** files **must not** include **`HipdnnStatus.h`**, so the plugin ABI stays free of backend layering—the same rule as engine plugins.
 
-**Shared with backend:** For conditions that correspond to backend API failures, reuse the **same numeric values** as **`hipdnnStatus_t`** (for example **`HIPDNN_STATUS_SUCCESS`**, **`HIPDNN_STATUS_BAD_PARAM`**, **`HIPDNN_STATUS_BAD_PARAM_NULL_POINTER`**, **`HIPDNN_STATUS_NOT_INITIALIZED`**, **`HIPDNN_STATUS_NOT_SUPPORTED`**, **`HIPDNN_STATUS_INTERNAL_ERROR`**, **`HIPDNN_STATUS_ALLOC_FAILED`**, and other **`HIPDNN_STATUS_*`** codes as entry points require). The public typedef remains **`hipdnnHeuristicStatus_t`** (exact constant-prefix spelling in headers TBD); host code can map to **`hipdnnStatus_t`** or user-facing errors without reconciling divergent taxonomies.
+Use the existing **`HIPDNN_PLUGIN_STATUS_*`** enumerators for ordinary outcomes—for example **`HIPDNN_PLUGIN_STATUS_SUCCESS`**, **`HIPDNN_PLUGIN_STATUS_BAD_PARAM`**, **`HIPDNN_PLUGIN_STATUS_INVALID_VALUE`**, **`HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR`**, and **`HIPDNN_PLUGIN_STATUS_ALLOC_FAILED`**. These are generic and align in purpose with backend **`HIPDNN_STATUS_*`** / **`hipdnnStatus_t`**; the host maps between plugin and backend status the same way it does for engine plugins.
 
-**Heuristic-only:** Add values that have **no** backend twin when needed—at minimum something like **`NOT_APPLICABLE`** for **`Finalize`** when the policy declines (**`out_applied == 0`**). Such values **must** use numeric codes **outside** the **`hipdnnStatus_t`** range in use (for example ≥ the first unused **`HIPDNN_STATUS_*`** ordinal) so the shared subset stays unambiguous.
+**Extensions:** When a heuristic-only outcome needs a distinct code—for example **decline** / **not applicable** on **`Finalize`** when **`out_applied == 0`**—add a new **`HIPDNN_PLUGIN_STATUS_*`** value to **`hipdnnPluginStatus_t`** (exact name TBD, e.g. **`HIPDNN_PLUGIN_STATUS_NOT_APPLICABLE`**). Append new ordinals **after** the existing **`HIPDNN_PLUGIN_STATUS_*`** values so the enum stays backward-compatible. Do **not** introduce a separate heuristic-only status typedef (for example **`hipdnnHeuristicStatus_t`**); extend **`hipdnnPluginStatus_t`** instead.
 
-This avoids overloading **`hipdnnPluginStatus_t`** (engine plugin semantics). Each heuristic C entry point returns **`hipdnnHeuristicStatus_t`** unless noted.
+Each heuristic C entry point returns **`hipdnnPluginStatus_t`** unless noted.
 
-**No buffer-size error for sorted IDs:** Do **not** define **`BUFFER_TOO_SMALL`** (or **`BAD_PARAM_SIZE_INSUFFICIENT`**) for **`hipdnnHeuristicPolicyGetSortedEngineIds`**. That call takes **`out_capacity`** and **`*out_count`**; the plugin writes **at most** **`out_capacity`** IDs and sets **`*out_count`** to how many were written. **`HIPDNN_STATUS_SUCCESS`** is returned even when the caller’s buffer holds only a **prefix** of the full ordering ([§8.9](#89-finalize-and-sorted-results)). This differs from backend APIs that require one buffer to fit an entire payload and return **`HIPDNN_STATUS_BAD_PARAM_SIZE_INSUFFICIENT`** when the query size is too small.
+**No buffer-size error for sorted IDs:** Do **not** add **`BUFFER_TOO_SMALL`** (or **`BAD_PARAM_SIZE_INSUFFICIENT`**) for **`hipdnnHeuristicPolicyGetSortedEngineIds`**. That call takes **`out_capacity`** and **`*out_count`**; the plugin writes **at most** **`out_capacity`** IDs and sets **`*out_count`** to how many were written. **`HIPDNN_PLUGIN_STATUS_SUCCESS`** is returned even when the caller’s buffer holds only a **prefix** of the full ordering ([§8.9](#89-finalize-and-sorted-results)). This differs from backend APIs that require one buffer to fit an entire payload and return **`HIPDNN_STATUS_BAD_PARAM_SIZE_INSUFFICIENT`** when the query size is too small.
 
 ### 8.6 Plugin handle lifecycle
 
 Illustrative names (headers may shorten or alias symbols—exact spelling TBD):
 
 ```c
-hipdnnHeuristicStatus_t hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* out_handle);
-hipdnnHeuristicStatus_t hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle);
+hipdnnPluginStatus_t hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* out_handle);
+hipdnnPluginStatus_t hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle);
 
-hipdnnHeuristicStatus_t hipdnnHeuristicHandleSetDeviceProperties(
+hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
     hipdnnHeuristicHandle_t handle,
-    const uint8_t* device_props_serialized,
-    size_t device_props_serialized_size);
+    const hipdnnPluginConstData_t* device_props_serialized);
 ```
 
 - **`Create`** / **`Destroy`** correspond to **createHandle** / **destroyHandle**: the host invokes them when binding a heuristic module to a **`hipdnnHandle`** (alongside other plugin-handle setup).
-- **`SetDeviceProperties`** corresponds to **setDeviceProperties(Handle\*)**: the host supplies **serialized device-properties** bytes only ([§8.4](#84-serialized-device-properties-no-pod-struct), [§13.2](#132-serialized-device-properties-flatbuffer)); plugins **must not** call HIP. The backend resolves **`DeviceProperties`** via **`queryDeviceProperties()`** or descriptor override ([§6](#6-device-properties)), **builds** the FlatBuffer, and forwards the buffer (typically when driving **`finalize()`**). **`device_props_serialized`** must remain valid for the duration of the call; the plugin may copy if it needs the payload after return.
+- **`SetDeviceProperties`** corresponds to **setDeviceProperties(Handle\*)**: the host supplies **serialized device-properties** only via **`const hipdnnPluginConstData_t*`** ([§8.4](#84-serialized-device-properties-no-pod-struct), [§13.2](#132-serialized-device-properties-flatbuffer)); plugins **must not** call HIP. The backend resolves **`DeviceProperties`** via **`queryDeviceProperties()`** or descriptor override ([§6](#6-device-properties)), **builds** the FlatBuffer, and fills the **`hipdnnPluginConstData_t`** pointed to by **`device_props_serialized`** (**`ptr`** and **`size`**); plugins verify and parse those bytes (FlatBuffer **`Verifier`** / accessors) exactly as for **`hipdnnHeuristicPolicySetSerializedGraph`**. The host then updates **each distinct** **`hipdnnHeuristicHandle_t`** used by the current policy slots **before** **`hipdnnHeuristicPolicyFinalize`** on any descriptor **created with** that handle ([§5.1](#51-single-orchestration-model-outer-loop), [§14.2](#142-pseudocode-for-finalize-first-draft)). The **`device_props_serialized`** view must remain valid for the duration of the call; the plugin may copy if it needs the payload after return. Heuristic implementations **read** this state from the handle during **`Finalize`** (and as needed elsewhere on that session)—the policy descriptor does **not** carry a parallel device-properties buffer in this design.
 
 ### 8.7 Policy descriptor (per-slot graph + candidate IDs)
 
@@ -347,45 +351,44 @@ A **policy descriptor** is a second opaque object. It holds **per–`EngineHeuri
 typedef struct hipdnnHeuristicPolicyDescriptor_opaque* hipdnnHeuristicPolicyDescriptor_t;
 ```
 
-**Lifecycle:** The backend **`EngineHeuristicDescriptor` owns** one **`hipdnnHeuristicPolicyDescriptor_t`** per entry in **`orderedPolicyIds`**. Objects are **created** when the descriptor’s policy list is established (on attribute set, bind, or lazily at first **`finalize()`**—implementation choice) and **destroyed** when the **`EngineHeuristicDescriptor`** is destroyed (**plugin policy descriptors and the hipDNN heuristic descriptor die together**).
+**Lifecycle:** The backend **`EngineHeuristicDescriptor` owns** one **`hipdnnHeuristicPolicyDescriptor_t`** per entry in **`orderedPolicyIds`**. Objects are **created** when the descriptor’s policy list is established (on attribute set, bind, or lazily at first **`finalize()`**—implementation choice) and **destroyed** when the **`EngineHeuristicDescriptor`** is destroyed (**plugin policy descriptors and the hipDNN heuristic descriptor die together**). **`hipdnnHeuristicPolicyDescriptorCreate`** takes the **`hipdnnHeuristicHandle_t`** for that slot’s module; that **binds** the policy to the handle **before** **`Finalize`**, so selection code can treat the handle as the source of **device-properties** session state (**`SetDeviceProperties`**—[§8.6](#86-plugin-handle-lifecycle)).
 
 ```c
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicyDescriptorCreate(
+hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorCreate(
     hipdnnHeuristicHandle_t plugin_handle,
     hipdnnHeuristicPolicyDescriptor_t* out_desc);
 
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicyDescriptorDestroy(
+hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorDestroy(
     hipdnnHeuristicPolicyDescriptor_t desc);
 ```
 
 ### 8.8 Policy inputs: engine IDs and serialized graph
 
 ```c
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicySetEngineIds(
+hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(
     hipdnnHeuristicPolicyDescriptor_t desc,
     const int64_t* engine_ids,
     size_t engine_id_count);
 
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicySetSerializedGraph(
+hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
     hipdnnHeuristicPolicyDescriptor_t desc,
-    const uint8_t* serialized_graph,
-    size_t serialized_graph_size);
+    const hipdnnPluginConstData_t* serialized_graph);
 ```
 
 These correspond to **setEngineIds** and to storing **graph details** on the plugin policy descriptor.
 
 ### 8.9 Finalize and sorted results
 
-**Two-phase** selection (matches **`SelectionEngine::finalize`** / **`getSortedEngineIds`**; leaves room for future async **`Finalize`**):
+**Two-phase** selection (matches **`SelectionHeuristic::finalize`** / **`getSortedEngineIds`**; leaves room for future async **`Finalize`**):
 
 ```c
 /* *out_applied == 1 => policy won; host then calls GetSortedEngineIds.
    *out_applied == 0 => not applicable or declined; host continues outer loop. */
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicyFinalize(
+hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(
     hipdnnHeuristicPolicyDescriptor_t desc,
     int32_t* out_applied);
 
-hipdnnHeuristicStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
+hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
     hipdnnHeuristicPolicyDescriptor_t desc,
     int64_t* out_ids,
     size_t out_capacity,
@@ -395,8 +398,9 @@ hipdnnHeuristicStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
 **Contract**
 
 - Calls on a policy descriptor that hang off a given **`hipdnnHeuristicHandle_t`** must occur on a **thread consistent** with that handle’s **single-thread** contract ([§8.3](#83-plugin-handle-session-object)).
+- **`Finalize`** assumes **current** device-properties bytes were applied to **that policy’s** **`hipdnnHeuristicHandle_t`** via **`hipdnnHeuristicHandleSetDeviceProperties`** earlier in the same **`EngineHeuristicDescriptor::finalize()`** (or whenever the host last updated device context for that handle). Plugins **query** that handle state as needed; the host does **not** pass device properties again on **`hipdnnHeuristicPolicyFinalize`**.
 - **`SetEngineIds` / `SetSerializedGraph` / `Finalize`:** candidate IDs come from **`EnginePluginResourceManager`**; output IDs **must** be a **permutation or subset** of the **SetEngineIds** input (host validates).
-- **`GetSortedEngineIds`:** valid only after **`Finalize`** with **`out_applied == 1`**. The plugin writes the first **`min(full_sorted_length, out_capacity)`** engine IDs into **`out_ids`**, sets **`*out_count`** to that count, and returns **`HIPDNN_STATUS_SUCCESS`** (via **`hipdnnHeuristicStatus_t`**). A smaller **`out_capacity`** is **not** an error—only a prefix is returned; callers that need the full ordering must supply a large enough buffer (for example at least the candidate count from **`SetEngineIds`**).
+- **`GetSortedEngineIds`:** valid only after **`Finalize`** with **`out_applied == 1`**. The plugin writes the first **`min(full_sorted_length, out_capacity)`** engine IDs into **`out_ids`**, sets **`*out_count`** to that count, and returns **`HIPDNN_PLUGIN_STATUS_SUCCESS`** (via **`hipdnnPluginStatus_t`**). A smaller **`out_capacity`** is **not** an error—only a prefix is returned; callers that need the full ordering must supply a large enough buffer (for example at least the candidate count from **`SetEngineIds`**).
 
 ### 8.10 Host integration (C++ backend)
 
@@ -408,7 +412,7 @@ hipdnnHeuristicStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
 2. Creates **`hipdnnHeuristicHandle_t`** via **`hipdnnHeuristicHandleCreate`** for each accepted module, stores it **like other plugin handles**, and exposes lookup (for example **`getHeuristicHandleForPolicyId`**) for the backend.
 3. Does **not** own **`EngineHeuristicDescriptor`**-scoped policy descriptors; those are created with **`hipdnnHeuristicPolicyDescriptorCreate(plugin_handle, …)`** when the heuristic descriptor (re)builds its policy slot table.
 
-**`EngineHeuristicDescriptor`** holds **`std::vector<std::unique_ptr<SelectionEngine>>`** (or equivalent): each **`SelectionEngine`** wraps one **`hipdnnHeuristicPolicyDescriptor_t`**, bound to the **`hipdnnHeuristicHandle_t`** for that slot’s policy module. **`finalize()`** resolves **`orderedPolicyIds`**, **SetDeviceProperties** (serialized device-properties FlatBuffer) on each distinct handle used, then for each slot **SetEngineIds** / **SetSerializedGraph** / **Finalize** / **GetSortedEngineIds** as in [§14.2](#142-pseudocode-for-finalize-first-draft). If no slot succeeds, **`finalize()`** aborts via **`HipdnnException`** (normal backend error path); there is **no** post-loop **`utilities::sortEngineIds`**.
+**`EngineHeuristicDescriptor`** holds **`std::vector<std::unique_ptr<SelectionHeuristic>>`** (or equivalent): each **`SelectionHeuristic`** wraps one **`hipdnnHeuristicPolicyDescriptor_t`**, bound to the **`hipdnnHeuristicHandle_t`** for that slot’s policy module. **`finalize()`** resolves **`orderedPolicyIds`**, ensures policy slots (and thus handle bindings) are in place, then **SetDeviceProperties** (serialized device-properties FlatBuffer in **`hipdnnPluginConstData_t`**) **once per distinct** **`hipdnnHeuristicHandle_t`** among those slots, then for each slot **SetEngineIds** / **SetSerializedGraph** / **Finalize** / **GetSortedEngineIds** as in [§14.2](#142-pseudocode-for-finalize-first-draft). If no slot succeeds, **`finalize()`** aborts via **`HipdnnException`** (normal backend error path); there is **no** post-loop **`utilities::sortEngineIds`**.
 
 ### 8.11 ABI evolution
 
@@ -419,20 +423,19 @@ hipdnnHeuristicStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
 
 ## 9. Policy plugins and the outer loop
 
-Each **heuristic policy plugin** implements one selection strategy and is loaded by **`HeuristicPluginManager`** (see [§10](#10-heuristicpluginmanager-and-resource-layer)). The backend maintains an **ordered list** of **`int64_t` policy IDs** (resolved from user **name** strings—[§5.3](#53-ordered-policy-list-default-and-user-configuration)) and **owns** one **policy descriptor** + **`SelectionEngine`** wrapper **per slot** on **`EngineHeuristicDescriptor`** ([§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)). For each slot in order during **`finalize()`**, the backend:
+Each **heuristic policy plugin** implements one selection strategy and is loaded by **`HeuristicPluginManager`** (see [§10](#10-heuristicpluginmanager-and-resource-layer)). The backend maintains an **ordered list** of **`int64_t` policy IDs** (resolved from user **name** strings—[§5.3](#53-ordered-policy-list-default-and-user-configuration)) and **owns** one **policy descriptor** + **`SelectionHeuristic`** wrapper **per slot** on **`EngineHeuristicDescriptor`** ([§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)). **Before** the per-slot loop (after slots are synced and **`DeviceProperties`** is resolved), the backend calls **`hipdnnHeuristicHandleSetDeviceProperties`** **once per distinct** **`hipdnnHeuristicHandle_t`** referenced by those slots, with the same **serialized device-properties** FlatBuffer ([§6](#6-device-properties), [§13.2](#132-serialized-device-properties-flatbuffer)). Plugins keep that state on the **handle** and **query** it during **`Finalize`**. Then for each slot in order during **`finalize()`**, the backend:
 
-1. Resolves the **`hipdnnHeuristicHandle_t`** for that slot’s module (from **`HeuristicPluginResourceManager`**); skips the slot if unknown / failed to load—policy TBD.
-2. Calls **`hipdnnHeuristicHandleSetDeviceProperties`** on that handle with **serialized device-properties** bytes (FlatBuffer built from resolved **`DeviceProperties`**—[§6](#6-device-properties), [§13.2](#132-serialized-device-properties-flatbuffer)).
-3. Calls **`setEngineIds`** and **`setSerializedGraph`** on the slot’s **`SelectionEngine`** (policy descriptor).
-4. Calls **`finalize()`**; if false, **continue** with the **original** candidate engine list unchanged for the next slot.
-5. On success, replaces candidates with **`getSortedEngineIds()`** and **breaks**.
-6. On failure, continues; the next policy always starts from the **original** candidate list (unless a future RFC defines chaining semantics).
+1. Resolves the **`hipdnnHeuristicHandle_t`** for that slot’s module (from **`HeuristicPluginResourceManager`**); skips the slot if unknown / failed to load—policy TBD. (Device properties on that handle were already updated in the pre-loop step if the handle is non-null.)
+2. Calls **`setEngineIds`** and **`setSerializedGraph`** on the slot’s **`SelectionHeuristic`** (policy descriptor).
+3. Calls **`finalize()`**; if false, **continue** with the **original** candidate engine list unchanged for the next slot.
+4. On success, replaces candidates with **`getSortedEngineIds()`** and **breaks**.
+5. On failure, continues; the next policy always starts from the **original** candidate list (unless a future RFC defines chaining semantics).
 
 **First-success wins:** The first applicable policy that reports success defines the final ordering. Later policies are not consulted.
 
 **Exhausted list:** If every slot is skipped, declined, or errors without a successful policy, **`EngineHeuristicDescriptor::finalize()`** fails with **`HipdnnException`** (same **`THROW_IF_*` / status pattern as other backend descriptor `finalize()` paths**—see [§5.1](#51-single-orchestration-model-outer-loop)); the implementation does **not** fall back to **`utilities::sortEngineIds`** or any other ordering outside **`orderedPolicyIds`**.
 
-**Read-only contract:** Heuristic plugins **must not** mutate hipDNN graph state, engine plugin handles, device memory, or global HIP device selection. They only **read** `SerializedGraph` bytes, **serialized device-properties** bytes (parsed per [§13.2](#132-serialized-device-properties-flatbuffer)), and the **candidate engine ID list** they receive, and they **output** a reordered subset or permutation of those candidates (subject to backend validation—see [§18](#18-risks-and-open-questions)).
+**Read-only contract:** Heuristic plugins **must not** mutate hipDNN graph state, engine plugin handles, device memory, or global HIP device selection. They only **read** `SerializedGraph` bytes, **device-properties** data obtained from the **bound** **`hipdnnHeuristicHandle_t`** (installed via **`SetDeviceProperties`**—parsed per [§13.2](#132-serialized-device-properties-flatbuffer)), and the **candidate engine ID list** they receive, and they **output** a reordered subset or permutation of those candidates (subject to backend validation—see [§18](#18-risks-and-open-questions)).
 
 ---
 
@@ -454,7 +457,7 @@ Analogous to **`EnginePluginManager`**:
 - Extends the same **plugin manager base** pattern (shared library load, symbol resolution, lifecycle).
 - Uses a **separate search path** from engine plugins (for example `hipdnn_plugins/heuristics/` and/or a dedicated env var such as `HIPDNN_HEURISTIC_PLUGIN_DIR`—exact names TBD).
 - Resolves **heuristic-only** symbols from [§8](#8-c-abi-for-heuristic-plugins); does **not** use **`EnginePlugin`** symbol tables.
-- Implements **`validateBeforeAdding`**-style checks before accepting a plugin: **API major** match (via **`hipdnnHeuristicGetApiVersion`**), unique **`int64_t` policy ID** (via **`hipdnnHeuristicGetPolicyId`**), and any additional rules from [§11](#11-versioning-and-compatibility-checks).
+- Implements **`validateBeforeAdding`**-style checks before accepting a plugin—**parallel to `EnginePluginManager`**: **API major** match (via **`hipdnnHeuristicGetApiVersion`**); **unique** **`int64_t` policy ID** (via **`hipdnnHeuristicGetPolicyId`**, tracked in a set so a second module cannot register the same ID—same pattern as duplicate engine IDs in `EnginePluginManager`); optional **ID ↔ name** consistency when **`hipdnnHeuristicGetPolicyName`** is exported; and any additional rules from [§11](#11-versioning-and-compatibility-checks).
 - Owns **`HeuristicPlugin`** wrappers that bind the C ABI (handle + policy symbols) and expose **`HandleCreate` / `HandleDestroy`** to the resource manager.
 
 ### 10.2 `HeuristicPluginResourceManager`
@@ -478,7 +481,7 @@ Analogous to **`EnginePluginResourceManager`**:
 ### 10.4 Relationship to `EnginePluginResourceManager`
 
 - **Candidate engine IDs** always come from **`EnginePluginResourceManager::getApplicableEngineIds`** (unchanged).
-- **Ordering** is applied by **`SelectionEngine`** instances **owned by** **`EngineHeuristicDescriptor`**, each wrapping a **`hipdnnHeuristicPolicyDescriptor_t`** bound to a **`hipdnnHeuristicHandle_t`** from **`HeuristicPluginResourceManager`**.
+- **Ordering** is applied by **`SelectionHeuristic`** instances **owned by** **`EngineHeuristicDescriptor`**, each wrapping a **`hipdnnHeuristicPolicyDescriptor_t`** bound to a **`hipdnnHeuristicHandle_t`** from **`HeuristicPluginResourceManager`**.
 - The two subsystems stay **separate**: heuristic plugins **do not** register engine IDs and **do not** execute graphs; engine plugins **do not** implement the heuristic C ABI.
 
 ---
@@ -490,8 +493,9 @@ Follow the same **spirit** as `EnginePluginManager::validateBeforeAdding` in the
 **Proposed checks**
 
 1. **Heuristic C ABI major:** Parse **`hipdnnHeuristicGetApiVersion`**; **major** must match the backend’s expected heuristic API major (analogous to engine plugins comparing `plugin.apiVersion()` major to `HIPDNN_BACKEND_VERSION_MAJOR`, but using the **heuristic** version string, not the engine plugin API version).
-2. **Policy ID uniqueness:** Two loaded heuristic modules **must not** return the same **`int64_t`** from **`hipdnnHeuristicGetPolicyId`** (same rule as duplicate engine IDs on the engine side).
-3. **Binary compatibility:** Document minimum backend / data-SDK versions per heuristic plugin release (align with project-wide versioning RFCs under `docs/rfcs/`), including expectations for **graph** and **device-properties** FlatBuffer schemas ([§13](#13-serialized-graph-device-properties-and-graph-level-preferences)).
+2. **Policy ID uniqueness:** Two loaded heuristic modules **must not** return the same **`int64_t`** from **`hipdnnHeuristicGetPolicyId`**. Enforce with the **same** “insert into a set, throw on duplicate” pattern as **`EnginePluginManager::validateBeforeAdding`** / **`actionAfterAdding`** for engine IDs ([§5.3.1](#531-well-known-policy-names-and-ids)).
+3. **Policy ID ↔ optional policy name:** If **`hipdnnHeuristicGetPolicyName`** is provided, **`engineNameToId`** of the returned UTF-8 string **must** equal **`hipdnnHeuristicGetPolicyId`**; otherwise the loader **rejects** the module (catches mistaken or overlapping well-known implementations early—[§5.3.1](#531-well-known-policy-names-and-ids)).
+4. **Binary compatibility:** Document minimum backend / data-SDK versions per heuristic plugin release (align with project-wide versioning RFCs under `docs/rfcs/`), including expectations for **graph** and **device-properties** FlatBuffer schemas ([§13](#13-serialized-graph-device-properties-and-graph-level-preferences)).
 
 **On failure:** Do not register the plugin; log via the shared logging path ([§12](#12-logging)); continue loading other policies if policy loading is best-effort, or fail handle creation if strict mode is required (policy TBD).
 
@@ -513,7 +517,7 @@ Engine plugins do **not** take a logger on each API call. After the `.so` is loa
 
 **Heuristic plugins should follow the same model:**
 
-1. **Backend (C++) code** in the heuristic path uses **`HIPDNN_BACKEND_LOG_*`** / the same global SDK dispatch as today—no logger argument on **`SelectionEngine`** or handle methods ([§7](#7-selectionengine-interface)).
+1. **Backend (C++) code** in the heuristic path uses **`HIPDNN_BACKEND_LOG_*`** / the same global SDK dispatch as today—no logger argument on **`SelectionHeuristic`** or handle methods ([§7](#7-selectionheuristic-interface)).
 2. **Heuristic `.so` code:** Immediately after loading a heuristic library (in **`HeuristicPluginManager`** / resource manager, mirroring **`loadPluginFromFile`**), the host calls **`hipdnnHeuristicSetLoggingCallback`** ([§8.2](#82-plugin-module-metadata)) with the same **`logging::backendLoggingCallback`** (or an equivalent that forwards to the consumer’s registered path), then optionally **`hipdnnHeuristicSetLogLevel`**. Handle and policy-descriptor entry points in [§8.6](#86-plugin-handle-lifecycle)–[§8.9](#89-finalize-and-sorted-results) **do not** take a logging parameter.
 3. **C ABI:** Only the module-level **`SetLoggingCallback`** / **`SetLogLevel`** symbols carry logging configuration—**not** the per-instance selection functions.
 
@@ -523,19 +527,19 @@ This matches engine plugins: **supplied and used outside the call signatures** o
 
 ## 13. Serialized graph, device properties, and graph-level preferences
 
-Heuristic plugins receive **two** structured inputs as **FlatBuffer** bytes over the C ABI: the **operation graph** (per policy descriptor) and **device properties** (per plugin handle). Both use the **same** serialization stack (data-SDK schemas, `flatbuffers::Verifier`, generated accessors) so **payloads** can evolve without changing **function signatures** or adding public C structs.
+Heuristic plugins receive **two** structured inputs as **FlatBuffer** payloads in **`hipdnnPluginConstData_t`** over the C ABI: the **operation graph** (per policy descriptor) and **device properties** (installed on the **plugin handle** via **`hipdnnHeuristicHandleSetDeviceProperties`** and **read** by the plugin during **`Finalize`** and other work on that session—[§8.6](#86-plugin-handle-lifecycle), [§8.9](#89-finalize-and-sorted-results)). Both use the **same** serialization stack (data-SDK schemas, `flatbuffers::Verifier`, generated accessors) so **payloads** can evolve without changing **function signatures** or adding public C structs beyond the existing const-buffer wrapper.
 
 ### 13.1 Serialized graph
 
-`GraphDescriptor` already maintains a **FlatBuffer** serialized graph and exposes it via **`getSerializedGraph()`** (pointer and byte length). The heuristic framework treats that buffer as the canonical **`SerializedGraph`** input to policies—**no alternate wire format** for the graph in v1.
+`GraphDescriptor` already maintains a **FlatBuffer** serialized graph and exposes it via **`getSerializedGraph()`**, which returns **`hipdnnPluginConstData_t`** (see **`PluginApiDataTypes.h`**). The heuristic framework treats that buffer as the canonical **`SerializedGraph`** input to policies—**no alternate wire format** for the graph in v1.
 
-Policies that need structured access may parse the FlatBuffer using existing data-SDK generated types, subject to version rules for the graph schema. The C ABI passes this buffer as **`const uint8_t*`** + **`size_t`** via **`hipdnnHeuristicPolicySetSerializedGraph`** ([§8.8](#88-policy-inputs-engine-ids-and-serialized-graph)).
+Policies that need structured access may parse the FlatBuffer using existing data-SDK generated types, subject to version rules for the graph schema. The C ABI passes this buffer as **`const hipdnnPluginConstData_t*`** via **`hipdnnHeuristicPolicySetSerializedGraph`** ([§8.8](#88-policy-inputs-engine-ids-and-serialized-graph)), matching **`GraphDescriptor::getSerializedGraph()`** and engine plugin graph arguments.
 
 ### 13.2 Serialized device properties (FlatBuffer)
 
 **Device facts** use a **second** FlatBuffer schema (root table name TBD, colocated with the graph schema in the data-SDK). The backend builds this buffer from the C++ **`DeviceProperties`** struct ([§6.1](#61-deviceproperties-struct)) after **`queryDeviceProperties()`** or a descriptor override ([§6.3](#63-proposed-override-descriptor-level-device-properties)).
 
-- **C ABI:** **`hipdnnHeuristicHandleSetDeviceProperties(handle, const uint8_t*, size_t)`** ([§8.6](#86-plugin-handle-lifecycle)); same pointer-lifetime pattern as **`SetSerializedGraph`** for the duration of the call.
+- **C ABI:** **`hipdnnHeuristicHandleSetDeviceProperties(handle, const hipdnnPluginConstData_t*)`** ([§8.6](#86-plugin-handle-lifecycle)); same **`hipdnnPluginConstData_t`** pointer-lifetime pattern as **`hipdnnHeuristicPolicySetSerializedGraph`** for the duration of the call. The host applies this **to each distinct handle** used by the current policy slots **before** **`PolicyFinalize`** on descriptors **created with** that handle ([§5.1](#51-single-orchestration-model-outer-loop)); plugins **query** the stored device context from the handle as needed (including inside **`Finalize`**), rather than receiving device bytes again on the policy descriptor.
 - **Plugins:** Verify and parse with the generated **device-properties** types; treat unknown or default-filled **optional** fields as “not provided” when the host runs an older backend.
 - **Evolution:** New device fields are **additive** in the `.fbs` definition; heuristic C ABI **major** bumps are reserved for incompatible **API surface** changes, not for ordinary schema extension (aligned with graph-schema practice).
 
@@ -558,8 +562,8 @@ The graph model already carries fields such as **`preferred_engine_id`** when bu
 Additionally it:
 
 - Obtains **`HeuristicPluginResourceManager`** from the handle (proposal: **`getHeuristicPluginResourceManager()`**) for **`hipdnnHeuristicHandle_t`** lookup per policy module.
-- **Owns** **`SelectionEngine`** (policy-descriptor) objects **one per** resolved policy slot ([§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)); (re)creates them when **`orderedPolicyIds`** changes.
-- Resolves **`DeviceProperties`** (override or `queryDeviceProperties()`) and **serializes** it for **`SetDeviceProperties`** ([§13.2](#132-serialized-device-properties-flatbuffer)).
+- **Owns** **`SelectionHeuristic`** (policy-descriptor) objects **one per** resolved policy slot ([§5.4](#54-two-tier-plugin-objects-handle-vs-policy-descriptor)); (re)creates them when **`orderedPolicyIds`** changes.
+- Resolves **`DeviceProperties`** (override or `queryDeviceProperties()`) and **serializes** it for **`SetDeviceProperties`** on each **distinct** **`hipdnnHeuristicHandle_t`** used by its policy slots **before** the per-slot **`Finalize`** loop ([§13.2](#132-serialized-device-properties-flatbuffer)).
 - Obtains serialized graph bytes from the finalized graph descriptor.
 - Runs the **outer policy loop** described in [§5.1](#51-single-orchestration-model-outer-loop), using **`orderedPolicyIds`** from [§5.3](#53-ordered-policy-list-default-and-user-configuration).
 - On success, stores the final ordered engine IDs for result construction; on **exhausted list without success**, aborts **`finalize()`** via **`HipdnnException`** (normal backend error path—[§14.2](#142-pseudocode-for-finalize-first-draft)).
@@ -579,28 +583,30 @@ finalize():
   candidates = engineRm.getApplicableEngineIds(graph)
 
   devProps = userDeviceOverride if set else queryDeviceProperties()
-  devicePropsSerialized = serializeDevicePropertiesFlatBuffer(devProps)  // §13.2; host-owned buffer for this finalize()
+  devicePropsSerialized = serializeDevicePropertiesFlatBuffer(devProps)  // §13.2; hipdnnPluginConstData_t; host-owned for this finalize()
 
-  serializedGraph = graph.getSerializedGraph()  // ptr + size; graph must be usable for heuristics
+  serializedGraph = graph.getSerializedGraph()  // hipdnnPluginConstData_t; graph must be usable for heuristics
 
   orderedPolicyIds = resolveHeuristicPolicyOrder(thisDescriptor, handle)
     // §5.3: descriptor attr > handle > env > default — user surface is UTF-8 policy *names*
-    // default names { "SelectionEngine::Config", "SelectionEngine::StaticOrdering" } if no override
+    // default names { "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" } if no override
     // implementation: merge names, then orderedPolicyIds[i] = engineNameToId(name[i])
 
   syncPolicySlots(thisDescriptor, orderedPolicyIds, heurRm)
-    // Ensure one SelectionEngine (hipdnnHeuristicPolicyDescriptor_t) per slot, each bound to
+    // Ensure one SelectionHeuristic (hipdnnHeuristicPolicyDescriptor_t) per slot, each created with
     // the hipdnnHeuristicHandle_t for that policy's module; destroy/recreate if list changed.
+    // PolicyFinalize reads device facts from that bound handle (§8.7 / §8.9).
+
+  for each distinct non-null hipdnnHeuristicHandle_t h among policy slots for this finalize():
+    hipdnnHeuristicHandleSetDeviceProperties(
+        h,
+        &devicePropsSerialized)  // hipdnnPluginConstData_t { ptr, size }; FlatBuffer; §8.6 / §13.2 — once per handle, not per slot
 
   success = false
   for each slot i aligned with orderedPolicyIds:
     pluginHandle = heurRm.getHeuristicHandleForPolicyId(orderedPolicyIds[i])
     if pluginHandle is null:
       continue
-    hipdnnHeuristicHandleSetDeviceProperties(
-        pluginHandle,
-        devicePropsSerialized.ptr,
-        devicePropsSerialized.size)  // FlatBuffer; §8.6 / §13.2
 
     selection = thisDescriptor.policySlot(i)  // wraps policy descriptor; §8.7
     selection.setEngineIds(candidates)
@@ -629,7 +635,7 @@ finalize():
 - **`HIPDNN_HEURISTIC_POLICY_ORDER` (optional env):** Comma-separated **policy names**; lowest precedence among user overrides ([§5.3.3](#533-how-the-user-sets-orderedpolicyids)).
 - **`HIPDNN_ATTR_ENGINEHEUR_MODE`:** Today the backend supports a narrow heuristic mode surface. This RFC does **not** remove the attribute; a future mapping might define default **policy order** per mode, or deprecate mode once **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`** and handle defaults are sufficient. That decision is left open in this draft.
 - **`HIPDNN_ATTR_ENGINEHEUR_DEVICEPROP`:** Proposed as the user-facing override for [§6.3](#63-proposed-override-descriptor-level-device-properties) when the descriptor type and setters are implemented.
-- **No requirement for new enums** per new policy: adding a policy is **deployment + registry order** (user-facing **names** in config; **`int64_t`** IDs from **`hipdnnHeuristicGetPolicyId`** at load time), not necessarily a new public enum value. Well-known **names** **`SelectionEngine::Config`** and **`SelectionEngine::StaticOrdering`** are **strings** in attributes and docs; their **`int64_t`** values are **`engineNameToId(...)`**, not enum members.
+- **No requirement for new enums** per new policy: adding a policy is **deployment + registry order** (user-facing **names** in config; **`int64_t`** IDs from **`hipdnnHeuristicGetPolicyId`** at load time), not necessarily a new public enum value. Well-known **names** **`SelectionHeuristic::Config`** and **`SelectionHeuristic::StaticOrdering`** are **strings** in attributes and docs; their **`int64_t`** values are **`engineNameToId(...)`**, not enum members.
 - **Headers:** Publish **`HeuristicsPluginApi.h`** (name TBD) in **plugin_sdk** (or a sibling package) containing the types and declarations in [§8](#8-c-abi-for-heuristic-plugins), without including **engine** plugin API headers.
 
 **Frontend:** End-to-end flow from application / **hipdnn_frontend** through heuristic **`finalize()`** and policy configuration is described in [§16](#16-frontend-api-flow-mirror-engine-selection).
@@ -666,7 +672,7 @@ So **which engines appear as options** for a given graph is **dynamic**: it come
 1. **Optional:** The application calls the enumeration helper to list **available policies** (**`int64_t` IDs** and optional **names**) for loaded heuristic plugins plus any **built-in** adapters registered under the same scheme without a separate `.so`.
 2. The application sets **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`** on the **`EngineHeuristicDescriptor`** when overriding defaults, and/or relies on handle-level default or environment ([§5.3.3](#533-how-the-user-sets-orderedpolicyids)).
 3. **Unchanged from today:** **`backendFinalize`** on **`EngineHeuristicDescriptor`** runs the outer policy loop ([§14.2](#142-pseudocode-for-finalize-first-draft)). **Candidate engine IDs** still come from **`EnginePluginResourceManager::getApplicableEngineIds`** ([§10.4](#104-relationship-to-enginepluginresourcemanager)).
-4. **Unchanged from today:** The application reads **`HIPDNN_ATTR_ENGINEHEUR_RESULTS`** to obtain **ordered engine configuration descriptors**; **`Graph::initializeEngineConfig`** continues to pick among those configs using **preferred** or **default engine id** on the graph. Graph-level preferences (for example **`preferred_engine_id`**) are interpreted inside policies such as **`SelectionEngine::Config`**, not by a separate hard-coded pass ([§13.3](#133-graph-level-preferences-for-example-preferred_engine_id)).
+4. **Unchanged from today:** The application reads **`HIPDNN_ATTR_ENGINEHEUR_RESULTS`** to obtain **ordered engine configuration descriptors**; **`Graph::initializeEngineConfig`** continues to pick among those configs using **preferred** or **default engine id** on the graph. Graph-level preferences (for example **`preferred_engine_id`**) are interpreted inside policies such as **`SelectionHeuristic::Config`**, not by a separate hard-coded pass ([§13.3](#133-graph-level-preferences-for-example-preferred_engine_id)).
 
 In short: **policies** are **configured** by an ordered **policy name** string list (public surface) plus an **optional discovery API**; the backend uses **`int64_t`** policy IDs internally for matching. **Engines** remain **graph-dependent** and appear under **`HIPDNN_ATTR_ENGINEHEUR_RESULTS`** only after heuristic **`finalize()`** succeeds.
 
@@ -675,11 +681,11 @@ In short: **policies** are **configured** by an ordered **policy name** string l
 ## 17. Testing
 
 - **Unit tests** for each policy with **synthetic serialized device-properties** (FlatBuffer built from test `DeviceProperties`) and small **graph** FlatBuffers (no GPU required where possible).
-- **Regression test** asserting that when **`SelectionEngine::StaticOrdering`** is in effect (for example via the default **policy name** order), ordering matches current `utilities::sortEngineIds` for a fixed candidate list.
+- **Regression test** asserting that when **`SelectionHeuristic::StaticOrdering`** is in effect (for example via the default **policy name** order), ordering matches current `utilities::sortEngineIds` for a fixed candidate list.
 - **Failure test** asserting that when **`orderedPolicyIds`** is empty, all IDs are unknown/skipped, or every policy declines, **`finalize()`** fails via **`HipdnnException`** / the same status path as other descriptor **`finalize()`** errors (no silent sort fallback).
 - **Integration tests** with real graphs and devices when GPU is available.
-- **ABI / loader tests** that load a minimal mock heuristic `.so`, verify **`hipdnnHeuristicGetApiVersion`**, **`hipdnnHeuristicGetPolicyId`** ( **`int64_t`** matches **`engineNameToId`** for the plugin’s documented name), **`HandleCreate` / `HandleDestroy`**, **`PolicyDescriptorCreate` / `Destroy`**, **`Finalize` / `GetSortedEngineIds`**, and reject wrong major versions.
-- **Policy order tests** that assert default **name** list **`{ "SelectionEngine::Config", "SelectionEngine::StaticOrdering" }`**, descriptor override wins over handle, and unknown **names** (after hashing) are handled per policy.
+- **ABI / loader tests** that load a minimal mock heuristic `.so`, verify **`hipdnnHeuristicGetApiVersion`**, **`hipdnnHeuristicGetPolicyId`** ( **`int64_t`** matches **`engineNameToId`** for the plugin’s documented name), **`HandleCreate` / `HandleDestroy`**, **`PolicyDescriptorCreate` / `Destroy`**, **`Finalize` / `GetSortedEngineIds`**, and reject wrong major versions; **negative tests** that a second module with a **duplicate** **`hipdnnHeuristicGetPolicyId`** and a module whose optional **`hipdnnHeuristicGetPolicyName`** does not hash to its policy ID are **rejected at load** (same spirit as **`EnginePluginManager`** duplicate engine IDs—[§5.3.1](#531-well-known-policy-names-and-ids), [§11](#11-versioning-and-compatibility-checks)).
+- **Policy order tests** that assert default **name** list **`{ "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" }`**, descriptor override wins over handle, and unknown **names** (after hashing) are handled per policy.
 - **Lifetime tests** that assert destroying **`EngineHeuristicDescriptor`** invokes **`hipdnnHeuristicPolicyDescriptorDestroy`** for every owned slot (and does not leak plugin handles owned by **`hipdnnHandle`**).
 - **Enumeration tests** that assert the handle-scoped **loaded heuristic policy** query ([§16.2](#162-loaded-heuristic-policy-enumeration)) matches modules that passed **`validateBeforeAdding`**-style checks, returns **`int64_t`** IDs consistent with **`hipdnnHeuristicGetPolicyId`**, and that optional frontend helpers return consistent metadata.
 
@@ -691,7 +697,7 @@ In short: **policies** are **configured** by an ordered **policy name** string l
 - **Duplicate policy IDs in `orderedPolicyIds`:** Two slots may reference the same loaded module (same **`hipdnnHeuristicHandle_t`**) but still require **distinct** **`hipdnnHeuristicPolicyDescriptor_t`** instances; whether duplicates are allowed, deduplicated, or rejected is policy TBD.
 - **Failure modes:** If the cache or ML policy returns partial or invalid engine IDs, should the backend validate against `candidates` before accepting success?
 - **Async selection:** When implemented, thread-safety of **`hipdnnHeuristicHandle_t`** / **`hipdnnHeuristicPolicyDescriptor_t`**, interaction with the **single-thread handle** rule ([§8.3](#83-plugin-handle-session-object)), and lifetime of **serialized graph** and **serialized device-properties** buffers, must be specified.
-- **Invalid device-properties buffers:** If **`SetDeviceProperties`** receives malformed bytes, plugins should return **`HIPDNN_STATUS_BAD_PARAM`** (or equivalent **`hipdnnHeuristicStatus_t`**); whether the backend retries, fails **`finalize()`**, or skips the policy is implementation TBD.
+- **Invalid device-properties buffers:** If **`SetDeviceProperties`** receives malformed bytes, plugins should return **`HIPDNN_PLUGIN_STATUS_BAD_PARAM`** (or an equivalent **`HIPDNN_PLUGIN_STATUS_*`** code); whether the backend retries, fails **`finalize()`**, or skips the policy is implementation TBD.
 - **`PluginApi.h` comment:** Today’s reference to heuristic plugins implementing `PluginApi.h` + `HeuristicsPluginApi.h` should be updated in code/docs to match **this** RFC: heuristic plugins use **only** the heuristic C ABI header, not **`PluginApi.h`**.
 
 ---
@@ -708,10 +714,10 @@ In short: **policies** are **configured** by an ordered **policy name** string l
 | **Outer loop** | Ordered list of policies; first applicable successful policy wins. If none succeed, **`finalize()`** fails via **`HipdnnException`** (normal backend error path); no built-in sort after the loop. |
 | **Policy name** | UTF-8 string in **`HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER`**, env, or handle defaults; hashed with **`engineNameToId`** to form the **`int64_t`** used in **`orderedPolicyIds`** and matched against **`hipdnnHeuristicGetPolicyId`**. |
 | **Policy ID (heuristic)** | **`int64_t`** stable identifier for one heuristic module; **must** equal **`engineNameToId(policy_name)`** for that module’s canonical name ([§5.3](#53-ordered-policy-list-default-and-user-configuration)). |
-| **orderedPolicyIds** | Resolved **`std::vector<int64_t>`** for one **`finalize()`**, each element the hash of a user-configured **policy name**; default **names** **`{ "SelectionEngine::Config", "SelectionEngine::StaticOrdering" }`** ([§5.3](#53-ordered-policy-list-default-and-user-configuration)). |
-| **DeviceProperties** | C++ struct of device facts in the backend; serialized to FlatBuffer for the heuristic C ABI ([§13.2](#132-serialized-device-properties-flatbuffer)). Plugins do not call HIP. |
-| **SelectionEngine** | C++ facade over **`hipdnnHeuristicPolicyDescriptor_t`** for one policy **slot** on **`EngineHeuristicDescriptor`**; session state stays on **`hipdnnHeuristicHandle_t`**. |
-| **Plugin heuristic handle** | **`hipdnnHeuristicHandle_t`**: session object per heuristic module per **`hipdnnHandle`**; **SetDeviceProperties** (serialized device-properties FlatBuffer); **single-thread** use ([§8.3](#83-plugin-handle-session-object)). |
+| **orderedPolicyIds** | Resolved **`std::vector<int64_t>`** for one **`finalize()`**, each element the hash of a user-configured **policy name**; default **names** **`{ "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering" }`** ([§5.3](#53-ordered-policy-list-default-and-user-configuration)). |
+| **DeviceProperties** | C++ struct of device facts in the backend; serialized to FlatBuffer and passed in **`hipdnnPluginConstData_t`** for the heuristic C ABI ([§13.2](#132-serialized-device-properties-flatbuffer)). Plugins do not call HIP. |
+| **SelectionHeuristic** | C++ facade over **`hipdnnHeuristicPolicyDescriptor_t`** for one policy **slot** on **`EngineHeuristicDescriptor`**; session state stays on **`hipdnnHeuristicHandle_t`**. |
+| **Plugin heuristic handle** | **`hipdnnHeuristicHandle_t`**: session object per heuristic module per **`hipdnnHandle`**; **SetDeviceProperties** (serialized device-properties FlatBuffer in **`hipdnnPluginConstData_t`**), applied **before** **`PolicyFinalize`** on descriptors bound to that handle; heuristics **read** device facts from the handle as needed; **single-thread** use ([§8.3](#83-plugin-handle-session-object)). |
 | **Plugin policy descriptor** | **`hipdnnHeuristicPolicyDescriptor_t`**: per-slot graph + candidate IDs + finalize result; **owned by** **`EngineHeuristicDescriptor`**. |
-| **SerializedGraph** | FlatBuffer bytes + length from the operation graph descriptor ([§13.1](#131-serialized-graph)). |
+| **SerializedGraph** | FlatBuffer from the operation graph descriptor, carried in **`hipdnnPluginConstData_t`** ([§13.1](#131-serialized-graph)). |
 | **Loaded heuristic policy enumeration** | Handle-scoped query of **`int64_t` policy IDs** (and optional **name** / version metadata) for heuristic modules that passed load-time validation; see [§16.2](#162-loaded-heuristic-policy-enumeration). |
