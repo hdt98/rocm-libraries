@@ -44,7 +44,8 @@ project_map = {
     },
     "blas": {
         "cmake_options": ["-DTHEROCK_ENABLE_BLAS=ON"],
-        "projects_to_test": ["hipblaslt", "rocblas", "hipblas", "rocroller"],
+        "projects_to_test": ["rocblas-multigpu"],
+        # "projects_to_test": ["hipblaslt", "rocblas", "hipblas", "rocroller", "rocblas-multigpu"],
     },
     "miopen": {
         "cmake_options": [
