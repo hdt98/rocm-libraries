@@ -129,7 +129,7 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnHeuristic
  * @brief Retrieves the canonical policy name (optional).
  *
  * Returns the NUL-terminated UTF-8 canonical name that users reference in configuration
- * (e.g., "SelectionEngine::Config", "SelectionEngine::StaticOrdering"). Used for logging
+ * (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"). Used for logging
  * and enumeration. If omitted, the host may derive display names from a static registry.
  *
  * @param[out] policy_name Pointer to receive the policy name string (NUL-terminated).
