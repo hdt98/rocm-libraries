@@ -789,7 +789,9 @@ static inline void rocsolver_syconv_getMemorySize(
         // Note rocprim storage query requires the actual d_data pointer
         // It is not safe to pass a nullptr as d_data
         //
-        // The following estimate is recommended by co-pilot
+        // This approximates the workspace as proportional to the number
+        // of processing blocks and incorporate a safety factor, then compare
+        // it with a simple per-element bound and keep the larger value.
         // -------------------------------------------------------------
         auto ceildiv = [](auto m, auto b) { return ((m <= 0) ? 0 : (m - 1) / b + 1); };
         size_t constexpr ITEMS_PER_BLOCK = 128;
