@@ -616,3 +616,56 @@ Recall that $K_{\text{gemm}} = Y \times X \times C$, which means that for typica
 - Case A: $K_{\text{gemm}} = 72$
 - Case B: $K_{\text{gemm}} = 9 \times 256 = 2304$.
 For most efficient vector loads with vector size 8, we need even bigger `KPerBlock` (at least 512).
+
+---
+
+## Profiling Results
+
+### Test Case
+
+Hardware: AMD Instinct MI300X (gfx942), ROCm 7.0.1. Profiled with `rocprof-compute 3.5.0`.
+
+```
+tile_example_grouped_conv_fwd -g=1 -n=32 -k=256 -c=256 -d=1 -h=100 -w=100
+                               -z=1 -y=3 -x=3 -lpad_h=1 -lpad_w=1 -rpad_h=1 -rpad_w=1
+```
+
+This corresponds to case B: `K_gemm = 9 × 256 = 2304`, `KPerBlock = 256`.
+With `C = 256 ≥ KPerBlock`, the k_gemm → (y,x,c) decode trivially gives `(y,x,c) = (0,0,k_gemm)`
+and memory access in the K-direction is coalesced.
+
+### Results Summary
+
+| Metric | Baseline (`tiled_im2col=0`) | Tiled (`tiled_im2col=1`) | Δ |
+|--------|----------------------------|--------------------------|---|
+| Mean kernel time | 1,370,217 ns | 1,367,211 ns | −0.22% |
+| **SALU instructions** | 23,014,821 | 19,124,816 | **−16.9%** |
+| VALU instructions | 84,057,448 | 83,580,415 | −0.57% |
+| Instructions per wavefront | 28,966 | 28,120 | −2.92% |
+| Wavefront Occupancy | 855 | 901 | **+5.4%** |
+| Active CUs | 219 | 234 | **+6.9%** |
+| VALU Utilization | 17.0% | 17.5% | +2.8% |
+| MFMA Utilization | 19.9% | 20.3% | +2.3% |
+| SALU Utilization | 5.94% | 5.83% | −1.9% |
+| vL1D Cache BW | 7,446 GB/s | 8,239 GB/s | +10.6% |
+| L2 Cache BW | 6,039 GB/s | 6,809 GB/s | +12.8% |
+
+### Interpretation
+
+The optimized im2col index calculation delivers a **−16.9% reduction in SALU instructions**. As a result:
+
+- **Wavefront occupancy improves by +5.4%** and **active CUs by +6.9%**: reduced SALU pressure frees
+  scheduler slots, allowing more wavefronts to be resident simultaneously.
+- **Cache bandwidth increases** (+10.6% vL1D, +12.8% L2): with less time spent on index arithmetic,
+  threads spend more cycles issuing memory transactions.
+- **MFMA utilization increases slightly** (+2.3%), consistent with faster data supply to the compute units.
+
+The overall kernel duration improvement is modest (−0.22%) for this shape because the problem is
+already fairly compute-bound at ~20% MFMA utilization — the index calculation is not the dominant
+bottleneck. However, the real bottleneck might still be the memory access which is not fully coalesced (need to be clarified).
+
+The SALU savings are expected to be more impactful for:
+
+- Shapes with more K-loop iterations (larger filter Y×X or smaller C relative to KPerBlock), where
+  index recomputation per K-tile is proportionally heavier.
+- Memory-bound problems where reduced index arithmetic translates more directly into wall-clock speedup.
