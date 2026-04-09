@@ -19,6 +19,7 @@
 #include <miopen/algorithm.hpp>
 #include <miopen/conv_algo_name.hpp>
 #include <miopen/convolution.hpp>
+#include <miopen/db_record.hpp>
 #include <miopen/env.hpp>
 #include <miopen/errors.hpp>
 #include <miopen/execution_context.hpp>
@@ -1887,7 +1888,8 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print2DConvJsonLog("fwd-conv",
                                "forward",
@@ -1967,7 +1969,8 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print3DConvJsonLog("fwd-conv",
                                "forward",
@@ -3035,7 +3038,8 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print2DConvJsonLog("bwdd-conv",
                                "backward",
@@ -3114,7 +3118,8 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print3DConvJsonLog("bwdd-conv",
                                "backward",
@@ -3367,7 +3372,8 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print2DConvJsonLog("bwdw-conv",
                                "backward-weights",
@@ -3446,7 +3452,8 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time,
             std::ostringstream ss;
             problem.Serialize(ss);
             const auto db_key      = ss.str();
-            const auto perf_db_key = problem.MakeNetworkConfig();
+            const std::string perf_db_key =
+                miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
             Print3DConvJsonLog("bwdw-conv",
                                "backward-weights",
