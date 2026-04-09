@@ -463,84 +463,6 @@ namespace rocRoller
             std::vector<ReplacementMapping> const& m_replacements;
         };
 
-        /**
-         * Visitor to apply expression replacements to all dimensions and operations in the graph
-         */
-        struct ReplaceInGraphVisitor
-        {
-            ReplaceInGraphVisitor(std::vector<ReplacementMapping> const& replacements)
-                : m_exprVisitor{replacements}
-            {
-            }
-
-            /**
-             * Helper function that calls the expression visitor
-             */
-            Expression::ExpressionPtr replaceExpression(Expression::ExpressionPtr expr) const
-            {
-                return m_exprVisitor.call(expr);
-            }
-
-            template <CoordinateGraph::CCoordinateTransformEdge T>
-            CoordinateGraph::Edge visitCoordinateEdge(int tag, T const& edge)
-            {
-                return edge;
-            }
-
-            template <CoordinateGraph::CDataFlowEdge T>
-            CoordinateGraph::Edge visitCoordinateEdge(int tag, T const& edge)
-            {
-                return edge;
-            }
-
-            template <CoordinateGraph::CDimension T>
-            CoordinateGraph::Dimension visitDimension(int tag, T const& dim)
-            {
-                auto d   = dim;
-                d.size   = replaceExpression(dim.size);
-                d.stride = replaceExpression(dim.stride);
-                d.offset = replaceExpression(dim.offset);
-                return d;
-            }
-
-            template <ControlGraph::COperation T>
-            ControlGraph::Operation visitOperation(int tag, T const& op)
-            {
-                return op;
-            }
-
-            ControlGraph::Operation visitOperation(int tag, ControlGraph::Assign const& op)
-            {
-                auto newOp       = op;
-                newOp.expression = replaceExpression(op.expression);
-                return newOp;
-            }
-
-            ControlGraph::Operation visitOperation(int tag, ControlGraph::ConditionalOp const& op)
-            {
-                auto newOp      = op;
-                newOp.condition = replaceExpression(op.condition);
-                return newOp;
-            }
-
-            ControlGraph::Operation visitOperation(int tag, ControlGraph::AssertOp const& op)
-            {
-                auto newOp      = op;
-                newOp.condition = replaceExpression(op.condition);
-                return newOp;
-            }
-
-            ControlGraph::Operation visitOperation(int tag, ControlGraph::ForLoopOp const& op)
-            {
-                auto newOp      = op;
-                newOp.condition = replaceExpression(op.condition);
-                return newOp;
-            }
-
-        private:
-            ReplaceExprWithExprVisitor m_exprVisitor;
-        };
-
         KernelGraph IdentifyParallelDimensions::apply(KernelGraph const& original)
         {
             auto parallelDims = mergeSets(identifyParallelDimensionSets(original));
@@ -605,8 +527,68 @@ namespace rocRoller
                        totalReplacements,
                        replacements.size());
 
-            auto visitor = ReplaceInGraphVisitor{replacements};
-            copy         = rewriteDimensions(copy, visitor);
+            ReplaceExprWithExprVisitor exprVisitor{replacements};
+            auto                       replaceExpr
+                = [&](Expression::ExpressionPtr expr) { return exprVisitor.call(expr); };
+
+            // Replace in coordinate nodes.
+            for(auto tag : copy.coordinates.getNodes())
+            {
+                auto node    = copy.coordinates.getNode(tag);
+                bool changed = std::visit(
+                    [&](auto& dim) -> bool {
+                        auto update = [&](Expression::ExpressionPtr& field) -> bool {
+                            if(!field)
+                                return false;
+                            auto newVal = replaceExpr(field);
+                            if(not Expression::identical(newVal, field))
+                            {
+                                field = std::move(newVal);
+                                return true;
+                            }
+                            return false;
+                        };
+                        return update(dim.size) | update(dim.stride) | update(dim.offset);
+                    },
+                    node);
+                if(changed)
+                    copy.coordinates.setElement(tag, node);
+            }
+
+            // Replace in control nodes.
+            for(auto tag : copy.control.getNodes())
+            {
+                auto node    = copy.control.getNode(tag);
+                bool changed = std::visit(
+                    [&](auto& op) -> bool {
+                        using T = std::decay_t<decltype(op)>;
+                        if constexpr(std::same_as<ControlGraph::Assign, T>)
+                        {
+                            auto newExpr = replaceExpr(op.expression);
+                            if(not Expression::identical(newExpr, op.expression))
+                            {
+                                op.expression = std::move(newExpr);
+                                return true;
+                            }
+                        }
+                        else if constexpr(
+                            std::same_as<
+                                ControlGraph::ConditionalOp,
+                                T> || std::same_as<ControlGraph::AssertOp, T> || std::same_as<ControlGraph::ForLoopOp, T>)
+                        {
+                            auto newCond = replaceExpr(op.condition);
+                            if(not Expression::identical(newCond, op.condition))
+                            {
+                                op.condition = std::move(newCond);
+                                return true;
+                            }
+                        }
+                        return false;
+                    },
+                    node);
+                if(changed)
+                    copy.control.setElement(tag, node);
+            }
 
             return copy;
         }

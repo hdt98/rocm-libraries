@@ -591,7 +591,11 @@ namespace rocRoller
 
             // Set User.size for tensor contraction inputs
             auto userSizeVisitor = SetUserSizeVisitor(kgraph, m_params);
-            rewriteDimensions(kgraph, userSizeVisitor);
+            for(auto tag : kgraph.coordinates.getNodes())
+            {
+                auto node = kgraph.coordinates.getNode(tag);
+                std::visit([&](auto& dim) { userSizeVisitor.visitDimension(tag, dim); }, node);
+            }
 
             return kgraph;
         }
