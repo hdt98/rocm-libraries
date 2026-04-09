@@ -30,7 +30,7 @@ To run the configure step in the build directory
     -D CMAKE_PREFIX_PATH=/opt/rocm                                                                    \
     -D CMAKE_CXX_COMPILER=/opt/rocm/bin/hipcc                                                         \
     -D CMAKE_BUILD_TYPE=Release                                                                       \
-    -D GPU_TARGETS="gfx50"                                                                            \
+    -D GPU_TARGETS="gfx942"                                                                            \
     -G Ninja                                                                                          \
     ..
 ```
@@ -53,7 +53,7 @@ They key idea is to reduce the expensive im2col index calculations by precomputi
 
 # Profiling
 
-Let's use the CK Tile fwd conv example (projects/composablekernel/build-gfx950/bin/tile_example_grouped_conv_fwd) as the vehicle for running 
+Let's use the CK Tile fwd conv example (projects/composablekernel/build/bin/tile_example_grouped_conv_fwd) as the vehicle for running 
 `rocprof-compute`. We'll define two test cases
 
 - tile_example_grouped_conv_fwd -g=1 -n=32 -k=256 -c=256 -d=1 -h=100, -w=100 -z=1 -y=3 -x=3 -lpad_d=0 -lpad_h=1 -lpad_w=1 -rpad_d=0 -rpad_h=1 -rpad_w=1
