@@ -129,7 +129,7 @@ namespace rocRoller
          * rematerialised as expressions at each use site. Compile-time constant strides
          * are always kept as expressions regardless of this setting.
          */
-        bool materialStrides = false;
+        bool materialStrides = true;
 
         std::string toString() const;
     };
