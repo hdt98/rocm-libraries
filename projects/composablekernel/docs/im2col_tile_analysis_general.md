@@ -469,7 +469,7 @@ accessing the global memory.
 Recall that for a normal GEMM problem, we can store the matrix in row- or column-major order. Suppose we have row-major order and 
 assume threads in the workgroup are also organized in the row-major order, separated by the vector load size. In this ordering, 
 the memory access is coalesced and the memory controller can organize the memory accesses as few transactions as possible. 
-The tile distribution corresponding to a coalesced memory access is given by (assume vector load size 4 for 16-bit data type).
+The tile distribution corresponding to a coalesced memory access is given by (assume vector load size 8 for 16-bit data type).
 
 Assume the following parameters
 
@@ -590,7 +590,7 @@ However, this requires LDS synch, that will probably be more costly than the com
 
 The fundamental equation:
 
-For wave-uniform $m_{\text{gemm}}$, all 64 lanes must map only to K. In thread_raked:
+For wave-uniform $m_{\text{gemm}}$, all 64 lanes must map only to K. In thread raked tile distribution:
 
 
 X0 = min(warp_size, KPerBlock / VecSize)
@@ -602,13 +602,17 @@ KPerBlock ≥ 64 × VecSize
 
 For VecSize=4:
 
-| KPerBlock | Required for wave-uniform M | X0 (achievable) | Lanes sharing M |
-|-----------|-----------------------------|-----------------|-----------------| 
-| 16        | ≥ 256                       | 4               | 4               |
-| 32        | ≥ 256                       | 8               | 8               |
-| 64        | ≥ 256                       | 16              | 16              |
+| KPerBlock | Required for wave-uniform M | X0 (achievable) | Lanes sharing M   |
+|-----------|-----------------------------|-----------------|-------------------| 
+| 16        | ≥ 256                       | 4               | 4                 |
+| 32        | ≥ 256                       | 8               | 8                 |
+| 64        | ≥ 256                       | 16              | 16                |
 | 256       | = 256                       | 64              | 64 (wave-uniform) |
 
 This constraint is layout-agnostic (indpendent of the tile distribution). With 64 lanes each loading VecSize=4 elements, a warp covering one M row consumes 64×4=256 K elements per iteration. KPerBlock must be chosen to accommodate that.
 We can choose e.g. tile size (64, 64, 256) to achieve the wave-uniform m_gemm index. 
 However, the tile size required to have wave-uniform $m_{\text{gemm}}$ are typically sub-optimal from the MFMA perpective.
+Recall that $K_{\text{gemm}} = Y \times X \times C$, which means that for typical 2D convolutions, `KPerBlock` is of the same order as $K_{\text{gemm}}$.
+- Case A: $K_{\text{gemm}} = 72$
+- Case B: $K_{\text{gemm}} = 9 \times 256 = 2304$.
+For most efficient vector loads with vector size 8, we need even bigger `KPerBlock` (at least 512).

@@ -141,9 +141,6 @@ struct tile_window_with_static_distribution
             {
                 // SGPR after this
                 const index_t k_start = amd_wave_read_first_lane((k_raw / meta.KPerBlock) * meta.KPerBlock);
-                // const index_t y = amd_wave_read_first_lane(k_start / meta.XC);
-                // const index_t x = amd_wave_read_first_lane((k_start % meta.XC) / meta.C);
-                // const index_t c_base = amd_wave_read_first_lane(k_start % meta.C);
                 // VGPR, lane-specific
                 const index_t k_loc   = k_raw - k_start;
                 bottom_tensor_thread_coord_tmp.init_k_aligned(k_start, k_loc, meta);                     
