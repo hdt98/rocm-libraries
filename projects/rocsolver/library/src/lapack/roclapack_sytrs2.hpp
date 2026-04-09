@@ -191,7 +191,6 @@ static __global__
                         B(i, j) = (ak * bkm1 - bk) / denom;
                         B(i + 1, j) = (akm1 * bk - bkm1) / denom;
                     }
-                    __syncthreads();
 
                     i = i + 1;
                 }
@@ -251,8 +250,6 @@ static __global__
                             B(i - 1, j) = (ak * bkm1 - bk) / denom;
                             B(i, j) = (akm1 * bk - bkm1) / denom;
                         }
-
-                        __syncthreads();
 
                         i = i - 1;
                     }
@@ -418,7 +415,6 @@ static __global__
                 B(k, j) = B(kp, j);
                 B(kp, j) = temp;
             }
-            __syncthreads();
         };
 
         if(!is_forward)
@@ -686,7 +682,6 @@ static __global__ __launch_bounds__(SYTRS1_MAX_THDS) void apply_pivot_lower_kern
                 B(k, j) = B(kp, j);
                 B(kp, j) = temp;
             }
-            __syncthreads();
         };
 
         if(!is_forward)
