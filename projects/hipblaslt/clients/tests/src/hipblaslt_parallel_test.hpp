@@ -29,5 +29,8 @@
 #ifndef _WIN32
 // Run tests in parallel across multiple GPUs using process-level parallelism
 // and Google Test's built-in sharding mechanism
-int run_tests_parallel_gpus(int argc, char** argv, int num_gpus);
+// argc/argv should already have --num_gpus and --gtest_output stripped
+// gtest_output_base is the parsed output filename (empty if not specified)
+int run_tests_parallel_gpus(int argc, char** argv, int num_gpus,
+                            const std::string& gtest_output_base);
 #endif

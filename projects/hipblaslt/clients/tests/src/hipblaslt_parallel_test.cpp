@@ -34,14 +34,104 @@
 #include <fstream>
 #include <thread>
 #include <cstdio>
+#include <signal.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <hip/hip_runtime.h>
 
+// Run a single GPU shard as a child process
+// This function sets up env vars, redirects output, and execs the test binary
+[[noreturn]] void run_child_shard(int argc, char** argv, int gpu, int num_gpus,
+                                  const std::string& log_file,
+                                  const std::string& gtest_output_base)
+{
+    // Set which GPU to use
+    std::string gpu_env = std::to_string(gpu);
+    setenv("HIP_VISIBLE_DEVICES", gpu_env.c_str(), 1);
+
+    // Set optimal OpenMP threads per GPU process
+    const char* env_threads = getenv("OMP_NUM_THREADS");
+    int current_threads = env_threads ? std::atoi(env_threads) : std::thread::hardware_concurrency();
+    int threads_per_gpu = std::max(1, current_threads / num_gpus);
+    setenv("OMP_NUM_THREADS", std::to_string(threads_per_gpu).c_str(), 1);
+
+    // Use Google Test's built-in sharding
+    setenv("GTEST_TOTAL_SHARDS", std::to_string(num_gpus).c_str(), 1);
+    setenv("GTEST_SHARD_INDEX", std::to_string(gpu).c_str(), 1);
+
+    // Redirect output to log file to avoid interleaved output
+    int fd = open(log_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if(fd >= 0)
+    {
+        dup2(fd, STDOUT_FILENO);
+        dup2(fd, STDERR_FILENO);
+        close(fd);
+    }
+
+    // Build argv - argv is already clean (custom flags removed by main)
+    std::vector<const char*> new_argv;
+    std::vector<std::string> arg_storage; // Store modified arguments
+
+    new_argv.push_back(argv[0]);
+
+    // Pass through all arguments from the clean argv
+    for(int i = 1; i < argc; i++)
+    {
+        new_argv.push_back(argv[i]);
+    }
+
+    // Add per-GPU gtest_output if it was specified
+    if(!gtest_output_base.empty())
+    {
+        size_t colon_pos = gtest_output_base.find(":");
+        if(colon_pos != std::string::npos)
+        {
+            // Format: json:file.json
+            std::string format = gtest_output_base.substr(0, colon_pos);
+            std::string filename = gtest_output_base.substr(colon_pos + 1);
+
+            // Insert GPU number before file extension
+            size_t dot_pos = filename.rfind(".");
+            std::string new_filename;
+            if(dot_pos != std::string::npos)
+            {
+                new_filename = filename.substr(0, dot_pos) + "_gpu" +
+                             std::to_string(gpu) + filename.substr(dot_pos);
+            }
+            else
+            {
+                new_filename = filename + "_gpu" + std::to_string(gpu);
+            }
+
+            std::string new_output_arg = "--gtest_output=" + format + ":" + new_filename;
+            arg_storage.push_back(new_output_arg);
+            new_argv.push_back(arg_storage.back().c_str());
+        }
+        else
+        {
+            // Format without colon, just pass through with default filename
+            std::string new_output_arg = "--gtest_output=" + gtest_output_base;
+            arg_storage.push_back(new_output_arg);
+            new_argv.push_back(arg_storage.back().c_str());
+        }
+    }
+
+    new_argv.push_back(nullptr);
+
+    // Execute the test binary
+    execvp(argv[0], const_cast<char* const*>(new_argv.data()));
+
+    // If exec fails
+    hipblaslt_cerr << "Failed to exec for GPU " << gpu << std::endl;
+    exit(1);
+}
+
 // Function to run tests in parallel across multiple GPUs
-int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
+// argc/argv should already have --num_gpus and --gtest_output stripped
+int run_tests_parallel_gpus(int argc, char** argv, int num_gpus,
+                            const std::string& gtest_output_base)
 {
     hipblaslt_cout << "\n========================================" << std::endl;
     hipblaslt_cout << "Parallel GPU Execution Mode" << std::endl;
@@ -64,91 +154,8 @@ int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
         num_gpus = available_gpus;
     }
 
-    // Get list of all tests by calling gtest with --gtest_list_tests
-    // IMPORTANT: Include --gtest_filter so we only split filtered tests
-    std::vector<std::string> all_tests;
-    std::string test_list_output = "/tmp/hipblaslt_test_list_" + std::to_string(getpid()) + ".txt";
-
-    // Build command to list tests, INCLUDING any --gtest_filter
-    std::string list_cmd = std::string(argv[0]) + " --gtest_list_tests";
-    for(int i = 1; i < argc; i++)
-    {
-        std::string arg = argv[i];
-        if(arg.find("--num_gpus") == std::string::npos)
-        {
-            list_cmd += " \"" + arg + "\"";  // Quote arguments to preserve filters
-        }
-    }
-    list_cmd += " > " + test_list_output + " 2>&1";
-
-    if(system(list_cmd.c_str()) != 0)
-    {
-        hipblaslt_cerr << "Error: Failed to list tests" << std::endl;
-        return 1;
-    }
-
-    // Parse test list
-    std::ifstream test_file(test_list_output);
-    if(!test_file.is_open())
-    {
-        hipblaslt_cerr << "Error: Could not open test list file" << std::endl;
-        return 1;
-    }
-
-    std::string current_suite;
-    std::string line;
-    while(std::getline(test_file, line))
-    {
-        if(line.empty())
-            continue;
-
-        // Remove trailing whitespace
-        while(!line.empty() && (line.back() == ' ' || line.back() == '\t' || line.back() == '\r'))
-            line.pop_back();
-
-        if(line.empty())
-            continue;
-
-        // Suite names don't start with spaces
-        if(line[0] != ' ')
-        {
-            current_suite = line;
-        }
-        else
-        {
-            // Test names start with spaces - remove leading whitespace
-            size_t start = line.find_first_not_of(" \t");
-            if(start != std::string::npos && !current_suite.empty())
-            {
-                std::string test_name = line.substr(start);
-
-                // Strip comment part (everything after '#')
-                size_t comment_pos = test_name.find('#');
-                if(comment_pos != std::string::npos)
-                {
-                    test_name = test_name.substr(0, comment_pos);
-                    // Remove trailing whitespace before the comment
-                    while(!test_name.empty() && (test_name.back() == ' ' || test_name.back() == '\t'))
-                        test_name.pop_back();
-                }
-
-                all_tests.push_back(current_suite + test_name);
-            }
-        }
-    }
-    test_file.close();
-    remove(test_list_output.c_str());
-
-    if(all_tests.empty())
-    {
-        hipblaslt_cerr << "Error: No tests found to run" << std::endl;
-        return 1;
-    }
-
-    hipblaslt_cout << "Found " << all_tests.size() << " tests total" << std::endl;
-
-    size_t tests_per_gpu = (all_tests.size() + num_gpus - 1) / num_gpus;
-    hipblaslt_cout << "Tests per GPU: ~" << tests_per_gpu << std::endl;
+    // Display sharding information
+    hipblaslt_cout << "Tests will be sharded across " << num_gpus << " GPUs" << std::endl;
 
     // Calculate and display OpenMP thread distribution
     const char* env_threads = getenv("OMP_NUM_THREADS");
@@ -161,6 +168,7 @@ int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
     // Split tests across GPUs using Google Test's built-in sharding
     std::vector<pid_t> child_pids;
     std::vector<std::string> output_files;
+    bool fork_failed = false;
 
     for(int gpu = 0; gpu < num_gpus; gpu++)
     {
@@ -168,127 +176,47 @@ int run_tests_parallel_gpus(int argc, char** argv, int num_gpus)
                                   std::to_string(getpid()) + ".log";
         output_files.push_back(output_file);
 
-        hipblaslt_cout << "GPU " << gpu << ": Running ~" << tests_per_gpu
-                       << " tests" << std::endl;
+        hipblaslt_cout << "GPU " << gpu << ": Starting shard " << gpu << std::endl;
 
         pid_t pid = fork();
         if(pid == 0)
         {
-            // Child process - run tests on this GPU
-
-            // Set which GPU to use
-            std::string gpu_env = std::to_string(gpu);
-            setenv("HIP_VISIBLE_DEVICES", gpu_env.c_str(), 1);
-
-            // Set optimal OpenMP threads per GPU process
-            // Get current OMP_NUM_THREADS setting, or use hardware concurrency
-            const char* env_threads = getenv("OMP_NUM_THREADS");
-            int current_threads = env_threads ? std::atoi(env_threads) : std::thread::hardware_concurrency();
-
-            // Divide CPU threads among GPU processes to avoid oversubscription
-            // Each GPU process should use (total_threads / num_gpus) threads
-            int threads_per_gpu = std::max(1, current_threads / num_gpus);
-            setenv("OMP_NUM_THREADS", std::to_string(threads_per_gpu).c_str(), 1);
-
-            // Use Google Test's built-in sharding
-            setenv("GTEST_TOTAL_SHARDS", std::to_string(num_gpus).c_str(), 1);
-            setenv("GTEST_SHARD_INDEX", std::to_string(gpu).c_str(), 1);
-
-            // Redirect output to log file to avoid interleaved output
-            int fd = open(output_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if(fd >= 0)
-            {
-                dup2(fd, STDOUT_FILENO);
-                dup2(fd, STDERR_FILENO);
-                close(fd);
-            }
-
-            // Build new argv
-            std::vector<const char*> new_argv;
-            std::vector<std::string> arg_storage; // Store modified arguments
-
-            new_argv.push_back(argv[0]);
-
-            for(int i = 1; i < argc; i++)
-            {
-                std::string arg = argv[i];
-
-                // Skip --num_gpus
-                if(arg.find("--num_gpus") != std::string::npos)
-                    continue;
-
-                // Keep --gtest_filter (it will be applied before sharding)
-                // Sharding happens AFTER filtering
-
-                // Modify --gtest_output to include GPU number
-                if(arg.find("--gtest_output=") == 0)
-                {
-                    size_t colon_pos = arg.find(":");
-                    std::string format;
-                    std::string filename;
-
-                    if(colon_pos != std::string::npos)
-                    {
-                        // Format: --gtest_output=json:file.json
-                        format = arg.substr(15, colon_pos - 15); // After "=" before ":"
-                        filename = arg.substr(colon_pos + 1);
-                    }
-                    else
-                    {
-                        // Format: --gtest_output=json (uses default filename)
-                        format = arg.substr(15);
-                        if(format == "json")
-                        {
-                            filename = "test_detail.json"; // GTest default
-                        }
-                        else
-                        {
-                            // For other formats, just pass through
-                            new_argv.push_back(argv[i]);
-                            continue;
-                        }
-                    }
-
-                    // Insert GPU number before file extension
-                    size_t dot_pos = filename.rfind(".");
-                    std::string new_filename;
-                    if(dot_pos != std::string::npos)
-                    {
-                        new_filename = filename.substr(0, dot_pos) + "_gpu" +
-                                     std::to_string(gpu) + filename.substr(dot_pos);
-                    }
-                    else
-                    {
-                        new_filename = filename + "_gpu" + std::to_string(gpu);
-                    }
-
-                    std::string new_output_arg = "--gtest_output=" + format + ":" + new_filename;
-                    arg_storage.push_back(new_output_arg);
-                    new_argv.push_back(arg_storage.back().c_str());
-                    continue;
-                }
-
-                new_argv.push_back(argv[i]);
-            }
-
-            new_argv.push_back(nullptr);
-
-            // Execute
-            execvp(argv[0], const_cast<char* const*>(new_argv.data()));
-
-            // If exec fails
-            hipblaslt_cerr << "Failed to exec for GPU " << gpu << std::endl;
-            exit(1);
+            // Child process
+            run_child_shard(argc, argv, gpu, num_gpus, output_file, gtest_output_base);
         }
         else if(pid > 0)
         {
+            // Parent process
             child_pids.push_back(pid);
         }
         else
         {
+            // Fork failed - need to clean up already-forked children
             hipblaslt_cerr << "Error: Failed to fork for GPU " << gpu << std::endl;
-            return 1;
+            fork_failed = true;
+            break;
         }
+    }
+
+    // If fork failed, terminate and wait for any already-started children
+    if(fork_failed)
+    {
+        hipblaslt_cerr << "Terminating " << child_pids.size() << " already-started child processes..." << std::endl;
+
+        // Send SIGTERM to all children
+        for(pid_t pid : child_pids)
+        {
+            kill(pid, SIGTERM);
+        }
+
+        // Wait for all children to terminate
+        for(pid_t pid : child_pids)
+        {
+            int status;
+            waitpid(pid, &status, 0);
+        }
+
+        return 1;
     }
 
     // Wait for all children and collect results (without printing yet)

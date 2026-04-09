@@ -32,7 +32,9 @@
 #ifndef _WIN32
 #include "hipblaslt_parallel_test.hpp"
 #endif
+#include <algorithm>
 #include <string>
+#include <vector>
 
 using namespace testing;
 
@@ -258,11 +260,10 @@ int main(int argc, char** argv)
         }
     }
 
-    // Check for --num_gpus argument and handle platform support
+    // Parse and strip --num_gpus argument
     int num_gpus = 0;
     bool has_num_gpus_flag = false;
-    int num_gpus_arg_start = -1;  // Track where the flag starts for removal
-    int num_gpus_arg_count = 0;   // How many argv entries to remove (1 or 2)
+    std::vector<int> indices_to_remove;  // Track all indices to remove
 
     for(int i = 1; i < argc; i++)
     {
@@ -271,16 +272,48 @@ int main(int argc, char** argv)
         {
             num_gpus = std::atoi(arg.substr(11).c_str());
             has_num_gpus_flag = true;
-            num_gpus_arg_start = i;
-            num_gpus_arg_count = 1;
+            indices_to_remove.push_back(i);
             break;
         }
         else if(arg == "--num_gpus" && i + 1 < argc)
         {
             num_gpus = std::atoi(argv[i + 1]);
             has_num_gpus_flag = true;
-            num_gpus_arg_start = i;
-            num_gpus_arg_count = 2;
+            indices_to_remove.push_back(i);
+            indices_to_remove.push_back(i + 1);
+            break;
+        }
+    }
+
+    // Parse and strip --gtest_output to extract base filename
+    std::string gtest_output_base;
+    for(int i = 1; i < argc; i++)
+    {
+        std::string arg = argv[i];
+        if(arg.find("--gtest_output=") == 0)
+        {
+            size_t colon_pos = arg.find(":");
+            if(colon_pos != std::string::npos)
+            {
+                // Format: --gtest_output=json:file.json
+                std::string format = arg.substr(15, colon_pos - 15);
+                std::string filename = arg.substr(colon_pos + 1);
+                gtest_output_base = format + ":" + filename;
+            }
+            else
+            {
+                // Format: --gtest_output=json (uses default filename)
+                std::string format = arg.substr(15);
+                if(format == "json")
+                {
+                    gtest_output_base = "json:test_detail.json"; // GTest default
+                }
+                else
+                {
+                    gtest_output_base = format; // Pass through other formats
+                }
+            }
+            indices_to_remove.push_back(i);
             break;
         }
     }
@@ -290,21 +323,55 @@ int main(int argc, char** argv)
     if(has_num_gpus_flag)
     {
         hipblaslt_cerr << "Warning: --num_gpus is not supported on Windows. Ignoring flag." << std::endl;
-
-        // Remove --num_gpus from argv to prevent GTest from complaining about unknown flag
-        for(int i = num_gpus_arg_start; i + num_gpus_arg_count < argc; i++)
-        {
-            argv[i] = argv[i + num_gpus_arg_count];
-        }
-        argc -= num_gpus_arg_count;
     }
 #else
     // If parallel GPUs requested, use parallel execution
     if(num_gpus > 1)
     {
-        return run_tests_parallel_gpus(argc, argv, num_gpus);
+        // Remove custom flags from argv before passing to parallel runner
+        // Sort indices in descending order to remove from back to front
+        std::sort(indices_to_remove.begin(), indices_to_remove.end(), std::greater<int>());
+        for(int idx : indices_to_remove)
+        {
+            for(int i = idx; i + 1 < argc; i++)
+            {
+                argv[i] = argv[i + 1];
+            }
+            argc--;
+        }
+
+        return run_tests_parallel_gpus(argc, argv, num_gpus, gtest_output_base);
     }
 #endif
+
+    // For single GPU or Windows, remove --num_gpus if present
+    if(has_num_gpus_flag)
+    {
+        std::sort(indices_to_remove.begin(), indices_to_remove.end(), std::greater<int>());
+        for(int idx : indices_to_remove)
+        {
+            // Skip --gtest_output indices, only remove --num_gpus
+            bool is_num_gpus = false;
+            if(idx < argc)
+            {
+                std::string arg = argv[idx];
+                if(arg.find("--num_gpus") == 0 ||
+                   (idx > 0 && std::string(argv[idx - 1]) == "--num_gpus"))
+                {
+                    is_num_gpus = true;
+                }
+            }
+
+            if(is_num_gpus)
+            {
+                for(int i = idx; i + 1 < argc; i++)
+                {
+                    argv[i] = argv[i + 1];
+                }
+                argc--;
+            }
+        }
+    }
 
     // Set signal handler
     hipblaslt_test_sigaction();
