@@ -1729,11 +1729,6 @@ def main():
         for variant in variants_used:
             prefix = prefix_map.get(variant, "grouped_conv_fwd")
             kernel_headers.extend(args.output_dir.glob(f"{prefix}_*.hpp"))
-        wrapper_headers = list(
-            (args.output_dir / "dispatcher_wrappers").glob(
-                "dispatcher_wrapper_grouped_conv_*.hpp"
-            )
-        )
 
     if not kernel_headers:
         print(f"[{target_name}] No kernel headers generated!")

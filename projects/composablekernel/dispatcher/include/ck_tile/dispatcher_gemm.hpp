@@ -17,4 +17,13 @@
 #include "ck_tile/dispatcher/arch_filter.hpp"
 #include "ck_tile/dispatcher/backends/tile_backend.hpp"
 #include "ck_tile/dispatcher/backends/generated_tile_backend.hpp"
+/// GEMM-only dispatcher header -- minimal include for GEMM operations.
+
+#pragma once
+
+// Core (needed by all ops)
+#include "ck_tile/dispatcher/base_registry.hpp"
+#include "ck_tile/dispatcher/dispatcher_error.hpp"
+#include "ck_tile/dispatcher/example_args.hpp"
+#include "ck_tile/dispatcher/json_export.hpp"
 #include "ck_tile/dispatcher/utils.hpp"

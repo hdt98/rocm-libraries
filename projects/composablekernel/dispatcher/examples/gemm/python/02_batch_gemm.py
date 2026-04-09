@@ -24,8 +24,6 @@ import numpy as np
 from ctypes_utils import (
     KernelConfig,
     Registry,
-    setup_gemm_dispatcher,
-    cleanup_gemm,
     detect_gpu_arch,
 )
 
