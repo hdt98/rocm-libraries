@@ -122,11 +122,12 @@ __all__ = [
 ]
 
 try:
-    # Import the python selector if possible (requires torch)
-    from .selector import OrigamiMatmulSelector
+    # Import the python selectors if possible (requires torch)
+    from .selector import OrigamiMatmulSelector, OrigamiAttentionSelector
     __all__.append("OrigamiMatmulSelector")
+    __all__.append("OrigamiAttentionSelector")
 except ImportError:
     # Do not raise this error if import fails - compiled Origami bindings still
-    # work without the dedicated Python selector
+    # work without the dedicated Python selectors
     pass
 
