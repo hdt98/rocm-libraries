@@ -1116,6 +1116,97 @@ namespace rocRoller::KernelGraph
             return assignTag;
         }
 
+        std::pair<int, int> GetInlineUnrollInfo(KernelGraph const& kgraph, int candidate)
+        {
+            if(!kgraph.control.get<LoadLDSTile>(candidate))
+                return {-1, -1};
+
+            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
+            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
+            auto dataType   = getDataType(kgraph.control.getNode(candidate));
+
+            if(isScaleType(dataType))
+                return {-1, -1};
+
+            int kSubdim = -1;
+            if(macTile.layoutType == LayoutType::MATRIX_A)
+                kSubdim = 1;
+            else if(macTile.layoutType == LayoutType::MATRIX_B)
+                kSubdim = 0;
+            else
+                return {-1, -1};
+
+            auto [target, direction]
+                = getOperationTarget(candidate, kgraph, /*isStorePartOfGlobalToLDSOp=*/false);
+            auto [required, path] = findRequiredCoordinates(target, direction, kgraph);
+            auto unrolls          = filterCoordinates<Unroll>(required, kgraph);
+
+            int kUnrollCoord = -1;
+            for(auto const& unroll : unrolls)
+            {
+                auto sdim = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
+                if(sdim == kSubdim)
+                {
+                    kUnrollCoord = unroll;
+                    break;
+                }
+            }
+
+            if(kUnrollCoord < 0)
+                return {-1, -1};
+
+            bool hasLDSSwizzle = false;
+            for(auto nodeTag : path)
+            {
+                for(auto edgeTag :
+                    kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
+                {
+                    if(kgraph.coordinates.get<LDSColSwizzle>(edgeTag).has_value()
+                       || kgraph.coordinates.get<LDSColUnswizzle>(edgeTag).has_value())
+                    {
+                        hasLDSSwizzle = true;
+                        break;
+                    }
+                }
+                if(hasLDSSwizzle)
+                    break;
+            }
+
+            if(!hasLDSSwizzle)
+                return {-1, -1};
+
+            int current = candidate;
+            while(true)
+            {
+                auto parents = kgraph.control.getInputNodeIndices<Body>(current).to<std::vector>();
+                if(parents.empty())
+                    break;
+
+                AssertFatal(parents.size() == 1,
+                            "GetInlineUnrollInfo: expected single Body parent",
+                            ShowValue(current),
+                            ShowValue(parents.size()));
+
+                current            = parents[0];
+                auto maybeSetCoord = kgraph.control.get<SetCoordinate>(current);
+                if(!maybeSetCoord)
+                    continue;
+
+                auto coordTag = kgraph.mapper.get<Unroll>(current);
+                if(coordTag != kUnrollCoord)
+                    continue;
+
+                auto valueExpr = maybeSetCoord->value;
+                if(!evaluationTimes(valueExpr)[EvaluationTime::Translate])
+                    break;
+
+                auto value = static_cast<int>(getUnsignedInt(evaluate(valueExpr)));
+                return {kUnrollCoord, value};
+            }
+
+            return {-1, -1};
+        }
+
     } // namespace AssignIndexExpressionsDetail
 
     // Import detail namespace for internal use
@@ -1265,101 +1356,7 @@ namespace rocRoller::KernelGraph
          */
         std::pair<int, int> getInlineUnrollInfo(KernelGraph const& kgraph, int candidate) const
         {
-            if(!kgraph.control.get<LoadLDSTile>(candidate))
-                return {-1, -1};
-
-            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
-            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
-            auto dataType   = getDataType(kgraph.control.getNode(candidate));
-
-            if(isScaleType(dataType))
-                return {-1, -1};
-
-            // K subdimension: dim 1 for MATRIX_A, dim 0 for MATRIX_B
-            int kSubdim = -1;
-            if(macTile.layoutType == LayoutType::MATRIX_A)
-                kSubdim = 1;
-            else if(macTile.layoutType == LayoutType::MATRIX_B)
-                kSubdim = 0;
-            else
-                return {-1, -1};
-
-            // Find the unroll coordinate for the K dimension
-            auto [target, direction]
-                = getOperationTarget(candidate, kgraph, /*isStorePartOfGlobalToLDSOp=*/false);
-            auto [required, path] = findRequiredCoordinates(target, direction, kgraph);
-            auto unrolls          = filterCoordinates<Unroll>(required, kgraph);
-
-            int kUnrollCoord = -1;
-            for(auto const& unroll : unrolls)
-            {
-                auto sdim = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
-                if(sdim == kSubdim)
-                {
-                    kUnrollCoord = unroll;
-                    break;
-                }
-            }
-
-            if(kUnrollCoord < 0)
-                return {-1, -1};
-
-            // Check if any node in the transform path has an
-            // LDS swizzle edge (LDSColSwizzle or LDSColUnswizzle).
-            // `path` contains coordinate node tags; getNeighbours
-            // returns incident edge tags in the hypergraph.
-            bool hasLDSSwizzle = false;
-            for(auto nodeTag : path)
-            {
-                for(auto edgeTag :
-                    kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
-                {
-                    if(kgraph.coordinates.get<LDSColSwizzle>(edgeTag).has_value()
-                       || kgraph.coordinates.get<LDSColUnswizzle>(edgeTag).has_value())
-                    {
-                        hasLDSSwizzle = true;
-                        break;
-                    }
-                }
-                if(hasLDSSwizzle)
-                    break;
-            }
-
-            if(!hasLDSSwizzle)
-                return {-1, -1};
-
-            // Walk upstream via Body edges to find the SetCoordinate that sets
-            // the unroll coordinate value for this candidate.
-            int current = candidate;
-            while(true)
-            {
-                auto parents = kgraph.control.getInputNodeIndices<Body>(current).to<std::vector>();
-                if(parents.empty())
-                    break;
-
-                AssertFatal(parents.size() == 1,
-                            "getInlineUnrollInfo: expected single Body parent",
-                            ShowValue(current),
-                            ShowValue(parents.size()));
-
-                current            = parents[0];
-                auto maybeSetCoord = kgraph.control.get<SetCoordinate>(current);
-                if(!maybeSetCoord)
-                    continue;
-
-                auto coordTag = kgraph.mapper.get<Unroll>(current);
-                if(coordTag != kUnrollCoord)
-                    continue;
-
-                auto valueExpr = maybeSetCoord->value;
-                if(!evaluationTimes(valueExpr)[EvaluationTime::Translate])
-                    break;
-
-                auto value = static_cast<int>(getUnsignedInt(evaluate(valueExpr)));
-                return {kUnrollCoord, value};
-            }
-
-            return {-1, -1};
+            return GetInlineUnrollInfo(kgraph, candidate);
         }
 
         void stage(KernelGraph const& kgraph, int candidate, bool isStorePartOfGlobalToLDSOp)
