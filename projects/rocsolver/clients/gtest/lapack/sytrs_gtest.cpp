@@ -60,6 +60,7 @@ const vector<vector<int>> matrix_sizeA_range = {
 const vector<vector<int>> matrix_sizeB_range = {
     // quick return
     {0, 0},
+    {0, 1},
     // invalid
     {-1, 0},
     // normal (valid) samples

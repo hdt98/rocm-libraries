@@ -10549,7 +10549,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_strided_batched_64(rocblas_hand
 
     \details
     It solves the linear system \f$ A X = B \f$ with a symmetric matrix using the factorization A = U * D * U^T or 
-    A = L * D * L^T computed by SYTRF and converted by SYCONV
+    A = L * D * L^T computed by SYTRF. Any required internal conversion of the factorization format is
+    handled automatically by SYTRS2.
 
     \f[
         \begin{array}{cl}
@@ -10576,8 +10577,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs_strided_batched_64(rocblas_hand
                 of the matrix B.
     @param[in,out]
     A           pointer to type. Array on the GPU of dimension lda*n.
-                The factors L (or U) and D  of the factorization A  returned by \ref rocsolver_ssytrf "SYTRF" 
-		and converted then restored by rocsolver_ssyconv "SYCONV"
+                The factors L (or U) and D  of the factorization A  returned by \ref rocsolver_ssytrf "SYTRF".
+                On entry, A holds the factorization; on exit, A is restored to its input state.
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of A.
@@ -10680,7 +10681,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_64(rocblas_handle handle,
 
     \details
     For each instance \f$ l \f$ in the batch, it solves the linear system \f$ A_l X_l = B_l \f$ 
-    using one of the following factorization and converted by SYCONV, depending on the value of ``uplo``:
+    using one of the following factorization, depending on the value of ``uplo``:
 
 
     \f[
@@ -10709,7 +10710,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_64(rocblas_handle handle,
     @param[in,out]
     A           Array of pointers to type. Each pointer points to an array on the GPU of dimension lda*n.
                 The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_ssytrf_batched "SYTRF_BATCHED".
-		and converted then restored by  rocsolver_ssyconv_batched "SYCONV_BATCHED"
+                On entry, A holds the factorization; on exit, A is restored to its input state.
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of matrices A_l.
@@ -10835,7 +10836,7 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_batched_64(rocblas_handle hand
 
     \details
     For each instance \f$ l \f$ in the batch, it solves the linear system \f$ A_l X_l = B_l \f$ 
-    using one of the following factorization and converted by SYCONV, depending on the value of ``uplo``:
+    using one of the following factorization, depending on the value of ``uplo``:
 
     \f[
         \begin{array}{cl}
@@ -10863,8 +10864,8 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs2_batched_64(rocblas_handle hand
                 of all the matrices B_l.
     @param[in,out]
     A           pointer to type. Array on the GPU (the size depends on the value of strideA).
-                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_ssytrf_strided_batched "SYTRF_STRIDED_BATCHED"
-		and converted then restored by rocsolver_ssyconv_strided_batched "SYCONV_STRIDED_BATCHED"
+                The factors L_l (or U_l) and D_l of the factorization A_l  returned by \ref rocsolver_ssytrf_strided_batched "SYTRF_STRIDED_BATCHED".
+                On entry, A holds the factorization; on exit, A is restored to its input state.
     @param[in]
     lda         rocblas_int. lda >= n.
                 The leading dimension of matrices A_l.
