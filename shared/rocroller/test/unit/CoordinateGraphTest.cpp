@@ -1219,5 +1219,4 @@ namespace rocRollerTest
                              ARCH_CoordinateGraphTest,
                              supportedISATuples());
 
-
 }
