@@ -285,31 +285,31 @@ NB_MODULE(origami, m) {
         static_cast<double (*)(const origami::problem_t&,
                                const origami::hardware_t&,
                                const origami::config_t&,
-                               size_t max_cus)>(&origami::compute_total_latency),
+                               size_t max_cus)>(&origami::gemm::compute_total_latency),
         "Compute total latency (uses Formocast when config.prediction_mode == simulation)");
   m.def("compute_number_matrix_instructions",
-        &origami::compute_number_matrix_instructions,
+        &origami::gemm::compute_number_matrix_instructions,
         "Compute the number of matrix instructions required");
   m.def("compute_mt_compute_latency",
-        &origami::compute_mt_compute_latency,
+        &origami::gemm::compute_mt_compute_latency,
         "Compute the latency to process a single macro-tile");
   m.def("check_lds_capacity",
-        &origami::check_lds_capacity,
+        &origami::gemm::check_lds_capacity,
         "Check if MT fits in LDS");
   m.def("estimate_l2_hit",
-        &origami::estimate_l2_hit,
+        &origami::gemm::estimate_l2_hit,
         "Estimate L2 hit rate");
   m.def("estimate_mall_hit",
-        &origami::estimate_mall_hit,
+        &origami::gemm::estimate_mall_hit,
         "Estimate MALL hit rate");
   m.def("compute_memory_latency",
-        &origami::compute_memory_latency,
+        &origami::gemm::compute_memory_latency,
         "Compute memory latency per macro tile");
   m.def("compute_tile_latency",
-        &origami::compute_tile_latency,
+        &origami::gemm::compute_tile_latency,
         "Compute latency to compute a K-complete tile");
   m.def("compute_timestep_latency",
-        &origami::compute_timestep_latency,
+        &origami::gemm::compute_timestep_latency,
         "Compute latency per K-complete MT wave");
 
   // StreamK functions
