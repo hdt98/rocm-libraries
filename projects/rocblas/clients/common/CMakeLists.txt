@@ -160,6 +160,10 @@ rocblas_client_library_settings( rocblas_clients_testing_common )
 if ( WARN_NOT_ILP64_PREFERRED )
   target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB_WARN )
 endif()
+if ( ROCBLAS_REFERENCE_BLAS_DEFINES )
+  target_compile_definitions( rocblas_clients_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
+  target_compile_definitions( rocblas_clients_testing_common PRIVATE ${ROCBLAS_REFERENCE_BLAS_DEFINES} )
+endif()
 target_compile_definitions( rocblas_clients_common PRIVATE ROCBLAS_REFERENCE_LIB=${BLAS_LIBRARY} )
 
 
