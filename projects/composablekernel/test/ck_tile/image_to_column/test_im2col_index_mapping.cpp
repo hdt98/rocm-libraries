@@ -24,6 +24,7 @@
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/transform_conv_fwd_to_gemm_v2.hpp"
+#include "ck_tile/ops/grouped_convolution/utils/transform_conv_bwd_data_to_gemm.hpp"
 
 using namespace ck_tile;
 
@@ -1059,6 +1060,482 @@ TEST_F(Im2colTiledCoordinate, MBaseConstantAcrossKMoves)
         {
             coord.move_step(0, p.C, meta);
             EXPECT_EQ(coord.M_base, m_base_ref) << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+// ===========================================================================
+// TEST SUITE 9: BwdDataInput (dY / GEMM-A in backward-data convolution)
+// ===========================================================================
+//
+// In backward data, GEMM-A is the output-gradient tensor dY (NHWGK).
+// The tilde decomposition introduces multiple sub-GEMMs, each with:
+//   GemmM = (N, HTildeSlice, WTildeSlice)
+//   GemmK = (YDotSlice, XDotSlice, K)
+//
+// Reference offsets are obtained from TransformConvBwdDataToGemm via
+// MakeABCGridDescriptor_A_K0_M_K1_B_K0_N_K1_C_M_N() which builds the
+// standard (non-tiled) descriptor for the A (dY) matrix.
+//
+// BwdData reference struct: per sub-GEMM (i_ytilde, i_xtilde)
+
+using BwdRefTransformer = TransformConvBwdDataToGemm<
+    2,
+    ConvolutionSpecialization::Default,
+    /*VectorSizeA=*/1,
+    /*VectorSizeB=*/1,
+    /*VectorSizeC=*/1,
+    /*SplitN=*/false,
+    float,
+    float,
+    /*NumGroupsToMerge=*/1,
+    /*IndexType=*/int>;
+
+// Build a bwd-data transformer for the given conv params and tilde indices
+BwdRefTransformer make_bwd_transformer(const Conv2dParams& p, int i_ytilde, int i_xtilde)
+{
+    std::array<int, 5> a_lens = {p.G, p.N, p.C, p.Hi, p.Wi};   // dX (NHWGC)
+    std::array<int, 5> b_lens = {p.G, p.K, p.C, p.Y,  p.X};    // W  (GKYXC)
+    std::array<int, 5> c_lens = {p.G, p.N, p.K, p.Ho, p.Wo};   // dY (NHWGK)
+    std::array<int, 2> strides    = {p.SH, p.SW};
+    std::array<int, 2> dilations  = {p.DH, p.DW};
+    std::array<int, 2> left_pads  = {p.PH, p.PW};
+    std::array<int, 2> right_pads = {p.PH, p.PW};
+    std::array<int, 2> tildes     = {i_ytilde, i_xtilde};
+    return BwdRefTransformer{
+        a_lens, b_lens, c_lens, strides, dilations, left_pads, right_pads, tildes};
+}
+
+// Reference offset for (m_gemm, k_gemm) in GEMM-A (dY) for a given sub-GEMM.
+// Returns -1 for positions that are invalid (out-of-bounds in output spatial dims).
+int bwd_reference_offset(const Conv2dParams& p, int i_ytilde, int i_xtilde, int m, int k)
+{
+    auto transformer = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto descs = transformer.MakeABCGridDescriptor_A_K0_M_K1_B_K0_N_K1_C_M_N(1);
+    auto& a_desc = descs.at(number<0>{});
+
+    auto coord = make_tensor_coordinate(a_desc, make_multi_index(m, k));
+    if(!coordinate_has_valid_offset_assuming_top_index_is_valid(a_desc, coord))
+        return -1;
+
+    return coord.get_offset();
+}
+
+class Im2colBwdDataInput : public ::testing::Test
+{
+    protected:
+    // Unit-stride conv (no padding): SH=SW=1, DH=DW=1, PH=PW=0
+    Conv2dParams p = make_unit_params();
+};
+
+// ---- 9a. MakeATileMetadata constants for BwdDataInput ----
+
+TEST_F(Im2colBwdDataInput, MetadataConstantsUnit)
+{
+    // For unit stride: YTilde = SH/gcd(SH,DH) = 1, XTilde = 1 → only one sub-GEMM (0,0)
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeATileMetadata();
+
+    int WoStride_dy = p.G * p.K;
+    int HoStride_dy = p.Wo * WoStride_dy;
+    int NStride_dy  = p.Ho * HoStride_dy;
+
+    // dY (NHWGK) strides
+    EXPECT_EQ(meta.NStride_dy,   NStride_dy);
+    EXPECT_EQ(meta.HoStride_dy,  HoStride_dy);
+    EXPECT_EQ(meta.WoStride_dy,  WoStride_dy);
+
+    // For unit stride+dilation: gcd=1, DH_gcd=DH/gcd=1, DH_gcd_HoStride = HoStride_dy
+    EXPECT_EQ(meta.DH_gcd, p.DH / gcd(p.SH, p.DH));
+    EXPECT_EQ(meta.DW_gcd, p.DW / gcd(p.SW, p.DW));
+    EXPECT_EQ(meta.DH_gcd_HoStride, meta.DH_gcd * HoStride_dy);
+    EXPECT_EQ(meta.DW_gcd_WoStride, meta.DW_gcd * WoStride_dy);
+
+    // GEMM bounds: M = N * HTildeSlice * WTildeSlice, K = YDotSlice * XDotSlice * K
+    EXPECT_EQ(meta.Ho,    p.Ho);
+    EXPECT_EQ(meta.Wo_bwd, p.Wo);
+    EXPECT_GT(meta.M_gemm, 0);
+    EXPECT_GT(meta.K_gemm, 0);
+}
+
+// ---- 9b. Im2ColCoordinate<BwdDataInput>::init() offset vs. reference ----
+
+TEST_F(Im2colBwdDataInput, InitOffsetMatchesReference)
+{
+    // Unit stride → only one sub-GEMM
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeATileMetadata();
+
+    for(int m = 0; m < meta.M_gemm; ++m)
+    {
+        for(int k = 0; k < meta.K_gemm; ++k)
+        {
+            int ref = bwd_reference_offset(p, i_ytilde, i_xtilde, m, k);
+            if(ref == -1) continue;
+
+            Im2ColCoordinate<Im2ColTensor::BwdDataInput> coord;
+            coord.init(m, k, meta);
+
+            EXPECT_TRUE(coord.is_valid())      << "m=" << m << " k=" << k;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+// ---- 9c. Validity agrees with reference ----
+
+TEST_F(Im2colBwdDataInput, ValidityMatchesReference)
+{
+    // Use padded conv so there are invalid positions
+    Conv2dParams pp = make_padded_params();
+    // Compute SH/gcd, SW/gcd for tilde count
+    int GcdSH_DH = gcd(pp.SH, pp.DH);
+    int GcdSW_DW = gcd(pp.SW, pp.DW);
+    int YTilde   = pp.SH / GcdSH_DH;
+    int XTilde   = pp.SW / GcdSW_DW;
+
+    for(int iy = 0; iy < YTilde; ++iy)
+    {
+        for(int ix = 0; ix < XTilde; ++ix)
+        {
+            auto bwd  = make_bwd_transformer(pp, iy, ix);
+            auto meta = bwd.MakeATileMetadata();
+            if(meta.M_gemm == 0 || meta.K_gemm == 0) continue;
+
+            for(int m = 0; m < meta.M_gemm; ++m)
+            {
+                for(int k = 0; k < meta.K_gemm; ++k)
+                {
+                    int ref = bwd_reference_offset(pp, iy, ix, m, k);
+
+                    Im2ColCoordinate<Im2ColTensor::BwdDataInput> coord;
+                    coord.init(m, k, meta);
+
+                    EXPECT_EQ(coord.is_valid(), ref != -1)
+                        << "iy=" << iy << " ix=" << ix << " m=" << m << " k=" << k;
+                    if(ref != -1)
+                        EXPECT_EQ(coord.get_offset(), ref)
+                            << "iy=" << iy << " ix=" << ix << " m=" << m << " k=" << k;
+                }
+            }
+        }
+    }
+}
+
+// ---- 9d. Stride-2 conv: multiple sub-GEMMs ----
+
+TEST_F(Im2colBwdDataInput, Stride2MultipleSubGemms)
+{
+    // SH=SW=2, DH=DW=1 → YTilde = 2, XTilde = 2 → 4 sub-GEMMs
+    Conv2dParams ps = make_stride2_params();
+    int GcdSH_DH = gcd(ps.SH, ps.DH);
+    int GcdSW_DW = gcd(ps.SW, ps.DW);
+    int YTilde   = ps.SH / GcdSH_DH;
+    int XTilde   = ps.SW / GcdSW_DW;
+
+    EXPECT_EQ(YTilde, 2);
+    EXPECT_EQ(XTilde, 2);
+
+    for(int iy = 0; iy < YTilde; ++iy)
+    {
+        for(int ix = 0; ix < XTilde; ++ix)
+        {
+            auto bwd  = make_bwd_transformer(ps, iy, ix);
+            auto meta = bwd.MakeATileMetadata();
+            if(meta.M_gemm == 0 || meta.K_gemm == 0) continue;
+
+            for(int m = 0; m < meta.M_gemm; ++m)
+            {
+                for(int k = 0; k < meta.K_gemm; ++k)
+                {
+                    int ref = bwd_reference_offset(ps, iy, ix, m, k);
+
+                    Im2ColCoordinate<Im2ColTensor::BwdDataInput> coord;
+                    coord.init(m, k, meta);
+
+                    EXPECT_EQ(coord.is_valid(), ref != -1)
+                        << "iy=" << iy << " ix=" << ix << " m=" << m << " k=" << k;
+                    if(ref != -1)
+                        EXPECT_EQ(coord.get_offset(), ref)
+                            << "iy=" << iy << " ix=" << ix << " m=" << m << " k=" << k;
+                }
+            }
+        }
+    }
+}
+
+// ---- 9e. move_step(0, dk) advances K correctly ----
+
+TEST_F(Im2colBwdDataInput, MoveKUpdatesOffset)
+{
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeATileMetadata();
+
+    // For each m, init at k=0 and advance +1 steps; compare against init(m, k).
+    for(int m = 0; m < meta.M_gemm; m += (meta.HTildeSlice * meta.WTildeSlice))
+    {
+        Im2ColCoordinate<Im2ColTensor::BwdDataInput> coord;
+        coord.init(m, 0, meta);
+        const int m_base_ref = coord.M_base;
+
+        for(int k = 1; k < meta.K_gemm; ++k)
+        {
+            coord.move_step(0, 1, meta);
+
+            // M_base must be unchanged
+            EXPECT_EQ(coord.M_base, m_base_ref) << "m=" << m << " k=" << k;
+
+            int ref = bwd_reference_offset(p, i_ytilde, i_xtilde, m, k);
+            if(ref == -1) continue;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+// ---- 9f. Dilation-2 conv ----
+
+TEST_F(Im2colBwdDataInput, Dilation2OffsetMatchesReference)
+{
+    // SH=SW=1, DH=DW=2 → YTilde = 1, XTilde = 1
+    Conv2dParams pd = make_dilation2_params();
+
+    auto bwd  = make_bwd_transformer(pd, 0, 0);
+    auto meta = bwd.MakeATileMetadata();
+
+    for(int m = 0; m < meta.M_gemm; ++m)
+    {
+        for(int k = 0; k < meta.K_gemm; ++k)
+        {
+            int ref = bwd_reference_offset(pd, 0, 0, m, k);
+            if(ref == -1) continue;
+
+            Im2ColCoordinate<Im2ColTensor::BwdDataInput> coord;
+            coord.init(m, k, meta);
+
+            EXPECT_TRUE(coord.is_valid())      << "m=" << m << " k=" << k;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " k=" << k;
+        }
+    }
+}
+
+// ===========================================================================
+// TEST SUITE 10: Im2ColCoordinate<BwdDataOutput>
+// ===========================================================================
+//
+// Reference offsets come from TransformConvBwdDataToGemm::MakeABCGridDescriptor (element [2]),
+// which is the dX (NHWGC) descriptor in the standard bwd-data GEMM transform.
+// The tiled coordinate under test is Im2ColCoordinate<BwdDataOutput> from MakeCTileMetadata().
+// Validity: hi ∈ [0,Hi) and wi ∈ [0,Wi) (i.e. not in the padded region of the input).
+// The N dimension (c_conv) is trivially linear with stride 1 — no divisions needed.
+
+// Reference offset for (m_gemm, n_gemm) in GEMM-C (dX) for a given sub-GEMM.
+// Returns -1 for positions that land in the padded region (outside dX spatial bounds).
+int bwd_c_reference_offset(const Conv2dParams& p, int i_ytilde, int i_xtilde, int m, int n)
+{
+    auto transformer = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto descs       = transformer.MakeABCGridDescriptor_A_K0_M_K1_B_K0_N_K1_C_M_N(1);
+    auto& c_desc     = descs.at(number<2>{});
+
+    auto coord = make_tensor_coordinate(c_desc, make_multi_index(m, n));
+    if(!coordinate_has_valid_offset_assuming_top_index_is_valid(c_desc, coord))
+        return -1;
+
+    return coord.get_offset();
+}
+
+class Im2colBwdDataOutput : public ::testing::Test
+{
+    protected:
+    Conv2dParams p = make_unit_params();
+};
+
+// ---- 10a. MakeCTileMetadata constants for BwdDataOutput ----
+
+TEST_F(Im2colBwdDataOutput, MetadataConstantsUnit)
+{
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeCTileMetadata();
+
+    int WiStride_dx = p.G * p.C;
+    int HiStride_dx = p.Wi * WiStride_dx;
+    int NStride_dx  = p.Hi * HiStride_dx;
+
+    // dX (NHWGC) strides
+    EXPECT_EQ(meta.NStride_dx,  NStride_dx);
+    EXPECT_EQ(meta.HiStride_dx, HiStride_dx);
+    EXPECT_EQ(meta.WiStride_dx, WiStride_dx);
+
+    // For unit stride: IdxYTilde=0 → IdxYTilde_DH = 0, SH=1, PH=0
+    EXPECT_EQ(meta.IdxYTilde_DH, i_ytilde * p.DH);
+    EXPECT_EQ(meta.IdxXTilde_DW, i_xtilde * p.DW);
+    EXPECT_EQ(meta.SH, p.SH);
+    EXPECT_EQ(meta.SW, p.SW);
+    EXPECT_EQ(meta.PH, p.PH);
+    EXPECT_EQ(meta.PW, p.PW);
+    EXPECT_EQ(meta.Hi, p.Hi);
+    EXPECT_EQ(meta.Wi, p.Wi);
+
+    // GEMM bounds
+    EXPECT_GT(meta.M_gemm, 0);
+    EXPECT_EQ(meta.K_gemm, p.C);  // K_gemm reused as N_gemm bound (= C)
+}
+
+// ---- 10b. Init offset vs. reference for unit-stride conv ----
+
+TEST_F(Im2colBwdDataOutput, InitOffsetMatchesReference)
+{
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeCTileMetadata();
+
+    for(int m = 0; m < meta.M_gemm; ++m)
+    {
+        for(int n = 0; n < meta.K_gemm; ++n)
+        {
+            int ref = bwd_c_reference_offset(p, i_ytilde, i_xtilde, m, n);
+            if(ref == -1) continue;
+
+            Im2ColCoordinate<Im2ColTensor::BwdDataOutput> coord;
+            coord.init(m, n, meta);
+
+            EXPECT_TRUE(coord.is_valid())      << "m=" << m << " n=" << n;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " n=" << n;
+        }
+    }
+}
+
+// ---- 10c. Validity agrees with reference (padded conv has invalid positions) ----
+
+TEST_F(Im2colBwdDataOutput, ValidityMatchesReference)
+{
+    Conv2dParams pp = make_padded_params();
+    int GcdSH_DH = gcd(pp.SH, pp.DH);
+    int GcdSW_DW = gcd(pp.SW, pp.DW);
+    int YTilde   = pp.SH / GcdSH_DH;
+    int XTilde   = pp.SW / GcdSW_DW;
+
+    for(int iy = 0; iy < YTilde; ++iy)
+    {
+        for(int ix = 0; ix < XTilde; ++ix)
+        {
+            auto bwd  = make_bwd_transformer(pp, iy, ix);
+            auto meta = bwd.MakeCTileMetadata();
+            if(meta.M_gemm == 0 || meta.K_gemm == 0) continue;
+
+            for(int m = 0; m < meta.M_gemm; ++m)
+            {
+                for(int n = 0; n < meta.K_gemm; ++n)
+                {
+                    int ref = bwd_c_reference_offset(pp, iy, ix, m, n);
+
+                    Im2ColCoordinate<Im2ColTensor::BwdDataOutput> coord;
+                    coord.init(m, n, meta);
+
+                    EXPECT_EQ(coord.is_valid(), ref != -1)
+                        << "iy=" << iy << " ix=" << ix << " m=" << m << " n=" << n;
+                    if(ref != -1)
+                        EXPECT_EQ(coord.get_offset(), ref)
+                            << "iy=" << iy << " ix=" << ix << " m=" << m << " n=" << n;
+                }
+            }
+        }
+    }
+}
+
+// ---- 10d. Stride-2: all four sub-GEMMs ----
+
+TEST_F(Im2colBwdDataOutput, Stride2MultipleSubGemms)
+{
+    Conv2dParams ps = make_stride2_params();
+    int GcdSH_DH = gcd(ps.SH, ps.DH);
+    int GcdSW_DW = gcd(ps.SW, ps.DW);
+    int YTilde   = ps.SH / GcdSH_DH;
+    int XTilde   = ps.SW / GcdSW_DW;
+
+    EXPECT_EQ(YTilde, 2);
+    EXPECT_EQ(XTilde, 2);
+
+    for(int iy = 0; iy < YTilde; ++iy)
+    {
+        for(int ix = 0; ix < XTilde; ++ix)
+        {
+            auto bwd  = make_bwd_transformer(ps, iy, ix);
+            auto meta = bwd.MakeCTileMetadata();
+            if(meta.M_gemm == 0 || meta.K_gemm == 0) continue;
+
+            for(int m = 0; m < meta.M_gemm; ++m)
+            {
+                for(int n = 0; n < meta.K_gemm; ++n)
+                {
+                    int ref = bwd_c_reference_offset(ps, iy, ix, m, n);
+
+                    Im2ColCoordinate<Im2ColTensor::BwdDataOutput> coord;
+                    coord.init(m, n, meta);
+
+                    EXPECT_EQ(coord.is_valid(), ref != -1)
+                        << "iy=" << iy << " ix=" << ix << " m=" << m << " n=" << n;
+                    if(ref != -1)
+                        EXPECT_EQ(coord.get_offset(), ref)
+                            << "iy=" << iy << " ix=" << ix << " m=" << m << " n=" << n;
+                }
+            }
+        }
+    }
+}
+
+// ---- 10e. move_step(0, dn): N_offset_ advances linearly, M_base unchanged ----
+
+TEST_F(Im2colBwdDataOutput, MoveNUpdatesOffset)
+{
+    int i_ytilde = 0, i_xtilde = 0;
+    auto bwd  = make_bwd_transformer(p, i_ytilde, i_xtilde);
+    auto meta = bwd.MakeCTileMetadata();
+
+    for(int m = 0; m < meta.M_gemm; m += (meta.HTildeSlice * meta.WTildeSlice))
+    {
+        Im2ColCoordinate<Im2ColTensor::BwdDataOutput> coord;
+        coord.init(m, 0, meta);
+        const int m_base_ref = coord.M_base;
+
+        for(int n = 1; n < meta.K_gemm; ++n)
+        {
+            coord.move_step(0, 1, meta);
+
+            // M_base must be unchanged across pure-N moves
+            EXPECT_EQ(coord.M_base, m_base_ref) << "m=" << m << " n=" << n;
+
+            int ref = bwd_c_reference_offset(p, i_ytilde, i_xtilde, m, n);
+            if(ref == -1) continue;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " n=" << n;
+        }
+    }
+}
+
+// ---- 10f. Dilation-2 conv ----
+
+TEST_F(Im2colBwdDataOutput, Dilation2OffsetMatchesReference)
+{
+    Conv2dParams pd = make_dilation2_params();
+
+    auto bwd  = make_bwd_transformer(pd, 0, 0);
+    auto meta = bwd.MakeCTileMetadata();
+
+    for(int m = 0; m < meta.M_gemm; ++m)
+    {
+        for(int n = 0; n < meta.K_gemm; ++n)
+        {
+            int ref = bwd_c_reference_offset(pd, 0, 0, m, n);
+            if(ref == -1) continue;
+
+            Im2ColCoordinate<Im2ColTensor::BwdDataOutput> coord;
+            coord.init(m, n, meta);
+
+            EXPECT_TRUE(coord.is_valid())      << "m=" << m << " n=" << n;
+            EXPECT_EQ(coord.get_offset(), ref) << "m=" << m << " n=" << n;
         }
     }
 }

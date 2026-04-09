@@ -14,8 +14,10 @@ namespace ck_tile {
 // ============================================================================
 enum class Im2ColTensor
 {
-    FwdInput,  // GEMM-A: input tensor (NHWGC), requires full (y,x,c) K-decode + padding check
-    FwdOutput, // GEMM-C: output tensor (NHWGK), K-dim is trivially k_conv = n_gemm
+    FwdInput,     // GEMM-A: input tensor (NHWGC), requires full (y,x,c) K-decode + padding check
+    FwdOutput,    // GEMM-C: output tensor (NHWGK), K-dim is trivially k_conv = n_gemm
+    BwdDataInput, // GEMM-A: output-gradient tensor (NHWGK); K decomposes as (ydot,xdot,k_out)
+    BwdDataOutput,// GEMM-C: input-gradient tensor (NHWGC); N-dim is c_conv; validity = no-pad
 };
 
 // ============================================================================
@@ -54,7 +56,7 @@ struct Im2ColMetadata
     index_t DH_HiStride;  // DH * HiStride  (y contribution to K_offset)
     index_t DW_WiStride;  // DW * WiStride  (x contribution to K_offset)
 
-    // ---- N-dimension constants (FwdOutput only; unused for FwdInput) ----
+    // ---- N-dimension constants (FwdOutput only; unused for FwdInput/BwdDataInput) ----
     index_t KStride;      // stride for k_conv in output tensor (= 1 for contiguous K)
 
     // ---- Dimension sizes (for decode and validity) ----
@@ -87,6 +89,80 @@ struct Im2ColMetadata
     mdiv2 mdiv_Wo;        // magic divisor for Wo    (used in init_m: rem / Wo)
     mdiv2 mdiv_XC;        // magic divisor for XC    (used in init_k: k / XC, FwdInput only)
     mdiv2 mdiv_C;         // magic divisor for C     (used in init_k: rem / C, FwdInput only)
+
+    // ---- BwdDataInput fields (BwdDataInput only) ----
+    // dY tensor layout: NHWGK  (n, ho, wo, g, k)
+    // GemmM = (N, HTildeSlice, WTildeSlice),  GemmK = (YDotSlice, XDotSlice, K)
+    //
+    // M decode:  m_gemm → (n, htilde_local, wtilde_local)
+    //   htilde_abs = htilde_local + IHTildeSliceBegin
+    //   wtilde_abs = wtilde_local + IWTildeSliceBegin
+    //   M_base  = n * NStride_dy + htilde_abs * HoStride_dy + wtilde_abs * WoStride_dy
+    //           = n * NStride_dy + (htilde_local + IHTildeSliceBegin) * HoStride_dy
+    //                            + (wtilde_local + IWTildeSliceBegin) * WoStride_dy
+    //
+    // K decode:  k_gemm → (ydot, xdot, k_out)  with periods (YDotSlice, XDotSlice, K)
+    //   K_offset = -ydot * (DH/gcd * HoStride_dy) - xdot * (DW/gcd * WoStride_dy) + k_out
+    //
+    // Validity: ho = htilde_abs - ydot*(DH/gcd) ∈ [0, Ho)
+    //           wo = wtilde_abs - xdot*(DW/gcd) ∈ [0, Wo)
+
+    // M-side strides for dY (NHWGK)
+    index_t NStride_dy;       // Ho * Wo * G * K
+    index_t HoStride_dy;      // Wo * G * K
+    index_t WoStride_dy;      // G * K  (= 1 when G=K=1)
+
+    // K-offset coefficients (negative per dot step)
+    index_t DH_gcd_HoStride;  // (DH / GcdSH_DH) * HoStride_dy   (step per ydot)
+    index_t DW_gcd_WoStride;  // (DW / GcdSW_DW) * WoStride_dy   (step per xdot)
+    index_t DH_gcd;           // DH / GcdSH_DH  — spatial step per ydot (for validity)
+    index_t DW_gcd;           // DW / GcdSW_DW  — spatial step per xdot (for validity)
+
+    // Tilde-slice origin (added to decoded htilde_local / wtilde_local to get htilde_abs)
+    index_t IHTildeSliceBegin; // first htilde that touches the non-pad input region
+    index_t IWTildeSliceBegin; // first wtilde that touches the non-pad input region
+
+    // Tilde-slice widths (sizes of the slice in M dimension)
+    index_t HTildeSlice;
+    index_t WTildeSlice;
+
+    // K decomposition periods
+    index_t K;            // output channels per group  (innermost K-period in GemmK)
+    index_t XDotSlice;    // ceil((X - IdxXTilde) / XTilde)  (mid K-period)
+
+    // Validity bounds for output spatial dimensions
+    index_t Ho;           // output height (htilde_abs - ydot*(DH/gcd) must be in [0, Ho))
+    index_t Wo_bwd;       // output width  (wtilde_abs - xdot*(DW/gcd) must be in [0, Wo))
+
+    // Magic divisors for BwdDataInput M and K decode
+    mdiv2 mdiv_HTildeSlice_WTildeSlice; // for n: m / (HTildeSlice * WTildeSlice)
+    mdiv2 mdiv_WTildeSlice;             // for htilde_local: rem / WTildeSlice
+    mdiv2 mdiv_XDotSlice_K;             // for ydot: k / (XDotSlice * K)
+    mdiv2 mdiv_K;                       // for xdot: rem / K
+
+    // ---- BwdDataOutput fields (BwdDataOutput only) ----
+    // dX tensor layout: NHWGC  (n, hi, wi, g, c)
+    // GemmM = (N, HTildeSlice, WTildeSlice),  GemmN = C
+    //
+    // M decode:  m_gemm → (n, htilde_local, wtilde_local)
+    //   htilde_abs = htilde_local + IHTildeSliceBegin
+    //   hi = IdxYTilde * DH + htilde_abs * SH - PH
+    //   wi = IdxXTilde * DW + wtilde_abs * SW - PW
+    //   M_base = n * NStride_dx + hi * HiStride_dx + wi * WiStride_dx
+    //
+    // N is trivially c_conv (contiguous C-dimension).
+    //
+    // Validity: hi ∈ [0, Hi)  and  wi ∈ [0, Wi)
+    //   (elements in the padded region are excluded)
+
+    // dX (NHWGC) strides
+    index_t NStride_dx;     // Hi * Wi * G * C
+    index_t HiStride_dx;    // Wi * G * C
+    index_t WiStride_dx;    // G * C
+
+    // Constants folded from tilde + conv params (per sub-GEMM)
+    index_t IdxYTilde_DH;   // IdxYTilde * DH  (constant hi contribution from current YTilde)
+    index_t IdxXTilde_DW;   // IdxXTilde * DW  (constant wi contribution from current XTilde)
 };
 
 // ============================================================================
@@ -339,6 +415,279 @@ struct Im2ColCoordinate<Im2ColTensor::FwdOutput>
         {
             n_gemm    += dn;
             N_offset_ += dn * meta.KStride;
+            valid = (n_gemm < meta.K_gemm) && valid;
+        }
+        else
+        {
+            init(m_gemm + dm, n_gemm + dn, meta);
+        }
+    }
+
+    CK_TILE_HOST_DEVICE index_t get_offset() const { return M_base + N_offset_; }
+    CK_TILE_HOST_DEVICE bool    is_valid()   const { return valid; }
+};
+
+// ============================================================================
+// Im2ColCoordinate<BwdDataInput>
+// ============================================================================
+// Coordinate for the A (dY / output-gradient) tile window in bwd-data convolution.
+// dY tensor layout: NHWGK  →  GemmM = (N, HTildeSlice, WTildeSlice),
+//                             GemmK = (YDotSlice, XDotSlice, K)
+//
+// Address formula:
+//   offset(m, k) = M_base(m) + K_offset(k)
+//
+//   M_base(m)    = n * NStride_dy
+//                + (htilde_local + IHTildeSliceBegin) * HoStride_dy
+//                + (wtilde_local + IWTildeSliceBegin) * WoStride_dy
+//
+//   K_offset(k)  = -ydot * DH_gcd_HoStride
+//                  -xdot * DW_gcd_WoStride
+//                  + k_out
+//   Note: K_offset is negative for non-zero ydot/xdot; combined offset ≥ 0 for valid elements.
+//
+// Validity: ho = (htilde_local + IHTildeSliceBegin) - ydot * (DH/gcd) ∈ [0, Ho)
+//           wo = (wtilde_local + IWTildeSliceBegin) - xdot * (DW/gcd) ∈ [0, Wo)
+//           m_gemm < M_gemm,  k_gemm < K_gemm
+
+template <>
+struct Im2ColCoordinate<Im2ColTensor::BwdDataInput>
+{
+    index_t M_base;         // offset from m_gemm (constant across K-loop when dm=0)
+    index_t K_offset_;      // offset from k_gemm (may be negative; total offset ≥ 0 when valid)
+    index_t m_gemm;         // current absolute M index
+    index_t k_gemm;         // current absolute K index
+    index_t htilde_local_;  // htilde within slice (htilde_abs = htilde_local_ + IHTildeSliceBegin)
+    index_t wtilde_local_;  // wtilde within slice
+    index_t htilde_abs_;    // cached htilde_abs = htilde_local_ + IHTildeSliceBegin
+    index_t wtilde_abs_;    // cached wtilde_abs = wtilde_local_ + IWTildeSliceBegin
+    index_t ydot_;          // current YDot index
+    index_t xdot_;          // current XDot index
+    index_t k_out_;         // current K (output channel) index within slice
+    bool    valid;          // true iff the (m, k) combination addresses a real dY element
+
+    // -------------------------------------------------------------------------
+    // M part: decode m_gemm → (n, htilde_local, wtilde_local), compute M_base.
+    // Cost: 3 integer divisions (via magic multiply-shift).
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init_m(index_t m, const Im2ColMetadata& meta)
+    {
+        m_gemm = m;
+
+        uint32_t n, rem_m, htloc, wtloc;
+        meta.mdiv_HTildeSlice_WTildeSlice.divmod(
+            static_cast<uint32_t>(m), meta.HTildeSlice * meta.WTildeSlice, n, rem_m);
+        meta.mdiv_WTildeSlice.divmod(
+            static_cast<uint32_t>(rem_m), meta.WTildeSlice, htloc, wtloc);
+
+        htilde_local_ = static_cast<index_t>(htloc);
+        wtilde_local_ = static_cast<index_t>(wtloc);
+        htilde_abs_   = htilde_local_ + meta.IHTildeSliceBegin;
+        wtilde_abs_   = wtilde_local_ + meta.IWTildeSliceBegin;
+
+        M_base = static_cast<index_t>(n) * meta.NStride_dy
+               + htilde_abs_ * meta.HoStride_dy
+               + wtilde_abs_ * meta.WoStride_dy;
+    }
+
+    // -------------------------------------------------------------------------
+    // K part: decode k_gemm → (ydot, xdot, k_out), compute K_offset_.
+    // Cost: 2 integer divisions.
+    // Must be called after init_m() (uses htilde_abs_, wtilde_abs_ for validity).
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init_k(index_t k, const Im2ColMetadata& meta)
+    {
+        k_gemm = k;
+
+        uint32_t ydot, rem_k, xdot, kout;
+        meta.mdiv_XDotSlice_K.divmod(
+            static_cast<uint32_t>(k), meta.XDotSlice * meta.K, ydot, rem_k);
+        meta.mdiv_K.divmod(static_cast<uint32_t>(rem_k), meta.K, xdot, kout);
+
+        ydot_   = static_cast<index_t>(ydot);
+        xdot_   = static_cast<index_t>(xdot);
+        k_out_  = static_cast<index_t>(kout);
+
+        // K_offset_ is negative for non-zero dot indices.
+        // The combined offset (M_base + K_offset_) is always non-negative for valid elements.
+        K_offset_ = -ydot_ * meta.DH_gcd_HoStride
+                    - xdot_ * meta.DW_gcd_WoStride
+                    + k_out_;
+    }
+
+    CK_TILE_HOST_DEVICE void init_valid(const Im2ColMetadata& meta)
+    {
+        // ho and wo are the output spatial coordinates in dY that this (m,k) addresses.
+        // For the element to exist in dY, both must be in [0, Ho) and [0, Wo) respectively.
+        const index_t ho = htilde_abs_ - ydot_ * meta.DH_gcd;
+        const index_t wo = wtilde_abs_ - xdot_ * meta.DW_gcd;
+        valid = (m_gemm < meta.M_gemm) && (k_gemm < meta.K_gemm) &&
+                (ho >= 0 && ho < meta.Ho) && (wo >= 0 && wo < meta.Wo_bwd);
+    }
+
+    CK_TILE_HOST_DEVICE void init(index_t m, index_t k, const Im2ColMetadata& meta)
+    {
+        init_m(m, meta);
+        init_k(k, meta);
+        init_valid(meta);
+    }
+
+    // -------------------------------------------------------------------------
+    // Move by (dm, dk) in the global (M, K) space.
+    //
+    // When dm == 0 (pure K step): 0 divmod.
+    //   k_out_, xdot_, ydot_ updated incrementally with additions and comparisons.
+    //
+    // When dm != 0: full reinit, 5 divmod.  Rare — only during tile setup.
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void move_step(index_t dm, index_t dk, const Im2ColMetadata& meta)
+    {
+        if(dm == 0)
+        {
+            k_gemm += dk;
+            k_out_ += dk;
+
+            if(k_out_ >= meta.K)
+            {
+                // k_out_ crossed a K boundary — recompute xdot_ and ydot_ from scratch.
+                // This is a less-frequent event (period K), so full recomputation is acceptable.
+                k_out_ -= meta.K;
+                xdot_++;
+
+                if(xdot_ >= meta.XDotSlice)
+                {
+                    xdot_ = 0;
+                    ydot_++;
+                }
+
+                // Recompute K_offset_ from the updated (ydot_, xdot_, k_out_).
+                K_offset_ = -ydot_ * meta.DH_gcd_HoStride
+                            - xdot_ * meta.DW_gcd_WoStride
+                            + k_out_;
+
+                // Recompute validity.
+                const index_t ho = htilde_abs_ - ydot_ * meta.DH_gcd;
+                const index_t wo = wtilde_abs_ - xdot_ * meta.DW_gcd;
+                valid = (k_gemm < meta.K_gemm) &&
+                        (ho >= 0 && ho < meta.Ho) && (wo >= 0 && wo < meta.Wo_bwd);
+            }
+            else
+            {
+                K_offset_ += dk;
+                valid = (k_gemm < meta.K_gemm) && valid;
+            }
+        }
+        else
+        {
+            init(m_gemm + dm, k_gemm + dk, meta);
+        }
+    }
+
+    CK_TILE_HOST_DEVICE index_t get_offset() const { return M_base + K_offset_; }
+    CK_TILE_HOST_DEVICE bool    is_valid()   const { return valid; }
+};
+
+// ============================================================================
+// Im2ColCoordinate<BwdDataOutput>
+// ============================================================================
+// Coordinate for the C (dX / input-gradient) tile window in bwd-data convolution.
+// dX tensor layout: NHWGC  →  GemmM = (N, HTildeSlice, WTildeSlice),
+//                             GemmN = C (trivially linear)
+//
+// Address formula:
+//   offset(m, n) = M_base(m) + n
+//
+//   M_base(m) = n_batch * NStride_dx
+//             + hi * HiStride_dx
+//             + wi * WiStride_dx
+//
+//   where hi = IdxYTilde_DH + (htilde_local + IHTildeSliceBegin) * SH - PH
+//         wi = IdxXTilde_DW + (wtilde_local + IWTildeSliceBegin) * SW - PW
+//
+// Validity: hi ∈ [0, Hi)  and  wi ∈ [0, Wi)
+//   Elements in the padded region must not be written to the input tensor.
+//   m_gemm < M_gemm  and  n < C (= K_gemm for BwdDataOutput).
+
+template <>
+struct Im2ColCoordinate<Im2ColTensor::BwdDataOutput>
+{
+    index_t M_base;         // offset from m_gemm (constant across N-loop when dm=0)
+    index_t N_offset_;      // offset from n_gemm (= n, since C-stride = 1)
+    index_t m_gemm;         // current absolute M index
+    index_t n_gemm;         // current absolute N index (= c_conv)
+    index_t htilde_local_;  // htilde within slice
+    index_t wtilde_local_;  // wtilde within slice
+    bool    valid;          // true iff (m, n) maps to a non-padded dX element
+
+    // -------------------------------------------------------------------------
+    // M part: decode m_gemm → (n_batch, htilde_local, wtilde_local), compute M_base.
+    // Cost: 3 integer divisions (via magic multiply-shift).
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init_m(index_t m, const Im2ColMetadata& meta)
+    {
+        m_gemm = m;
+
+        uint32_t n_batch, rem_m, htloc, wtloc;
+        meta.mdiv_HTildeSlice_WTildeSlice.divmod(
+            static_cast<uint32_t>(m), meta.HTildeSlice * meta.WTildeSlice, n_batch, rem_m);
+        meta.mdiv_WTildeSlice.divmod(
+            static_cast<uint32_t>(rem_m), meta.WTildeSlice, htloc, wtloc);
+
+        htilde_local_ = static_cast<index_t>(htloc);
+        wtilde_local_ = static_cast<index_t>(wtloc);
+
+        const index_t htilde_abs = htilde_local_ + meta.IHTildeSliceBegin;
+        const index_t wtilde_abs = wtilde_local_ + meta.IWTildeSliceBegin;
+
+        // Map tilde coordinates to input spatial coordinates
+        const index_t hi = meta.IdxYTilde_DH + htilde_abs * meta.SH - meta.PH;
+        const index_t wi = meta.IdxXTilde_DW + wtilde_abs * meta.SW - meta.PW;
+
+        M_base = static_cast<index_t>(n_batch) * meta.NStride_dx
+               + hi * meta.HiStride_dx
+               + wi * meta.WiStride_dx;
+    }
+
+    // -------------------------------------------------------------------------
+    // N part: trivially linear — n_gemm is the input channel index c_conv.
+    // Cost: 0 integer divisions.
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void init_k(index_t n, const Im2ColMetadata& meta)
+    {
+        n_gemm    = n;
+        N_offset_ = n;   // C-stride = 1 (contiguous channels)
+        (void)meta;
+    }
+
+    CK_TILE_HOST_DEVICE void init_valid(const Im2ColMetadata& meta)
+    {
+        const index_t htilde_abs = htilde_local_ + meta.IHTildeSliceBegin;
+        const index_t wtilde_abs = wtilde_local_ + meta.IWTildeSliceBegin;
+        const index_t hi = meta.IdxYTilde_DH + htilde_abs * meta.SH - meta.PH;
+        const index_t wi = meta.IdxXTilde_DW + wtilde_abs * meta.SW - meta.PW;
+        valid = (m_gemm < meta.M_gemm) && (n_gemm < meta.K_gemm) &&
+                (hi >= 0 && hi < meta.Hi) && (wi >= 0 && wi < meta.Wi);
+    }
+
+    CK_TILE_HOST_DEVICE void init(index_t m, index_t n, const Im2ColMetadata& meta)
+    {
+        init_m(m, meta);
+        init_k(n, meta);
+        init_valid(meta);
+    }
+
+    // -------------------------------------------------------------------------
+    // Move by (dm, dn) in the global (M, N) space.
+    //
+    // When dm == 0 (pure N step): 0 divmod.  N_offset_ updated trivially.
+    // When dm != 0: full reinit, 3 divmod.  Rare — only during tile setup.
+    // -------------------------------------------------------------------------
+    CK_TILE_HOST_DEVICE void move_step(index_t dm, index_t dn, const Im2ColMetadata& meta)
+    {
+        if(dm == 0)
+        {
+            n_gemm    += dn;
+            N_offset_ += dn;
             valid = (n_gemm < meta.K_gemm) && valid;
         }
         else

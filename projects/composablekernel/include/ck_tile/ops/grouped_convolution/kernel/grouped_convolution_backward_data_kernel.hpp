@@ -237,9 +237,19 @@ struct GroupedConvBwdDataKernelArgs
                                       .template MakeABCGridDescriptor_A_K0_M_K1_B_K0_N_K1_C_M_N<
                                           GroupedConvTraitsType_::NDimSpatial>(1);
 
-                a_grid_descs_m_k[gemm_count] = grid_descs.at(number<0>{});
-                b_grid_descs_n_k[gemm_count] = grid_descs.at(number<1>{});
-                c_grid_descs_m_n[gemm_count] = grid_descs.at(number<2>{});
+                a_grid_descs_m_k[gemm_count]  = grid_descs.at(number<0>{});
+                b_grid_descs_n_k[gemm_count]  = grid_descs.at(number<1>{});
+                c_grid_descs_m_n[gemm_count]  = grid_descs.at(number<2>{});
+
+                if constexpr(GroupedConvTraitsType_::NDimSpatial == 2)
+                {
+                    a_tiled_descs_m_k[gemm_count] =
+                        conv_to_gemm_transformer
+                            .template MakeADescriptor_M_K</*EnableTiledIm2Col=*/true>();
+                    c_tiled_descs_m_n[gemm_count] =
+                        conv_to_gemm_transformer
+                            .template MakeCDescriptor_M_N</*EnableTiledIm2Col=*/true>();
+                }
 
                 const index_t grid_size_grp =
                     TilePartitioner::GridSize(c_grid_descs_m_n[gemm_count].get_length(I0),
@@ -427,6 +437,37 @@ struct GroupedConvBwdDataKernelArgs
     using BGridDescNK = remove_cvref_t<decltype(ABCGridDescs{}[number<1>{}])>;
     using CGridDescMN = remove_cvref_t<decltype(ABCGridDescs{}[number<2>{}])>;
 
+    static constexpr bool UseTiledIm2Col = GroupedConvTraitsType_::UseTiledIm2Col;
+
+    // ATiledDescMK: type of the tiled im2col descriptor for GEMM-A (BwdDataInput, 2D only).
+    // For 1D and 3D we just alias AGridDescMK since tiled im2col is not implemented for them.
+    template <index_t NDim, typename = void>
+    struct ATiledDescMKHelper
+    {
+        using type = AGridDescMK;
+    };
+    template <index_t NDim>
+    struct ATiledDescMKHelper<NDim, typename std::enable_if<NDim == 2>::type>
+    {
+        using type = remove_cvref_t<decltype(
+            ConvToGemmTransformer{}.template MakeADescriptor_M_K</*EnableTiledIm2Col=*/true>())>;
+    };
+    using ATiledDescMK = typename ATiledDescMKHelper<GroupedConvTraitsType_::NDimSpatial>::type;
+
+    // CTiledDescMN: type of the tiled im2col descriptor for GEMM-C (BwdDataOutput, 2D only).
+    template <index_t NDim, typename = void>
+    struct CTiledDescMNHelper
+    {
+        using type = CGridDescMN;
+    };
+    template <index_t NDim>
+    struct CTiledDescMNHelper<NDim, typename std::enable_if<NDim == 2>::type>
+    {
+        using type = remove_cvref_t<decltype(
+            ConvToGemmTransformer{}.template MakeCDescriptor_M_N</*EnableTiledIm2Col=*/true>())>;
+    };
+    using CTiledDescMN = typename CTiledDescMNHelper<GroupedConvTraitsType_::NDimSpatial>::type;
+
     static constexpr index_t NonSpatialDims = 3;
     array<index_t, NonSpatialDims + GroupedConvTraitsType_::NDimSpatial> in_g_n_c_wis_lengths;
     array<index_t, NonSpatialDims + GroupedConvTraitsType_::NDimSpatial> wei_g_k_c_xs_lengths;
@@ -448,9 +489,11 @@ struct GroupedConvBwdDataKernelArgs
     std::array<const void*, NumDTensor> ds_ptr;
     const void* wei_ptr;
 
-    array<AGridDescMK, MaxGroupedGemmGroupsNum> a_grid_descs_m_k;
-    array<BGridDescNK, MaxGroupedGemmGroupsNum> b_grid_descs_n_k;
-    array<CGridDescMN, MaxGroupedGemmGroupsNum> c_grid_descs_m_n;
+    array<AGridDescMK,    MaxGroupedGemmGroupsNum> a_grid_descs_m_k;
+    array<ATiledDescMK,   MaxGroupedGemmGroupsNum> a_tiled_descs_m_k;
+    array<BGridDescNK,    MaxGroupedGemmGroupsNum> b_grid_descs_n_k;
+    array<CGridDescMN,    MaxGroupedGemmGroupsNum> c_grid_descs_m_n;
+    array<CTiledDescMN,   MaxGroupedGemmGroupsNum> c_tiled_descs_m_n;
 
     array<index_t, MaxGroupedGemmGroupsNum> block_starts;
     array<index_t, MaxGroupedGemmGroupsNum> block_ends;
@@ -624,23 +667,42 @@ struct GroupedConvolutionBackwardDataKernel
                      const index_t i_m,
                      const index_t i_k)
     {
-        // Step 1: Create tensor view for A (Out tensor)
-        const auto& a_tensor_view =
-            make_tensor_view<address_space_enum::global>(a_ptr, kargs.a_grid_descs_m_k[group_id]);
+        if constexpr(GroupedConvBwdDataKernelArgsSpecialized::UseTiledIm2Col)
+        {
+            // Tiled im2col path: use the pre-computed BwdDataInput descriptor with Im2ColMetadata.
+            const auto& a_tensor_view = make_tensor_view<address_space_enum::global>(
+                a_ptr, kargs.a_tiled_descs_m_k[group_id]);
 
-        // Step 2: Create padded view
-        const auto& a_pad_view = pad_tensor_view(
-            a_tensor_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            sequence<true, true>{});
+            const auto& a_pad_view = pad_tensor_view(
+                a_tensor_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::KPerBlock>{}),
+                sequence<true, true>{});
 
-        // Step 3: Create tile window
-        auto a_block_window = make_tile_window(
-            a_pad_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            {i_m, i_k});
+            return make_tile_window(
+                a_pad_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::KPerBlock>{}),
+                {i_m, i_k});
+        }
+        else
+        {
+            // Standard path: use the regular transform-chain descriptor.
+            const auto& a_tensor_view = make_tensor_view<address_space_enum::global>(
+                a_ptr, kargs.a_grid_descs_m_k[group_id]);
 
-        return a_block_window;
+            const auto& a_pad_view = pad_tensor_view(
+                a_tensor_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::KPerBlock>{}),
+                sequence<true, true>{});
+
+            return make_tile_window(
+                a_pad_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::KPerBlock>{}),
+                {i_m, i_k});
+        }
     }
 
     CK_TILE_DEVICE static auto
@@ -709,23 +771,44 @@ struct GroupedConvolutionBackwardDataKernel
                      const index_t i_m,
                      const index_t i_n)
     {
-        // Step 1: Create tensor view for C (Input tensor)
-        const auto& c_tensor_view = make_tensor_view<address_space_enum::global, DstInMemOp>(
-            c_ptr, kargs.c_grid_descs_m_n[group_id]);
+        if constexpr(GroupedConvBwdDataKernelArgsSpecialized::UseTiledIm2Col)
+        {
+            // Tiled im2col path: use the pre-computed BwdDataOutput descriptor.
+            const auto& c_tensor_view =
+                make_tensor_view<address_space_enum::global, DstInMemOp>(
+                    c_ptr, kargs.c_tiled_descs_m_n[group_id]);
 
-        // Step 2: Create padded view
-        const auto& c_pad_view = pad_tensor_view(
-            c_tensor_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
-            sequence<true, true>{});
+            const auto& c_pad_view = pad_tensor_view(
+                c_tensor_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::NPerBlock>{}),
+                sequence<true, true>{});
 
-        // Step 3: Create tile window
-        auto c_block_window = make_tile_window(
-            c_pad_view,
-            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
-            {i_m, i_n});
+            return make_tile_window(
+                c_pad_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::NPerBlock>{}),
+                {i_m, i_n});
+        }
+        else
+        {
+            // Standard path: use the regular transform-chain descriptor.
+            const auto& c_tensor_view =
+                make_tensor_view<address_space_enum::global, DstInMemOp>(
+                    c_ptr, kargs.c_grid_descs_m_n[group_id]);
 
-        return c_block_window;
+            const auto& c_pad_view = pad_tensor_view(
+                c_tensor_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::NPerBlock>{}),
+                sequence<true, true>{});
+
+            return make_tile_window(
+                c_pad_view,
+                make_tuple(number<TilePartitioner::MPerBlock>{},
+                           number<TilePartitioner::NPerBlock>{}),
+                {i_m, i_n});
+        }
     }
 
     CK_TILE_HOST static bool

@@ -3,6 +3,8 @@
 
 #pragma once
 #include "ck_tile/core.hpp"
+#include "ck_tile/core/tensor/im2col_coordinate.hpp"
+#include "ck_tile/core/tensor/tiled_im2col_descriptor.hpp"
 #include "ck_tile/ops/grouped_convolution/utils/convolution_specialization.hpp"
 
 namespace ck_tile {
@@ -1188,6 +1190,408 @@ struct TransformConvBwdDataToGemm
             return make_tuple(out_gemmm_gemmkraw_grid_desc,
                               wei_gemmn_gemmkraw_grid_desc,
                               in_gemmmraw_gemmnraw_grid_desc);
+        }
+    }
+
+    // =========================================================================
+    // MakeATileMetadata — 2D NHWGK (dY), Default specialization.
+    //
+    // Builds the Im2ColMetadata for the BwdDataInput tensor (GEMM-A in bwd-data).
+    // The dY tensor layout is NHWGK:
+    //   GemmM = (N, HTildeSlice, WTildeSlice)
+    //   GemmK = (YDotSlice, XDotSlice, K)
+    //
+    // Must be called after setting IdxYTilde_ / IdxXTilde_ for the current sub-GEMM.
+    // =========================================================================
+    template <index_t NDim = NDimSpatial, typename std::enable_if<NDim == 2, bool>::type = false>
+    CK_TILE_HOST Im2ColMetadata MakeATileMetadata() const
+    {
+        // dY tensor (NHWGK) strides
+        const IndexType WoStride_dy = G_ * K_;
+        const IndexType HoStride_dy = Wo_ * WoStride_dy;
+        const IndexType NStride_dy  = Ho_ * HoStride_dy;
+
+        // Tilde-slice bounds (same as in MakeABCGridDescriptor)
+        const IndexType IHTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadH_ - ConvDilationH_ * (YTilde_ - I1)), ConvStrideH_);
+        const IndexType IWTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadW_ - ConvDilationW_ * (XTilde_ - I1)), ConvStrideW_);
+        const IndexType IHTildeSliceEnd =
+            min(HTilde_, integer_divide_ceil(InLeftPadH_ + Hi_ - I1, ConvStrideH_) + I1);
+        const IndexType IWTildeSliceEnd =
+            min(WTilde_, integer_divide_ceil(InLeftPadW_ + Wi_ - I1, ConvStrideW_) + I1);
+        const IndexType HTildeSlice = IHTildeSliceEnd - IHTildeSliceBegin;
+        const IndexType WTildeSlice = IWTildeSliceEnd - IWTildeSliceBegin;
+
+        // K-decomposition sizes for this sub-GEMM (indexed by IdxYTilde_ / IdxXTilde_)
+        const IndexType YDotSlice = integer_divide_ceil(Y_ - IdxYTilde_, YTilde_);
+        const IndexType XDotSlice = integer_divide_ceil(X_ - IdxXTilde_, XTilde_);
+
+        // DH/gcd and DW/gcd — spatial step per dot index
+        const IndexType DH_gcd = ConvDilationH_ / GcdStrideDilationH_;
+        const IndexType DW_gcd = ConvDilationW_ / GcdStrideDilationW_;
+
+        Im2ColMetadata meta;
+
+        // M-side: dY spatial strides
+        meta.NStride_dy        = static_cast<index_t>(NStride_dy);
+        meta.HoStride_dy       = static_cast<index_t>(HoStride_dy);
+        meta.WoStride_dy       = static_cast<index_t>(WoStride_dy);
+
+        // K-offset coefficients
+        meta.DH_gcd_HoStride   = static_cast<index_t>(DH_gcd * HoStride_dy);
+        meta.DW_gcd_WoStride   = static_cast<index_t>(DW_gcd * WoStride_dy);
+        meta.DH_gcd            = static_cast<index_t>(DH_gcd);
+        meta.DW_gcd            = static_cast<index_t>(DW_gcd);
+
+        // Tilde-slice geometry
+        meta.IHTildeSliceBegin = static_cast<index_t>(IHTildeSliceBegin);
+        meta.IWTildeSliceBegin = static_cast<index_t>(IWTildeSliceBegin);
+        meta.HTildeSlice       = static_cast<index_t>(HTildeSlice);
+        meta.WTildeSlice       = static_cast<index_t>(WTildeSlice);
+
+        // K decomposition
+        meta.K                 = static_cast<index_t>(K_);
+        meta.XDotSlice         = static_cast<index_t>(XDotSlice);
+
+        // Validity bounds
+        meta.Ho                = static_cast<index_t>(Ho_);
+        meta.Wo_bwd            = static_cast<index_t>(Wo_);
+
+        // GEMM bounds
+        meta.M_gemm            = static_cast<index_t>(N_ * HTildeSlice * WTildeSlice);
+        meta.K_gemm            = static_cast<index_t>(YDotSlice * XDotSlice * K_);
+
+        // Magic divisors for M decode: m → (n, htilde_local, wtilde_local)
+        meta.mdiv_HTildeSlice_WTildeSlice =
+            mdiv2(static_cast<uint32_t>(HTildeSlice * WTildeSlice));
+        meta.mdiv_WTildeSlice = mdiv2(static_cast<uint32_t>(WTildeSlice));
+
+        // Magic divisors for K decode: k → (ydot, xdot, k_out)
+        meta.mdiv_XDotSlice_K = mdiv2(static_cast<uint32_t>(XDotSlice * K_));
+        meta.mdiv_K           = mdiv2(static_cast<uint32_t>(K_));
+
+        // Fields unused for BwdDataInput — zero-initialise for safety
+        meta.NStride     = 0;
+        meta.HiStride    = 0;
+        meta.WiStride    = 0;
+        meta.SH_HiStride = 0;
+        meta.step_w      = 0;
+        meta.wrap_delta  = 0;
+        meta.pad_offset  = 0;
+        meta.DH_HiStride = 0;
+        meta.DW_WiStride = 0;
+        meta.KStride     = 0;
+        meta.C           = 0;
+        meta.X           = 0;
+        meta.XC          = 0;
+        meta.Wo          = 0;
+        meta.HoWo        = 0;
+        meta.Hi          = 0;
+        meta.Wi          = 0;
+        meta.SH          = 0;
+        meta.SW          = 0;
+        meta.DH          = 0;
+        meta.DW          = 0;
+        meta.PH          = 0;
+        meta.PW          = 0;
+        meta.KPerBlock   = 0;
+        meta.mdiv_HoWo   = mdiv2(1);
+        meta.mdiv_Wo     = mdiv2(1);
+        meta.mdiv_XC     = mdiv2(1);
+        meta.mdiv_C      = mdiv2(1);
+
+        return meta;
+    }
+
+    // =========================================================================
+    // MakeADescriptor_M_K — 2D NHWGK (dY) tiled descriptor for BwdDataInput.
+    //
+    // Returns a tiled tensor descriptor attaching Im2ColMetadata for the fast
+    // BwdDataInput coordinate calculation.  Only enabled for NDimSpatial == 2.
+    // =========================================================================
+    template <bool EnableTiledIm2Col = false,
+              index_t NDim           = NDimSpatial,
+              typename std::enable_if<NDim == 2, bool>::type = false>
+    CK_TILE_HOST auto MakeADescriptor_M_K() const
+    {
+        const IndexType NStride_dy  = Ho_ * Wo_ * G_ * K_;
+        const IndexType HoStride_dy = Wo_ * G_ * K_;
+        const IndexType WoStride_dy = G_ * K_;
+        constexpr auto  KStride_dy  = I1;
+
+        const IndexType IHTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadH_ - ConvDilationH_ * (YTilde_ - I1)), ConvStrideH_);
+        const IndexType IWTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadW_ - ConvDilationW_ * (XTilde_ - I1)), ConvStrideW_);
+        const IndexType IHTildeSliceEnd =
+            min(HTilde_, integer_divide_ceil(InLeftPadH_ + Hi_ - I1, ConvStrideH_) + I1);
+        const IndexType IWTildeSliceEnd =
+            min(WTilde_, integer_divide_ceil(InLeftPadW_ + Wi_ - I1, ConvStrideW_) + I1);
+        const IndexType HTildeSlice = IHTildeSliceEnd - IHTildeSliceBegin;
+        const IndexType WTildeSlice = IWTildeSliceEnd - IWTildeSliceBegin;
+        const IndexType YDotSlice   = integer_divide_ceil(Y_ - IdxYTilde_, YTilde_);
+        const IndexType XDotSlice   = integer_divide_ceil(X_ - IdxXTilde_, XTilde_);
+
+        // A (dY) raw descriptor: (N, Ho, Wo, K) with NHWGK strides
+        const auto out_n_ho_wo_k_desc = make_naive_tensor_descriptor_tiled(
+            make_tuple(N_, Ho_, Wo_, K_),
+            make_tuple(NStride_dy, HoStride_dy, WoStride_dy, KStride_dy),
+            number<VectorSizeA>{},
+            I1);
+
+        // Embed (YDot, HTilde) into Ho and (XDot, WTilde) into Wo
+        const auto out_n_ydot_htilde_xdot_wtilde_k_desc = transform_tensor_descriptor_tiled(
+            out_n_ho_wo_k_desc,
+            make_tuple(
+                make_pass_through_transform(N_),
+                make_embed_transform(make_tuple(YDot_, HTilde_),
+                                     make_tuple(-ConvDilationH_ / GcdStrideDilationH_, I1)),
+                make_embed_transform(make_tuple(XDot_, WTilde_),
+                                     make_tuple(-ConvDilationW_ / GcdStrideDilationW_, I1)),
+                make_pass_through_transform(K_)),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+            make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+        // Slice to the active tilde region and active dot region
+        const auto out_n_ydotslice_htildeslice_xdotslice_wtildeslice_k_desc =
+            transform_tensor_descriptor_tiled(
+                out_n_ydot_htilde_xdot_wtilde_k_desc,
+                make_tuple(make_pass_through_transform(N_),
+                           make_slice_transform(YDot_, I0, YDotSlice),
+                           make_slice_transform(HTilde_, IHTildeSliceBegin, HTildeSlice),
+                           make_slice_transform(XDot_, I0, XDotSlice),
+                           make_slice_transform(WTilde_, IWTildeSliceBegin, WTildeSlice),
+                           make_pass_through_transform(K_)),
+                make_tuple(sequence<0>{},
+                           sequence<1>{},
+                           sequence<2>{},
+                           sequence<3>{},
+                           sequence<4>{},
+                           sequence<5>{}),
+                make_tuple(sequence<0>{},
+                           sequence<1>{},
+                           sequence<2>{},
+                           sequence<3>{},
+                           sequence<4>{},
+                           sequence<5>{}));
+
+        // Merge to (GemmM = N*HTildeSlice*WTildeSlice, GemmK = YDotSlice*XDotSlice*K)
+        const auto base_desc = transform_tensor_descriptor_tiled(
+            out_n_ydotslice_htildeslice_xdotslice_wtildeslice_k_desc,
+            make_tuple(make_merge_transform(make_tuple(YDotSlice, XDotSlice, K_)),
+                       make_merge_transform(make_tuple(N_, HTildeSlice, WTildeSlice))),
+            make_tuple(sequence<1, 3, 5>{}, sequence<0, 2, 4>{}),
+            make_tuple(sequence<1>{}, sequence<0>{}));
+
+        if constexpr(EnableTiledIm2Col)
+        {
+            return make_tiled_im2col_descriptor</*WaveUniformM=*/false>(base_desc,
+                                                                        MakeATileMetadata());
+        }
+        else
+        {
+            return base_desc;
+        }
+    }
+
+    // =========================================================================
+    // MakeCTileMetadata — 2D NHWGC (dX), Default specialization.
+    //
+    // Returns an Im2ColMetadata struct for the BwdDataOutput tensor (GEMM-C in bwd-data).
+    // Must be called after setting IdxYTilde_ / IdxXTilde_ for the current sub-GEMM.
+    // =========================================================================
+    template <index_t NDim = NDimSpatial, typename std::enable_if<NDim == 2, bool>::type = false>
+    CK_TILE_HOST Im2ColMetadata MakeCTileMetadata() const
+    {
+        // dX tensor (NHWGC) strides
+        const IndexType WiStride_dx = G_ * C_;
+        const IndexType HiStride_dx = Wi_ * WiStride_dx;
+        const IndexType NStride_dx  = Hi_ * HiStride_dx;
+
+        // Tilde-slice bounds (same as in MakeABCGridDescriptor)
+        const IndexType IHTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadH_ - ConvDilationH_ * (YTilde_ - I1)), ConvStrideH_);
+        const IndexType IWTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadW_ - ConvDilationW_ * (XTilde_ - I1)), ConvStrideW_);
+        const IndexType IHTildeSliceEnd =
+            min(HTilde_, integer_divide_ceil(InLeftPadH_ + Hi_ - I1, ConvStrideH_) + I1);
+        const IndexType IWTildeSliceEnd =
+            min(WTilde_, integer_divide_ceil(InLeftPadW_ + Wi_ - I1, ConvStrideW_) + I1);
+        const IndexType HTildeSlice = IHTildeSliceEnd - IHTildeSliceBegin;
+        const IndexType WTildeSlice = IWTildeSliceEnd - IWTildeSliceBegin;
+
+        // Constants folded from tilde index and conv dilation (per sub-GEMM)
+        const IndexType IdxYTilde_DH = IdxYTilde_ * ConvDilationH_;
+        const IndexType IdxXTilde_DW = IdxXTilde_ * ConvDilationW_;
+
+        Im2ColMetadata meta;
+
+        // dX (NHWGC) strides
+        meta.NStride_dx    = static_cast<index_t>(NStride_dx);
+        meta.HiStride_dx   = static_cast<index_t>(HiStride_dx);
+        meta.WiStride_dx   = static_cast<index_t>(WiStride_dx);
+
+        // Per-sub-GEMM tilde-origin constants
+        meta.IdxYTilde_DH  = static_cast<index_t>(IdxYTilde_DH);
+        meta.IdxXTilde_DW  = static_cast<index_t>(IdxXTilde_DW);
+
+        // Shared with BwdDataInput: tilde-slice geometry and conv stride/pad
+        meta.IHTildeSliceBegin = static_cast<index_t>(IHTildeSliceBegin);
+        meta.IWTildeSliceBegin = static_cast<index_t>(IWTildeSliceBegin);
+        meta.HTildeSlice       = static_cast<index_t>(HTildeSlice);
+        meta.WTildeSlice       = static_cast<index_t>(WTildeSlice);
+        meta.SH                = static_cast<index_t>(ConvStrideH_);
+        meta.SW                = static_cast<index_t>(ConvStrideW_);
+        meta.PH                = static_cast<index_t>(InLeftPadH_);
+        meta.PW                = static_cast<index_t>(InLeftPadW_);
+        meta.Hi                = static_cast<index_t>(Hi_);
+        meta.Wi                = static_cast<index_t>(Wi_);
+
+        // GEMM bounds: M = N * HTildeSlice * WTildeSlice, K_gemm = C (used as N_gemm bound)
+        meta.M_gemm  = static_cast<index_t>(N_ * HTildeSlice * WTildeSlice);
+        meta.K_gemm  = static_cast<index_t>(C_);   // reuse K_gemm field for N bound
+
+        // Magic divisors for M decode: m → (n, htilde_local, wtilde_local)
+        // These are the same as BwdDataInput for the same sub-GEMM.
+        meta.mdiv_HTildeSlice_WTildeSlice =
+            mdiv2(static_cast<uint32_t>(HTildeSlice * WTildeSlice));
+        meta.mdiv_WTildeSlice = mdiv2(static_cast<uint32_t>(WTildeSlice));
+
+        // Fields unused for BwdDataOutput — zero-initialise for safety
+        meta.NStride     = 0;
+        meta.HiStride    = 0;
+        meta.WiStride    = 0;
+        meta.SH_HiStride = 0;
+        meta.step_w      = 0;
+        meta.wrap_delta  = 0;
+        meta.pad_offset  = 0;
+        meta.DH_HiStride = 0;
+        meta.DW_WiStride = 0;
+        meta.KStride     = 0;
+        meta.C           = static_cast<index_t>(C_);  // keep C for reference
+        meta.X           = 0;
+        meta.XC          = 0;
+        meta.Wo          = 0;
+        meta.HoWo        = 0;
+        meta.DH          = 0;
+        meta.DW          = 0;
+        meta.KPerBlock   = 0;
+        meta.NStride_dy  = 0;
+        meta.HoStride_dy = 0;
+        meta.WoStride_dy = 0;
+        meta.DH_gcd_HoStride = 0;
+        meta.DW_gcd_WoStride = 0;
+        meta.DH_gcd      = 0;
+        meta.DW_gcd      = 0;
+        meta.K           = 0;
+        meta.XDotSlice   = 0;
+        meta.Ho          = 0;
+        meta.Wo_bwd      = 0;
+        meta.mdiv_HoWo   = mdiv2(1);
+        meta.mdiv_Wo     = mdiv2(1);
+        meta.mdiv_XC     = mdiv2(1);
+        meta.mdiv_C      = mdiv2(1);
+        meta.mdiv_XDotSlice_K = mdiv2(1);
+        meta.mdiv_K      = mdiv2(1);
+
+        return meta;
+    }
+
+    // =========================================================================
+    // MakeCDescriptor_M_N — 2D NHWGC (dX) tiled descriptor for BwdDataOutput.
+    //
+    // Returns a tiled tensor descriptor attaching Im2ColMetadata for the fast
+    // BwdDataOutput coordinate calculation.  Only enabled for NDimSpatial == 2.
+    // =========================================================================
+    template <bool EnableTiledIm2Col = false,
+              index_t NDim           = NDimSpatial,
+              typename std::enable_if<NDim == 2, bool>::type = false>
+    CK_TILE_HOST auto MakeCDescriptor_M_N() const
+    {
+        const IndexType WiStride_dx = G_ * C_;
+        const IndexType HiStride_dx = Wi_ * WiStride_dx;
+        const IndexType NStride_dx  = Hi_ * HiStride_dx;
+        constexpr auto  CStride_dx  = I1;
+
+        const IndexType IHTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadH_ - ConvDilationH_ * (YTilde_ - I1)), ConvStrideH_);
+        const IndexType IWTildeSliceBegin = integer_divide_floor(
+            max(I0, InLeftPadW_ - ConvDilationW_ * (XTilde_ - I1)), ConvStrideW_);
+        const IndexType IHTildeSliceEnd =
+            min(HTilde_, integer_divide_ceil(InLeftPadH_ + Hi_ - I1, ConvStrideH_) + I1);
+        const IndexType IWTildeSliceEnd =
+            min(WTilde_, integer_divide_ceil(InLeftPadW_ + Wi_ - I1, ConvStrideW_) + I1);
+        const IndexType HTildeSlice = IHTildeSliceEnd - IHTildeSliceBegin;
+        const IndexType WTildeSlice = IWTildeSliceEnd - IWTildeSliceBegin;
+
+        // C (dX) raw descriptor: padded (N, Hi, Wi, C)
+        const auto in_n_hi_wi_c_desc = make_naive_tensor_descriptor_tiled(
+            make_tuple(N_, Hi_, Wi_, C_),
+            make_tuple(NStride_dx, HiStride_dx, WiStride_dx, CStride_dx),
+            number<VectorSizeC>{},
+            I1);
+
+        // Apply padding to Hi and Wi dimensions
+        const auto in_n_hip_wip_c_desc = transform_tensor_descriptor_tiled(
+            in_n_hi_wi_c_desc,
+            make_tuple(make_pass_through_transform(N_),
+                       make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                       make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                       make_pass_through_transform(C_)),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}));
+
+        // Embed (YTilde, HTilde) into hip and (XTilde, WTilde) into wip
+        const auto in_n_ytilde_htilde_xtilde_wtilde_c_desc = transform_tensor_descriptor_tiled(
+            in_n_hip_wip_c_desc,
+            make_tuple(make_pass_through_transform(N_),
+                       make_embed_transform(make_tuple(YTilde_, HTilde_),
+                                            make_tuple(ConvDilationH_, ConvStrideH_)),
+                       make_embed_transform(make_tuple(XTilde_, WTilde_),
+                                            make_tuple(ConvDilationW_, ConvStrideW_)),
+                       make_pass_through_transform(C_)),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}, sequence<3>{}),
+            make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3, 4>{}, sequence<5>{}));
+
+        // Freeze current YTilde/XTilde and slice HTilde/WTilde to the active region
+        const auto in_n_htildeslice_wtildeslice_c_desc = transform_tensor_descriptor_tiled(
+            in_n_ytilde_htilde_xtilde_wtilde_c_desc,
+            make_tuple(make_pass_through_transform(N_),
+                       make_freeze_transform(IdxYTilde_),
+                       make_slice_transform(HTilde_, IHTildeSliceBegin, HTildeSlice),
+                       make_freeze_transform(IdxXTilde_),
+                       make_slice_transform(WTilde_, IWTildeSliceBegin, WTildeSlice),
+                       make_pass_through_transform(C_)),
+            make_tuple(sequence<0>{},
+                       sequence<1>{},
+                       sequence<2>{},
+                       sequence<3>{},
+                       sequence<4>{},
+                       sequence<5>{}),
+            make_tuple(sequence<0>{},
+                       sequence<>{},
+                       sequence<1>{},
+                       sequence<>{},
+                       sequence<2>{},
+                       sequence<3>{}));
+
+        // Merge to (GemmM = N*HTildeSlice*WTildeSlice, GemmN = C)
+        const auto base_desc = transform_tensor_descriptor_tiled(
+            in_n_htildeslice_wtildeslice_c_desc,
+            make_tuple(make_merge_transform(make_tuple(N_, HTildeSlice, WTildeSlice)),
+                       make_pass_through_transform(C_)),
+            make_tuple(sequence<0, 1, 2>{}, sequence<3>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+
+        if constexpr(EnableTiledIm2Col)
+        {
+            return make_tiled_im2col_descriptor</*WaveUniformM=*/false>(base_desc,
+                                                                        MakeCTileMetadata());
+        }
+        else
+        {
+            return base_desc;
         }
     }
 
