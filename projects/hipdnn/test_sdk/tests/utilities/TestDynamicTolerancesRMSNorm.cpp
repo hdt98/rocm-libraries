@@ -3,17 +3,17 @@
 
 #include <cmath>
 #include <gtest/gtest.h>
-#include <hipdnn_data_sdk/types.hpp>
-#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
-#include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_flatbuffers_sdk/types.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerancesCommon.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerancesRMSNorm.hpp>
 #include <vector>
 
 using namespace hipdnn_test_sdk::utilities::rmsnorm;
-using hipdnn_data_sdk::types::bfloat16;
-using hipdnn_data_sdk::types::half;
+using hipdnn_flatbuffers_sdk::types::bfloat16;
+using hipdnn_flatbuffers_sdk::types::half;
 using hipdnn_test_sdk::utilities::computeGamma;
 
 template <typename Out, typename In, typename Comp>
@@ -288,9 +288,9 @@ TEST(TestCalculateRMSNormFwdTolerance, DetectsFailure)
     const std::vector<int64_t> dims = {1, 1, 10, 10};
     const std::vector<int64_t> strides = {100, 100, 10, 1};
 
-    auto baseline = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualPassing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualFailing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto baseline = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualPassing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualFailing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
 
     baseline->fillTensorWithValue(1.0f);
     actualPassing->fillTensorWithValue(1.000001f); // Small error (1e-6 < tol ~1.25e-5)
@@ -303,7 +303,7 @@ TEST(TestCalculateRMSNormFwdTolerance, DetectsFailure)
     EXPECT_GT(tol, 1e-6f);
 
     auto validator = hipdnn_test_sdk::utilities::createAllCloseValidator(
-        hipdnn_data_sdk::data_objects::DataType::FLOAT, tol, 0);
+        hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT, tol, 0);
 
     bool valid = validator->allClose(*baseline, *actualPassing);
     EXPECT_TRUE(valid);

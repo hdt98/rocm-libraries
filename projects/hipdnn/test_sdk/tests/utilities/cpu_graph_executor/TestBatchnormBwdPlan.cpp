@@ -5,8 +5,8 @@
 
 #include "BatchnormGraphUtils.hpp"
 #include "BatchnormTensorBundles.hpp"
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
-#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+#include <hipdnn_flatbuffers_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceBatchnorm.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/Seeds.hpp>
@@ -15,16 +15,16 @@
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_test_sdk::detail;
-using namespace hipdnn_data_sdk::data_objects;
-using namespace hipdnn_data_sdk::utilities;
-using namespace hipdnn_data_sdk::flatbuffer_utilities;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::utilities;
+using namespace hipdnn_flatbuffers_sdk::flatbuffer_utilities;
 using namespace ::testing;
 using namespace hipdnn_sdk_test_utils;
 
 class TestBatchnormBwdPlan : public ::testing::Test
 {
 protected:
-    static void initTensorValues(hipdnn_data_sdk::data_objects::TensorAttributesT& tensorAttr,
+    static void initTensorValues(hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT& tensorAttr,
                                  DataType dataType,
                                  const Tensor<float>& tensor,
                                  int64_t uid)
@@ -103,7 +103,7 @@ TEST(TestBatchnormBwdPlanBuilder, PlanConstruction)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const BatchnormBwdPlanBuilder<DataType::FLOAT,
@@ -181,7 +181,7 @@ TEST(TestBatchnormBwdPlanBuilder, IsApplicable)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const BatchnormBwdPlanBuilder<DataType::FLOAT,

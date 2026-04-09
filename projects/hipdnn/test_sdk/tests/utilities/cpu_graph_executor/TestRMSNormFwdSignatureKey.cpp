@@ -7,13 +7,13 @@
 
 #include "RMSNormGraphUtils.hpp"
 #include "RMSNormTensorBundles.hpp"
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/RMSNormFwdSignatureKey.hpp>
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_test_sdk::detail;
-using namespace hipdnn_data_sdk::data_objects;
-using namespace hipdnn_data_sdk::utilities;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::utilities;
 using namespace hipdnn_sdk_test_utils;
 
 TEST(TestRMSNormFwdSignatureKey, EqualityOperator)
@@ -98,7 +98,7 @@ TEST(TestRMSNormFwdSignatureKey, CreateFromNodeAndTensorMap)
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const RMSNormFwdSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());

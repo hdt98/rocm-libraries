@@ -147,20 +147,21 @@ private:
 };
 
 inline std::unique_ptr<hipdnn_test_sdk::utilities::IReferenceValidation>
-    createRmsValidator(hipdnn_data_sdk::data_objects::DataType dataType, float relativeTolerance)
+    createRmsValidator(hipdnn_flatbuffers_sdk::data_objects::DataType dataType,
+                       float relativeTolerance)
 {
     switch(dataType)
     {
-    case hipdnn_data_sdk::data_objects::DataType::FLOAT:
+    case hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT:
         return std::make_unique<CpuFpReferenceMiopenRmsValidation<float>>(relativeTolerance);
-    case hipdnn_data_sdk::data_objects::DataType::HALF:
+    case hipdnn_flatbuffers_sdk::data_objects::DataType::HALF:
         return std::make_unique<CpuFpReferenceMiopenRmsValidation<hipdnn_data_sdk::types::half>>(
             hipdnn_data_sdk::types::half(relativeTolerance));
-    case hipdnn_data_sdk::data_objects::DataType::BFLOAT16:
+    case hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16:
         return std::make_unique<
             CpuFpReferenceMiopenRmsValidation<hipdnn_data_sdk::types::bfloat16>>(
             hipdnn_data_sdk::types::bfloat16(relativeTolerance));
-    case hipdnn_data_sdk::data_objects::DataType::DOUBLE:
+    case hipdnn_flatbuffers_sdk::data_objects::DataType::DOUBLE:
         return std::make_unique<CpuFpReferenceMiopenRmsValidation<double>>(
             static_cast<double>(relativeTolerance));
     default:

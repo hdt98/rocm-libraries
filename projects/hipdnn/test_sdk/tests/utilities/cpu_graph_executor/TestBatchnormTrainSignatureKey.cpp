@@ -7,13 +7,13 @@
 
 #include "BatchnormGraphUtils.hpp"
 #include "BatchnormTensorBundles.hpp"
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/BatchnormTrainSignatureKey.hpp>
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_test_sdk::detail;
-using namespace hipdnn_data_sdk::data_objects;
-using namespace hipdnn_data_sdk::utilities;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::utilities;
 using namespace hipdnn_sdk_test_utils;
 
 TEST(TestBatchnormTrainSignatureKey, EqualityOperator)
@@ -114,7 +114,7 @@ TEST(TestBatchnormTrainSignatureKey, CreateFromNodeAndTensorMap)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const BatchnormTrainSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());

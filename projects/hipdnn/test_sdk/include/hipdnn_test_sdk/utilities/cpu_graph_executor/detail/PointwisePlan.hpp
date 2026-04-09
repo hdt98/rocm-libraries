@@ -6,9 +6,9 @@
 #include <functional>
 #include <variant>
 
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_data_sdk/utilities/PointwiseValidation.hpp>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferDatatypeMapping.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/IGraphNodePlanBuilder.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/IGraphNodePlanExecutor.hpp>
@@ -24,16 +24,17 @@ namespace hipdnn_test_sdk::detail
 struct PointwiseParams
 {
     PointwiseParams() = default;
-    PointwiseParams(const hipdnn_data_sdk::data_objects::PointwiseMode pointwiseMode,
-                    const hipdnn_data_sdk::data_objects::TensorAttributes& in0Attributes,
-                    const hipdnn_data_sdk::data_objects::TensorAttributes* optionalIn1Attributes,
-                    const hipdnn_data_sdk::data_objects::TensorAttributes& out0Attributes,
-                    std::optional<float> reluLowerClipLocal,
-                    std::optional<float> reluUpperClipLocal,
-                    std::optional<float> reluLowerClipSlopeLocal,
-                    std::optional<float> swishBetaLocal,
-                    std::optional<float> eluAlphaLocal,
-                    std::optional<float> softplusBetaLocal)
+    PointwiseParams(
+        const hipdnn_flatbuffers_sdk::data_objects::PointwiseMode pointwiseMode,
+        const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& in0Attributes,
+        const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes* optionalIn1Attributes,
+        const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes& out0Attributes,
+        std::optional<float> reluLowerClipLocal,
+        std::optional<float> reluUpperClipLocal,
+        std::optional<float> reluLowerClipSlopeLocal,
+        std::optional<float> swishBetaLocal,
+        std::optional<float> eluAlphaLocal,
+        std::optional<float> softplusBetaLocal)
         : in0Tensor(unpackTensorAttributes(in0Attributes))
         , out0Tensor(unpackTensorAttributes(out0Attributes))
         , mode(pointwiseMode)
@@ -50,10 +51,10 @@ struct PointwiseParams
         }
     }
 
-    hipdnn_data_sdk::data_objects::TensorAttributesT in0Tensor;
-    std::optional<hipdnn_data_sdk::data_objects::TensorAttributesT> in1Tensor;
-    hipdnn_data_sdk::data_objects::TensorAttributesT out0Tensor;
-    hipdnn_data_sdk::data_objects::PointwiseMode mode;
+    hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT in0Tensor;
+    std::optional<hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT> in1Tensor;
+    hipdnn_flatbuffers_sdk::data_objects::TensorAttributesT out0Tensor;
+    hipdnn_flatbuffers_sdk::data_objects::PointwiseMode mode;
 
     std::optional<float> reluLowerClip;
     std::optional<float> reluUpperClip;
@@ -183,10 +184,10 @@ private:
     PointwiseParams _params;
 };
 
-template <hipdnn_data_sdk::data_objects::DataType Input0DataTypeEnum,
-          hipdnn_data_sdk::data_objects::DataType Input1DataTypeEnum,
-          hipdnn_data_sdk::data_objects::DataType ComputeDataTypeEnum,
-          hipdnn_data_sdk::data_objects::DataType OutputDataTypeEnum>
+template <hipdnn_flatbuffers_sdk::data_objects::DataType Input0DataTypeEnum,
+          hipdnn_flatbuffers_sdk::data_objects::DataType Input1DataTypeEnum,
+          hipdnn_flatbuffers_sdk::data_objects::DataType ComputeDataTypeEnum,
+          hipdnn_flatbuffers_sdk::data_objects::DataType OutputDataTypeEnum>
 class PointwisePlanBuilder : public IGraphNodePlanBuilder
 {
 public:
@@ -196,8 +197,9 @@ public:
     using OutputType = utilities::DataTypeToNative<OutputDataTypeEnum>;
 
     bool isApplicable(
-        const hipdnn_data_sdk::data_objects::Node& node,
-        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_flatbuffers_sdk::data_objects::Node& node,
+        const std::unordered_map<int64_t,
+                                 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
             tensorMap) const override
     {
         if(node.compute_data_type() != ComputeDataTypeEnum)
@@ -248,8 +250,8 @@ public:
     }
 
     std::unique_ptr<IGraphNodePlanExecutor>
-        buildNodePlan(const hipdnn_data_sdk::flatbuffer_utilities::IGraph& graph,
-                      const hipdnn_data_sdk::data_objects::Node& node) const override
+        buildNodePlan(const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& graph,
+                      const hipdnn_flatbuffers_sdk::data_objects::Node& node) const override
     {
         const auto* nodeAttributes = node.attributes_as_PointwiseAttributes();
         if(nodeAttributes == nullptr)

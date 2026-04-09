@@ -7,15 +7,15 @@
 
 #include "PointwiseGraphUtils.hpp"
 #include "PointwiseTensorBundles.hpp"
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_data_sdk/types.hpp>
-#include <hipdnn_data_sdk/utilities/PointwiseValidation.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_flatbuffers_sdk/types.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/PointwiseValidation.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/PointwiseSignatureKey.hpp>
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_test_sdk::detail;
-using namespace hipdnn_data_sdk::data_objects;
-using namespace hipdnn_data_sdk::utilities;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::utilities;
 using namespace hipdnn_sdk_test_utils;
 
 TEST(TestPointwiseSignatureKey, EqualityOperator)
@@ -117,7 +117,7 @@ TEST(TestPointwiseSignatureKey, CreateFromNodeAndTensorMapUnary)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const PointwiseSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());
@@ -160,7 +160,7 @@ TEST(TestPointwiseSignatureKey, CreateFromNodeAndTensorMapBinary)
     auto [serializedGraph, serErr] = graph->to_binary();
     ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
                                                                          serializedGraph.size());
 
     const PointwiseSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());
@@ -233,8 +233,8 @@ TEST(TestPointwiseSignatureKey, UnorderedSetUsage)
 
 TEST(TestPointwiseSignatureKey, DifferentOperationsAreDifferent)
 {
-    auto unaryModesBitset = hipdnn_data_sdk::utilities::getUnaryModesBitset();
-    auto binaryModesBitset = hipdnn_data_sdk::utilities::getBinaryModesBitset();
+    auto unaryModesBitset = hipdnn_flatbuffers_sdk::utilities::getUnaryModesBitset();
+    auto binaryModesBitset = hipdnn_flatbuffers_sdk::utilities::getBinaryModesBitset();
 
     // Test that all supported operations create different keys
     std::unordered_set<PointwiseSignatureKey, PointwiseSignatureKey> uniqueKeys;
