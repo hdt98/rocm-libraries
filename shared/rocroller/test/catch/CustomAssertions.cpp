@@ -4,7 +4,6 @@
 #include <catch2/catch_test_case_info.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/interfaces/catch_interfaces_capture.hpp>
-#include <catch2/interfaces/catch_interfaces_registry_hub.hpp>
 #include <catch2/interfaces/catch_interfaces_testcase.hpp>
 
 #include <algorithm>
