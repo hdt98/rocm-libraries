@@ -36,16 +36,33 @@ from copy import copy
 from functools import partial
 from typing import Any
 
-from rocisa.instruction import SWaitCnt, SBarrier, SNop
+from rocisa.instruction import (
+    SWaitCnt, SBarrier, SNop,
+    SMovB32, SAddU32, SAddCU32, SSubU32, SSubBU32,
+    SCmpEQU32, SCmpEQI32, SCSelectB32, SXorB32,
+    VXorB32, SCBranchSCC0,
+)
 
 from rocasm.ops import Op
 from rocasm.regs import VgprArray, AccArray, SgprArray, _RegArray
 
 # Side-effect instructions have no destination register.
+# All args/kwargs are passed directly through to the rocisa constructor.
 _SIDE_EFFECT_INSTRUCTIONS: dict[str, type] = {
     "s_waitcnt": SWaitCnt,
     "s_barrier": SBarrier,
     "s_nop": SNop,
+    "s_mov_b32": SMovB32,
+    "s_add_u32": SAddU32,
+    "s_addc_u32": SAddCU32,
+    "s_sub_u32": SSubU32,
+    "s_subb_u32": SSubBU32,
+    "s_cmp_eq_u32": SCmpEQU32,
+    "s_cmp_eq_i32": SCmpEQI32,
+    "s_cselect_b32": SCSelectB32,
+    "s_xor_b32": SXorB32,
+    "v_xor_b32": VXorB32,
+    "s_cbranch_scc0": SCBranchSCC0,
 }
 
 

@@ -215,7 +215,7 @@ class TestBlock:
 
 # ---------- vmfma instruction ----------
 
-from rocasm.instructions import vmfma_f32_16x16x32_bf16
+from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4
 from rocasm.ops import Op
 
 
@@ -542,3 +542,211 @@ class TestCombinedCallingConventions:
         asm = block.emit()
         assert asm.count("v_mfma") == 2
         assert "lgkmcnt(0)" in asm
+
+
+# ---------- Scalar side-effect instructions ----------
+
+from rocisa.container import sgpr, vgpr
+
+
+class TestScalarSideEffects:
+
+    def _make_block(self):
+        return Block(
+            Acc=AccArray("Acc", base=0, count=64),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+            S=SgprArray("S", base=0, count=16),
+        )
+
+    def test_s_mov_b32(self):
+        block = self._make_block()
+        block.s_mov_b32(dst=sgpr(0), src=0x10)
+        assert len(block) == 1
+        assert "s_mov_b32" in block.emit()
+
+    def test_s_add_u32(self):
+        block = self._make_block()
+        block.s_add_u32(dst=sgpr(0), src0=sgpr(0), src1=sgpr(1))
+        assert len(block) == 1
+        assert "s_add_u32" in block.emit()
+
+    def test_s_addc_u32(self):
+        block = self._make_block()
+        block.s_addc_u32(dst=sgpr(1), src0=sgpr(1), src1=0)
+        assert len(block) == 1
+        assert "s_addc_u32" in block.emit()
+
+    def test_s_sub_u32(self):
+        block = self._make_block()
+        block.s_sub_u32(dst=sgpr(2), src0=sgpr(2), src1=1)
+        assert len(block) == 1
+        assert "s_sub_u32" in block.emit()
+
+    def test_s_subb_u32(self):
+        block = self._make_block()
+        block.s_subb_u32(dst=sgpr(3), src0=sgpr(3), src1=0)
+        assert len(block) == 1
+        assert "s_subb_u32" in block.emit()
+
+    def test_s_cmp_eq_u32(self):
+        block = self._make_block()
+        block.s_cmp_eq_u32(src0=sgpr(0), src1=0)
+        assert len(block) == 1
+        assert "s_cmp_eq_u32" in block.emit()
+
+    def test_s_cmp_eq_i32(self):
+        block = self._make_block()
+        block.s_cmp_eq_i32(src0=sgpr(0), src1=1)
+        assert len(block) == 1
+        assert "s_cmp_eq_i32" in block.emit()
+
+    def test_s_cselect_b32(self):
+        block = self._make_block()
+        block.s_cselect_b32(dst=sgpr(4), src0=sgpr(5), src1=sgpr(6))
+        assert len(block) == 1
+        assert "s_cselect_b32" in block.emit()
+
+    def test_s_xor_b32(self):
+        block = self._make_block()
+        block.s_xor_b32(dst=sgpr(0), src0=sgpr(0), src1=1)
+        assert len(block) == 1
+        assert "s_xor_b32" in block.emit()
+
+    def test_v_xor_b32(self):
+        block = self._make_block()
+        block.v_xor_b32(dst=vgpr(0), src0=vgpr(0), src1=vgpr(1))
+        assert len(block) == 1
+        assert "v_xor_b32" in block.emit()
+
+    def test_s_cbranch_scc0(self):
+        block = self._make_block()
+        block.s_cbranch_scc0(labelName="label_LoopBeginL")
+        assert len(block) == 1
+        asm = block.emit()
+        assert "s_cbranch_scc0" in asm
+        assert "label_LoopBeginL" in asm
+
+
+# ---------- Scalar side-effect ordering ----------
+
+class TestScalarSideEffectOrdering:
+
+    def test_scalar_ops_interleaved_with_mfma(self):
+        """Scalar arithmetic and comparisons interleave correctly with compute."""
+        block = Block(
+            Acc=AccArray("Acc", base=0, count=16),
+            A=VgprArray("A", base=24, count=8),
+            B=VgprArray("B", base=0, count=8),
+            S=SgprArray("S", base=0, count=8),
+        )
+
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        block.s_add_u32(dst=sgpr(0), src0=sgpr(0), src1=sgpr(1))
+        block.s_addc_u32(dst=sgpr(1), src0=sgpr(1), src1=0)
+        block.Acc[4:8] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[4:8], block.Acc[4:8])
+        block.s_cmp_eq_u32(src0=sgpr(0), src1=0)
+        block.s_cbranch_scc0(labelName="label_LoopBeginL")
+
+        assert len(block) == 6
+        asm = block.emit()
+        lines = [l for l in asm.split("\n") if l.strip()]
+        assert "v_mfma" in lines[0]
+        assert "s_add_u32" in lines[1]
+        assert "s_addc_u32" in lines[2]
+        assert "v_mfma" in lines[3]
+        assert "s_cmp_eq_u32" in lines[4]
+        assert "s_cbranch_scc0" in lines[5]
+
+
+# ---------- ds_read_b128 instruction ----------
+
+class TestDsReadB128:
+
+    def _make_block(self):
+        return Block(
+            A=VgprArray("A", base=24, count=8),
+            LocalReadAddr=VgprArray("LocalReadAddr", base=128, count=2),
+        )
+
+    def test_basic_ds_read(self):
+        block = self._make_block()
+        block.A[0:4] = ds_read_b128(block.LocalReadAddr[0:1])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "ds_read_b128"
+        assert op.dst.phys_base == 24
+        assert op.dst.count == 4
+
+    def test_ds_read_emits_assembly(self):
+        block = self._make_block()
+        block.A[0:4] = ds_read_b128(block.LocalReadAddr[0:1])
+        asm = block.emit()
+        assert "ds_load_b128" in asm or "ds_read_b128" in asm
+
+    def test_ds_read_with_offset(self):
+        from rocisa.container import DSModifiers
+        block = self._make_block()
+        block.A[4:8] = ds_read_b128(block.LocalReadAddr[0:1], ds=DSModifiers(offset=0x100))
+        assert len(block) == 1
+        assert "0x100" in block.emit() or "256" in block.emit() or "offset" in block.emit().lower()
+
+    def test_ds_read_unattached_raises(self):
+        addr = VgprArray("Addr", base=0, count=2)
+        with pytest.raises(RuntimeError, match="not attached"):
+            ds_read_b128(addr[0:1])
+
+
+# ---------- buffer_load_dwordx4 instruction ----------
+
+class TestBufferLoadDwordx4:
+
+    def _make_block(self):
+        return Block(
+            A=VgprArray("A", base=24, count=8),
+            GlobalReadAddr=VgprArray("GlobalReadAddr", base=130, count=2),
+            SrdA=SgprArray("SrdA", base=24, count=4),
+            Soffset=SgprArray("Soffset", base=28, count=1),
+        )
+
+    def test_basic_buffer_load(self):
+        block = self._make_block()
+        block.A[0:4] = buffer_load_dwordx4(
+            block.GlobalReadAddr[0:1],
+            block.SrdA[0:4],
+            block.Soffset[0:1].container(),
+        )
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "buffer_load_dwordx4"
+        assert op.dst.phys_base == 24
+        assert op.dst.count == 4
+
+    def test_buffer_load_emits_assembly(self):
+        block = self._make_block()
+        block.A[0:4] = buffer_load_dwordx4(
+            block.GlobalReadAddr[0:1],
+            block.SrdA[0:4],
+            block.Soffset[0:1].container(),
+        )
+        asm = block.emit()
+        assert "buffer_load" in asm
+
+    def test_buffer_load_with_mubuf(self):
+        from rocisa.container import MUBUFModifiers
+        block = self._make_block()
+        block.A[0:4] = buffer_load_dwordx4(
+            block.GlobalReadAddr[0:1],
+            block.SrdA[0:4],
+            block.Soffset[0:1].container(),
+            mubuf=MUBUFModifiers(offen=True, offset12=0),
+        )
+        assert len(block) == 1
+        asm = block.emit()
+        assert "buffer_load" in asm
+
+    def test_buffer_load_unattached_raises(self):
+        vaddr = VgprArray("V", base=0, count=2)
+        saddr = SgprArray("S", base=0, count=4)
+        with pytest.raises(RuntimeError, match="not attached"):
+            buffer_load_dwordx4(vaddr[0:1], saddr[0:4], 0)

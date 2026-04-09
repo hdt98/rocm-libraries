@@ -35,7 +35,7 @@ Usage:
 from __future__ import annotations
 
 from rocisa.enum import InstType
-from rocisa.instruction import MFMAInstruction
+from rocisa.instruction import MFMAInstruction, DSLoadB128 as _DSLoadB128, BufferLoadB128 as _BufferLoadB128
 
 from rocasm.ops import PendingOp
 from rocasm.regs import RegisterSlice
@@ -83,6 +83,77 @@ def vmfma_f32_16x16x32_bf16(src_b: RegisterSlice, src_a: RegisterSlice,
     return PendingOp(
         inst_name="v_mfma_f32_16x16x32_bf16",
         srcs=[src_b, src_a, acc2],
+        build_fn=_build,
+        block=block,
+    )
+
+
+def ds_read_b128(src: RegisterSlice, ds=None, comment: str = "") -> PendingOp:
+    """ds_read_b128 / ds_load_b128: Load 128 bits (4 dwords) from LDS.
+
+    Args:
+        src: Address VGPR (1 VGPR)
+        ds: Optional DSModifiers (offset, etc.)
+        comment: Optional comment string
+
+    Returns:
+        PendingOp to be resolved by assignment to a VGPR slice (4 VGPRs)
+    """
+    block = src.array.block
+    if block is None:
+        raise RuntimeError(
+            "ds_read_b128: source register is not attached to a Block")
+
+    def _build(dst: RegisterSlice, srcs: list[RegisterSlice]):
+        return _DSLoadB128(
+            dst=dst.container(),
+            src=srcs[0].container(),
+            ds=ds,
+            comment=comment,
+        )
+
+    return PendingOp(
+        inst_name="ds_read_b128",
+        srcs=[src],
+        build_fn=_build,
+        block=block,
+    )
+
+
+def buffer_load_dwordx4(vaddr: RegisterSlice, saddr: RegisterSlice,
+                        soffset, mubuf=None, comment: str = "") -> PendingOp:
+    """buffer_load_dwordx4 / buffer_load_b128: Load 128 bits from global memory via buffer.
+
+    Args:
+        vaddr: Address VGPR (offset within buffer)
+        saddr: SGPR resource descriptor (4 SGPRs)
+        soffset: Scalar offset (SGPR container or immediate)
+        mubuf: Optional MUBUFModifiers (offen, offset12, etc.)
+        comment: Optional comment string
+
+    Returns:
+        PendingOp to be resolved by assignment to a VGPR slice (4 VGPRs)
+    """
+    block = vaddr.array.block
+    if block is None:
+        block = saddr.array.block
+    if block is None:
+        raise RuntimeError(
+            "buffer_load_dwordx4: source registers are not attached to a Block")
+
+    def _build(dst: RegisterSlice, srcs: list[RegisterSlice]):
+        return _BufferLoadB128(
+            dst=dst.container(),
+            vaddr=srcs[0].container(),
+            saddr=srcs[1].container(),
+            soffset=soffset,
+            mubuf=mubuf,
+            comment=comment,
+        )
+
+    return PendingOp(
+        inst_name="buffer_load_dwordx4",
+        srcs=[vaddr, saddr],
         build_fn=_build,
         block=block,
     )
