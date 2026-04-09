@@ -598,6 +598,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v3<BlockGemmPipelineSch
                             constexpr auto n0 = Number<kn[Number<1>{}]>{};
                             vector_type<ComputeDataType, KPack> a_thread_vec;
                             vector_type<ComputeDataType, KPack> b_thread_vec;
+                            constexpr auto var = m0 + HotloopLocalBufSwitch * mfma_reg_buf) % 2;
 
                             auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                                   decltype(a_thread_buf),
@@ -723,6 +724,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v3<BlockGemmPipelineSch
                     constexpr auto n0 = Number<kn[Number<1>{}]>{};
                     vector_type<ComputeDataType, KPack> a_thread_vec;
                     vector_type<ComputeDataType, KPack> b_thread_vec;
+                    constexpr auto var = m0 % 2;
 
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),
@@ -808,6 +810,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v3<BlockGemmPipelineSch
                     constexpr auto n0 = Number<kn[Number<1>{}]>{};
                     vector_type<ComputeDataType, KPack> a_thread_vec;
                     vector_type<ComputeDataType, KPack> b_thread_vec;
+                    constexpr auto var = (m0 + HotloopLocalBufSwitch) % 2;
 
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),
@@ -878,6 +881,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v3<BlockGemmPipelineSch
                     constexpr auto n0 = Number<kn[Number<1>{}]>{};
                     vector_type<ComputeDataType, KPack> a_thread_vec;
                     vector_type<ComputeDataType, KPack> b_thread_vec;
+                    constexpr auto var = m0 % 2;
 
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),

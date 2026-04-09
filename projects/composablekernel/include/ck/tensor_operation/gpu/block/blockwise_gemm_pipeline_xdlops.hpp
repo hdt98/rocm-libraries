@@ -872,7 +872,7 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                       FloatAB,
                                                       decltype(m0),
                                                       Number<0>,
-                                                      decltype(k0),
+                                                      decltype(k),
                                                       index_expression::Ik>{
                     a_thread_vec, a_thread_bufs[PingP2{}]};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
@@ -881,7 +881,7 @@ struct BlockwiseGemmXdlops_pipeline_v4
                                                       FloatAB,
                                                       decltype(n0),
                                                       Number<0>,
-                                                      decltype(k0),
+                                                      decltype(k),
                                                       index_expression::Ik>{
                     b_thread_vec, b_thread_bufs[PingP2{}]};
 
