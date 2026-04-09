@@ -112,7 +112,7 @@ struct Gemm
         //
         // Implementation uses make_merge_transform with (N0, M0) -- N is the fast-moving
         // (inner) dimension. This means consecutive block IDs map to consecutive N tiles:
-        //   block 0 -> (n=0, m=0), block 1 -> (n=1, m=0), block 2 -> (n=0, m=1), ...
+        //   block 0 -> (n=0, m=0), block 1 -> (n=1, m=0), block 2 -> (n=2, m=0), ...
         //
         // N-first ordering improves L2 cache reuse: adjacent blocks load the same A rows
         // (same M strip) but different B rows. Since B is read once per block while A rows
