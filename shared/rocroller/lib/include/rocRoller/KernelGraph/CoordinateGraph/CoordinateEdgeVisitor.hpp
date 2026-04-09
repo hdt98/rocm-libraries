@@ -200,14 +200,54 @@ namespace rocRoller
 
             std::vector<Expression::ExpressionPtr> operator()(LDSColSwizzle const& e)
             {
+                using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                return {e.swizzle(indexes[0], indexes[1])};
+                auto col     = indexes[0];
+                auto row     = indexes[1];
+                auto numCol  = literal(e.numColumns);
+                auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
+
+                // Convert tile row to LDS bank row index
+                auto bankRowIdx = row >> logRows;
+
+                // On even bank rows, swap adjacent column pairs (0<->1, 2<->3, etc)
+                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
+                col                = col ^ swapOnEvenRow;
+
+                // Rotate columns: rotation = numCol - (bankRowIdx / 2) * 2
+                auto rotation = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
+                col           = (col + rotation) & (numCol - literal(1u));
+                return {col};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
             {
+                using namespace Expression;
                 AssertFatal(srcs.size() == 1 && indexes.size() >= 2);
-                return {e.unswizzle(indexes[0], indexes[1])};
+                auto col    = indexes[0];
+                auto row    = indexes[1];
+                auto numCol = literal(e.numColumns);
+                auto logElems
+                    = literal(static_cast<unsigned int>(__builtin_ctz(e.elementsPerChunk)));
+                auto elems   = literal(e.elementsPerChunk);
+                auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(e.rowsPerBankRow)));
+
+                // Decompose element index into dwordx4 chunk and sub-element offset
+                auto colChunk       = col >> logElems;
+                auto elementInChunk = col & (elems - literal(1u));
+
+                // Convert tile row to LDS bank row index
+                auto bankRowIdx = row >> logRows;
+
+                // Inverse rotation: invRotation = (bankRowIdx / 2) * 2
+                auto invRotation = (bankRowIdx >> literal(1u)) << literal(1u);
+                colChunk         = (colChunk + invRotation) & (numCol - literal(1u));
+
+                // On even bank rows, swap adjacent column pairs
+                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
+                colChunk           = colChunk ^ swapOnEvenRow;
+
+                return {colChunk * elems + elementInChunk};
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)
@@ -523,7 +563,9 @@ namespace rocRoller
                 auto delta = getDelta(dstTags[0]);
                 for(size_t i = 0; i < srcs.size(); ++i)
                     deltas.emplace(srcTags[i], delta);
-                return {e.swizzle(indexes[0], indexes[1])};
+                ReverseEdgeVisitor rev;
+                rev.setLocation(indexes, srcs, dsts, srcTags, dstTags);
+                return rev(e);
             }
 
             std::vector<Expression::ExpressionPtr> operator()(LDSColUnswizzle const& e)
@@ -532,7 +574,9 @@ namespace rocRoller
                 auto delta = getDelta(dstTags[0]);
                 for(size_t i = 0; i < srcs.size(); ++i)
                     deltas.emplace(srcTags[i], delta);
-                return {e.unswizzle(indexes[0], indexes[1])};
+                ReverseEdgeVisitor rev;
+                rev.setLocation(indexes, srcs, dsts, srcTags, dstTags);
+                return rev(e);
             }
 
             std::vector<Expression::ExpressionPtr> operator()(PiecewiseAffineJoin const& e)

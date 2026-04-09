@@ -284,27 +284,6 @@ namespace rocRoller
             {
             }
 
-            /// Compute swizzled column from col and row index expressions.
-            Expression::ExpressionPtr swizzle(Expression::ExpressionPtr col,
-                                              Expression::ExpressionPtr row) const
-            {
-                using namespace Expression;
-                auto numCol  = literal(numColumns);
-                auto logRows = literal(static_cast<unsigned int>(__builtin_ctz(rowsPerBankRow)));
-
-                // Convert tile row to LDS bank row index
-                auto bankRowIdx = row >> logRows;
-
-                // On even bank rows, swap adjacent column pairs (0<->1, 2<->3, etc)
-                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-                col                = col ^ swapOnEvenRow;
-
-                // Rotate columns: rotation = numCol - (bankRowIdx / 2) * 2
-                auto rotation = numCol - ((bankRowIdx >> literal(1u)) << literal(1u));
-                col           = (col + rotation) & (numCol - literal(1u));
-                return col;
-            }
-
             std::string toString() const
             {
                 return name();
@@ -341,34 +320,6 @@ namespace rocRoller
                 , rowsPerBankRow(rowsPerBankRow)
                 , elementsPerChunk(elementsPerChunk)
             {
-            }
-
-            /// Compute un-swizzled column (in elements) from col and row index expressions.
-            Expression::ExpressionPtr unswizzle(Expression::ExpressionPtr col,
-                                                Expression::ExpressionPtr row) const
-            {
-                using namespace Expression;
-                auto numCol   = literal(numColumns);
-                auto logElems = literal(static_cast<unsigned int>(__builtin_ctz(elementsPerChunk)));
-                auto elems    = literal(elementsPerChunk);
-                auto logRows  = literal(static_cast<unsigned int>(__builtin_ctz(rowsPerBankRow)));
-
-                // Decompose element index into dwordx4 chunk and sub-element offset
-                auto colChunk       = col >> logElems;
-                auto elementInChunk = col & (elems - literal(1u));
-
-                // Convert tile row to LDS bank row index
-                auto bankRowIdx = row >> logRows;
-
-                // Inverse rotation: invRotation = (bankRowIdx / 2) * 2
-                auto invRotation = (bankRowIdx >> literal(1u)) << literal(1u);
-                colChunk         = (colChunk + invRotation) & (numCol - literal(1u));
-
-                // On even bank rows, swap adjacent column pairs
-                auto swapOnEvenRow = (bankRowIdx ^ literal(1u)) & literal(1u);
-                colChunk           = colChunk ^ swapOnEvenRow;
-
-                return colChunk * elems + elementInChunk;
             }
 
             std::string toString() const
