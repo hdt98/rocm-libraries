@@ -36,7 +36,7 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB32, BufferLoadB64, \
   FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
   MFMAInstruction, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpLeU32, \
   SMFMAInstruction, SNop, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
-  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64
+  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, STrap, VCmpNeU32
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType, DataTypeEnum
 
@@ -2818,6 +2818,34 @@ class KernelWriter(metaclass=abc.ABCMeta):
       pack[packIdx] = Module()
       packPre[packPreIdx] = Module()
 
+      # trap Nan/Inf
+      if self.states.useTF32EmuInfSupport:
+        labelTrap = Label(self.labels.getUniqueNamePrefix(f"Trap"), "")
+        labelTrapExit = Label(self.labels.getUniqueNamePrefix(f"Trap_Exit"), "")
+        with self.allocTmpSgpr(2,2) as tmpSgprInfo:
+          tmpSgpr = tmpSgprInfo.idx
+          module.add(VCmpNeU32(dst=sgpr(tmpSgpr, self.states.laneSGPRCount), src0=vgpr("InfTmp"), src1=0))
+          module.add(SNop(waitState=6, comment="nop"))
+          module.add(SCmpEQU32(src0=sgpr(tmpSgpr), src1=0, comment="jump to trap if sreg is not 0"))
+          module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+          module.add(SCmpEQU32(src0=sgpr(tmpSgpr+1), src1=0, comment="jump to trap if sreg is not 0"))
+          module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+          module.add(SBranch(labelName=labelTrapExit.getLabelName(), comment="jump to Trap exit"))
+          module.add(labelTrap)
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(labelTrapExit)
+
       # tail loop in NoLoadLoop case, generate close loop code for TailLoop here (except for last loop iteration)
       if useTailloopInNll:
         finalLoop = (u == kernel["LoopIters"] - 1)
@@ -3390,6 +3418,34 @@ class KernelWriter(metaclass=abc.ABCMeta):
       finalStr = " (final)" if lc == 1 else ""
       endStr = " %u/%u%s"%(lc+1, loopCopies, finalStr)
     module.addComment2("Unrolled Loop - End%s"%(endStr))
+
+    # trap Nan/Inf
+    if self.states.useTF32EmuInfSupport:
+      labelTrap = Label(self.labels.getUniqueNamePrefix(f"Trap"), "")
+      labelTrapExit = Label(self.labels.getUniqueNamePrefix(f"Trap_Exit"), "")
+      with self.allocTmpSgpr(2,2) as tmpSgprInfo:
+        tmpSgpr = tmpSgprInfo.idx
+        module.add(VCmpNeU32(dst=sgpr(tmpSgpr, self.states.laneSGPRCount), src0=vgpr("InfTmp"), src1=0))
+        module.add(SNop(waitState=6, comment="nop"))
+        module.add(SCmpEQU32(src0=sgpr(tmpSgpr), src1=0, comment="jump to trap if sreg is not 0"))
+        module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+        module.add(SCmpEQU32(src0=sgpr(tmpSgpr+1), src1=0, comment="jump to trap if sreg is not 0"))
+        module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+        module.add(SBranch(labelName=labelTrapExit.getLabelName(), comment="jump to Trap exit"))
+        module.add(labelTrap)
+        module.add(SNop(waitState=0, comment=""))
+        module.add(SNop(waitState=0, comment=""))
+        module.add(SNop(waitState=0, comment=""))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(STrap(imm16=1, comment="trap for debugging"))
+        module.add(SNop(waitState=0, comment=""))
+        module.add(SNop(waitState=0, comment=""))
+        module.add(SNop(waitState=0, comment=""))
+        module.add(labelTrapExit)
 
     oddLabel = (lc == 0 and loopCopies == 2)
     if not skipClose and not kernel["UseCustomMainLoopSchedule"]:
@@ -4185,6 +4241,34 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # always emit the skip-tail-loop label
       module.add(self.closeLoop(kernel, tensorParametersA, tensorParametersB, -1, None, emitEndLabelOnly=True))
 
+      # trap Nan/Inf
+      if self.states.useTF32EmuInfSupport:
+        labelTrap = Label(self.labels.getUniqueNamePrefix(f"Trap"), "")
+        labelTrapExit = Label(self.labels.getUniqueNamePrefix(f"Trap_Exit"), "")
+        with self.allocTmpSgpr(2,2) as tmpSgprInfo:
+          tmpSgpr = tmpSgprInfo.idx
+          module.add(VCmpNeU32(dst=sgpr(tmpSgpr, self.states.laneSGPRCount), src0=vgpr("InfTmp"), src1=0))
+          module.add(SNop(waitState=6, comment="nop"))
+          module.add(SCmpEQU32(src0=sgpr(tmpSgpr), src1=0, comment="jump to trap if sreg is not 0"))
+          module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+          module.add(SCmpEQU32(src0=sgpr(tmpSgpr+1), src1=0, comment="jump to trap if sreg is not 0"))
+          module.add(SCBranchSCC0(labelName=labelTrap.getLabelName(), comment=""))
+          module.add(SBranch(labelName=labelTrapExit.getLabelName(), comment="jump to Trap exit"))
+          module.add(labelTrap)
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(STrap(imm16=1, comment="trap for debugging"))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(SNop(waitState=0, comment=""))
+          module.add(labelTrapExit)
+
       # Check in VGPR for VALU
       for item in valuResources:
         if item[0] != -1:
@@ -4354,9 +4438,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     self.asmAssert = Assert(self.states.laneSGPRCount, kernel["WavefrontSize"], self.db["EnableAsserts"])
 
+    # TF32 Inf support
+    self.states.useTF32EmuInfSupport = kernel["UseF32XEmulation"] and kernel["_UseTF32EmuInfSupport"]
+
     self.states.tailloopInNll = kernel["TailloopInNll"]
     # remove staggerU code for tailloopInNll (cannot support staggerU)
     self.states.staggerUCode = not self.states.tailloopInNll
+    if self.states.useTF32EmuInfSupport:
+      self.states.staggerUCode = False # disable StaggerU code for Inf/Nan trap (not enough sgpr)
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
       tluA = kernel["ProblemType"]["TLUA"]
@@ -5568,9 +5657,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     #   False: Does not use interleave layout
     #         ider local read + index transpose case, this needs to be False
 
-    # TF32 Inf support
-    self.states.useTF32EmuInfSupport = kernel["UseF32XEmulation"] and kernel["_UseTF32EmuInfSupport"]
-
     def initTF32Emu():
       # for UseF32XEmulation only
       if not kernel["UseF32XEmulation"]:
@@ -5983,6 +6069,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.defineSgpr("StreamKTileID", 1)
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
+    #if self.states.useTF32EmuInfSupport:
+    #  self.defineSgpr("TF32Tmp", 2,2)
 
     # These SGPRs aren't used right away, add them to spr pool temporarily
     if self.states.doShadowInit and kernel["BufferStore"]:

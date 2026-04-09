@@ -747,7 +747,7 @@ class KernelWriterAssembly(KernelWriter):
     # TF32 Inf Support
     if self.states.useTF32EmuInfSupport:
       self.moduleVgprMacroValuB_T.add(RegSet("v", "InfCheck", self.states.startVgprInfCheck, 0))
-      self.moduleVgprMacroValuB_T.add(RegSet("v", "InfTmp", self.states.startVgprInfTmp, 0))
+      self.moduleVgprMacroValuB_T.add(RegSet("v", "vgprInfTmp", self.states.startVgprInfTmp, 0))
 
   def macroAndSet(self, kernel, tPA, tPB) -> Module:
     module = Module("MacroNSet")
@@ -14943,7 +14943,9 @@ class KernelWriterAssembly(KernelWriter):
   def createTF32ClassSrc(self, kernel):
     module = Module("TF32InfClassSrc")
     module.addComment0("Create a Src vreg value for TF32 Inf check")
-    module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x204", comment="inf check for cmp_class"))
+    #module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x204", comment="inf check for cmp_class"))
+    module.add(VMovB32(vgpr(self.states.startVgprInfCheck), "0x207", comment="inf+nan check for cmp_class"))
+    module.add(VMovB32(dst=vgpr("InfTmp"), src=0, comment="tmp vreg init for inf+nan check"))
     #module.add(SMovB32(sgpr("InfCheck"), "0x204", comment="inf check for cmp_class"))
     return module
 

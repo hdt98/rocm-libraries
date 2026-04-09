@@ -1300,6 +1300,40 @@ namespace rocisa
         int prior;
     };
 
+    struct STrap : public Instruction
+    {
+        STrap(int imm16, const std::string& comment = "")
+            : Instruction(InstType::INST_NOTYPE, comment)
+            , imm16(imm16)
+        {
+            setInst("s_trap");
+        }
+
+        STrap(const STrap& other)
+            : Instruction(other)
+            , imm16(other.imm16)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<STrap>(*this);
+        }
+
+        std::vector<InstructionInput> getParams() const override
+        {
+            return {imm16};
+        }
+
+        std::string toString() const override
+        {
+            return formatWithComment(instStr + " " + std::to_string(imm16));
+        }
+
+    private:
+        int imm16;
+    };
+
     struct SBarrier : public Instruction
     {
         SBarrier(const std::string& comment = "")

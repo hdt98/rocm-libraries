@@ -951,6 +951,9 @@ class Solution(collections.abc.Mapping):
   # determine can we use DirectToLds
   @staticmethod
   def isDirectToLdsDoable(state, tc, isaInfoMap, printRejectionReason: bool):
+    # workaround: disable DTL for TF32 Inf/Nan detect (avoid updating scc with add m0)
+    #if state["_UseTF32EmuInfSupport"]:
+    #  return False
     numBytes = state["ProblemType"]["DataType"].numBytes()
     isa = state["ISA"]
 
