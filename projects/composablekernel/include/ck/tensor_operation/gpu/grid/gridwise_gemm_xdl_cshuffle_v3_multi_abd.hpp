@@ -806,58 +806,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
         index_t b_k_split_offset;
     };
 
-#if 0
-    struct SplitKBatchOffsetMultiABD
-    {
-        __device__ SplitKBatchOffsetMultiABD(AsGridPointer& p_as_grid,
-                                             BsGridPointer& p_bs_grid,
-                                             Argument& karg)
-        {
-            static_for<0, NumATensor, 1>{}([&](auto i) {
-                using ALayout_ = remove_cvref_t<tuple_element_t<i.value, AsLayout>>;
-                if constexpr(is_same_v<tensor_layout::gemm::RowMajor, ALayout_>)
-                {
-                    as_k_split_offset[i] = blockIdx.z * karg.KRead;
-                }
-                else if constexpr(is_same_v<tensor_layout::gemm::ColumnMajor, ALayout_>)
-                {
-                    as_k_split_offset[i] = blockIdx.z * karg.KRead * karg.StrideAs[i];
-                }
-
-                p_as_grid_(i) = p_as_grid[i] + as_k_split_offset[i];
-            });
-
-            static_for<0, NumBTensor, 1>{}([&](auto i) {
-                using BLayout_ = remove_cvref_t<tuple_element_t<i.value, BsLayout>>;
-                if constexpr(is_same_v<tensor_layout::gemm::RowMajor, BLayout_>)
-                {
-                    bs_k_split_offset[i] = blockIdx.z * karg.KRead * karg.StrideBs[i];
-                }
-                else if constexpr(is_same_v<tensor_layout::gemm::ColumnMajor, BLayout_>)
-                {
-                    bs_k_split_offset[i] = blockIdx.z * karg.KRead;
-                }
-
-                p_bs_grid_(i) = p_bs_grid[i] + bs_k_split_offset[i];
-            });
-
-            if(blockIdx.z < static_cast<uint32_t>(karg.KBatch - 1))
-            {
-                karg.K = karg.KRead;
-            }
-            else
-            {
-                karg.K = karg.K - karg.KRead * (karg.KBatch - 1);
-            }
-        }
-
-        AsGridPointer p_as_grid_;
-        BsGridPointer p_bs_grid_;
-        std::array<index_t, NumATensor> as_k_split_offset;
-        std::array<index_t, NumBTensor> bs_k_split_offset;
-    };
-#endif
-
     using BlockwiseGemmPipe = remove_cvref_t<
         decltype(BlockGemmPipeline_Selector<
                  BlkGemmPipelineVer,
@@ -1146,13 +1094,6 @@ struct GridwiseGemm_xdl_cshuffle_v3
 
         const auto ds_grid_desc_m_n = MakeDsGridDescriptor_M_N(
             problem.M, problem.MPadded, problem.N, problem.NPadded, problem.StrideDs);
-
-#if 0
-        static_for<0, NumDTensor, 1>{}([&](auto j) {
-            ds_grid_desc_m_n(j) = MakeCGridDescriptor_M_N(
-                problem.M, problem.MPadded, problem.N, problem.NPadded, problem.StrideDs[j]);
-        });
-#endif
 
         const auto ds_grid_desc_mblock_mperblock_nblock_nperblock =
             MakeDsGridDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(
