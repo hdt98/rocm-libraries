@@ -66,8 +66,16 @@ RUN wget -nv --show-progress --progress=dot:mega https://github.com/ccache/ccach
     rm -r /tmp/ccache-4.11 /tmp/ccache-4.11.tar.gz
 
 # cppcheck
-ADD docker/install-cppcheck /tmp
-RUN /tmp/install-cppcheck && rm /tmp/install-cppcheck
+WORKDIR /tmp
+RUN wget -nv -O cppcheck_2.9.3.zip https://github.com/danmar/cppcheck/archive/refs/tags/2.9.3.zip \
+    && unzip cppcheck_2.9.3.zip \
+    && cmake \
+        -S cppcheck-2.9.3 \
+        -B cppcheck-2.9.3_build \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build cppcheck-2.9.3_build --target install \
+    && rm -rf /tmp/*
 
 # graph & documentation & perf
 RUN apt-get update && apt-get install -y \
