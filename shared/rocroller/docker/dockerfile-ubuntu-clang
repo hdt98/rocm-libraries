@@ -3,19 +3,11 @@
 
 # See here for image contents: https://github.com/devcontainers/images/tree/main/src/base-ubuntu
 
-##
-## Common with other Dockerfiles.
-##
 
 # ubuntu-20.04 = focal
 # ubuntu-22.04 = jammy
 ARG BASE_IMAGE=jammy
 FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
-
-RUN ( \
-    echo "base_image: ${BASE_IMAGE}" && \
-    echo "rocroller: clang" \
-    ) > /.container_info.txt
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -122,6 +114,9 @@ RUN wget -nv -O codeql.zip https://github.com/github/codeql-cli-binaries/release
 ADD https://github.com/github/codeql/archive/refs/tags/codeql-cli/${CODEQL_VERSION}.zip /opt/codeql/codeql-cli.zip
 ENV PATH="/opt/codeql/codeql:${PATH}"
 
+ADD docker/install-rocprof-trace-decoder /tmp
+RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder
+
 # ROCM
 # Set URL to something like https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
 ARG ROCROLLER_AMDGPU_URL
@@ -138,8 +133,10 @@ RUN wget -nv -O amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
         hipblas-common-dev \
     && rm -rf /tmp/* /var/lib/apt/lists/*
 
+# Info and compilers
+RUN ( \
+    echo "base_image: ${BASE_IMAGE}" && \
+    echo "rocroller: clang" \
+    ) > /.container_info.txt
 ENV CXX=/opt/rocm/bin/amdclang++
 ENV CC=/opt/rocm/bin/amdclang
-
-ADD docker/install-rocprof-trace-decoder /tmp
-RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder

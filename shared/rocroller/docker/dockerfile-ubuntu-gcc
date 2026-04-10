@@ -3,19 +3,10 @@
 
 # See here for image contents: https://github.com/devcontainers/images/tree/main/src/base-ubuntu
 
-##
-## Common with other Dockerfiles.
-##
-
 # ubuntu-20.04 = focal
 # ubuntu-22.04 = jammy
 ARG BASE_IMAGE=jammy
 FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
-
-RUN ( \
-    echo "base_image: ${BASE_IMAGE}" && \
-    echo "rocroller: gcc-13" \
-    ) > /.container_info.txt
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -116,10 +107,6 @@ ENV PATH="/opt/rr-python-venv/bin:$PATH"
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
-##
-## Specific to this Dockerfile.  Put faster-changing-things last.
-##
-
 # codeql
 ARG CODEQL_VERSION=v2.20.4
 WORKDIR /opt/codeql
@@ -128,6 +115,9 @@ RUN wget -nv -O codeql.zip https://github.com/github/codeql-cli-binaries/release
     && rm codeql.zip
 ADD https://github.com/github/codeql/archive/refs/tags/codeql-cli/${CODEQL_VERSION}.zip /opt/codeql/codeql-cli.zip
 ENV PATH="/opt/codeql/codeql:${PATH}"
+
+ADD docker/install-rocprof-trace-decoder /tmp
+RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder
 
 # ROCM
 # Set URL to something like https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
@@ -149,8 +139,10 @@ RUN wget -nv -O amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
 RUN apt-get update && apt-get install -y \
       g++-13
 
+# Info and compilers
+RUN ( \
+    echo "base_image: ${BASE_IMAGE}" && \
+    echo "rocroller: gcc-13" \
+    ) > /.container_info.txt
 ENV CXX=/usr/bin/g++-13
 ENV CC=/usr/bin/gcc-13
-
-ADD docker/install-rocprof-trace-decoder /tmp
-RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder
