@@ -2714,7 +2714,7 @@ public:
                 {
                     std::cerr << "Error: Boolean flag --" << key
                               << " cannot be registered with a default value of true. "
-                              << "Flags are implicitly false.\n";
+                              << "Flags are implicitly false by default.\n";
                     std::exit(EXIT_FAILURE);
                 }
 
