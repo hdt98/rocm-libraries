@@ -9,7 +9,8 @@
 
 # ubuntu-20.04 = focal
 # ubuntu-22.04 = jammy
-FROM mcr.microsoft.com/devcontainers/base:jammy
+ARG BASE_IMAGE=jammy
+FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -107,7 +108,7 @@ RUN apt-get update && apt-get install -y \
       g++-13
 
 RUN ( \
-    echo "base_image: ${base_image}" && \
+    echo "base_image: ${BASE_IMAGE}" && \
     echo "rocroller: gcc-13" \
     ) > /.container_info.txt
 

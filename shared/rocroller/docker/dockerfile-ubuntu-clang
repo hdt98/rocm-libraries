@@ -9,7 +9,8 @@
 
 # ubuntu-20.04 = focal
 # ubuntu-22.04 = jammy
-FROM mcr.microsoft.com/devcontainers/base:jammy
+ARG BASE_IMAGE=jammy
+FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -105,7 +106,7 @@ RUN /tmp/install_codeql && rm /tmp/install_codeql
 ENV PATH="/opt/codeql/codeql:${PATH}"
 
 RUN ( \
-    echo "base_image: ${base_image}" && \
+    echo "base_image: ${BASE_IMAGE}" && \
     echo "rocroller: clang" \
     ) > /.container_info.txt
 
