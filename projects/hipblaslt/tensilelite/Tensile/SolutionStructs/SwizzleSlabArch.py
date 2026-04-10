@@ -33,7 +33,8 @@ def cal_swizzle_pack_k_tensor(state_or_kernel: Mapping[str, Any], tc: str, isa: 
     Returns
     -------
     int
-        **RDNA4** + Half/BF16 + ``SwizzleTensorA`` on **A** → ``1`` (RDNA4 WMMA slab).
+        **RDNA4** + ``SwizzleTensorA`` on **A** → ``16 // MIInputPerThread // bpe``
+        (Half/BF16 → 1, FP8/Int8 → 2).
 
         Otherwise **CDNA3** formula: ``16 // MIInputPerThread // elementBytes``.
     """
@@ -42,10 +43,13 @@ def cal_swizzle_pack_k_tensor(state_or_kernel: Mapping[str, Any], tc: str, isa: 
     dt = pt[f"DataType{tc}"]
     bpe = dt.numBytes()
 
-    # TODO: generalize this for rdna4 and support for tensor B
-    if is_rdna4_swizzle_slab_isa(isa) and (dt.isHalf() or dt.isBFloat16()):
+    # RDNA4 WMMA slab: explicit path for supported types on tensor A.
+    # FP16/BF16 → PackK=1 (two b64 → one b128 via 8-element lanes)
+    # FP8/Int8  → PackK=2 (single b128 via 16-element lanes)
+    # The values match the generic formula below but are kept explicit for clarity.
+    if is_rdna4_swizzle_slab_isa(isa) and (dt.isHalf() or dt.isBFloat16() or bpe == 1):
         if tc == "A" and pt.get("SwizzleTensorA", False):
-            return 1
+            return 16 // mi_pt // bpe
 
     return 16 // mi_pt // bpe
 
@@ -56,20 +60,23 @@ def cal_swizzle_lane_size_elements(state_or_kernel: Mapping[str, Any], tc: str, 
 
     Legacy formula: '(MatrixInstK // 4) * swizzlePackK' (same 'kPack' as stride).
 
-    RDNA4 FP16/BF16 SwizzleTensorA: host slab uses **MiKv*PackK = 8** half per lane strip
-    (see client reshape); global loads use **8 coalesced half** per lane (128 bytes).
-    With 'swizzlePackK == 1' the stride formula alone would give lane size **4**, which
-    does **not** match the pre-shuffle layout — force **8**.
+    RDNA4 SwizzleTensorA: each lane loads exactly 128 bits (16 bytes) contiguously.
+    The element count per lane is therefore ``16 // bpe``:
+    - FP16/BF16 (bpe=2) → 8 elements per lane
+    - FP8/Int8  (bpe=1) → 16 elements per lane
+    The generic formula would give incorrect values for RDNA4 because MatrixInstK
+    differs from CDNA3 (16 vs 32 for FP8).
     """
     mik = int(state_or_kernel["MatrixInstK"])
     pk = cal_swizzle_pack_k_tensor(state_or_kernel, tc, isa)
     pt = state_or_kernel["ProblemType"]
     dt = pt[f"DataType{tc}"]
+    bpe = dt.numBytes()
     if (
         is_rdna4_swizzle_slab_isa(isa)
         and tc == "A"
         and pt.get("SwizzleTensorA", False)
-        and (dt.isHalf() or dt.isBFloat16())
+        and (dt.isHalf() or dt.isBFloat16() or bpe == 1)
     ):
-        return 8
+        return 16 // bpe
     return (mik // 4) * pk

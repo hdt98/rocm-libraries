@@ -391,11 +391,11 @@ namespace TensileLite
             PackK = 16 / MiKv / rocisa::GetElementSize(datatype);
         }
 
-        /// RDNA4 WMMA FP16/BF16 TN swizzle-A slab (matches asmStandaloneRunner doSwizzleFp16).
-        void calculateKforSwizzlingRdna4Fp16Slab(rocisa::DataType datatype,
-                                                 size_t&          MiK,
-                                                 size_t&          MiKv,
-                                                 size_t&          PackK)
+        /// RDNA4 WMMA TN swizzle-A slab parameters (FP16/BF16 and FP8 paths).
+        void calculateKforSwizzlingRdna4Slab(rocisa::DataType datatype,
+                                             size_t&          MiK,
+                                             size_t&          MiKv,
+                                             size_t&          PackK)
         {
             switch(datatype)
             {
@@ -403,6 +403,19 @@ namespace TensileLite
             case rocisa::DataType::BFloat16:
                 MiK   = 16;
                 MiKv  = 8;
+                PackK = 1;
+                break;
+            case rocisa::DataType::Int8:
+            case rocisa::DataType::Float8_fnuz:
+            case rocisa::DataType::BFloat8_fnuz:
+            case rocisa::DataType::Float8BFloat8_fnuz:
+            case rocisa::DataType::BFloat8Float8_fnuz:
+            case rocisa::DataType::Float8:
+            case rocisa::DataType::BFloat8:
+            case rocisa::DataType::Float8BFloat8:
+            case rocisa::DataType::BFloat8Float8:
+                MiK   = 32;
+                MiKv  = 16;
                 PackK = 1;
                 break;
             default:
@@ -428,6 +441,58 @@ namespace TensileLite
             return AMDGPU::toProcessor(prop.gcnArchName);
         }
 
+        /// RDNA4 FP8 512-byte slab scatter (ported from tnSlabDoSwizzleF8).
+        /// Each 16×32 tile (512 elements, 1 byte each) is rearranged so that every
+        /// lane reads 16 contiguous FP8 elements via a single buffer_load_b128.
+        ///
+        /// The source tensor has shape {M_padded, K_padded} with K varying fastest
+        /// (TN layout).  The scatter must extract each 16×32 sub-tile using strided
+        /// access because contiguous memory spans the full K dimension, not just 32.
+        static void shuffleFp8SlabRdna4(const void* src,
+                                        void*       dst,
+                                        size_t      M_padded,
+                                        size_t      K_padded,
+                                        size_t      elementBytes)
+        {
+            constexpr size_t MI_M = 16;
+            constexpr size_t MI_K = 32;
+            if(elementBytes != 1)
+                throw std::runtime_error("shuffleFp8SlabRdna4: element size must be 1 byte");
+            if(M_padded % MI_M != 0 || K_padded % MI_K != 0)
+                throw std::runtime_error(
+                    "shuffleFp8SlabRdna4: dimensions must be multiples of 16×32");
+            const auto* srcB = static_cast<const unsigned char*>(src);
+            auto*       dstB = static_cast<unsigned char*>(dst);
+
+            const size_t nMtiles = M_padded / MI_M;
+            const size_t nKtiles = K_padded / MI_K;
+
+            for(size_t mt = 0; mt < nMtiles; ++mt)
+            {
+                for(size_t kt = 0; kt < nKtiles; ++kt)
+                {
+                    unsigned char* pd
+                        = dstB + mt * MI_M * K_padded + kt * (MI_M * MI_K);
+                    for(size_t i = 0; i < MI_M * MI_K; ++i)
+                    {
+                        const size_t mLocal = i / MI_K;
+                        const size_t kLocal = i % MI_K;
+                        const size_t srcOff
+                            = (mt * MI_M + mLocal) * K_padded + (kt * MI_K + kLocal);
+
+                        const uint32_t seg = static_cast<uint32_t>(i / 8);
+                        const uint32_t eis = static_cast<uint32_t>(i % 8);
+                        const uint32_t g   = seg / 8u;
+                        const uint32_t row = (seg % 2u) == 0u ? g : (g + 8u);
+                        const uint32_t col = (seg % 8u) / 2u * 8u + eis;
+                        const size_t   o
+                            = static_cast<size_t>(row) * MI_K + static_cast<size_t>(col);
+                        pd[o] = srcB[srcOff];
+                    }
+                }
+            }
+        }
+
         void calculateKforSwizzlingTensor(SwizzleSlabLayoutType         slabLayout,
                                           ContractionProblemGemm const& problem,
                                           size_t                        tensorIndex,
@@ -441,7 +506,8 @@ namespace TensileLite
                     return tensorIndex == ContractionProblemGemm::TENSOR::A &&
                            problem.swizzleTensorA() &&
                            problem.transA() &&
-                           (dt == rocisa::DataType::Half || dt == rocisa::DataType::BFloat16);
+                           (dt == rocisa::DataType::Half || dt == rocisa::DataType::BFloat16
+                            || rocisa::GetElementSize(dt) == 1);
             };
 
             switch(slabLayout)
@@ -450,8 +516,8 @@ namespace TensileLite
                 if(!isRdna4SupportedSwizzleTensor(problem, tensorIndex, dt))
                     throw std::runtime_error(
                         "[DataInitialization] RDNA4 (gfx1200/gfx1201): host swizzle slab requires "
-                        "FP16/BF16 TN with SwizzleTensorA on tensor A.");
-                calculateKforSwizzlingRdna4Fp16Slab(dt, MiK, MiKv, PackK);
+                        "FP16/BF16/FP8 TN with SwizzleTensorA on tensor A.");
+                calculateKforSwizzlingRdna4Slab(dt, MiK, MiKv, PackK);
                 break;
             case SwizzleSlabLayoutType::SWZ_SLAB_CDNA3:
                 calculateKforSwizzlingCdna3Slab(dt, MiK, MiKv, PackK);
@@ -1995,12 +2061,40 @@ namespace TensileLite
                                                       kind,
                                                       swizzlePadding);
                         else if(kind == hipMemcpyDeviceToDevice)
+                        {
                             ptr = copyNaNInputBuffers(desc,
                                                       p.gpuInput.current.get(),
                                                       p.gpuInput.valid.get(),
                                                       p.maxElements,
                                                       kind,
                                                       swizzlePadding);
+                            if(problem.swizzleTensorA()
+                               && i == ContractionProblemGemm::TENSOR::A
+                               && desc.totalAllocatedElements() <= 512)
+                            {
+                                std::vector<unsigned char> readback(512);
+                                HIP_CHECK_EXC(hipMemcpy(readback.data(),
+                                                        ptr,
+                                                        512,
+                                                        hipMemcpyDeviceToHost));
+                                std::cerr
+                                    << "[DBG-D2D] gpuInput.current A[0..31]: ";
+                                for(int z = 0; z < 32; ++z)
+                                    std::cerr << (unsigned)readback[z] << " ";
+                                std::cerr << "\n";
+                                std::cerr
+                                    << "[DBG-D2D] gpuInput.current A[256..287]: ";
+                                for(int z = 256; z < 288; ++z)
+                                    std::cerr << (unsigned)readback[z] << " ";
+                                std::cerr << "\n";
+                                std::cerr
+                                    << "[DBG-D2D] ptr=" << ptr
+                                    << " swizzlePadding=" << swizzlePadding
+                                    << " maxElements=" << p.maxElements
+                                    << " totalAlloc=" << desc.totalAllocatedElements()
+                                    << "\n";
+                            }
+                        }
                         ptrs.push_back(ptr);
                         batchPtrs.push_back(p.getInputByKind(kind).batch.get());
                         maxElements.push_back(p.maxElements);
@@ -2026,11 +2120,24 @@ namespace TensileLite
                     {
                         auto& p = it->second;
                         if(kind == hipMemcpyHostToHost)
+                        {
                             ptr = copyInputBuffers(desc,
                                                    p.cpuInput.current.get(),
                                                    p.cpuInput.valid.get(),
                                                    p.maxElements,
                                                    kind);
+                            if(problem.swizzleTensorA()
+                               && i == ContractionProblemGemm::TENSOR::A
+                               && desc.totalAllocatedElements() <= 512)
+                            {
+                                auto* cb
+                                    = static_cast<const unsigned char*>(ptr);
+                                std::cerr << "[DBG-CPU] A cpu[0..31]: ";
+                                for(int z = 0; z < 32; ++z)
+                                    std::cerr << (unsigned)cb[z] << " ";
+                                std::cerr << "\n";
+                            }
+                        }
                         else if(kind == hipMemcpyHostToDevice)
                             ptr = copyInputBuffers(desc,
                                                    p.gpuInput.current.get(),
@@ -2038,11 +2145,32 @@ namespace TensileLite
                                                    p.maxElements,
                                                    kind);
                         else if(kind == hipMemcpyDeviceToDevice)
+                        {
                             ptr = copyInputBuffers(desc,
                                                    p.gpuInput.current.get(),
                                                    p.gpuInput.valid.get(),
                                                    p.maxElements,
                                                    kind);
+                            if(problem.swizzleTensorA()
+                               && i == ContractionProblemGemm::TENSOR::A
+                               && desc.totalAllocatedElements() <= 512)
+                            {
+                                std::vector<unsigned char> rb(512);
+                                HIP_CHECK_EXC(hipMemcpy(
+                                    rb.data(), ptr, 512, hipMemcpyDeviceToHost));
+                                std::cerr << "[DBG-D2D] A current[0..31]: ";
+                                for(int z = 0; z < 32; ++z)
+                                    std::cerr << (unsigned)rb[z] << " ";
+                                std::cerr << "\n[DBG-D2D] A current[256..287]: ";
+                                for(int z = 256; z < 288; ++z)
+                                    std::cerr << (unsigned)rb[z] << " ";
+                                std::cerr << "\n[DBG-D2D] maxEl="
+                                          << p.maxElements
+                                          << " totalAlloc="
+                                          << desc.totalAllocatedElements()
+                                          << " ptr=" << ptr << "\n";
+                            }
+                        }
                         if(ptr == nullptr)
                         {
                             std::runtime_error("output ptr is null when copy input");
@@ -2203,22 +2331,95 @@ namespace TensileLite
 
                         memcpy(
                             tmpTensor.as<void>(), p.cpuInput.valid.get(), tmpTensor.getNumBytes());
-                        //Temporary hack
                         uint64_t padVal{};
                         auto     paddedTensor = ::Tensor::Manipulation::pad(
                             tmpTensor, paddedShape, &padVal, tmpTensor.getElementSize());
-                        paddedTensor.reshape({paddedShape[0] / MiM_N,
-                                              MiM_N,
-                                              paddedShape[1] / (MiK * PackK),
-                                              MiK / MiKv,
-                                              MiKv * PackK});
-                        Tensor permuted = permute(paddedTensor, {0, 2, 3, 1, 4});
-                        ptr             = copyInputBuffers(desc,
+
+                        Tensor swizzled = [&]() -> Tensor {
+                            if(m_swizzleSlabLayoutType == SwizzleSlabLayoutType::SWZ_SLAB_RDNA4
+                               && desc.elementBytes() == 1)
+                            {
+                                Tensor shuffled(paddedTensor.getDesc().getShape(),
+                                                paddedTensor.getElementSize());
+                                shuffleFp8SlabRdna4(paddedTensor.as<void>(),
+                                                    shuffled.as<void>(),
+                                                    paddedShape[0],
+                                                    paddedShape[1],
+                                                    paddedTensor.getElementSize());
+
+                                if(paddedShape[0] <= 16 && paddedShape[1] <= 32)
+                                {
+                                    auto* sb = static_cast<const unsigned char*>(
+                                        paddedTensor.as<void>());
+                                    auto* db = static_cast<const unsigned char*>(
+                                        shuffled.as<void>());
+                                    size_t n = paddedShape[0] * paddedShape[1];
+                                    std::cerr << "[DBG-FP8-SWZ] paddedShape=(" << paddedShape[0]
+                                              << "," << paddedShape[1] << ") total=" << n
+                                              << "\n";
+                                    std::cerr << "[DBG-FP8-SWZ] src[0..31]: ";
+                                    for(size_t z = 0; z < 32 && z < n; ++z)
+                                        std::cerr << (unsigned)sb[z] << " ";
+                                    std::cerr << "\n";
+                                    std::cerr << "[DBG-FP8-SWZ] dst[0..31] (tid0): ";
+                                    for(size_t z = 0; z < 32 && z < n; ++z)
+                                        std::cerr << (unsigned)db[z] << " ";
+                                    std::cerr << "\n";
+                                    std::cerr << "[DBG-FP8-SWZ] dst[256..287] (tid16): ";
+                                    for(size_t z = 256; z < 288 && z < n; ++z)
+                                        std::cerr << (unsigned)db[z] << " ";
+                                    std::cerr << "\n";
+
+                                    std::cerr << "[DBG-FP8-SWZ] expected tid0 bytes [0..15]:\n";
+                                    std::cerr << "  G2LA[0:1] = src[0..7] = ";
+                                    for(size_t z = 0; z < 8; ++z)
+                                        std::cerr << (unsigned)sb[z] << " ";
+                                    std::cerr << "\n  G2LA[2:3] = src[16..23] = ";
+                                    for(size_t z = 16; z < 24; ++z)
+                                        std::cerr << (unsigned)sb[z] << " ";
+                                    std::cerr << "\n";
+                                    std::cerr << "[DBG-FP8-SWZ] expected tid16 bytes [256..271]:\n";
+                                    std::cerr << "  G2LA[0:1] = src[8..15] = ";
+                                    for(size_t z = 8; z < 16; ++z)
+                                        std::cerr << (unsigned)sb[z] << " ";
+                                    std::cerr << "\n  G2LA[2:3] = src[24..31] = ";
+                                    for(size_t z = 24; z < 32; ++z)
+                                        std::cerr << (unsigned)sb[z] << " ";
+                                    std::cerr << "\n";
+
+                                    bool match = true;
+                                    for(size_t z = 0; z < 8; ++z)
+                                        if(db[z] != sb[z])
+                                            match = false;
+                                    for(size_t z = 0; z < 8; ++z)
+                                        if(db[8 + z] != sb[16 + z])
+                                            match = false;
+                                    for(size_t z = 0; z < 8; ++z)
+                                        if(db[256 + z] != sb[8 + z])
+                                            match = false;
+                                    for(size_t z = 0; z < 8; ++z)
+                                        if(db[264 + z] != sb[24 + z])
+                                            match = false;
+                                    std::cerr << "[DBG-FP8-SWZ] scatter check tid0+tid16: "
+                                              << (match ? "PASS" : "FAIL") << "\n";
+                                }
+
+                                return shuffled;
+                            }
+                            paddedTensor.reshape({paddedShape[0] / MiM_N,
+                                                  MiM_N,
+                                                  paddedShape[1] / (MiK * PackK),
+                                                  MiK / MiKv,
+                                                  MiKv * PackK});
+                            return permute(paddedTensor, {0, 2, 3, 1, 4});
+                        }();
+
+                        ptr = copyInputBuffers(desc,
                                                p.gpuInput.valid.get(),
-                                               permuted.as<void>(),
-                                               permuted.getDesc().flattenSize(),
+                                               swizzled.as<void>(),
+                                               swizzled.getDesc().flattenSize(),
                                                hipMemcpyHostToDevice);
-                        g_swizzleCache.emplace(swizzleKey, std::move(permuted));
+                        g_swizzleCache.emplace(swizzleKey, std::move(swizzled));
                     }
                 }
                 else

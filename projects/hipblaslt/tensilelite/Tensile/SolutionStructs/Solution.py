@@ -884,8 +884,10 @@ class Solution(collections.abc.Mapping):
       return False
 
     # TLU=False or enableGLTr case, need GlobalReadVectorWidth == LocalReadVectorWidth
+    # Exception: SwizzleTensor bypasses LDS via DirectToVgpr, so GRVW != LRVW is OK
     if ((not state["ProblemType"]["TLU%c"%tc]) or state["enableGLTr%c"%tc]) and \
-       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth"]:
+       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth"] and \
+       not isSwizzle:
       reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU=False GlobalReadVectorWidth%c(%u) != LocalReadVectorWidth(%u)"%(tc, tc, state["GlobalReadVectorWidth%c"%tc], state["LocalReadVectorWidth"]))
       return False
 
