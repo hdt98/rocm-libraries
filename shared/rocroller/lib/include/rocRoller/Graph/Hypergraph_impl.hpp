@@ -382,9 +382,8 @@ namespace rocRoller
         template <typename Node, typename Edge, bool Hyper>
         auto Hypergraph<Node, Edge, Hyper>::getElement(int tag) const -> Element const&
         {
-            auto it = m_elements.find(tag);
-            AssertFatal(it != m_elements.end(), "Element not found", ShowValue(tag));
-            return it->second;
+            AssertFatal(m_elements.contains(tag), "Element not found", ShowValue(tag));
+            return m_elements.at(tag);
         }
 
         template <typename Node, typename Edge, bool Hyper>
