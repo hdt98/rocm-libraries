@@ -65,7 +65,7 @@ BenchmarkProblems:
         - LdsPadMetadata: [0]
         - LDSTrInst: [True, False]
         - PrefetchAcrossPersistent: [1]
-        - PrefetchGlobalRead: [2]
+        - PrefetchGlobalRead: [1, 2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
         - SourceSwap: [0]
