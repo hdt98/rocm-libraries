@@ -954,7 +954,9 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
 
                 &size_work1, &size_work2, &size_work3, &size_work4);
 
-            if(istat != rocblas_status_success)
+            bool const is_ok
+                = (istat == rocblas_status_success) || (istat == rocblas_status_continue);
+            if(!is_ok)
             {
                 return (rocblas_status_internal_error);
             }
@@ -1329,12 +1331,13 @@ static rocblas_status sytrs1_template(rocblas_handle handle,
 int constexpr ialign = 128;
 
 template <typename T, typename I>
-void rocsolver_sytrs2_getMemorySize(I const n,
-                                    I const nrhs,
-                                    I const batch_count,
-                                    I const lda,
-                                    I const ldb,
-                                    size_t* const p_size_work)
+rocblas_status rocsolver_sytrs2_getMemorySize(rocblas_handle handle,
+                                              I const n,
+                                              I const nrhs,
+                                              I const batch_count,
+                                              I const lda,
+                                              I const ldb,
+                                              size_t* const p_size_work)
 {
     *p_size_work = 0;
 
@@ -1345,7 +1348,7 @@ void rocsolver_sytrs2_getMemorySize(I const n,
         bool const has_work_to_do = (n >= 1) && (nrhs >= 1) && (batch_count >= 1);
         if(!has_work_to_do)
         {
-            return;
+            return (rocblas_status_success);
         }
     }
 
@@ -1377,10 +1380,17 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocblasCall_trsm_mem<BATCHED, T, I>(
+                auto const istat = rocblasCall_trsm_mem<BATCHED, T, I>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
 
                     &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
+
+                bool const is_ok
+                    = (istat == rocblas_status_success) || (istat == rocblas_status_continue);
+                if(!is_ok)
+                {
+                    return (istat);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -1397,10 +1407,14 @@ void rocsolver_sytrs2_getMemorySize(I const n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocblasCall_trsm_mem<BATCHED, T>(
+                auto const istat = rocblasCall_trsm_mem<BATCHED, T>(
                     side, trans, n, nrhs, lda, ldb, batch_count,
 
                     &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
+                if(istat != rocblas_status_success)
+                {
+                    return (istat);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -1415,9 +1429,17 @@ void rocsolver_sytrs2_getMemorySize(I const n,
 
     size_t size_syconv = 0;
 
-    rocsolver_syconv_getMemorySize<T>(n, batch_count, &size_syconv);
+    {
+        auto const istat = rocsolver_syconv_getMemorySize<T>(handle, n, batch_count, &size_syconv);
+        if(istat != rocblas_status_success)
+        {
+            return (istat);
+        }
+    }
 
     *p_size_work = size_E + std::max(size_syconv, size_trsm);
+
+    return (rocblas_status_success);
 }
 
 template <typename UA, typename UB, typename I>

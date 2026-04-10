@@ -54,7 +54,9 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     // argument checking
 
     {
-        rocblas_status st = rocsolver_sytrs2_argCheck(handle, uplo, n, nrhs, lda, ldb, A, B, ipiv);
+        rocblas_status st = rocsolver_sytrs2_argCheck(handle,
+
+                                                      uplo, n, nrhs, lda, ldb, A, B, ipiv);
 
         bool const is_ok = (st == rocblas_status_continue) || (st == rocblas_status_success);
         if(!is_ok)
@@ -76,7 +78,18 @@ rocblas_status rocsolver_sytrs2_impl(rocblas_handle handle,
     // memory workspace sizes:
     // size of reusable workspace
     size_t size_work = 0;
-    rocsolver_sytrs2_getMemorySize<T>(n, nrhs, batch_count, lda, ldb, &size_work);
+    {
+        auto const istat
+            = rocsolver_sytrs2_getMemorySize<T>(handle,
+
+                                                n, nrhs, batch_count, lda, ldb, &size_work);
+
+        bool const is_ok = (istat == rocblas_status_success) || (istat == rocblas_status_continue);
+        if(!is_ok)
+        {
+            return (istat);
+        }
+    }
 
     if(rocblas_is_device_memory_size_query(handle))
     {

@@ -77,7 +77,18 @@ rocblas_status rocsolver_sytrs2_strided_batched_impl(rocblas_handle handle,
     // memory workspace sizes:
     // ----------------------
     size_t size_work = 0;
-    rocsolver_sytrs2_getMemorySize<T>(n, nrhs, batch_count, lda, ldb, &size_work);
+    {
+        auto const istat
+            = rocsolver_sytrs2_getMemorySize<T>(handle,
+
+                                                n, nrhs, batch_count, lda, ldb, &size_work);
+
+        bool const is_ok = (istat == rocblas_status_success) || (istat == rocblas_status_continue);
+        if(!is_ok)
+        {
+            return (istat);
+        }
+    }
 
     if(rocblas_is_device_memory_size_query(handle))
     {

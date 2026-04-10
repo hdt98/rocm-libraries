@@ -1327,12 +1327,13 @@ rocblas_status rocsolver_sytrs_argCheck(rocblas_handle handle,
 }
 
 template <typename T, typename I>
-void rocsolver_sytrs_getMemorySize(I const n,
-                                   I const nrhs,
-                                   I const batch_count,
-                                   I const lda,
-                                   I const ldb,
-                                   size_t* const p_size_work)
+rocblas_status rocsolver_sytrs_getMemorySize(rocblas_handle handle,
+                                             I const n,
+                                             I const nrhs,
+                                             I const batch_count,
+                                             I const lda,
+                                             I const ldb,
+                                             size_t* const p_size_work)
 {
     // ---------------------------
     // request at least 1 byte to avoid possibly getting
@@ -1344,13 +1345,21 @@ void rocsolver_sytrs_getMemorySize(I const n,
     if(use_sytrs2<T>(n, nrhs, batch_count))
     {
         size_t size_sytrs2 = 0;
-        rocsolver_sytrs2_getMemorySize<T, I>(n, nrhs, batch_count, lda, ldb, &size_sytrs2);
+        auto const istat
+            = rocsolver_sytrs2_getMemorySize<T, I>(handle,
 
+                                                   n, nrhs, batch_count, lda, ldb, &size_sytrs2);
+
+        bool const is_ok = (istat == rocblas_status_success) || (istat == rocblas_status_continue);
+        if(!is_ok)
+        {
+            return (istat);
+        }
         size_work += size_sytrs2;
     }
 #endif
     *p_size_work = size_work;
-    return;
+    return (rocblas_status_success);
 }
 
 template <typename T, typename I, typename Istride, typename UA, typename UB>
