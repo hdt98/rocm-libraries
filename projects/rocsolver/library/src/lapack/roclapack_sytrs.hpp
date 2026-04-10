@@ -50,7 +50,7 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <typename T, typename I>
 static inline bool use_sytrs2(I const n, I const nrhs, I const batch_count)
 {
-    return (nrhs * 2 >= n);
+    return (nrhs >= ((n / 2) + (n % 2)));
 }
 #endif
 
