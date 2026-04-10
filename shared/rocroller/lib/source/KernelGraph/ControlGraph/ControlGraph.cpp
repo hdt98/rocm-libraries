@@ -151,7 +151,7 @@ namespace rocRoller::KernelGraph::ControlGraph
         if(m_cacheStatus == CacheStatus::Valid)
             return;
 
-        auto r = roots().to<std::set>();
+        auto r = roots().to<std::unordered_set>();
         populateOrderCache(r);
         m_cacheStatus = CacheStatus::Valid;
 
@@ -165,9 +165,9 @@ namespace rocRoller::KernelGraph::ControlGraph
     }
 
     template <CForwardRangeOf<int> Range>
-    std::set<int> ControlGraph::populateOrderCache(Range const& startingNodes) const
+    std::unordered_set<int> ControlGraph::populateOrderCache(Range const& startingNodes) const
     {
-        std::set<int> rv;
+        std::unordered_set<int> rv;
 
         auto it = startingNodes.begin();
         if(it == startingNodes.end())
@@ -184,14 +184,14 @@ namespace rocRoller::KernelGraph::ControlGraph
         return rv;
     }
 
-    std::set<int> ControlGraph::populateOrderCache(int startingNode) const
+    std::unordered_set<int> ControlGraph::populateOrderCache(int startingNode) const
     {
         auto ccEntry = m_descendentCache.find(startingNode);
         if(ccEntry != m_descendentCache.end())
             return ccEntry->second;
 
         auto addDescendents = [this](Generator<int> nodes) {
-            auto theNodes = nodes.to<std::set>();
+            auto theNodes = nodes.to<std::unordered_set>();
 
             auto descendents = populateOrderCache(theNodes);
             theNodes.insert(descendents.begin(), descendents.end());
@@ -248,13 +248,26 @@ namespace rocRoller::KernelGraph::ControlGraph
                                        BRange const& nodesB,
                                        NodeOrdering  order) const
     {
-        for(int nodeA : nodesA)
-            for(int nodeB : nodesB)
-                writeOrderCache(nodeA, nodeB, order);
+        // Batch update cache in both sets of nodes
+        for(int a : nodesA)
+        {
+            m_orderCache[a][order].insert(nodesB.begin(), nodesB.end());
+        }
+        auto oppositeOrder = opposite(order);
+        for(int b : nodesB)
+        {
+            m_orderCache[b][oppositeOrder].insert(nodesA.begin(), nodesA.end());
+        }
+
+        // Cache has been updated. Skip this
+        //for(int nodeA : nodesA)
+        //    for(int nodeB : nodesB)
+        //        writeOrderCache(nodeA, nodeB, order);
     }
 
     void ControlGraph::writeOrderCache(int nodeA, int nodeB, NodeOrdering order) const
     {
+        throw std::runtime_error("this function would NOT be called anymore");
         if(nodeA > nodeB)
         {
             writeOrderCache(nodeB, nodeA, opposite(order));

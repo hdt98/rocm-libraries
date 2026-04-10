@@ -247,13 +247,13 @@ namespace rocRoller
              * startingNodes.
              */
             template <CForwardRangeOf<int> Range>
-            std::set<int> populateOrderCache(Range const& startingNodes) const;
+            std::unordered_set<int> populateOrderCache(Range const& startingNodes) const;
 
             /**
              * Populates m_orderCache for startingNode relative to its descendents, and the
              * descendents relative to each other. Returns the descendents of startingNode.
              */
-            std::set<int> populateOrderCache(int startingNode) const;
+            std::unordered_set<int> populateOrderCache(int startingNode) const;
 
             NodeOrdering lookupOrder(CacheOnlyPolicy const, int nodeA, int nodeB) const;
             NodeOrdering lookupOrder(IgnoreCachePolicy const, int nodeA, int nodeB) const;
@@ -273,7 +273,7 @@ namespace rocRoller
              * If an entry is present, the value will be the IDs of every descendent from the key,
              * following every kind of edge.
              */
-            mutable std::unordered_map<int, std::set<int>> m_descendentCache;
+            mutable std::unordered_map<int, std::unordered_set<int>> m_descendentCache;
 
             mutable CacheStatus m_cacheStatus = CacheStatus::Invalid;
 

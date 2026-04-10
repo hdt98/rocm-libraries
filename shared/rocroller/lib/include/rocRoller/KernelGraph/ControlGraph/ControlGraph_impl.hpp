@@ -143,13 +143,13 @@ namespace rocRoller::KernelGraph::ControlGraph
                 co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-            if(nodeOrderBuckets[NodeOrdering::RightFirst].contains(node))
-                co_yield otherNode;
-        }
+        //for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
+        //{
+        //    if(otherNode >= node)
+        //        continue;
+        //    if(nodeOrderBuckets[NodeOrdering::RightFirst].contains(node))
+        //        co_yield otherNode;
+        //}
     }
 
     inline Generator<int> ControlGraph::nodesBefore(int node) const
@@ -162,13 +162,13 @@ namespace rocRoller::KernelGraph::ControlGraph
                 co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-            if(nodeOrderBuckets[NodeOrdering::LeftFirst].contains(node))
-                co_yield otherNode;
-        }
+        //for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
+        //{
+        //    if(otherNode >= node)
+        //        continue;
+        //    if(nodeOrderBuckets[NodeOrdering::LeftFirst].contains(node))
+        //        co_yield otherNode;
+        //}
     }
 
     inline Generator<int> ControlGraph::nodesInBody(int node) const
@@ -181,13 +181,13 @@ namespace rocRoller::KernelGraph::ControlGraph
                 co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-            if(nodeOrderBuckets[NodeOrdering::LeftInBodyOfRight].contains(node))
-                co_yield otherNode;
-        }
+        //for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
+        //{
+        //    if(otherNode >= node)
+        //        continue;
+        //    if(nodeOrderBuckets[NodeOrdering::LeftInBodyOfRight].contains(node))
+        //        co_yield otherNode;
+        //}
     }
 
     inline Generator<int> ControlGraph::nodesContaining(int node) const
@@ -200,13 +200,13 @@ namespace rocRoller::KernelGraph::ControlGraph
                 co_yield otherNode;
         }
 
-        for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
-        {
-            if(otherNode >= node)
-                continue;
-            if(nodeOrderBuckets[NodeOrdering::RightInBodyOfLeft].contains(node))
-                co_yield otherNode;
-        }
+        //for(auto const& [otherNode, nodeOrderBuckets] : m_orderCache)
+        //{
+        //    if(otherNode >= node)
+        //        continue;
+        //    if(nodeOrderBuckets[NodeOrdering::RightInBodyOfLeft].contains(node))
+        //        co_yield otherNode;
+        //}
     }
 
     template <typename T>
