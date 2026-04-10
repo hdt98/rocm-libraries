@@ -247,7 +247,6 @@ namespace rocRoller
             uint wfs = context->kernel()->wavefront_size();
 
             return CopyInfo{varType.dataType, elements / wfs};
-            //return CopyInfo{varType.dataType, elements / wfs / packFactor};
         }
 
         /**
@@ -272,8 +271,6 @@ namespace rocRoller
 
             auto copyExpr = std::make_shared<Expression::Expression>(
                 Expression::DataFlowTag{macTileTag, Register::Type::Vector, copyInfo->dataType});
-            //auto copyTag = graph.control.addElement(
-            //    Assign{Register::Type::Vector, copyExpr, copyInfo->numVGPRs});
             auto copyTag = graph.control.addElement(
                 Assign{Register::Type::Vector, copyExpr, copyInfo->valueCount});
             auto destMacTileTag = graph.coordinates.addElement(MacroTile());
