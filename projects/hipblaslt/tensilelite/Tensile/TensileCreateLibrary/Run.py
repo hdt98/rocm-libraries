@@ -83,6 +83,7 @@ from Tensile.Utilities.Decorators.Timing import timing
 from rocasm.setparse import parse_set_directives
 from rocasm.asm_to_rocasm import asm_to_rocasm, parse_register_counts
 from rocasm.tile_analysis import analyze_tile, generate_tiled_mainloop
+from Tensile.Components.ROCasmRegistry import lookup_rocasm_mainloop
 
 from .ParseArguments import parseArguments
 
@@ -112,7 +113,7 @@ class KernelCodeGenResult(NamedTuple):
     pgr: int
     mathclk: int
     generateROCasm: bool
-    useROCasmMainLoop: str
+    useROCasmMainLoop: Optional[dict]
 
 class KernelMinResult(NamedTuple):
     err: int
@@ -140,12 +141,24 @@ def processKernelSource(kernelWriterAssembly, data, outOptions, splitGSU, kernel
     header = kernelWriter.getHeaderFileString(kernel)
     objFilename = kernel._state.get("codeObjectFile", None)
     pgr = int(kernel["PrefetchGlobalRead"])
+    rocasm_kernel = None
+    if kernel["UseROCasmMainLoop"]:
+        rocasm_kernel = {
+            "MacroTile0": kernel["MacroTile0"],
+            "MacroTile1": kernel["MacroTile1"],
+            "DepthU": kernel["DepthU"],
+            "MatrixInstruction": list(kernel["MatrixInstruction"]),
+            "ProblemType": {
+                "TransposeA": kernel["ProblemType"]["TransposeA"],
+                "TransposeB": kernel["ProblemType"]["TransposeB"],
+            },
+        }
     return KernelCodeGenResult(
         err, src, header, asmFilename, objFilename, tuple(kernel["ISA"]), \
         kernel["WavefrontSize"], kernel["CUOccupancy"], \
         pgr, kernel["MathClocksUnrolledLoop"], \
         kernel["GenerateROCasm"], \
-        kernel["UseROCasmMainLoop"]
+        rocasm_kernel
     )
 
 def _checkInvalidSolutionsAndKernels(errorTolerant, result, kernel):
@@ -383,14 +396,23 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
 
     return src
 
-def _useROCasmMainloop(src: str, mainloopPath: str) -> str:
-    """Replace the main loop in src with the output of a user-supplied rocasm module.
+def _useROCasmMainloop(src: str, kernel: dict) -> str:
+    """Replace the main loop in src using a registered rocasm module.
 
-    Imports the module at mainloopPath, calls its get_main_loop() function, and
-    splices the returned text into src between label_LoopBeginL: and label_LoopEndL:.
+    Looks up a matching rocasm mainloop function from the registry,
+    calls it to get a Block, emits assembly, and splices the result
+    into src between label_LoopBeginL: and label_LoopEndL:.
 
-    If either label is not found in src, returns src unchanged.
+    If no registered module matches, or if the labels are not found,
+    returns src unchanged.
     """
+    # Trigger auto-discovery of user rocasm modules
+    import Tensile.ROCasmMainloops  # noqa: F401
+
+    mainloop_func = lookup_rocasm_mainloop(kernel)
+    if mainloop_func is None:
+        return src
+
     begin_marker = "label_LoopBeginL:"
     end_marker = "label_LoopEndL:"
 
@@ -411,19 +433,8 @@ def _useROCasmMainloop(src: str, mainloopPath: str) -> str:
     prefix = src[:line_start]
     suffix = src[end_line_start:]
 
-    resolved = Path(mainloopPath).resolve()
-    if not resolved.exists():
-        raise FileNotFoundError(f"UseROCasmMainLoop: module not found: {resolved}")
-
-    spec = importlib.util.spec_from_file_location("_rocasm_user_mainloop", str(resolved))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    if not hasattr(mod, "get_main_loop"):
-        raise AttributeError(
-            f"UseROCasmMainLoop: module {resolved} does not define get_main_loop()")
-
-    user_main_loop = mod.get_main_loop()
+    block = mainloop_func()
+    user_main_loop = block.emit()
     return prefix + user_main_loop + suffix
 
 def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
@@ -439,7 +450,7 @@ def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
         if result.generateROCasm:
             mainloopPath = Path(asmPath) / f"{result.name}_mainloop.py"
             src = _generateROCasmMainloop(src, mainloopPath)
-        if result.useROCasmMainLoop:
+        if result.useROCasmMainLoop is not None:
             src = _useROCasmMainloop(src, result.useROCasmMainLoop)
         f.write(src)
 

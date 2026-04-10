@@ -462,7 +462,7 @@ defaultBenchmarkCommonParameters = [
     {"MbskPrefetchMethod": [-1]},
     {"UseCustomMainLoopSchedule": [-1]},
     {"GenerateROCasm": [False]},
-    {"UseROCasmMainLoop": [""]},
+    {"UseROCasmMainLoop": [False]},
     {"SpaceFillingAlgo": [[]]},
     {"SFCWGM": [[[1,1],[1,1]]]},
     {"AdaptiveGemm": [0]},

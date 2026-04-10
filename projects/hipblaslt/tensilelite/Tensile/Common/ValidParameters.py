@@ -934,10 +934,9 @@ validParameters = { # we need to make sure this matches develop
     # When True, the main loop text is extracted, placed in a get_main_loop() function,
     # and the .s file is built by calling that function (proving the round-trip).
     "GenerateROCasm": [True, False],
-    # Path to a rocasm Python mainloop file to use instead of the generated main loop.
-    # The module must define get_main_loop() returning the main loop assembly text.
-    # Empty string (default) means disabled.
-    "UseROCasmMainLoop": -1,
+    # When True, look up a registered rocasm mainloop module from the registry
+    # (rocasm/mainloops/) and use it to replace the generated main loop.
+    "UseROCasmMainLoop": [True, False],
     "AdaptiveGemm": [0, 1],
     # Add extra latency to calculate number of MFMA to insert between local read and wait
     # Negative value means reduce interval between local read and wait (for DirectToVgpr only)
