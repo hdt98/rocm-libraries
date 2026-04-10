@@ -100,12 +100,14 @@ private:
         auto shallowOut0Tensor = createShallowTensor<OutputType>(
             _params.out0Tensor, variantPack.at(_params.out0Tensor.uid));
 
-        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(_params.mode))
+        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(
+            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type>::pointwiseCompute(
                 _params.mode, *shallowOut0Tensor, *shallowIn0Tensor);
         }
-        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(_params.mode))
+        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(
+            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             if(!_params.in1Tensor.has_value())
             {
@@ -133,7 +135,8 @@ private:
         auto shallowOut0Tensor = createShallowTensor<OutputType>(
             _params.out0Tensor, variantPack.at(_params.out0Tensor.uid));
 
-        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(_params.mode))
+        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(
+            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type>::pointwiseCompute(
                 _params.mode,
@@ -150,7 +153,8 @@ private:
                 static_cast<OutputType>(_params.swishBeta.has_value() ? _params.swishBeta.value()
                                                                       : 1.0f));
         }
-        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(_params.mode))
+        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(
+            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             if(!_params.in1Tensor.has_value())
             {
@@ -215,14 +219,15 @@ public:
 
         // Check that the operation is implemented
         auto mode = nodeAttributes->operation();
+        const auto dataSdkMode = static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(mode);
         bool isImplemented = false;
-        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(mode))
+        if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(dataSdkMode))
         {
-            isImplemented = hipdnn_data_sdk::utilities::isImplementedUnaryPointwiseMode(mode);
+            isImplemented = hipdnn_data_sdk::utilities::isImplementedUnaryPointwiseMode(dataSdkMode);
         }
-        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(mode))
+        else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(dataSdkMode))
         {
-            isImplemented = hipdnn_data_sdk::utilities::isImplementedBinaryPointwiseMode(mode);
+            isImplemented = hipdnn_data_sdk::utilities::isImplementedBinaryPointwiseMode(dataSdkMode);
         }
 
         if(!isImplemented)
@@ -239,7 +244,7 @@ public:
         CHECK_TENSOR_TYPE(tensorMap, nodeAttributes->out_0_tensor_uid(), OutputDataTypeEnum);
 
         // Check optional tensors based on operation mode
-        if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(mode))
+        if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(dataSdkMode))
         {
             CHECK_OPTIONAL_TENSOR_EXISTS(tensorMap, nodeAttributes->in_1_tensor_uid());
             CHECK_OPTIONAL_TENSOR_TYPE(

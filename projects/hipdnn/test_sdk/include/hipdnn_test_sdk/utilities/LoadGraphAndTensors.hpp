@@ -180,7 +180,7 @@ inline GraphAndTensorMap loadGraphAndTensors(const std::filesystem::path& path)
     }(path);
 
     flatbuffers::FlatBufferBuilder graphBuilder;
-    auto graphOffset = hipdnn_data_sdk::json::to<hipdnn_flatbuffers_sdk::data_objects::Graph>(
+    auto graphOffset = hipdnn_data_sdk::json::to<hipdnn_data_sdk::data_objects::Graph>(
         graphBuilder, graphJson);
     graphBuilder.Finish(graphOffset);
 

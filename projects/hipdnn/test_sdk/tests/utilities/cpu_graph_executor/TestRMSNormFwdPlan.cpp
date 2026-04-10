@@ -5,7 +5,7 @@
 
 #include "RMSNormGraphUtils.hpp"
 #include "RMSNormTensorBundles.hpp"
-#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceRMSNorm.hpp>
@@ -53,7 +53,8 @@ TEST(TestRMSNormFwdPlan, ExecutePlan)
     const std::unordered_map<int64_t, void*> variantPack = planTensorBundle.toHostVariantPack();
 
     const double epsilon
-        = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(params.epsilonTensor, "Epsilon");
+        = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(params.epsilonTensor,
+                                                                          "Epsilon");
 
     auto shallowXTensor = createShallowTensor<float>(
         params.xTensor, directTensorBundle.tensors[attributes.x_tensor_uid()]->rawHostData());
@@ -147,7 +148,8 @@ TEST(TestRMSNormFwdPlan, ExecutePlanWithBias)
                             invRmsBiasPtr,
                             biasPtr);
 
-    const double epsilon = extractDoubleFromTensorValue(params.epsilonTensor, "Epsilon");
+    const double epsilon = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
+        params.epsilonTensor, "Epsilon");
 
     auto shallowXTensor = createShallowTensor<float>(
         params.xTensor, directTensorBundle.tensors[attributes.x_tensor_uid()]->rawHostData());

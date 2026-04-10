@@ -8,6 +8,7 @@
 #include <hipdnn_data_sdk/utilities/Constants.hpp>
 #include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceBatchnorm.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
@@ -76,7 +77,8 @@ TEST_F(TestBatchnormFwdWithVariancePlan, ExecutePlan)
         params.yTensor, directTensorBundle.tensors[attributes.y_tensor_uid()]->rawHostData());
 
     const double epsilon
-        = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(params.epsilonTensor, "Epsilon");
+        = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(params.epsilonTensor,
+                                                                          "Epsilon");
 
     CpuFpReferenceBatchnorm::fwdInferenceWithVariance(*shallowXTensor,
                                                       *shallowScaleTensor,

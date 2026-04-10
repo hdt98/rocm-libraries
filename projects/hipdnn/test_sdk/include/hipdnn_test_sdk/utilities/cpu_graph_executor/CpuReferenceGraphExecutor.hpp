@@ -129,7 +129,7 @@ private:
             return detail::RMSNormFwdSignatureKey(node, tensorMap);
         case hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::SdpaAttributes:
             return detail::SdpaFwdSignatureKey(node, tensorMap);
-        case hipdnn_data_sdk::data_objects::NodeAttributes::ReductionAttributes:
+        case hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::ReductionAttributes:
             return detail::ReductionSignatureKey(node, tensorMap, computeType);
         default:
             throw std::runtime_error("Unsupported node type for signature key generation");

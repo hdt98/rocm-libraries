@@ -4,7 +4,7 @@
 #pragma once
 
 #include <functional>
-#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceBatchnorm.hpp>
@@ -139,7 +139,7 @@ public:
             _params.yTensor, variantPack.at(_params.yTensor.uid));
 
         // Extract epsilon from pass-by-value tensor (cast to double)
-        const double epsilon = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+        const double epsilon = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
             _params.epsilonTensor, "Epsilon");
 
         // Optional batch statistics tensors
@@ -183,7 +183,7 @@ public:
         double momentumValue = 0.1;
         if(_params.momentumTensor.has_value())
         {
-            momentumValue = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+            momentumValue = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
                 _params.momentumTensor.value(), "Momentum");
         }
 

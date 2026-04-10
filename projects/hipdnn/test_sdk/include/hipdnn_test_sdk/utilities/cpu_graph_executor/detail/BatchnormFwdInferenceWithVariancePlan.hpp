@@ -7,7 +7,7 @@
 #include <variant>
 
 #include <hipdnn_data_sdk/utilities/Constants.hpp>
-#include <hipdnn_data_sdk/utilities/FlatbufferUtils.hpp>
+#include <hipdnn_flatbuffers_sdk/utilities/FlatbufferUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceBatchnorm.hpp>
@@ -88,7 +88,7 @@ public:
         auto shallowVarianceTensor = createShallowTensor<MeanVarianceDataType>(
             _params.varianceTensor, variantPack.at(_params.varianceTensor.uid));
 
-        const double epsilonVal = hipdnn_data_sdk::utilities::extractDoubleFromTensorValue(
+        const double epsilonVal = hipdnn_flatbuffers_sdk::utilities::extractDoubleFromTensorValue(
             _params.epsilonTensor, "Epsilon");
 
         utilities::CpuFpReferenceBatchnorm::fwdInferenceWithVariance(*shallowXTensor,
