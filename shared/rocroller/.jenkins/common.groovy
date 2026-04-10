@@ -252,9 +252,6 @@ def runBuildDocsCommand(platform, project)
 def runPerformanceCommand (platform, project)
 {
     String masterURL = env.CHANGE_ID ? env.JOB_URL.replace("PR-${env.CHANGE_ID}", env.CHANGE_TARGET) : env.JOB_URL
-    String gitCommitHash = env.GIT_COMMIT ? env.GIT_COMMIT.take(10) : "unknown"
-    String gitBranchName = env.CHANGE_BRANCH ?: env.BRANCH_NAME
-
     withSSH(platform){
         sshBlock ->
         def rrperfSuite = platform.jenkinsLabel.contains('gfx12') ? "all_gfx120X" : "all"
@@ -393,6 +390,13 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
+                # Resolve branch name and commit hash from remote (Jenkins detached HEAD workaround)
+                GIT_BRANCH_NAME=\$(git branch -r --contains HEAD | grep -v '\\->' | grep -v 'HEAD' | head -1 | sed 's|.*origin/||' | xargs)
+                if [ -z "\$GIT_BRANCH_NAME" ]; then
+                    GIT_BRANCH_NAME="${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
+                fi
+                GIT_COMMIT_HASH=\$(git ls-remote origin "refs/heads/\$GIT_BRANCH_NAME" | cut -c1-10)
+
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -424,9 +428,9 @@ def runPerformanceCommand (platform, project)
                         --csv \$CSV_FILE \\
                         --arch ${platform.gpu} \\
                         --repo github.com/ROCm/rocm-libraries \\
-                        --branch ${gitBranchName} \\
+                        --branch \$GIT_BRANCH_NAME \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${gitCommitHash} \\
+                        --commit \$GIT_COMMIT_HASH \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
@@ -611,6 +615,13 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
+                # Resolve branch name and commit hash from remote tracking refs (Jenkins detached HEAD workaround)
+                GIT_COMMIT_HASH=\$(git rev-parse --short=10 FETCH_HEAD 2>/dev/null || git rev-parse --short=10 HEAD)
+                GIT_BRANCH_NAME=\$(git branch -r --contains HEAD | grep -v '\\->' | grep -v 'HEAD' | head -1 | sed 's|.*origin/||' | xargs)
+                if [ -z "\$GIT_BRANCH_NAME" ]; then
+                    GIT_BRANCH_NAME="${env.BRANCH_NAME}"
+                fi
+
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
                     echo "=== gemmaiperf not found, cloning ==="
@@ -642,9 +653,9 @@ def runPerformanceCommand (platform, project)
                         --csv \$CSV_FILE \\
                         --arch ${platform.gpu} \\
                         --repo github.com/ROCm/rocm-libraries \\
-                        --branch ${gitBranchName} \\
+                        --branch \$GIT_BRANCH_NAME \\
                         --comment "rocroller CI automatic insertion" \\
-                        --commit ${gitCommitHash} \\
+                        --commit \$GIT_COMMIT_HASH \\
                         --machine ${env.NODE_NAME} \\
                         --library_size 0 \\
                         --streamk 0
