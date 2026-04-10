@@ -761,12 +761,11 @@ static inline rocblas_status rocsolver_syconv_argCheck(rocblas_handle handle,
 }
 
 template <typename T, typename I>
-static inline void rocsolver_syconv_getMemorySize(
+static inline rocblas_status rocsolver_syconv_getMemorySize(rocblas_handle handle,
+                                                            I const n,
+                                                            I const batch_count,
 
-    I const n,
-    I const batch_count,
-
-    size_t* p_size_work)
+                                                            size_t* p_size_work)
 {
     *p_size_work = 0;
 
@@ -774,46 +773,65 @@ static inline void rocsolver_syconv_getMemorySize(
         bool const has_work_to_do = (n >= 1) && (batch_count >= 1);
         if(!has_work_to_do)
         {
-            return;
+            return (rocblas_status_success);
         }
     }
 
     size_t const size_icount = sizeof(I) * n * batch_count;
 
     size_t size_rocprim = 0;
-
     {
-        // -------------------------------------------------------------
-        // This is just an estimate of the upper bound of storage needed
+        hipStream_t stream;
+        rocblas_get_stream(handle, &stream);
+
+        // Functor to generate offsets
+        struct mul_n
+        {
+            I n;
+            __host__ __device__ I operator()(I i) const
+            {
+                return i * n;
+            }
+        };
+
+        auto counting = rocprim::make_counting_iterator<I>(0);
+        auto offsets = rocprim::make_transform_iterator(counting, mul_n{n});
+
+        void* temp = nullptr;
+        size_t temp_bytes = 0;
+
+        // ------------------------------
+        // size query for scratch storage in in-place prefix sum scan
         //
-        // Note rocprim storage query requires the actual d_data pointer
-        // It is not safe to pass a nullptr as d_data
+        // NOTE:  rocprim expect argument temp_bytes as  size_t&
+        //        and not as size_t *
         //
-        // This approximates the workspace as proportional to the number
-        // of processing blocks and incorporate a safety factor, then compare
-        // it with a simple per-element bound and keep the larger value.
-        // -------------------------------------------------------------
-        auto ceildiv = [](auto m, auto b) { return ((m <= 0) ? 0 : (m - 1) / b + 1); };
-        size_t constexpr ITEMS_PER_BLOCK = 128;
-        size_t constexpr SAFETY = 8;
-        size_t const N = static_cast<size_t>(n) * batch_count;
-        size_t const num_blocks = ceildiv(N, ITEMS_PER_BLOCK);
+        // ------------------------------
+        {
+            // ------------------------------------------------
+            // NOTE: rocprim needs to deduce the type from d_data
+            // so pass in  I * pointer that has value nullptr
+            // ------------------------------------------------
+            I* const d_data = nullptr;
 
-        size_t const temp_bytes = (num_blocks * sizeof(int64_t)) * SAFETY;
+            hipError_t const hstat = rocprim::segmented_inclusive_scan(
+                temp, temp_bytes,
+                d_data, // input
+                d_data, // output (same pointer)
+                batch_count, offsets, offsets + 1, rocprim::plus<I>(), stream);
 
-        size_t const size_rocprim_est1 = temp_bytes;
+            if(hstat != hipSuccess)
+            {
+                return (rocblas_status_internal_error);
+            }
 
-        // -----------------
-        // gross upper bound
-        // -----------------
-        size_t const size_rocprim_est2 = (n * sizeof(I)) * batch_count;
-
-        size_rocprim = std::max(size_rocprim_est1, size_rocprim_est2);
+            size_rocprim = temp_bytes;
+        }
     }
 
     *p_size_work = size_icount + size_rocprim;
 
-    return;
+    return (rocblas_status_success);
 }
 
 //  -----------------------------------
@@ -1025,3 +1043,4 @@ static rocblas_status rocsolver_syconv_template(rocblas_handle handle,
     return (rocblas_status_success);
 }
 ROCSOLVER_END_NAMESPACE
+#undef SYCONV_MAX_THDS
