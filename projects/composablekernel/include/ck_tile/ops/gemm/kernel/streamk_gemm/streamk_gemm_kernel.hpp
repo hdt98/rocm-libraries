@@ -206,7 +206,7 @@ struct StreamKKernel
      */
     CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
                                                          int num_cu    = NumCU(),
-                                                         int occupancy = Occupancy())
+                                                         int occupancy = Occupancy<Kernel, KernelArgs, kBlockSize>())
     {
         const index_t max_active_wgs = num_cu * occupancy;
 
@@ -357,7 +357,7 @@ struct StreamKKernel
             index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
 
             // Get the K offsets for the A and B tensors
-            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout>(
+            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout, TilePartitioner::KPerBlock>(
                 local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
@@ -537,76 +537,6 @@ struct StreamKKernel
                 BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             },
             [&](index_t sk_cta_idx) { StreamKGemm(kargs, sk_cta_idx, smem_ptr_0); });
-    }
-
-    private:
-    /**
-     * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset
-     * is the starting macro tile index in the K dimension for the workgroup.
-     * @return A tuple containing the offsets into the A and B tensors accounting for the
-     * layouts of A and B.
-     * @note The default case is that A is assumed to be row major and B is assumed to be column
-     * major.
-     */
-    template <typename ALayout, typename BLayout>
-    CK_TILE_DEVICE static tuple<index_t, index_t>
-    GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
-    {
-        index_t stride_offset_a;
-        index_t stride_offset_b;
-        if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
-        {
-            stride_offset_a = stride_a;
-        }
-        else
-        {
-            stride_offset_a = 1;
-        }
-
-        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
-        {
-            stride_offset_b = stride_b;
-        }
-        else
-        {
-            stride_offset_b = 1;
-        }
-
-        index_t base_offset = iter_offset * TilePartitioner::KPerBlock;
-
-        return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
-    }
-
-    CK_TILE_HOST static int NumCU()
-    {
-        hipDeviceProp_t dev_prop;
-        hipDevice_t dev;
-        ck_tile::hip_check_error(hipGetDevice(&dev));
-        ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
-        int num_cu = dev_prop.multiProcessorCount;
-
-        return num_cu;
-    }
-
-    /**
-     * @brief Computes the occupancy (i.e. maximum number of active blocks per CU) for the
-     * kernel
-     * @return The occupancy
-     * @note This function queries the maximum occupancy of the kernel using
-     * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
-     */
-    CK_TILE_HOST static int Occupancy()
-    {
-        int occupancy;
-
-        // Since occupancy of 1 is valid for stream k, we set min_num_block_per_cu to 1
-        constexpr int min_block_per_cu = 1;
-        const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
-
-        ck_tile::hip_check_error(
-            hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
-
-        return max(occupancy, 1);
     }
 };
 } // namespace ck_tile
