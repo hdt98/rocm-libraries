@@ -390,12 +390,13 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
-                # Resolve branch name and commit hash from remote
-                GIT_BRANCH_NAME=\$(git branch -r --contains HEAD | grep -v '\\->' | grep -v 'HEAD' | head -1 | sed 's|.*origin/||' | xargs)
-                if [ -z "\$GIT_BRANCH_NAME" ]; then
-                    GIT_BRANCH_NAME="${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
-                fi
-                GIT_COMMIT_HASH=\$(git ls-remote origin "refs/heads/\$GIT_BRANCH_NAME" | cut -c1-10)
+                # Debug: print Jenkins env vars to determine what's available
+                echo "DEBUG BRANCH_NAME=${env.BRANCH_NAME}"
+                echo "DEBUG CHANGE_BRANCH=${env.CHANGE_BRANCH}"
+                echo "DEBUG CHANGE_SHA=${env.CHANGE_SHA}"
+                echo "DEBUG GIT_COMMIT=${env.GIT_COMMIT}"
+                echo "DEBUG git HEAD^2=\$(git rev-parse HEAD^2 2>/dev/null || echo 'no HEAD^2')"
+                echo "DEBUG git branch -r=\$(git branch -r --contains HEAD 2>/dev/null)"
 
                 # Ensure gemmaiperf is available
                 if [ ! -d "gemmaiperf" ]; then
