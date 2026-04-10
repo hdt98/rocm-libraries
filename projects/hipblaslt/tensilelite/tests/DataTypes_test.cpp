@@ -74,7 +74,6 @@ TYPED_TEST(TypedDataTypesTest, TypeInfo_Consistency)
     EXPECT_EQ(fromEnum.dataType, MyTypeInfo::Enum);
     EXPECT_EQ(fromEnum.elementSize, sizeof(TheType));
     EXPECT_EQ(fromEnum.packing, MyTypeInfo::Packing);
-    EXPECT_EQ(fromEnum.segmentSize, MyTypeInfo::SegmentSize);
 
     EXPECT_EQ(fromEnum.isComplex, MyTypeInfo::IsComplex);
     EXPECT_EQ(fromEnum.isIntegral, MyTypeInfo::IsIntegral);

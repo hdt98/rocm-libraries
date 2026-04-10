@@ -1,0 +1,1059 @@
+py3: install_deps> python -I -m pip install cmake filelock invoke nanobind 'pytest-xdist>=1.32.0' 'pytest>=5.4.1' setuptools -r /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/requirements.txt
+.pkg: install_requires> python -I -m pip install 'setuptools>=40.8.0'
+.pkg: _optional_hooks> python /usr/local/lib/python3.12/dist-packages/pyproject_api/_backend.py True setuptools.build_meta __legacy__
+.pkg: get_requires_for_build_sdist> python /usr/local/lib/python3.12/dist-packages/pyproject_api/_backend.py True setuptools.build_meta __legacy__
+.pkg: get_requires_for_build_wheel> python /usr/local/lib/python3.12/dist-packages/pyproject_api/_backend.py True setuptools.build_meta __legacy__
+.pkg: prepare_metadata_for_build_wheel> python /usr/local/lib/python3.12/dist-packages/pyproject_api/_backend.py True setuptools.build_meta __legacy__
+.pkg: build_sdist> python /usr/local/lib/python3.12/dist-packages/pyproject_api/_backend.py True setuptools.build_meta __legacy__
+py3: install_package_deps> python -I -m pip install 'joblib>=1.4.0' msgpack orjson packaging pyyaml simplejson ujson yappi
+py3: install_package> python -I -m pip install --force-reinstall --no-deps /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/.tmp/package/1/tensile-5.0.0.tar.gz
+py3: commands[0]> pip install --upgrade pip
+Requirement already satisfied: pip in ./.tox/py3/lib/python3.12/site-packages (26.0.1)
+py3: commands[1]> pip install --no-build-isolation /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/rocisa/
+Processing ./rocisa
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Requirement already satisfied: nanobind in ./.tox/py3/lib/python3.12/site-packages (from rocisa==0.1.0) (2.12.0)
+Building wheels for collected packages: rocisa
+  Building wheel for rocisa (pyproject.toml): started
+  Building wheel for rocisa (pyproject.toml): finished with status 'done'
+  Created wheel for rocisa: filename=rocisa-0.1.0-cp312-cp312-linux_x86_64.whl size=1167328 sha256=dbd0cc8358e89f91f03ea6ff72d23cff1996c604767dac0e6bbe7931babfd136
+  Stored in directory: /tmp/pip-ephem-wheel-cache-q3r9gn7y/wheels/80/35/37/132f7e9f5f4e80f6ba20f316df6910247dacb3bddcdee56a67
+Successfully built rocisa
+Installing collected packages: rocisa
+Successfully installed rocisa-0.1.0
+py3: commands[2]> pytest -v --basetemp=/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/tmp --junit-xml=/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/rocisa_tests.xml --junit-prefix=rocisa --color=yes -n 4 /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/rocisa/test
+[1m============================= test session starts ==============================[0m
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0 -- /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/bin/python
+cachedir: .tox/py3/.pytest_cache
+rootdir: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite
+configfile: pytest.ini
+plugins: xdist-3.8.0
+created: 4/4 workers
+4 workers [114 items]
+
+scheduling tests via LoadScheduling
+
+rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_three_quarters 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_half_string 
+rocisa/test/test_container.py::test_containers_copy 
+[gw1][36m [  0%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_three_quarters 
+rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_one 
+[gw1][36m [  1%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_one 
+rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_two 
+[gw1][36m [  2%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_two 
+rocisa/test/test_base.py::test_rocisa 
+rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_four 
+[gw1][36m [  3%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_four 
+rocisa/test/test_functions.py::test_vectorMultiply64Bpe_half 
+[gw1][36m [  4%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiply64Bpe_half 
+rocisa/test/test_functions.py::test_vectorMultiply64Bpe_three_quarters 
+[gw1][36m [  5%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiply64Bpe_three_quarters 
+[gw2][36m [  6%] [0m[32mPASSED[0m rocisa/test/test_container.py::test_containers_copy 
+rocisa/test/test_cycle.py::test_cycles[wrapper0] 
+[gw0][36m [  7%] [0m[32mPASSED[0m rocisa/test/test_base.py::test_rocisa 
+rocisa/test/test_base.py::test_item 
+[gw0][36m [  7%] [0m[32mPASSED[0m rocisa/test/test_base.py::test_item 
+rocisa/test/test_base.py::test_copy 
+[gw0][36m [  8%] [0m[32mPASSED[0m rocisa/test/test_base.py::test_copy 
+rocisa/test/test_base.py::test_functions 
+[gw0][36m [  9%] [0m[32mPASSED[0m rocisa/test/test_base.py::test_functions 
+rocisa/test/test_code.py::test_code 
+[gw0][36m [ 10%] [0m[32mPASSED[0m rocisa/test/test_code.py::test_code 
+rocisa/test/test_code.py::test_copy 
+[gw0][36m [ 11%] [0m[32mPASSED[0m rocisa/test/test_code.py::test_copy 
+[gw3][36m [ 12%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_half_string 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_three_quarters 
+[gw3][36m [ 13%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_three_quarters 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_one_same 
+[gw3][36m [ 14%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_one_same 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_one_diff 
+[gw3][36m [ 14%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_one_diff 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_two 
+[gw3][36m [ 15%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_two 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_four 
+[gw3][36m [ 16%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_four 
+rocisa/test/test_functions.py::test_vectorMultiply64Bpe_one_same 
+[gw1][36m [ 17%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiply64Bpe_one_same 
+rocisa/test/test_functions.py::test_vectorMultiply64Bpe_two 
+[gw1][36m [ 18%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiply64Bpe_two 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_int 
+[gw1][36m [ 19%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_int 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_string 
+[gw1][36m [ 20%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_string 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_mixed 
+[gw1][36m [ 21%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_half_mixed 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_three_quarters 
+[gw1][36m [ 21%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_three_quarters 
+rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_half 
+[gw3][36m [ 22%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorAddMultiplyBpe_half 
+rocisa/test/test_instruction.py::test_instruction_common 
+[gw3][36m [ 23%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_common 
+rocisa/test/test_container.py::test_containers 
+[gw0][36m [ 24%] [0m[32mPASSED[0m rocisa/test/test_container.py::test_containers 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_two 
+[gw0][36m [ 25%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_two 
+rocisa/test/test_instruction.py::test_instruction_cvt 
+[gw3][36m [ 26%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_cvt 
+rocisa/test/test_instruction.py::test_instruction_tdm 
+[gw3][36m [ 27%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_tdm 
+rocisa/test/test_instruction.py::test_instruction_tdm_2_sgprs 
+[gw3][36m [ 28%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_tdm_2_sgprs 
+rocisa/test/test_instruction.py::test_instruction_ds_store_b192 
+rocisa/test/test_functions.py::test_scalarMultiplyBpe_one_same 
+[gw1][36m [ 28%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiplyBpe_one_same 
+rocisa/test/test_label.py::test_label 
+[gw1][36m [ 29%] [0m[32mPASSED[0m rocisa/test/test_label.py::test_label 
+rocisa/test/test_label.py::test_label_copy 
+rocisa/test/test_functions.py::test_scalarMultiply64Bpe_half_int 
+[gw0][36m [ 30%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiply64Bpe_half_int 
+rocisa/test/test_functions.py::test_scalarMultiply64Bpe_half_string 
+[gw0][36m [ 31%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiply64Bpe_half_string 
+rocisa/test/test_functions.py::test_scalarMultiply64Bpe_three_quarters 
+[gw0][36m [ 32%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiply64Bpe_three_quarters 
+rocisa/test/test_functions.py::test_scalarMultiply64Bpe_one_same 
+[gw0][36m [ 33%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiply64Bpe_one_same 
+[gw1][36m [ 34%] [0m[32mPASSED[0m rocisa/test/test_label.py::test_label_copy 
+rocisa/test/test_mfma.py::test_mxmfma_basic_toString 
+[gw3][36m [ 35%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_ds_store_b192 
+rocisa/test/test_instruction.py::test_instruction_ds_load_b192 
+[gw3][36m [ 35%] [0m[32mPASSED[0m rocisa/test/test_instruction.py::test_instruction_ds_load_b192 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_block16 
+rocisa/test/test_functions.py::test_scalarMultiply64Bpe_two 
+[gw0][36m [ 36%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_scalarMultiply64Bpe_two 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF8-MATRIX_FMT_BF8-MATRIX_FMT_BF8] 
+[gw2][36m [ 37%] [0m[32mPASSED[0m rocisa/test/test_cycle.py::test_cycles[wrapper0] 
+rocisa/test/test_cycle.py::test_cycles[wrapper1] 
+[gw2][36m [ 38%] [0m[32mPASSED[0m rocisa/test/test_cycle.py::test_cycles[wrapper1] 
+[gw1][36m [ 39%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_basic_toString 
+rocisa/test/test_cycle.py::test_cycles[wrapper2] 
+rocisa/test/test_mfma.py::test_mxmfma_variant_in_name 
+[gw1][36m [ 40%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_variant_in_name 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_prestr 
+[gw2][36m [ 41%] [0m[32mPASSED[0m rocisa/test/test_cycle.py::test_cycles[wrapper2] 
+rocisa/test/test_cycle.py::test_cycles[wrapper3] 
+[gw2][36m [ 42%] [0m[32mPASSED[0m rocisa/test/test_cycle.py::test_cycles[wrapper3] 
+rocisa/test/test_enum.py::test_enum 
+[gw2][36m [ 42%] [0m[32mPASSED[0m rocisa/test/test_enum.py::test_enum 
+rocisa/test/test_functions.py::test_vectorMultiplyBpe_half_int 
+[gw2][36m [ 43%] [0m[32mPASSED[0m rocisa/test/test_functions.py::test_vectorMultiplyBpe_half_int 
+[gw3][36m [ 44%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_block16 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_F6-MATRIX_FMT_FP4-MATRIX_FMT_FP6] 
+[gw0][36m [ 45%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF8-MATRIX_FMT_BF8-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_BF8-MATRIX_FMT_FP8-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_block0 
+[gw3][36m [ 46%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_block0 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_typeconvert_f8f6f4 
+[gw3][36m [ 47%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_typeconvert_f8f6f4 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_typeconvert_f4 
+[gw3][36m [ 48%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_typeconvert_f4 
+[gw0][36m [ 49%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_BF8-MATRIX_FMT_FP8-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF8_F8-MATRIX_FMT_BF8-MATRIX_FMT_FP8] 
+[gw0][36m [ 50%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF8_F8-MATRIX_FMT_BF8-MATRIX_FMT_FP8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6-MATRIX_FMT_FP6-MATRIX_FMT_FP6] 
+[gw0][36m [ 50%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6-MATRIX_FMT_FP6-MATRIX_FMT_FP6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8-MATRIX_FMT_FP8-MATRIX_FMT_FP8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF6-MATRIX_FMT_BF6-MATRIX_FMT_BF6] 
+[gw3][36m [ 51%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8-MATRIX_FMT_FP8-MATRIX_FMT_FP8] 
+[gw0][36m [ 52%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_BF6-MATRIX_FMT_BF6-MATRIX_FMT_BF6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F8-MATRIX_FMT_BF6-MATRIX_FMT_FP8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_B6-MATRIX_FMT_FP4-MATRIX_FMT_BF6] 
+[gw3][36m [ 53%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F8-MATRIX_FMT_BF6-MATRIX_FMT_FP8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_F4-MATRIX_FMT_BF8-MATRIX_FMT_FP4] 
+[gw0][36m [ 54%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_B6-MATRIX_FMT_FP4-MATRIX_FMT_BF6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_F6-MATRIX_FMT_BF8-MATRIX_FMT_FP6] 
+[gw3][36m [ 55%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_F4-MATRIX_FMT_BF8-MATRIX_FMT_FP4] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_B8-MATRIX_FMT_FP4-MATRIX_FMT_BF8] 
+[gw0][36m [ 56%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_F6-MATRIX_FMT_BF8-MATRIX_FMT_FP6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_B8-MATRIX_FMT_FP6-MATRIX_FMT_BF8] 
+[gw3][36m [ 57%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_B8-MATRIX_FMT_FP4-MATRIX_FMT_BF8] 
+[gw0][36m [ 57%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_B8-MATRIX_FMT_FP6-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F4-MATRIX_FMT_BF6-MATRIX_FMT_FP4] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_B6-MATRIX_FMT_BF8-MATRIX_FMT_BF6] 
+[gw3][36m [ 58%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F4-MATRIX_FMT_BF6-MATRIX_FMT_FP4] 
+[gw0][36m [ 59%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B8_B6-MATRIX_FMT_BF8-MATRIX_FMT_BF6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_B8-MATRIX_FMT_BF6-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_f4_no_permute_large_variant 
+[gw0][36m [ 60%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_f4_no_permute_large_variant 
+[gw3][36m [ 61%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_B8-MATRIX_FMT_BF6-MATRIX_FMT_BF8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_e5m3 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_no_permute_small_k 
+[gw3][36m [ 62%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_no_permute_small_k 
+[gw0][36m [ 63%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_e5m3 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_f4_permute_small_variant 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_f8 
+[gw3][36m [ 64%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_f4_permute_small_variant 
+[gw0][36m [ 64%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_f8 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_getparams 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_mixed 
+[gw3][36m [ 65%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_mixed 
+[gw0][36m [ 66%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_getparams 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_default 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_prestr 
+[gw3][36m [ 67%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_scale_fmt_default 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_block_ignored 
+[gw1][36m [ 68%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_prestr 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_B6-MATRIX_FMT_FP6-MATRIX_FMT_BF6] 
+[gw1][36m [ 69%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_B6-MATRIX_FMT_FP6-MATRIX_FMT_BF6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F6-MATRIX_FMT_BF6-MATRIX_FMT_FP6] 
+[gw1][36m [ 70%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_B6_F6-MATRIX_FMT_BF6-MATRIX_FMT_FP6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_F4-MATRIX_FMT_FP8-MATRIX_FMT_FP4] 
+[gw1][36m [ 71%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_F4-MATRIX_FMT_FP8-MATRIX_FMT_FP4] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_F8-MATRIX_FMT_FP4-MATRIX_FMT_FP8] 
+[gw1][36m [ 71%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_F8-MATRIX_FMT_FP4-MATRIX_FMT_FP8] 
+[gw3][36m [ 72%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_block_ignored 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_F4-MATRIX_FMT_FP6-MATRIX_FMT_FP4] 
+[gw1][36m [ 73%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_F4-MATRIX_FMT_FP6-MATRIX_FMT_FP4] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF8_F8-1-0] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8-0-0] 
+[gw1][36m [ 74%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF8_F8-1-0] 
+[gw3][36m [ 75%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8-0-0] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF6-3-3] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6-2-2] 
+[gw1][36m [ 76%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF6-3-3] 
+[gw3][36m [ 77%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6-2-2] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4-4-4] 
+[gw1][36m [ 78%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4-4-4] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_F6-0-2] 
+[gw3][36m [ 78%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_F6-0-2] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_F8-2-0] 
+[gw1][36m [ 79%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_F8-2-0] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_F4-0-4] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_F8-4-0] 
+[gw3][36m [ 80%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_F4-0-4] 
+[gw1][36m [ 81%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_F8-4-0] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_B6-2-3] 
+[gw3][36m [ 82%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_B6-2-3] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_B6_F6-3-2] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_F4-2-4] 
+[gw1][36m [ 83%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_B6_F6-3-2] 
+[gw3][36m [ 84%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F6_F4-2-4] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_F6-4-2] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_B6_F4-3-4] 
+[gw3][36m [ 85%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_B6_F4-3-4] 
+[gw1][36m [ 85%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_F6-4-2] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_B6-4-3] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_no_permute_small_k 
+[gw1][36m [ 86%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F4_B6-4-3] 
+[gw3][36m [ 87%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_no_permute_small_k 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_getparams 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_issue_latency 
+[gw1][36m [ 88%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_getparams 
+[gw3][36m [ 89%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_issue_latency 
+rocisa/test/test_mfma.py::test_mxmfma_member_access 
+[gw1][36m [ 90%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_member_access 
+rocisa/test/test_mfma.py::test_mxmfma_member_write 
+[gw3][36m [ 91%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_member_write 
+rocisa/test/test_mfma.py::test_mxmfma_deepcopy 
+[gw1][36m [ 92%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_deepcopy 
+rocisa/test/test_mfma.py::test_mxmfma_comment 
+[gw3][36m [ 92%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_comment 
+rocisa/test/test_mfma.py::test_mxmfma_no_comment 
+[gw1][36m [ 93%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_no_comment 
+[gw2][36m [ 94%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F4_F6-MATRIX_FMT_FP4-MATRIX_FMT_FP6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_F6-MATRIX_FMT_FP8-MATRIX_FMT_FP6] 
+[gw2][36m [ 95%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_F6-MATRIX_FMT_FP8-MATRIX_FMT_FP6] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_F8-MATRIX_FMT_FP6-MATRIX_FMT_FP8] 
+[gw2][36m [ 96%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F6_F8-MATRIX_FMT_FP6-MATRIX_FMT_FP8] 
+rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_B6-MATRIX_FMT_FP8-MATRIX_FMT_BF6] 
+[gw2][36m [ 97%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_wmma_input_permute[InstType.INST_F8_B6-MATRIX_FMT_FP8-MATRIX_FMT_BF6] 
+[gw0][36m [ 98%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_prestr 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF8-1-1] 
+[gw0][36m [ 99%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_BF8-1-1] 
+rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_BF8-0-1] 
+[gw0][36m [100%] [0m[32mPASSED[0m rocisa/test/test_mfma.py::test_mxmfma_mfma_input_permute[InstType.INST_F8_BF8-0-1] 
+
+- generated xml file: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/rocisa_tests.xml -
+[32m============================= [32m[1m114 passed[0m[32m in 11.01s[0m[32m =============================[0m
+py3: commands[3]> pip install pytest-cov
+Collecting pytest-cov
+  Using cached pytest_cov-7.1.0-py3-none-any.whl.metadata (32 kB)
+Collecting coverage>=7.10.6 (from coverage[toml]>=7.10.6->pytest-cov)
+  Using cached coverage-7.13.5-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (8.5 kB)
+Requirement already satisfied: pluggy>=1.2 in ./.tox/py3/lib/python3.12/site-packages (from pytest-cov) (1.6.0)
+Requirement already satisfied: pytest>=7 in ./.tox/py3/lib/python3.12/site-packages (from pytest-cov) (9.0.3)
+Requirement already satisfied: iniconfig>=1.0.1 in ./.tox/py3/lib/python3.12/site-packages (from pytest>=7->pytest-cov) (2.3.0)
+Requirement already satisfied: packaging>=22 in ./.tox/py3/lib/python3.12/site-packages (from pytest>=7->pytest-cov) (26.0)
+Requirement already satisfied: pygments>=2.7.2 in ./.tox/py3/lib/python3.12/site-packages (from pytest>=7->pytest-cov) (2.20.0)
+Using cached pytest_cov-7.1.0-py3-none-any.whl (22 kB)
+Using cached coverage-7.13.5-cp312-cp312-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (254 kB)
+Installing collected packages: coverage, pytest-cov
+
+Successfully installed coverage-7.13.5 pytest-cov-7.1.0
+py3: commands[4]> sh -c 'ARCH=$(invoke get-gpu-arch); export TENSILE_ARCHITECTURE=\$ARCH; export TENSILELITE_CLIENT_ARGS='"'"' --gpu-targets '"'"'$ARCH; invoke build-client --build-dir /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp $TENSILELITE_CLIENT_ARGS; pytest -v --basetemp=/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/tmp --junit-xml=/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/python_tests.xml --junit-prefix=py3 --color=yes -n 4 --prebuilt-client=/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp/tensilelite/client/tensilelite-client Tensile/Tests -m common'
+-- The CXX compiler identification is Clang 22.0.0
+-- The C compiler identification is Clang 22.0.0
+-- The ASM compiler identification is Clang with GNU-like command-line
+-- Found assembler: /opt/rocm/bin/amdclang
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /opt/rocm/bin/amdclang++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /opt/rocm/bin/amdclang - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- ROCmCMakeBuildTools not found. Fetching from source...
+CMake Warning (dev) at tensilelite/.tox/py3/lib/python3.12/site-packages/cmake/data/share/cmake-4.3/Modules/FetchContent.cmake:1966 (message):
+  Calling FetchContent_Populate(rocm-cmake) is deprecated, call
+  FetchContent_MakeAvailable(rocm-cmake) instead.  Policy CMP0169 can be set
+  to OLD to allow FetchContent_Populate(rocm-cmake) to be called directly for
+  now, but the ability to call it with declared details will be removed
+  completely in a future version.
+Call Stack (most recent call first):
+  cmake/fetch_rocm_cmake.cmake:19 (fetchcontent_populate)
+  CMakeLists.txt:24 (include)
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Added ROCm CMake modules path: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp/_deps/rocm-cmake-src/share/rocmcmakebuildtools/cmake
+-- Enable mxDataGenerator for MX format data generation: ON
+-- Building for GPU targets: gfx1250
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Performing Test HIP_CLANG_SUPPORTS_PARALLEL_JOBS
+-- Performing Test HIP_CLANG_SUPPORTS_PARALLEL_JOBS - Success
+-- Found OpenMP_C: -fopenmp=libomp (found version "5.1")
+-- Found OpenMP_CXX: -fopenmp=libomp (found version "5.1")
+-- Found OpenMP: TRUE (found version "5.1")
+-- Performing Test HAVE_FFI_CALL
+-- Performing Test HAVE_FFI_CALL - Success
+-- Found FFI: /usr/lib/x86_64-linux-gnu/libffi.so
+-- Could NOT find LibEdit (missing: LibEdit_INCLUDE_DIRS LibEdit_LIBRARIES) 
+-- Performing Test Terminfo_LINKABLE
+-- Performing Test Terminfo_LINKABLE - Success
+-- Found Terminfo: /usr/lib/x86_64-linux-gnu/libtinfo.so
+-- Found ZLIB: /usr/lib/x86_64-linux-gnu/libz.so (found version "1.3")
+-- Found zstd: /usr/lib/x86_64-linux-gnu/libzstd.so
+-- Found LibXml2: /usr/lib/x86_64-linux-gnu/libxml2.so (found version "2.9.14")
+-- Could NOT find CURL (missing: CURL_LIBRARY CURL_INCLUDE_DIR) 
+-- Found Python3: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/bin/python3.12 (found suitable version "3.12.3", minimum required is "3.8") found components: Interpreter Development.Module
+-- Found Python: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/bin/python3.12 (found suitable version "3.12.3", minimum required is "3.8") found components: Interpreter Development.Module
+-- Found Git: /usr/bin/git (found version "2.43.0")
+-- ROCmCMakeBuildTools not found. Fetching from source...
+-- Script created: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp/TensileMergeLibrary.sh. Please run the Tensile bin command as usual under the build folder.
+-- Found OpenMP_C: -fopenmp=libomp (found version "5.1")
+-- Found OpenMP_CXX: -fopenmp=libomp (found version "5.1")
+-- Configuring done (9.5s)
+-- Generating done (0.1s)
+-- Build files have been written to: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/build_tmp
+[  1%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/gemm.cpp.o
+[  2%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_internals.cpp.o
+[  3%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/hardware.cpp.o
+[  4%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_func.cpp.o
+[  5%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/heuristics.cpp.o
+[  6%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/logger.cpp.o
+[  7%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_type.cpp.o
+[  8%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_enum.cpp.o
+[  9%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/origami.cpp.o
+[  9%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_ndarray.cpp.o
+[  9%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/streamk.cpp.o
+[ 11%] Building CXX object origami/CMakeFiles/origami.dir/src/origami/types.cpp.o
+[ 12%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_ft.cpp.o
+[ 13%] Building CXX object origami/CMakeFiles/origami.dir/src/simulator/tensilelite/formocast_simulator.cpp.o
+[ 13%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/nb_static_property.cpp.o
+[ 14%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/common.cpp.o
+[ 15%] Building CXX object origami/CMakeFiles/origami.dir/src/simulator/tensilelite/formocast.cpp.o
+[ 17%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/error.cpp.o
+[ 17%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/trampoline.cpp.o
+[ 17%] Building CXX object tensilelite/rocisa/CMakeFiles/nanobind.dir/__/__/_deps/nanobind-src/src/implicit.cpp.o
+[ 18%] Linking CXX shared library libnanobind.so
+[ 18%] Built target nanobind
+[ 19%] Linking CXX static library liborigami.a
+[ 19%] Built target origami
+[ 21%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/llvm/Loading.cpp.o
+[ 21%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/llvm/YAML.cpp.o
+[ 22%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/main.cpp.o
+[ 22%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/hip/HipSolutionAdapter.cpp.o
+[ 22%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/base.cpp.o
+[ 23%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/hip/HipHardware.cpp.o
+[ 24%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/code.cpp.o
+[ 25%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/Activation.cpp.o
+[ 28%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/AMDGPU.cpp.o
+[ 29%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/ContractionProblem.cpp.o
+[ 29%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/count.cpp.o
+[ 30%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/Debug.cpp.o
+[ 30%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/container.cpp.o
+[ 31%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/enum.cpp.o
+[ 32%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/ContractionSolution.cpp.o
+[ 32%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/DataTypes.cpp.o
+[ 34%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/helper.cpp.o
+[ 34%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/label.cpp.o
+[ 34%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/macro.cpp.o
+[ 35%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/EmbeddedLibrary.cpp.o
+[ 37%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/instruction.cpp.o
+[ 38%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/register.cpp.o
+[ 40%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/branch.cpp.o
+[ 40%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/KernelArguments.cpp.o
+[ 40%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/EmbeddedData.cpp.o
+[ 42%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/KernelLanguageTypes.cpp.o
+[ 42%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/common.cpp.o
+[ 43%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/cvt.cpp.o
+[ 44%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/MLFeatures.cpp.o
+[ 44%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/MLPNet.cpp.o
+[ 45%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/cmp.cpp.o
+[ 46%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/mfma.cpp.o
+[ 47%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/PerformanceMetricTypes.cpp.o
+[ 49%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/extension.cpp.o
+[ 49%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/instruction/mem.cpp.o
+[ 50%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/pass.cpp.o
+[ 50%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/ScalarValueTypes.cpp.o
+[ 52%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/graph.cpp.o
+[ 52%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/cycle.cpp.o
+[ 53%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/remove.cpp.o
+[ 53%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/composite.cpp.o
+[ 54%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/pass/insert_delay_alu.cpp.o
+[ 55%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/functions/argument.cpp.o
+[ 56%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/functions/f_cast.cpp.o
+[ 56%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/functions/f_branch.cpp.o
+[ 58%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/functions/f_math.cpp.o
+[ 59%] Building CXX object tensilelite/rocisa/CMakeFiles/rocisa.dir/rocisa/src/functions/functions.cpp.o
+[ 59%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/TensorDescriptor.cpp.o
+[ 60%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/TensorOps.cpp.o
+[ 61%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/Tensile.cpp.o
+[ 62%] Building CXX object tensilelite/CMakeFiles/tensilelite-host.dir/src/Utils.cpp.o
+[ 63%] Linking CXX shared module lib/rocisa.cpython-312-x86_64-linux-gnu.so
+[ 63%] Built target rocisa
+[ 63%] Built target tensilelite-host
+[ 64%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/DataInitialization.cpp.o
+[ 65%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/main.cpp.o
+[ 65%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/cpu_gemm_driver.cpp.o
+[ 67%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/BenchmarkTimer.cpp.o
+[ 67%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/BenchmarkTimer.cpp.o
+[ 68%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ClientProblemFactory.cpp.o
+[ 71%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ProgramOptions.cpp.o
+[ 71%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ClientProblemFactory.cpp.o
+[ 71%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ProgramOptions.cpp.o
+[ 72%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/HardwareMonitor.cpp.o
+[ 72%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/DataInitialization.cpp.o
+[ 73%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/HardwareMonitor.cpp.o
+[ 74%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/PerformanceReporter.cpp.o
+[ 76%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/HardwareMonitorListener.cpp.o
+[ 76%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/PerformanceReporter.cpp.o
+[ 76%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/HardwareMonitorListener.cpp.o
+[ 77%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/TimingEvents.cpp.o
+[ 78%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/TimingEvents.cpp.o
+[ 79%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ReferenceValidator.cpp.o
+[ 81%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/MetaRunListener.cpp.o
+[ 82%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ResultFileReporter.cpp.o
+[ 82%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ReferenceValidator.cpp.o
+[ 84%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ResultReporter.cpp.o
+[ 84%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ResultFileReporter.cpp.o
+[ 84%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ResultReporter.cpp.o
+[ 86%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/Reference.cpp.o
+[ 86%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/ProgressListener.cpp.o
+[ 88%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/TypedId.cpp.o
+[ 88%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/MetaRunListener.cpp.o
+[ 89%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/Rotating.cpp.o
+[ 89%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/CSVStackFile.cpp.o
+[ 90%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/Reference.cpp.o
+[ 90%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/TypedId.cpp.o
+[ 91%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/ProgressListener.cpp.o
+[ 93%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/CSVStackFile.cpp.o
+[ 94%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/SolutionIterator.cpp.o
+[ 94%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/__/__/clients/common/src/mxDataGen.cpp.o
+[ 95%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/__/__/clients/common/src/mxDataGen.cpp.o
+[ 97%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/Rotating.cpp.o
+[ 97%] Building CXX object tensilelite/client/CMakeFiles/tensilelite-client.dir/src/LibraryUpdateReporter.cpp.o
+[ 98%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/SolutionIterator.cpp.o
+[ 98%] Building CXX object tensilelite/client/CMakeFiles/cpu-gemm-driver.dir/src/LibraryUpdateReporter.cpp.o
+[ 99%] Linking CXX executable cpu-gemm-driver
+[100%] Linking CXX executable tensilelite-client
+[100%] Built target cpu-gemm-driver
+[100%] Built target tensilelite-client
+[1m============================= test session starts ==============================[0m
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0 -- /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/.tox/py3/bin/python
+cachedir: .tox/py3/.pytest_cache
+rootdir: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite
+configfile: pytest.ini
+plugins: xdist-3.8.0, cov-7.1.0
+created: 4/4 workers
+4 workers [274 items]
+
+scheduling tests via LoadScheduling
+
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one_sb.yaml] 
+Tensile/Tests/common/flags/gfx942/test_build_only.py::test_compile 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8_sb.yaml] 
+[gw1][36m [  0%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8.yaml] 
+[gw1][36m [  0%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_ldstr.yaml] 
+[gw1][36m [  1%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_ldstr.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8hs.yaml] 
+[gw1][36m [  1%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16.yaml] 
+[gw1][36m [  1%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one.yaml] 
+[gw1][36m [  2%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8_sb.yaml] 
+[gw1][36m [  2%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16_sb.yaml] 
+[gw1][36m [  2%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8.yaml] 
+[gw1][36m [  3%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8.yaml] 
+[gw1][36m [  3%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8_sb.yaml] 
+[gw1][36m [  4%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs_sb.yaml] 
+[gw0][36m [  4%] [0m[32mPASSED[0m Tensile/Tests/common/flags/gfx942/test_build_only.py::test_compile 
+Tensile/Tests/common/flags/gfx942/test_build_only.py::test_use_cache 
+[gw0][36m [  4%] [0m[33mSKIPPED[0m Tensile/Tests/common/flags/gfx942/test_build_only.py::test_use_cache 
+Tensile/Tests/common/flags/gfx942/test_use_cache.py::test_compile_and_benchmark 
+[gw0][36m [  5%] [0m[33mSKIPPED[0m Tensile/Tests/common/flags/gfx942/test_use_cache.py::test_compile_and_benchmark 
+Tensile/Tests/common/flags/gfx942/test_use_cache.py::test_use_cache 
+[gw0][36m [  5%] [0m[33mSKIPPED[0m Tensile/Tests/common/flags/gfx942/test_use_cache.py::test_use_cache 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sgemm_xf32_asm.yaml] 
+[gw0][36m [  5%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sgemm_xf32_asm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm.yaml] 
+[gw0][36m [  6%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_userargs.yaml] 
+[gw0][36m [  6%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_userargs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_ck_gfx942.yaml] 
+[gw0][36m [  6%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_ck_gfx942.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_userargs_gfx11.yaml] 
+[gw0][36m [  7%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_userargs_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_gfx11.yaml] 
+[gw0][36m [  7%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/exception/f16_cf32_nan.yaml] 
+[gw0][36m [  8%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/exception/f16_cf32_nan.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/exception/f16_cf32_nan_gfx11.yaml] 
+[gw0][36m [  8%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/exception/f16_cf32_nan_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/amaxd/8rn_amaxd.yaml] 
+[gw0][36m [  8%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/amaxd/8rn_amaxd.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8_sb.yaml] 
+[gw0][36m [  9%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16.yaml] 
+[gw0][36m [  9%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8.yaml] 
+[gw0][36m [  9%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16_sb.yaml] 
+[gw0][36m [ 10%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/libray_logic.yaml] 
+[gw0][36m [ 10%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/libray_logic.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs.yaml] 
+[gw0][36m [ 10%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16.yaml] 
+[gw0][36m [ 11%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one.yaml] 
+[gw0][36m [ 11%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs_sb.yaml] 
+[gw0][36m [ 12%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32_sb.yaml] 
+[gw0][36m [ 12%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/i8_activation.yaml] 
+[gw0][36m [ 12%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/i8_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16_sb.yaml] 
+[gw0][36m [ 13%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/fp16_activation.yaml] 
+[gw0][36m [ 13%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/fp16_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_reduction.yaml] 
+[gw0][36m [ 13%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_reduction.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_mx32f4_quick.yaml] 
+[gw0][36m [ 14%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_mx32f4_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_mx32f8_quick.yaml] 
+[gw0][36m [ 14%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_mx32f8_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_dgemm_quick.yaml] 
+[gw0][36m [ 14%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_dgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_bgemm_quick.yaml] 
+[gw0][36m [ 15%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_bgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_f8ngemm_quick.yaml] 
+[gw0][36m [ 15%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_f8ngemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_quick.yaml] 
+[gw0][36m [ 16%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_bgemm_div.yaml] 
+[gw0][36m [ 16%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_bgemm_div.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_f8gemm_quick.yaml] 
+[gw0][36m [ 16%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_f8gemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_epilogues.yaml] 
+[gw0][36m [ 17%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_epilogues.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_I8gemm_quick.yaml] 
+[gw0][36m [ 17%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_I8gemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_sgemm_quick.yaml] 
+[gw0][36m [ 17%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_sgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_race.yaml] 
+[gw0][36m [ 18%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_race.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_lsu.yaml] 
+[gw0][36m [ 18%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_hgemm_lsu.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_sgemm_alpha0.yaml] 
+[gw0][36m [ 18%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/sk_sgemm_alpha0.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx11/sk_bgemm_quick.yaml] 
+[gw0][36m [ 19%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx11/sk_bgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx11/sk_hgemm_quick.yaml] 
+[gw0][36m [ 19%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx11/sk_hgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx12/sk_bgemm_quick.yaml] 
+[gw0][36m [ 20%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx12/sk_bgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx12/sk_hgemm_quick.yaml] 
+[gw0][36m [ 20%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/streamk/gfx12/sk_hgemm_quick.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/auto_gsu_zero_dim.yaml] 
+[gw0][36m [ 20%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/auto_gsu_zero_dim.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/auto_gsu.yaml] 
+[gw0][36m [ 21%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/auto_gsu.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/gsu_mbsk.yaml] 
+[gw0][36m [ 21%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/gsu_mbsk.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/f32_gsu.yaml] 
+[gw0][36m [ 21%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gsu/f32_gsu.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs_lsu4.yaml] 
+[gw0][36m [ 22%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs_lsu4.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/largeMT.yaml] 
+[gw0][36m [ 22%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/largeMT.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/i8_gsu_gfx940.yaml] 
+[gw0][36m [ 22%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/i8_gsu_gfx940.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/large_size.yaml] 
+[gw0][36m [ 23%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/large_size.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dot2_gfx942.yaml] 
+[gw0][36m [ 23%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dot2_gfx942.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/tail_small_size.yaml] 
+[gw0][36m [ 24%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/tail_small_size.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_nt.yaml] 
+[gw0][36m [ 24%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_nt.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtl.yaml] 
+[gw0][36m [ 24%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtl.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/swizzleB.yaml] 
+[gw0][36m [ 25%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/swizzleB.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/lsu_i8.yaml] 
+[gw0][36m [ 25%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/lsu_i8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/wgm.yaml] 
+[gw0][36m [ 25%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/wgm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_HH_BHS_bf16mfma.yaml] 
+[gw0][36m [ 26%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_HH_BHS_bf16mfma.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/mix_cvt_after_ds_fnuz.yaml] 
+[gw0][36m [ 26%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/mix_cvt_after_ds_fnuz.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/i8_gsu.yaml] 
+[gw0][36m [ 27%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/i8_gsu.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_tn.yaml] 
+[gw0][36m [ 27%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_tn.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/lsu_fnuz.yaml] 
+[gw0][36m [ 27%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/lsu_fnuz.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/zgemm.yaml] 
+[gw0][36m [ 28%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/zgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64_mac.yaml] 
+[gw0][36m [ 28%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64_mac.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched.yaml] 
+[gw0][36m [ 28%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f32_mac.yaml] 
+[gw0][36m [ 29%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f32_mac.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n.yaml] 
+[gw0][36m [ 29%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gsuasb.yaml] 
+[gw0][36m [ 29%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gsuasb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64_gfx90a.yaml] 
+[gw0][36m [ 30%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64_gfx90a.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/8rn_b_s.yaml] 
+[gw0][36m [ 30%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/8rn_b_s.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs.yaml] 
+[gw0][36m [ 31%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/bf16_tn_predict.yaml] 
+[gw0][36m [ 31%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/bf16_tn_predict.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n_rowwise.yaml] 
+[gw0][36m [ 31%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n_rowwise.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/swizzleA.yaml] 
+[gw0][36m [ 32%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/swizzleA.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hfp8ns.yaml] 
+[gw0][36m [ 32%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hfp8ns.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/bf16_tn.yaml] 
+[gw0][36m [ 32%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/bf16_tn.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast.yaml] 
+[gw0][36m [ 33%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtv.yaml] 
+[gw0][36m [ 33%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtv.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_scalealphavec.yaml] 
+[gw0][36m [ 33%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp32_scalealphavec.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtv_gfx90a.yaml] 
+[gw0][36m [ 34%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/dtv_gfx90a.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gsuc.yaml] 
+[gw0][36m [ 34%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gsuc.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n_use_e.yaml] 
+[gw0][36m [ 35%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8n_use_e.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/cgemm.yaml] 
+[gw0][36m [ 35%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/cgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64.yaml] 
+[gw0][36m [ 35%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/f64.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/ag.yaml] 
+[gw0][36m [ 36%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/ag.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/no_shadowinit.yaml] 
+[gw0][36m [ 36%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/no_shadowinit.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/icache_flush.yaml] 
+[gw0][36m [ 36%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/icache_flush.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/mbskPrefetchOpt.yaml] 
+[gw0][36m [ 37%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/mbskPrefetchOpt.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8bf8nss.yaml] 
+[gw0][36m [ 37%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8bf8nss.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_gfx940.yaml] 
+[gw0][36m [ 37%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_gfx940.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_fp8nss.yaml] 
+[gw0][36m [ 38%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp8nfp16mix_fp8nss.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_use_e.yaml] 
+[gw0][36m [ 38%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_use_e.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/ulsgro1.yaml] 
+[gw0][36m [ 39%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/ulsgro1.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/xfp32.yaml] 
+[gw0][36m [ 39%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/xfp32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/hh_f8nhs.yaml] 
+[gw0][36m [ 39%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/hh_f8nhs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_tn.yaml] 
+[gw0][36m [ 40%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16_tn.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_ck_gfx942.yaml] 
+[gw0][36m [ 40%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_ck_gfx942.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast_gfx940.yaml] 
+[gw0][36m [ 40%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast_gfx940.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16fp32mix.yaml] 
+[gw0][36m [ 41%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/fp16fp32mix.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss.yaml] 
+[gw0][36m [ 41%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/general_wgm.yaml] 
+[gw0][36m [ 41%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/general_wgm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_xfp32.yaml] 
+[gw0][36m [ 42%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_xfp32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act_groupgemm.yaml] 
+[gw0][36m [ 42%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/lds160K.yaml] 
+[gw0][36m [ 43%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/lds160K.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/bf16_cvt.yaml] 
+[gw0][36m [ 43%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/bf16_cvt.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling_tf32.yaml] 
+[gw0][36m [ 43%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling_tf32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/dtl.yaml] 
+[gw0][36m [ 44%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/dtl.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/kringshift.yaml] 
+[gw0][36m [ 44%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/kringshift.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act.yaml] 
+[gw0][36m [ 44%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8.yaml] 
+[gw0][36m [ 45%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/i8_gsu_gfx950.yaml] 
+[gw0][36m [ 45%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/i8_gsu_gfx950.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mx32f8_tn.yaml] 
+[gw0][36m [ 45%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mx32f8_tn.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/dot2_gfx950.yaml] 
+[gw0][36m [ 46%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/dot2_gfx950.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/ss_bss.yaml] 
+[gw0][36m [ 46%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/ss_bss.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f8b8hs.yaml] 
+[gw0][36m [ 47%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f8b8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss_stoch.yaml] 
+[gw0][36m [ 47%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss_stoch.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act.yaml] 
+[gw0][36m [ 47%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act_groupgemm.yaml] 
+[gw0][36m [ 48%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mx32f4_tn.yaml] 
+[gw0][36m [ 48%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mx32f4_tn.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act_groupgemm.yaml] 
+[gw0][36m [ 48%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f8f16mix_f8s.yaml] 
+[gw0][36m [ 49%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/f8f16mix_f8s.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act.yaml] 
+[gw0][36m [ 49%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act.yaml] 
+[gw0][36m [ 50%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act.yaml] 
+[gw0][36m [ 50%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act_groupgemm.yaml] 
+[gw0][36m [ 50%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/lds_tr.yaml] 
+[gw0][36m [ 51%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/lds_tr.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act.yaml] 
+[gw0][36m [ 51%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/xfp32.yaml] 
+[gw0][36m [ 51%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/xfp32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling.yaml] 
+[gw0][36m [ 52%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act_groupgemm.yaml] 
+[gw0][36m [ 52%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/plr_zero.yaml] 
+[gw0][36m [ 52%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/plr_zero.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act_groupgemm.yaml] 
+[gw0][36m [ 53%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act_groupgemm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/i8_gsu_gfx11.yaml] 
+[gw0][36m [ 53%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/i8_gsu_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_HH_BHS_bf16mfma_gfx11.yaml] 
+[gw0][36m [ 54%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_HH_BHS_bf16mfma_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gsuasb_gfx11.yaml] 
+[gw0][36m [ 54%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gsuasb_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_broadcast_gfx11.yaml] 
+[gw0][36m [ 54%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_broadcast_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/bf16_tn_gfx11.yaml] 
+[gw0][36m [ 55%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/bf16_tn_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_tn_gfx11.yaml] 
+[gw0][36m [ 55%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_tn_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_use_e_gfx11.yaml] 
+[gw0][36m [ 55%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/fp16_use_e_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_gfx11.yaml] 
+[gw0][36m [ 56%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gsuasb_gfx12.yaml] 
+[gw0][36m [ 56%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gsuasb_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6b8ss_gfx1250.yaml] 
+[gw3][36m [ 56%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8.yaml] 
+[gw1][36m [ 57%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8.yaml] 
+[gw3][36m [ 57%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_sb.yaml] 
+[gw2][36m [ 58%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs_sb.yaml] 
+[gw0][36m [ 58%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6b8ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8b6ss_gfx1250.yaml] 
+[gw1][36m [ 58%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8.yaml] 
+[gw2][36m [ 59%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16_sb.yaml] 
+[gw3][36m [ 59%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_sb.yaml] 
+[gw0][36m [ 59%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8b6ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f4b8ss_gfx1250.yaml] 
+[gw3][36m [ 60%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs_sb.yaml] 
+[gw1][36m [ 60%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs.yaml] 
+[gw2][36m [ 60%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16_sb.yaml] 
+[gw3][36m [ 61%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/bf16_activation.yaml] 
+[gw3][36m [ 61%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8_sb.yaml] 
+[gw0][36m [ 62%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f4b8ss_gfx1250.yaml] 
+[gw2][36m [ 62%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/bf16_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs_sb.yaml] 
+[gw3][36m [ 62%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32.yaml] 
+[gw3][36m [ 63%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n_sb.yaml] 
+[gw3][36m [ 63%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n.yaml] 
+[gw3][36m [ 63%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n.yaml] 
+[gw3][36m [ 64%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32.yaml] 
+[gw3][36m [ 64%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n_sb.yaml] 
+[gw3][36m [ 64%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro.yaml] 
+[gw3][36m [ 65%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16.yaml] 
+[gw3][36m [ 65%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16.yaml] 
+[gw3][36m [ 66%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro_sb.yaml] 
+[gw3][36m [ 66%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8_gfx1250.yaml] 
+[gw2][36m [ 66%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_gfx1250.yaml] 
+[gw2][36m [ 67%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs_sb.yaml] 
+[gw2][36m [ 67%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs.yaml] 
+[gw3][36m [ 67%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8i8i_grvw1_gfx12.yaml] 
+[gw3][36m [ 68%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8i8i_grvw1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12.yaml] 
+[gw3][36m [ 68%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8ii_gfx1250.yaml] 
+[gw1][36m [ 68%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16.yaml] 
+[gw2][36m [ 69%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_ml.yaml] 
+[gw0][36m [ 69%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf4b8ss_gfx1250.yaml] 
+[gw3][36m [ 70%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8ii_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_gfx1250.yaml] 
+[gw1][36m [ 70%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/f16_activation.yaml] 
+[gw1][36m [ 70%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/f16_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16_sb.yaml] 
+[gw1][36m [ 71%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16_sb.yaml] 
+[gw1][36m [ 71%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/bf16_activation.yaml] 
+[gw1][36m [ 71%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/bf16_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is.yaml] 
+[gw1][36m [ 72%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs_sb.yaml] 
+[gw1][36m [ 72%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n_sb.yaml] 
+[gw1][36m [ 72%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one_sb.yaml] 
+[gw1][36m [ 73%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n_sb.yaml] 
+[gw1][36m [ 73%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n.yaml] 
+[gw1][36m [ 74%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is_sb.yaml] 
+[gw1][36m [ 74%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs.yaml] 
+[gw1][36m [ 74%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32_sb.yaml] 
+[gw1][36m [ 75%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n.yaml] 
+[gw1][36m [ 75%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_gsuc.yaml] 
+[gw1][36m [ 75%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx94x/spmm_gsuc.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/8r_b_s_gfx12.yaml] 
+[gw1][36m [ 76%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/8r_b_s_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f4_gfx1250.yaml] 
+[gw3][36m [ 76%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf4_gfx1250.yaml] 
+[gw0][36m [ 77%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf4b8ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx12.yaml] 
+[gw0][36m [ 77%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8f8ss_grvw1_gfx12.yaml] 
+[gw0][36m [ 77%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8f8ss_grvw1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6_gfx1250.yaml] 
+[gw2][36m [ 78%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_ml.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs.yaml] 
+[gw0][36m [ 78%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx1250.yaml] 
+[gw3][36m [ 78%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf4_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8b8ss_gfx1250.yaml] 
+[gw2][36m [ 79%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs.yaml] 
+[gw1][36m [ 79%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f4_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx12.yaml] 
+[gw1][36m [ 79%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8b6ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_fp16_ml1.yaml] 
+[gw0][36m [ 80%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12_predict.yaml] 
+[gw0][36m [ 80%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12_predict.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f32_gfx1250.yaml] 
+[gw3][36m [ 81%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8b8ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_grvw1_gfx12.yaml] 
+[gw3][36m [ 81%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_grvw1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_gfx12.yaml] 
+[gw3][36m [ 81%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8f4ss_gfx1250.yaml] 
+[gw0][36m [ 82%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f32_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/xfp32_gfx1250.yaml] 
+[gw3][36m [ 82%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8f4ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6b6ss_gfx1250.yaml] 
+[gw1][36m [ 82%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8b6ss_gfx1250.yaml] 
+[gw3][36m [ 83%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6b6ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8bf8ss_gfx12.yaml] 
+[gw1][36m [ 83%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8bf8ss_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/1024_vgpr_gfx1250.yaml] 
+[gw0][36m [ 83%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/xfp32_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxb6f4ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8ss_tdm.yaml] 
+[gw2][36m [ 84%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_fp16_ml1.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs.yaml] 
+[gw3][36m [ 84%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf8ss_tdm.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b6f4ss_gfx1250.yaml] 
+[gw0][36m [ 85%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxb6f4ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/largeLds_gfx1250.yaml] 
+[gw0][36m [ 85%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/largeLds_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8hs_grvw1_gfx12.yaml] 
+[gw0][36m [ 85%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8hs_grvw1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx1250.yaml] 
+[gw1][36m [ 86%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/1024_vgpr_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8ii_grvw1_gfx12.yaml] 
+[gw1][36m [ 86%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8ii_grvw1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8_gsu_gfx12.yaml] 
+[gw1][36m [ 86%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/i8_gsu_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f32_grid_limit_size.yaml] 
+[gw1][36m [ 87%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f32_grid_limit_size.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6b6ss_gfx1250.yaml] 
+[gw3][36m [ 87%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b6f4ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf6_gfx1250.yaml] 
+[gw1][36m [ 87%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6b6ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f4ss_gfx1250.yaml] 
+[gw0][36m [ 88%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_use_e_gfx1250.yaml] 
+[gw0][36m [ 88%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/fp16_use_e_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6_gfx1250.yaml] 
+[gw2][36m [ 89%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16.yaml] 
+[gw1][36m [ 89%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f8f4ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f64_gfx1250.yaml] 
+[gw3][36m [ 89%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/bf6_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8b8s_gfx1250.yaml] 
+[gw0][36m [ 90%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/mxf6_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_broadcast_gfx12.yaml] 
+[gw0][36m [ 90%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_broadcast_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp8bf8nss_gradient_bias_b.yaml] 
+[gw0][36m [ 90%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp8bf8nss_gradient_bias_b.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp16_gradient_activation.yaml] 
+[gw0][36m [ 91%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp16_gradient_activation.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx950/bf16_gradient_bias.yaml] 
+[gw0][36m [ 91%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx950/bf16_gradient_bias.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradd_gfx1250.yaml] 
+[gw0][36m [ 91%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradd_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_dgelu_gfx1250.yaml] 
+[gw3][36m [ 92%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/b8b8s_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp16_gradient_bias.yaml] 
+[gw3][36m [ 92%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/fp16_gradient_bias.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgrada_gfx1250.yaml] 
+[gw2][36m [ 93%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16.yaml] 
+[gw1][36m [ 93%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f64_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6b8ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs.yaml] 
+[gw0][36m [ 93%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_dgelu_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradb_gfx1250.yaml] 
+[gw3][36m [ 94%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgrada_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgrada_gfx1250.yaml] 
+[gw1][36m [ 94%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gemm/gfx12/f6b8ss_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradd_gfx1250.yaml] 
+[gw1][36m [ 94%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradd_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_bias_gfx11.yaml] 
+[gw1][36m [ 95%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_bias_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_activation_gfx11.yaml] 
+[gw1][36m [ 95%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_activation_gfx11.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode1_gfx12.yaml] 
+[gw1][36m [ 95%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode1_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode0_gfx12.yaml] 
+[gw1][36m [ 96%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode0_gfx12.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode0.yaml] 
+[gw1][36m [ 96%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode0.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode1.yaml] 
+[gw1][36m [ 97%] [0m[33mSKIPPED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/client/rotate_mode1.yaml] 
+[gw0][36m [ 97%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradb_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradb_gfx1250.yaml] 
+[gw2][36m [ 97%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8_sb.yaml] 
+[gw3][36m [ 98%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgrada_gfx1250.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_dgelu_gfx1250.yaml] 
+[gw0][36m [ 98%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradb_gfx1250.yaml] 
+[gw3][36m [ 98%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/gradient/gfx1250/bbs_dgelu_gfx1250.yaml] 
+[gw2][36m [ 99%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16_sb.yaml] 
+[gw2][36m [ 99%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16_sb.yaml] 
+Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8.yaml] 
+[gw2][36m [100%] [0m[32mPASSED[0m Tensile/Tests/common/test_config.py::test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8.yaml] 
+
+[33m=============================== warnings summary ===============================[0m
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+  /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:90: PytestUnknownMarkWarning: Unknown pytest.mark.gfx1250 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    return getattr(pytest.mark, name)
+
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+  /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:90: PytestUnknownMarkWarning: Unknown pytest.mark.Float4 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    return getattr(pytest.mark, name)
+
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+  /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:90: PytestUnknownMarkWarning: Unknown pytest.mark.BFloat6 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    return getattr(pytest.mark, name)
+
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+Tensile/Tests/common/test_config.py:90
+  /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:90: PytestUnknownMarkWarning: Unknown pytest.mark.Float6 - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    return getattr(pytest.mark, name)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/python_tests.xml -
+[33m========== [32m69 passed[0m, [33m[1m205 skipped[0m, [33m[1m16 warnings[0m[33m in 8866.10s (2:27:46)[0m[33m ===========[0m
+  py3: OK (9070.96=setup[16.44]+cmd[0.63,49.47,11.42,1.38,8991.62] seconds)
+  congratulations :) (9071.00 seconds)

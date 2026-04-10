@@ -1,0 +1,1231 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="205" tests="274" time="8866.095" timestamp="2026-04-10T08:13:23.799966+00:00" hostname="cdf7d0a12e5b"><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one_sb.yaml]" time="0.001"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8bs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_ldstr.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8hs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_vw_lg_one.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_f16_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_f8_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.flags.gfx942.test_build_only" name="test_compile" time="10.322" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8.yaml]" time="428.689" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8_sb.yaml]" time="53.337" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs_sb.yaml]" time="80.653" /><testcase classname="py3.Tensile.Tests.common.flags.gfx942.test_build_only" name="test_use_cache" time="0.000"><skipped type="pytest.skip" message="gfx942 GPU not available">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/flags/gfx942/test_build_only.py:117: gfx942 GPU not available</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.flags.gfx942.test_use_cache" name="test_compile_and_benchmark" time="0.000"><skipped type="pytest.skip" message="gfx942 GPU not available">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/flags/gfx942/test_use_cache.py:106: gfx942 GPU not available</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.flags.gfx942.test_use_cache" name="test_use_cache" time="0.000"><skipped type="pytest.skip" message="gfx942 GPU not available">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/flags/gfx942/test_use_cache.py:115: gfx942 GPU not available</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sgemm_xf32_asm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/groupedgemm/grouped_gemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_userargs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/groupedgemm/grouped_gemm_ck_gfx942.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_userargs_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/groupedgemm/gfx11/grouped_gemm_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/exception/f16_cf32_nan.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/exception/f16_cf32_nan_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/amaxd/8rn_amaxd.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_b8_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_i8.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx950/spmm_bf16_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/libray_logic.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8hs_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/i8_activation.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/fp16_activation.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_reduction.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_mx32f4_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_mx32f8_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_dgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_bgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_f8ngemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_hgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_bgemm_div.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_f8gemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_hgemm_epilogues.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_I8gemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_sgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_hgemm_race.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_hgemm_lsu.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/sk_sgemm_alpha0.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/gfx11/sk_bgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/gfx11/sk_hgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/gfx12/sk_bgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/streamk/gfx12/sk_hgemm_quick.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gsu/auto_gsu_zero_dim.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gsu/auto_gsu.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gsu/gsu_mbsk.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gsu/f32_gsu.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs_lsu4.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/largeMT.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/i8_gsu_gfx940.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/large_size.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/dot2_gfx942.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/tail_small_size.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp32_nt.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/dtl.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/swizzleB.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/lsu_i8.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/wgm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp16_HH_BHS_bf16mfma.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/mix_cvt_after_ds_fnuz.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/i8_gsu.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp32_tn.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/lsu_fnuz.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/zgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/f64_mac.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/f32_mac.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8n.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gsuasb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/f64_gfx90a.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/8rn_b_s.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hhs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/bf16_tn_predict.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8n_rowwise.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/swizzleA.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8nfp16mix_hfp8ns.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/bf16_tn.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/dtv.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp32_scalealphavec.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/dtv_gfx90a.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gsuc.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8n_use_e.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/cgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/f64.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/ag.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/no_shadowinit.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/icache_flush.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/mbskPrefetchOpt.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8bf8nss.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_gfx940.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp8nfp16mix_fp8nss.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp16_use_e.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/ulsgro1.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/xfp32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/hh_f8nhs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp16_tn.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gemm_ck_gfx942.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gemm_bias_strided_batched_broadcast_gfx940.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/fp16fp32mix.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/general_wgm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/custom_xfp32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/lds160K.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/bf16_cvt.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling_tf32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/dtl.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/kringshift.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/fp8.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/i8_gsu_gfx950.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mx32f8_tn.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/dot2_gfx950.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/ss_bss.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/f8b8hs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/f16f8mix_ss_stoch.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_fp32_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mx32f4_tn.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_bf16_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/f8f16mix_f8s.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/fp8_mxfp4_bf16_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_fp32_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/lds_tr.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/xfp32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/custom_mainloop_scheduling.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_mxfp4_bf16_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/plr_zero.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx950/mxfp4_fp8_fp32_tn_act_groupgemm.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/i8_gsu_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/fp16_HH_BHS_bf16mfma_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/gsuasb_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_broadcast_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/bf16_tn_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/fp16_tn_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/fp16_use_e_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx11/gemm_bias_strided_batched_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/gsuasb_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf6b8ss_gfx1250.yaml]" time="516.787" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8.yaml]" time="336.563" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8b8.yaml]" time="679.167" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_sb.yaml]" time="369.924" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs_sb.yaml]" time="206.262" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f8b6ss_gfx1250.yaml]" time="232.579" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16_sb.yaml]" time="500.755" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8_sb.yaml]" time="223.688" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs_sb.yaml]" time="109.403" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f4b8ss_gfx1250.yaml]" time="925.019" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs_sb.yaml]" time="223.202" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8hs.yaml]" time="1107.029" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8.yaml]" time="295.920" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/bf16_activation.yaml]" time="430.637" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8f8_sb.yaml]" time="236.710" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs_sb.yaml]" time="118.496" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf8n_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8_mi16.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/use_sgpr_for_gro_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf8_gfx1250.yaml]" time="399.712" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8bs.yaml]" time="250.713" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_gfx1250.yaml]" time="528.898" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs_sb.yaml]" time="85.424" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8bs.yaml]" time="109.575" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/i8i8i_grvw1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/i8ii_gfx1250.yaml]" time="354.753" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_bf16.yaml]" time="593.162" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f8_ml.yaml]" time="1088.620" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf4b8ss_gfx1250.yaml]" time="936.755" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/bf16_gfx1250.yaml]" time="722.438" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/f16_activation.yaml]" time="247.698" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_bf16_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi16_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/bf16_activation.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_vw_lg_one_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8n_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_b8f8n.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8is_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_i8bs.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_fp16_mi32_sb.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_f8b8n.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx94x/spmm_gsuc.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/8r_b_s_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f4_gfx1250.yaml]" time="1371.229" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf4_gfx1250.yaml]" time="484.285" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/b8f8ss_grvw1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f6_gfx1250.yaml]" time="376.118" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8bs.yaml]" time="1083.487" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx1250.yaml]" time="884.761" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f8b8ss_gfx1250.yaml]" time="868.513" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp16_gfx12.yaml]" time="0.001"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf8b6ss_gfx1250.yaml]" time="589.989" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_fp16_ml1.yaml]" time="712.510" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/bf16_tn_gfx12_predict.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f32_gfx1250.yaml]" time="201.515" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f8f8s_grvw1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf8f4ss_gfx1250.yaml]" time="326.396" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/xfp32_gfx1250.yaml]" time="308.160" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf6b6ss_gfx1250.yaml]" time="139.873" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp8bf8ss_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/1024_vgpr_gfx1250.yaml]" time="371.969" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxb6f4ss_gfx1250.yaml]" time="133.240" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf8ss_tdm.yaml]" time="110.793" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8hs.yaml]" time="582.902" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/b6f4ss_gfx1250.yaml]" time="238.694" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/largeLds_gfx1250.yaml]" time="64.274" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/b8hs_grvw1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp8_gfx1250.yaml]" time="418.113" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/i8ii_grvw1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/i8_gsu_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f32_grid_limit_size.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f6b6ss_gfx1250.yaml]" time="60.963" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/bf6_gfx1250.yaml]" time="429.038" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f8f4ss_gfx1250.yaml]" time="328.151" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/fp16_use_e_gfx1250.yaml]" time="23.928" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/mxf6_gfx1250.yaml]" time="612.331" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16.yaml]" time="2558.055" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f64_gfx1250.yaml]" time="2495.515" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/b8b8s_gfx1250.yaml]" time="1403.564" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/gemm_bias_strided_batched_broadcast_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/fp8bf8nss_gradient_bias_b.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/fp16_gradient_activation.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx950/bf16_gradient_bias.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradd_gfx1250.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/hhs_dgelu_gfx1250.yaml]" time="2016.262" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/fp16_gradient_bias.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgrada_gfx1250.yaml]" time="1175.349" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gemm/gfx12/f6b8ss_gfx1250.yaml]" time="194.065" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8hs.yaml]" time="223.815" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradb_gfx1250.yaml]" time="164.675" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgrada_gfx1250.yaml]" time="154.161" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/bbs_bgradd_gfx1250.yaml]" time="0.001"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_bias_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx11/fp16_gradient_activation_gfx11.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/client/rotate_mode1_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/client/rotate_mode0_gfx12.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/client/rotate_mode0.yaml]" time="0.000"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/client/rotate_mode1.yaml]" time="0.001"><skipped type="pytest.skip" message="unconditional skip">/home/tomtang2/workspace_npi_mi450/rocm-libraries/projects/hipblaslt/tensilelite/Tensile/Tests/common/test_config.py:231: unconditional skip</skipped><system-out>--------------------------------- Captured Log ---------------------------------
+
+--------------------------------- Captured Out ---------------------------------
+
+</system-out><system-err>--------------------------------- Captured Err ---------------------------------
+
+</system-err></testcase><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/hhs_bgradb_gfx1250.yaml]" time="156.243" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_i8_sb.yaml]" time="161.855" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/gradient/gfx1250/bbs_dgelu_gfx1250.yaml]" time="83.200" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_f16_sb.yaml]" time="172.815" /><testcase classname="py3.Tensile.Tests.common.test_config" name="test_config[Tensile/Tests/common/sparse/gfx1250/spmm_b8.yaml]" time="70.231" /></testsuite></testsuites>

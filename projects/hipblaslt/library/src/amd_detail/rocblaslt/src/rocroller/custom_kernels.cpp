@@ -12,14 +12,26 @@ std::shared_ptr<GemmKernel> createCustomGemmKernel(const std::string&           
                                                    const WorkGroupTileSize&     wgt,
                                                    const std::filesystem::path& path)
 {
-    auto gemmKernel = std::make_shared<GemmKernel>();
-
+    std::shared_ptr<GemmKernel> gemmKernel;
+    gemmKernel = std::make_shared<AssemblyStoreRowOrderGemm>(customKernelName, path.string());
     gemmKernel->params                = std::make_shared<SolutionParameters>();
     gemmKernel->params->kernelType    = kernelType;
     gemmKernel->params->workgroupTile = wgt;
+    return gemmKernel;
+}
 
-    gemmKernel->module = GemmHipModuleWrapper(customKernelName, path);
-
+std::shared_ptr<GemmKernel> createWaveGemmKernel(const std::string&           customKernelName,
+                                                   const KernelType&            kernelType,
+                                                   const WorkGroupTileSize&     wgt,
+                                                   const dim3&    blockSize,
+                                                   const ShapeCondition&        condition,
+                                                   const std::filesystem::path& path)
+{
+    std::shared_ptr<GemmKernel> gemmKernel = std::make_shared<WaveKernel>(customKernelName, path.string(), blockSize);
+    gemmKernel->params                = std::make_shared<SolutionParameters>();
+    gemmKernel->params->kernelType    = kernelType;
+    gemmKernel->params->workgroupTile = wgt;
+    gemmKernel->shapeCondition = condition;
     return gemmKernel;
 }
 
@@ -656,18 +668,28 @@ struct __attribute__((packed)) F4GemmKernelArgs
     }
 };
 
-rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
-                                 const RocblasltContractionProblem& prob)
-{
-    if(!gemm->module.has_value())
-    {
-        std::cerr << "runCustomKernel failed: Module not loadable" << std::endl;
-        return rocblaslt_status_internal_error;
-    }
+// WaveKernel method implementations
 
-    if (prob.beta && *static_cast<const float*>(prob.beta) != 0)
+size_t WaveKernel::workspaceRequired(const RocblasltContractionProblem& prob)
+{
+    return 0;
+}
+
+bool WaveKernel::isSupportedProblem(const RocblasltContractionProblem& prob)
+{
+    if(shapeCondition.has_value()
+           && !shapeCondition->matches(prob.m, prob.n, prob.k))
+            return false;
+
+    const auto& wgt = params->workgroupTile;
+    return (prob.m % wgt.m == 0 && prob.n % wgt.n == 0 && prob.k % wgt.k == 0);
+}
+
+rocblaslt_status WaveKernel::run(const RocblasltContractionProblem& prob)
+{
+    if(prob.beta && *static_cast<const float*>(prob.beta) != 0)
     {
-        std::cerr << "Kernel only supports when beta is 0" << std::endl;;
+        std::cerr << "Kernel only supports when beta is 0" << std::endl;
         return rocblaslt_status_invalid_value;
     }
 
@@ -738,7 +760,7 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                                HIP_LAUNCH_PARAM_END};
 
     hipFunction_t function;
-    if(hipError_t error = gemm->module->getHipFunction(function))
+    if(hipError_t error = module.getHipFunction(function))
     {
         std::cerr << "GemmHipModuleWrapper::getHipFunction failed: " << std::endl
                   << " error: " << hipGetErrorString(error) << std::endl;

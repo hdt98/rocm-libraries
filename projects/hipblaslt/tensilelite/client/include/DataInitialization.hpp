@@ -458,7 +458,17 @@ namespace TensileLite
                 case rocisa::DataType::Float8BFloat8:
                 case rocisa::DataType::BFloat8Float8:
                 case rocisa::DataType::Float8BFloat8_fnuz:
-                case rocisa::DataType::BFloat8Float8_fnuz:;
+                case rocisa::DataType::BFloat8Float8_fnuz:
+#ifndef TENSILE_USE_FP6
+                case rocisa::DataType::Float6:
+#endif
+#ifndef TENSILE_USE_BF6
+                case rocisa::DataType::BFloat6:
+#endif
+#ifndef TENSILE_USE_FP4
+                case rocisa::DataType::Float4:
+#endif
+                ;
                 }
             }
 
