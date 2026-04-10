@@ -61,9 +61,9 @@ public:
      *
      */
     // NOLINTNEXTLINE(portability-template-virtual-member-function)
-    virtual bool
-        isApplicable(THandle& handle,
-                     const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const
+    virtual bool isApplicable( // NOLINT(portability-template-virtual-member-function)
+        THandle& handle,
+        const hipdnn_flatbuffers_sdk::flatbuffer_utilities::IGraph& opGraph) const
         = 0;
 
     /**
