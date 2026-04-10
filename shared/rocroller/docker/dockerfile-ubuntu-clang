@@ -107,6 +107,15 @@ RUN apt-get update && apt-get install -y \
 ## Specific to this Dockerfile.  Put faster-changing-things last.
 ##
 
+# codeql
+ARG CODEQL_VERSION=v2.20.4
+WORKDIR /opt/codeql
+RUN wget -nv -O codeql.zip https://github.com/github/codeql-cli-binaries/releases/download/${CODEQL_VERSION}/codeql-linux64.zip \
+    && unzip -q codeql.zip \
+    && rm codeql.zip
+ADD https://github.com/github/codeql/archive/refs/tags/codeql-cli/${CODEQL_VERSION}.zip /opt/codeql/codeql-cli.zip
+ENV PATH="/opt/codeql/codeql:${PATH}"
+
 # ROCM
 # Set URL to something like https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
 ARG ROCROLLER_AMDGPU_URL
@@ -122,11 +131,6 @@ RUN wget -nv -O amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
         rocm-llvm-dev \
         hipblas-common-dev \
     && rm -rf /tmp/* /var/lib/apt/lists/*
-
-# codeql
-ADD codeql/install_codeql /tmp
-RUN /tmp/install_codeql && rm /tmp/install_codeql
-ENV PATH="/opt/codeql/codeql:${PATH}"
 
 ENV CXX=/opt/rocm/bin/amdclang++
 ENV CC=/opt/rocm/bin/amdclang
