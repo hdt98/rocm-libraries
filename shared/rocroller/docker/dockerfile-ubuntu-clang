@@ -92,18 +92,21 @@ RUN apt-get update && apt-get install -y \
 ## Specific to this Dockerfile.  Put faster-changing-things last.
 ##
 
-# ROCm
-ARG ROCROLLER_AMDGPU_URL=https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
+# ROCM
+# Set URL to something like https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
+ARG ROCROLLER_AMDGPU_URL
 ARG ROCROLLER_AMDGPU_BUILD_NUMBER=
 ARG ROCROLLER_AMDGPU_BUILD_URI=
-
-RUN wget -nv --show-progress --progress=dot:mega -O /tmp/amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
+WORKDIR /tmp
+RUN wget -nv -O amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
     && apt-get update \
-    && apt-get install -y /tmp/amdgpu_install.deb \
-    && rm /tmp/amdgpu_install.deb \
+    && apt-get install -y --no-install-recommends ./amdgpu_install.deb \
     && if test -n "${ROCROLLER_AMDGPU_BUILD_NUMBER}"; then amdgpu-repo --amdgpu-build=${ROCROLLER_AMDGPU_BUILD_NUMBER} --rocm-build=${ROCROLLER_AMDGPU_BUILD_URI}; fi \
-    && amdgpu-install -y --usecase=rocmdev --no-dkms
-RUN apt-get update && apt-get install -y rocm-llvm-dev
+    && amdgpu-install -y --usecase=rocmdev --no-dkms \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        rocm-llvm-dev \
+        hipblas-common-dev \
+    && rm -rf /tmp/* /var/lib/apt/lists/*
 
 # codeql
 ADD codeql/install_codeql /tmp
