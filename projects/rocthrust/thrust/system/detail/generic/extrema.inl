@@ -226,6 +226,16 @@ minmax_element(thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator fi
   return thrust::minmax_element(exec, first, last, thrust::less<value_type>());
 } // end minmax_element()
 
+template <typename DerivedPolicy, typename ForwardIterator>
+THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator>
+minmax_element2(thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, unsigned char* test)
+{
+  using value_type = typename thrust::iterator_value<ForwardIterator>::type;
+
+  // HERE!!!
+  return thrust::minmax_element(exec, first, last, thrust::less<value_type>());
+} // end minmax_element()
+
 template <typename DerivedPolicy, typename ForwardIterator, typename BinaryPredicate>
 THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator> minmax_element(
   thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, BinaryPredicate comp)
@@ -250,6 +260,7 @@ THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator> minmax_element
 
   return thrust::make_pair(first + thrust::get<1>(thrust::get<0>(result)),
                            first + thrust::get<1>(thrust::get<1>(result)));
+	
 } // end minmax_element()
 
 } // end namespace generic

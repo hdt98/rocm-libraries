@@ -68,10 +68,10 @@ ForwardIterator max_element(const thrust::detail::execution_policy_base<DerivedP
 THRUST_EXEC_CHECK_DISABLE
 template<typename DerivedPolicy, typename ForwardIterator>
 THRUST_HOST_DEVICE
-thrust::pair<ForwardIterator,ForwardIterator> minmax_element(const thrust::detail::execution_policy_base<DerivedPolicy> &exec, ForwardIterator first, ForwardIterator last)
+thrust::pair<ForwardIterator,ForwardIterator> minmax_element(const thrust::detail::execution_policy_base<DerivedPolicy> &exec, ForwardIterator first, ForwardIterator last, unsigned char* test)
 {
-  using thrust::system::detail::generic::minmax_element;
-  return minmax_element(thrust::detail::derived_cast(thrust::detail::strip_const(exec)), first, last);
+  using thrust::system::detail::generic::minmax_element2;
+  return minmax_element2(thrust::detail::derived_cast(thrust::detail::strip_const(exec)), first, last, test);
 } // end minmax_element()
 
 
@@ -141,7 +141,7 @@ ForwardIterator max_element(ForwardIterator first, ForwardIterator last,
 
 template <typename ForwardIterator>
 thrust::pair<ForwardIterator,ForwardIterator>
-minmax_element(ForwardIterator first, ForwardIterator last)
+minmax_element(ForwardIterator first, ForwardIterator last, unsigned char* test)
 {
   using thrust::system::detail::generic::select_system;
 
@@ -149,7 +149,7 @@ minmax_element(ForwardIterator first, ForwardIterator last)
 
   System system;
 
-  return thrust::minmax_element(select_system(system), first, last);
+  return thrust::minmax_element(select_system(system), first, last, test);
 } // end minmax_element()
 
 

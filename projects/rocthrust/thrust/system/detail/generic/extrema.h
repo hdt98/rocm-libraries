@@ -53,10 +53,14 @@ template <typename DerivedPolicy, typename ForwardIterator>
 THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator>
 minmax_element(thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last);
 
+template <typename DerivedPolicy, typename ForwardIterator>
+THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator>
+minmax_element2(thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, unsigned char* test=nullptr);
+
 template <typename DerivedPolicy, typename ForwardIterator, typename BinaryPredicate>
 THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator> minmax_element(
-  thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, BinaryPredicate comp);
-
+  thrust::execution_policy<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, BinaryPredicate comp, unsigned char* test=nullptr);
+	
 } // end namespace generic
 } // end namespace detail
 } // end namespace system

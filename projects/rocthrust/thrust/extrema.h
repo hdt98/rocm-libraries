@@ -624,7 +624,7 @@ ForwardIterator max_element(ForwardIterator first, ForwardIterator last, BinaryP
  */
 template <typename DerivedPolicy, typename ForwardIterator>
 THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator> minmax_element(
-  const thrust::detail::execution_policy_base<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last);
+  const thrust::detail::execution_policy_base<DerivedPolicy>& exec, ForwardIterator first, ForwardIterator last, unsigned char* test=nullptr);
 
 /*! \p minmax_element finds the smallest and largest elements in the range <tt>[first, last)</tt>.
  *  It returns a pair of iterators <tt>(imin, imax)</tt> where \c imin is the same iterator
@@ -657,7 +657,7 @@ THRUST_HOST_DEVICE thrust::pair<ForwardIterator, ForwardIterator> minmax_element
  *  \see http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2005/n1840.pdf
  */
 template <typename ForwardIterator>
-thrust::pair<ForwardIterator, ForwardIterator> minmax_element(ForwardIterator first, ForwardIterator last);
+thrust::pair<ForwardIterator, ForwardIterator> minmax_element(ForwardIterator first, ForwardIterator last, unsigned char* test=nullptr);
 
 /*! \p minmax_element finds the smallest and largest elements in the range <tt>[first, last)</tt>.
  *  It returns a pair of iterators <tt>(imin, imax)</tt> where \c imin is the same iterator
