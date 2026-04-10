@@ -3,10 +3,6 @@
 
 # NHWGC layout instances for grouped_conv2d_bwd_weight
 set(GROUPED_CONV2D_BWD_WEIGHT_NHWGC
-   # dl
-   dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_bf16_f32_bf16_instance.cpp
-   dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_f16_instance.cpp
-   dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_f32_instance.cpp
    # wmma
    wmma/nhwgc_gkyxc_nhwgk/device_grouped_conv2d_bwd_weight_two_stage_wmma_nhwgc_gkyxc_nhwgk_bf16_pipev1_instance.cpp
    wmma/nhwgc_gkyxc_nhwgk/device_grouped_conv2d_bwd_weight_two_stage_wmma_nhwgc_gkyxc_nhwgk_f16_pipev1_instance.cpp
@@ -49,5 +45,12 @@ set(GROUPED_CONV2D_BWD_WEIGHT_NHWGC
    xdl/nhwgc_gkyxc_nhwgk/device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_pad0_pipev2_instance.cpp
    xdl/nhwgc_gkyxc_nhwgk/device_grouped_conv2d_bwd_weight_xdl_nhwgc_gkyxc_nhwgk_f32_tf32_pad0_pipev5_instance.cpp
 )
+
+if(DL_KERNELS)
+    list(APPEND GROUPED_CONV2D_BWD_WEIGHT_NHWGC
+        dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_bf16_f32_bf16_instance.cpp
+        dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_f16_instance.cpp
+        dl/device_grouped_conv2d_bwd_weight_dl_nhwgc_gkyxc_nhwgk_f32_instance.cpp)
+endif()
 
 add_instance_library(device_grouped_conv2d_bwd_weight_nhwgc_instance ${GROUPED_CONV2D_BWD_WEIGHT_NHWGC})
