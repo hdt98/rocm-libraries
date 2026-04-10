@@ -39,10 +39,6 @@ RUN apt-get update && apt-get install -y \
    xz-utils \
    libdw-dev
 
-# Needed for clang-format from ROCm 4.3.1
-RUN wget -nv --show-progress --progress=dot:mega -O /tmp/libtinfo5.deb http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb \
-    && apt-get install -y /tmp/libtinfo5.deb
-
 # CMake
 ARG CMAKE_VERSION=3.25.2
 WORKDIR /tmp
@@ -51,8 +47,15 @@ RUN wget -nv -O cmake-install.sh https://github.com/Kitware/CMake/releases/downl
     && rm -rf /tmp/*
 
 # clang-format from ROCm 4.3.1
-ADD docker/install-clang-format /tmp
-RUN /tmp/install-clang-format && rm /tmp/install-clang-format
+WORKDIR /tmp
+RUN wget -nv -O libtinfo5.deb http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb \
+    && apt-get install -y --no-install-recommends ./libtinfo5.deb \
+    && wget -nv -O llvm-amdgpu.deb https://repo.radeon.com/rocm/apt/4.3.1/pool/main/l/llvm-amdgpu4.3.1/llvm-amdgpu4.3.1_13.0.0.21313.40301_amd64.deb \
+    && ar x llvm-amdgpu.deb data.tar.xz \
+    && tar xJf data.tar.xz --strip-components=5 ./opt/rocm-4.3.1/llvm/bin/clang-format \
+    && mkdir -p /opt/clang-format/bin \
+    && mv clang-format /opt/clang-format/bin \
+    && rm -rf /tmp/* /var/lib/apt/lists/*
 ENV PATH="/opt/clang-format/bin:${PATH}"
 
 # ccache
