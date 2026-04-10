@@ -3,9 +3,9 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_flatbuffers_sdk/types.hpp>
-#include <hipdnn_flatbuffers_sdk/utilities/ShapeUtilities.hpp>
-#include <hipdnn_flatbuffers_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/types.hpp>
+#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMatmul.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
@@ -20,10 +20,10 @@
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_flatbuffers_sdk::data_objects;
-using namespace hipdnn_flatbuffers_sdk::utilities;
+using namespace hipdnn_data_sdk::utilities;
 using namespace hipdnn_flatbuffers_sdk::flatbuffer_utilities;
 using namespace hipdnn_sdk_test_utils;
-using namespace hipdnn_flatbuffers_sdk::types;
+using namespace hipdnn_data_sdk::types;
 using hipdnn_test_sdk::detail::safeTestTypeCast;
 
 namespace

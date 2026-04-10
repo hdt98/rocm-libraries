@@ -3,14 +3,14 @@
 
 #include <cmath>
 #include <gtest/gtest.h>
-#include <hipdnn_flatbuffers_sdk/types.hpp>
+#include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <vector>
 
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_test_sdk::utilities::conv;
-using namespace hipdnn_flatbuffers_sdk::types;
+using namespace hipdnn_data_sdk::types;
 // =================================================================================================
 // TestCalculateConvWrwTolerance
 // =================================================================================================
@@ -59,9 +59,9 @@ std::vector<ConvWrwToleranceTestCase>
     return {{-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
             {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
             // N=1. Accum = 1. Tol = 2 * 1^2 * 2^-23 = 2 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 2.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
             // N=2. Accum = 2. Tol = 2 * 2^2 * 2^-23 = 8 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+            {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 8.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
             // N=10. Accum = 10. Tol = 2 * 10^2 * 2^-23 = 200 * 2^-23
             // Exact gamma: (20 * 2^-23) / (1 - 20 * 2^-23) * 10
             {-1.0,
@@ -69,8 +69,8 @@ std::vector<ConvWrwToleranceTestCase>
              -1.0,
              1.0,
              {10, 1, 1, 1},
-             (20.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-                 / (1.0 - 20.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 10.0},
+             (20.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+                 / (1.0 - 20.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 10.0},
             // Large values: range -1000, 1000. maxProduct = 10^6.
             // N=10. Accum = 10. Tol = gamma * 10^7
             {-1000.0,
@@ -78,8 +78,8 @@ std::vector<ConvWrwToleranceTestCase>
              -1000.0,
              1000.0,
              {10, 1, 1, 1},
-             (20.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-                 / (1.0 - 20.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 1.0e7}};
+             (20.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+                 / (1.0 - 20.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 1.0e7}};
 }
 
 // Float / Double / Float (Input casting error)
@@ -92,9 +92,9 @@ std::vector<ConvWrwToleranceTestCase>
     getConvWrwToleranceTestCases<TypeTriple<float, double, float>>()
 {
     return {// N=1. Accum = 1. Tol = (2 + 2) * 2^-23 = 4 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 4.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 4.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
             // N=10. Accum = 10. Tol = (200 + 20) * 2^-23 = 220 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {10, 1, 1, 1}, 220.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)}};
+            {-1.0, 1.0, -1.0, 1.0, {10, 1, 1, 1}, 220.0 * hipdnn_data_sdk::types::pow(2.0, -23)}};
 }
 
 // HipBfloat16 / Float / Float (High Precision Compute: Linear)
@@ -113,26 +113,26 @@ std::vector<ConvWrwToleranceTestCase>
          -1.0,
          1.0,
          {1, 1, 1, 1},
-         2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+         2.0 * hipdnn_data_sdk::types::pow(2.0, -23) + hipdnn_data_sdk::types::pow(2.0, -7)},
         // N=2. Accum = 2. Tol = 8 * 2^-23 + 2 * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {2, 1, 1, 1},
-         8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+         8.0 * hipdnn_data_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_data_sdk::types::pow(2.0, -7)},
         // N=10. Accum = 10. Tol = 200 * 2^-23 + 10 * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {10, 1, 1, 1},
-         200.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)
-             + 10.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)}};
+         200.0 * hipdnn_data_sdk::types::pow(2.0, -23)
+             + 10.0 * hipdnn_data_sdk::types::pow(2.0, -7)}};
 }
 
 // HipBfloat16 / HipBfloat16 / HipBfloat16 (Lower Precision: Statistical)
-// Error = K * hipdnn_flatbuffers_sdk::types::sqrt(2N) * u * (N * maxProduct) = K * N * hipdnn_flatbuffers_sdk::types::sqrt(2N) * u * maxProduct
+// Error = K * hipdnn_data_sdk::types::sqrt(2N) * u * (N * maxProduct) = K * N * hipdnn_data_sdk::types::sqrt(2N) * u * maxProduct
 template <>
 std::vector<ConvWrwToleranceTestCase>
     getConvWrwToleranceTestCases<TypeTriple<bfloat16, bfloat16, bfloat16>>()
@@ -141,22 +141,22 @@ std::vector<ConvWrwToleranceTestCase>
     return {
         {-1.0, 1.0, -1.0, 1.0, {}, 0.0, true},
         {-1.0, 1.0, -1.0, 1.0, {1}, 0.0, true},
-        // N=1. Accum = 1. Tol = 6 * 1 * hipdnn_flatbuffers_sdk::types::sqrt(2) * 2^-7
+        // N=1. Accum = 1. Tol = 6 * 1 * hipdnn_data_sdk::types::sqrt(2) * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {1, 1, 1, 1},
-         6.0 * hipdnn_flatbuffers_sdk::types::sqrt(2.0) * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
-        // N=2. Accum = 2. Tol = 6 * 2 * hipdnn_flatbuffers_sdk::types::sqrt(4) * 2^-7 = 24 * 2^-7 = 0.1875
-        {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 24.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
-        // N=10. Accum = 10. Tol = 6 * 10 * hipdnn_flatbuffers_sdk::types::sqrt(20) * 2^-7
+         6.0 * hipdnn_data_sdk::types::sqrt(2.0) * hipdnn_data_sdk::types::pow(2.0, -7)},
+        // N=2. Accum = 2. Tol = 6 * 2 * hipdnn_data_sdk::types::sqrt(4) * 2^-7 = 24 * 2^-7 = 0.1875
+        {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 24.0 * hipdnn_data_sdk::types::pow(2.0, -7)},
+        // N=10. Accum = 10. Tol = 6 * 10 * hipdnn_data_sdk::types::sqrt(20) * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {10, 1, 1, 1},
-         60.0 * hipdnn_flatbuffers_sdk::types::sqrt(20.0) * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)}};
+         60.0 * hipdnn_data_sdk::types::sqrt(20.0) * hipdnn_data_sdk::types::pow(2.0, -7)}};
 }
 
 // Half / Float / Float (High Precision Compute: Linear)
@@ -174,22 +174,22 @@ std::vector<ConvWrwToleranceTestCase> getConvWrwToleranceTestCases<TypeTriple<ha
          -1.0,
          1.0,
          {1, 1, 1, 1},
-         2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + hipdnn_flatbuffers_sdk::types::pow(2.0, -10)},
+         2.0 * hipdnn_data_sdk::types::pow(2.0, -23) + hipdnn_data_sdk::types::pow(2.0, -10)},
         // N=2. Accum = 2. Tol = 8 * 2^-23 + 2 * 2^-10
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {2, 1, 1, 1},
-         8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -10)},
+         8.0 * hipdnn_data_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_data_sdk::types::pow(2.0, -10)},
         // N=10. Accum = 10. Tol = 200 * 2^-23 + 10 * 2^-10
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {10, 1, 1, 1},
-         200.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)
-             + 10.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -10)}};
+         200.0 * hipdnn_data_sdk::types::pow(2.0, -23)
+             + 10.0 * hipdnn_data_sdk::types::pow(2.0, -10)}};
 }
 
 // Half / Half / Half
@@ -308,9 +308,9 @@ TEST(TestCalculateConvWrwTolerance, DetectsFailure)
     const std::vector<int64_t> strides = {100, 100, 10, 1};
 
     // Create tensors
-    auto baseline = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualPassing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualFailing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
+    auto baseline = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualPassing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualFailing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
 
     // Populate with values
     // Correct value: 1.0
@@ -417,9 +417,9 @@ std::vector<ConvDgradToleranceTestCase>
         {-1.0, 1.0, -1.0, 1.0, {1, 1}, 0.0, true},
         {-1.0, 1.0, -1.0, 1.0, {1, 1, 1}, 0.0, true},
         // wDims=[K=1, C=1, R=1, S=1]. Accum = 1 * 1 * 1 = 1. Tol = 2 * 1^2 * 2^-23 = 2 * 2^-23
-        {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+        {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 2.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
         // wDims=[K=2, C=1, R=1, S=1]. Accum = 2. Tol = 2 * 2^2 * 2^-23 = 8 * 2^-23
-        {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+        {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 8.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
         // wDims=[K=1, C=1, R=3, S=3]. Accum = 1 * 3 * 3 = 9. Tol = 2 * 9^2 * 2^-23 = 162 * 2^-23
         // Exact gamma: (18 * 2^-23) / (1 - 18 * 2^-23) * 9
         {-1.0,
@@ -427,24 +427,24 @@ std::vector<ConvDgradToleranceTestCase>
          -1.0,
          1.0,
          {1, 1, 3, 3},
-         (18.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-             / (1.0 - 18.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 9.0},
+         (18.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+             / (1.0 - 18.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 9.0},
         // wDims=[K=16, C=16, R=3, S=3]. Accum = 16 * 3 * 3 = 144.
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {16, 16, 3, 3},
-         (288.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-             / (1.0 - 288.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 144.0},
+         (288.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+             / (1.0 - 288.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 144.0},
         // 3D Convolution: wDims=[K=8, C=8, D=3, R=3, S=3]. Accum = 8 * 3 * 3 * 3 = 216.
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {8, 8, 3, 3, 3},
-         (432.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-             / (1.0 - 432.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 216.0},
+         (432.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+             / (1.0 - 432.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 216.0},
         // Large values: range -1000, 1000. maxProduct = 10^6.
         // wDims=[K=16, C=16, R=3, S=3]. Accum = 144.
         {-1000.0,
@@ -452,8 +452,8 @@ std::vector<ConvDgradToleranceTestCase>
          -1000.0,
          1000.0,
          {16, 16, 3, 3},
-         (288.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23))
-             / (1.0 - 288.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)) * 144.0 * 1.0e6}};
+         (288.0 * hipdnn_data_sdk::types::pow(2.0, -23))
+             / (1.0 - 288.0 * hipdnn_data_sdk::types::pow(2.0, -23)) * 144.0 * 1.0e6}};
 }
 
 // Float / Double / Float (Input casting error)
@@ -466,9 +466,9 @@ std::vector<ConvDgradToleranceTestCase>
     getConvDgradToleranceTestCases<TypeTriple<float, double, float>>()
 {
     return {// wDims=[1, 1, 1, 1]. Accum = 1. Tol = (2 + 2) * 2^-23 = 4 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 4.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)},
+            {-1.0, 1.0, -1.0, 1.0, {1, 1, 1, 1}, 4.0 * hipdnn_data_sdk::types::pow(2.0, -23)},
             // wDims=[1, 1, 3, 3]. Accum = 9. Tol = (162 + 18) * 2^-23 = 180 * 2^-23
-            {-1.0, 1.0, -1.0, 1.0, {1, 1, 3, 3}, 180.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)}};
+            {-1.0, 1.0, -1.0, 1.0, {1, 1, 3, 3}, 180.0 * hipdnn_data_sdk::types::pow(2.0, -23)}};
 }
 
 // HipBfloat16 / Float / Float (High Precision Compute: Linear)
@@ -489,22 +489,22 @@ std::vector<ConvDgradToleranceTestCase>
          -1.0,
          1.0,
          {1, 1, 1, 1},
-         2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+         2.0 * hipdnn_data_sdk::types::pow(2.0, -23) + hipdnn_data_sdk::types::pow(2.0, -7)},
         // wDims=[2, 1, 1, 1]. Accum = 2. Tol = 8 * 2^-23 + 2 * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {2, 1, 1, 1},
-         8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+         8.0 * hipdnn_data_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_data_sdk::types::pow(2.0, -7)},
         // wDims=[1, 1, 3, 3]. Accum = 9. Tol = 162 * 2^-23 + 9 * 2^-7
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {1, 1, 3, 3},
-         162.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)
-             + 9.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)}};
+         162.0 * hipdnn_data_sdk::types::pow(2.0, -23)
+             + 9.0 * hipdnn_data_sdk::types::pow(2.0, -7)}};
 }
 
 // HipBfloat16 / HipBfloat16 / HipBfloat16 (Lower Precision: Statistical)
@@ -523,16 +523,16 @@ std::vector<ConvDgradToleranceTestCase>
              -1.0,
              1.0,
              {1, 1, 1, 1},
-             6.0 * hipdnn_flatbuffers_sdk::types::sqrt(2.0) * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+             6.0 * hipdnn_data_sdk::types::sqrt(2.0) * hipdnn_data_sdk::types::pow(2.0, -7)},
             // wDims=[2, 1, 1, 1]. Accum = 2. Tol = 6 * 2 * sqrt(4) * 2^-7 = 24 * 2^-7
-            {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 24.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)},
+            {-1.0, 1.0, -1.0, 1.0, {2, 1, 1, 1}, 24.0 * hipdnn_data_sdk::types::pow(2.0, -7)},
             // wDims=[1, 1, 3, 3]. Accum = 9. Tol = 6 * 9 * sqrt(18) * 2^-7
             {-1.0,
              1.0,
              -1.0,
              1.0,
              {1, 1, 3, 3},
-             54.0 * hipdnn_flatbuffers_sdk::types::sqrt(18.0) * hipdnn_flatbuffers_sdk::types::pow(2.0, -7)}};
+             54.0 * hipdnn_data_sdk::types::sqrt(18.0) * hipdnn_data_sdk::types::pow(2.0, -7)}};
 }
 
 // Half / Float / Float (High Precision Compute: Linear)
@@ -553,22 +553,22 @@ std::vector<ConvDgradToleranceTestCase>
          -1.0,
          1.0,
          {1, 1, 1, 1},
-         2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + hipdnn_flatbuffers_sdk::types::pow(2.0, -10)},
+         2.0 * hipdnn_data_sdk::types::pow(2.0, -23) + hipdnn_data_sdk::types::pow(2.0, -10)},
         // wDims=[2, 1, 1, 1]. Accum = 2. Tol = 8 * 2^-23 + 2 * 2^-10
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {2, 1, 1, 1},
-         8.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -10)},
+         8.0 * hipdnn_data_sdk::types::pow(2.0, -23) + 2.0 * hipdnn_data_sdk::types::pow(2.0, -10)},
         // wDims=[1, 1, 3, 3]. Accum = 9. Tol = 162 * 2^-23 + 9 * 2^-10
         {-1.0,
          1.0,
          -1.0,
          1.0,
          {1, 1, 3, 3},
-         162.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -23)
-             + 9.0 * hipdnn_flatbuffers_sdk::types::pow(2.0, -10)}};
+         162.0 * hipdnn_data_sdk::types::pow(2.0, -23)
+             + 9.0 * hipdnn_data_sdk::types::pow(2.0, -10)}};
 }
 
 // Half / Half / Half
@@ -690,9 +690,9 @@ TEST(TestCalculateConvDgradTolerance, DetectsFailure)
     const std::vector<int64_t> strides = {100, 100, 10, 1};
 
     // Create tensors
-    auto baseline = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualPassing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualFailing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
+    auto baseline = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualPassing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualFailing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
 
     // Populate with values
     baseline->fillTensorWithValue(1.0f);
@@ -1043,9 +1043,9 @@ TEST(TestCalculateConvFpropTolerance, DetectsFailure)
     const std::vector<int64_t> strides = {100, 100, 10, 1};
 
     // Create tensors
-    auto baseline = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualPassing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
-    auto actualFailing = hipdnn_flatbuffers_sdk::utilities::createTensor<float>(dims, strides);
+    auto baseline = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualPassing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
+    auto actualFailing = hipdnn_data_sdk::utilities::createTensor<float>(dims, strides);
 
     baseline->fillTensorWithValue(1.0f);
     actualPassing->fillTensorWithValue(1.05f);
