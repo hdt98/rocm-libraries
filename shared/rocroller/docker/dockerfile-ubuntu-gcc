@@ -25,22 +25,45 @@ RUN [ -z ${HTTP_PROXY} ] || (echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /e
 # Add PPA with g++-13
 RUN apt-get update && apt-get reinstall -y software-properties-common && add-apt-repository -y ppa:ubuntu-toolchain-r/test
 
-RUN apt-get update && apt-get install -y \
-   bc \
-   gdb \
-   libopenblas-dev \
-   libncurses-dev \
-   m4 \
-   make \
-   nano \
-   netcat-traditional \
-   ninja-build \
-   python3-dev \
-   python3-venv \
-   vim \
-   wget \
-   xz-utils \
-   libdw-dev
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        # Tools, utils, compilation
+        bc \
+        build-essential \
+        ca-certificates \
+        doxygen \
+        gdb \
+        gfortran \
+        graphviz \
+        kmod \
+        linux-tools-common \
+        linux-tools-generic \
+        m4 \
+        make \
+        netcat-traditional \
+        ninja-build \
+        pkg-config \
+        wget \
+        xz-utils \
+        wget \
+        # Editors
+        nano \
+        vim \
+        # Python
+        python3-dev \
+        python3-yaml \
+        python3-venv \
+        # Libraries
+        libboost-filesystem-dev \
+        libboost-program-options-dev \
+        libdw-dev \
+        libmsgpack-dev \
+        libncurses-dev \
+        libnuma1 \
+        libopenblas-dev \
+        libssl-dev \
+        libzstd-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # CMake
 ARG CMAKE_VERSION=3.25.2
@@ -87,24 +110,11 @@ RUN wget -nv -O cppcheck_2.9.3.zip https://github.com/danmar/cppcheck/archive/re
     && cmake --build cppcheck-2.9.3_build --target install \
     && rm -rf /tmp/*
 
-# graph & documentation & perf
-RUN apt-get update && apt-get install -y \
-      graphviz \
-      doxygen \
-      linux-tools-common linux-tools-generic
-
 # Python
 RUN python3 -m venv /opt/rr-python-venv
 ENV PATH="/opt/rr-python-venv/bin:$PATH"
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
-
-# HipBLASLt
-RUN apt-get update && apt-get install -y \
-    libmsgpack-dev \
-    libboost-program-options-dev \
-    libboost-filesystem-dev \
-    kmod
 
 ##
 ## Specific to this Dockerfile.  Put faster-changing-things last.
@@ -144,6 +154,3 @@ ENV CC=/usr/bin/gcc-13
 
 ADD docker/install-rocprof-trace-decoder /tmp
 RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder
-
-# Clean image
-RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
