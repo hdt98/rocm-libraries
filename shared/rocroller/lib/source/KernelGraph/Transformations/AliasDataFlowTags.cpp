@@ -302,15 +302,6 @@ namespace rocRoller
                             = ControlGraph::getDataType(kgraph.control.getNode(rec.control));
                     }
 
-                    if(rv.dataType == DataType::None
-                       && (rec.rw == Tracer::WRITE or rec.rw == Tracer::READWRITE))
-                    {
-                        auto  op       = kgraph.control.getNode(rec.control);
-                        auto* assignOp = std::get_if<ControlGraph::Assign>(&op);
-                        if(assignOp && assignOp->variableType.has_value())
-                            rv.dataType = assignOp->variableType->dataType;
-                    }
-
                     auto mt
                         = kgraph.coordinates.getNode<CoordinateGraph::MacroTile>(rec.coordinate);
 

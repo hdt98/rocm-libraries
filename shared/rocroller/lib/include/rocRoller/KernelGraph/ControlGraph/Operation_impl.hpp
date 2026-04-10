@@ -17,6 +17,14 @@ namespace rocRoller
                 } -> std::convertible_to<VariableType>;
         };
 
+        template <typename T>
+        concept CHasOptionalVarTypeMember = requires(T const& op)
+        {
+            {
+                op.variableType
+                } -> std::same_as<std::optional<VariableType>&>;
+        };
+
         template <CConcreteOperation Op>
         inline std::string name(const Op& x)
         {
@@ -77,12 +85,20 @@ namespace rocRoller
             template <CHasVarTypeMember Op>
             DataType operator()(Op const& op)
             {
-                static_assert(not std::is_same_v<Op, Assign>);
                 return op.varType.dataType;
             }
 
+            template <CHasOptionalVarTypeMember Op>
+            DataType operator()(Op const& op)
+            {
+                if(op.variableType.has_value())
+                    return op.variableType->dataType;
+            }
+
             template <typename Op>
-            requires(!CHasDataTypeMember<Op> && !CHasVarTypeMember<Op>) DataType
+            requires(
+                !CHasDataTypeMember<Op> && !CHasVarTypeMember<Op> && !CHasOptionalVarTypeMember<Op>)
+                DataType
                 operator()(Op const& op)
             {
                 return DataType::None;
