@@ -287,7 +287,6 @@ namespace rocRoller
 
             TagExtent getInfo(KernelGraph const& kgraph, std::vector<Record> const& records)
             {
-                using Tracer = ControlFlowRWTracer;
                 TagExtent rv;
 
                 for(auto const& rec : records)
@@ -297,10 +296,8 @@ namespace rocRoller
                     rv.tags.insert(rec.coordinate);
 
                     if(rv.dataType == DataType::None)
-                    {
                         rv.dataType
                             = ControlGraph::getDataType(kgraph.control.getNode(rec.control));
-                    }
 
                     auto mt
                         = kgraph.coordinates.getNode<CoordinateGraph::MacroTile>(rec.coordinate);

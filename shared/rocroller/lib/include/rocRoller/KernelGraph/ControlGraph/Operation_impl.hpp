@@ -18,12 +18,9 @@ namespace rocRoller
         };
 
         template <typename T>
-        concept CHasOptionalVarTypeMember = requires(T const& op)
-        {
-            {
-                op.variableType
-                } -> std::same_as<std::optional<VariableType>&>;
-        };
+        concept CHasOptionalVarTypeMember
+            = std::same_as<std::remove_cvref_t<decltype(std::declval<T>().variableType)>,
+                           std::optional<VariableType>>;
 
         template <CConcreteOperation Op>
         inline std::string name(const Op& x)
@@ -93,6 +90,7 @@ namespace rocRoller
             {
                 if(op.variableType.has_value())
                     return op.variableType->dataType;
+                return DataType::None;
             }
 
             template <typename Op>
