@@ -43,10 +43,12 @@ RUN apt-get update && apt-get install -y \
 RUN wget -nv --show-progress --progress=dot:mega -O /tmp/libtinfo5.deb http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb \
     && apt-get install -y /tmp/libtinfo5.deb
 
-# cmake 3.25.2
- RUN wget -nv --show-progress --progress=dot:mega -O /tmp/cmake-install.sh https://github.com/Kitware/CMake/releases/download/v3.25.2/cmake-3.25.2-linux-x86_64.sh \
-   && sh /tmp/cmake-install.sh --prefix=/usr/local --skip-license \
-   && rm /tmp/cmake-install.sh
+# CMake
+ARG CMAKE_VERSION=3.25.2
+WORKDIR /tmp
+RUN wget -nv -O cmake-install.sh https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh \
+    && sh cmake-install.sh --prefix=/usr/local --skip-license \
+    && rm -rf /tmp/*
 
 # clang-format from ROCm 4.3.1
 ADD docker/install-clang-format /tmp
