@@ -318,7 +318,25 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
     num_sgprs = reg_counts.get("sgpr", 88)
 
     # Translate assembly to rocasm Python code
-    rocasm_code = asm_to_rocasm(main_loop_text, symbols)
+    rocasm_code, named_regs = asm_to_rocasm(main_loop_text, symbols)
+
+    # Build the Block init kwargs: named arrays first, then flat fallbacks
+    _ARRAY_TYPE = {"v": "VgprArray", "s": "SgprArray", "acc": "AccArray"}
+    block_kwargs = []
+    for alias in sorted(named_regs):
+        reg_type, phys_base, count = named_regs[alias]
+        arr_type = _ARRAY_TYPE[reg_type]
+        block_kwargs.append(f"        {alias}={arr_type}(base={phys_base}, count={count}),\n")
+
+    # Always include Acc as a flat array (accumulators use literal indices)
+    block_kwargs.append(f"        Acc=AccArray(base=0, count={num_accvgprs}),\n")
+
+    # Check if flat V or S are still needed (for registers without named symbols)
+    # by scanning the generated code for flat references
+    if "V[" in rocasm_code:
+        block_kwargs.append(f"        V=VgprArray(base=0, count={num_vgprs}),\n")
+    if "S[" in rocasm_code:
+        block_kwargs.append(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
 
     # Write the mainloop Python file
     with open(mainloopPath, "w", encoding="utf-8") as f:
@@ -333,9 +351,8 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
         f.write("    Edit this function to modify the main loop programmatically.\n")
         f.write('    """\n')
         f.write(f"    block = Block(\n")
-        f.write(f"        Acc=AccArray(base=0, count={num_accvgprs}),\n")
-        f.write(f"        V=VgprArray(base=0, count={num_vgprs}),\n")
-        f.write(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
+        for kwarg in block_kwargs:
+            f.write(kwarg)
         f.write(f"    )\n")
         f.write("\n")
         for line in rocasm_code.splitlines():

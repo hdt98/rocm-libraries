@@ -32,6 +32,8 @@ from rocasm.asm_to_rocasm import (
     asm_to_rocasm,
     parse_register_counts,
     _resolve_expr,
+    _extract_base_symbol,
+    _make_alias,
     _parse_reg_operand,
     _parse_scalar_operand,
     _split_operands,
@@ -221,25 +223,79 @@ class TestResolveExpr:
             _resolve_expr("noSuch+4", {})
 
 
+class TestExtractBaseSymbol:
+
+    def test_pure_literal(self):
+        assert _extract_base_symbol("0", {}) == (None, 0)
+
+    def test_literal_int(self):
+        assert _extract_base_symbol("42", {}) == (None, 42)
+
+    def test_symbol_only(self):
+        syms = {"vgprValuA_X0_I0": 16}
+        assert _extract_base_symbol("vgprValuA_X0_I0", syms) == ("vgprValuA_X0_I0", 0)
+
+    def test_symbol_plus_offset(self):
+        syms = {"vgprValuA_X0_I0": 16}
+        assert _extract_base_symbol("vgprValuA_X0_I0+4", syms) == ("vgprValuA_X0_I0", 4)
+
+    def test_symbol_plus_chained_zeros(self):
+        syms = {"vgprValuA_X0_I0": 16}
+        assert _extract_base_symbol("vgprValuA_X0_I0+4+0+0", syms) == ("vgprValuA_X0_I0", 4)
+
+    def test_symbol_plus_chained_with_end(self):
+        syms = {"vgprValuA_X0_I0": 16}
+        assert _extract_base_symbol("vgprValuA_X0_I0+4+0+0+3", syms) == ("vgprValuA_X0_I0", 7)
+
+
+class TestMakeAlias:
+
+    def test_valu_a_compact(self):
+        assert _make_alias("vgprValuA_X0_I0") == "A0"
+
+    def test_valu_a_x1(self):
+        assert _make_alias("vgprValuA_X1_I0") == "A1"
+
+    def test_valu_b_compact(self):
+        assert _make_alias("vgprValuB_X0_I0") == "B0"
+
+    def test_valu_b_x1(self):
+        assert _make_alias("vgprValuB_X1_I0") == "B1"
+
+    def test_sgpr_prefix(self):
+        assert _make_alias("sgprSrdA") == "SrdA"
+
+    def test_vgpr_other(self):
+        assert _make_alias("vgprLocalReadAddrA") == "LocalReadAddrA"
+
+    def test_no_prefix(self):
+        assert _make_alias("BufferLimit") == "BufferLimit"
+
+
 class TestParseRegOperand:
 
     def test_acc_range(self):
-        assert _parse_reg_operand("acc[0:3]", {}) == ("acc", 0, 4)
+        assert _parse_reg_operand("acc[0:3]", {}) == ("acc", 0, 4, None, 0)
 
     def test_v_range_with_symbols(self):
         syms = {"vgprValuA": 16}
         result = _parse_reg_operand("v[vgprValuA+0:vgprValuA+0+3]", syms)
-        assert result == ("v", 16, 4)
+        assert result == ("v", 16, 4, "vgprValuA", 0)
 
     def test_s_range_with_symbols(self):
         syms = {"sgprSrdA": 64}
         result = _parse_reg_operand("s[sgprSrdA:sgprSrdA+3]", syms)
-        assert result == ("s", 64, 4)
+        assert result == ("s", 64, 4, "sgprSrdA", 0)
 
     def test_single_vgpr(self):
         syms = {"vgprLocalReadAddrA": 14}
         result = _parse_reg_operand("v[vgprLocalReadAddrA]", syms)
-        assert result == ("v", 14, 1)
+        assert result == ("v", 14, 1, "vgprLocalReadAddrA", 0)
+
+    def test_v_range_with_offset(self):
+        syms = {"vgprValuA_X0_I0": 16}
+        result = _parse_reg_operand("v[vgprValuA_X0_I0+4:vgprValuA_X0_I0+4+3]", syms)
+        assert result == ("v", 20, 4, "vgprValuA_X0_I0", 4)
 
     def test_not_a_register(self):
         assert _parse_reg_operand("0x10000", {}) is None
@@ -324,15 +380,21 @@ class TestParseRegisterCounts:
 # ─── asm_to_rocasm integration tests ────────────────────────────────────────
 
 
-def _body(result: str) -> str:
+def _body(result: tuple[str, dict] | str) -> str:
     """Extract the instruction body from asm_to_rocasm output, skipping the alias preamble."""
-    lines = result.split("\n")
+    code = result[0] if isinstance(result, tuple) else result
+    lines = code.split("\n")
     # Find the blank line separating preamble from body
     for i, line in enumerate(lines):
         if line == "":
             return "\n".join(lines[i + 1:])
     # No preamble (e.g. only unhandled lines) — return as-is
-    return result
+    return code
+
+
+def _code(result: tuple[str, dict]) -> str:
+    """Extract just the code string from the asm_to_rocasm tuple return."""
+    return result[0]
 
 
 class TestAsmToRocasm:
@@ -359,42 +421,51 @@ class TestAsmToRocasm:
 
     def test_preamble_has_register_aliases(self):
         asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[64:67], v[16:19], acc[0:3]"
-        result = asm_to_rocasm(asm, {})
-        assert "Acc = block.Acc" in result
-        assert "V = block.V" in result
+        code, named_regs = asm_to_rocasm(asm, {})
+        assert "Acc = block.Acc" in code
+        assert "V = block.V" in code
 
     def test_preamble_has_method_aliases(self):
         asm = "s_waitcnt lgkmcnt(0)"
-        result = asm_to_rocasm(asm, {})
-        assert "s_waitcnt = block.s_waitcnt" in result
+        code, _ = asm_to_rocasm(asm, {})
+        assert "s_waitcnt = block.s_waitcnt" in code
 
     def test_mfma(self):
         asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[vgprValuB_X0_I0+0+0+0:vgprValuB_X0_I0+0+0+0+3], v[vgprValuA_X0_I0+0+0+0:vgprValuA_X0_I0+0+0+0+3], acc[0:3]"
-        body = _body(asm_to_rocasm(asm, self.SYMBOLS))
+        result = asm_to_rocasm(asm, self.SYMBOLS)
+        body = _body(result)
         assert body == (
             "Acc[0:4] = vmfma_f32_16x16x32_bf16("
-            "V[64:68], V[16:20], Acc[0:4])"
+            "B0[0:4], A0[0:4], Acc[0:4])"
         )
+
+    def test_mfma_named_regs(self):
+        asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[vgprValuB_X0_I0+0+0+0:vgprValuB_X0_I0+0+0+0+3], v[vgprValuA_X0_I0+0+0+0:vgprValuA_X0_I0+0+0+0+3], acc[0:3]"
+        _, named_regs = asm_to_rocasm(asm, self.SYMBOLS)
+        assert "B0" in named_regs
+        assert "A0" in named_regs
+        assert named_regs["B0"] == ("v", 64, 4)
+        assert named_regs["A0"] == ("v", 16, 4)
 
     def test_ds_read_b128_with_offset(self):
         asm = "ds_read_b128 v[vgprValuA_X1_I0+0:vgprValuA_X1_I0+0+3], v[vgprLocalReadAddrA] offset:64"
         body = _body(asm_to_rocasm(asm, self.SYMBOLS))
         assert body == (
-            "V[40:44] = ds_read_b128("
-            "V[14:15], ds=DSModifiers(offset=64))"
+            "A1[0:4] = ds_read_b128("
+            "LocalReadAddrA[0:1], ds=DSModifiers(offset=64))"
         )
 
     def test_ds_read_b128_no_offset(self):
         asm = "ds_read_b128 v[vgprValuA_X0_I0+0:vgprValuA_X0_I0+0+3], v[vgprLocalReadAddrA] offset:0"
         body = _body(asm_to_rocasm(asm, self.SYMBOLS))
-        assert body == "V[16:20] = ds_read_b128(V[14:15])"
+        assert body == "A0[0:4] = ds_read_b128(LocalReadAddrA[0:1])"
 
     def test_buffer_load_lds(self):
         asm = "buffer_load_dwordx4 v[vgprGlobalReadOffsetA+0], s[sgprSrdA:sgprSrdA+3], 0 offen offset:0 lds"
         body = _body(asm_to_rocasm(asm, self.SYMBOLS))
         assert "buffer_load_lds(" in body
-        assert "V[0:1]" in body
-        assert "S[64:68]" in body
+        assert "GlobalReadOffsetA[0:1]" in body
+        assert "SrdA[0:4]" in body
         assert "offen=True" in body
         assert "lds=True" in body
 
@@ -485,8 +556,8 @@ class TestAsmToRocasm:
         assert body == "s_barrier()"
 
     def test_unhandled_instruction(self):
-        result = asm_to_rocasm("v_unknown_op v0, v1, v2", self.SYMBOLS)
-        assert "# UNHANDLED:" in result
+        code, _ = asm_to_rocasm("v_unknown_op v0, v1, v2", self.SYMBOLS)
+        assert "# UNHANDLED:" in code
 
     def test_multi_instruction_snippet(self):
         """Verify a realistic multi-instruction sequence produces correct output."""
@@ -497,8 +568,8 @@ class TestAsmToRocasm:
             s_sub_u32 s[sgprLoopCounterL], s[sgprLoopCounterL], 1 // dec
             s_cbranch_scc0 label_LoopBeginL
         """)
-        result = asm_to_rocasm(asm, self.SYMBOLS)
-        body = _body(result)
+        code, named_regs = asm_to_rocasm(asm, self.SYMBOLS)
+        body = _body(code)
         lines = body.strip().split("\n")
         assert len(lines) == 5
         assert lines[0] == "s_waitcnt(dscnt=0)"
@@ -506,13 +577,17 @@ class TestAsmToRocasm:
         assert lines[2].startswith("Acc[0:4] = vmfma")
         assert lines[3] == "s_sub_u32(dst=sgpr(8), src0=sgpr(8), src1=1)"
         assert lines[4] == 's_cbranch_scc0(labelName="label_LoopBeginL")'
-        # Check preamble has all needed aliases
-        assert "Acc = block.Acc" in result
-        assert "V = block.V" in result
-        assert "s_barrier = block.s_barrier" in result
-        assert "s_cbranch_scc0 = block.s_cbranch_scc0" in result
-        assert "s_sub_u32 = block.s_sub_u32" in result
-        assert "s_waitcnt = block.s_waitcnt" in result
+        # Check preamble has named + flat aliases
+        assert "Acc = block.Acc" in code
+        assert "A0 = block.A0" in code
+        assert "B0 = block.B0" in code
+        assert "s_barrier = block.s_barrier" in code
+        assert "s_cbranch_scc0 = block.s_cbranch_scc0" in code
+        assert "s_sub_u32 = block.s_sub_u32" in code
+        assert "s_waitcnt = block.s_waitcnt" in code
+        # Named regs dict should have the compact aliases
+        assert "A0" in named_regs
+        assert "B0" in named_regs
 
     def test_symbols_auto_parsed(self):
         """When symbols=None, .set directives in the text are parsed automatically."""
@@ -522,3 +597,11 @@ class TestAsmToRocasm:
         """)
         body = _body(asm_to_rocasm(asm))
         assert body == "s_mov_b32(dst=sgpr(10), src=sgpr(10))"
+
+    def test_acc_uses_flat_alias(self):
+        """Accumulators without named symbols should use the flat Acc alias."""
+        asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[64:67], v[16:19], acc[0:3]"
+        body = _body(asm_to_rocasm(asm, {}))
+        assert "Acc[0:4]" in body
+        assert "V[64:68]" in body
+        assert "V[16:20]" in body

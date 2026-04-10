@@ -57,24 +57,79 @@ def _resolve_expr(expr: str, symbols: dict[str, int]) -> int:
     return total
 
 
-def _parse_reg_operand(operand: str, symbols: dict[str, int]) -> tuple[str, int, int] | None:
+def _extract_base_symbol(expr: str, symbols: dict[str, int]) -> tuple[str | None, int]:
+    """Extract the base symbol name and numeric offset from an expression.
+
+    For 'vgprValuA_X0_I0+4+0+0' returns ('vgprValuA_X0_I0', 4).
+    For '0' or '3' returns (None, 0) or (None, 3).
+    """
+    symbol = None
+    offset = 0
+    for part in re.split(r'(?=[+-])', expr):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            offset += int(part, 0)
+        except ValueError:
+            if part in symbols:
+                if symbol is None:
+                    symbol = part
+                    # Don't add the symbol's resolved value to offset;
+                    # offset is relative to the symbol base.
+                else:
+                    # Second symbol in same expression — fall back to resolved
+                    offset += symbols[part]
+            else:
+                raise ValueError(f"Cannot resolve expression part '{part}' in '{expr}'")
+    return symbol, offset
+
+
+def _make_alias(symbol: str) -> str:
+    """Produce a short alias from a register symbol name.
+
+    ValuA/ValuB with buffer indices get compact names:
+        'vgprValuA_X0_I0' -> 'A0'
+        'vgprValuA_X1_I0' -> 'A1'
+        'vgprValuB_X0_I0' -> 'B0'
+
+    Other symbols just strip the vgpr/sgpr prefix:
+        'sgprSrdA' -> 'SrdA'
+        'vgprLocalReadAddrA' -> 'LocalReadAddrA'
+    """
+    name = symbol
+    for prefix in ("vgpr", "sgpr"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    m = re.match(r'^Valu([AB])_X(\d+)_I\d+$', name)
+    if m:
+        return f"{m.group(1)}{m.group(2)}"
+    return name
+
+
+def _parse_reg_operand(operand: str, symbols: dict[str, int]) -> tuple[str, int, int, str | None, int] | None:
     """Parse a register operand like 'v[vgprValuA+4:vgprValuA+4+3]' or 'acc[0:3]'.
 
-    Returns (reg_type, phys_start, count) or None if not a register operand.
-    reg_type is 'v', 'acc', or 's'.
+    Returns (reg_type, phys_start, count, symbol, sym_offset) or None if not a
+    register operand.  reg_type is 'v', 'acc', or 's'.
+    symbol is the base symbol name (e.g. 'vgprValuA_X0_I0') or None for literals.
+    sym_offset is the offset from the symbol base.
     """
     m = re.match(r'^(v|acc|s)\[(.+):(.+)\]$', operand)
     if m:
         reg_type = m.group(1)
         start = _resolve_expr(m.group(2), symbols)
         end = _resolve_expr(m.group(3), symbols)
-        return reg_type, start, end - start + 1  # inclusive to exclusive
+        symbol, sym_offset = _extract_base_symbol(m.group(2), symbols)
+        return reg_type, start, end - start + 1, symbol, sym_offset
 
     m = re.match(r'^(v|acc|s)\[(.+)\]$', operand)
     if m:
         reg_type = m.group(1)
         start = _resolve_expr(m.group(2), symbols)
-        return reg_type, start, 1
+        symbol, sym_offset = _extract_base_symbol(m.group(2), symbols)
+        return reg_type, start, 1, symbol, sym_offset
 
     return None
 
@@ -133,11 +188,21 @@ def _parse_scalar_operand(operand: str, symbols: dict[str, int]) -> str:
 _REG_TYPE_ALIAS = {"acc": "Acc", "v": "V", "s": "S"}
 
 
-def _reg_ref(reg_type: str, start: int, count: int) -> str:
-    """Convert a physical register reference to an alias-based slice expression.
+def _reg_ref(reg_type: str, start: int, count: int,
+             symbol: str | None = None, sym_offset: int = 0) -> str:
+    """Convert a register reference to a slice expression.
 
-    Returns e.g. 'Acc[0:4]', 'V[16:20]', 'S[64:68]'.
+    When *symbol* is provided, uses a named alias:
+        ('v', 16, 4, 'vgprValuA_X0_I0', 0)  -> 'ValuA_X0_I0[0:4]'
+        ('v', 20, 4, 'vgprValuA_X0_I0', 4)  -> 'ValuA_X0_I0[4:8]'
+
+    When *symbol* is None, falls back to a flat array alias:
+        ('acc', 0, 4, None, 0)  -> 'Acc[0:4]'
     """
+    if symbol is not None:
+        alias = _make_alias(symbol)
+        return f"{alias}[{sym_offset}:{sym_offset + count}]"
+
     alias = _REG_TYPE_ALIAS.get(reg_type)
     if alias is None:
         raise ValueError(f"Unknown register type: {reg_type}")
@@ -192,7 +257,7 @@ def _strip_comment(line: str) -> str:
     return line[:idx].rstrip() if idx != -1 else line.rstrip()
 
 
-def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
+def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple[str, dict]:
     """Convert assembly text to rocasm Python source code.
 
     Args:
@@ -201,9 +266,9 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
                  If None, any .set directives in asm_text are parsed.
 
     Returns:
-        Python source code string that uses rocasm to reconstruct the assembly.
-        The output uses local aliases (Acc, V, S, s_waitcnt, etc.) and includes
-        a preamble that binds them from a ``block`` variable.
+        A tuple ``(code, named_regs)`` where *code* is the Python source string
+        and *named_regs* maps alias names to ``(reg_type, phys_base, count)``.
+        For example: ``{"ValuA_X0_I0": ("v", 16, 24), "SrdA": ("s", 64, 4)}``.
     """
     if symbols is None:
         symbols = parse_set_directives(asm_text)
@@ -212,6 +277,8 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
     used_reg_types: set[str] = set()       # e.g. {"acc", "v", "s"}
     used_block_methods: set[str] = set()   # e.g. {"s_waitcnt", "s_barrier", ...}
     used_inst_funcs: set[str] = set()      # e.g. {"vmfma_f32_16x16x32_bf16", ...}
+    # alias -> (reg_type, phys_base, max_extent)
+    used_named_regs: dict[str, tuple[str, int, int]] = {}
 
     body_lines = []
     for raw_line in asm_text.splitlines():
@@ -237,14 +304,18 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
             continue
 
         code = _convert_instruction(inst_line, symbols, used_reg_types,
-                                     used_block_methods, used_inst_funcs)
+                                     used_block_methods, used_inst_funcs,
+                                     used_named_regs)
         if code is not None:
             body_lines.append(code)
         else:
             body_lines.append(f"# UNHANDLED: {stripped}")
 
-    # Build preamble: register aliases, then block method aliases
+    # Build preamble: named register aliases first, then flat fallbacks, then methods
     preamble = []
+
+    for alias in sorted(used_named_regs):
+        preamble.append(f"{alias} = block.{alias}")
 
     for reg_type in ("acc", "v", "s"):
         if reg_type in used_reg_types:
@@ -260,21 +331,31 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> str:
         parts.append("")  # blank separator line
     parts.append("\n".join(body_lines))
 
-    return "\n".join(parts)
+    return "\n".join(parts), used_named_regs
 
 
 def _convert_instruction(inst_line: str, symbols: dict[str, int],
                          used_reg_types: set[str],
                          used_block_methods: set[str],
-                         used_inst_funcs: set[str]) -> str | None:
+                         used_inst_funcs: set[str],
+                         used_named_regs: dict[str, tuple[str, int, int]]) -> str | None:
     """Convert a single assembly instruction line to rocasm Python code."""
     parts = inst_line.split(None, 1)
     mnemonic = parts[0]
     operand_str = parts[1] if len(parts) > 1 else ""
 
-    def _reg(reg_type, start, count):
-        used_reg_types.add(reg_type)
-        return _reg_ref(reg_type, start, count)
+    def _reg(reg_type, start, count, symbol=None, sym_offset=0):
+        if symbol is not None:
+            alias = _make_alias(symbol)
+            phys_base = symbols[symbol]
+            extent = sym_offset + count
+            if alias in used_named_regs:
+                _, _, prev_extent = used_named_regs[alias]
+                extent = max(extent, prev_extent)
+            used_named_regs[alias] = (reg_type, phys_base, extent)
+        else:
+            used_reg_types.add(reg_type)
+        return _reg_ref(reg_type, start, count, symbol, sym_offset)
 
     # --- MFMA ---
     if mnemonic == "v_mfma_f32_16x16x32_bf16":
