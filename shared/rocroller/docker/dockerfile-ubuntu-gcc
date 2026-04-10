@@ -56,17 +56,19 @@ ADD docker/install-clang-format /tmp
 RUN /tmp/install-clang-format && rm /tmp/install-clang-format
 ENV PATH="/opt/clang-format/bin:${PATH}"
 
-# ccache
-RUN apt-get update && apt-get install -y \
-      libzstd-dev
-RUN wget -nv --show-progress --progress=dot:mega https://github.com/ccache/ccache/releases/download/v4.11/ccache-4.11.tar.gz -O /tmp/ccache-4.11.tar.gz && \
-    tar xf /tmp/ccache-4.11.tar.gz -C /tmp && \
-    cmake -S/tmp/ccache-4.11 -B/tmp/ccache-4.11/build -GNinja \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DENABLE_TESTING=OFF \
-      -DREDIS_STORAGE_BACKEND=OFF && \
-    ninja -C /tmp/ccache-4.11/build install && \
-    rm -r /tmp/ccache-4.11 /tmp/ccache-4.11.tar.gz
+# ccache (needs cmake ninja)
+WORKDIR /tmp
+RUN wget -nv -O ccache-4.11.tar.gz https://github.com/ccache/ccache/releases/download/v4.11/ccache-4.11.tar.gz \
+    && tar xf ccache-4.11.tar.gz \
+    && cmake \
+        -S ccache-4.11 \
+        -B ccache-4.11_build \
+        -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_TESTING=OFF \
+        -DREDIS_STORAGE_BACKEND=OFF \
+    && cmake --build ccache-4.11_build --target install \
+    && rm -rf /tmp/*
 
 # cppcheck
 WORKDIR /tmp
