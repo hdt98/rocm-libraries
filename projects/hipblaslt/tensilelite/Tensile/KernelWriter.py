@@ -8626,7 +8626,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return (kernel["StreamK"] == 3
             and kernel.get("PrefetchAcrossPersistent", 0)
             and not kernel.get("SuppressNoLoadLoop", False)
-            and kernel["PrefetchGlobalRead"] >= 2
+            and kernel["PrefetchGlobalRead"] >= 1
             and not kernel.get("UseCustomMainLoopSchedule", 0))
 
   def storeWorkGroupSgpr(self, kernel, dim):
