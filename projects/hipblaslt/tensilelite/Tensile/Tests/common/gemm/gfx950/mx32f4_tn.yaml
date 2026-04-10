@@ -69,7 +69,7 @@ BenchmarkProblems:
           #- [32, 32,  64, 1, 1, 2,2, 2,2]  # 64x64
           #- [32, 32,  64, 1, 1, 4,2, 2,2]  # 64x64
 #          - [32, 32,  64, 1, 1, 2,4, 2,2]  # 64x64
-        #- ForceDisableShadowInit: [True, False]
+        - ForceDisableShadowInit: [True, False]
         - UseSgprForGRO: [0,1]
         - DepthU: [64, 128, 256]
         - AssertFree0ElementMultiple: [1]
@@ -78,7 +78,7 @@ BenchmarkProblems:
         - LocalReadVectorWidth: [32]
         - PrefetchGlobalRead: [0,1,2]
         - PrefetchLocalRead: [0,1]
-        #- PreloadKernArgs: [0,1]
+        - PreloadKernArgs: [0,1]
         - ClusterLocalRead: [0,1]
         - VectorWidthA: [1]
         - VectorWidthB: [1]
@@ -156,16 +156,15 @@ BenchmarkProblems:
           - [16, 16, 128, 1, 1, 2,8, 2,2]  # 64x256
           - [32, 32, 64, 1, 1, 4,4, 2,2]  # 256x256
           - [32, 32, 64, 1, 1, 2,2, 2,2]  # 128x128
-        - DepthU: [64,128,256]
+        - DepthU: [128]
         - AssertSummationElementMultiple: [32]
         - LocalReadVectorWidth: [32]
         - PrefetchGlobalRead: [2]
         - PrefetchLocalRead: [1]
         - ScheduleIterAlg: [3]
         - 1LDSBuffer: [0]
-        - DirectToLds: [0,1,2,3]
+        - DirectToLds: [1,2,3]
         - Use64bShadowLimitMX: [0,1]
-        - StreamK: [0,3]
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
@@ -175,12 +174,6 @@ BenchmarkProblems:
           - Exact: [127, 127, 1, 640] #special cleanup case
           - Exact: [129, 129, 1, 640]
           - Exact: [128, 128, 1, 512]
-          - Exact: [128, 128, 1, 32]
-          - Exact: [128, 128, 1, 64]
-          - Exact: [128, 128, 1, 96]
-          - Exact: [128, 128, 1, 160]
-          - Exact: [128, 128, 1, 192]
-          - Exact: [128, 128, 1, 224]
           # mutiple of 16 (not working for now)
           #- Exact: [128, 128, 1, 16]
           #- Exact: [128, 128, 1, 48]
