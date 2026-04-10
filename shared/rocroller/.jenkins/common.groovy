@@ -390,7 +390,7 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
-                # Resolve branch name and commit hash from remote (Jenkins detached HEAD workaround)
+                # Resolve branch name and commit hash from remote
                 GIT_BRANCH_NAME=\$(git branch -r --contains HEAD | grep -v '\\->' | grep -v 'HEAD' | head -1 | sed 's|.*origin/||' | xargs)
                 if [ -z "\$GIT_BRANCH_NAME" ]; then
                     GIT_BRANCH_NAME="${env.CHANGE_BRANCH ?: env.BRANCH_NAME}"
@@ -615,7 +615,7 @@ def runPerformanceCommand (platform, project)
 
                 ${sshBlock}
 
-                # Resolve branch name and commit hash from remote tracking refs (Jenkins detached HEAD workaround)
+                # Resolve branch name and commit hash from remote tracking refs
                 GIT_COMMIT_HASH=\$(git rev-parse --short=10 FETCH_HEAD 2>/dev/null || git rev-parse --short=10 HEAD)
                 GIT_BRANCH_NAME=\$(git branch -r --contains HEAD | grep -v '\\->' | grep -v 'HEAD' | head -1 | sed 's|.*origin/||' | xargs)
                 if [ -z "\$GIT_BRANCH_NAME" ]; then
