@@ -81,7 +81,8 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         return false;
     if(!problem.Is2d())
         return false;
-    if(!StartsWith(ctx.GetStream().GetDeviceName(), "gfx95"))
+    const auto arch = hipconv::parse_arch(ctx.GetStream().GetDeviceName());
+    if(!arch.has_value())
         return false;
 
     // The wgrad kernel uses atomicAdd and is non-deterministic.
@@ -93,7 +94,7 @@ bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescrip
         return false;
 
     const auto par = ToHipconvParams(problem);
-    const auto cfg = hipconv::find_config(par);
+    const auto cfg = hipconv::find_config(*arch, par);
     return cfg.has_value();
 }
 
@@ -119,8 +120,9 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
 {
     ConvSolution result;
 
-    const auto par = ToHipconvParams(problem);
-    const auto cfg = hipconv::find_config(par).value();
+    const auto arch = hipconv::parse_arch(ctx.GetStream().GetDeviceName()).value();
+    const auto par  = ToHipconvParams(problem);
+    const auto cfg  = hipconv::find_config(arch, par).value();
 
     if(problem.IsDirectionBackwardWrW())
     {
@@ -148,8 +150,14 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
                     const HipEventProfiler profiler(handle);
 
                     // Launch the hipconv wgrad kernel writing fp32 into workspace.
-                    hipconv::launch(
-                        cfg, par, tensors.x, tensors.dy, workSpace, nullptr, handle.GetStream());
+                    hipconv::launch(arch,
+                                    cfg,
+                                    par,
+                                    tensors.x,
+                                    tensors.dy,
+                                    workSpace,
+                                    nullptr,
+                                    handle.GetStream());
 
                     // Cast fp32 workspace -> fp16 dw.
                     CastTensor(handle,
@@ -175,8 +183,14 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
 
                 {
                     const HipEventProfiler profiler(handle);
-                    hipconv::launch(
-                        cfg, par, tensors.in, tensors.w, tensors.out, nullptr, handle.GetStream());
+                    hipconv::launch(arch,
+                                    cfg,
+                                    par,
+                                    tensors.in,
+                                    tensors.w,
+                                    tensors.out,
+                                    nullptr,
+                                    handle.GetStream());
                 }
             };
         };

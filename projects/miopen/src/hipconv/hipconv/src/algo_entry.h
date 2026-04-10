@@ -12,14 +12,15 @@
 struct AlgorithmEntry
 {
     hipconv::Algorithm algorithm;
-    std::vector<AlgoConfig> (*get_valid_configs)(const hipconv::Conv2dParams& par);
-    void (*launch)(AlgoConfig,
+    std::vector<AlgoConfig> (*get_valid_configs)(hipconv::Arch, const hipconv::Conv2dParams& par);
+    void (*launch)(hipconv::Arch,
+                   AlgoConfig,
                    const hipconv::Conv2dParams&,
                    const void*,
                    const void*,
                    void*,
                    void* workspace,
                    hipStream_t);
-    size_t (*get_workspace_size)(AlgoConfig, const hipconv::Conv2dParams&);
-    void (*get_tolerance)(AlgoConfig, const hipconv::Conv2dParams&, float&, float&);
+    size_t (*get_workspace_size)(hipconv::Arch, AlgoConfig, const hipconv::Conv2dParams&);
+    void (*get_tolerance)(hipconv::Arch, AlgoConfig, const hipconv::Conv2dParams&, float&, float&);
 };

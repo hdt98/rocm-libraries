@@ -26,9 +26,10 @@ const AlgorithmEntry* find_algorithm(Algorithm algo)
     return nullptr;
 }
 
-std::vector<KernelConfig> do_get_valid_configs(const Conv2dParams& par, const AlgorithmEntry& entry)
+std::vector<KernelConfig>
+do_get_valid_configs(Arch arch, const Conv2dParams& par, const AlgorithmEntry& entry)
 {
-    auto acfgs = entry.get_valid_configs(par);
+    auto acfgs = entry.get_valid_configs(arch, par);
     std::vector<KernelConfig> result;
     result.reserve(acfgs.size());
     for(const auto& ac : acfgs)
@@ -39,42 +40,43 @@ std::vector<KernelConfig> do_get_valid_configs(const Conv2dParams& par, const Al
 } // anonymous namespace
 
 
-std::vector<KernelConfig> get_valid_configs(const Conv2dParams& par, Algorithm algo)
+std::vector<KernelConfig> get_valid_configs(Arch arch, const Conv2dParams& par, Algorithm algo)
 {
     auto* entry = find_algorithm(algo);
     if(!entry)
         return {};
-    return do_get_valid_configs(par, *entry);
+    return do_get_valid_configs(arch, par, *entry);
 }
 
-std::vector<KernelConfig> get_valid_configs(const Conv2dParams& par)
+std::vector<KernelConfig> get_valid_configs(Arch arch, const Conv2dParams& par)
 {
     std::vector<KernelConfig> result;
     for(const auto* entry : algorithms)
     {
-        auto cfgs = do_get_valid_configs(par, *entry);
+        auto cfgs = do_get_valid_configs(arch, par, *entry);
         result.insert(result.end(), cfgs.begin(), cfgs.end());
     }
     return result;
 }
 
-std::optional<KernelConfig> find_config(const Conv2dParams& par)
+std::optional<KernelConfig> find_config(Arch arch, const Conv2dParams& par)
 {
-    auto cfgs = get_valid_configs(par);
+    auto cfgs = get_valid_configs(arch, par);
     if(cfgs.empty())
         return std::nullopt;
     return cfgs.front();
 }
 
-size_t get_workspace_size(KernelConfig cfg, const Conv2dParams& par)
+size_t get_workspace_size(Arch arch, KernelConfig cfg, const Conv2dParams& par)
 {
     auto* entry = find_algorithm(cfg.algorithm);
     if(!entry)
         throw std::invalid_argument("unsupported algorithm");
-    return entry->get_workspace_size({cfg.kernel_variant, cfg.config_idx}, par);
+    return entry->get_workspace_size(arch, {cfg.kernel_variant, cfg.config_idx}, par);
 }
 
-void launch(KernelConfig cfg,
+void launch(Arch arch,
+            KernelConfig cfg,
             const Conv2dParams& par,
             const void* in,
             const void* wei,
@@ -85,15 +87,15 @@ void launch(KernelConfig cfg,
     auto* entry = find_algorithm(cfg.algorithm);
     if(!entry)
         throw std::invalid_argument("unsupported algorithm");
-    entry->launch({cfg.kernel_variant, cfg.config_idx}, par, in, wei, out, workspace, stream);
+    entry->launch(arch, {cfg.kernel_variant, cfg.config_idx}, par, in, wei, out, workspace, stream);
 }
 
-void get_tolerance(KernelConfig cfg, const Conv2dParams& par, float& atol, float& rtol)
+void get_tolerance(Arch arch, KernelConfig cfg, const Conv2dParams& par, float& atol, float& rtol)
 {
     auto* entry = find_algorithm(cfg.algorithm);
     if(!entry)
         throw std::invalid_argument("unsupported algorithm");
-    entry->get_tolerance({cfg.kernel_variant, cfg.config_idx}, par, atol, rtol);
+    entry->get_tolerance(arch, {cfg.kernel_variant, cfg.config_idx}, par, atol, rtol);
 }
 
 } // namespace hipconv
