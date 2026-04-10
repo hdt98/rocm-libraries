@@ -26,6 +26,17 @@ struct TileSageAttnTraits
     static constexpr auto QScaleEnum      = QScaleEnum_;
     static constexpr index_t kBlockPerCu  = kBlockPerCu_;
     static constexpr bool kSkipMinSeqlenQ = kSkipMinSeqlenQ_;
+
+    /// Tokens per Q/K descale along seqlen. Fine-to-coarse: PERTHREAD, PERWARP, then 128 for Q
+    /// (BLOCKSCALE / no_scale / pertensor). K: PERWARP 64, BLOCKSCALE 128, else 128.
+    static constexpr index_t kBlockScaleSizeQ =
+        QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERTHREAD ? 4
+        : QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERWARP  ? 32
+                                                                    : 128;
+    static constexpr index_t kBlockScaleSizeK =
+        QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERTHREAD ? 16
+        : QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERWARP ? 64
+                                                                   : 128;
 };
 
 } // namespace ck_tile

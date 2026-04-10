@@ -10,6 +10,7 @@
 #include "ck_tile/ops/fmha/block/block_position_encoding.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
 
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -115,8 +116,10 @@ struct SageAttnFwdKernel
         ck_tile::index_t nhead_stride_k_descale;
         ck_tile::index_t nhead_stride_v_descale;
 
-        ck_tile::index_t block_scale_size_q;
-        ck_tile::index_t block_scale_size_k;
+        /// Host must match TileSageAttnTraits / Problem; validated in MakeKargs (device uses
+        /// Problem::kBlockScaleSizeQ/K).
+        ck_tile::index_t block_scale_size_q = 0;
+        ck_tile::index_t block_scale_size_k = 0;
     };
 
     struct SageAttnFwdBatchBlockScaleKargs : public SageAttnFwdCommonBlockScaleKargs
@@ -197,7 +200,7 @@ struct SageAttnFwdKernel
     };
 
     template <bool Cond = !kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
+    CK_TILE_HOST static std::enable_if_t<Cond, Kargs>
     MakeKargs(const void* q_ptr,
               const void* k_ptr,
               const void* v_ptr,
@@ -280,6 +283,15 @@ struct SageAttnFwdKernel
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
         {
+            using PipelineProblem = typename SageAttnPipeline::Problem;
+            if(block_scale_size_q != PipelineProblem::kBlockScaleSizeQ ||
+               block_scale_size_k != PipelineProblem::kBlockScaleSizeK)
+            {
+                throw std::runtime_error(
+                    "sageattn_fwd MakeKargs: block_scale_size_q/k must match kernel "
+                    "TileSageAttnTraits (Problem::kBlockScaleSizeQ/K)");
+            }
+
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
@@ -303,7 +315,7 @@ struct SageAttnFwdKernel
     }
 
     template <bool Cond = kIsGroupMode>
-    CK_TILE_HOST static constexpr std::enable_if_t<Cond, Kargs>
+    CK_TILE_HOST static std::enable_if_t<Cond, Kargs>
     MakeKargs(const void* q_ptr,
               const void* k_ptr,
               const void* v_ptr,
@@ -386,6 +398,15 @@ struct SageAttnFwdKernel
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
         {
+            using PipelineProblem = typename SageAttnPipeline::Problem;
+            if(block_scale_size_q != PipelineProblem::kBlockScaleSizeQ ||
+               block_scale_size_k != PipelineProblem::kBlockScaleSizeK)
+            {
+                throw std::runtime_error(
+                    "sageattn_fwd MakeKargs: block_scale_size_q/k must match kernel "
+                    "TileSageAttnTraits (Problem::kBlockScaleSizeQ/K)");
+            }
+
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
@@ -808,6 +829,8 @@ struct SageAttnFwdKernel
 
         BlockIndices block_indices{i_batch, i_nhead, i_nhead / kargs.nhead_ratio_qk};
         auto o_acc_tile = [&]() {
+            using PipelineProblem = typename SageAttnPipeline::Problem;
+
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTENSOR)
             {
                 // TODO - move global load of descale to pipeline
@@ -859,8 +882,8 @@ struct SageAttnFwdKernel
                         kargs.nhead_stride_v_descale +
                     batch_offset_v_descale;
 
-                // BLOCKSCALE: one q_descale per tile (block_scale_size_q=128)
-                size_t idx      = i_m0 / kargs.block_scale_size_q;
+                // BLOCKSCALE: one q_descale per tile (kBlockScaleSizeQ from traits, typically 128)
+                size_t idx      = i_m0 / PipelineProblem::kBlockScaleSizeQ;
                 float q_descale = q_descale_ptr[idx];
 
                 return SageAttnPipeline{}(
@@ -882,12 +905,31 @@ struct SageAttnFwdKernel
                     smem_ptr,
                     nullptr,
                     k_descale_ptr,
-                    v_descale_ptr,
-                    0,
-                    kargs.block_scale_size_k);
+                    v_descale_ptr);
             }
-            else if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)
+            else if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
+                              QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
+                using SageShape = typename SageAttnPipeline::BlockSageAttnShape;
+                constexpr index_t kWarpSize       = get_warp_size();
+                constexpr index_t kGemm0MPerWarp =
+                    SageShape::Gemm0WarpTile::at(number<0>{});
+                static_assert(SageAttnPipeline::kM0 * kWarpSize ==
+                                  kGemm0MPerWarp * SageAttnPipeline::kBlockSize,
+                              "PERWARP/PERTHREAD q_descale: kM0 * warp_size must equal "
+                              "Gemm0 MPerWarp * block_size");
+                static_assert(kWarpSize % kGemm0MPerWarp == 0,
+                              "PERWARP/PERTHREAD: warp_size must be divisible by Gemm0 MPerWarp");
+                if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)
+                {
+                    static_assert(kGemm0MPerWarp == PipelineProblem::kBlockScaleSizeQ,
+                                  "PERWARP: Gemm0 MPerWarp must match kBlockScaleSizeQ "
+                                  "(one q scale per warp with shared q_descale scalar)");
+                }
+                static_assert(SageShape::Gemm0WarpTile::at(number<0>{}) == 32 &&
+                                  SageShape::Gemm0WarpTile::at(number<1>{}) == 32,
+                              "PERWARP/PERTHREAD q_descale assumes Gemm0 warp tile MxN is 32x32");
+
                 const float* q_descale_ptr =
                     reinterpret_cast<const float*>(kargs.q_descale_ptr) +
                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q_descale +
@@ -903,15 +945,22 @@ struct SageAttnFwdKernel
                         kargs.nhead_stride_v_descale +
                     batch_offset_v_descale;
 
-                // PERWARP: one q_descale per warp (block_scale_size_q=32)
-                // Each tile has kM0 rows (e.g., 128), divided into kM0/32 = 4 groups
-                // Each wave within a block processes different rows
-                constexpr index_t wave_size = 64; // AMD GPU wave size
-                const index_t wave_id = __builtin_amdgcn_readfirstlane(threadIdx.x / wave_size);
-
-                const size_t tile_base_idx = i_m0 / kargs.block_scale_size_q;
-                const size_t idx           = tile_base_idx + wave_id;
-                const float q_descale      = q_descale_ptr[idx];
+                // Q row from tile origin i_m0 + wave M strip + lane; clamp q_scale_idx to the
+                // last scale block for this seqlen_q (e.g. seqlen_q=129, S=32 ⇒ ceil(129/32)=5
+                // blocks, indices 0..4; row 128 → 128/32=4, padding rows → min(raw_idx, 4)).
+                constexpr index_t kBlockSq = PipelineProblem::kBlockScaleSizeQ;
+                const index_t wave_id      = __builtin_amdgcn_readfirstlane(threadIdx.x / kWarpSize);
+                const index_t q_row_raw =
+                    i_m0 + wave_id * kGemm0MPerWarp + threadIdx.x % kGemm0MPerWarp;
+                const index_t q_scale_idx_raw =
+                    ck_tile::integer_divide_floor(q_row_raw, kBlockSq);
+                const index_t max_q_scale_idx =
+                    kargs.seqlen_q > 0
+                        ? ck_tile::integer_divide_ceil(kargs.seqlen_q, kBlockSq) - 1
+                        : 0;
+                const index_t q_scale_idx = q_scale_idx_raw < max_q_scale_idx ? q_scale_idx_raw
+                                                                              : max_q_scale_idx;
+                const float q_descale = q_descale_ptr[q_scale_idx];
 
                 return SageAttnPipeline{}(q_dram_window,
                                           identity{}, // q_element_func
@@ -919,7 +968,7 @@ struct SageAttnFwdKernel
                                           identity{}, // k_element_func
                                           v_dram_window,
                                           identity{}, // v_element_func
-                                          identity{}, // s_acc_element_func
+                                          identity{}, // s_acc_element_func (K/V scales in pipeline)
                                           identity{}, // p_compute_element_func
                                           identity{}, // o_acc_element_func
                                           mask,
@@ -932,63 +981,7 @@ struct SageAttnFwdKernel
                                           nullptr,
                                           k_descale_ptr,
                                           v_descale_ptr,
-                                          0,
-                                          kargs.block_scale_size_k,
                                           q_descale);
-            }
-            else if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
-            {
-                const float* q_descale_ptr =
-                    reinterpret_cast<const float*>(kargs.q_descale_ptr) +
-                    static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_q_descale +
-                    batch_offset_q_descale;
-                const float* k_descale_ptr =
-                    reinterpret_cast<const float*>(kargs.k_descale_ptr) +
-                    static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
-                        kargs.nhead_stride_k_descale +
-                    batch_offset_k_descale;
-                const float* v_descale_ptr =
-                    reinterpret_cast<const float*>(kargs.v_descale_ptr) +
-                    static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) *
-                        kargs.nhead_stride_v_descale +
-                    batch_offset_v_descale;
-
-                // PERTHREAD: Each thread handles one row, so q_scale is constant for this thread
-                // Calculate q_scale based on the row this thread handles
-                // q_dram_window origin is {i_m0, 0}, so the global Q position for this thread's row
-                // is i_m0
-                constexpr index_t wave_size = 64; // AMD GPU wave size
-                const index_t wave_id = __builtin_amdgcn_readfirstlane(threadIdx.x / wave_size);
-
-                const index_t q_scale_idx =
-                    (i_m0 + wave_id * 32 + threadIdx.x % 32) / kargs.block_scale_size_q;
-                const float q_descale_value = q_descale_ptr[q_scale_idx];
-
-                // PERTHREAD: Q uses 4 tokens/scale, K uses 16 tokens/scale
-                // q_scale is pre-computed and passed as a scalar value
-                return SageAttnPipeline{}(
-                    q_dram_window,
-                    identity{}, // q_element_func
-                    k_dram_window,
-                    identity{}, // k_element_func
-                    v_dram_window,
-                    identity{}, // v_element_func
-                    identity{}, // s_acc_element_func - per-element scale applied in pipeline
-                    identity{}, // p_compute_element_func - No scaling (done in exp2)
-                    identity{}, // o_acc_element_func - No dequant (canceled by rowsum)
-                    mask,
-                    position_encoding,
-                    kargs.scale_s,
-                    variant,
-                    variant_params,
-                    block_indices,
-                    smem_ptr,
-                    nullptr, // q_descale_ptr not needed, using q_descale_value instead
-                    k_descale_ptr,
-                    v_descale_ptr,
-                    kargs.block_scale_size_q, // Q: 4 tokens/scale
-                    kargs.block_scale_size_k, // K: 16 tokens/scale
-                    q_descale_value);
             }
             else
             {

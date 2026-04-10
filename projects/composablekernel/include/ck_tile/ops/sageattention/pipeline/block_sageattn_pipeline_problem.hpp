@@ -51,6 +51,10 @@ struct BlockSageAttnPipelineProblem
     static constexpr bool kSkipMinSeqlenQ = Traits::kSkipMinSeqlenQ;
     static constexpr auto QScaleEnum      = Traits::QScaleEnum;
     static constexpr index_t kBlockPerCu  = Traits::kBlockPerCu;
+
+    /// Must match host scale tensor layout (same values as TileSageAttnTraits for Sage kernels).
+    static constexpr index_t kBlockScaleSizeQ = Traits::kBlockScaleSizeQ;
+    static constexpr index_t kBlockScaleSizeK = Traits::kBlockScaleSizeK;
 };
 
 } // namespace ck_tile

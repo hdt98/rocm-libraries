@@ -173,7 +173,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
 
     // PERWARP mode: Q=32 (warp size), K=64 (2x warp size)
-    // BLOCKSCALE mode: Q=128 (tile size), K=64 (2x warp size)
+    // BLOCKSCALE mode: Q=128 (tile size), K=128
     // PERTHREAD mode: Q=4 (tokens/scale), K=16 (tokens/scale)
     // Note: V uses per-channel scale, not block scale
     const ck_tile::index_t block_scale_size_q_ = (qscale.type == quant_scale_enum::perwarp) ? 32
@@ -703,8 +703,6 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             args.nhead_stride_k_descale = num_block_scale_k;
             // BLOCKSCALE, PERWARP, and PERTHREAD V all use per-channel scale: stride = hdim_v
             args.nhead_stride_v_descale = hdim_v;
-            args.block_scale_size_q     = block_scale_size_q_;
-            args.block_scale_size_k     = block_scale_size_k_;
 
             if(mode == mode_enum::batch)
             {
@@ -717,7 +715,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             else // group mode
             {
                 // BLOCKSCALE, PERWARP, and PERTHREAD all use block_scale_seqstart in group mode
-                // They differ only in block size: BLOCKSCALE (Q:128, K:64), PERWARP (Q:32, K:64),
+                // They differ only in block size: BLOCKSCALE (Q:128, K:128), PERWARP (Q:32, K:64),
                 // PERTHREAD (Q:4, K:16)
                 args.block_scale_seqstart_q_ptr = block_scale_seqstart_q_buf.GetDeviceBuffer();
                 args.block_scale_seqstart_k_ptr = block_scale_seqstart_k_buf.GetDeviceBuffer();
@@ -725,6 +723,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                 // nhead_k * hdim_v
                 args.batch_stride_v_descale = nhead_k * hdim_v;
             }
+
+            args.block_scale_size_q = block_scale_size_q_;
+            args.block_scale_size_k = block_scale_size_k_;
         }
 
         // Sequence length and padding parameters (mode-specific)

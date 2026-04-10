@@ -153,8 +153,6 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                [[maybe_unused]] const float* q_descale_ptr = nullptr,
                const float* k_descale_ptr                  = nullptr,
                const float* v_descale_ptr                  = nullptr,
-               [[maybe_unused]] index_t block_scale_size_q = 0,
-               index_t block_scale_size_k                  = 0,
                [[maybe_unused]] float q_descale_value      = 1.0f) const
     {
         static_assert(
@@ -309,26 +307,34 @@ struct BlockSageAttentionPipelineQRKSVSAsync
 
         static_assert(1 <= k0_loops);
         static_assert(1 <= k1_loops);
-        index_t thread_idx = (threadIdx.x % 64) / 32;
+        constexpr index_t kGemm0MPerWarp =
+            BlockSageAttnShape::Gemm0WarpTile::at(number<0>{});
+        static_assert(kGemm0MPerWarp == 32);
+        constexpr index_t kWarpSz = get_warp_size();
+        index_t thread_idx        = (threadIdx.x % kWarpSz) / kGemm0MPerWarp;
         // main loop
         do
         {
             float k_descale = 1.0f;
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::BLOCKSCALE)
             {
-                const index_t kv_idx = (seqlen_k_start + i_total_loops * kN0) / block_scale_size_k;
-                k_descale            = k_descale_ptr[kv_idx];
+                const index_t kv_idx =
+                    (seqlen_k_start + i_total_loops * kN0) / Problem::kBlockScaleSizeK;
+                k_descale = k_descale_ptr[kv_idx];
             }
-            constexpr index_t kBlockScaleK =
-                (QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)     ? 64
-                : (QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD) ? 16
-                                                                              : 128;
-            constexpr index_t kNumKScalesPW                               = kN0 / kBlockScaleK;
-            constexpr index_t kNumKScalesPT                               = kN0 / kBlockScaleK / 2;
+            constexpr index_t kNumKScalesPW =
+                QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP
+                    ? kN0 / Problem::kBlockScaleSizeK
+                    : 1;
+            constexpr index_t kNumKScalesPT =
+                QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD
+                    ? kN0 / Problem::kBlockScaleSizeK / 2
+                    : 1;
             float k_scales_perwarp[kNumKScalesPW > 0 ? kNumKScalesPW : 1] = {};
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)
             {
-                const index_t kv_idx = (seqlen_k_start + i_total_loops * kN0) / block_scale_size_k;
+                const index_t kv_idx =
+                    (seqlen_k_start + i_total_loops * kN0) / Problem::kBlockScaleSizeK;
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPW; i++)
                     k_scales_perwarp[i] = k_descale_ptr[kv_idx + i];
@@ -337,7 +343,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
                 const index_t k_global_start    = seqlen_k_start + i_total_loops * kN0;
-                const index_t k_scale_start_idx = k_global_start / block_scale_size_k;
+                const index_t k_scale_start_idx = k_global_start / Problem::kBlockScaleSizeK;
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
                     k_scales_reg[i] = k_descale_ptr[k_scale_start_idx + 2 * i + thread_idx];
@@ -773,8 +779,6 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                const float* q_descale_ptr                  = nullptr,
                const float* k_descale_ptr                  = nullptr,
                const float* v_descale_ptr                  = nullptr,
-               [[maybe_unused]] index_t block_scale_size_q = 0,
-               index_t block_scale_size_k                  = 0,
                [[maybe_unused]] float q_descale_value      = 1.0f) const
     {
         return operator()(q_dram_block_window_tmp,
@@ -796,8 +800,6 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                           q_descale_ptr,
                           k_descale_ptr,
                           v_descale_ptr,
-                          block_scale_size_q,
-                          block_scale_size_k,
                           q_descale_value);
     }
 };
