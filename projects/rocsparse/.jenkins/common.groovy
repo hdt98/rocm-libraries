@@ -53,7 +53,7 @@ def runTestCommand (platform, project, gfilter, boolean rocmExamples=false, Stri
     if (rocmExamples){
         String buildString = ""
         if (platform.os.contains("ubuntu")){
-            buildString += "sudo dpkg -i *.deb"
+            buildString += "sudo dpkg -i --force-depends *.deb"
         }
         else {
             buildString += "sudo rpm -i *.rpm"
