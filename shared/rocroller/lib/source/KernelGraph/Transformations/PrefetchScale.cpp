@@ -218,7 +218,7 @@ namespace rocRoller
         struct CopyInfo
         {
             DataType dataType; /**< Type of values being copied */
-            size_t   numVGPRs; /**< VGPRs required to hold the copy */
+            size_t   valueCount; /**< Logical element count for Assign */
         };
 
         /**
@@ -246,7 +246,8 @@ namespace rocRoller
 
             uint wfs = context->kernel()->wavefront_size();
 
-            return CopyInfo{varType.dataType, elements / wfs / packFactor};
+            return CopyInfo{varType.dataType, elements / wfs};
+            //return CopyInfo{varType.dataType, elements / wfs / packFactor};
         }
 
         /**
@@ -271,8 +272,10 @@ namespace rocRoller
 
             auto copyExpr = std::make_shared<Expression::Expression>(
                 Expression::DataFlowTag{macTileTag, Register::Type::Vector, copyInfo->dataType});
+            //auto copyTag = graph.control.addElement(
+            //    Assign{Register::Type::Vector, copyExpr, copyInfo->numVGPRs});
             auto copyTag = graph.control.addElement(
-                Assign{Register::Type::Vector, copyExpr, copyInfo->numVGPRs});
+                Assign{Register::Type::Vector, copyExpr, copyInfo->valueCount});
             auto destMacTileTag = graph.coordinates.addElement(MacroTile());
             // macTile is being copied into destMacTile through this assign node
             graph.coordinates.addElement(DataFlow(), {macTileTag}, {destMacTileTag});

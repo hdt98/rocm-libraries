@@ -659,17 +659,38 @@ namespace rocRoller
                     if(!deferred)
                     {
                         auto valueCount = assign.valueCount;
-                        if(valueCount == 0)
-                        {
-                            auto tmp   = m_context->registerTagManager()->getRegister(dimTag);
-                            valueCount = tmp->valueCount();
-                        }
-
-                        auto varType = resultVariableType(assign.expression);
+                        auto varType    = resultVariableType(assign.expression);
                         if(assign.variableType)
                         {
                             varType = assign.variableType.value();
-                            // For non-packed types, the denominator is 1.
+                        }
+                        if(valueCount == 0)
+                        {
+                            auto existing = m_context->registerTagManager()->getRegister(dimTag);
+                            auto srcPacking
+                                = existing->variableType().dataType == DataType::None
+                                      ? 1
+                                      : DataTypeInfo::Get(existing->variableType()).packing;
+                            auto dstPacking  = varType.dataType == DataType::None
+                                                   ? 1
+                                                   : DataTypeInfo::Get(varType).packing;
+                            auto scalarCount = existing->valueCount() * srcPacking;
+                            AssertFatal(dstPacking > 0, ShowValue(varType));
+                            AssertFatal(
+                                scalarCount % dstPacking == 0,
+                                "Cannot infer Assign valueCount from existing packed register.",
+                                ShowValue(dimTag),
+                                ShowValue(existing->variableType()),
+                                ShowValue(varType),
+                                ShowValue(existing->valueCount()),
+                                ShowValue(srcPacking),
+                                ShowValue(dstPacking),
+                                ShowValue(scalarCount));
+                            valueCount = scalarCount / dstPacking;
+                        }
+                        else if(assign.variableType)
+                        {
+                            // Explicit Assign::valueCount is expressed in scalar elements.
                             valueCount /= DataTypeInfo::Get(varType).packing;
                         }
 
