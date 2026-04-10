@@ -82,6 +82,7 @@ from Tensile.Utilities.Decorators.Timing import timing
 
 from rocasm.setparse import parse_set_directives
 from rocasm.asm_to_rocasm import asm_to_rocasm, parse_register_counts
+from rocasm.tile_analysis import analyze_tile, generate_tiled_mainloop
 
 from .ParseArguments import parseArguments
 
@@ -278,12 +279,15 @@ def passPostKernelInfoToLibrary(results, kernels, masterLibraries, splitGSU: boo
                         print(f"{'='*80}\n")
                         raise
 
-def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
+def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = True) -> str:
     """Extract the main loop and write a rocasm Python translation alongside the .s file.
 
     Searches for label_LoopBeginL: and label_LoopEndL: in the source text.
     Writes a Python file at mainloopPath containing a ``rocasm_main_loop(block)``
     function with the rocasm translation of the assembly.
+
+    When *tiled* is True (the default), attempts to detect the MFMA tile structure
+    and generate loop-based code.  Falls back to flat output if tile analysis fails.
 
     The .s source is returned unchanged; only the _mainloop.py file is generated.
     If either label is not found, returns src unchanged (graceful skip).
@@ -317,48 +321,65 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path) -> str:
     num_accvgprs = reg_counts.get("accvgpr", 192)
     num_sgprs = reg_counts.get("sgpr", 88)
 
-    # Translate assembly to rocasm Python code
+    # Translate assembly to rocasm Python code (flat path — always needed)
     rocasm_code, named_regs = asm_to_rocasm(main_loop_text, symbols)
 
-    # Build the Block init kwargs: named arrays first, then flat fallbacks
-    _ARRAY_TYPE = {"v": "VgprArray", "s": "SgprArray", "acc": "AccArray"}
-    block_kwargs = []
-    for alias in sorted(named_regs):
-        reg_type, phys_base, count = named_regs[alias]
-        arr_type = _ARRAY_TYPE[reg_type]
-        block_kwargs.append(f"        {alias}={arr_type}(base={phys_base}, count={count}),\n")
-
-    # Always include Acc as a flat array (accumulators use literal indices)
-    block_kwargs.append(f"        Acc=AccArray(base=0, count={num_accvgprs}),\n")
-
-    # Check if flat V or S are still needed (for registers without named symbols)
-    # by scanning the generated code for flat references
-    if "V[" in rocasm_code:
-        block_kwargs.append(f"        V=VgprArray(base=0, count={num_vgprs}),\n")
-    if "S[" in rocasm_code:
-        block_kwargs.append(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
-
-    # Write the mainloop Python file
-    with open(mainloopPath, "w", encoding="utf-8") as f:
-        f.write("from rocasm.block import Block\n")
-        f.write("from rocasm.regs import VgprArray, AccArray, SgprArray\n")
-        f.write("from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4\n")
-        f.write("\n\n")
-        f.write("def rocasm_main_loop():\n")
-        f.write('    """ROCasm translation of the main loop.\n')
-        f.write("\n")
-        f.write("    Auto-generated from the assembly main loop by asm_to_rocasm.\n")
-        f.write("    Edit this function to modify the main loop programmatically.\n")
-        f.write('    """\n')
-        f.write(f"    block = Block(\n")
-        for kwarg in block_kwargs:
-            f.write(kwarg)
-        f.write(f"    )\n")
-        f.write("\n")
+    # Try the tiled path: analyze the flat code and generate loop-based output
+    tile_info = None
+    if tiled:
+        # Extract the instruction body (skip preamble aliases)
+        body_lines = []
+        in_body = False
         for line in rocasm_code.splitlines():
-            f.write(f"    {line}\n")
-        f.write("\n")
-        f.write("    return block\n")
+            stripped = line.strip()
+            if stripped.startswith('label('):
+                in_body = True
+            if in_body:
+                body_lines.append(stripped)
+        if body_lines:
+            tile_info = analyze_tile("\n".join(body_lines))
+
+    if tile_info is not None:
+        # Tiled path: generate loop-based mainloop
+        output = generate_tiled_mainloop(tile_info, named_regs, reg_counts)
+        with open(mainloopPath, "w", encoding="utf-8") as f:
+            f.write(output)
+    else:
+        # Flat path: write the flat rocasm code
+        _ARRAY_TYPE = {"v": "VgprArray", "s": "SgprArray", "acc": "AccArray"}
+        block_kwargs = []
+        for alias in sorted(named_regs):
+            reg_type, phys_base, count = named_regs[alias]
+            arr_type = _ARRAY_TYPE[reg_type]
+            block_kwargs.append(f"        {alias}={arr_type}(base={phys_base}, count={count}),\n")
+
+        block_kwargs.append(f"        Acc=AccArray(base=0, count={num_accvgprs}),\n")
+
+        if "V[" in rocasm_code:
+            block_kwargs.append(f"        V=VgprArray(base=0, count={num_vgprs}),\n")
+        if "S[" in rocasm_code:
+            block_kwargs.append(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
+
+        with open(mainloopPath, "w", encoding="utf-8") as f:
+            f.write("from rocasm.block import Block\n")
+            f.write("from rocasm.regs import VgprArray, AccArray, SgprArray\n")
+            f.write("from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4\n")
+            f.write("\n\n")
+            f.write("def rocasm_main_loop():\n")
+            f.write('    """ROCasm translation of the main loop.\n')
+            f.write("\n")
+            f.write("    Auto-generated from the assembly main loop by asm_to_rocasm.\n")
+            f.write("    Edit this function to modify the main loop programmatically.\n")
+            f.write('    """\n')
+            f.write(f"    block = Block(\n")
+            for kwarg in block_kwargs:
+                f.write(kwarg)
+            f.write(f"    )\n")
+            f.write("\n")
+            for line in rocasm_code.splitlines():
+                f.write(f"    {line}\n")
+            f.write("\n")
+            f.write("    return block\n")
 
     return src
 
