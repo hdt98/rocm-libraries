@@ -13,9 +13,6 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Propagate the environment variable HTTP_PROXY into the apt config if it's set.
 RUN [ -z ${HTTP_PROXY} ] || (echo "Acquire::http::Proxy \"${HTTP_PROXY}\";" > /etc/apt/apt.conf.d/proxy)
 
-# Add PPA with g++-13
-RUN apt-get update && apt-get reinstall -y software-properties-common && add-apt-repository -y ppa:ubuntu-toolchain-r/test
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         # Tools, utils, compilation
@@ -75,7 +72,7 @@ RUN wget -nv -O libtinfo5.deb http://security.ubuntu.com/ubuntu/pool/universe/n/
     && rm -rf /tmp/* /var/lib/apt/lists/*
 ENV PATH="/opt/clang-format/bin:${PATH}"
 
-# ccache (needs cmake ninja)
+# ccache
 WORKDIR /tmp
 RUN wget -nv -O ccache-4.11.tar.gz https://github.com/ccache/ccache/releases/download/v4.11/ccache-4.11.tar.gz \
     && tar xf ccache-4.11.tar.gz \
@@ -136,8 +133,14 @@ RUN wget -nv -O amdgpu_install.deb ${ROCROLLER_AMDGPU_URL} \
     && rm -rf /tmp/* /var/lib/apt/lists/*
 
 # g++-13
-RUN apt-get update && apt-get install -y \
-      g++-13
+RUN apt-get update \
+    && apt-get reinstall -y software-properties-common \
+    # Add PPA with g++-13
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+      g++-13 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Info and compilers
 RUN ( \
