@@ -113,8 +113,11 @@ RUN wget -nv -O codeql.zip https://github.com/github/codeql-cli-binaries/release
 ADD https://github.com/github/codeql/archive/refs/tags/codeql-cli/${CODEQL_VERSION}.zip /opt/codeql/codeql-cli.zip
 ENV PATH="/opt/codeql/codeql:${PATH}"
 
-ADD docker/install-rocprof-trace-decoder /tmp
-RUN /tmp/install-rocprof-trace-decoder && rm /tmp/install-rocprof-trace-decoder
+# ROCprof Trace Decoder for thread trace with rocprofiler-sdk
+WORKDIR /tmp
+RUN wget -nv -O rocprof-trace-decoder.deb https://github.com/ROCm/rocprof-trace-decoder/releases/download/0.1.4/rocprof-trace-decoder-ubuntu-22.04-0.1.4-Linux.deb \
+    && apt-get install -y --no-install-recommends rocprof-trace-decoder.deb \
+    && rm -rf /tmp/* /var/lib/apt/lists/*
 
 # ROCM
 # Set URL to something like https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/jammy/amdgpu-install_7.2.1.70201-1_all.deb
