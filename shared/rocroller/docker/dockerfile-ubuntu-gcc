@@ -12,6 +12,11 @@
 ARG BASE_IMAGE=jammy
 FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
 
+RUN ( \
+    echo "base_image: ${BASE_IMAGE}" && \
+    echo "rocroller: gcc-13" \
+    ) > /.container_info.txt
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Propagate the environment variable HTTP_PROXY into the apt config if it's set.
@@ -106,11 +111,6 @@ RUN apt-get update && apt-get install -y rocm-llvm-dev
 # g++-13
 RUN apt-get update && apt-get install -y \
       g++-13
-
-RUN ( \
-    echo "base_image: ${BASE_IMAGE}" && \
-    echo "rocroller: gcc-13" \
-    ) > /.container_info.txt
 
 ENV CXX=/usr/bin/g++-13
 ENV CC=/usr/bin/gcc-13

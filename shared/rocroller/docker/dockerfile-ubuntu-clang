@@ -12,6 +12,11 @@
 ARG BASE_IMAGE=jammy
 FROM mcr.microsoft.com/devcontainers/base:${BASE_IMAGE}
 
+RUN ( \
+    echo "base_image: ${BASE_IMAGE}" && \
+    echo "rocroller: clang" \
+    ) > /.container_info.txt
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Propagate the environment variable HTTP_PROXY into the apt config if it's set.
@@ -104,11 +109,6 @@ RUN apt-get update && apt-get install -y rocm-llvm-dev
 ADD codeql/install_codeql /tmp
 RUN /tmp/install_codeql && rm /tmp/install_codeql
 ENV PATH="/opt/codeql/codeql:${PATH}"
-
-RUN ( \
-    echo "base_image: ${BASE_IMAGE}" && \
-    echo "rocroller: clang" \
-    ) > /.container_info.txt
 
 ENV CXX=/opt/rocm/bin/amdclang++
 ENV CC=/opt/rocm/bin/amdclang
