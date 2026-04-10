@@ -95,7 +95,7 @@ struct CommonLayoutSettingSelector
     : CommonLayoutSetting<ck::tuple_element_t<NDimSpatial - 1,
                                               ck::Tuple<ck::tensor_layout::convolution::GNWC,
                                                         ck::tensor_layout::convolution::GNHWC,
-                                                        ck::tensor_layout::convolution::GNDHWC>>,
+                                                        ck::tensor_layout::convolution::NDHWGC>>,
                           ck::tuple_element_t<NDimSpatial - 1,
                                               ck::Tuple<ck::tensor_layout::convolution::GKXC,
                                                         ck::tensor_layout::convolution::GKYXC,
@@ -103,7 +103,7 @@ struct CommonLayoutSettingSelector
                           ck::tuple_element_t<NDimSpatial - 1,
                                               ck::Tuple<ck::tensor_layout::convolution::GNWK,
                                                         ck::tensor_layout::convolution::GNHWK,
-                                                        ck::tensor_layout::convolution::GNDHWK>>>
+                                                        ck::tensor_layout::convolution::NDHWGK>>>
 {
 };
 
@@ -118,7 +118,7 @@ using OutputLayout = typename CommonLayoutSettingSelector<NDimSpatial>::OutputLa
 
 struct ExecutionConfig final
 {
-    int do_verification = 1; // 0=no, 1=CPU, 2=GPU
+    int do_verification = 2; // 0=no, 1=CPU, 2=GPU
     int init_method     = 1;
     bool time_kernel    = false;
 };
@@ -126,7 +126,7 @@ struct ExecutionConfig final
 #define DefaultConvParam                                                                         \
     ck::utils::conv::ConvParam                                                                   \
     {                                                                                            \
-        3, 4, 1, 128, 256, {3, 3, 3}, {14, 14, 14}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, { 1, 1, 1 } \
+        3, 2, 16, 128, 256, {1, 1, 1}, {7, 7, 7}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}    \
     }
 
 inline void print_help_msg()

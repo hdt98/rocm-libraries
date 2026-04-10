@@ -1,7 +1,7 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
-template <ck::index_t NDimSpatial>
+template <ck::index_t NDimSpatial, bool GpuVerification = true>
 bool run_grouped_conv_bwd_weight(const ExecutionConfig& config,
                                  const ck::utils::conv::ConvParam& conv_param)
 {
@@ -147,58 +147,69 @@ bool run_grouped_conv_bwd_weight(const ExecutionConfig& config,
                                     rtol,
                                     atol);
     }
-    else if(config.do_verification == 2)
+
+    if constexpr (GpuVerification)
     {
-        // GPU verification using naive GPU reference
-        std::cout << "Running GPU verification..." << std::endl;
+        if(config.do_verification == 2)
+        {
+            // GPU verification using naive GPU reference
+            std::cout << "Running GPU verification..." << std::endl;
 
-        // Allocate and ZERO GPU memory for reference weights
-        DeviceMem wei_device_ref_buf(sizeof(WeiDataType) *
-                                     wei_device_result.mDesc.GetElementSpaceSize());
-        wei_device_ref_buf.SetZero();
+            // Allocate and ZERO GPU memory for reference weights
+            DeviceMem wei_device_ref_buf(sizeof(WeiDataType) *
+                                        wei_device_result.mDesc.GetElementSpaceSize());
+            wei_device_ref_buf.SetZero();
 
-        // Call GPU reference function with ConvParam and layout types
-        using InLayout  = InputLayout<NDimSpatial>;
-        using WeiLayout = WeightLayout<NDimSpatial>;
-        using OutLayout = OutputLayout<NDimSpatial>;
+            // Call GPU reference function with ConvParam and layout types
+            using InLayout  = InputLayout<NDimSpatial>;
+            using WeiLayout = WeightLayout<NDimSpatial>;
+            using OutLayout = OutputLayout<NDimSpatial>;
 
-        ck::ref::naive_conv_bwd_weight<InLayout,
-                                       WeiLayout,
-                                       OutLayout,
-                                       InDataType,
-                                       WeiDataType,
-                                       OutDataType,
-                                       InElementOp,
-                                       WeiElementOp,
-                                       OutElementOp>(
-            reinterpret_cast<const InDataType*>(in_device_buf.GetDeviceBuffer()),
-            reinterpret_cast<WeiDataType*>(wei_device_ref_buf.GetDeviceBuffer()),
-            reinterpret_cast<const OutDataType*>(out_device_buf.GetDeviceBuffer()),
-            conv_param);
+            ck::ref::naive_conv_bwd_weight<InLayout,
+                                        WeiLayout,
+                                        OutLayout,
+                                        InDataType,
+                                        WeiDataType,
+                                        OutDataType,
+                                        InElementOp,
+                                        WeiElementOp,
+                                        OutElementOp>(
+                reinterpret_cast<const InDataType*>(in_device_buf.GetDeviceBuffer()),
+                reinterpret_cast<WeiDataType*>(wei_device_ref_buf.GetDeviceBuffer()),
+                reinterpret_cast<const OutDataType*>(out_device_buf.GetDeviceBuffer()),
+                conv_param);
 
-        HIP_CHECK_ERROR(hipDeviceSynchronize());
+            HIP_CHECK_ERROR(hipDeviceSynchronize());
 
-        std::cout << "GPU reference function completed successfully, copying results..."
-                  << std::endl;
+            std::cout << "GPU reference function completed successfully, copying results..."
+                    << std::endl;
 
-        // Copy GPU reference result to host
-        wei_device_ref_buf.FromDevice(wei_host_result.mData.data());
+            // Copy GPU reference result to host
+            wei_device_ref_buf.FromDevice(wei_host_result.mData.data());
 
-        // Copy GPU kernel result to host
-        wei_device_buf.FromDevice(wei_device_result.mData.data());
+            // Copy GPU kernel result to host
+            wei_device_buf.FromDevice(wei_device_result.mData.data());
 
-        std::cout << "Comparing GPU kernel output vs GPU reference..." << std::endl;
+            std::cout << "Comparing GPU kernel output vs GPU reference..." << std::endl;
 
-        // Compare: Optimized kernel result vs GPU reference result
-        bool pass = ck::utils::check_err(wei_device_result.mData,
-                                         wei_host_result.mData,
-                                         "Error: Incorrect results!",
-                                         get_rtol<WeiDataType, float>(),
-                                         get_atol<WeiDataType, float>());
+            // Compare: Optimized kernel result vs GPU reference result
+            bool pass = ck::utils::check_err(wei_device_result.mData,
+                                            wei_host_result.mData,
+                                            "Error: Incorrect results!",
+                                            get_rtol<WeiDataType, float>(),
+                                            get_atol<WeiDataType, float>());
 
-        std::cout << "GPU verification result is:" << (pass ? "correct" : "fail") << std::endl;
+            std::cout << "GPU verification result is:" << (pass ? "correct" : "fail") << std::endl;
 
-        return pass;
+            return pass;
+        }
+    }
+    else
+    {
+        if (config.do_verification == 2)
+        {
+            throw std::runtime_error("GPU verification is not available.");
+        }
     }
 
     float avg_time = invoker.Run(argument, StreamConfig{nullptr, config.time_kernel});
