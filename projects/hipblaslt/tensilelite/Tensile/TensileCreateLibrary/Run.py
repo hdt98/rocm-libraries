@@ -279,7 +279,7 @@ def passPostKernelInfoToLibrary(results, kernels, masterLibraries, splitGSU: boo
                         print(f"{'='*80}\n")
                         raise
 
-def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = True) -> str:
+def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -> str:
     """Extract the main loop and write a rocasm Python translation alongside the .s file.
 
     Searches for label_LoopBeginL: and label_LoopEndL: in the source text.
