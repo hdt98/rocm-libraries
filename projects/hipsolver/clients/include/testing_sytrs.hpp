@@ -226,11 +226,13 @@ void testing_sytrs_bad_arg()
                                    &lworkOnDevice,
                                    &lworkOnHost);
 
-        device_strided_batch_vector<char> dWork(lworkOnDevice, 1, lworkOnDevice, 1);
+        // NOTE: lworkOnDevice/lworkOnHost are in bytes when using the hipsolverDnX API,
+        // so allocating as T over-allocates by a factor of sizeof(T)
+        device_strided_batch_vector<T> dWork(lworkOnDevice, 1, lworkOnDevice, 1);
         if(lworkOnDevice)
             CHECK_HIP_ERROR(dWork.memcheck());
 
-        std::vector<char> hWork(lworkOnHost);
+        std::vector<T> hWork(lworkOnHost);
 
         // check bad arguments
         sytrs_checkBadArgs<API>(handle,
@@ -757,18 +759,20 @@ void testing_sytrs(Arguments& argus)
     else
     {
         // memory allocations
-        host_strided_batch_vector<T>      hA(size_A, 1, stA, bc);
-        host_strided_batch_vector<T>      hB(size_B, 1, stB, bc);
-        host_strided_batch_vector<T>      hBRes(size_BRes, 1, stBRes, bc);
-        host_strided_batch_vector<I>      hIpiv(size_P, 1, stP, bc);
-        host_strided_batch_vector<int>    hIpiv_cpu(size_P, 1, stP, bc);
-        host_strided_batch_vector<int>    hInfo(1, 1, 1, bc);
-        host_strided_batch_vector<int>    hInfoRes(1, 1, 1, bc);
-        device_strided_batch_vector<T>    dA(size_A, 1, stA, bc);
-        device_strided_batch_vector<T>    dB(size_B, 1, stB, bc);
-        device_strided_batch_vector<I>    dIpiv(size_P, 1, stP, bc);
-        device_strided_batch_vector<int>  dInfo(1, 1, 1, bc);
-        device_strided_batch_vector<char> dWork(lworkOnDevice, 1, lworkOnDevice, 1);
+        host_strided_batch_vector<T>     hA(size_A, 1, stA, bc);
+        host_strided_batch_vector<T>     hB(size_B, 1, stB, bc);
+        host_strided_batch_vector<T>     hBRes(size_BRes, 1, stBRes, bc);
+        host_strided_batch_vector<I>     hIpiv(size_P, 1, stP, bc);
+        host_strided_batch_vector<int>   hIpiv_cpu(size_P, 1, stP, bc);
+        host_strided_batch_vector<int>   hInfo(1, 1, 1, bc);
+        host_strided_batch_vector<int>   hInfoRes(1, 1, 1, bc);
+        device_strided_batch_vector<T>   dA(size_A, 1, stA, bc);
+        device_strided_batch_vector<T>   dB(size_B, 1, stB, bc);
+        device_strided_batch_vector<I>   dIpiv(size_P, 1, stP, bc);
+        device_strided_batch_vector<int> dInfo(1, 1, 1, bc);
+        // NOTE: lworkOnDevice/lworkOnHost are in bytes when using the hipsolverDnX API,
+        // so allocating as T over-allocates by a factor of sizeof(T)
+        device_strided_batch_vector<T> dWork(lworkOnDevice, 1, lworkOnDevice, 1);
         if(size_A)
             CHECK_HIP_ERROR(dA.memcheck());
         if(size_B)
@@ -779,7 +783,7 @@ void testing_sytrs(Arguments& argus)
         if(lworkOnDevice)
             CHECK_HIP_ERROR(dWork.memcheck());
 
-        std::vector<char> hWork(lworkOnHost);
+        std::vector<T> hWork(lworkOnHost);
 
         // check computations
         if(argus.unit_check || argus.norm_check)

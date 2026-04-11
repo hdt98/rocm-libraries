@@ -9755,6 +9755,8 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    // NOTE: hipsolverDnXsytrs_bufferSize returns workspace sizes in bytes,
+    // which may over-allocate when used with typed workspace buffers (e.g. T instead of char)
     *lworkOnHost = 0;
     switch(API)
     {
@@ -9791,6 +9793,8 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    // NOTE: hipsolverDnXsytrs_bufferSize returns workspace sizes in bytes,
+    // which may over-allocate when used with typed workspace buffers (e.g. T instead of char)
     *lworkOnHost = 0;
     switch(API)
     {
@@ -9827,6 +9831,8 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    // NOTE: hipsolverDnXsytrs_bufferSize returns workspace sizes in bytes,
+    // which may over-allocate when used with typed workspace buffers (e.g. T instead of char)
     *lworkOnHost = 0;
     switch(API)
     {
@@ -9863,6 +9869,8 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t               API,
                                                     size_t*                 lworkOnDevice,
                                                     size_t*                 lworkOnHost)
 {
+    // NOTE: hipsolverDnXsytrs_bufferSize returns workspace sizes in bytes,
+    // which may over-allocate when used with typed workspace buffers (e.g. T instead of char)
     *lworkOnHost = 0;
     switch(API)
     {
