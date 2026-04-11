@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -52,6 +52,7 @@
 #include "testing_sygvj_hegvj.hpp"
 #include "testing_sytrd_hetrd.hpp"
 #include "testing_sytrf.hpp"
+#include "testing_sytrs.hpp"
 
 #ifdef HAVE_HIPSPARSE
 #include "testing_csrlsvchol.hpp"
@@ -96,6 +97,7 @@ class hipsolver_dispatcher
             {"potrs", testing_potrs<API_NORMAL, false, false, T>},
             {"potrs_batched", testing_potrs<API_NORMAL, true, false, T>},
             {"sytrf", testing_sytrf<API_NORMAL, false, false, T>},
+            {"sytrs", testing_sytrs<API_COMPAT, false, false, T, int64_t, size_t>},
         };
 
         // Grab function from the map and execute
