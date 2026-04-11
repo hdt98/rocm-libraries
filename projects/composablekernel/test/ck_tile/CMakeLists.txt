@@ -1,6 +1,7 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 
+# TODO: remove this comment after CI parallel test experiment
 ################################################################################
 # CK Tile Test Organization
 ################################################################################
