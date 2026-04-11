@@ -44,6 +44,8 @@ const vector<char> uplo_range = {'L', 'U'};
 
 // for checkin_lapack tests
 const vector<vector<int>> matrix_sizeA_range = {
+    // quick return
+    {0, 1, 1},
     // invalid
     {-1, 1, 1},
     {20, 5, 20},
@@ -55,6 +57,9 @@ const vector<vector<int>> matrix_sizeA_range = {
     {50, 60, 60}};
 
 const vector<vector<int>> matrix_sizeB_range = {
+    // quick return
+    {0},
+    {1},
     // invalid
     {-1},
     // valid
