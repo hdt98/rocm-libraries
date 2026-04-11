@@ -51,6 +51,7 @@ struct Config
 {
     int groups_per_wg;
     int wave_q32 = 1;
+    int wave_n   = 1;
     int kh       = 3;
     int kw       = 3;
 
@@ -62,8 +63,10 @@ struct Config
 
 constexpr Config configs[] = {
     {.groups_per_wg = 2, .wave_q32 = 2},
+    {.groups_per_wg = 2, .wave_q32 = 1, .wave_n = 2},
     {.groups_per_wg = 2, .wave_q32 = 1},
     {.groups_per_wg = 1, .wave_q32 = 2},
+    {.groups_per_wg = 1, .wave_q32 = 1, .wave_n = 2},
     {.groups_per_wg = 1, .wave_q32 = 1},
 };
 
@@ -78,6 +81,8 @@ inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
     // Reject wider Q tiling when the selected block width would be at least twice par.q.
     if(cfg.wave_q32 > 1 && cfg.block_q() >= 2 * par.q)
         return false;
+    if(cfg.wave_n > 1 && par.n < cfg.wave_n)
+        return false;
     return true;
 }
 
@@ -89,7 +94,7 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
     auto blocks_c = divup(par.groups, cfg.groups_per_wg);
 
     LaunchParams launch;
-    launch.grid       = dim3(blocks_c, blocks_q, par.n);
+    launch.grid       = dim3(blocks_c, blocks_q, divup(par.n, cfg.wave_n));
     launch.block_size = dim3(cfg.block_size(), 1, 1);
     return launch;
 }
@@ -136,8 +141,8 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
 
     constexpr int NUM_INPUT_LDS_BUFFERS    = 2;
     constexpr int NUM_DELTA_LDS_BUFFERS    = 2;
-    constexpr int INPUT_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_W_TOTAL;
-    constexpr int DELTA_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_Q_TOTAL;
+    constexpr int INPUT_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_W_TOTAL * cfg.wave_n;
+    constexpr int DELTA_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_Q_TOTAL * cfg.wave_n;
 
     constexpr int COMPUTE_LDS_SIZE  = NUM_INPUT_LDS_BUFFERS * INPUT_LDS_BUFFER_SIZE_C8 +
                                       NUM_DELTA_LDS_BUFFERS * DELTA_LDS_BUFFER_SIZE_C8;
@@ -179,8 +184,8 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     for(int i = 0; i < cfg.kh * cfg.kw; i++)
         acc[i] = Zero;
 
-    // Delta register circular buffer: kh rows × wave_q32 Q-tiles.
-    fp16x8_t delta_regs[cfg.kh][cfg.wave_q32];
+    // Delta register circular buffer: kh rows × (wave_n * wave_q32) Q-tiles.
+    fp16x8_t delta_regs[cfg.kh][cfg.wave_n * cfg.wave_q32];
 
     constexpr int rsrc_data_format = 1 << 15;
 
@@ -193,8 +198,10 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
         const_cast<_Float16*>(delta), 0, delta_bytes, rsrc_data_format);
 
     // Multi-pass loading setup.
-    constexpr int INPUT_LOAD_PASSES = divup(BLOCK_W_TOTAL * BLOCK_C8, cfg.block_size());
-    constexpr int DELTA_LOAD_PASSES = divup(BLOCK_Q_TOTAL * BLOCK_C8, cfg.block_size());
+    constexpr int INPUT_LOAD_PASSES =
+        divup(BLOCK_W_TOTAL * cfg.wave_n * BLOCK_C8, cfg.block_size());
+    constexpr int DELTA_LOAD_PASSES =
+        divup(BLOCK_Q_TOTAL * cfg.wave_n * BLOCK_C8, cfg.block_size());
 
     const int lane_row0 = TransposeLayout::row(lane, 0);
     const int lane_row1 = TransposeLayout::row(lane, 1);
@@ -208,11 +215,11 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     const int delta_lane_c4 = wave_group * GROUP_SIZE_C4 + delta_half * HALF_SIZE_C4 + lane_col / 4;
 
     // Load one tile of delta from LDS to registers.
-    auto load_delta_q32_lds = [&](int buf, int q32) -> fp16x8_t
+    auto load_delta_q32_lds = [&](int buf, int x_base) -> fp16x8_t
     {
         auto* base   = reinterpret_cast<int16x4_t*>(delta_lds + buf * DELTA_LDS_BUFFER_SIZE_C8);
-        int off0     = Sw::offset_uint2(q32 * 32 + lane_row0, delta_lane_c4);
-        int off1     = Sw::offset_uint2(q32 * 32 + lane_row1, delta_lane_c4);
+        int off0     = Sw::offset_uint2(x_base + lane_row0, delta_lane_c4);
+        int off1     = Sw::offset_uint2(x_base + lane_row1, delta_lane_c4);
         int16x4_t r0 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off0]);
         int16x4_t r1 = __builtin_amdgcn_ds_read_tr16_b64_v4i16(&base[off1]);
         return __builtin_bit_cast(
@@ -222,8 +229,16 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
     // Load one delta row from LDS to registers.
     auto load_delta_lds = [&](int buf, int slot)
     {
-        static_for<cfg.wave_q32>([&]<int Q32>()
-                                 { delta_regs[slot][Q32] = load_delta_q32_lds(buf, Q32); });
+        static_for<cfg.wave_n>(
+            [&]<int NI>()
+            {
+                static_for<cfg.wave_q32>(
+                    [&]<int Q32>()
+                    {
+                        delta_regs[slot][NI * cfg.wave_q32 + Q32] =
+                            load_delta_q32_lds(buf, NI * BLOCK_Q_TOTAL + Q32 * 32);
+                    });
+            });
     };
 
     // Load one input row from LDS to registers.
@@ -238,11 +253,8 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
             fp16x8_t, (int16x8_t){r0[0], r0[1], r0[2], r0[3], r1[0], r1[1], r1[2], r1[3]});
     };
 
-    const int block_n = blockIdx.z;
+    const int block_n_base = blockIdx.z * cfg.wave_n;
     {
-        const size_t input_n_offset = (size_t)block_n * hi * wi * C8;
-        const size_t delta_n_offset = (size_t)block_n * ho * wo * C8;
-
         // Precompute per-pass load info (invariant across rows).
         uint32_t input_global_offsets[INPUT_LOAD_PASSES];
         bool input_active[INPUT_LOAD_PASSES];
@@ -250,17 +262,21 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
         for(int pass = 0; pass < INPUT_LOAD_PASSES; pass++)
         {
             int lds_idx                 = tid + pass * cfg.block_size();
-            input_active[pass]          = (lds_idx < BLOCK_W_TOTAL * BLOCK_C8);
+            input_active[pass]          = (lds_idx < BLOCK_W_TOTAL * cfg.wave_n * BLOCK_C8);
             input_store_lds_addrs[pass] = &input_lds[lds_idx];
             if(input_active[pass])
             {
-                int col        = Sw::x(lds_idx);
+                int col_total  = Sw::x(lds_idx);
                 int c8_idx     = Sw::c8(lds_idx);
+                int n_local    = col_total / BLOCK_W_TOTAL;
+                int col        = col_total % BLOCK_W_TOTAL;
                 int global_col = (block_q - px) + col;
-                if(global_col >= 0 && global_col < wi)
+                int actual_n   = block_n_base + n_local;
+
+                if(actual_n < N && global_col >= 0 && global_col < wi)
                     input_global_offsets[pass] =
-                        sizeof(uint4) *
-                        (input_n_offset + (size_t)global_col * C8 + block_c8 + c8_idx);
+                        sizeof(uint4) * ((size_t)actual_n * hi * wi * C8 + (size_t)global_col * C8 +
+                                         block_c8 + c8_idx);
                 else
                     input_global_offsets[pass] = input_bytes;
             }
@@ -272,17 +288,21 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
         for(int pass = 0; pass < DELTA_LOAD_PASSES; pass++)
         {
             int lds_idx                 = tid + pass * cfg.block_size();
-            delta_active[pass]          = (lds_idx < BLOCK_Q_TOTAL * BLOCK_C8);
+            delta_active[pass]          = (lds_idx < BLOCK_Q_TOTAL * cfg.wave_n * BLOCK_C8);
             delta_store_lds_addrs[pass] = &delta_lds[lds_idx];
             if(delta_active[pass])
             {
-                int col      = Sw::x(lds_idx);
-                int c8_idx   = Sw::c8(lds_idx);
-                int global_q = block_q + col;
-                if(global_q >= 0 && global_q < wo)
+                int col_total = Sw::x(lds_idx);
+                int c8_idx    = Sw::c8(lds_idx);
+                int n_local   = col_total / BLOCK_Q_TOTAL;
+                int col       = col_total % BLOCK_Q_TOTAL;
+                int global_q  = block_q + col;
+                int actual_n  = block_n_base + n_local;
+
+                if(actual_n < N && global_q >= 0 && global_q < wo)
                     delta_global_offsets[pass] =
-                        sizeof(uint4) *
-                        (delta_n_offset + (size_t)global_q * C8 + block_c8 + c8_idx);
+                        sizeof(uint4) * ((size_t)actual_n * ho * wo * C8 + (size_t)global_q * C8 +
+                                         block_c8 + c8_idx);
                 else
                     delta_global_offsets[pass] = delta_bytes;
             }
@@ -376,23 +396,30 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
                     static_for<cfg.kw>(
                         [&]<int S>()
                         {
-                            static_for<cfg.wave_q32>(
-                                [&]<int Q32>()
+                            static_for<cfg.wave_n>(
+                                [&]<int NI>()
                                 {
-                                    fp16x8_t input_reg = load_input_lds(toc, Q32 * 32 + S);
-                                    static_for<cfg.kh>(
-                                        [&]<int R>()
+                                    static_for<cfg.wave_q32>(
+                                        [&]<int Q32>()
                                         {
-                                            constexpr int SLOT =
-                                                (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                            acc[R * cfg.kw + S] =
-                                                __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                                    input_reg,
-                                                    delta_regs[SLOT][Q32],
-                                                    acc[R * cfg.kw + S],
-                                                    0,
-                                                    0,
-                                                    0);
+                                            fp16x8_t input_reg = load_input_lds(
+                                                toc, NI * BLOCK_W_TOTAL + Q32 * 32 + S);
+                                            static_for<cfg.kh>(
+                                                [&]<int R>()
+                                                {
+                                                    constexpr int SLOT =
+                                                        (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) %
+                                                        cfg.kh;
+                                                    acc[R * cfg.kw + S] =
+                                                        __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                                            input_reg,
+                                                            delta_regs[SLOT]
+                                                                      [NI * cfg.wave_q32 + Q32],
+                                                            acc[R * cfg.kw + S],
+                                                            0,
+                                                            0,
+                                                            0);
+                                                });
                                         });
                                 });
                         });
@@ -431,23 +458,30 @@ __device__ void conv2d_grouped_32c_wgrad_fp16_cdna4_nhwc_impl(const _Float16* __
                     static_for<cfg.kw>(
                         [&]<int S>()
                         {
-                            static_for<cfg.wave_q32>(
-                                [&]<int Q32>()
+                            static_for<cfg.wave_n>(
+                                [&]<int NI>()
                                 {
-                                    fp16x8_t input_reg = load_input_lds(toc, Q32 * 32 + S);
-                                    static_for<cfg.kh>(
-                                        [&]<int R>()
+                                    static_for<cfg.wave_q32>(
+                                        [&]<int Q32>()
                                         {
-                                            constexpr int SLOT =
-                                                (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) % cfg.kh;
-                                            acc[R * cfg.kw + S] =
-                                                __builtin_amdgcn_mfma_f32_16x16x32_f16(
-                                                    input_reg,
-                                                    delta_regs[SLOT][Q32],
-                                                    acc[R * cfg.kw + S],
-                                                    0,
-                                                    0,
-                                                    0);
+                                            fp16x8_t input_reg = load_input_lds(
+                                                toc, NI * BLOCK_W_TOTAL + Q32 * 32 + S);
+                                            static_for<cfg.kh>(
+                                                [&]<int R>()
+                                                {
+                                                    constexpr int SLOT =
+                                                        (cfg.kh - 1 + Y_LOCAL - R + cfg.kh) %
+                                                        cfg.kh;
+                                                    acc[R * cfg.kw + S] =
+                                                        __builtin_amdgcn_mfma_f32_16x16x32_f16(
+                                                            input_reg,
+                                                            delta_regs[SLOT]
+                                                                      [NI * cfg.wave_q32 + Q32],
+                                                            acc[R * cfg.kw + S],
+                                                            0,
+                                                            0,
+                                                            0);
+                                                });
                                         });
                                 });
                         });
