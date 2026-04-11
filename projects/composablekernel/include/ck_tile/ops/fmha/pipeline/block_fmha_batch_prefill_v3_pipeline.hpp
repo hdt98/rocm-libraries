@@ -899,40 +899,31 @@ struct BlockFmhaBatchPrefillV3Pipeline
 
         auto fmha_alu0 = [&](auto sp_reg_idx) {
             m_old = m; // m{j-1}
-            static_assert(m.thread_buf_.size() == 1,
-                          "assuming that each thread holds 1 rowmax value");
             // kFoldKDescale: reduce on raw (undescaled) values with -MAX_FLOAT init,
             // then fold k_descale into the scalar row_max. This eliminates the
             // full-tile pk_mul_f32 pass after GEMM0 (sp_compute *= k_descale).
-            auto m_init = [&]() {
-                if constexpr(kFoldKDescale)
-                    return -numeric<SMPLComputeDataType>::max();
-                else
-                    return m.thread_buf_[0];
-            }();
-            auto m_latest = block_tile_reduce<SMPLComputeDataType>(
-                sp(sp_reg_idx).sp_compute, sequence<1>{}, f_max, m_init);
-            // permlane32_swap cross-warp reduction (gfx950 only, 32x32 mfma)
-            int32x2_t swapped_regs =
-                __builtin_amdgcn_permlane32_swap(bit_cast<int32_t>(m_latest.thread_buf_[0]),
-                                                 bit_cast<int32_t>(m_latest.thread_buf_[0]),
-                                                 false,
-                                                 false);
-            m_latest.thread_buf_[0] = f_max(bit_cast<SMPLComputeDataType>(swapped_regs.x),
-                                            bit_cast<SMPLComputeDataType>(swapped_regs.y));
+            if constexpr(kFoldKDescale)
+            {
+                // Reset m to -MAX so the in-place reduce starts fresh
+                static_for<0, m.thread_buf_.size(), 1>{}([&](auto i) {
+                    m.thread_buf_[i] = -numeric<SMPLComputeDataType>::max();
+                });
+            }
+            block_tile_reduce(m, sp(sp_reg_idx).sp_compute, sequence<1>{}, f_max);
+            block_tile_reduce_sync(m, f_max, bool_constant<false>{}, bool_constant<false>{});
 
             if constexpr(kFoldKDescale)
             {
                 constexpr index_t si = decltype(sp_reg_idx)::value;
                 // Fold k_descale into scalar row_max: max(s_raw) * d_i == max(s_raw * d_i)
-                m_latest.thread_buf_[0] *= saved_k_descale[si];
+                m.thread_buf_[0] *= saved_k_descale[si];
                 // Running max in descaled domain (same leaky-max as before)
-                m_latest.thread_buf_[0] = f_max(m_latest.thread_buf_[0], m_old.thread_buf_[0]);
+                m.thread_buf_[0] = f_max(m.thread_buf_[0], m_old.thread_buf_[0]);
                 // FP8 shift: exp2(s*ss_k - ss*m) implicitly scales P by 2^shift
 #if CK_TILE_USE_OCP_FP8
-                m_latest.thread_buf_[0] -= OCP_FP8_SHIFT;
+                m.thread_buf_[0] -= OCP_FP8_SHIFT;
 #else
-                m_latest.thread_buf_[0] -= FNUZ_FP8_SHIFT;
+                m.thread_buf_[0] -= FNUZ_FP8_SHIFT;
 #endif
                 // Precompute k_descale-adjusted scale_s for sp_delta FMA
                 scale_s_k = scale_s * saved_k_descale[si];
@@ -941,15 +932,13 @@ struct BlockFmhaBatchPrefillV3Pipeline
             {
                 // LogitsSoftCap + KV_BLOCKSCALE: sp_compute already descaled by
                 // full-tile pass in gemm/cl_calc. Reduction init was m_old, so
-                // m_latest already incorporates the running max. Apply FP8 shift.
+                // m already incorporates the running max. Apply FP8 shift.
 #if CK_TILE_USE_OCP_FP8
-                m_latest.thread_buf_[0] -= OCP_FP8_SHIFT;
+                m.thread_buf_[0] -= OCP_FP8_SHIFT;
 #else
-                m_latest.thread_buf_[0] -= FNUZ_FP8_SHIFT;
+                m.thread_buf_[0] -= FNUZ_FP8_SHIFT;
 #endif
             }
-
-            m = m_latest;
 
             constexpr auto p_spans =
                 std::decay_t<decltype(sp(sp_reg_idx).sp_compute)>::get_distributed_spans();
@@ -993,16 +982,7 @@ struct BlockFmhaBatchPrefillV3Pipeline
                 sequence<1>{},
                 f_sum,
                 SMPLComputeDataType{0}); // rowsum(Pcompute{j})
-            static_assert(rowsum_p.thread_buf_.size() == 1,
-                          "assuming that each thread holds 1 rowsum value");
-            // permlane32_swap cross-warp reduction (gfx950 only, 32x32 mfma)
-            int32x2_t swapped_regs =
-                __builtin_amdgcn_permlane32_swap(bit_cast<int32_t>(rowsum_p.thread_buf_[0]),
-                                                 bit_cast<int32_t>(rowsum_p.thread_buf_[0]),
-                                                 false,
-                                                 false);
-            rowsum_p.thread_buf_[0] = f_sum(bit_cast<SMPLComputeDataType>(swapped_regs.x),
-                                            bit_cast<SMPLComputeDataType>(swapped_regs.y));
+            block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{}, bool_constant<false>{});
 
             // l{j}
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
@@ -1515,10 +1495,11 @@ struct BlockFmhaBatchPrefillV3Pipeline
                     K_page_issue();          // global_load for K3 offset
                     K_mem_load(number<0>{}); // buffer_load K2
                     K_page_consume();        // s_waitcnt vmcnt(K_mem_su_ld_insts), transform
-
-                    s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts>();
-                    __builtin_amdgcn_s_barrier();
                 }
+
+                // drain K1 + V0 async loads before core_loop reads K1 from LDS
+                s_waitcnt<K_mem_su_ld_insts + V_mem_su_ld_insts>();
+                __builtin_amdgcn_s_barrier();
 
                 CK_TILE_FMHA_V3_ASM_MARKER("end pre-stage");
             }

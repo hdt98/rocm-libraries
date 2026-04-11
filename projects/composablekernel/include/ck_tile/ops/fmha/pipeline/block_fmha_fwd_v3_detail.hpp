@@ -25,6 +25,10 @@
 #define CK_TILE_FMHA_V3_ADD_SBARRIER_FOR_PHASE0 1
 #endif
 
+#if !defined(CK_TILE_DISABLE_PACKED_FP32)
+#define CK_TILE_DISABLE_PACKED_FP32 0
+#endif
+
 namespace ck_tile {
 
 // ---------------------------------------------------------------------------
