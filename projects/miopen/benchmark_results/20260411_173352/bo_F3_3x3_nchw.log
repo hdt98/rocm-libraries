@@ -1,0 +1,129 @@
+MIOpenDriver convbfp16 -n 128 -c 64 -H 56 -W 56 -k 64 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -g 1 -F 1 -s 1 -t 1
+MIOpen(HIP): Info [get_device_name] Raw device name: gfx942:sramecc+:xnack-
+MIOpen(HIP): Info [Handle] stream: 0x3ca3800, device_id: 0
+MIOpen(HIP): Info [] MIOPEN_FIND_MODE = DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [AmdRocmMetadataVersionDetect] ROCm MD version AMDHSA_COv3, HIP version 7.1.25424, MIOpen version 3.5.1.d65bd09ddcf
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [GetWorkSpaceSize] 205594624
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:37:14 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Info [FindConvFwdAlgorithm] requestAlgoCount = 2, workspace = 205594624
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsNetworkedFilesystem] Filesystem type at '"/root/.config/miopen/"' is: 0x794c7630 'OVERLAYFS_SUPER_MAGIC'
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.015864 ms
+MIOpen(HIP): Info [TryLoad] Find-db regenerating.
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [FindConvolution] Find Start: 64-56-56-3x3-64-56-56-128-1x1-1x1-1x1-0-NCHW-BF16-F, findMode: DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [FindSolutionImpl] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GenericSearch] GenericSearch: routing to BayesianSearch
+MIOpen(HIP): Info [GetDefaultPerformanceConfig] fwd,nhwc,bf16,0,1,128,64,32,32,32,8,1,1,1,2,0,0,0,0,0,1,8,2,1,1,4,1,64,1,8,1,1,1,4,1,64,0
+MIOpen(HIP): Info [GetAllConfigs] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: Searching the best solution among 2b (spare)...
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC (43 configs)
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase1 random_init=3
+MIOpen(HIP): Info [PrintVersionImpl] COMgr v.3.0.0
+MIOpen(HIP): Info [PrintVersion] HIPRTC v.9.0
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase2 bo_budget=20
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=2 NEW BEST #0 t=0.32292
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=3 NEW BEST #5 t=0.280645
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 23/43 | best: #5 | time: 0.280645ms | score: 0.948557x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: fwd,nhwc,bf16,0,1,100,40,20,20,20,8,1,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,40,1,8,1,1,1,4,1,40,bf
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.280645ms
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Info [GetPerfDbPathFile] Found exact perf database file
+MIOpen(HIP): Info [Measure] ReadonlyRamDb::Prefetch time: 120.787 ms
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.020881 ms
+MIOpen(HIP): Info [FindSolutionImpl] ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GenericSearch] GenericSearch: routing to BayesianSearch
+MIOpen(HIP): Info [GetAllConfigs] ConvHipImplicitGemmGroupFwdXdlops: Searching the best solution among 97...
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupFwdXdlops (151 configs)
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase1 random_init=3
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase2 bo_budget=74
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=1 NEW BEST #58 t=0.322552
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=3 NEW BEST #26 t=0.307339
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=29 NEW BEST #60 t=0.303151
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=36 NEW BEST #7 t=0.30194
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=39 NEW BEST #47 t=0.291818
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=44 NEW BEST #35 t=0.286804
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=63 NEW BEST #57 t=0.278063
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=64 NEW BEST #9 t=0.275728
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=65 NEW BEST #25 t=0.26575
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 77/151 | best: #25 | time: 0.26575ms | score: 1.27348x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 64, 32, OddC, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #2 ConvHipImplicitGemmGroupFwdXdlops | time: 0.26575ms
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Info [FindSolutionImpl] GemmFwdRest (not searchable)
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [FindSolutionImpl] ConvDirectNaiveConvFwd (not searchable)
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoImplicitGEMM:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt256x64x32_wt32x32x8_ws1x1_wr2x2_ta1x8x4x1_1x4x1x64_tb1x8x1x1_1x4x1x64/batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/: 0.268026 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoImplicitGEMM:ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvHipImplicitGemmGroupFwdXdlops: batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/batched_transpose_32x32_half/: 0.322227 >= 0.268026
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt256x64x32_wt32x32x8_ws1x1_wr2x2_ta1x8x4x1_1x4x1x64_tb1x8x1x1_1x4x1x64/batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/: 0.268026, workspace_sz = c412000
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoGEMM:GemmFwdRest
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):GemmFwdRest: : 3.31109 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Selected: GemmFwdRest: : 3.31109, workspace_sz = 372000
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoDirect:ConvDirectNaiveConvFwd
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvDirectNaiveConvFwd: naive_conv_ab_nonpacked_fwd_nchw_ushort_double_ushort_0/: 8.35943 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvDirectNaiveConvFwd: naive_conv_ab_nonpacked_fwd_nchw_ushort_double_ushort_0/: 8.35943, workspace_sz = 0
+MIOpen(HIP): Info [FindConvolution] Find Ended: 64-56-56-3x3-64-56-56-128-1x1-1x1-1x1-0-NCHW-BF16-F
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionFwdAlgoImplicitGEMM	0.268026	c412000
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionFwdAlgoGEMM	3.31109	372000
+MIOpen(HIP): Info [FillFindReturnParameters] FW Chosen Algorithm: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC , c412000, 0.268026
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen Forward Conv. Algorithm: 0, Solution: 0/UNKNOWN
+GPU Kernel Time Forward Conv. Elapsed: 0.251151 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: fwd-conv3x3u1, 128, 64, 56, 56, 3, 3, 64, 29595009024, 51453952, 51380224, 117838, 409, 0.251151
+Forward Convolution Verifies OK on GPU reference (0.000821318 < 0.656)
+
+real	1m19.963s
+user	1m17.867s
+sys	0m1.945s

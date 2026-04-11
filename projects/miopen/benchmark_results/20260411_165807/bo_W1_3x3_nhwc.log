@@ -1,0 +1,22 @@
+MIOpenDriver convbfp16 -n 512 -c 512 -H 28 -W 28 -k 512 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -g 1 --in_layout NHWC --out_layout NHWC --fil_layout NHWC -F 4 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:23:23 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupWrwXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvHipImplicitGemmGroupWrwXdlops (306 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 8/306 | best: #278 | time: 13.3095ms | score: 0.976965x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle<256, 64, 64, 64, Default, 8, 1, 1, 2, 8, 2, 8, 1, 1, 2, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v1, 1>+-1
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvHipImplicitGemmGroupWrwXdlops | time: 13.3095ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC (362 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 182/362 | best: #12 | time: 3.3465ms | score: 1.37476x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: wrw,nhwc,bf16,0,1,256,256,32,32,32,8,2,2,2,2,0,1,2,0,0,1,4,1,8,1,8,1,32,1,4,1,8,1,8,1,32,154
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #2 ConvAsmImplicitGemmGTCDynamicWrwXdlopsNHWC | time: 3.3465ms
+MIOpen Backward Weights Conv. Algorithm: 5, Solution: 156/ConvHipImplicitGemmGroupWrwXdlops
+GPU Kernel Time Backward Weights Conv. Elapsed: 3.611287 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: bwdw-conv3x3u1, 512, 512, 28, 28, 3, 3, 512, 1894080577536, 0, 0, 524489, 0, 3.611287
+Backward Convolution Weights Verifies OK on GPU reference (2.4338e-05 < 0.1312)
+
+real	0m56.872s
+user	0m54.699s
+sys	0m2.031s

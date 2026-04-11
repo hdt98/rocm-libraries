@@ -1,0 +1,22 @@
+MIOpenDriver convbfp16 -n 16 -c 64 -H 56 -W 56 -k 128 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -g 1 --in_layout NHWC --out_layout NHWC --fil_layout NHWC -F 1 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 16:58:26 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC (43 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 23/43 | best: #0 | time: 0.0373599ms | score: 2.68786x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: fwd,nhwc,bf16,0,1,256,128,32,32,32,8,2,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,64,1,8,2,1,1,4,1,64,183
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.0373599ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupFwdXdlops (151 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 77/151 | best: #46 | time: 0.0301148ms | score: 1.28086x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #2 ConvHipImplicitGemmGroupFwdXdlops | time: 0.0301148ms
+MIOpen Forward Conv. Algorithm: 5, Solution: 137/ConvHipImplicitGemmGroupFwdXdlops
+GPU Kernel Time Forward Conv. Elapsed: 0.030904 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: fwd-conv3x3u1, 16, 64, 56, 56, 3, 3, 128, 7398752256, 6569984, 12845056, 239407, 628, 0.030904
+Forward Convolution Verifies OK on GPU reference (4.58694e-06 < 0.656)
+
+real	0m5.643s
+user	0m4.880s
+sys	0m0.747s

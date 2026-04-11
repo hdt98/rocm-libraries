@@ -1,0 +1,11 @@
+case|bf_wall_s|bf_search_ms|bf_final_ms|bf_verify|bf_solver|bf_config
+F1_1x1_nhwc|6|0.051351|0.052392|OK|137/ConvHipImplicitGemmGroupFwdXdlops|DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Filter1x1Stride1Pad0, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>
+F2_3x3_nhwc|6|0.0305571|0.031563|OK|137/ConvHipImplicitGemmGroupFwdXdlops|DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>
+F3_3x3_nchw|175|0.274588|0.241648|OK|0/UNKNOWN|fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,1,1,10,1,1,1,2,4,20,1,8,1,1,1,4,1,40,db
+F4_1x1_fp16|411|0.091656|0.092461|OK|88/GemmFwd1x1_0_1|fwd,nhwc,fp16,0,0,80,100,20,20,20,8,1,2,2,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,4,1,1,4,1,40,6a
+B1_5x5_nhwc|9|0.203391|0.208274|OK|155/ConvHipImplicitGemmGroupBwdXdlops|bwd,nhwc,bf16,0,1,100,100,20,20,20,8,2,2,2,2,1,0,0,0,0,1,8,4,1,1,4,1,40,1,8,1,4,1,4,1,40,eb
+B2_3x3_nchw|392|0.153358|0.146682|OK|0/UNKNOWN|bwd,nhwc,bf16,0,1,80,100,20,20,20,8,1,2,2,2,1,0,0,0,0,1,8,2,1,1,4,1,40,1,8,1,4,1,4,1,40,109
+B3_1x1_nhwc|11|0.101625|0.101540|OK|155/ConvHipImplicitGemmGroupBwdXdlops|bwd,nhwc,bf16,0,0,80,100,20,20,20,8,1,2,2,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,1,4,1,4,1,40,10a
+W1_3x3_nhwc|74|3.24744|3.365149|OK|156/ConvHipImplicitGemmGroupWrwXdlops|wrw,nhwc,bf16,0,1,100,100,20,20,20,8,2,2,2,2,0,0,1,0,0,1,4,1,8,1,8,1,20,1,4,1,8,1,8,1,20,99
+W2_3x3_nchw|819|0.169104|0.157653|OK|0/UNKNOWN|wrw,nhwc,bf16,0,1,100,80,20,20,20,8,2,1,2,2,0,1,1,0,0,1,4,1,8,1,8,1,20,1,4,1,4,1,8,1,20,a1
+W3_1x1_nhwc|29|0.353229|0.359865|OK|156/ConvHipImplicitGemmGroupWrwXdlops|wrw,nhwc,bf16,0,0,100,100,20,20,20,8,2,2,2,2,0,1,1,0,0,1,4,1,8,1,8,1,20,1,4,1,8,1,8,1,20,9d

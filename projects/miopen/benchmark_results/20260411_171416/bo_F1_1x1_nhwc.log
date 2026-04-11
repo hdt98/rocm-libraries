@@ -1,0 +1,22 @@
+MIOpenDriver convbfp16 -n 64 -c 1280 -H 8 -W 8 -k 1280 -y 1 -x 1 -p 0 -q 0 -u 1 -v 1 -l 1 -j 1 -g 1 --in_layout NHWC --out_layout NHWC --fil_layout NHWC -F 1 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:14:23 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC (77 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 40/77 | best: #0 | time: 0.0705674ms | score: 1.69719x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: fwd,nhwc,bf16,0,0,256,128,32,32,32,8,2,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,64,1,8,2,1,1,4,1,64,184
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.0705674ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupFwdXdlops (303 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 153/303 | best: #97 | time: 0.0516223ms | score: 1.14838x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Filter1x1Pad0, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #2 ConvHipImplicitGemmGroupFwdXdlops | time: 0.0516223ms
+MIOpen Forward Conv. Algorithm: 5, Solution: 137/ConvHipImplicitGemmGroupFwdXdlops
+GPU Kernel Time Forward Conv. Elapsed: 0.052223 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: fwd-conv1x1u1, 64, 1280, 8, 8, 1, 1, 1280, 13421772800, 13762560, 10485760, 257007, 464, 0.052223
+Forward Convolution Verifies OK on GPU reference (6.06566e-06 < 0.656)
+
+real	0m6.383s
+user	0m5.628s
+sys	0m0.742s

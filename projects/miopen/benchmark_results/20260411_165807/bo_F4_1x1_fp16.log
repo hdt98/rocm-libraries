@@ -1,0 +1,27 @@
+MIOpenDriver convfp16 -n 64 -c 256 -H 14 -W 14 -k 1024 -y 1 -x 1 -p 0 -q 0 -u 1 -v 1 -l 1 -j 1 -g 1 -F 1 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:09:21 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC (129 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 66/129 | best: #87 | time: 0.0894734ms | score: 1.02787x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: fwd,nhwc,fp16,0,0,64,128,32,32,32,8,1,1,2,1,0,0,0,0,0,1,8,1,1,1,4,1,64,1,8,2,1,1,4,1,64,146
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.0894734ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupFwdXdlops (283 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 143/283 | best: #54 | time: 0.128457ms | score: 1.18085x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 128, 128, 32, OddC, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.0894734ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvBinWinogradRxSf3x2, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #3] ConvBinWinogradRxSf3x2 (304 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 153/304 | best: #270 | time: 0.244025ms | score: 1.12652x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: 271
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC | time: 0.0894734ms
+MIOpen Forward Conv. Algorithm: 0, Solution: 88/GemmFwd1x1_0_1
+GPU Kernel Time Forward Conv. Elapsed: 0.092105 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: fwd-conv1x1u1, 64, 256, 14, 14, 1, 1, 1024, 6576668672, 6946816, 25690112, 71404, 354, 0.092105
+Forward Convolution Verifies OK on GPU reference (3.34989e-06 < 0.0082)
+
+real	2m39.947s
+user	2m36.429s
+sys	0m3.384s

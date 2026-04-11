@@ -1,0 +1,22 @@
+MIOpenDriver convbfp16 -n 64 -c 512 -H 28 -W 28 -k 512 -y 1 -x 1 -p 0 -q 0 -u 1 -v 1 -l 1 -j 1 -g 1 --in_layout NHWC --out_layout NHWC --fil_layout NHWC -F 2 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:21:48 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC (166 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 84/166 | best: #53 | time: 0.101397ms | score: 1.2246x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: bwd,nhwc,bf16,0,0,128,256,32,32,32,8,1,2,2,2,0,0,0,0,0,1,8,2,1,1,4,1,64,1,8,1,4,1,4,1,64,266
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC | time: 0.101397ms
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupBwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupBwdXdlops (516 configs)
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 259/516 | best: #132 | time: 0.103614ms | score: 1.7315x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1<256, 128, 256, 32, 8, 8, Filter1x1Stride1Pad0, 32, 32, 2, 4, 8, 4, 1, 1>+1
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC | time: 0.101397ms
+MIOpen Backward Data Conv. Algorithm: 5, Solution: 155/ConvHipImplicitGemmGroupBwdXdlops
+GPU Kernel Time Backward Data Conv. Elapsed: 0.100641 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: bwdd-conv1x1u1, 64, 512, 28, 28, 1, 1, 512, 26306674688, 34078720, 51380224, 261392, 849, 0.100641
+Backward Convolution Data Verifies OK on GPU reference (0.000773279 < 0.656)
+
+real	0m12.384s
+user	0m11.447s
+sys	0m0.931s

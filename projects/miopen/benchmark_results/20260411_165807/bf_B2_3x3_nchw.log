@@ -1,0 +1,14 @@
+MIOpenDriver convbfp16 -n 128 -c 256 -H 14 -W 14 -k 256 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -g 1 -F 2 -s 1 -t 1
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:12:23 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupBwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen Backward Data Conv. Algorithm: 0, Solution: 0/UNKNOWN
+GPU Kernel Time Backward Data Conv. Elapsed: 0.152406 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: bwdd-conv3x3u1, 128, 256, 14, 14, 3, 3, 256, 29595009024, 17956864, 12845056, 194185, 202, 0.152406
+Backward Convolution Data Verifies OK on GPU reference (0.000853486 < 0.656)
+
+real	6m41.056s
+user	6m34.644s
+sys	0m6.567s

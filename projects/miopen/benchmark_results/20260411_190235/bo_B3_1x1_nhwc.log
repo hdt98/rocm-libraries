@@ -1,0 +1,89 @@
+MIOpenDriver convbfp16 -n 64 -c 512 -H 28 -W 28 -k 512 -y 1 -x 1 -p 0 -q 0 -u 1 -v 1 -l 1 -j 1 -g 1 --in_layout NHWC --out_layout NHWC --fil_layout NHWC -F 2 -s 1 -t 1
+MIOpen(HIP): Info [get_device_name] Raw device name: gfx942:sramecc+:xnack-
+MIOpen(HIP): Info [Handle] stream: 0x3ca3820, device_id: 0
+MIOpen(HIP): Info [] MIOPEN_FIND_MODE = DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [AmdRocmMetadataVersionDetect] ROCm MD version AMDHSA_COv3, HIP version 7.1.25424, MIOpen version 3.5.1.d65bd09ddcf
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [GetCKSplitkMaxWorkspaceSize] Max workspace size reported by CK: 0
+MIOpen(HIP): Info [GetWorkSpaceSize] 102760448
+PRNG seed: 12345678
+Timestamp: 2026-04-11 19:26:20 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Info [FindConvBwdDataAlgorithm] requestAlgoCount = 2, workspace = 102760448
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsNetworkedFilesystem] Filesystem type at '"/root/.config/miopen/"' is: 0x794c7630 'OVERLAYFS_SUPER_MAGIC'
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.01343 ms
+MIOpen(HIP): Info [TryLoad] Find-db regenerating.
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [FindConvolution] Find Start: 512-28-28-1x1-512-28-28-64-0x0-1x1-1x1-0-NHWC-NHWC-NHWC-BF16-B, findMode: DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [FindSolutionImpl] ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x512x28x28x1x1x1x1x512x64x0x0x0x1x1x0x1x1x0x0x1xNHWCxBF16xB : ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GenericSearch] GenericSearch: routing to BayesianSearch
+MIOpen(HIP): Info [HeuristicInit] m_per_block:80, n_per_block:80, k_per_block:20
+MIOpen(HIP): Info [HeuristicInit] into current m_per_block:80, n_per_block:80, k_per_block:20
+MIOpen(HIP): Info [HeuristicInit] into current m_per_block:80, n_per_block:80, k_per_block:20
+MIOpen(HIP): Info [GetDefaultPerformanceConfig] bwd,nhwc,bf16,0,0,128,128,32,32,32,8,1,1,2,2,0,0,0,0,0,1,8,2,1,1,4,1,64,1,8,1,2,1,4,1,64,0
+MIOpen(HIP): Info [GetAllConfigs] ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC: Searching the best solution among a6 (spare)...
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #1] ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC (166 configs)
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase1 random_init=3
+MIOpen(HIP): Info [PrintVersionImpl] COMgr v.3.0.0
+MIOpen(HIP): Info [PrintVersion] HIPRTC v.9.0
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase2 bo_budget=81
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=0 NEW BEST #0 t=0.112956
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=1 NEW BEST #53 t=0.10153
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 84/166 | best: #53 | time: 0.10153ms | score: 1.2238x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: bwd,nhwc,bf16,0,0,80,100,20,20,20,8,1,2,2,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,1,4,1,4,1,40,10a
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC | time: 0.10153ms
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x512x28x28x1x1x1x1x512x64x0x0x0x1x1x0x1x1x0x0x1xNHWCxBF16xB : ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC
+MIOpen(HIP): Info [GetPerfDbPathFile] Found exact perf database file
+MIOpen(HIP): Info [Measure] ReadonlyRamDb::Prefetch time: 120.784 ms
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.027171 ms
+MIOpen(HIP): Info [FindSolutionImpl] ConvHipImplicitGemmGroupBwdXdlops
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupBwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x512x28x28x1x1x1x1x512x64x0x0x0x1x1x0x1x1x0x0x1xNHWCxBF16xB : ConvHipImplicitGemmGroupBwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GenericSearch] GenericSearch: routing to BayesianSearch
+MIOpen(HIP): Info [GetAllConfigs] ConvHipImplicitGemmGroupBwdXdlops: Searching the best solution among 204...
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [Solver #2] ConvHipImplicitGemmGroupBwdXdlops (516 configs)
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase1 random_init=3
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: phase2 bo_budget=256
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=0 NEW BEST #42 t=0.134595
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=1 NEW BEST #18 t=0.132178
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=2 NEW BEST #26 t=0.126472
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=7 NEW BEST #196 t=0.125237
+MIOpen(HIP): Info [BayesianSearch] BayesianSearch: iter=19 NEW BEST #132 t=0.104255
+MIOpen(HIP): BayesOpt [BayesianSearch]      evaluated: 259/516 | best: #132 | time: 0.104255ms | score: 1.54835x
+MIOpen(HIP): BayesOpt [BayesianSearch]      config: DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1<256, 128, 256, 32, 8, 8, Filter1x1Stride1Pad0, 32, 32, 2, 4, 8, 4, 1, 1>+1
+MIOpen(HIP): BayesOpt [BayesianSearch] >> [BEST] Solver #1 ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC | time: 0.10153ms
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x512x28x28x1x1x1x1x512x64x0x0x0x1x1x0x1x1x0x0x1xNHWCxBF16xB : ConvHipImplicitGemmGroupBwdXdlops
+MIOpen(HIP): Info [FindSolutionImpl] ConvDirectNaiveConvBwd (not searchable)
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionBwdDataAlgoImplicitGEMM:ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC: igemm_bwd_gtcx3_nhwc_bf16_bx0_ex0_bt128x256x32_wt32x32x8_ws1x2_wr2x2_ta1x8x2x1_1x4x1x64_tb1x8x1x4_1x4x1x64/: 0.0994283 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionBwdDataAlgoImplicitGEMM:ConvHipImplicitGemmGroupBwdXdlops
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvHipImplicitGemmGroupBwdXdlops: : 0.104521 >= 0.0994283
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC: igemm_bwd_gtcx3_nhwc_bf16_bx0_ex0_bt128x256x32_wt32x32x8_ws1x2_wr2x2_ta1x8x2x1_1x4x1x64_tb1x8x1x4_1x4x1x64/: 0.0994283, workspace_sz = 6200000
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionBwdDataAlgoDirect:ConvDirectNaiveConvBwd
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvDirectNaiveConvBwd: naive_conv_ab_nonpacked_bwd_nhwc_ushort_double_ushort_0/: 5.34967 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvDirectNaiveConvBwd: naive_conv_ab_nonpacked_bwd_nhwc_ushort_double_ushort_0/: 5.34967, workspace_sz = 0
+MIOpen(HIP): Info [FindConvolution] Find Ended: 512-28-28-1x1-512-28-28-64-0x0-1x1-1x1-0-NHWC-NHWC-NHWC-BF16-B
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionBwdDataAlgoImplicitGEMM	0.0994283	6200000
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionBwdDataAlgoDirect	5.34967	0
+MIOpen(HIP): Info [FillFindReturnParameters] BWD Chosen Algorithm: ConvAsmImplicitGemmGTCDynamicBwdXdlopsNHWC , 6200000, 0.0994283
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen(HIP): Info [ConvolutionBackwardData] algo = 5, workspace = 6200000
+MIOpen Backward Data Conv. Algorithm: 5, Solution: 155/ConvHipImplicitGemmGroupBwdXdlops
+GPU Kernel Time Backward Data Conv. Elapsed: 0.102159 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: bwdd-conv1x1u1, 64, 512, 28, 28, 1, 1, 512, 26306674688, 34078720, 51380224, 257508, 837, 0.102159
+Backward Convolution Data Verifies OK on GPU reference (0.000773279 < 0.656)
+
+real	0m12.676s
+user	0m11.626s
+sys	0m1.046s

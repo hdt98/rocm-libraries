@@ -1,0 +1,166 @@
+MIOpenDriver convbfp16 -n 128 -c 64 -H 56 -W 56 -k 64 -y 3 -x 3 -p 1 -q 1 -u 1 -v 1 -l 1 -j 1 -g 1 -F 1 -s 1 -t 1
+MIOpen(HIP): Info [get_device_name] Raw device name: gfx942:sramecc+:xnack-
+MIOpen(HIP): Info [Handle] stream: 0x3ca3800, device_id: 0
+MIOpen(HIP): Info [] MIOPEN_FIND_MODE = DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [AmdRocmMetadataVersionDetect] ROCm MD version AMDHSA_COv3, HIP version 7.1.25424, MIOpen version 3.5.1.d65bd09ddcf
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [GetWorkSpaceSize] 205594624
+PRNG seed: 12345678
+Timestamp: 2026-04-11 17:34:17 UTC; Host Name: gt-ccs-aus-h17-18.cs-aus.dcgpu; Operating System: Linux 6.4.3-0_fbk1_zion_755_ga25447393a1d; ROCm: 7.1.25424; MIOpen Driver: 3.5.1; CPU Vendor: AMD; CPU Model: 2 x EPYC 9654; RAM Size: 2267 GB; GPU Model: 8 x ; AMDGPU Driver: 6.8.5
+MIOpen(HIP): Info [FindConvFwdAlgorithm] requestAlgoCount = 2, workspace = 205594624
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsNetworkedFilesystem] Filesystem type at '"/root/.config/miopen/"' is: 0x794c7630 'OVERLAYFS_SUPER_MAGIC'
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.012719 ms
+MIOpen(HIP): Info [TryLoad] Find-db regenerating.
+MIOpen(HIP): Info [IsEnabled] MIOPEN_FIND_MODE is set to NORMAL due to MIOPEN_FIND_ENFORCE
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [FindConvolution] Find Start: 64-56-56-3x3-64-56-56-128-1x1-1x1-1x1-0-NCHW-BF16-F, findMode: DYNAMIC_HYBRID(5)
+MIOpen(HIP): Info [FindSolutionImpl] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GetDefaultPerformanceConfig] fwd,nhwc,bf16,0,1,128,64,32,32,32,8,1,1,1,2,0,0,0,0,0,1,8,2,1,1,4,1,64,1,8,1,1,1,4,1,64,0
+MIOpen(HIP): Info [GetAllConfigs] ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: Searching the best solution among 2b (spare)...
+MIOpen(HIP): Info [PrintVersionImpl] COMgr v.3.0.0
+MIOpen(HIP): Info [PrintVersion] HIPRTC v.9.0
+MIOpen(HIP): Info [GenericSearch] #0/0/2b 0.526614 < 3.40282e+38 fwd,nhwc,bf16,0,1,40,80,20,20,20,8,1,1,2,1,0,0,1,0,0,1,8,1,1,1,4,1,40,1,8,2,1,1,4,1,40,eb
+MIOpen(HIP): Info [Monitor] 0/0/2b 0.526614, best within recent 1: 0.526614 #0 fwd,nhwc,bf16,0,1,40,80,20,20,20,8,1,1,2,1,0,0,1,0,0,1,8,1,1,1,4,1,40,1,8,2,1,1,4,1,40,eb, ETA:0 sec.
+MIOpen(HIP): Info [GenericSearch] #1/0/2b 0.319789 < 0.526614 fwd,nhwc,bf16,0,1,40,40,40,10,10,10,1,1,2,2,0,0,0,0,0,1,8,2,1,1,8,1,20,1,8,2,1,1,8,1,20,ed
+MIOpen(HIP): Info [Monitor] 2/0/2b 0.319789, best within recent 2: 0.319789 #1 fwd,nhwc,bf16,0,1,40,40,40,10,10,10,1,1,2,2,0,0,0,0,0,1,8,2,1,1,8,1,20,1,8,2,1,1,8,1,20,ed, ETA:163.665 sec.
+MIOpen(HIP): Info [Monitor] 5/0/2b 0.319789, best within recent 3: 0.322911 #4 fwd,nhwc,bf16,0,1,80,80,20,20,20,8,1,1,2,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,2,1,1,4,1,40,d1, ETA:93.7052 sec.
+MIOpen(HIP): Info [Monitor] 8/0/2b 0.319789, best within recent 3: 0.338448 #8 fwd,nhwc,bf16,0,1,40,80,20,20,20,8,1,1,2,1,0,0,0,0,0,1,8,1,1,1,4,1,40,1,8,2,1,1,4,1,40,e9, ETA:72.8756 sec.
+MIOpen(HIP): Info [GenericSearch] #9/0/2b 0.314854 < 0.319789 fwd,nhwc,bf16,0,1,100,80,20,20,20,8,2,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,40,1,8,2,1,1,4,1,40,b7
+MIOpen(HIP): Info [GenericSearch] #b/0/2b 0.298196 < 0.314854 fwd,nhwc,bf16,0,1,100,40,20,20,20,8,1,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,40,1,8,1,1,1,4,1,40,bf
+MIOpen(HIP): Info [Monitor] b/0/2b 0.298196, best within recent 3: 0.298196 #b fwd,nhwc,bf16,0,1,100,40,20,20,20,8,1,1,2,2,0,0,0,0,0,1,8,4,1,1,4,1,40,1,8,1,1,1,4,1,40,bf, ETA:61.1087 sec.
+MIOpen(HIP): Info [Monitor] e/0/2b 0.298196, best within recent 3: 0.502331 #c fwd,nhwc,bf16,0,1,80,20,10,40,10,4,1,1,1,1,0,0,0,1,0,1,1,8,1,1,10,1,10,1,1,2,1,1,10,1,10,e4, ETA:52.4728 sec.
+MIOpen(HIP): Info [Monitor] 11/0/2b 0.298196, best within recent 3: 0.369505 #11 fwd,nhwc,bf16,0,1,100,40,10,40,20,4,1,1,1,2,0,0,0,0,0,1,4,4,1,1,4,1,40,1,4,1,1,1,4,1,40,c3, ETA:45.3734 sec.
+MIOpen(HIP): Info [Monitor] 13/0/2b 0.298196, best within recent 2: 0.50137 #13 fwd,nhwc,bf16,0,1,20,80,20,10,40,4,1,1,1,1,0,0,0,0,0,1,4,1,1,1,8,1,20,1,4,4,1,1,8,1,20,fb, ETA:42.0213 sec.
+MIOpen(HIP): Info [Monitor] 16/0/2b 0.298196, best within recent 3: 0.447375 #16 fwd,nhwc,bf16,0,1,40,40,10,10,10,4,1,1,2,2,0,0,0,1,0,1,1,4,1,1,10,1,10,1,1,4,1,1,10,1,10,f1, ETA:35.8785 sec.
+MIOpen(HIP): Info [GenericSearch] #19/0/2b 0.296424 < 0.298196 fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,1,1,1,4,1,40,d7
+MIOpen(HIP): Info [Monitor] 19/0/2b 0.296424, best within recent 3: 0.296424 #19 fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,1,1,1,4,1,40,d7, ETA:30.1851 sec.
+MIOpen(HIP): Info [GenericSearch] #1b/0/2b 0.281552 < 0.296424 fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,1,1,10,1,1,1,2,4,20,1,8,1,1,1,4,1,40,db
+MIOpen(HIP): Info [Monitor] 1b/0/2b 0.281552, best within recent 2: 0.281552 #1b fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,1,1,10,1,1,1,2,4,20,1,8,1,1,1,4,1,40,db, ETA:26.9772 sec.
+MIOpen(HIP): Info [Monitor] 1d/0/2b 0.281552, best within recent 2: 0.424743 #1d fwd,nhwc,bf16,0,1,40,100,20,20,20,8,1,1,2,2,0,0,0,0,0,1,8,1,1,1,4,1,40,1,8,4,1,1,4,1,40,e5, ETA:23.713 sec.
+MIOpen(HIP): Info [Monitor] 20/0/2b 0.281552, best within recent 3: 0.427909 #1f fwd,nhwc,bf16,0,1,80,100,20,20,20,8,1,2,2,2,0,0,0,0,0,1,8,2,1,1,4,1,40,1,8,4,1,1,4,1,40,cd, ETA:18.3743 sec.
+MIOpen(HIP): Info [Monitor] 24/0/2b 0.281552, best within recent 4: 0.452423 #21 fwd,nhwc,bf16,0,1,80,40,10,20,20,4,1,1,2,1,0,0,0,1,0,1,1,8,1,1,10,1,10,1,1,4,1,1,10,1,10,df, ETA:11.0956 sec.
+MIOpen(HIP): Info [Monitor] 29/0/2b 0.281552, best within recent 5: 0.467644 #25 fwd,nhwc,bf16,0,1,80,80,8,20,20,4,1,1,2,2,0,0,0,1,0,1,1,4,1,1,8,1,20,1,1,4,1,1,8,1,20,d6, ETA:2.95996 sec.
+MIOpen(HIP): Info [GenericSearch] Done: 2b/0/2b, best #1b 0.281552 fwd,nhwc,bf16,0,1,80,40,20,20,20,8,1,1,1,2,0,0,0,0,1,1,10,1,1,1,2,4,20,1,8,1,1,1,4,1,40,db
+MIOpen(HIP): Info [GenericSearch] ...Score: 1.00355 (default time 0.28255)
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Info [GetPerfDbPathFile] Found exact perf database file
+MIOpen(HIP): Info [Measure] ReadonlyRamDb::Prefetch time: 118.636 ms
+MIOpen(HIP): Info [Measure] RamDb::Prefetch time: 0.020361 ms
+MIOpen(HIP): Info [FindSolutionImpl] ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Warning [FindSolutionImpl] Perf Db: load skipped: ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [FindSolutionImpl] Search Started: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvHipImplicitGemmGroupFwdXdlops, enforce: SEARCH_DB_UPDATE(4)
+MIOpen(HIP): Info [GetAllConfigs] ConvHipImplicitGemmGroupFwdXdlops: Searching the best solution among 97...
+MIOpen(HIP): Info [GenericSearch] #0/0/97 0.411176 < 3.40282e+38 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 32, 16, 64, Default, 16, 16, 1, 1, 8, 8, 2, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2>
+MIOpen(HIP): Info [GenericSearch] #1/0/97 0.359515 < 0.411176 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 64, 128, 32, OddC, 32, 32, 1, 2, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): Info [GenericSearch] #3/0/97 0.356096 < 0.359515 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<128, 128, 128, 32, Default, 32, 32, 4, 2, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): Info [GenericSearch] #4/0/97 0.35309 < 0.356096 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 32, 32, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): Info [Monitor] 4/0/97 0.35309, best within recent 5: 0.35309 #4 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 32, 32, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, 1>, ETA:111.353 sec.
+MIOpen(HIP): Info [Monitor] 9/0/97 0.35309, best within recent 5: 0.359387 #5 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 128, 128, 32, OddC, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:105.404 sec.
+MIOpen(HIP): Info [GenericSearch] #b/0/97 0.337616 < 0.35309 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 256, 128, 32, OddC, 32, 32, 4, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>
+MIOpen(HIP): Info [Monitor] e/0/97 0.337616, best within recent 5: 0.337616 #b DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 256, 128, 32, OddC, 32, 32, 4, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>, ETA:100.961 sec.
+MIOpen(HIP): Info [Monitor] 13/0/97 0.337616, best within recent 5: 0.380155 #10 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v4>, ETA:96.7552 sec.
+MIOpen(HIP): Info [GenericSearch] #16/0/97 0.313432 < 0.337616 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 64, 32, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>
+MIOpen(HIP): Info [Monitor] 18/0/97 0.313432, best within recent 5: 0.313432 #16 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 64, 32, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:92.8353 sec.
+MIOpen(HIP): Info [Monitor] 1d/0/97 0.313432, best within recent 5: 0.319925 #1d DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 64, 64, Default, 32, 32, 2, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:89.0043 sec.
+MIOpen(HIP): Info [Monitor] 22/0/97 0.313432, best within recent 5: 0.357543 #22 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 32, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v4>, ETA:85.3362 sec.
+MIOpen(HIP): Info [Monitor] 27/0/97 0.313432, best within recent 5: 0.348209 #24 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 128, 32, 64, Default, 32, 32, 2, 1, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2>, ETA:81.581 sec.
+MIOpen(HIP): Info [Monitor] 2c/0/97 0.313432, best within recent 5: 0.332228 #2a DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 256, 128, 32, Default, 32, 32, 4, 2, 8, 8, 8, 1, 1, 1>, ETA:77.903 sec.
+MIOpen(HIP): Info [Monitor] 31/0/97 0.313432, best within recent 5: 0.317664 #30 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 64, 64, 64, Default, 32, 32, 1, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:74.2292 sec.
+MIOpen(HIP): Info [Monitor] 36/0/97 0.313432, best within recent 5: 0.351829 #34 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<128, 128, 64, 32, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:70.5463 sec.
+MIOpen(HIP): Info [Monitor] 3b/0/97 0.313432, best within recent 5: 0.363814 #38 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 16, 64, 64, Default, 16, 16, 1, 2, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2>, ETA:66.8894 sec.
+MIOpen(HIP): Info [Monitor] 40/0/97 0.313432, best within recent 5: 0.400312 #40 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<128, 32, 128, 32, Default, 32, 32, 1, 2, 8, 8, 8, 1, 1, 1>, ETA:63.2327 sec.
+MIOpen(HIP): Info [Monitor] 45/0/97 0.313432, best within recent 5: 0.393262 #43 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 64, 64, 32, Default, 16, 16, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:59.5672 sec.
+MIOpen(HIP): Info [Monitor] 4a/0/97 0.313432, best within recent 5: 0.339328 #47 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 128, 32, 64, OddC, 32, 32, 2, 1, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v2>, ETA:55.93 sec.
+MIOpen(HIP): Info [Monitor] 4f/0/97 0.313432, best within recent 5: 0.344615 #4f DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 128, 32, 64, Default, 32, 32, 2, 1, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2>, ETA:52.2909 sec.
+MIOpen(HIP): Info [GenericSearch] #51/0/97 0.312155 < 0.313432 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 64, 64, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>
+MIOpen(HIP): Info [Monitor] 54/0/97 0.312155, best within recent 5: 0.312155 #51 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 64, 64, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:48.6514 sec.
+MIOpen(HIP): Info [Monitor] 59/0/97 0.312155, best within recent 5: 0.359596 #58 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<128, 64, 32, 64, Default, 32, 32, 1, 1, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2>, ETA:45.0189 sec.
+MIOpen(HIP): Info [Monitor] 5e/0/97 0.312155, best within recent 5: 0.346325 #5a DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 64, 64, 32, OddC, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:41.3817 sec.
+MIOpen(HIP): Info [Monitor] 63/0/97 0.312155, best within recent 5: 0.34135 #61 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<128, 128, 32, 32, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, 1>, ETA:37.742 sec.
+MIOpen(HIP): Info [Monitor] 68/0/97 0.312155, best within recent 5: 0.332307 #65 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 64, 64, 64, OddC, 32, 32, 1, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:34.1071 sec.
+MIOpen(HIP): Info [Monitor] 6d/0/97 0.312155, best within recent 5: 0.3217 #6d DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 128, 64, 32, Default, 32, 32, 2, 1, 8, 8, 8, 1, 1, 1>, ETA:30.4753 sec.
+MIOpen(HIP): Info [Monitor] 72/0/97 0.312155, best within recent 5: 0.380131 #6f DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 256, 32, 64, Default, 32, 32, 2, 1, 8, 8, 4, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v2>, ETA:26.8421 sec.
+MIOpen(HIP): Info [Monitor] 77/0/97 0.312155, best within recent 5: 0.350479 #76 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 256, 128, 32, Default, 32, 32, 4, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Interwave, BlkGemmPipelineVersion: v1>, ETA:23.2133 sec.
+MIOpen(HIP): Info [Monitor] 7c/0/97 0.312155, best within recent 5: 0.347345 #7b DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 64, 128, 64, Default, 32, 32, 1, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:19.5836 sec.
+MIOpen(HIP): Info [Monitor] 81/0/97 0.312155, best within recent 5: 0.314053 #7d DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 128, 64, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>, ETA:15.9558 sec.
+MIOpen(HIP): Info [Monitor] 86/0/97 0.312155, best within recent 5: 0.314 #82 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 128, 64, 32, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, 1>, ETA:12.3312 sec.
+MIOpen(HIP): Info [Monitor] 8b/0/97 0.312155, best within recent 5: 0.341004 #8a DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<64, 32, 64, 32, Default, 32, 32, 1, 2, 8, 8, 8, 1, 1, 1>, ETA:8.70571 sec.
+MIOpen(HIP): Info [Monitor] 90/0/97 0.312155, best within recent 5: 0.360946 #8d DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 256, 128, 32, OddC, 32, 32, 4, 2, 8, 8, 8, 1, 1, 1>, ETA:5.07776 sec.
+MIOpen(HIP): Info [Monitor] 95/0/97 0.312155, best within recent 5: 0.31908 #92 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle<256, 128, 128, 32, Default, 32, 32, 2, 2, 8, 8, 8, 1, 1, 1>, ETA:1.45076 sec.
+MIOpen(HIP): Info [GenericSearch] Done: 97/0/97, best #51 0.312155 DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3<256, 128, 64, 64, OddC, 32, 32, 2, 1, 8, 8, 8, 1, 1, BlkGemmPipelineScheduler: Intrawave, BlkGemmPipelineVersion: v3>
+MIOpen(HIP): Info [GenericSearch] ...Score: 1.11508 (default time 0.348078)
+MIOpen(HIP): Info [FindSolutionImpl] Search Ended: 2x64x56x56x1x3x3x1x64x128x1x1x0x1x1x0x1x1x0x0x1xNCHWxBF16xF : ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Info [FindSolutionImpl] GemmFwdRest (not searchable)
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [IsApplicable] No layout difference detected for solver, skipping transpose
+MIOpen(HIP): Info [FindSolutionImpl] ConvDirectNaiveConvFwd (not searchable)
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoImplicitGEMM:ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x64x32_wt32x32x8_ws1x1_wr1x2_ta1x16x1x1_1x2x4x32_tb1x8x1x1_1x4x1x64_pta/batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/: 0.273443 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoImplicitGEMM:ConvHipImplicitGemmGroupFwdXdlops
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvHipImplicitGemmGroupFwdXdlops: batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/batched_transpose_32x32_half/: 0.282378 >= 0.273443
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC: igemm_fwd_gtcx3_nhwc_bf16_bx0_ex1_bt128x64x32_wt32x32x8_ws1x1_wr1x2_ta1x16x1x1_1x2x4x32_tb1x8x1x1_1x4x1x64_pta/batched_transpose_32x32_half/batched_transpose_16x32_half/batched_transpose_32x32_half/: 0.273443, workspace_sz = c412000
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoGEMM:GemmFwdRest
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):GemmFwdRest: : 3.39569 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Selected: GemmFwdRest: : 3.39569, workspace_sz = 372000
+MIOpen(HIP): Info [EvaluateInvokers] Evaluating Solver: miopenConvolutionFwdAlgoDirect:ConvDirectNaiveConvFwd
+MIOpen(HIP): Info [EvaluateInvokers] solution(current vs best):ConvDirectNaiveConvFwd: naive_conv_ab_nonpacked_fwd_nchw_ushort_double_ushort_0/: 8.35201 < 3.40282e+38
+MIOpen(HIP): Info [EvaluateInvokers] Selected: ConvDirectNaiveConvFwd: naive_conv_ab_nonpacked_fwd_nchw_ushort_double_ushort_0/: 8.35201, workspace_sz = 0
+MIOpen(HIP): Info [FindConvolution] Find Ended: 64-56-56-3x3-64-56-56-128-1x1-1x1-1x1-0-NCHW-BF16-F
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionFwdAlgoImplicitGEMM	0.273443	c412000
+MIOpen(HIP): Info [FindConvolution] miopenConvolutionFwdAlgoGEMM	3.39569	372000
+MIOpen(HIP): Info [FillFindReturnParameters] FW Chosen Algorithm: ConvAsmImplicitGemmGTCDynamicFwdXdlopsNHWC , c412000, 0.273443
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen(HIP): Info [ConvolutionForward] algo = 5, workspace = c412000
+MIOpen Forward Conv. Algorithm: 0, Solution: 0/UNKNOWN
+GPU Kernel Time Forward Conv. Elapsed: 0.256963 ms (average)
+stats: name, n, c, ho, wo, y, x, k, flopCnt, bytesRead, bytesWritten, GFLOPs, GB/s, timeMs
+stats: fwd-conv3x3u1, 128, 64, 56, 56, 3, 3, 64, 29595009024, 51453952, 51380224, 115172, 400, 0.256963
+Forward Convolution Verifies OK on GPU reference (0.000821319 < 0.656)
+
+real	2m57.023s
+user	2m53.425s
+sys	0m3.453s

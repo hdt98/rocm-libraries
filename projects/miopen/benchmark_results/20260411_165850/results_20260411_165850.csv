@@ -1,0 +1,4 @@
+case,direction,description,bf_wall_s,bo_wall_s,speedup,bf_kernel_ms,bo_kernel_ms,kernel_diff_pct,bf_verify,bo_verify
+F1_1x1_nhwc,F,N64_C1280_K1280_8x8_1x1_NHWC,6,6,1.0,0.054070,0.052521,-2.9,OK,OK
+F2_3x3_nhwc,F,N16_C64_K128_56x56_3x3_NHWC,6,6,1.0,0.031274,0.031444,0.5,OK,OK
+F3_3x3_nchw,F,N128_C64_K64_56x56_3x3_NCHW,173,79,2.2,0.238537,0.249388,4.5,OK,OK
