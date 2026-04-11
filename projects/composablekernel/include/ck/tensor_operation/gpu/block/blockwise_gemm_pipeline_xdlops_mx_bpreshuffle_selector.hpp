@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_v3_mx_bpreshuffle.hpp"
+#include "ck/tensor_operation/gpu/block/blockwise_gemm_pipeline_xdlops_b_preshuffle_mx_moe_v3.hpp"
 
 namespace ck {
 template <BlockGemmPipelineVersion BlkGemmPipelineVer,
@@ -37,27 +37,27 @@ constexpr auto BlockGemmMXBPreshufflePipeline_Selector()
     // Hardware MX GEMM pipeline
     if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
     {
-        return BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlkGemmPipeSche,
-                                                             ThreadBlockSize,
-                                                             ScaleBlockSize,
-                                                             ADataType,
-                                                             AScaleDataType,
-                                                             BDataType,
-                                                             BScaleDataType,
-                                                             ATileDesc,
-                                                             BTileDesc,
-                                                             AMmaTileDesc,
-                                                             BMmaTileDesc,
-                                                             ABlockTransferSrcScalarPerVector,
-                                                             BBlockTransferSrcScalarPerVector,
-                                                             MPerBlock,
-                                                             NPerBlock,
-                                                             KPerBlock,
-                                                             MPerXDL,
-                                                             NPerXDL,
-                                                             MRepeat,
-                                                             NRepeat,
-                                                             KPack>{};
+        return BlockwiseGemmXdlops_pipeline_bpreshuffle_mx_moe_v3<BlkGemmPipeSche,
+                                                                  ThreadBlockSize,
+                                                                  ScaleBlockSize,
+                                                                  ADataType,
+                                                                  AScaleDataType,
+                                                                  BDataType,
+                                                                  BScaleDataType,
+                                                                  ATileDesc,
+                                                                  BTileDesc,
+                                                                  AMmaTileDesc,
+                                                                  BMmaTileDesc,
+                                                                  ABlockTransferSrcScalarPerVector,
+                                                                  BBlockTransferSrcScalarPerVector,
+                                                                  MPerBlock,
+                                                                  NPerBlock,
+                                                                  KPerBlock,
+                                                                  MPerXDL,
+                                                                  NPerXDL,
+                                                                  MRepeat,
+                                                                  NRepeat,
+                                                                  KPack>{};
     }
     else
     {
