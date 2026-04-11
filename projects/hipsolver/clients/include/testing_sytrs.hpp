@@ -38,12 +38,12 @@ void sytrs_checkBadArgs(const hipsolverHandle_t   handle,
                         const I                   nrhs,
                         Td                        dA,
                         const I                   lda,
-                        const I                   stA,
+                        const rocblas_stride      stA,
                         Id                        dIpiv,
-                        const I                   stP,
+                        const rocblas_stride      stP,
                         Td                        dB,
                         const I                   ldb,
-                        const I                   stB,
+                        const rocblas_stride      stB,
                         Ud                        dWorkOnDevice,
                         const SIZE                lworkOnDevice,
                         Ud                        dWorkOnHost,
@@ -190,9 +190,9 @@ void testing_sytrs_bad_arg()
     I                      nrhs = 1;
     I                      lda  = 1;
     I                      ldb  = 1;
-    I                      stA  = 1;
-    I                      stP  = 1;
-    I                      stB  = 1;
+    rocblas_stride         stA  = 1;
+    rocblas_stride         stP  = 1;
+    rocblas_stride         stB  = 1;
     int                    bc   = 1;
 
     if(BATCHED)
@@ -269,12 +269,12 @@ void sytrs_initData(const hipsolverHandle_t   handle,
                     const I                   nrhs,
                     Td&                       dA,
                     const I                   lda,
-                    const I                   stA,
+                    const rocblas_stride      stA,
                     Id&                       dIpiv,
-                    const I                   stP,
+                    const rocblas_stride      stP,
                     Td&                       dB,
                     const I                   ldb,
-                    const I                   stB,
+                    const rocblas_stride      stB,
                     const int                 bc,
                     Th&                       hA,
                     Ih&                       hIpiv,
@@ -350,12 +350,12 @@ void sytrs_getError(const hipsolverHandle_t   handle,
                     const I                   nrhs,
                     Td&                       dA,
                     const I                   lda,
-                    const I                   stA,
+                    const rocblas_stride      stA,
                     Id&                       dIpiv,
-                    const I                   stP,
+                    const rocblas_stride      stP,
                     Td&                       dB,
                     const I                   ldb,
-                    const I                   stB,
+                    const rocblas_stride      stB,
                     void*                     dWorkOnDevice,
                     const SIZE                lworkOnDevice,
                     void*                     workOnHost,
@@ -459,12 +459,12 @@ void sytrs_getPerfData(const hipsolverHandle_t   handle,
                        const I                   nrhs,
                        Td&                       dA,
                        const I                   lda,
-                       const I                   stA,
+                       const rocblas_stride      stA,
                        Id&                       dIpiv,
-                       const I                   stP,
+                       const rocblas_stride      stP,
                        Td&                       dB,
                        const I                   ldb,
-                       const I                   stB,
+                       const rocblas_stride      stB,
                        void*                     dWorkOnDevice,
                        const SIZE                lworkOnDevice,
                        void*                     workOnHost,
@@ -635,15 +635,15 @@ void testing_sytrs(Arguments& argus)
     I                      nrhs  = argus.get<int>("nrhs", n);
     I                      lda   = argus.get<int>("lda", n);
     I                      ldb   = argus.get<int>("ldb", n);
-    I                      stA   = argus.get<int>("strideA", lda * n);
-    I                      stP   = argus.get<int>("strideP", n);
-    I                      stB   = argus.get<int>("strideB", ldb * nrhs);
+    rocblas_stride         stA   = argus.get<rocblas_stride>("strideA", lda * n);
+    rocblas_stride         stP   = argus.get<rocblas_stride>("strideP", n);
+    rocblas_stride         stB   = argus.get<rocblas_stride>("strideB", ldb * nrhs);
 
     hipsolverFillMode_t uplo      = char2hipsolver_fill(uploC);
     int                 bc        = argus.batch_count;
     int                 hot_calls = argus.iters;
 
-    I stBRes = (argus.unit_check || argus.norm_check) ? stB : 0;
+    rocblas_stride stBRes = (argus.unit_check || argus.norm_check) ? stB : 0;
 
     // check non-supported values
     if(uplo != HIPSOLVER_FILL_MODE_UPPER && uplo != HIPSOLVER_FILL_MODE_LOWER)
