@@ -887,6 +887,7 @@ hipsolverStatus_t hipsolverDnXsytrs_bufferSize(hipsolverDnHandle_t handle,
                                                size_t*             lworkOnHost)
 try
 {
+    *lworkOnDevice = 0;
     return HIPSOLVER_STATUS_NOT_SUPPORTED;
 }
 catch(...)
