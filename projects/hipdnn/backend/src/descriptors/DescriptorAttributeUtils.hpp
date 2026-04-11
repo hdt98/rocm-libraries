@@ -513,17 +513,17 @@ void setConvolutionAttribute(DataT& data,
     switch(attributeName)
     {
     case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
-        setInt64Vector(data.pre_padding, attributeType, elementCount, arrayOfElements, errorPrefix);
+        setScalarVector<int64_t>(data.pre_padding, attributeType, elementCount, arrayOfElements, errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
-        setInt64Vector(
+        setScalarVector<int64_t>(
             data.post_padding, attributeType, elementCount, arrayOfElements, errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
-        setInt64Vector(data.stride, attributeType, elementCount, arrayOfElements, errorPrefix);
+        setScalarVector<int64_t>(data.stride, attributeType, elementCount, arrayOfElements, errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
-        setInt64Vector(data.dilation, attributeType, elementCount, arrayOfElements, errorPrefix);
+        setScalarVector<int64_t>(data.dilation, attributeType, elementCount, arrayOfElements, errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_CONV_MODE:
         setConvMode(data.conv_mode, attributeType, elementCount, arrayOfElements, errorPrefix);
@@ -557,7 +557,7 @@ void getConvolutionAttribute(const DataT& data,
     switch(attributeName)
     {
     case HIPDNN_ATTR_CONVOLUTION_PRE_PADDINGS:
-        getInt64Vector(data.pre_padding,
+        getScalarVector<int64_t>(data.pre_padding,
                        attributeType,
                        requestedElementCount,
                        elementCount,
@@ -565,7 +565,7 @@ void getConvolutionAttribute(const DataT& data,
                        errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_POST_PADDINGS:
-        getInt64Vector(data.post_padding,
+        getScalarVector<int64_t>(data.post_padding,
                        attributeType,
                        requestedElementCount,
                        elementCount,
@@ -573,7 +573,7 @@ void getConvolutionAttribute(const DataT& data,
                        errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_FILTER_STRIDES:
-        getInt64Vector(data.stride,
+        getScalarVector<int64_t>(data.stride,
                        attributeType,
                        requestedElementCount,
                        elementCount,
@@ -581,7 +581,7 @@ void getConvolutionAttribute(const DataT& data,
                        errorPrefix);
         break;
     case HIPDNN_ATTR_CONVOLUTION_DILATIONS:
-        getInt64Vector(data.dilation,
+        getScalarVector<int64_t>(data.dilation,
                        attributeType,
                        requestedElementCount,
                        elementCount,
