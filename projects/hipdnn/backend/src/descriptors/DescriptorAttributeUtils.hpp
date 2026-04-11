@@ -40,19 +40,6 @@ void checkGetArgs(hipdnnBackendAttributeType_t expectedType,
                   hipdnnBackendAttributeType_t attributeType,
                   const char* errorPrefix);
 
-void setInt64Vector(std::vector<int64_t>& target,
-                    hipdnnBackendAttributeType_t attributeType,
-                    int64_t elementCount,
-                    const void* arrayOfElements,
-                    const char* errorPrefix);
-
-void getInt64Vector(const std::vector<int64_t>& source,
-                    hipdnnBackendAttributeType_t attributeType,
-                    int64_t requestedElementCount,
-                    int64_t* elementCount,
-                    void* arrayOfElements,
-                    const char* errorPrefix);
-
 void setString(std::string& target,
                hipdnnBackendAttributeType_t attributeType,
                int64_t elementCount,
