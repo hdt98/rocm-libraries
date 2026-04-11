@@ -3453,21 +3453,33 @@ void cpu_sytrf<hipsolverDoubleComplex>(hipsolverFillMode_t     uplo,
 
 // sytrs
 template <>
-void cpu_sytrs<float>(
-    hipsolverFillMode_t uplo, int n, int nrhs, float* A, int lda, int* ipiv, float* B, int ldb)
+void cpu_sytrs<float>(hipsolverFillMode_t uplo,
+                      int                 n,
+                      int                 nrhs,
+                      float*              A,
+                      int                 lda,
+                      int*                ipiv,
+                      float*              B,
+                      int                 ldb,
+                      int*                info)
 {
-    int  info  = 0;
     char uploC = hipsolver2char_fill(uplo);
-    ssytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+    ssytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, info);
 }
 
 template <>
-void cpu_sytrs<double>(
-    hipsolverFillMode_t uplo, int n, int nrhs, double* A, int lda, int* ipiv, double* B, int ldb)
+void cpu_sytrs<double>(hipsolverFillMode_t uplo,
+                       int                 n,
+                       int                 nrhs,
+                       double*             A,
+                       int                 lda,
+                       int*                ipiv,
+                       double*             B,
+                       int                 ldb,
+                       int*                info)
 {
-    int  info  = 0;
     char uploC = hipsolver2char_fill(uplo);
-    dsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+    dsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, info);
 }
 
 template <>
@@ -3478,11 +3490,11 @@ void cpu_sytrs<hipsolverComplex>(hipsolverFillMode_t uplo,
                                  int                 lda,
                                  int*                ipiv,
                                  hipsolverComplex*   B,
-                                 int                 ldb)
+                                 int                 ldb,
+                                 int*                info)
 {
-    int  info  = 0;
     char uploC = hipsolver2char_fill(uplo);
-    csytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+    csytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, info);
 }
 
 template <>
@@ -3493,9 +3505,9 @@ void cpu_sytrs<hipsolverDoubleComplex>(hipsolverFillMode_t     uplo,
                                        int                     lda,
                                        int*                    ipiv,
                                        hipsolverDoubleComplex* B,
-                                       int                     ldb)
+                                       int                     ldb,
+                                       int*                    info)
 {
-    int  info  = 0;
     char uploC = hipsolver2char_fill(uplo);
-    zsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+    zsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, info);
 }

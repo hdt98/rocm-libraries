@@ -417,7 +417,7 @@ void sytrs_getError(const hipsolverHandle_t   handle,
     // CPU lapack
     for(int b = 0; b < bc; ++b)
     {
-        cpu_sytrs(uplo, n, nrhs, hA[b], lda, hIpiv_cpu[b], hB[b], ldb);
+        cpu_sytrs(uplo, n, nrhs, hA[b], lda, hIpiv_cpu[b], hB[b], ldb, hInfo[b]);
     }
 
     // error is ||hB - hBRes|| / ||hB||
@@ -505,7 +505,7 @@ void sytrs_getPerfData(const hipsolverHandle_t   handle,
         *cpu_time_used = get_time_us_no_sync();
         for(int b = 0; b < bc; ++b)
         {
-            cpu_sytrs(uplo, n, nrhs, hA[b], lda, hIpiv_cpu[b], hB[b], ldb);
+            cpu_sytrs(uplo, n, nrhs, hA[b], lda, hIpiv_cpu[b], hB[b], ldb, hInfo[b]);
         }
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
     }
