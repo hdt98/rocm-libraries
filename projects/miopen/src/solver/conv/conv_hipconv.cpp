@@ -120,9 +120,18 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
 {
     ConvSolution result;
 
-    const auto arch = hipconv::parse_arch(ctx.GetStream().GetDeviceName()).value();
+    const auto arch_opt = hipconv::parse_arch(ctx.GetStream().GetDeviceName());
+    if(!arch_opt.has_value())
+        MIOPEN_THROW("ConvHipConv: unsupported architecture.");
+
+    const auto arch = arch_opt.value();
     const auto par  = ToHipconvParams(problem);
-    const auto cfg  = hipconv::find_config(arch, par).value();
+
+    const auto cfg_opt = hipconv::find_config(arch, par);
+    if(!cfg_opt.has_value())
+        MIOPEN_THROW("ConvHipConv: no applicable kernel config found.");
+
+    const auto cfg = cfg_opt.value();
 
     if(problem.IsDirectionBackwardWrW())
     {

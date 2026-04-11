@@ -28,7 +28,7 @@ inline std::optional<Arch> parse_arch(std::string_view name)
 {
     auto matches = [&](std::string_view prefix)
     {
-        return name.substr(0, prefix.size()) == prefix &&
+        return name.starts_with(prefix) &&
                (name.size() == prefix.size() || name[prefix.size()] == ':');
     };
     if(matches("gfx942"))
