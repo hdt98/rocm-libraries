@@ -930,7 +930,7 @@ struct FastGelu
     CK_TILE_HOST_DEVICE void
     operator()<ck_tile::bf16_t, ck_tile::bf16_t>(ck_tile::bf16_t& y, const ck_tile::bf16_t& x) const
     {
-#if defined(__gfx125__) || defined(__gfx13__)
+#if defined(CK_TILE_SUPPORT_BF16_TRANS_INSTS)
         const ck_tile::bf16_t c1 = type_convert<ck_tile::bf16_t>(0.035677f);
         const ck_tile::bf16_t c2 = type_convert<ck_tile::bf16_t>(0.797885f);
         const ck_tile::bf16_t u  = x * (c1 * x * x + c2);

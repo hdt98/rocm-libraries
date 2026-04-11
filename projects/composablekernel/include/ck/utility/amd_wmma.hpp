@@ -24,11 +24,6 @@ namespace ck {
 #define __gfx125__
 #endif
 
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || \
-    defined(__gfx131F__) || defined(__gfx13_generic__)
-#define __gfx13__
-#endif
-
 /********************************WAVE32 MODE***********************************************/
 
 // src: fp16, dst: fp32

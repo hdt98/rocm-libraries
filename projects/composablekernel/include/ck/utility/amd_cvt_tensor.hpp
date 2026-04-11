@@ -7,10 +7,6 @@
 #include "data_type.hpp"
 namespace ck {
 
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
-#define __gfx13__
-#endif
-
 // __builtin_amdgcn_scale_bias_activate_f32
 // aux_data[ 5: 0] maps to instr[ 63: 58] for VOP2M-VOP6M (MOD0)
 // aux_data[17: 6] maps to instr[ 87: 76] for VOP3M-VOP5M (MOD1)

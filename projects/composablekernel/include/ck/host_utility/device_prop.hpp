@@ -109,7 +109,8 @@ inline bool is_gfx125_supported()
 inline bool is_gfx13_supported()
 {
     return ck::get_device_name() == "gfx1310" || ck::get_device_name() == "gfx1370" ||
-           ck::get_device_name() == "gfx130F" || ck::get_device_name() == "gfx131F";
+           ck::get_device_name() == "gfx130F" || ck::get_device_name() == "gfx130C" ||
+           ck::get_device_name() == "gfx131F" || ck::get_device_name() == "gfx135F";
 }
 
 inline bool is_xdl_supported()

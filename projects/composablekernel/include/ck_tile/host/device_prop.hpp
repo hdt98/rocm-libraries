@@ -98,7 +98,8 @@ inline bool is_gfx95_supported()
 inline bool is_gfx13_supported()
 {
     return ck_tile::get_device_name() == "gfx1310" || ck_tile::get_device_name() == "gfx1370" ||
-           ck_tile::get_device_name() == "gfx130F" || ck_tile::get_device_name() == "gfx131F";
+           ck_tile::get_device_name() == "gfx130F" || ck_tile::get_device_name() == "gfx130C" ||
+           ck_tile::get_device_name() == "gfx131F" || ck_tile::get_device_name() == "gfx135F";
 }
 
 inline size_t get_num_cus()

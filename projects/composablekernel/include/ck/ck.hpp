@@ -82,9 +82,16 @@
 #if defined(__gfx1250__) || defined(__gfx1251__)
 #define __gfx125__
 #endif
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
+#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || \
+    defined(__gfx130C__) || defined(__gfx131F__) || defined(__gfx135F__)
 #define __gfx13__
 #endif
+
+// All GFX12.5 and some GFX13 GPU targets support bf16-trans-insts, bf16-cvt-insts & bf16-pk-insts
+#if defined(__gfx125__) || (defined(__gfx13__) && !defined(__gfx130F__) && !defined(__gfx130C__))
+#define CK_SUPPORT_BF16_TRANS_INSTS 1
+#endif
+
 // buffer resource
 #ifndef __HIP_DEVICE_COMPILE__ // for host code
 #define CK_BUFFER_RESOURCE_3RD_DWORD -1
