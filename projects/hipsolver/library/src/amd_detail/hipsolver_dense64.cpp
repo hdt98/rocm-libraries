@@ -871,6 +871,7 @@ catch(...)
 }
 
 /******************** SYTRS ********************/
+// TODO: update when SYTRS implementation in rocSOLVER is available
 hipsolverStatus_t hipsolverDnXsytrs_bufferSize(hipsolverDnHandle_t handle,
                                                hipsolverFillMode_t uplo,
                                                int64_t             n,
