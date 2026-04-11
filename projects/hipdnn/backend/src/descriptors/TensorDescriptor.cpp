@@ -70,7 +70,7 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                     "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_DIMENSIONS:
-        getInt64Vector(_data.dims,
+        getScalarVector<int64_t>(_data.dims,
                        attributeType,
                        requestedElementCount,
                        elementCount,
@@ -78,7 +78,7 @@ void TensorDescriptor::getAttribute(hipdnnBackendAttributeName_t attributeName,
                        "TensorDescriptor::getAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_STRIDES:
-        getInt64Vector(_data.strides,
+        getScalarVector<int64_t>(_data.strides,
                        attributeType,
                        requestedElementCount,
                        elementCount,
@@ -146,14 +146,14 @@ void TensorDescriptor::setAttribute(hipdnnBackendAttributeName_t attributeName,
                     "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_DIMENSIONS:
-        setInt64Vector(_data.dims,
+        setScalarVector<int64_t>(_data.dims,
                        attributeType,
                        elementCount,
                        arrayOfElements,
                        "TensorDescriptor::setAttribute()");
         break;
     case HIPDNN_ATTR_TENSOR_STRIDES:
-        setInt64Vector(_data.strides,
+        setScalarVector<int64_t>(_data.strides,
                        attributeType,
                        elementCount,
                        arrayOfElements,
