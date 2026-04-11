@@ -895,6 +895,7 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
+// TODO: add check the ipiv is not nullptr, not permitted in AMD backend
 hipsolverStatus_t hipsolverDnXsytrs(hipsolverDnHandle_t handle,
                                     hipsolverFillMode_t uplo,
                                     int64_t             n,
