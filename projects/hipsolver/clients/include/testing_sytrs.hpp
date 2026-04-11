@@ -316,9 +316,9 @@ void sytrs_initData(const hipsolverHandle_t   handle,
             }
 
             // do the LDL^T factorization of matrix A w/ the reference LAPACK routine
-            int            sytrf_lwork = 64 * n;
+            int            sytrf_lwork = lda * n;
             std::vector<T> hWork(sytrf_lwork);
-            int            info;
+            int            info = 0;
             cpu_sytrf(uplo, n, hA[b], lda, hIpiv_cpu[b], hWork.data(), sytrf_lwork, &info);
 
             // copy ipiv from int to int64_t
