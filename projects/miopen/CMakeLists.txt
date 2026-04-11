@@ -816,6 +816,7 @@ enable_cppcheck(
         *:*src/sqlite/*.cpp
         *:*.cl
         *:*src/kernels/*.h
+        *:*src/hipconv/*
         knownConditionTrueFalse:*src/kernels/static_composable_kernel/*/*
         redundantAssignment:*src/kernels/static_composable_kernel/*/*
         unreadVariable:*src/kernels/static_composable_kernel/*/*
