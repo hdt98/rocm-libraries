@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -1173,6 +1173,29 @@ void zsytrf_(char*                   uplo,
              int*                    ipiv,
              hipsolverDoubleComplex* work,
              int*                    lwork,
+             int*                    info);
+
+void ssytrs_(
+    char* uplo, int* n, int* nrhs, float* A, int* lda, int* ipiv, float* B, int* ldb, int* info);
+void dsytrs_(
+    char* uplo, int* n, int* nrhs, double* A, int* lda, int* ipiv, double* B, int* ldb, int* info);
+void csytrs_(char*             uplo,
+             int*              n,
+             int*              nrhs,
+             hipsolverComplex* A,
+             int*              lda,
+             int*              ipiv,
+             hipsolverComplex* B,
+             int*              ldb,
+             int*              info);
+void zsytrs_(char*                   uplo,
+             int*                    n,
+             int*                    nrhs,
+             hipsolverDoubleComplex* A,
+             int*                    lda,
+             int*                    ipiv,
+             hipsolverDoubleComplex* B,
+             int*                    ldb,
              int*                    info);
 
 #ifdef __cplusplus
@@ -3426,4 +3449,53 @@ void cpu_sytrf<hipsolverDoubleComplex>(hipsolverFillMode_t     uplo,
 {
     char uploC = hipsolver2char_fill(uplo);
     zsytrf_(&uploC, &n, A, &lda, ipiv, work, &lwork, info);
+}
+
+// sytrs
+template <>
+void cpu_sytrs<float>(
+    hipsolverFillMode_t uplo, int n, int nrhs, float* A, int lda, int* ipiv, float* B, int ldb)
+{
+    int  info  = 0;
+    char uploC = hipsolver2char_fill(uplo);
+    ssytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<double>(
+    hipsolverFillMode_t uplo, int n, int nrhs, double* A, int lda, int* ipiv, double* B, int ldb)
+{
+    int  info  = 0;
+    char uploC = hipsolver2char_fill(uplo);
+    dsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<hipsolverComplex>(hipsolverFillMode_t uplo,
+                                 int                 n,
+                                 int                 nrhs,
+                                 hipsolverComplex*   A,
+                                 int                 lda,
+                                 int*                ipiv,
+                                 hipsolverComplex*   B,
+                                 int                 ldb)
+{
+    int  info  = 0;
+    char uploC = hipsolver2char_fill(uplo);
+    csytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<hipsolverDoubleComplex>(hipsolverFillMode_t     uplo,
+                                       int                     n,
+                                       int                     nrhs,
+                                       hipsolverDoubleComplex* A,
+                                       int                     lda,
+                                       int*                    ipiv,
+                                       hipsolverDoubleComplex* B,
+                                       int                     ldb)
+{
+    int  info  = 0;
+    char uploC = hipsolver2char_fill(uplo);
+    zsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
 }
