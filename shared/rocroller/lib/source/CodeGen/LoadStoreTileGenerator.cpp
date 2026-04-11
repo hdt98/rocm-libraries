@@ -198,10 +198,6 @@ namespace rocRoller
                                                                  bool               preserveOffset,
                                                                  bool isStorePartOfGlobalToLDS)
         {
-            auto offsetConsumerCount = [this](int coordTag) -> std::size_t {
-                return m_graph->mapper.getCoordinateConnections(coordTag).size();
-            };
-
             auto offsetTag
                 = m_graph->mapper.get<Offset>(info.tag, isStorePartOfGlobalToLDS ? 2 : 0);
             rocRoller::Log::getLogger()->debug("KernelGraph::LoadStoreTileGenerator::getOffset(tag:"
@@ -260,36 +256,17 @@ namespace rocRoller
                 }
                 else
                 {
+                    info.rowOffsetReg = m_context->registerTagManager()->getRegister(
+                        offsetTag,
+                        Register::Type::Vector,
+                        getOffsetDataTypeFromGraph(info.tag, *m_graph, isStorePartOfGlobalToLDS),
+                        1);
+                    info.rowOffsetReg->setName(concatenate("Offset", offsetTag));
+                    m_context->getScopeManager()->addRegister(offsetTag);
+
+                    // Copy base to new offset register
                     auto baseReg = m_context->registerTagManager()->getRegister(baseTag);
-
-                    auto expectedOffsetType
-                        = getOffsetDataTypeFromGraph(info.tag, *m_graph, isStorePartOfGlobalToLDS);
-
-                    bool singleConsumerOffset = (offsetConsumerCount(offsetTag) == 1);
-                    bool canReuseBaseAsSeed   = singleConsumerOffset
-                                              && baseReg->regType() == Register::Type::Vector
-                                              && baseReg->valueCount() == 1
-                                              && baseReg->variableType() == expectedOffsetType;
-
-                    if(canReuseBaseAsSeed)
-                    {
-                        // Do not materialize a tracked Offset<tag> register when this
-                        // offset coordinate has only one consumer. The later
-                        // rowOffsetExpr/preserveOffset logic can still create a local
-                        // working cursor if needed, but we avoid keeping a second,
-                        // long-lived tracked copy alive in the tag manager.
-                        info.rowOffsetReg = baseReg;
-                    }
-                    else
-                    {
-                        info.rowOffsetReg = m_context->registerTagManager()->getRegister(
-                            offsetTag, Register::Type::Vector, expectedOffsetType, 1);
-                        info.rowOffsetReg->setName(concatenate("Offset", offsetTag));
-                        m_context->getScopeManager()->addRegister(offsetTag);
-
-                        // Copy base to new offset register
-                        co_yield m_context->copier()->copy(info.rowOffsetReg, baseReg);
-                    }
+                    co_yield m_context->copier()->copy(info.rowOffsetReg, baseReg);
                 }
 
                 rowOffsetExpr = getOffsetExpr(info.tag, isStorePartOfGlobalToLDS, coords);
@@ -709,32 +686,6 @@ namespace rocRoller
                        toString(Dir));
 
             AssertFatal(!info.bufOpts.lds);
-
-            if(info.n == 1)
-            {
-                for(uint64_t i = 0; i < info.m; ++i)
-                {
-                    co_yield m_context->mem()->moveData<Dir>(
-                        info.kind,
-                        info.rowOffsetReg,
-                        info.data->element({static_cast<int>((i * info.n) / info.packedAmount)}),
-                        info.offset,
-                        CeilDivide(info.elementBits, 8u),
-                        "",
-                        false,
-                        info.bufDesc,
-                        info.bufOpts);
-
-                    if(i < info.m - 1)
-                    {
-                        co_yield generate(info.rowOffsetReg,
-                                          info.rowOffsetReg->expression()
-                                              + info.rowStrideReg->subset({0})->expression());
-                    }
-                }
-
-                co_return;
-            }
 
             auto colOffsetReg = info.rowOffsetReg->placeholder();
 
