@@ -72,7 +72,9 @@ size_t do_get_workspace_size(AlgoConfig gcfg, const Conv2dParams& par)
 }
 
 void do_get_tolerance(AlgoConfig, const Conv2dParams& par, float& atol, float& rtol)
-{ hipconv::get_grouped_tolerance(par, atol, rtol); }
+{
+    hipconv::get_grouped_tolerance(par, atol, rtol);
+}
 } // namespace grouped_cdna4_detail
 
 // Host-only: the device linker must not see this struct or its function pointers.
