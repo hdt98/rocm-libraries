@@ -9755,6 +9755,7 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    *lworkOnHost = 0;
     switch(API)
     {
     case API_COMPAT:
@@ -9773,7 +9774,6 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                             lworkOnHost);
     default:
         *lworkOnDevice = 0;
-        *lworkOnHost   = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
 }
@@ -9791,6 +9791,7 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    *lworkOnHost = 0;
     switch(API)
     {
     case API_COMPAT:
@@ -9809,7 +9810,6 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                             lworkOnHost);
     default:
         *lworkOnDevice = 0;
-        *lworkOnHost   = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
 }
@@ -9827,6 +9827,7 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                                     size_t*             lworkOnDevice,
                                                     size_t*             lworkOnHost)
 {
+    *lworkOnHost = 0;
     switch(API)
     {
     case API_COMPAT:
@@ -9845,7 +9846,6 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t           API,
                                             lworkOnHost);
     default:
         *lworkOnDevice = 0;
-        *lworkOnHost   = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
 }
@@ -9863,6 +9863,7 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t               API,
                                                     size_t*                 lworkOnDevice,
                                                     size_t*                 lworkOnHost)
 {
+    *lworkOnHost = 0;
     switch(API)
     {
     case API_COMPAT:
@@ -9881,7 +9882,6 @@ inline hipsolverStatus_t hipsolver_sytrs_bufferSize(testAPI_t               API,
                                             lworkOnHost);
     default:
         *lworkOnDevice = 0;
-        *lworkOnHost   = 0;
         return HIPSOLVER_STATUS_NOT_SUPPORTED;
     }
 }
