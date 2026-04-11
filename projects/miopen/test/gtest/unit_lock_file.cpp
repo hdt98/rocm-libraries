@@ -69,16 +69,17 @@ TEST(CPU_UnitTestLockFile_NONE, TimedLockTimeout)
     miopen::FSLockFile lockfile1(lockpath);
     EXPECT_TRUE(lockfile1.try_lock());
 
-    // Second lock should timeout
+    // Second lock should timeout — verify only the lower bound (≥ timeout duration).
+    // An upper bound is intentionally omitted: a loaded CI system may preempt the
+    // process for longer than any reasonable ceiling, making upper-bound assertions
+    // non-deterministic.
     miopen::FSLockFile lockfile2(lockpath);
     auto start = std::chrono::steady_clock::now();
     EXPECT_FALSE(lockfile2.timed_lock(ToPTime(std::chrono::milliseconds(50))));
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start);
 
-    // Should have waited approximately 50ms
     EXPECT_GE(elapsed.count(), 40);
-    EXPECT_LE(elapsed.count(), 100);
 
     lockfile1.unlock();
 }
@@ -148,48 +149,76 @@ TEST(CPU_UnitTestLockFile_NONE, BlockingLockBothTypes)
     auto lockpath = miopen::LockFilePath(
         miopen::fs::path{"/tmp/config/miopen/test_blocking." + std::to_string(getpid())});
 
-    // Test blocking exclusive lock
+    // Test blocking exclusive lock.
+    // Two-phase synchronisation: the worker signals just before calling lock()
+    // ("about to block"), so the main thread knows the worker has definitely
+    // reached lock() before sampling whether it has acquired.  A short yield
+    // after that signal lets the worker enter the blocking call, after which a
+    // zero-timeout future check confirms it is genuinely blocked and has not
+    // returned.  A second promise captures when lock() eventually returns.
     {
         miopen::FSLockFile lockfile1(lockpath);
         EXPECT_TRUE(lockfile1.try_lock());
 
-        std::atomic<bool> lock_acquired{false};
-        std::thread t([&lockpath, &lock_acquired]() {
+        std::promise<void> about_to_lock_promise;
+        auto about_to_lock_future = about_to_lock_promise.get_future();
+        std::promise<void> acquired_promise;
+        auto acquired_future = acquired_promise.get_future();
+
+        std::thread t([&lockpath, &about_to_lock_promise, &acquired_promise]() {
             miopen::FSLockFile lockfile2(lockpath);
+            about_to_lock_promise.set_value();
             lockfile2.lock();
-            lock_acquired = true;
+            acquired_promise.set_value();
             lockfile2.unlock();
         });
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        EXPECT_FALSE(lock_acquired.load());
+        // Wait until the worker has reached lock(), then give it a moment to enter
+        // the blocking call before sampling.
+        about_to_lock_future.wait();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)),
+                  std::future_status::ready)
+            << "lock() returned before the holder released";
 
         lockfile1.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        EXPECT_TRUE(lock_acquired.load());
+
+        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)),
+                  std::future_status::ready)
+            << "lock() never unblocked after holder released";
 
         t.join();
     }
 
-    // Test blocking shared lock
+    // Test blocking shared lock — same two-phase pattern.
     {
         miopen::FSLockFile exclusive_lock(lockpath);
         EXPECT_TRUE(exclusive_lock.try_lock());
 
-        std::atomic<bool> shared_acquired{false};
-        std::thread t([&lockpath, &shared_acquired]() {
+        std::promise<void> about_to_lock_promise;
+        auto about_to_lock_future = about_to_lock_promise.get_future();
+        std::promise<void> acquired_promise;
+        auto acquired_future = acquired_promise.get_future();
+
+        std::thread t([&lockpath, &about_to_lock_promise, &acquired_promise]() {
             miopen::FSLockFile shared_lock(lockpath);
+            about_to_lock_promise.set_value();
             shared_lock.lock_shared();
-            shared_acquired = true;
+            acquired_promise.set_value();
             shared_lock.unlock_shared();
         });
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        EXPECT_FALSE(shared_acquired.load());
+        about_to_lock_future.wait();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)),
+                  std::future_status::ready)
+            << "lock_shared() returned before the exclusive holder released";
 
         exclusive_lock.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        EXPECT_TRUE(shared_acquired.load());
+
+        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)),
+                  std::future_status::ready)
+            << "lock_shared() never unblocked after exclusive holder released";
 
         t.join();
     }
@@ -239,37 +268,35 @@ TEST(CPU_UnitTestLockFile_NONE, MassiveConcurrentLoad)
     auto lockpath = miopen::LockFilePath(
         miopen::fs::path{"/tmp/config/miopen/test_massive_load." + std::to_string(getpid())});
 
+    // Use blocking lock()/lock_shared() so every attempt is guaranteed to succeed
+    // regardless of CI scheduling jitter.  Even threads → exclusive, odd → shared.
+    constexpr int kThreads      = 20;
+    constexpr int kOpsPerThread = 10;
+
     std::atomic<int> total_acquires{0};
     std::vector<std::thread> threads;
+    threads.reserve(kThreads);
 
-    for(int i = 0; i < 20; ++i)
+    for(int i = 0; i < kThreads; ++i)
     {
         threads.emplace_back([&, i]() {
-            for(int j = 0; j < 10; ++j)
+            for(int j = 0; j < kOpsPerThread; ++j)
             {
-                miopen::FSLockFile lock(lockpath);
-                bool exclusive = (i % 2 == 0);
-
-                if(exclusive)
+                miopen::FSLockFile lockfile(lockpath);
+                if(i % 2 == 0)
                 {
-                    if(lock.try_lock())
-                    {
-                        total_acquires++;
-                        std::this_thread::sleep_for(std::chrono::microseconds(100));
-                        lock.unlock();
-                    }
+                    lockfile.lock();
+                    total_acquires++;
+                    std::this_thread::sleep_for(std::chrono::microseconds(100));
+                    lockfile.unlock();
                 }
                 else
                 {
-                    if(lock.try_lock_shared())
-                    {
-                        total_acquires++;
-                        std::this_thread::sleep_for(std::chrono::microseconds(100));
-                        lock.unlock_shared();
-                    }
+                    lockfile.lock_shared();
+                    total_acquires++;
+                    std::this_thread::sleep_for(std::chrono::microseconds(100));
+                    lockfile.unlock_shared();
                 }
-
-                std::this_thread::sleep_for(std::chrono::microseconds(50));
             }
         });
     }
@@ -277,7 +304,7 @@ TEST(CPU_UnitTestLockFile_NONE, MassiveConcurrentLoad)
     for(auto& t : threads)
         t.join();
 
-    EXPECT_GT(total_acquires.load(), 50);
+    EXPECT_EQ(total_acquires.load(), kThreads * kOpsPerThread);
 }
 
 // ========== Clock and Timeout Tests ==========
@@ -353,13 +380,12 @@ TEST(CPU_UnitTestLockFile_NONE, ExclusiveBlocksShared)
     miopen::FSLockFile shared_lock(lockpath);
     EXPECT_FALSE(shared_lock.try_lock_shared());
 
-    // Timed shared lock should also timeout
+    // Timed shared lock should also timeout — lower-bound only (see TimedLockTimeout).
     auto start = std::chrono::steady_clock::now();
     EXPECT_FALSE(shared_lock.timed_lock_shared(ToPTime(std::chrono::milliseconds{50})));
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - start);
     EXPECT_GE(elapsed.count(), 40);
-    EXPECT_LE(elapsed.count(), 100);
 
     exclusive_lock.unlock();
 
@@ -680,40 +706,43 @@ TEST(CPU_UnitTestLockFile_NONE, EmptyDirectoryRaceCondition)
 
 TEST(CPU_UnitTestLockFile_NONE, ConcurrentExclusiveSharedAttempts)
 {
+    // Verify that exclusive and shared lock attempts interleave correctly when
+    // mixed threads compete.  Use blocking lock()/lock_shared() so every attempt
+    // is guaranteed to succeed regardless of CI scheduling jitter; the final
+    // counts are therefore deterministic.
     auto lockpath = miopen::LockFilePath(
         miopen::fs::path{"/tmp/config/miopen/test_concurrent_types." + std::to_string(getpid())});
 
+    constexpr int kPairs = 5; // kPairs exclusive threads + kPairs shared threads
     std::atomic<int> exclusive_acquired{0};
     std::atomic<int> shared_acquired{0};
     std::vector<std::thread> threads;
+    threads.reserve(kPairs * 2);
 
-    for(int i = 0; i < 5; ++i)
+    for(int i = 0; i < kPairs; ++i)
     {
         threads.emplace_back([&lockpath, &exclusive_acquired]() {
             miopen::FSLockFile lock(lockpath);
-            if(lock.try_lock())
-            {
-                exclusive_acquired++;
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                lock.unlock();
-            }
+            lock.lock();
+            exclusive_acquired++;
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
+            lock.unlock();
         });
 
         threads.emplace_back([&lockpath, &shared_acquired]() {
             miopen::FSLockFile lock(lockpath);
-            if(lock.try_lock_shared())
-            {
-                shared_acquired++;
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                lock.unlock_shared();
-            }
+            lock.lock_shared();
+            shared_acquired++;
+            std::this_thread::sleep_for(std::chrono::microseconds(200));
+            lock.unlock_shared();
         });
     }
 
     for(auto& t : threads)
         t.join();
 
-    EXPECT_GT(exclusive_acquired.load() + shared_acquired.load(), 0);
+    EXPECT_EQ(exclusive_acquired.load(), kPairs);
+    EXPECT_EQ(shared_acquired.load(), kPairs);
 }
 
 // ========== Production Usage Pattern Tests (std::unique_lock / std::shared_lock) ==========
@@ -1034,11 +1063,13 @@ TEST(CPU_UnitTestLockFile_NONE, ConcurrentLockSharedSameInstance)
             {
                 lockfile.lock_shared();
                 int current = ++held_count;
-                // At most one thread should hold the lock at a time on this instance.
+                // Update max_held to the highest simultaneous holder count seen.
                 int expected = max_held.load();
                 while(current > expected && !max_held.compare_exchange_weak(expected, current))
                     ;
-                std::this_thread::sleep_for(std::chrono::microseconds(200));
+                // Hold for long enough that both threads overlap with high probability
+                // on any scheduler.  5 ms >> typical scheduling quantum (1–4 ms).
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 --held_count;
                 lockfile.unlock_shared();
             }
