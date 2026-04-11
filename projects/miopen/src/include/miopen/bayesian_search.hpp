@@ -111,6 +111,16 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
 std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
                                std::vector<std::vector<double>>& out_features);
 
+struct BayesOptTracker
+{
+    int solver_count = 0;
+    float best_time  = std::numeric_limits<float>::max();
+    std::string best_solver;
+    int best_solver_num = 0;
+};
+
+MIOPEN_INTERNALS_EXPORT BayesOptTracker& GetBayesOptTracker();
+
 } // namespace bayesian
 
 // -------------------------------------------------------------------
@@ -147,7 +157,14 @@ auto BayesianSearch(const Solver s,
     if(n_configs == 0)
         MIOPEN_THROW("BayesianSearch: solver " + s.SolverDbId() + " has no valid configs");
 
-    MIOPEN_LOG_I("BayesianSearch: solver=" << s.SolverDbId() << " total_configs=" << n_configs);
+    auto& bo_tracker     = bayesian::GetBayesOptTracker();
+    bo_tracker.solver_count++;
+    const int solver_num = bo_tracker.solver_count;
+
+    MIOPEN_LOG_XQ_CUSTOM(miopen::LoggingLevel::Warning, false, "BayesOpt",
+        MIOPEN_GET_FN_NAME,
+        ">> [Solver #" << std::to_string(solver_num) << "] "
+        << s.SolverDbId() << " (" << std::to_string(n_configs) << " configs)");
 
     // --- Collect config strings ---
     std::vector<std::string> config_strings(n_configs);
@@ -226,7 +243,7 @@ auto BayesianSearch(const Solver s,
     std::mt19937 rng(rd());
     std::shuffle(perm.begin(), perm.end(), rng);
 
-    MIOPEN_LOG_I("BayesianSearch: phase1 random_init=" << n_initial);
+    MIOPEN_LOG_I("BayesianSearch: phase1 random_init=" << std::to_string(n_initial));
     for(std::size_t i = 0; i < n_initial; ++i)
     {
         std::size_t idx = perm[i];
@@ -260,7 +277,7 @@ auto BayesianSearch(const Solver s,
     const std::size_t remaining = n_configs - observed_idx.size();
     const std::size_t bo_budget = std::max<std::size_t>(1, remaining / 2);
 
-    MIOPEN_LOG_I("BayesianSearch: phase2 bo_budget=" << bo_budget);
+    MIOPEN_LOG_I("BayesianSearch: phase2 bo_budget=" << std::to_string(bo_budget));
 
     bayesian::GaussianProcess gp;
 
@@ -311,8 +328,8 @@ auto BayesianSearch(const Solver s,
             best_time   = t;
             best_config = all_configs[next];
             n_best      = next;
-            MIOPEN_LOG_I("BayesianSearch: iter=" << iter << " NEW BEST #" << next
-                         << " t=" << t);
+            MIOPEN_LOG_I("BayesianSearch: iter=" << std::to_string(iter)
+                         << " NEW BEST #" << std::to_string(next) << " t=" << t);
         }
         else
         {
@@ -322,9 +339,6 @@ auto BayesianSearch(const Solver s,
     }
 
     // --- Done ---
-    MIOPEN_LOG_I("BayesianSearch: evaluated " << observed_idx.size() << "/" << n_configs
-                 << " best=#" << n_best << " time=" << best_time);
-
     if(!is_passed)
         MIOPEN_THROW("BayesianSearch failed: no config succeeded");
 
@@ -333,7 +347,29 @@ auto BayesianSearch(const Solver s,
     invoker(profile_h, invoke_ctx);
     const auto default_time = profile_h.GetKernelTime();
     const auto score        = (best_time > 0.0f) ? default_time / best_time : 0.0f;
-    MIOPEN_LOG_I("BayesianSearch: score=" << score << " default_time=" << default_time);
+
+    MIOPEN_LOG_XQ_CUSTOM(miopen::LoggingLevel::Warning, false, "BayesOpt",
+        MIOPEN_GET_FN_NAME,
+        "     evaluated: " << std::to_string(observed_idx.size())
+        << "/" << std::to_string(n_configs)
+        << " | best: #" << std::to_string(n_best)
+        << " | time: " << best_time << "ms"
+        << " | score: " << score << "x");
+    MIOPEN_LOG_XQ_CUSTOM(miopen::LoggingLevel::Warning, false, "BayesOpt",
+        MIOPEN_GET_FN_NAME,
+        "     config: " << best_config);
+
+    if(best_time < bo_tracker.best_time)
+    {
+        bo_tracker.best_time       = best_time;
+        bo_tracker.best_solver     = s.SolverDbId();
+        bo_tracker.best_solver_num = solver_num;
+    }
+    MIOPEN_LOG_XQ_CUSTOM(miopen::LoggingLevel::Warning, false, "BayesOpt",
+        MIOPEN_GET_FN_NAME,
+        ">> [BEST] Solver #" << std::to_string(bo_tracker.best_solver_num)
+        << " " << bo_tracker.best_solver
+        << " | time: " << bo_tracker.best_time << "ms");
 
     return best_config;
 }

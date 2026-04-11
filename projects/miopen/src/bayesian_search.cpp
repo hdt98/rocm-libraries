@@ -502,6 +502,12 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
     return n_features;
 }
 
+BayesOptTracker& GetBayesOptTracker()
+{
+    thread_local BayesOptTracker tracker;
+    return tracker;
+}
+
 } // namespace bayesian
 } // namespace solver
 } // namespace miopen
