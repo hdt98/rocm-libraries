@@ -12,6 +12,78 @@ namespace rocRoller
 {
     namespace KernelGraph
     {
+
+        namespace
+        {
+            namespace CT = CoordinateGraph;
+            namespace CG = ControlGraph;
+            std::optional<int> directDataFlowSourceTag(Expression::ExpressionPtr const& expr)
+            {
+                if(!expr || !std::holds_alternative<Expression::DataFlowTag>(*expr))
+                    return std::nullopt;
+                return std::get<Expression::DataFlowTag>(*expr).tag;
+            }
+            bool touchesView(KernelGraph const& graph, int coord)
+            {
+                return !graph.coordinates.getInputNodeIndices(coord, CT::isEdge<CT::View>).empty()
+                       || !graph.coordinates.getOutputNodeIndices(coord, CT::isEdge<CT::View>)
+                               .empty();
+            }
+            bool sameMacroTileShape(CT::MacroTile const& lhs, CT::MacroTile const& rhs)
+            {
+                return lhs.rank == rhs.rank && lhs.memoryType == rhs.memoryType
+                       && lhs.layoutType == rhs.layoutType && lhs.sizes == rhs.sizes
+                       && lhs.subTileSizes == rhs.subTileSizes && lhs.miTileSizes == rhs.miTileSizes
+                       && lhs.swizzleTileSizes == rhs.swizzleTileSizes
+                       && lhs.padBytesOfDim == rhs.padBytesOfDim;
+            }
+            std::optional<int> uniqueAssignDestProducerForCoordinate(KernelGraph const& graph,
+                                                                     int                coord)
+            {
+                std::optional<int> producer;
+                for(auto const& conn : graph.mapper.getCoordinateConnections(coord))
+                {
+                    if(getNaryArgument(conn) != NaryArgument::DEST)
+                        continue;
+                    // The converted coordinate must have exactly one writer, and it must be an Assign.
+                    if(!graph.control.get<CG::Assign>(conn.control))
+                        return std::nullopt;
+                    if(producer && *producer != conn.control)
+                        return std::nullopt;
+                    producer = conn.control;
+                }
+                return producer;
+            }
+            bool hasOnlyProducerAndStoreUsers(KernelGraph const& graph,
+                                              int                coord,
+                                              int                producer,
+                                              int                store)
+            {
+                for(auto const& conn : graph.mapper.getCoordinateConnections(coord))
+                {
+                    if(conn.control == producer && getNaryArgument(conn) == NaryArgument::DEST)
+                        continue;
+                    if(conn.control == store)
+                        continue;
+                    return false;
+                }
+                return true;
+            }
+            bool isDirectUnaryCoordinateFlow(KernelGraph const& graph, int srcCoord, int dstCoord)
+            {
+                // For the safe subset, the converted coordinate must be produced only by a
+                // single unary coordinate DataFlow edge directly from the original source tile.
+                auto upstream = only(
+                    graph.coordinates.getInputNodeIndices(dstCoord, CT::isEdge<CT::DataFlow>));
+                if(!upstream || *upstream != srcCoord)
+                    return false;
+                // If there are downstream coordinate edges (View, Alias, Index, Segment, ...),
+                // then this converted coordinate carries additional graph semantics and we must
+                // not bypass it here.
+                return graph.coordinates.getLocation(dstCoord).outgoing.empty();
+            }
+        }
+
         /**
          * 1. For every `MacroTile` dimension in the coordinate graph:
          *     1. We use a `ControlFlowRWTracer` to identify every control node
@@ -549,6 +621,75 @@ namespace rocRoller
         KernelGraph AliasDataFlowTags::apply(KernelGraph const& original)
         {
             auto rv = original;
+
+            if(true)
+            {
+                using namespace ControlGraph;
+                using namespace CoordinateGraph;
+
+                auto             graph = original;
+                std::vector<int> producersToPurge;
+                for(auto storeTag : graph.control.getNodes<CG::StoreTiled>().to<std::vector>())
+                {
+                    auto maybeStore = graph.control.get<CG::StoreTiled>(storeTag);
+                    if(!maybeStore || maybeStore->varType != DataType::Halfx2)
+                        continue;
+                    auto convertedCoord = graph.mapper.get<CT::MacroTile>(storeTag);
+                    if(convertedCoord < 0)
+                        continue;
+                    auto maybeConvertedTile = graph.coordinates.get<CT::MacroTile>(convertedCoord);
+                    if(!maybeConvertedTile)
+                        continue;
+                    auto producerTag = uniqueAssignDestProducerForCoordinate(graph, convertedCoord);
+                    if(!producerTag)
+                        continue;
+                    auto maybeAssign = graph.control.get<CG::Assign>(*producerTag);
+                    if(!maybeAssign || !maybeAssign->expression)
+                        continue;
+                    if(!std::holds_alternative<Expression::Convert>(*maybeAssign->expression))
+                        continue;
+                    auto const& convertExpr
+                        = std::get<Expression::Convert>(*maybeAssign->expression);
+                    if(convertExpr.destinationType != DataType::Half)
+                        continue;
+                    auto srcCoord = directDataFlowSourceTag(convertExpr.arg);
+                    if(!srcCoord || *srcCoord == convertedCoord)
+                        continue;
+                    auto maybeSourceTile = graph.coordinates.get<CT::MacroTile>(*srcCoord);
+                    if(!maybeSourceTile)
+                        continue;
+                    // Reject any case that relies on View reshaping. RegisterTagManager explicitly
+                    // understands Alias/Index/Segment, but not arbitrary View structure.
+                    if(touchesView(graph, convertedCoord) || touchesView(graph, *srcCoord))
+                        continue;
+                    // The original tile and converted tile must represent the same logical MacroTile.
+                    if(!sameMacroTileShape(*maybeSourceTile, *maybeConvertedTile))
+                        continue;
+                    // The converted coordinate must be used only by its producer and this store.
+                    if(!hasOnlyProducerAndStoreUsers(graph, convertedCoord, *producerTag, storeTag))
+                        continue;
+                    // The coordinate-side provenance must also be the simple unary case:
+                    // srcCoord --DataFlow--> convertedCoord, with no downstream coordinate users.
+                    if(!isDirectUnaryCoordinateFlow(graph, *srcCoord, convertedCoord))
+                        continue;
+                    // Rewire the store to consume the original float tile directly.
+                    graph.mapper.disconnect<CT::MacroTile>(storeTag, convertedCoord);
+                    graph.mapper.connect<CT::MacroTile>(storeTag, *srcCoord);
+                    // The old Assign no longer defines this coordinate as a materialized value.
+                    graph.mapper.disconnect(*producerTag,
+                                            convertedCoord,
+                                            Connections::JustNaryArgument{NaryArgument::DEST});
+                    // Preserve sequencing, then purge the dead producer and its remaining mappings.
+                    auto nopTag = graph.control.addElement(CG::NOP());
+                    replaceWith(graph, *producerTag, nopTag, false);
+                    producersToPurge.push_back(*producerTag);
+                }
+                if(!producersToPurge.empty())
+                    purgeNodes(graph, producersToPurge);
+
+                rv = graph;
+            }
+            Log::info("Done");
 
             auto aliases = AliasDataFlowTagsDetail::findAliasCandidates(rv);
 
