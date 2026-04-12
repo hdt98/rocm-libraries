@@ -389,7 +389,47 @@ namespace rocRoller
 
                 if(dest == nullptr)
                 {
-                    dest = resultPlaceholder(resType, true);
+                    auto canReuseInputAsDest = [&](Register::ValuePtr const& reg) -> bool {
+                        if constexpr(!std::same_as<T, rocRoller::Expression::Multiply>)
+                            return false;
+
+                        if(!reg)
+                            return false;
+
+                        if(reg->regType() != Register::Type::Vector
+                           || reg->regType() != resType.regType)
+                            return false;
+
+                        if(IsSpecial(reg->regType()))
+                            return false;
+
+                        if(reg->variableType() != resType.varType)
+                            return false;
+
+                        if(reg->valueCount() != resType.valueCount)
+                            return false;
+
+                        if(reg->readOnly() || reg->isPlaceholder())
+                            return false;
+
+                        auto tagManager = m_context->registerTagManager();
+                        if(tagManager && tagManager->findRegister(reg).has_value())
+                            return false;
+
+                        return true;
+                    };
+
+                    if(dest == nullptr)
+                    {
+                        // Prefer reusing a disposable vector temporary rather than
+                        // allocating a second result block.
+                        if(canReuseInputAsDest(rhs))
+                            dest = rhs;
+                        else if(canReuseInputAsDest(lhs))
+                            dest = lhs;
+                        else
+                            dest = resultPlaceholder(resType, true);
+                    }
                 }
                 else
                 {
