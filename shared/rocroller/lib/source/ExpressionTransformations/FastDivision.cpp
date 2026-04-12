@@ -247,13 +247,6 @@ namespace rocRoller
         template <>
         ExpressionPtr powerOfTwoDivision(ExpressionPtr lhs, int rhs)
         {
-            auto lhsVarType = resultVariableType(lhs);
-            if(!DataTypeInfo::Get(lhsVarType).isSigned)
-            {
-                uint shiftAmount = std::countr_zero(static_cast<unsigned int>(rhs));
-                return arithmeticShiftR(lhs, literal(shiftAmount));
-            }
-
             int          shiftAmount        = std::countr_zero(static_cast<unsigned int>(rhs));
             unsigned int signBits           = sizeof(int) * 8 - 1;
             unsigned int reverseShiftAmount = sizeof(int) * 8 - shiftAmount;
@@ -285,13 +278,6 @@ namespace rocRoller
         template <>
         ExpressionPtr powerOfTwoModulo(ExpressionPtr lhs, int rhs)
         {
-            auto lhsVarType = resultVariableType(lhs);
-            if(!DataTypeInfo::Get(lhsVarType).isSigned)
-            {
-                unsigned int mask = static_cast<unsigned int>(rhs) - 1u;
-                return lhs & literal(mask);
-            }
-
             int          shiftAmount        = std::countr_zero(static_cast<unsigned int>(rhs));
             unsigned int signBits           = sizeof(int) * 8 - 1;
             unsigned int reverseShiftAmount = sizeof(int) * 8 - shiftAmount;
