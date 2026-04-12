@@ -8,132 +8,6 @@
 
 #include <rocRoller/Graph/GraphUtilities.hpp>
 
-namespace rocRoller::KernelGraph
-{
-    namespace CT   = CoordinateGraph;
-    namespace CG   = ControlGraph;
-    namespace Expr = rocRoller::Expression;
-
-    namespace
-    {
-        std::optional<int> directDeferredDataFlowSourceTag(Expr::ExpressionPtr const& expr)
-        {
-            if(!expr || !std::holds_alternative<Expr::DataFlowTag>(*expr))
-                return std::nullopt;
-
-            auto const& tag = std::get<Expr::DataFlowTag>(*expr);
-            if(tag.varType != DataType::None)
-                return std::nullopt;
-
-            return tag.tag;
-        }
-
-        bool sameMacroTileShape(CT::MacroTile const& lhs, CT::MacroTile const& rhs)
-        {
-            return lhs.rank == rhs.rank && lhs.memoryType == rhs.memoryType
-                   && lhs.layoutType == rhs.layoutType && lhs.sizes == rhs.sizes
-                   && lhs.subTileSizes == rhs.subTileSizes && lhs.miTileSizes == rhs.miTileSizes
-                   && lhs.swizzleTileSizes == rhs.swizzleTileSizes
-                   && lhs.padBytesOfDim == rhs.padBytesOfDim;
-        }
-
-        bool isPlainUnaryOutputCoordinate(KernelGraph const& graph, int srcCoord, int dstCoord)
-        {
-            auto const& loc = graph.coordinates.getLocation(dstCoord);
-
-            if(loc.incoming.size() != 1)
-                return false;
-
-            if(!loc.outgoing.empty())
-                return false;
-
-            auto upstream
-                = only(graph.coordinates.getInputNodeIndices(dstCoord, CT::isEdge<CT::DataFlow>));
-
-            return upstream && *upstream == srcCoord;
-        }
-
-        bool allOtherConsumersAreHalfx2Stores(KernelGraph const& graph, int coord, int producer)
-        {
-            bool sawStore = false;
-
-            for(auto const& conn : graph.mapper.getCoordinateConnections(coord))
-            {
-                if(conn.control == producer && getNaryArgument(conn) == NaryArgument::DEST)
-                    continue;
-
-                auto maybeStore = graph.control.get<CG::StoreTiled>(conn.control);
-                if(!maybeStore || maybeStore->varType != DataType::Halfx2)
-                    return false;
-
-                if(graph.mapper.get<CT::MacroTile>(conn.control) != coord)
-                    return false;
-
-                sawStore = true;
-            }
-
-            return sawStore;
-        }
-    }
-
-    KernelGraph PromoteStoreHalfConvertToHalfx2(KernelGraph const& original)
-    {
-        auto graph = original;
-
-        for(auto assignTag : graph.control.getNodes<CG::Assign>().to<std::vector>())
-        {
-            auto maybeAssign = graph.control.get<CG::Assign>(assignTag);
-            if(!maybeAssign || !maybeAssign->expression)
-                continue;
-
-            // Restrict this transform to the deferred T_Execute-style producer subset.
-            if(maybeAssign->regType != Register::Type::Vector)
-                continue;
-
-            if(maybeAssign->variableType.has_value())
-                continue;
-
-            if(!std::holds_alternative<Expr::Convert>(*maybeAssign->expression))
-                continue;
-
-            auto const& convertExpr = std::get<Expr::Convert>(*maybeAssign->expression);
-            if(convertExpr.destinationType != DataType::Half)
-                continue;
-
-            auto srcCoord = directDeferredDataFlowSourceTag(convertExpr.arg);
-            if(!srcCoord)
-                continue;
-
-            auto dstCoord = graph.mapper.get(assignTag, NaryArgument::DEST);
-            if(dstCoord < 0)
-                continue;
-
-            auto maybeSrcTile = graph.coordinates.get<CT::MacroTile>(*srcCoord);
-            auto maybeDstTile = graph.coordinates.get<CT::MacroTile>(dstCoord);
-            if(!maybeSrcTile || !maybeDstTile)
-                continue;
-
-            if(!sameMacroTileShape(*maybeSrcTile, *maybeDstTile))
-                continue;
-
-            if(!isPlainUnaryOutputCoordinate(graph, *srcCoord, dstCoord))
-                continue;
-
-            if(!allOtherConsumersAreHalfx2Stores(graph, dstCoord, assignTag))
-                continue;
-
-            auto rewritten           = *maybeAssign;
-            auto promoted            = convertExpr;
-            promoted.destinationType = DataType::Halfx2;
-            rewritten.expression     = std::make_shared<Expr::Expression>(promoted);
-
-            graph.control.setElement(assignTag, rewritten);
-        }
-
-        return graph;
-    }
-}
-
 namespace rocRoller
 {
     namespace KernelGraph
@@ -674,7 +548,7 @@ namespace rocRoller
 
         KernelGraph AliasDataFlowTags::apply(KernelGraph const& original)
         {
-            auto rv = PromoteStoreHalfConvertToHalfx2(original);
+            auto rv = original;
 
             auto aliases = AliasDataFlowTagsDetail::findAliasCandidates(rv);
 
