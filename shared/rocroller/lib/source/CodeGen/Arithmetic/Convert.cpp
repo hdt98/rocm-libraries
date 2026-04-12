@@ -165,26 +165,13 @@ namespace rocRoller
                         arg->description(),
                         ")");
 
-            Register::ValuePtr pair = arg;
+            auto temp = Register::Value::Placeholder(
+                m_context, Register::Type::Vector, DataType::Half, 1);
 
-            // Packed float-to-half conversion requires VGPR operands. If the
-            // source pair still resides in ACCVGPRs, copy the pair once to a
-            // temporary VGPR pair and convert from there.
-            if(arg->regType() == rocRoller::Register::Type::Accumulator)
-            {
-                const auto& arch = m_context->targetArchitecture();
-                AssertFatal(arch.HasCapability(GPUCapability::HasAccCD),
-                            concatenate("Architecture",
-                                        arch.target().toString(),
-                                        "does not use Accumulator registers."));
+            co_yield generateHalf(dest, arg->element({0}));
+            co_yield generateHalf(temp, arg->element({1}));
 
-                pair = Register::Value::Placeholder(
-                    m_context, Register::Type::Vector, DataType::Float, 2);
-                co_yield m_context->copier()->copy(pair, arg, "");
-            }
-
-            co_yield_(Instruction(
-                "v_cvt_pkrtz_f16_f32", {dest}, {pair->element({0}), pair->element({1})}, {}, ""));
+            co_yield m_context->copier()->packHalf(dest, dest, temp);
             break;
         }
         case DataType::Half:
