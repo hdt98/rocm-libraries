@@ -24,7 +24,6 @@ Output:
 Columns (CSV):
     Speed%     Wall-clock: positive = BO faster search
     Kernel%    10-run avg: positive = BO found faster kernel
-    Final%     1-run:      noisy single-run reference (less reliable)
 
 Examples:
     # First run: build baseline (~2-3 hours)
@@ -171,7 +170,7 @@ if [ "$MODE" = "bo-only" ] && [ ! -f "$BASELINE_CSV" ]; then
     exit 1
 fi
 
-echo "case|direction|description|bf_wall_s|bo_wall_s|speedup|speed_pct|bf_search_ms|bo_search_ms|kernel_pct|bf_final_ms|bo_final_ms|final_diff_pct|bf_verify|bo_verify|bf_solver|bo_solver|bf_config|bo_config|same_solver|same_config" > "$CSV"
+echo "case|direction|description|bf_wall_s|bo_wall_s|speedup|speed_pct|bf_search_ms|bo_search_ms|kernel_pct|bf_verify|bo_verify|bf_solver|bo_solver|bf_config|bo_config|same_solver|same_config" > "$CSV"
 
 run_case() {
     local method="$1"
@@ -186,10 +185,6 @@ run_case() {
     fi
 
     { time env "${env_vars[@]}" ${DRIVER} ${driver_cmd} ; } > "${logfile}" 2>&1 || true
-}
-
-parse_kernel_time() {
-    grep "GPU Kernel Time" "$1" | head -1 | grep -oP '[\d.]+(?= ms)' || echo "N/A"
 }
 
 parse_verify() {
@@ -256,13 +251,12 @@ echo ""
 TOTAL_START=$(date +%s)
 
 # Load BF baseline into associative array for bo-only mode
-declare -A BF_WALL BF_SEARCH BF_KERNEL BF_VERIFY BF_SOLVER BF_CONFIG
+declare -A BF_WALL BF_SEARCH BF_VERIFY BF_SOLVER BF_CONFIG
 if [ "$MODE" = "bo-only" ]; then
-    while IFS='|' read -r cid bf_w bf_sk bf_k bf_v bf_s bf_c; do
+    while IFS='|' read -r cid bf_w bf_sk bf_v bf_s bf_c; do
         [ "$cid" = "case" ] && continue
         BF_WALL["$cid"]="$bf_w"
         BF_SEARCH["$cid"]="$bf_sk"
-        BF_KERNEL["$cid"]="$bf_k"
         BF_VERIFY["$cid"]="$bf_v"
         BF_SOLVER["$cid"]="$bf_s"
         BF_CONFIG["$cid"]="$bf_c"
@@ -282,22 +276,20 @@ for i in "${!CASES[@]}"; do
     if [ "$MODE" = "bo-only" ]; then
         bf_wall="${BF_WALL[$case_id]:-N/A}"
         bf_search="${BF_SEARCH[$case_id]:-N/A}"
-        bf_kernel="${BF_KERNEL[$case_id]:-N/A}"
         bf_verify="${BF_VERIFY[$case_id]:-N/A}"
         bf_solver="${BF_SOLVER[$case_id]:-N/A}"
         bf_config="${BF_CONFIG[$case_id]:-N/A}"
-        echo "  [BF] baseline: ${bf_wall}s  search=${bf_search}ms  final=${bf_kernel}ms  solver=${bf_solver}  ${bf_verify}"
+        echo "  [BF] baseline: ${bf_wall}s  kernel=${bf_search}ms  solver=${bf_solver}  ${bf_verify}"
     else
         bf_log="${RESULT_DIR}/bf_${case_id}.log"
         echo "  [BF] running..."
         run_case "bf" "$driver_cmd" "$bf_log"
         bf_wall=$(parse_wall_s "$bf_log")
         bf_search=$(parse_bf_search_time "$bf_log")
-        bf_kernel=$(parse_kernel_time "$bf_log")
         bf_verify=$(parse_verify "$bf_log")
         bf_solver=$(parse_bf_solver "$bf_log")
         bf_config=$(parse_bf_config "$bf_log")
-        echo "  [BF] ${bf_wall}s  search=${bf_search}ms  final=${bf_kernel}ms  solver=${bf_solver}  ${bf_verify}"
+        echo "  [BF] ${bf_wall}s  kernel=${bf_search}ms  solver=${bf_solver}  ${bf_verify}"
         echo "  [BF] config: ${bf_config}"
     fi
 
@@ -307,11 +299,10 @@ for i in "${!CASES[@]}"; do
     run_case "bo" "$driver_cmd" "$bo_log"
     bo_wall=$(parse_wall_s "$bo_log")
     bo_search=$(parse_bo_search_time "$bo_log")
-    bo_kernel=$(parse_kernel_time "$bo_log")
     bo_verify=$(parse_verify "$bo_log")
     bo_solver=$(parse_bo_solver "$bo_log")
     bo_config=$(parse_bo_config "$bo_log")
-    echo "  [BO] ${bo_wall}s  search=${bo_search}ms  final=${bo_kernel}ms  solver=${bo_solver}  ${bo_verify}"
+    echo "  [BO] ${bo_wall}s  kernel=${bo_search}ms  solver=${bo_solver}  ${bo_verify}"
     echo "  [BO] config: ${bo_config}"
 
     # Check if same config
@@ -340,7 +331,6 @@ for i in "${!CASES[@]}"; do
     speed_pct=$(awk "BEGIN { if ($bf_wall > 0) printf \"%+.0f\", ($bf_wall - $bo_wall) / $bf_wall * 100; else print \"N/A\" }")
     # Kernel%: positive = BO found faster kernel, negative = BO found slower kernel
     kernel_pct=$(awk "BEGIN { if (\"$bf_search\" != \"N/A\" && \"$bo_search\" != \"N/A\" && $bf_search > 0) printf \"%+.1f\", ($bf_search - $bo_search) / $bf_search * 100; else print \"N/A\" }")
-    final_diff=$(awk "BEGIN { if (\"$bf_kernel\" != \"N/A\" && \"$bo_kernel\" != \"N/A\" && $bf_kernel > 0) printf \"%+.1f\", ($bf_kernel - $bo_kernel) / $bf_kernel * 100; else print \"N/A\" }")
 
     if [ "$same_config" = "YES" ]; then
         match_str="SAME"
@@ -352,7 +342,7 @@ for i in "${!CASES[@]}"; do
 
     printf "  ──▶  Speed: %s%% (%sx)  |  Kernel: %s%%  |  Match: %s\n\n" "$speed_pct" "$speedup" "$kernel_pct" "$match_str"
 
-    echo "${case_id}|${direction}|${description}|${bf_wall}|${bo_wall}|${speedup}|${speed_pct}|${bf_search}|${bo_search}|${kernel_pct}|${bf_kernel}|${bo_kernel}|${final_diff}|${bf_verify}|${bo_verify}|${bf_solver}|${bo_solver}|${bf_config}|${bo_config}|${same_solver}|${same_config}" >> "$CSV"
+    echo "${case_id}|${direction}|${description}|${bf_wall}|${bo_wall}|${speedup}|${speed_pct}|${bf_search}|${bo_search}|${kernel_pct}|${bf_verify}|${bo_verify}|${bf_solver}|${bo_solver}|${bf_config}|${bo_config}|${same_solver}|${same_config}" >> "$CSV"
 done
 
 TOTAL_END=$(date +%s)
@@ -360,10 +350,10 @@ TOTAL_ELAPSED=$((TOTAL_END - TOTAL_START))
 
 # Save BF baseline for future bo-only runs
 if [ "$MODE" != "bo-only" ]; then
-    echo "case|bf_wall_s|bf_search_ms|bf_final_ms|bf_verify|bf_solver|bf_config" > "$BASELINE_CSV"
-    while IFS='|' read -r cid dir desc bf_w bo_w spd spd_pct bf_sk bo_sk kpct bf_k bo_k fdiff bf_v bo_v bf_s bo_s bf_c bo_c same_s same_c; do
+    echo "case|bf_wall_s|bf_search_ms|bf_verify|bf_solver|bf_config" > "$BASELINE_CSV"
+    while IFS='|' read -r cid dir desc bf_w bo_w spd spd_pct bf_sk bo_sk kpct bf_v bo_v bf_s bo_s bf_c bo_c same_s same_c; do
         [ "$cid" = "case" ] && continue
-        echo "${cid}|${bf_w}|${bf_sk}|${bf_k}|${bf_v}|${bf_s}|${bf_c}" >> "$BASELINE_CSV"
+        echo "${cid}|${bf_w}|${bf_sk}|${bf_v}|${bf_s}|${bf_c}" >> "$BASELINE_CSV"
     done < "$CSV"
     echo "BF baseline saved to: ${BASELINE_CSV}"
 fi
@@ -373,17 +363,17 @@ echo "========================================================================"
 echo "  RESULTS SUMMARY"
 echo "========================================================================"
 echo ""
-printf "%-18s %3s %-35s %6s %6s %7s %8s %10s %10s %8s %10s %10s %8s %4s %4s %s\n" \
-    "Case" "Dir" "Description" "BF(s)" "BO(s)" "Speedup" "Speed%" "BF-Srch" "BO-Srch" "Kernel%" "BF-Final" "BO-Final" "Final%" "Slvr" "Cfg" "Verify"
-printf "%-18s %3s %-35s %6s %6s %7s %8s %10s %10s %8s %10s %10s %8s %4s %4s %s\n" \
-    "------------------" "---" "-----------------------------------" "------" "------" "-------" "--------" "----------" "----------" "--------" "----------" "----------" "--------" "----" "----" "------"
+printf "%-18s %3s %-35s %6s %6s %7s %8s %10s %10s %8s %4s %4s %s\n" \
+    "Case" "Dir" "Description" "BF(s)" "BO(s)" "Speedup" "Speed%" "BF-Kern" "BO-Kern" "Kernel%" "Slvr" "Cfg" "Verify"
+printf "%-18s %3s %-35s %6s %6s %7s %8s %10s %10s %8s %4s %4s %s\n" \
+    "------------------" "---" "-----------------------------------" "------" "------" "-------" "--------" "----------" "----------" "--------" "----" "----" "------"
 
 total_bf=0
 total_bo=0
-while IFS='|' read -r cid dir desc bf_w bo_w spd spd_pct bf_sk bo_sk kpct bf_k bo_k fdiff bf_v bo_v bf_s bo_s bf_c bo_c same_s same_c; do
+while IFS='|' read -r cid dir desc bf_w bo_w spd spd_pct bf_sk bo_sk kpct bf_v bo_v bf_s bo_s bf_c bo_c same_s same_c; do
     [ "$cid" = "case" ] && continue
-    printf "%-18s %3s %-35s %5ss %5ss %6sx %7s%% %9sms %9sms %7s%% %9sms %9sms %7s%% %4s %4s %s/%s\n" \
-        "$cid" "$dir" "$desc" "$bf_w" "$bo_w" "$spd" "$spd_pct" "$bf_sk" "$bo_sk" "$kpct" "$bf_k" "$bo_k" "$fdiff" "$same_s" "$same_c" "$bf_v" "$bo_v"
+    printf "%-18s %3s %-35s %5ss %5ss %6sx %7s%% %9sms %9sms %7s%% %4s %4s %s/%s\n" \
+        "$cid" "$dir" "$desc" "$bf_w" "$bo_w" "$spd" "$spd_pct" "$bf_sk" "$bo_sk" "$kpct" "$same_s" "$same_c" "$bf_v" "$bo_v"
     total_bf=$((total_bf + bf_w))
     total_bo=$((total_bo + bo_w))
 done < "$CSV"

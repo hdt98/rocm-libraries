@@ -236,7 +236,8 @@ static double NormalPDF(double x)
 std::size_t SelectNextByEI(const std::vector<double>& mu,
                            const std::vector<double>& sigma,
                            double best_observed,
-                           std::size_t n_cand)
+                           std::size_t n_cand,
+                           double* out_max_ei)
 {
     // EI(x) = (best - mu(x)) * Phi(z) + sigma(x) * phi(z)
     // where z = (best - mu(x)) / sigma(x)
@@ -262,6 +263,10 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
             best_idx = i;
         }
     }
+
+    if(out_max_ei != nullptr)
+        *out_max_ei = best_ei;
+
     return best_idx;
 }
 
@@ -278,19 +283,24 @@ static std::string TrimWhitespace(const std::string& s)
     return s.substr(start, end - start + 1);
 }
 
-static double ParseToken(const std::string& raw)
+static std::string PrepareToken(const std::string& raw)
 {
     std::string tok = TrimWhitespace(raw);
-    if(tok.empty())
-        return 0.0;
-
     // Strip CK V3 named-field prefixes like "BlkGemmPipelineScheduler: Intrawave"
     auto colon = tok.find(':');
     if(colon != std::string::npos)
         tok = TrimWhitespace(tok.substr(colon + 1));
+    return tok;
+}
 
-    // Try parsing as number
-    bool is_number = !tok.empty();
+static bool TryParseNumber(const std::string& tok, double& out)
+{
+    if(tok.empty())
+    {
+        out = 0.0;
+        return true;
+    }
+    bool is_number = true;
     bool has_dot   = false;
     for(std::size_t i = 0; i < tok.size(); ++i)
     {
@@ -309,28 +319,11 @@ static double ParseToken(const std::string& raw)
         }
     }
     if(is_number)
-        return std::stod(tok);
-
-    // Known categorical mappings (ordinal encoding)
-    // ConvSpecialization
-    if(tok == "Default")       return 0.0;
-    if(tok == "OddC")          return 1.0;
-    if(tok == "Filter1x1Pad0") return 2.0;
-    if(tok == "Filter1x1Stride1Pad0") return 3.0;
-    if(tok == "Filter3x3")     return 4.0;
-    // PipelineScheduler
-    if(tok == "Intrawave")     return 0.0;
-    if(tok == "Interwave")     return 1.0;
-    // PipelineVersion
-    if(tok == "v1")            return 1.0;
-    if(tok == "v2")            return 2.0;
-    if(tok == "v3")            return 3.0;
-    if(tok == "v4")            return 4.0;
-    if(tok == "v5")            return 5.0;
-
-    // Fallback: hash for unknown strings (ASM direction, layout, precision, etc.)
-    std::hash<std::string> hasher;
-    return static_cast<double>(hasher(tok) % 10000) / 10000.0;
+    {
+        out = std::stod(tok);
+        return true;
+    }
+    return false;
 }
 
 // Split a CK config string into (variant_name, param_tokens, split_k).
@@ -472,6 +465,24 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
     if(n_features == 0)
         return 0;
 
+    // --- Pass 1.5: build per-column ordinal maps for non-numeric tokens ---
+    // For each param column, collect unique string values and assign 0, 1, 2, ...
+    std::vector<std::map<std::string, int>> col_ordinal(max_params);
+    for(std::size_t i = 0; i < n; ++i)
+    {
+        for(std::size_t j = 0; j < parsed[i].params.size(); ++j)
+        {
+            std::string tok = PrepareToken(parsed[i].params[j]);
+            double dummy;
+            if(!TryParseNumber(tok, dummy))
+            {
+                auto& m = col_ordinal[j];
+                if(m.find(tok) == m.end())
+                    m[tok] = static_cast<int>(m.size());
+            }
+        }
+    }
+
     // --- Pass 2: build uniform feature vectors ---
     out_features.resize(n);
     for(std::size_t i = 0; i < n; ++i)
@@ -487,15 +498,49 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
             col++;
         }
 
-        // Param columns (parsed tokens → numbers, padded with 0)
+        // Param columns: numeric → value, string → per-column ordinal index
         for(std::size_t j = 0; j < parsed[i].params.size(); ++j)
-            out_features[i][col + j] = ParseToken(parsed[i].params[j]);
+        {
+            std::string tok = PrepareToken(parsed[i].params[j]);
+            double num_val;
+            if(TryParseNumber(tok, num_val))
+            {
+                out_features[i][col + j] = num_val;
+            }
+            else
+            {
+                out_features[i][col + j] = static_cast<double>(col_ordinal[j][tok]);
+            }
+        }
         col += max_params;
 
         // Suffix column (split_k or gks)
         if(has_suffix_col)
         {
             out_features[i][col] = (parsed[i].suffix_value >= 0.0) ? parsed[i].suffix_value : 0.0;
+        }
+    }
+
+    // --- Pass 3: per-feature min-max normalization to [0, 1] ---
+    for(std::size_t j = 0; j < n_features; ++j)
+    {
+        double fmin = out_features[0][j];
+        double fmax = fmin;
+        for(std::size_t i = 1; i < n; ++i)
+        {
+            fmin = std::min(fmin, out_features[i][j]);
+            fmax = std::max(fmax, out_features[i][j]);
+        }
+        double range = fmax - fmin;
+        if(range > 1e-12)
+        {
+            for(std::size_t i = 0; i < n; ++i)
+                out_features[i][j] = (out_features[i][j] - fmin) / range;
+        }
+        else
+        {
+            for(std::size_t i = 0; i < n; ++i)
+                out_features[i][j] = 0.0;
         }
     }
 

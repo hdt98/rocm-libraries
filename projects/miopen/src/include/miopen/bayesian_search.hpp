@@ -50,6 +50,15 @@
 // 1 = Bayesian optimization
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_TUNING_SEARCH_METHOD, 0)
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_TUNING_BO_INITIAL, 3)
+// EI convergence threshold: stop BO when max EI < best_time * threshold.
+// 0 = disabled (run full budget). Default 0.001 = stop when <0.1% improvement expected.
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_TUNING_BO_EI_THRESH_E4, 10)
+// Skip full 10-run measurement if single probe > best_time * (skip_pct/100).
+// 0 = disabled (always run 10). Default 150 = skip if probe is >50% worse than best.
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_TUNING_BO_SKIP_PCT, 150)
+// Cap observations fed to GP (O(n^3) Cholesky safety).
+// 0 = disabled (use all). Default 128 = keep best + most recent 127.
+MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_DEBUG_TUNING_BO_GP_CAP, 128)
 
 // Must come after env var declarations (generic_search.hpp routing uses MIOPEN_TUNING_SEARCH_METHOD)
 #include <miopen/generic_search.hpp>
@@ -97,10 +106,12 @@ private:
 // Expected Improvement: returns index of candidate with highest EI.
 // mu, sigma are in original y-space; best_observed is the best (lowest) time seen.
 // We MINIMIZE time, so EI = E[max(best_observed - f(x), 0)].
+// If out_max_ei is non-null, stores the max EI value (for convergence detection).
 std::size_t SelectNextByEI(const std::vector<double>& mu,
                            const std::vector<double>& sigma,
                            double best_observed,
-                           std::size_t n_cand);
+                           std::size_t n_cand,
+                           double* out_max_ei = nullptr);
 
 // Two-pass feature extraction from config strings.
 // Pass 1: discover variant names and max param count across all configs.
@@ -185,6 +196,18 @@ auto BayesianSearch(const Solver s,
         return GenericSearch(s, context_, problem, invoke_ctx_);
     }
 
+    // --- State ---
+    std::vector<bool> evaluated(n_configs, false);
+    std::vector<double> observed_y;
+    std::vector<std::size_t> observed_idx;
+    PerformanceConfig best_config;
+    float best_time = std::numeric_limits<float>::max();
+    std::size_t n_best = 0;
+    bool is_passed = false;
+
+    // Skip threshold: skip full 10-run if probe > best * (skip_pct/100). 0 = disabled.
+    const float skip_pct = static_cast<float>(env::value(MIOPEN_DEBUG_TUNING_BO_SKIP_PCT));
+
     // --- Evaluate one config on GPU, return mean time or -1 on failure ---
     auto evaluate = [&](std::size_t idx) -> float {
         auto solution = s.GetSolution(context, problem, all_configs[idx]);
@@ -195,13 +218,30 @@ auto BayesianSearch(const Solver s,
 
             auto invoker = profile_h.PrepareInvoker(*solution.invoker_factory,
                                                     solution.construction_params);
+            // Warm-up run
             invoker(profile_h, invoke_ctx);
             profile_h.ResetKernelTime();
 
+            // Single probe
+            invoker(profile_h, invoke_ctx);
+            float probe = profile_h.GetKernelTime();
+            profile_h.ResetKernelTime();
+
+            // Skip full measurement if probe is far worse than current best
+            if(skip_pct > 0.0f && best_time < std::numeric_limits<float>::max() &&
+               probe > best_time * (skip_pct / 100.0f))
+            {
+                for(const auto& ki : solution.construction_params)
+                    profile_h.ClearProgram(ki.kernel_file, ki.comp_options);
+                return probe;
+            }
+
+            // Full measurement: 9 more runs (total 10 including probe)
             constexpr int N_RUNS = 10;
             std::vector<float> samples;
             samples.reserve(N_RUNS);
-            for(int r = 0; r < N_RUNS; ++r)
+            samples.push_back(probe);
+            for(int r = 1; r < N_RUNS; ++r)
             {
                 invoker(profile_h, invoke_ctx);
                 samples.push_back(profile_h.GetKernelTime());
@@ -224,18 +264,11 @@ auto BayesianSearch(const Solver s,
         }
     };
 
-    // --- State ---
-    std::vector<bool> evaluated(n_configs, false);
-    std::vector<double> observed_y;
-    std::vector<std::size_t> observed_idx;
-    PerformanceConfig best_config;
-    float best_time = std::numeric_limits<float>::max();
-    std::size_t n_best = 0;
-    bool is_passed = false;
-
     // --- Phase 1: Random initial probes ---
-    const std::size_t n_initial =
-        std::min(static_cast<std::size_t>(env::value(MIOPEN_DEBUG_TUNING_BO_INITIAL)), n_configs);
+    // Scale with config space: max(env_min, sqrt(n_configs)), capped at n_configs
+    const std::size_t env_min = static_cast<std::size_t>(env::value(MIOPEN_DEBUG_TUNING_BO_INITIAL));
+    const std::size_t scaled  = static_cast<std::size_t>(std::ceil(std::sqrt(static_cast<double>(n_configs))));
+    const std::size_t n_initial = std::min(std::max(env_min, scaled), n_configs);
 
     std::vector<std::size_t> perm(n_configs);
     std::iota(perm.begin(), perm.end(), 0);
@@ -244,15 +277,17 @@ auto BayesianSearch(const Solver s,
     std::shuffle(perm.begin(), perm.end(), rng);
 
     MIOPEN_LOG_I("BayesianSearch: phase1 random_init=" << std::to_string(n_initial));
-    for(std::size_t i = 0; i < n_initial; ++i)
+    std::size_t init_successes = 0;
+    for(std::size_t i = 0; i < n_configs && init_successes < n_initial; ++i)
     {
         std::size_t idx = perm[i];
         float t = evaluate(idx);
+        evaluated[idx] = true;
         if(t < 0)
             continue;
 
         is_passed = true;
-        evaluated[idx] = true;
+        init_successes++;
         observed_y.push_back(static_cast<double>(t));
         observed_idx.push_back(idx);
 
@@ -262,7 +297,7 @@ auto BayesianSearch(const Solver s,
             best_config = all_configs[idx];
             n_best      = idx;
         }
-        MIOPEN_LOG_I2("BayesianSearch: init #" << i << " idx=" << idx
+        MIOPEN_LOG_I2("BayesianSearch: init #" << init_successes << " idx=" << idx
                       << " t=" << t << " best=" << best_time);
     }
 
@@ -273,15 +308,36 @@ auto BayesianSearch(const Solver s,
     }
 
     // --- Phase 2: BO guided by GP + EI ---
-    // Budget: at most half of remaining unevaluated configs
-    const std::size_t remaining = n_configs - observed_idx.size();
+    // Count actually remaining (unevaluated) configs
+    std::size_t remaining = 0;
+    for(std::size_t i = 0; i < n_configs; ++i)
+        if(!evaluated[i])
+            remaining++;
+
     const std::size_t bo_budget = std::max<std::size_t>(1, remaining / 2);
 
-    MIOPEN_LOG_I("BayesianSearch: phase2 bo_budget=" << std::to_string(bo_budget));
+    // EI convergence: stop when max EI < best_time * threshold.
+    // Env var is in units of 1e-4 (integer). Default 10 → 10/10000 = 0.001.
+    // Set to 0 to disable.
+    const double ei_thresh_raw =
+        static_cast<double>(env::value(MIOPEN_DEBUG_TUNING_BO_EI_THRESH_E4)) / 10000.0;
+
+    const std::size_t gp_cap =
+        static_cast<std::size_t>(env::value(MIOPEN_DEBUG_TUNING_BO_GP_CAP));
+
+    const std::size_t max_attempts = std::min(remaining, bo_budget * 3);
+
+    MIOPEN_LOG_I("BayesianSearch: phase2 bo_budget=" << std::to_string(bo_budget)
+                 << " max_attempts=" << std::to_string(max_attempts)
+                 << " ei_thresh=" << ei_thresh_raw
+                 << " gp_cap=" << std::to_string(gp_cap));
 
     bayesian::GaussianProcess gp;
 
-    for(std::size_t iter = 0; iter < bo_budget; ++iter)
+    std::size_t successful_iters = 0;
+    std::size_t total_attempts   = 0;
+
+    while(successful_iters < bo_budget && total_attempts < max_attempts)
     {
         // Build candidate list
         std::vector<std::size_t> cands;
@@ -291,16 +347,51 @@ auto BayesianSearch(const Solver s,
         if(cands.empty())
             break;
 
-        const std::size_t n_obs  = observed_idx.size();
         const std::size_t n_cand = cands.size();
+
+        // Select which observations to feed the GP (cap for O(n^3) safety)
+        std::vector<std::size_t> gp_sel_idx;
+        std::vector<double> gp_sel_y;
+
+        const std::size_t n_total_obs = observed_idx.size();
+        if(gp_cap == 0 || n_total_obs <= gp_cap)
+        {
+            gp_sel_idx = observed_idx;
+            gp_sel_y   = observed_y;
+        }
+        else
+        {
+            // Find which position holds the best observation
+            std::size_t best_pos = 0;
+            for(std::size_t i = 1; i < n_total_obs; ++i)
+                if(observed_y[i] < observed_y[best_pos])
+                    best_pos = i;
+
+            // Take most recent (gp_cap - 1), always include best
+            const std::size_t tail_start = n_total_obs - (gp_cap - 1);
+            bool best_in_tail = (best_pos >= tail_start);
+
+            if(!best_in_tail)
+            {
+                gp_sel_idx.push_back(observed_idx[best_pos]);
+                gp_sel_y.push_back(observed_y[best_pos]);
+            }
+            for(std::size_t i = tail_start; i < n_total_obs; ++i)
+            {
+                gp_sel_idx.push_back(observed_idx[i]);
+                gp_sel_y.push_back(observed_y[i]);
+            }
+        }
+
+        const std::size_t n_obs = gp_sel_idx.size();
 
         // Flatten observed X
         std::vector<double> X_obs(n_obs * n_features);
         for(std::size_t i = 0; i < n_obs; ++i)
             for(std::size_t j = 0; j < n_features; ++j)
-                X_obs[i * n_features + j] = features[observed_idx[i]][j];
+                X_obs[i * n_features + j] = features[gp_sel_idx[i]][j];
 
-        gp.Fit(X_obs, observed_y, n_obs, n_features);
+        gp.Fit(X_obs, gp_sel_y, n_obs, n_features);
 
         // Flatten candidate X
         std::vector<double> X_cand(n_cand * n_features);
@@ -311,15 +402,35 @@ auto BayesianSearch(const Solver s,
         std::vector<double> mu, sigma;
         gp.Predict(X_cand, n_cand, mu, sigma);
 
+        double max_ei = 0.0;
         std::size_t pick = bayesian::SelectNextByEI(mu, sigma,
-                                                    static_cast<double>(best_time), n_cand);
+                                                    static_cast<double>(best_time), n_cand,
+                                                    &max_ei);
+
+        // EI convergence check
+        if(ei_thresh_raw > 0.0 && best_time < std::numeric_limits<float>::max())
+        {
+            const double ei_threshold = static_cast<double>(best_time) * ei_thresh_raw;
+            if(max_ei < ei_threshold)
+            {
+                MIOPEN_LOG_I("BayesianSearch: EI converged at iter="
+                             << std::to_string(successful_iters)
+                             << " (attempts=" << std::to_string(total_attempts)
+                             << ") max_ei=" << max_ei
+                             << " < thresh=" << ei_threshold);
+                break;
+            }
+        }
+
         std::size_t next = cands[pick];
 
         float t = evaluate(next);
         evaluated[next] = true;
+        total_attempts++;
         if(t < 0)
             continue;
 
+        successful_iters++;
         observed_y.push_back(static_cast<double>(t));
         observed_idx.push_back(next);
 
@@ -328,12 +439,15 @@ auto BayesianSearch(const Solver s,
             best_time   = t;
             best_config = all_configs[next];
             n_best      = next;
-            MIOPEN_LOG_I("BayesianSearch: iter=" << std::to_string(iter)
-                         << " NEW BEST #" << std::to_string(next) << " t=" << t);
+            MIOPEN_LOG_I("BayesianSearch: iter=" << std::to_string(successful_iters)
+                         << " (attempts=" << std::to_string(total_attempts)
+                         << ") NEW BEST #" << std::to_string(next) << " t=" << t);
         }
         else
         {
-            MIOPEN_LOG_I2("BayesianSearch: iter=" << iter << " #" << next
+            MIOPEN_LOG_I2("BayesianSearch: iter=" << successful_iters
+                          << " (attempts=" << total_attempts
+                          << ") #" << next
                           << " t=" << t << " best=" << best_time);
         }
     }
