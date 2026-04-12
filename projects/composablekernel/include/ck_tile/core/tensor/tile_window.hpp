@@ -1229,7 +1229,9 @@ struct tile_window_with_static_distribution
             Policy::template ValidationTraits<InDstrEncode>::LaneGroupSize;
         static constexpr index_t TransposeVecSize =
             Policy::template GetTransposeVecSize<LaneGroupSizeTr>();
-        using vector_t = thread_buffer<typename Base::DataType, TransposeVecSize>;
+
+        // TODO: fix using vector_t = thread_buffer<typename Base::DataType, TransposeVecSize>;
+        using vector_t = typename Traits::vector_t;
 
         constexpr auto tile_dstr = typename Base::TileDstr{};
 

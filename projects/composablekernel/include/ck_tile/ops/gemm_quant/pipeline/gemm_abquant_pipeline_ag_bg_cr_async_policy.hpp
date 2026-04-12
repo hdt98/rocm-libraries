@@ -386,7 +386,11 @@ struct GemmABQuantPipelineAgBgCrAsyncPolicy
 } // namespace detail
 
 struct GemmABQuantPipelineAgBgCrAsyncPolicy
+    : UniversalGemmBasePolicy<GemmABQuantPipelineAgBgCrAsyncPolicy>
 {
+    using Base = UniversalGemmBasePolicy<GemmABQuantPipelineAgBgCrAsyncPolicy>;
+    using Base::is_a_load_tr;
+    using Base::is_b_load_tr;
 
 #define FORWARD_METHOD_(method)                                               \
     template <typename Problem, typename... Args>                             \
