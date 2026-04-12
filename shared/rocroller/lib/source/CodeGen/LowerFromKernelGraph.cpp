@@ -698,42 +698,7 @@ namespace rocRoller
                             dest->setName(concatenate("DataFlowTag", dimTag));
                     }
 
-                    bool handledTopLevelNoOpConvert = false;
-
-                    if(dest && assign.expression
-                       && std::holds_alternative<Convert>(*assign.expression))
-                    {
-                        auto const& convertExpr = std::get<Convert>(*assign.expression);
-                        auto        srcVarType  = resultVariableType(convertExpr.arg);
-                        auto        dstVarType  = dest->variableType();
-
-                        auto const& srcTypeInfo = DataTypeInfo::Get(srcVarType);
-                        auto const& dstTypeInfo = DataTypeInfo::Get(dstVarType);
-
-                        // Same-width integral Convert does not need a data movement instruction.
-                        // Generate the source expression directly into the final destination
-                        // allocation, but viewed with the source type.
-                        if(srcTypeInfo.isIntegral && dstTypeInfo.isIntegral
-                           && srcTypeInfo.elementBits == dstTypeInfo.elementBits
-                           && srcTypeInfo.registerCount == dstTypeInfo.registerCount)
-                        {
-                            auto sourceTypedDest
-                                = std::make_shared<Register::Value>(dest->allocation(),
-                                                                    dest->regType(),
-                                                                    srcVarType,
-                                                                    dest->allocationCoord());
-
-                            if(!dest->name().empty())
-                                sourceTypedDest->setName(dest->name() + " convertSource");
-
-                            co_yield Expression::generate(
-                                sourceTypedDest, convertExpr.arg, m_context);
-                            handledTopLevelNoOpConvert = true;
-                        }
-                    }
-
-                    if(!handledTopLevelNoOpConvert)
-                        co_yield Expression::generate(dest, assign.expression, m_context);
+                    co_yield Expression::generate(dest, assign.expression, m_context);
 
                     if(deferred)
                     {
