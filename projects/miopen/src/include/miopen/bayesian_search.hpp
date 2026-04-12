@@ -119,8 +119,10 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
 // Handles CK "Variant<p0,p1,...>", CK WrW "Variant<...>+split_k",
 // ASM "val0,val1,...[gks]", and simple numeric configs.
 // Returns the feature dimension (all vectors in out_features have this size).
+// out_variant_ids: per-config variant group (0..K-1 for CK, -1 for non-CK).
 std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
-                               std::vector<std::vector<double>>& out_features);
+                               std::vector<std::vector<double>>& out_features,
+                               std::vector<int>& out_variant_ids);
 
 struct BayesOptTracker
 {
@@ -188,7 +190,8 @@ auto BayesianSearch(const Solver s,
 
     // --- Build uniform feature matrix (two-pass: discover schema, then parse) ---
     std::vector<std::vector<double>> features;
-    const std::size_t n_features = bayesian::BuildFeatureMatrix(config_strings, features);
+    std::vector<int> variant_ids;
+    const std::size_t n_features = bayesian::BuildFeatureMatrix(config_strings, features, variant_ids);
 
     if(n_features == 0)
     {
@@ -264,23 +267,75 @@ auto BayesianSearch(const Solver s,
         }
     };
 
-    // --- Phase 1: Random initial probes ---
+    // --- Phase 1: Variant-stratified initial probes ---
     // Scale with config space: max(env_min, sqrt(n_configs)), capped at n_configs
     const std::size_t env_min = static_cast<std::size_t>(env::value(MIOPEN_DEBUG_TUNING_BO_INITIAL));
     const std::size_t scaled  = static_cast<std::size_t>(std::ceil(std::sqrt(static_cast<double>(n_configs))));
     const std::size_t n_initial = std::min(std::max(env_min, scaled), n_configs);
 
-    std::vector<std::size_t> perm(n_configs);
-    std::iota(perm.begin(), perm.end(), 0);
     std::random_device rd;
     std::mt19937 rng(rd());
+
+    // Build per-variant config lists for stratified sampling
+    std::map<int, std::vector<std::size_t>> variant_configs;
+    for(std::size_t i = 0; i < n_configs; ++i)
+        variant_configs[variant_ids[i]].push_back(i);
+    for(auto& kv : variant_configs)
+        std::shuffle(kv.second.begin(), kv.second.end(), rng);
+
+    const std::size_t n_variants = variant_configs.size();
+
+    MIOPEN_LOG_I("BayesianSearch: phase1 n_initial=" << std::to_string(n_initial)
+                 << " n_variants=" << std::to_string(n_variants));
+
+    // Phase 1a: ensure at least 1 success per variant (round-robin)
+    std::size_t init_successes = 0;
+    if(n_variants > 1)
+    {
+        for(auto& kv : variant_configs)
+        {
+            bool got_one = false;
+            for(auto idx : kv.second)
+            {
+                if(evaluated[idx])
+                    continue;
+                float t = evaluate(idx);
+                evaluated[idx] = true;
+                if(t < 0)
+                    continue;
+                is_passed = true;
+                init_successes++;
+                observed_y.push_back(static_cast<double>(t));
+                observed_idx.push_back(idx);
+                if(t < best_time)
+                {
+                    best_time   = t;
+                    best_config = all_configs[idx];
+                    n_best      = idx;
+                }
+                got_one = true;
+                break;
+            }
+            if(!got_one)
+            {
+                MIOPEN_LOG_I2("BayesianSearch: variant " << kv.first
+                              << " had no successful probe");
+            }
+        }
+        MIOPEN_LOG_I("BayesianSearch: phase1a stratified " << std::to_string(init_successes)
+                     << " successes from " << std::to_string(n_variants) << " variants");
+    }
+
+    // Phase 1b: fill remaining init budget with random probes
+    std::vector<std::size_t> perm(n_configs);
+    std::iota(perm.begin(), perm.end(), 0);
     std::shuffle(perm.begin(), perm.end(), rng);
 
-    MIOPEN_LOG_I("BayesianSearch: phase1 random_init=" << std::to_string(n_initial));
-    std::size_t init_successes = 0;
     for(std::size_t i = 0; i < n_configs && init_successes < n_initial; ++i)
     {
         std::size_t idx = perm[i];
+        if(evaluated[idx])
+            continue;
         float t = evaluate(idx);
         evaluated[idx] = true;
         if(t < 0)
@@ -308,7 +363,6 @@ auto BayesianSearch(const Solver s,
     }
 
     // --- Phase 2: BO guided by GP + EI ---
-    // Count actually remaining (unevaluated) configs
     std::size_t remaining = 0;
     for(std::size_t i = 0; i < n_configs; ++i)
         if(!evaluated[i])
@@ -316,15 +370,10 @@ auto BayesianSearch(const Solver s,
 
     const std::size_t bo_budget = std::max<std::size_t>(1, remaining / 2);
 
-    // EI convergence: stop when max EI < best_time * threshold.
-    // Env var is in units of 1e-4 (integer). Default 10 → 10/10000 = 0.001.
-    // Set to 0 to disable.
     const double ei_thresh_raw =
         static_cast<double>(env::value(MIOPEN_DEBUG_TUNING_BO_EI_THRESH_E4)) / 10000.0;
-
     const std::size_t gp_cap =
         static_cast<std::size_t>(env::value(MIOPEN_DEBUG_TUNING_BO_GP_CAP));
-
     const std::size_t max_attempts = std::min(remaining, bo_budget * 3);
 
     MIOPEN_LOG_I("BayesianSearch: phase2 bo_budget=" << std::to_string(bo_budget)
@@ -333,13 +382,11 @@ auto BayesianSearch(const Solver s,
                  << " gp_cap=" << std::to_string(gp_cap));
 
     bayesian::GaussianProcess gp;
-
     std::size_t successful_iters = 0;
     std::size_t total_attempts   = 0;
 
     while(successful_iters < bo_budget && total_attempts < max_attempts)
     {
-        // Build candidate list
         std::vector<std::size_t> cands;
         for(std::size_t i = 0; i < n_configs; ++i)
             if(!evaluated[i])
@@ -349,11 +396,10 @@ auto BayesianSearch(const Solver s,
 
         const std::size_t n_cand = cands.size();
 
-        // Select which observations to feed the GP (cap for O(n^3) safety)
         std::vector<std::size_t> gp_sel_idx;
         std::vector<double> gp_sel_y;
-
         const std::size_t n_total_obs = observed_idx.size();
+
         if(gp_cap == 0 || n_total_obs <= gp_cap)
         {
             gp_sel_idx = observed_idx;
@@ -361,13 +407,11 @@ auto BayesianSearch(const Solver s,
         }
         else
         {
-            // Find which position holds the best observation
             std::size_t best_pos = 0;
             for(std::size_t i = 1; i < n_total_obs; ++i)
                 if(observed_y[i] < observed_y[best_pos])
                     best_pos = i;
 
-            // Take most recent (gp_cap - 1), always include best
             const std::size_t tail_start = n_total_obs - (gp_cap - 1);
             bool best_in_tail = (best_pos >= tail_start);
 
@@ -385,7 +429,6 @@ auto BayesianSearch(const Solver s,
 
         const std::size_t n_obs = gp_sel_idx.size();
 
-        // Flatten observed X
         std::vector<double> X_obs(n_obs * n_features);
         for(std::size_t i = 0; i < n_obs; ++i)
             for(std::size_t j = 0; j < n_features; ++j)
@@ -393,7 +436,6 @@ auto BayesianSearch(const Solver s,
 
         gp.Fit(X_obs, gp_sel_y, n_obs, n_features);
 
-        // Flatten candidate X
         std::vector<double> X_cand(n_cand * n_features);
         for(std::size_t i = 0; i < n_cand; ++i)
             for(std::size_t j = 0; j < n_features; ++j)
@@ -407,7 +449,6 @@ auto BayesianSearch(const Solver s,
                                                     static_cast<double>(best_time), n_cand,
                                                     &max_ei);
 
-        // EI convergence check
         if(ei_thresh_raw > 0.0 && best_time < std::numeric_limits<float>::max())
         {
             const double ei_threshold = static_cast<double>(best_time) * ei_thresh_raw;
@@ -423,7 +464,6 @@ auto BayesianSearch(const Solver s,
         }
 
         std::size_t next = cands[pick];
-
         float t = evaluate(next);
         evaluated[next] = true;
         total_attempts++;

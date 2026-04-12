@@ -401,10 +401,12 @@ static void ParseCSVConfigString(const std::string& config_str,
 }
 
 std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
-                               std::vector<std::vector<double>>& out_features)
+                               std::vector<std::vector<double>>& out_features,
+                               std::vector<int>& out_variant_ids)
 {
     const std::size_t n = config_strings.size();
     out_features.clear();
+    out_variant_ids.assign(n, -1);
     if(n == 0)
         return 0;
 
@@ -446,27 +448,19 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
         if(suffix >= 0.0)
             has_any_suffix = true;
 
-        if(parsed[i].is_ck &&
-           variant_map.find(parsed[i].variant) == variant_map.end())
+        if(parsed[i].is_ck)
         {
-            variant_map[parsed[i].variant] = static_cast<int>(variant_map.size());
+            if(variant_map.find(parsed[i].variant) == variant_map.end())
+                variant_map[parsed[i].variant] = static_cast<int>(variant_map.size());
+            out_variant_ids[i] = variant_map[parsed[i].variant];
         }
 
         max_params = std::max(max_params, parsed[i].params.size());
     }
 
-    // Feature dimension:
-    //   CK:  1 (variant) + max_params + (1 if any config has split_k suffix)
-    //   CSV: max_params + (1 if any config has [gks] suffix)
-    const std::size_t has_variant_col = has_any_ck ? 1 : 0;
-    const std::size_t has_suffix_col  = has_any_suffix ? 1 : 0;
-    const std::size_t n_features      = has_variant_col + max_params + has_suffix_col;
+    const std::size_t has_suffix_col = has_any_suffix ? 1 : 0;
 
-    if(n_features == 0)
-        return 0;
-
-    // --- Pass 1.5: build per-column ordinal maps for non-numeric tokens ---
-    // For each param column, collect unique string values and assign 0, 1, 2, ...
+    // --- Pass 1.5: build per-column maps for non-numeric tokens ---
     std::vector<std::map<std::string, int>> col_ordinal(max_params);
     for(std::size_t i = 0; i < n; ++i)
     {
@@ -483,41 +477,62 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
         }
     }
 
-    // --- Pass 2: build uniform feature vectors ---
+    // Compute expanded feature dimension with one-hot encoding:
+    //   Variant: one-hot → variant_map.size() columns (0 if no CK)
+    //   Each param column j: numeric → 1 col, categorical → col_ordinal[j].size() cols
+    //   Suffix: 1 col (numeric)
+    const std::size_t variant_width = has_any_ck ? variant_map.size() : 0;
+
+    std::vector<std::size_t> col_start(max_params);
+    std::vector<std::size_t> col_width(max_params);
+    std::size_t param_total = 0;
+    for(std::size_t j = 0; j < max_params; ++j)
+    {
+        col_start[j] = param_total;
+        col_width[j] = col_ordinal[j].empty() ? 1 : col_ordinal[j].size();
+        param_total += col_width[j];
+    }
+
+    const std::size_t n_features = variant_width + param_total + has_suffix_col;
+    if(n_features == 0)
+        return 0;
+
+    // --- Pass 2: build feature vectors with one-hot encoding ---
     out_features.resize(n);
     for(std::size_t i = 0; i < n; ++i)
     {
         out_features[i].assign(n_features, 0.0);
-        std::size_t col = 0;
 
-        // Variant column (CK only)
-        if(has_variant_col)
+        // Variant: one-hot (CK only)
+        if(variant_width > 0 && parsed[i].is_ck)
         {
-            if(parsed[i].is_ck)
-                out_features[i][col] = static_cast<double>(variant_map[parsed[i].variant]);
-            col++;
+            int vid = variant_map[parsed[i].variant];
+            out_features[i][static_cast<std::size_t>(vid)] = 1.0;
         }
 
-        // Param columns: numeric → value, string → per-column ordinal index
+        // Param columns
+        const std::size_t base = variant_width;
         for(std::size_t j = 0; j < parsed[i].params.size(); ++j)
         {
             std::string tok = PrepareToken(parsed[i].params[j]);
             double num_val;
             if(TryParseNumber(tok, num_val))
             {
-                out_features[i][col + j] = num_val;
+                out_features[i][base + col_start[j]] = num_val;
             }
             else
             {
-                out_features[i][col + j] = static_cast<double>(col_ordinal[j][tok]);
+                int oid = col_ordinal[j][tok];
+                out_features[i][base + col_start[j] + static_cast<std::size_t>(oid)] = 1.0;
             }
         }
-        col += max_params;
 
         // Suffix column (split_k or gks)
         if(has_suffix_col)
         {
-            out_features[i][col] = (parsed[i].suffix_value >= 0.0) ? parsed[i].suffix_value : 0.0;
+            std::size_t suffix_col = variant_width + param_total;
+            out_features[i][suffix_col] =
+                (parsed[i].suffix_value >= 0.0) ? parsed[i].suffix_value : 0.0;
         }
     }
 
