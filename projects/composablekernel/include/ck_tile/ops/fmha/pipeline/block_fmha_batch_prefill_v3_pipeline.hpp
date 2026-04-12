@@ -905,9 +905,8 @@ struct BlockFmhaBatchPrefillV3Pipeline
             if constexpr(kFoldKDescale)
             {
                 // Reset m to -MAX so the in-place reduce starts fresh
-                static_for<0, m.thread_buf_.size(), 1>{}([&](auto i) {
-                    m.thread_buf_[i] = -numeric<SMPLComputeDataType>::max();
-                });
+                static_for<0, m.thread_buf_.size(), 1>{}(
+                    [&](auto i) { m.thread_buf_[i] = -numeric<SMPLComputeDataType>::max(); });
             }
             block_tile_reduce(m, sp(sp_reg_idx).sp_compute, sequence<1>{}, f_max);
             block_tile_reduce_sync(m, f_max, bool_constant<false>{}, bool_constant<false>{});
