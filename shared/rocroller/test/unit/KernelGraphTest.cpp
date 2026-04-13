@@ -595,9 +595,9 @@ namespace KernelGraphTest
         auto kgraph1 = kgraph0.transform(lowerLinearTransform);
 
         auto user0   = 1;
-        auto subdim0 = 3;
-        auto block0  = 17;
-        auto thread0 = 18;
+        auto subdim0 = 2;
+        auto block0  = 25;
+        auto thread0 = 26;
 
         // given block id and thread id, compute regular (user) index for first (0) dataflow array
         auto block_id  = Expression::literal(2);
