@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -2108,38 +2108,25 @@ void rocfft_plan_t::GlobalTranspose(size_t                     elem_size,
                                     std::vector<size_t>&       outputItems,
                                     size_t                     transposeNumber)
 {
-    bool use_p2p = rocfft_plan_description_t::multiple_devices_in_rank(inField)
-                   || rocfft_plan_description_t::multiple_devices_in_rank(outField);
-
-    // All-to-all transpose is preferred as it's faster. This requires
-    // that each rank have a single base pointer to send/receive with
-    // offsets for every other rank.
-    // That's only feasible if each rank has data on just one device
-    // (since we can hipMalloc a single buffer per device and have
-    // offsets into it).
-
-    // Fall back to point-to-point transfers if all-to-all is not
-    // possible.
     std::string itemGroup = "transpose_" + std::to_string(transposeNumber);
 
 #ifdef ROCFFT_RCCL_ENABLE
     if(rccl)
     {
-        // use RCCL for single-process multi-GPU
         GlobalTransposeRCCL(
             elem_size, inField, outField, input, output, inputAntecedents, outputItems, itemGroup);
+        return;
     }
-    else
 #endif
-        if(use_p2p)
+
+    if(rocfft_plan_description_t::multiple_devices_in_rank(inField)
+       || rocfft_plan_description_t::multiple_devices_in_rank(outField))
     {
         GlobalTransposeP2P(
             elem_size, inField, outField, input, output, inputAntecedents, outputItems, itemGroup);
     }
     else
     {
-        // GlobalTransposeA2A will use MPI_Ialltoall when possible,
-        // falling back to MPI_Ialltoallv otherwise
         GlobalTransposeA2A(
             elem_size, inField, outField, input, output, inputAntecedents, outputItems, itemGroup);
     }
@@ -3071,11 +3058,9 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         return false;
 
 #ifdef ROCFFT_RCCL_ENABLE
-    // initialize RCCL for single-process multi-GPU if not already initialized
-    if(rocfft_plan_description_t::multiple_devices_in_rank(desc.inFields.front())
-       || rocfft_plan_description_t::multiple_devices_in_rank(desc.outFields.front()))
+    // Collect local devices for RCCL communicator creation.
+    // Only devices owned by local_comm_rank are included.
     {
-        // collect all unique device IDs from bricks
         std::set<int> device_set;
         for(const auto& brick : desc.inFields.front().bricks)
         {
@@ -3087,12 +3072,8 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
             if(brick.location.comm_rank == local_comm_rank)
                 device_set.insert(brick.location.device);
         }
-
-        // initialize RCCL with these devices
-        if(!device_set.empty())
-        {
+        if(device_set.size() > 1)
             rccl = rocfft_rccl::Communicator::create(device_set);
-        }
     }
 #endif
 
