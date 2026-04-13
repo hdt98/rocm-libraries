@@ -142,7 +142,10 @@ struct GemmTile1DPartitioner
     GetOutputTileIndex(index_t blockIdx) noexcept -> const tuple<index_t, index_t>
     {
         const index_t NBlocks = integer_divide_ceil(N_, NPerBlock);
-
+#if 0
+        const index_t iM = blockIdx / NBlocks;
+        const index_t iN = blockIdx - iM * NBlocks;
+#endif 
         const index_t iM = amd_wave_read_first_lane(blockIdx / NBlocks);
         const index_t iN = amd_wave_read_first_lane(blockIdx - iM * NBlocks);
         return make_tuple(iM, iN);

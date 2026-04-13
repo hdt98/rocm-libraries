@@ -41,3 +41,9 @@ repos:
         - dos2unix
         - clang-format==18.1.3
         pass_filenames: false
+    -   id: clang-tidy-preprocessor
+        name: clang-tidy (readability-avoid-unconditional-preprocessor-if)
+        entry: projects/composablekernel/script/run_clang_tidy.sh
+        language: script
+        files: '^projects/composablekernel/'
+        pass_filenames: false
