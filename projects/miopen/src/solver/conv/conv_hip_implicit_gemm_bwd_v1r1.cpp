@@ -639,8 +639,6 @@ bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
     const std::string name = ctx.GetStream().GetDeviceName();
     if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
         return false;
-    if(problem.GetConv().attribute.deterministic)
-        return false;
     if(!ctx.use_hip_kernels)
         return false;
     if(problem.HasNonPackedTensors())
