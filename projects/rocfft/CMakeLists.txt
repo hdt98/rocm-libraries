@@ -215,7 +215,7 @@ if( ROCFFT_MPI_ENABLE )
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 endif()
 
-# Enable RCCL support for single-node multi-GPU:
+# Optional RCCL backend for single-node multi-GPU communication.
 option(ROCFFT_RCCL_ENABLE "Enable RCCL for optimized single-node multi-GPU communication" OFF)
 
 add_subdirectory( library )

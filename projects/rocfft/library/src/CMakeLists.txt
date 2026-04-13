@@ -73,13 +73,15 @@ if( ROCFFT_MPI_ENABLE )
   endif()
 endif()
 
+# RCCL: find and link (compile definition added after target creation below).
 if( ROCFFT_RCCL_ENABLE )
   find_package(rccl)
   if( rccl_FOUND )
     message(STATUS "RCCL support enabled for multi-GPU communication")
     set( ROCFFT_HOST_LINK_LIBS "${ROCFFT_HOST_LINK_LIBS}" "roc::rccl" )
   else()
-    message(STATUS "RCCL support disabled for multi-GPU communication")
+    message(FATAL_ERROR "ROCFFT_RCCL_ENABLE is ON but RCCL was not found. "
+      "Install RCCL or set -DROCFFT_RCCL_ENABLE=OFF.")
   endif()
 endif()
 
@@ -426,6 +428,7 @@ if( ROCFFT_MPI_ENABLE )
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 endif()
 
+# RCCL: activate RCCL code paths (no-op stubs when undefined).
 if( rccl_FOUND )
   target_compile_definitions(rocfft PRIVATE ROCFFT_RCCL_ENABLE)
 endif()
