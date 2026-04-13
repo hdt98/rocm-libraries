@@ -131,6 +131,7 @@ add_compile_options(-Wno-bit-int-extension)
 add_compile_options(-Wno-pass-failed)
 add_compile_options(-Wno-switch-default)
 add_compile_options(-Wno-unique-object-duplication)
+add_compile_options(-Wno-lifetime-safety-intra-tu-suggestions)
 
 # Increase the number of max elements in fold expressions
 add_compile_options(-fbracket-depth=1024)
@@ -222,16 +223,23 @@ message(STATUS "checking which targets are supported")
 #the GPU_TARGETS flag will be reset in this case in order to avoid conflicts.
 #
 #In order to build CK along with all tests and examples it should be OK to set GPU_TARGETS to just 1 or 2 similar architectures.
+
+# List of public GFX13 GPU targets
+set(CK_GFX13_PUBLIC_GPU_TARGETS gfx1310 gfx131F gfx1370)
+# List of private GFX13 GPU targets
+set(CK_GFX13_PRIVATE_GPU_TARGETS gfx130F gfx130C gfx135F)
+set(CK_GFX13_GPU_TARGETS ${CK_GFX13_PUBLIC_GPU_TARGETS} ${CK_GFX13_PRIVATE_GPU_TARGETS})
+
 if(NOT ENABLE_ASAN_PACKAGING)
     if(NOT WIN32 AND ${hip_VERSION_FLAT} LESS 600300000)
         # WORKAROUND: compiler does not yet fully support gfx12 targets, need to fix version above
         set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1103")
     elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600300000 AND ${hip_VERSION_FLAT} LESS 600400000)
-        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1310;gfx131F;gfx1370;gfx130F")
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;${CK_GFX13_GPU_TARGETS}")
     elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 600400000 AND ${hip_VERSION_FLAT} LESS 700200000)
-        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;gfx1310;gfx131F;gfx1370;gfx130F;gfx950")
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1200;gfx1201;${CK_GFX13_GPU_TARGETS};gfx950")
     elseif(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER_EQUAL 700200000)
-        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx10-3-generic;gfx11-generic;gfx12-generic;gfx950;gfx1250;gfx1310;gfx131F;gfx1370;gfx130F")
+        set(CK_GPU_TARGETS "gfx908;gfx90a;gfx942;gfx10-3-generic;gfx11-generic;gfx12-generic;gfx950;gfx1250;${CK_GFX13_GPU_TARGETS}")
     endif()
 else()
     #build CK only for xnack-supported targets when using ASAN

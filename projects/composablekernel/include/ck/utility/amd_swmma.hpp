@@ -5,10 +5,6 @@
 
 namespace ck {
 
-#if defined(__gfx1310__) || defined(__gfx1370__) || defined(__gfx130F__) || defined(__gfx131F__)
-#define __gfx13__
-#endif
-
 template <index_t MPerWave, index_t NPerWave, bool clamp, index_t kMultiplier, bool sparseSel>
 struct intrin_swmma_f32_16x16_f16f16_w32;
 

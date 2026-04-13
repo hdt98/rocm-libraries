@@ -1152,7 +1152,7 @@ struct FastGelu
     template <>
     __device__ void operator()<bhalf_t, bhalf_t>(bhalf_t& y, const bhalf_t& x) const
     {
-#if defined(__gfx125__) || (defined(__gfx13__) && !defined(__gfx130F__))
+#if defined(CK_SUPPORT_BF16_TRANS_INSTS)
         const bhalf_t c1 = type_convert<bhalf_t>(0.035677f);
         const bhalf_t c2 = type_convert<bhalf_t>(0.797885f);
         const bhalf_t u  = x * (c1 * x * x + c2);
