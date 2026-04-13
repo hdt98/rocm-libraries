@@ -103,11 +103,11 @@ namespace KernelGraphTest
             auto arguments = command->getArguments();
             for(auto argument : arguments)
             {
-                if(argument->name() == "Tensor_4_size_0")
+                if(argument->name() == "Tensor_0_size_0")
                     tensorDsizeX = argument;
             }
         }
-        ASSERT_NE(tensorDsizeX, nullptr) << "D size not found";
+        ASSERT_NE(tensorDsizeX, nullptr) << "Tensor_0 size not found";
 
         workitemCount = m_context->kernel()->workitemCount();
 

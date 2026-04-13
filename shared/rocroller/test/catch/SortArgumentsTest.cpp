@@ -72,8 +72,8 @@ TEST_CASE("SortArguments transform works as expected", "[kernel-graph][SortArgum
     kgraph = transform<KG::CleanArguments>(kgraph, context.get(), command);
     kgraph = transform<KG::AddDeallocateArguments>(kgraph, context.get());
 
-    std::vector<std::string> argNamesByUse = {"user_Float_Value_8",
-                                              "user_Float_Value_6",
+    std::vector<std::string> argNamesByUse = {"user_Float_Value_6",
+                                              "user_Float_Value_8",
                                               "Tensor_0_stride_1",
                                               "Tensor_0_pointer",
                                               "Tensor_0_size_1",
@@ -93,8 +93,8 @@ TEST_CASE("SortArguments transform works as expected", "[kernel-graph][SortArgum
                                                      "Tensor_2_stride_0",
                                                      "Tensor_2_pointer",
                                                      "Tensor_2_size_0",
-                                                     "user_Float_Value_8",
                                                      "user_Float_Value_6",
+                                                     "user_Float_Value_8",
                                                      "Tensor_4_stride_1",
                                                      "Tensor_4_pointer",
                                                      "Tensor_4_size_1",
