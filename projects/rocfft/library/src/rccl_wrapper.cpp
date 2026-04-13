@@ -58,8 +58,12 @@ namespace rocfft_rccl
             dtype = ncclFloat64;
             break;
         default:
-            dtype = ncclInt8;
-            break;
+            // rocFFT only produces half (2), float (4), or double (8).
+            // Any other size indicates a bug in the caller.  There is
+            // no safe fallback since the count_multiplier assumes a
+            // floating-point element width.
+            throw std::runtime_error("unexpected base_type_size " + std::to_string(base_type_size)
+                                     + " in RCCL datatype mapping (expected 2, 4, or 8)");
         }
         return {dtype, is_complex ? size_t{2} : size_t{1}};
     }
