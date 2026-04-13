@@ -694,13 +694,10 @@ static inline rocblas_status rocsolver_syconv_argCheck(rocblas_handle handle,
                                                        UA A,
                                                        Istride const shiftA,
                                                        I const lda,
-                                                       Istride const strideA,
 
                                                        I* const ipiv,
-                                                       Istride const strideP,
 
                                                        T* const E,
-                                                       Istride const strideE,
 
                                                        I const batch_count,
                                                        void* const work,
@@ -743,17 +740,6 @@ static inline rocblas_status rocsolver_syconv_argCheck(rocblas_handle handle,
         if(!is_valid_pointers)
         {
             return (rocblas_status_invalid_pointer);
-        }
-    }
-
-    if(batch_count > 1)
-    {
-        bool const is_valid_stride
-            = (strideA >= (static_cast<Istride>(lda) * n)) && (strideP >= n) && (strideE >= n);
-
-        if(!is_valid_stride)
-        {
-            return (rocblas_status_invalid_size);
         }
     }
 
@@ -872,11 +858,11 @@ static rocblas_status rocsolver_syconv_template(rocblas_handle handle,
     {
         rocblas_status const istat = rocsolver_syconv_argCheck(handle, is_upper, is_convert, n,
 
-                                                               A, shiftA, lda, strideA,
+                                                               A, shiftA, lda,
 
-                                                               ipiv, strideP,
+                                                               ipiv,
 
-                                                               E, strideE,
+                                                               E,
 
                                                                batch_count,
 
