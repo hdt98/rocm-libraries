@@ -98,7 +98,6 @@ namespace KernelGraphTest
             EXPECT_TRUE(kgraph0.coordinates.get<User>(id).has_value());
         }
 
-
         // Coordinate graph: 3 User (2 inputs + 1 output), 3 SubDimension, 5 Linear
         EXPECT_EQ(kgraph0.coordinates.getNodes<User>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph0.coordinates.getNodes<SubDimension>().to<std::vector>().size(), 3u);
@@ -109,7 +108,6 @@ namespace KernelGraphTest
         EXPECT_EQ(kgraph0.control.getNodes<LoadLinear>().to<std::vector>().size(), 2u);
         EXPECT_EQ(kgraph0.control.getNodes<Assign>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph0.control.getNodes<StoreLinear>().to<std::vector>().size(), 1u);
-
 
         auto one = Expression::literal(1u);
         m_context->kernel()->setWorkgroupSize({64, 1, 1});
@@ -130,7 +128,6 @@ namespace KernelGraphTest
         EXPECT_EQ(kgraph2.coordinates.getNodes<Workgroup>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph2.coordinates.getNodes<Workitem>().to<std::vector>().size(), 3u);
 
-
         int  loopSize     = 16;
         auto loopSizeExpr = Expression::literal(loopSize);
 
@@ -140,9 +137,11 @@ namespace KernelGraphTest
         // After LowerLinearLoop: 1 ForLoopOp + 2 Assign SGPR (init/increment);
         // 3 ForLoop + 1 Linear coordinate nodes added for the loop variable.
         EXPECT_EQ(kgraph3.control.getNodes<ForLoopOp>().to<std::vector>().size(), 1u);
-        EXPECT_EQ(kgraph3.control.getNodes<Assign>().to<std::vector>().size(), 5u); // 3 VGPR + 2 SGPR
+        EXPECT_EQ(kgraph3.control.getNodes<Assign>().to<std::vector>().size(),
+                  5u); // 3 VGPR + 2 SGPR
         EXPECT_EQ(kgraph3.coordinates.getNodes<ForLoop>().to<std::vector>().size(), 3u);
-        EXPECT_EQ(kgraph3.coordinates.getNodes<Linear>().to<std::vector>().size(), 6u); // 5 original + 1 loop
+        EXPECT_EQ(kgraph3.coordinates.getNodes<Linear>().to<std::vector>().size(),
+                  6u); // 5 original + 1 loop
     }
 
     TEST_F(KernelGraphTest, BasicTranslateScalar)
@@ -156,7 +155,6 @@ namespace KernelGraphTest
         {
             EXPECT_TRUE(kgraph0.coordinates.get<User>(id).has_value());
         }
-
 
         // Scalar variant: inputs map directly to VGPR, no SubDimension/Linear decomposition.
         // 5 VGPR coordinate nodes; no store operation in scalar variant.
@@ -189,7 +187,6 @@ namespace KernelGraphTest
             EXPECT_TRUE(kgraph0.coordinates.get<User>(id).has_value());
         }
 
-
         // Coordinate graph: 3 User, 4 SubDimension, 3 MacroTile (2 input + 1 output).
         EXPECT_EQ(kgraph0.coordinates.getNodes<User>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph0.coordinates.getNodes<MacroTile>().to<std::vector>().size(), 3u);
@@ -204,12 +201,15 @@ namespace KernelGraphTest
         // Mapper: TensorContraction's LHS, RHS, DEST all connect to MacroTile coordinates.
         {
             auto tcTag = *kgraph0.control.getNodes<TensorContraction>().only();
-            EXPECT_TRUE(kgraph0.coordinates.get<MacroTile>(
-                kgraph0.mapper.get(tcTag, NaryArgument::LHS)).has_value());
-            EXPECT_TRUE(kgraph0.coordinates.get<MacroTile>(
-                kgraph0.mapper.get(tcTag, NaryArgument::RHS)).has_value());
-            EXPECT_TRUE(kgraph0.coordinates.get<MacroTile>(
-                kgraph0.mapper.get(tcTag, NaryArgument::DEST)).has_value());
+            EXPECT_TRUE(
+                kgraph0.coordinates.get<MacroTile>(kgraph0.mapper.get(tcTag, NaryArgument::LHS))
+                    .has_value());
+            EXPECT_TRUE(
+                kgraph0.coordinates.get<MacroTile>(kgraph0.mapper.get(tcTag, NaryArgument::RHS))
+                    .has_value());
+            EXPECT_TRUE(
+                kgraph0.coordinates.get<MacroTile>(kgraph0.mapper.get(tcTag, NaryArgument::DEST))
+                    .has_value());
         }
     }
 
@@ -540,7 +540,6 @@ namespace KernelGraphTest
 
         kgraph0 = kgraph0.transform(updateParametersTransform);
 
-
         // Coordinate graph: 3 User, 4 SubDimension, 5 MacroTile (1 LDS + 4 VGPR).
         EXPECT_EQ(kgraph0.coordinates.getNodes<User>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph0.coordinates.getNodes<SubDimension>().to<std::vector>().size(), 6u);
@@ -555,7 +554,7 @@ namespace KernelGraphTest
                 else if(mt.memoryType == MemoryType::VGPR)
                     vgprCount++;
             }
-            EXPECT_EQ(ldsCount, 1);  // A tile stored in LDS
+            EXPECT_EQ(ldsCount, 1); // A tile stored in LDS
             EXPECT_EQ(vgprCount, 4); // intermediate and result tiles in VGPR
         }
 
@@ -1293,7 +1292,6 @@ namespace KernelGraphTest
         auto yaml2    = toYAML(graph2);
         EXPECT_EQ(yamlData, yaml2);
 
-
         // Coordinate graph: 3 User, 3 SubDimension, 6 Linear, 1 Buffer, 1 MakeOutput, 1 Join.
         EXPECT_EQ(kgraph.coordinates.getNodes<User>().to<std::vector>().size(), 3u);
         EXPECT_EQ(kgraph.coordinates.getNodes<SubDimension>().to<std::vector>().size(), 3u);
@@ -1326,7 +1324,6 @@ namespace KernelGraphTest
         command->addOperation(rocRoller::Operations::T_Store_Tiled(tagStoreD, tagTensorD));
 
         auto kgraph0 = translate(command);
-
 
         // Coordinate graph: 3 User, 4 SubDimension, 3 MacroTile (pre-transform: no sizes).
         EXPECT_EQ(kgraph0.coordinates.getNodes<User>().to<std::vector>().size(), 3u);
@@ -1361,7 +1358,6 @@ namespace KernelGraphTest
         auto updateParametersTransform = std::make_shared<UpdateParameters>(params);
 
         kgraph0 = kgraph0.transform(updateParametersTransform);
-
 
         // After UpdateParameters: same control graph, but MacroTiles now have
         // concrete sizes {64,64} with memory types (2 VGPR inputs, 1 WAVE accumulator).
@@ -1887,7 +1883,6 @@ namespace KernelGraphTest
         //           nop6              nop3        nop4       nop5
         //
 
-
         // After RemoveSetCoordinate: all 6 SetCoordinate nodes removed,
         // 6 NOP nodes remain, and nop2 now directly parents nop3-nop6.
         EXPECT_EQ(kg2.control.getNodes<SetCoordinate>().to<std::vector>().size(), 0u);
@@ -1895,7 +1890,7 @@ namespace KernelGraphTest
         EXPECT_EQ(kg2.control.getNodes<Kernel>().to<std::vector>().size(), 1u);
         // nop3, nop4, nop5, nop6 are now leaves (direct children of nop2 with no children of their own)
         {
-            auto leaves = kg2.control.leaves().to<std::unordered_set>();
+            auto                    leaves = kg2.control.leaves().to<std::unordered_set>();
             std::unordered_set<int> leafNOPs;
             for(auto id : leaves)
                 if(kg2.control.get<NOP>(id).has_value())
