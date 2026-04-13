@@ -63,6 +63,7 @@ std::string make_kernel_source(const Problem& prob,
                                const FmhaFwdRefParams& ref_params)
 {
     auto template_string = solution.ToTemplateString();
+    std::cout << "template_string: " << template_string << std::endl;
     return ck::host::InterpolateString(
         kernel_template,
         {{"include", prob.GetIncludeHeader()},
@@ -736,10 +737,10 @@ TEST_CASE(test_fmha_fwd_with_bias)
     rtc::buffer<half> q_host(q_size), k_host(k_size), v_host(v_size), bias_host(bias_size);
     std::vector<float> q_ref(q_size), k_ref(k_size), v_ref(v_size), bias_ref(bias_size),
         o_ref(o_size);
-    auto fill_buffers = [&](auto& host, auto& ref, auto& dist) {
+    auto fill_buffers = [&](auto& host, auto& ref, auto& distribution) {
         for(std::size_t i = 0; i < host.size(); ++i)
         {
-            float val = dist(rng);
+            float val = distribution(rng);
             host[i]   = half(val);
             ref[i]    = val;
         }

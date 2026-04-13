@@ -8,7 +8,6 @@
 #include <cmath>
 #include <cstdint>
 #include <cassert>
-#include <sstream>
 #include "ck_tile/core.hpp"
 #include "ck_tile/ops/fmha.hpp"
 #include "ck_tile/ops/epilogue/default_2d_epilogue.hpp"
