@@ -894,7 +894,7 @@ try
         return HIPSOLVER_STATUS_INVALID_VALUE;
 
     *lworkOnDevice = 0;
-    *lworkOnHost = 0;
+    *lworkOnHost   = 0;
     return HIPSOLVER_STATUS_NOT_SUPPORTED;
 }
 catch(...)
@@ -902,7 +902,6 @@ catch(...)
     return hipsolver::exception2hip_status();
 }
 
-// TODO: add check the ipiv is not nullptr, not permitted in AMD backend
 hipsolverStatus_t hipsolverDnXsytrs(hipsolverDnHandle_t handle,
                                     hipsolverFillMode_t uplo,
                                     int64_t             n,
@@ -921,6 +920,18 @@ hipsolverStatus_t hipsolverDnXsytrs(hipsolverDnHandle_t handle,
                                     int*                devInfo)
 try
 {
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    if(uplo != HIPSOLVER_FILL_MODE_UPPER && uplo != HIPSOLVER_FILL_MODE_LOWER)
+        return HIPSOLVER_STATUS_INVALID_ENUM;
+
+    if(!devInfo)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
+    if(!devIpiv)
+        return HIPSOLVER_STATUS_INVALID_VALUE; // TODO: if sytrs without pivoting in hipsolver, this should be changed to call the no pivoting version
+
     return HIPSOLVER_STATUS_NOT_SUPPORTED;
 }
 catch(...)
