@@ -47,7 +47,7 @@ namespace rocfft_rccl
 
         // return a communicator for the specified devices
         static std::shared_ptr<Communicator> create(const std::set<int>& devices);
-        // process-wide communicator for all visible devices, created
+        // cached communicator for the requested devices, created
         // on demand and destroyed at cleanup
         static std::shared_ptr<Communicator> comm_world;
 

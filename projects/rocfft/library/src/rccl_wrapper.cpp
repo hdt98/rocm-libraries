@@ -70,7 +70,7 @@ namespace rocfft_rccl
     struct Communicator::Impl
     {
         // each comm is for one rank, and each rank has exactly one
-        // device.  comms is indexed by device_id.
+        // device.  comms is indexed by rank.
         std::vector<ncclComm_t> comms;
 
         // unique id used to bootstrap this communicator group.
