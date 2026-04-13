@@ -78,7 +78,7 @@ namespace rocRoller
                             loadInputA, solutionParams.types.pretileA, true));
                     }
 
-                    m_tagA = command->addOperation(Operations::T_Load_Tiled(m_tagTensorA));
+                    m_tagA = command->addOperation(Operations::T_Load_Tiled(loadInputA));
 
                     m_tagTensorB
                         = command->addOperation(Operations::Tensor(2, typeB, {}, unitStrides));

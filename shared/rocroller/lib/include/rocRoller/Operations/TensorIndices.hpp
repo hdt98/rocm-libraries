@@ -24,6 +24,11 @@ namespace rocRoller
             size_t ab, d;
         };
 
+        inline bool operator==(const FreeIndex& lhs, const FreeIndex& rhs)
+        {
+            return lhs.ab == rhs.ab && lhs.d == rhs.d;
+        }
+
         inline std::ostream& operator<<(std::ostream& os, const FreeIndex& idx)
         {
             os << "FreeIndex(ab=" << idx.ab << ", d=" << idx.d << ")";
@@ -40,6 +45,11 @@ namespace rocRoller
         {
             size_t a, b;
         };
+
+        inline bool operator==(const BoundIndex& lhs, const BoundIndex& rhs)
+        {
+            return lhs.a == rhs.a && lhs.b == rhs.b;
+        }
 
         inline std::ostream& operator<<(std::ostream& os, const BoundIndex& idx)
         {
