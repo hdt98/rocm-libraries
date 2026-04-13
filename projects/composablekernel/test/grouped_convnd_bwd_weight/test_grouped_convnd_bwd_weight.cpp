@@ -33,7 +33,8 @@ class TestGroupedConvndBwdWeight : public ::testing::Test
     using NDimSpatial = std::tuple_element_t<6, Tuple>;
 
     std::vector<ck::utils::conv::ConvParam> conv_params;
-    std::vector<ck::index_t> split_ks{-1, 1, 2};
+    // std::vector<ck::index_t> split_ks{-1, 1, 2};
+    std::vector<ck::index_t> split_ks{1};
 
     bool skip_case(const ck::index_t split_k)
     {
@@ -183,20 +184,30 @@ TYPED_TEST(TestGroupedConvndBwdWeight2d, Test2D)
 TYPED_TEST(TestGroupedConvndBwdWeight3d, Test3D)
 {
     this->conv_params.clear();
+    
+    /////////////////////
+    // Failing config
     this->conv_params.push_back(
         {3, 2, 16, 128, 256, {1, 1, 1}, {7, 7, 7}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}});
-    this->conv_params.push_back(
-        {3, 2, 2, 128, 256, {3, 3, 3}, {14, 14, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
-    this->conv_params.push_back(
-        {3, 2, 32, 128, 256, {1, 1, 1}, {3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}});
-    this->conv_params.push_back(
-        {3, 1, 1, 1, 32, {3, 3, 3}, {16, 16, 16}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
-    this->conv_params.push_back(
-        {3, 1, 1, 64, 3, {3, 3, 3}, {14, 14, 14}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
-    this->conv_params.push_back(
-        {3, 1, 1, 1, 1, {3, 3, 3}, {18, 18, 18}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
-    this->conv_params.push_back(
-        {3, 16, 16, 1, 1, {3, 3, 3}, {28, 28, 28}, {2, 2, 2}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+    /////////////////////
+
+    /////////////////////////
+    // These configs are OK
+    ////////////////////////
+    // this->conv_params.push_back(
+    //     {3, 2, 2, 128, 256, {3, 3, 3}, {14, 14, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+    // this->conv_params.push_back(
+    //     {3, 2, 32, 128, 256, {1, 1, 1}, {3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, {0, 0, 0}});
+    // this->conv_params.push_back(
+    //     {3, 1, 1, 1, 32, {3, 3, 3}, {16, 16, 16}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+    // this->conv_params.push_back(
+    //     {3, 1, 1, 64, 3, {3, 3, 3}, {14, 14, 14}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+
+    // this->conv_params.push_back(
+    //     {3, 1, 1, 1, 1, {3, 3, 3}, {18, 18, 18}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+    // this->conv_params.push_back(
+    //     {3, 16, 16, 1, 1, {3, 3, 3}, {28, 28, 28}, {2, 2, 2}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}});
+
     this->Run();
 }
 

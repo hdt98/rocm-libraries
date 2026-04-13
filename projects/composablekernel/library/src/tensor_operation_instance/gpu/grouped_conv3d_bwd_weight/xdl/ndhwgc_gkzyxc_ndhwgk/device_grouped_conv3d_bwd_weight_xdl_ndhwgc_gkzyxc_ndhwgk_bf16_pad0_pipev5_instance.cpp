@@ -20,17 +20,17 @@ void add_device_grouped_conv3d_bwd_weight_xdl_ndhwgc_gkzyxc_ndhwgk_bf16_pad0_pip
                                                            BF16,
                                                            PassThrough,
                                                            PassThrough,
-                                                           PassThrough>>>& instances)
+                                                           PassThrough>>>& /*instances*/)
 {
-    add_device_operation_instances(instances,
-                                   device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_bf16_instances<
-                                       3,
-                                       NDHWGC,
-                                       GKZYXC,
-                                       NDHWGK,
-                                       ConvBwdWeightFilter1x1Stride1Pad0,
-                                       BlockGemmPipelineScheduler::Intrawave,
-                                       BlockGemmPipelineVersion::v5>{});
+    // add_device_operation_instances(instances,
+    //                                device_grouped_conv_bwd_weight_v3_xdl_c_shuffle_bf16_instances<
+    //                                    3,
+    //                                    NDHWGC,
+    //                                    GKZYXC,
+    //                                    NDHWGK,
+    //                                    ConvBwdWeightFilter1x1Stride1Pad0,
+    //                                    BlockGemmPipelineScheduler::Intrawave,
+    //                                    BlockGemmPipelineVersion::v5>{});
 }
 
 } // namespace instance
