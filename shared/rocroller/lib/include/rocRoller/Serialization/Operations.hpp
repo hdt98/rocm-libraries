@@ -270,6 +270,28 @@ namespace rocRoller
         };
 
         template <typename IO, typename Context>
+        struct MappingTraits<Operations::BatchIndex, IO, Context>
+        {
+            using iot = IOTraits<IO>;
+
+            static void mapping(IO& io, Operations::BatchIndex& idx, Context& ctx)
+            {
+                iot::mapRequired(io, "a", idx.a);
+                iot::mapRequired(io, "b", idx.b);
+                iot::mapRequired(io, "d", idx.d);
+            }
+
+            static void mapping(IO& io, Operations::BatchIndex& idx)
+            {
+                AssertFatal((std::same_as<EmptyContext, Context>));
+                Context ctx;
+                mapping(io, idx, ctx);
+            }
+
+            static const bool flow = true;
+        };
+
+        template <typename IO, typename Context>
         struct MappingTraits<Operations::T_Mul, IO, Context>
         {
             using TOp = Operations::T_Mul;
@@ -284,6 +306,7 @@ namespace rocRoller
                 iot::mapRequired(io, "freeDimsB", op.freeDimsB);
                 iot::mapRequired(io, "boundDims", op.boundDims);
                 iot::mapRequired(io, "accType", op.accType);
+                iot::mapOptional(io, "batchDims", op.batchDims);
             }
 
             static void mapping(IO& io, TOp& val)

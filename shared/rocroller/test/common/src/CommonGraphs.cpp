@@ -76,11 +76,14 @@ namespace rocRollerTest::Graphs
                 rocRoller::Operations::BlockScale(tagB, 2, m_tagScaleB, {1, 32}));
         }
 
-        auto [freeDimsA, freeDimsB, boundDims]
-            = rocRoller::Operations::MakeGemmIndices(false, false);
+        auto gemmIndices = rocRoller::Operations::MakeGemmIndices(false, false);
 
-        m_tagD = m_command->addOperation(rocRoller::Operations::T_Mul(
-            tagA, tagB, {freeDimsA}, {freeDimsB}, {boundDims})); // D = A * B
+        m_tagD = m_command->addOperation(
+            rocRoller::Operations::T_Mul(tagA,
+                                         tagB,
+                                         {gemmIndices.freeDimsA},
+                                         {gemmIndices.freeDimsB},
+                                         {gemmIndices.boundDims})); // D = A * B
 
         auto tagTensorD = m_command->addOperation(rocRoller::Operations::Tensor(2, m_cdType)); // D
         m_command->addOperation(rocRoller::Operations::T_Store_Tiled(m_tagD, tagTensorD));
@@ -251,11 +254,15 @@ namespace rocRollerTest::Graphs
         auto tagLoadBeta = m_command->addOperation(
             rocRoller::Operations::T_Load_Scalar(m_tagScalarBeta)); // beta
 
-        auto [freeDimsA, freeDimsB, boundDims] = rocRoller::Operations::MakeGemmIndices(
-            m_problem.transA == "T", m_problem.transB == "T");
+        auto gemmIndices = rocRoller::Operations::MakeGemmIndices(m_problem.transA == "T",
+                                                                  m_problem.transB == "T");
 
-        auto tagAB = m_command->addOperation(rocRoller::Operations::T_Mul(
-            tagA, tagB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
+        auto tagAB = m_command->addOperation(
+            rocRoller::Operations::T_Mul(tagA,
+                                         tagB,
+                                         {gemmIndices.freeDimsA},
+                                         {gemmIndices.freeDimsB},
+                                         {gemmIndices.boundDims})); // A * B
 
         rocRoller::Operations::T_Execute execute(m_command->getNextTag());
 

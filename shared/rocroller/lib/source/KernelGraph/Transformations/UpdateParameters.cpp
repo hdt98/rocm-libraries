@@ -445,27 +445,10 @@ namespace rocRoller
                             size)[rocRoller::Expression::EvaluationTime::Translate];
                     };
 
-                    // Filter subdimensions to keep only those with dynamic (non-literal) sizes
-                    std::vector<int> dynamicSubDims;
-                    for(auto subDimTag : subDims)
-                    {
-                        if(hasDynamicSize(subDimTag))
-                            dynamicSubDims.push_back(subDimTag);
-                    }
-
-                    // Current implementation assumes 2D Users (e.g., GEMM M×N, K×N, M×K)
-                    // or 4D Users with two fixed size dimensions and two dynamic subdimensions (pre-tiling)
-                    AssertFatal(
-                        dynamicSubDims.size() == 2,
-                        "SetUserSizeVisitor: Expected 2 dynamic subdimensions for MacroTile "
-                        "{}, got {}",
-                        tag,
-                        dynamicSubDims.size());
-
                     // Dimensions are ordered fastest-to-slowest stride.
                     // The last dynamic SubDimension has the largest stride.
-                    auto subDim = m_graph.coordinates.get<SubDimension>(
-                        dynamicSubDims[dynamicSubDims.size() - 1]);
+                    auto subDim
+                        = m_graph.coordinates.get<SubDimension>(subDims[subDims.size() - 1]);
                     AssertFatal(
                         subDim && subDim->size && subDim->stride,
                         "SubDimension must have size and stride defined for User.size calculation");
@@ -480,7 +463,7 @@ namespace rocRoller
                         "for MacroTile {}",
                         userTag,
                         toString(user.size),
-                        dynamicSubDims[dynamicSubDims.size() - 1],
+                        subDims[subDims.size() - 1],
                         tag);
                 }
 

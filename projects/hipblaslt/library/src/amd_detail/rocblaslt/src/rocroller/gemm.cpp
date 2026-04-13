@@ -336,15 +336,15 @@ std::shared_ptr<RocRollerGemmKernel> RocRollerGemmKernel::generate(std::shared_p
         = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // beta
     auto tagLoadBeta = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarBeta));
 
-    auto [freeDimsA, freeDimsB, boundDims]
+    auto gemmIndices
         = Operations::MakeGemmIndices(gemm->kernelType.transA, gemm->kernelType.transB);
 
     auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
         mulInputA,
         mulInputB,
-        {freeDimsA},
-        {freeDimsB},
-        {boundDims},
+        {gemmIndices.freeDimsA},
+        {gemmIndices.freeDimsB},
+        {gemmIndices.boundDims},
         gemm->kernelType.typeAcc)); // A * B
 
     rocRoller::Operations::T_Execute execute(command->getNextTag());

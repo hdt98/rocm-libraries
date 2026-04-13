@@ -544,11 +544,15 @@ namespace GEMMTests
             auto tagLoadBeta
                 = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarBeta));
 
-            auto [freeDimsA, freeDimsB, boundDims]
+            auto gemmIndices
                 = rocRoller::Operations::MakeGemmIndices(gemm.transA == "T", gemm.transB == "T");
 
-            auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
-                mulInputA, mulInputB, {freeDimsA}, {freeDimsB}, {boundDims}, dataTypeAcc)); // A * B
+            auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(mulInputA,
+                                                                            mulInputB,
+                                                                            {gemmIndices.freeDimsA},
+                                                                            {gemmIndices.freeDimsB},
+                                                                            {gemmIndices.boundDims},
+                                                                            dataTypeAcc)); // A * B
 
             rocRoller::Operations::T_Execute execute(command->getNextTag());
             auto                             tagBetaC

@@ -39,6 +39,7 @@ target_sources(rocroller-tests-catch
         "${CMAKE_CURRENT_SOURCE_DIR}/ArgumentTracerTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ArithmeticUtilityTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/AssignIndexExpressionsTest.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/BatchedGEMMTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/BinaryExpressionTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/BranchGeneratorTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/CommandArgumentValueTest.cpp"

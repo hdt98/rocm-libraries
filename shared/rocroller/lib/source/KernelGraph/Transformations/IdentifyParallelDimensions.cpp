@@ -164,14 +164,23 @@ namespace rocRoller
                                  .filter(notFixedSize)
                                  .to<std::vector>();
 
-                auto expectedASize = op.freeDimsA.size() + op.boundDims.size();
+                auto numBatchDimsA
+                    = std::count_if(op.batchDims.begin(), op.batchDims.end(), [](auto const& b) {
+                          return b.a != Operations::BatchIndex::NoBatch;
+                      });
+                auto numBatchDimsB
+                    = std::count_if(op.batchDims.begin(), op.batchDims.end(), [](auto const& b) {
+                          return b.b != Operations::BatchIndex::NoBatch;
+                      });
+
+                auto expectedASize = op.freeDimsA.size() + op.boundDims.size() + numBatchDimsA;
                 AssertFatal(aDims.size() == expectedASize,
                             ShowValue(aDims.size()),
                             ShowValue(expectedASize),
                             ShowValue(op.freeDimsA.size()),
                             ShowValue(op.boundDims.size()));
 
-                auto expectedBSize = op.freeDimsB.size() + op.boundDims.size();
+                auto expectedBSize = op.freeDimsB.size() + op.boundDims.size() + numBatchDimsB;
                 AssertFatal(bDims.size() == expectedBSize,
                             ShowValue(bDims.size()),
                             ShowValue(expectedBSize),
@@ -208,7 +217,8 @@ namespace rocRoller
                     auto dDims = graph.coordinates.getOutputNodeIndices(dTile, isDestructMacroTile)
                                      .to<std::vector>();
 
-                    size_t expectedDSize = op.freeDimsA.size() + op.freeDimsB.size();
+                    size_t expectedDSize
+                        = op.freeDimsA.size() + op.freeDimsB.size() + op.batchDims.size();
                     AssertFatal(dDims.size() == expectedDSize,
                                 ShowValue(dDims.size()),
                                 ShowValue(expectedDSize),
@@ -235,6 +245,22 @@ namespace rocRoller
                         auto bDim = bDims.at(freeB.ab);
                         auto dDim = dDims.at(freeB.d);
                         redundantArgs.push_back({bDim, dDim});
+                    }
+
+                    // Match batch dimensions across A, B, and D
+                    for(auto const& batch : op.batchDims)
+                    {
+                        auto dDim = dDims.at(batch.d);
+                        if(batch.a != Operations::BatchIndex::NoBatch)
+                        {
+                            auto aDim = aDims.at(batch.a);
+                            redundantArgs.push_back({aDim, dDim});
+                        }
+                        if(batch.b != Operations::BatchIndex::NoBatch)
+                        {
+                            auto bDim = bDims.at(batch.b);
+                            redundantArgs.push_back({bDim, dDim});
+                        }
                     }
                 }
 

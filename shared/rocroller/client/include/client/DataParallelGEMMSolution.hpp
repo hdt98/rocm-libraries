@@ -261,15 +261,15 @@ namespace rocRoller
                     auto tagLoadBeta
                         = command->addOperation(Operations::T_Load_Scalar(m_tagScalarBeta));
 
-                    auto [freeDimsA, freeDimsB, boundDims] = Operations::MakeGemmIndices(
+                    auto gemmIndices = Operations::MakeGemmIndices(
                         solutionParams.types.transA == TransposeType::T,
                         solutionParams.types.transB == TransposeType::T);
 
                     auto tagAB = command->addOperation(Operations::T_Mul(mulInputA,
                                                                          mulInputB,
-                                                                         {freeDimsA},
-                                                                         {freeDimsB},
-                                                                         {boundDims},
+                                                                         {gemmIndices.freeDimsA},
+                                                                         {gemmIndices.freeDimsB},
+                                                                         {gemmIndices.boundDims},
                                                                          typeAcc)); // A * B
 
                     Operations::T_Execute execute(command->getNextTag());

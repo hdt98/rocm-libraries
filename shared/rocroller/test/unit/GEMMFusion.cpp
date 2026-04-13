@@ -180,11 +180,15 @@ namespace GEMMDriverTest
             auto tagLiteralZero
                 = command->addOperation(rocRoller::Operations::Literal(0.0f)); // zero
 
-            auto [freeDimsA, freeDimsB, boundDims]
+            auto gemmIndices
                 = rocRoller::Operations::MakeGemmIndices(gemm.transA == "T", gemm.transB == "T");
 
-            auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
-                tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
+            auto tagAB = command->addOperation(
+                rocRoller::Operations::T_Mul(tagLoadA,
+                                             tagLoadB,
+                                             {gemmIndices.freeDimsA},
+                                             {gemmIndices.freeDimsB},
+                                             {gemmIndices.boundDims})); // A * B
 
             rocRoller::Operations::T_Execute execute(command->getNextTag());
             auto                             tagBetaC

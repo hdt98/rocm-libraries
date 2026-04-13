@@ -153,11 +153,14 @@ namespace rocRollerTest
         auto tagTensorC = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeC)); // C
         auto tagLoadC   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorC));
 
-        auto [freeDimsA, freeDimsB, boundDims]
-            = rocRoller::Operations::MakeGemmIndices(false, false);
+        auto gemmIndices = rocRoller::Operations::MakeGemmIndices(false, false);
 
-        auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
-            tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
+        auto tagAB
+            = command->addOperation(rocRoller::Operations::T_Mul(tagLoadA,
+                                                                 tagLoadB,
+                                                                 {gemmIndices.freeDimsA},
+                                                                 {gemmIndices.freeDimsB},
+                                                                 {gemmIndices.boundDims})); // A * B
 
         auto execute = rocRoller::Operations::T_Execute(command->getNextTag());
         auto tagAdd  = execute.addXOp(rocRoller::Operations::E_Add(tagAB, tagLoadC)); //  A * B + C
@@ -280,11 +283,14 @@ namespace rocRollerTest
         auto tagTensorB = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeAB)); // B
         auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
 
-        auto [freeDimsA, freeDimsB, boundDims]
-            = rocRoller::Operations::MakeGemmIndices(false, false);
+        auto gemmIndices = rocRoller::Operations::MakeGemmIndices(false, false);
 
-        auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
-            tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
+        auto tagAB
+            = command->addOperation(rocRoller::Operations::T_Mul(tagLoadA,
+                                                                 tagLoadB,
+                                                                 {gemmIndices.freeDimsA},
+                                                                 {gemmIndices.freeDimsB},
+                                                                 {gemmIndices.boundDims})); // A * B
 
         auto cvtOp  = rocRoller::Operations::T_Execute(command->getNextTag()); // Convert(A * B)
         auto tagCvt = cvtOp.addXOp(rocRoller::Operations::E_Cvt(tagAB, dataTypeD));

@@ -27,7 +27,8 @@ namespace rocRoller
                   std::vector<FreeIndex>  freeDimsA,
                   std::vector<FreeIndex>  freeDimsB,
                   std::vector<BoundIndex> boundDims,
-                  VariableType            accType = DataType::Float);
+                  VariableType            accType   = DataType::Float,
+                  std::vector<BatchIndex> batchDims = {});
 
             std::unordered_set<OperationTag> getInputs() const;
             std::string                      toString() const;
@@ -37,6 +38,7 @@ namespace rocRoller
             std::vector<FreeIndex>  freeDimsB;
             std::vector<BoundIndex> boundDims;
             VariableType            accType;
+            std::vector<BatchIndex> batchDims;
 
             bool operator==(T_Mul const&) const;
 

@@ -2444,11 +2444,14 @@ namespace KernelGraphTest
             = command->addOperation(rocRoller::Operations::Tensor(2, DataType::Float)); // B
         auto tagLoadB = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
 
-        auto [freeDimsA, freeDimsB, boundDims]
-            = rocRoller::Operations::MakeGemmIndices(false, false);
+        auto gemmIndices = rocRoller::Operations::MakeGemmIndices(false, false);
 
-        auto tagStoreD = command->addOperation(rocRoller::Operations::T_Mul(
-            tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // D = A * B
+        auto tagStoreD = command->addOperation(
+            rocRoller::Operations::T_Mul(tagLoadA,
+                                         tagLoadB,
+                                         {gemmIndices.freeDimsA},
+                                         {gemmIndices.freeDimsB},
+                                         {gemmIndices.boundDims})); // D = A * B
 
         auto tagTensorD
             = command->addOperation(rocRoller::Operations::Tensor(2, DataType::Float)); // D

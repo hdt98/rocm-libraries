@@ -16,7 +16,8 @@ namespace rocRoller
                             std::vector<FreeIndex>  freeDimsA,
                             std::vector<FreeIndex>  freeDimsB,
                             std::vector<BoundIndex> boundDims,
-                            VariableType            accType)
+                            VariableType            accType,
+                            std::vector<BatchIndex> batchDims)
             : BaseOperation()
             , a(a)
             , b(b)
@@ -24,6 +25,7 @@ namespace rocRoller
             , freeDimsB(freeDimsB)
             , boundDims(boundDims)
             , accType(accType)
+            , batchDims(batchDims)
         {
         }
 
@@ -41,7 +43,7 @@ namespace rocRoller
         {
             return m_tag == rhs.m_tag && a == rhs.a && b == rhs.b && accType == rhs.accType
                    && freeDimsA == rhs.freeDimsA && freeDimsB == rhs.freeDimsB
-                   && boundDims == rhs.boundDims;
+                   && boundDims == rhs.boundDims && batchDims == rhs.batchDims;
         }
     }
 }

@@ -401,6 +401,7 @@ namespace rocRoller
             std::vector<Operations::FreeIndex>  freeDimsA;
             std::vector<Operations::FreeIndex>  freeDimsB;
             std::vector<Operations::BoundIndex> boundDims;
+            std::vector<Operations::BatchIndex> batchDims;
 
             Operations::ScaleMode scaleModeA = Operations::ScaleMode::None;
             Operations::ScaleMode scaleModeB = Operations::ScaleMode::None;

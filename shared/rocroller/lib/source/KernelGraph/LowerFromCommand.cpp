@@ -670,6 +670,7 @@ namespace rocRoller
 
                 TensorContraction contraction(
                     mul.freeDimsA, mul.freeDimsB, mul.boundDims, mul.accType);
+                contraction.batchDims = mul.batchDims;
 
                 std::tie(contraction.scaleModeA, contraction.scaleStridesA)
                     = std::visit(getBlockParams, *aSource);

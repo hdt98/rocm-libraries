@@ -220,8 +220,7 @@ namespace MatrixMultiplyTest
                     = command->addOperation(rocRoller::Operations::T_Load_Tiled(*tagTensorScaleB));
             }
 
-            auto [freeDimsA, freeDimsB, boundDims]
-                = rocRoller::Operations::MakeGemmIndices(transA == "T", transB == "T");
+            auto gemmIndices = rocRoller::Operations::MakeGemmIndices(transA == "T", transB == "T");
 
             rocRoller::Operations::OperationTag tagStoreD;
 
@@ -232,9 +231,9 @@ namespace MatrixMultiplyTest
                 tagStoreD
                     = command->addOperation(rocRoller::Operations::T_Mul(tagLoadA,
                                                                          tagLoadB,
-                                                                         {freeDimsA},
-                                                                         {freeDimsB},
-                                                                         {boundDims},
+                                                                         {gemmIndices.freeDimsA},
+                                                                         {gemmIndices.freeDimsB},
+                                                                         {gemmIndices.boundDims},
                                                                          dataTypeAcc)); // D = A * B
             }
             else
@@ -255,9 +254,9 @@ namespace MatrixMultiplyTest
                 tagStoreD
                     = command->addOperation(rocRoller::Operations::T_Mul(scaledA,
                                                                          scaledB,
-                                                                         {freeDimsA},
-                                                                         {freeDimsB},
-                                                                         {boundDims},
+                                                                         {gemmIndices.freeDimsA},
+                                                                         {gemmIndices.freeDimsB},
+                                                                         {gemmIndices.boundDims},
                                                                          dataTypeAcc)); // D = A * B
             }
 
@@ -609,15 +608,14 @@ namespace MatrixMultiplyTest
                 rocRoller::Operations::Tensor(2, dataTypeB, {}, unitStrides));
             auto tagLoadB = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
 
-            auto [freeDimsA, freeDimsB, boundDims]
-                = rocRoller::Operations::MakeGemmIndices(transA, transB);
+            auto gemmIndices = rocRoller::Operations::MakeGemmIndices(transA, transB);
 
             auto tagStoreD
                 = command->addOperation(rocRoller::Operations::T_Mul(tagLoadA,
                                                                      tagLoadB,
-                                                                     {freeDimsA},
-                                                                     {freeDimsB},
-                                                                     {boundDims},
+                                                                     {gemmIndices.freeDimsA},
+                                                                     {gemmIndices.freeDimsB},
+                                                                     {gemmIndices.boundDims},
                                                                      dataTypeAcc)); // D = A * B
 
             auto tagTensorD
@@ -750,11 +748,14 @@ namespace MatrixMultiplyTest
                 = command->addOperation(rocRoller::Operations::Tensor(2, dataType)); // C
             auto tagLoadC = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorC));
 
-            auto [freeDimsA, freeDimsB, boundDims]
-                = rocRoller::Operations::MakeGemmIndices(false, false);
+            auto gemmIndices = rocRoller::Operations::MakeGemmIndices(false, false);
 
-            auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
-                tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims}, dataTypeAcc)); // A * B
+            auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(tagLoadA,
+                                                                            tagLoadB,
+                                                                            {gemmIndices.freeDimsA},
+                                                                            {gemmIndices.freeDimsB},
+                                                                            {gemmIndices.boundDims},
+                                                                            dataTypeAcc)); // A * B
 
             auto execute = rocRoller::Operations::T_Execute(command->getNextTag());
             auto tagStoreD

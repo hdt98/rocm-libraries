@@ -1948,11 +1948,33 @@ namespace rocRoller
                 auto tile = graph.coordinates.getNode<MacroTile>(tileTag);
 
                 ReorderSubDimsForMacroTile(sdims, m_params->transposeMemoryAccess[tile.layoutType]);
+
+                // Extract batch SubDimension if present (3D or 5D tensor).
+                // The batch dim is always the last SubDim (slowest stride).
+                // Separate it so the existing 2D/4D load functions work unchanged.
+                std::optional<int> batchSubDim;
+                auto               matrixSdims = sdims;
+                if(sdims.size() == 3 || sdims.size() == 5)
+                {
+                    batchSubDim = sdims.back();
+                    matrixSdims.pop_back();
+                }
+
                 AssertFatal(tile.rank == 2, "Rank /= 2 not implemented yet.");
 
                 logger->debug("  User({}), MacroTile({}), Size: {}", userTag, tileTag, tile.sizes);
 
                 std::vector<DeferredConnection> connections;
+
+                // Connect batch dim to MacroTileNumber(2) via PassThrough
+                if(batchSubDim.has_value())
+                {
+                    auto batchSize = graph.coordinates.get<SubDimension>(*batchSubDim)->size;
+                    auto batchMacTileNum
+                        = graph.coordinates.addElement(MacroTileNumber(2, batchSize, literal(1u)));
+                    graph.coordinates.addElement(PassThrough(), {*batchSubDim}, {batchMacTileNum});
+                    connections.push_back(DC<MacroTileNumber>(batchMacTileNum, 2));
+                }
 
                 auto loadTag               = reindexer.control.at(tag);
                 auto varType               = getVariableType(graph, loadTag);
@@ -1960,8 +1982,14 @@ namespace rocRoller
                 switch(tile.memoryType)
                 {
                 case MemoryType::VGPR:
-                    loadMacroTile_VGPR(
-                        graph, connections, userTag, tileTag, sdims, {1, 1}, m_params, m_context);
+                    loadMacroTile_VGPR(graph,
+                                       connections,
+                                       userTag,
+                                       tileTag,
+                                       matrixSdims,
+                                       {1, 1},
+                                       m_params,
+                                       m_context);
                     break;
                 case MemoryType::WAVE:
                 case MemoryType::WAVE_FROM_GLOBAL:
@@ -1969,7 +1997,7 @@ namespace rocRoller
                                        connections,
                                        userTag,
                                        tileTag,
-                                       sdims,
+                                       matrixSdims,
                                        varType.dataType,
                                        wavetilesPerWavefront,
                                        m_params,
@@ -1981,7 +2009,7 @@ namespace rocRoller
                                           loadTag,
                                           userTag,
                                           tileTag,
-                                          sdims,
+                                          matrixSdims,
                                           wavetilesPerWavefront,
                                           m_params,
                                           m_context);
@@ -1991,7 +2019,7 @@ namespace rocRoller
                                        connections,
                                        userTag,
                                        tileTag,
-                                       sdims,
+                                       matrixSdims,
                                        {1, 1},
                                        m_params,
                                        m_context,
@@ -2138,7 +2166,26 @@ namespace rocRoller
 
                 ReorderSubDimsForMacroTile(sdims, m_params->transposeMemoryAccess[tile.layoutType]);
 
+                // Extract batch SubDimension if present (3D or 5D tensor).
+                std::optional<int> batchSubDim;
+                auto               matrixSdims = sdims;
+                if(sdims.size() == 3 || sdims.size() == 5)
+                {
+                    batchSubDim = sdims.back();
+                    matrixSdims.pop_back();
+                }
+
                 std::vector<DeferredConnection> connections;
+
+                // Connect batch dim to MacroTileNumber(2) via PassThrough
+                if(batchSubDim.has_value())
+                {
+                    auto batchSize = graph.coordinates.get<SubDimension>(*batchSubDim)->size;
+                    auto batchMacTileNum
+                        = graph.coordinates.addElement(MacroTileNumber(2, batchSize, literal(1u)));
+                    graph.coordinates.addElement(PassThrough(), {*batchSubDim}, {batchMacTileNum});
+                    connections.push_back(DC<MacroTileNumber>(batchMacTileNum, 2));
+                }
 
                 auto storeTag              = reindexer.control.at(tag);
                 auto wavetilesPerWavefront = m_params->getWaveTilesPerWavefront();
@@ -2150,7 +2197,7 @@ namespace rocRoller
                                         connections,
                                         userTag,
                                         tileTag,
-                                        sdims,
+                                        matrixSdims,
                                         wavetilesPerWavefront,
                                         m_params,
                                         m_context);
@@ -2160,7 +2207,7 @@ namespace rocRoller
                                         connections,
                                         userTag,
                                         tileTag,
-                                        sdims,
+                                        matrixSdims,
                                         wavetilesPerWavefront,
                                         m_params,
                                         m_context);
@@ -2170,7 +2217,7 @@ namespace rocRoller
                                               connections,
                                               userTag,
                                               tileTag,
-                                              sdims,
+                                              matrixSdims,
                                               wavetilesPerWavefront,
                                               m_context);
                     break;
@@ -2180,7 +2227,7 @@ namespace rocRoller
                                            storeTag,
                                            userTag,
                                            tileTag,
-                                           sdims,
+                                           matrixSdims,
                                            wavetilesPerWavefront,
                                            m_params,
                                            m_context);

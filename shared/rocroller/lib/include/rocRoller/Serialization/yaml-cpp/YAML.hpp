@@ -626,6 +626,33 @@ namespace YAML
         }
     };
 
+    template <>
+    struct convert<rocRoller::Operations::BatchIndex>
+    {
+        static Node encode(const rocRoller::Operations::BatchIndex& rhs)
+        {
+            Node node;
+            node["a"] = rhs.a;
+            node["b"] = rhs.b;
+            node["d"] = rhs.d;
+            node.SetStyle(YAML::EmitterStyle::Flow);
+            return node;
+        }
+
+        static bool decode(const Node& node, rocRoller::Operations::BatchIndex& rhs)
+        {
+            if(!node.IsMap())
+            {
+                return false;
+            }
+
+            rhs.a = node["a"].as<size_t>();
+            rhs.b = node["b"].as<size_t>();
+            rhs.d = node["d"].as<size_t>();
+            return true;
+        }
+    };
+
     inline Emitter& operator<<(Emitter& emitter, const rocRoller::Operations::FreeIndex& idx)
     {
         emitter << Flow << BeginMap << Key << "ab" << Value << idx.ab << Key << "d" << Value
@@ -637,6 +664,13 @@ namespace YAML
     {
         emitter << Flow << BeginMap << Key << "a" << Value << idx.a << Key << "b" << Value << idx.b
                 << EndMap;
+        return emitter;
+    }
+
+    inline Emitter& operator<<(Emitter& emitter, const rocRoller::Operations::BatchIndex& idx)
+    {
+        emitter << Flow << BeginMap << Key << "a" << Value << idx.a << Key << "b" << Value << idx.b
+                << Key << "d" << Value << idx.d << EndMap;
         return emitter;
     }
 }
