@@ -120,6 +120,7 @@ static const TileMap gfx9_fp16_tiles = {
                   {128, 128,  32, 256,  32, 256,   8,  1,  1,   8,  1,  1,  16, 16, 32,  16, 16, 16}}},
 };
 
+// TODO WIP - Currently not used, additional configs will be added later
 // gfx12 fp16/bf16 tiles from KernelComponentFactoryGfx12::get_hdim_tile_size_dict
 static const TileMap gfx12_fp16_tiles = {
     //             bm0, bn0, bk0, bn1, bk1,bk0max,rm0,rn0,rk0,rm1,rn1,rk1, wm0,wn0,wk0, wm1,wn1,wk1
@@ -180,6 +181,7 @@ GetPipelinesGfx9(std::size_t bucket_hdim, std::size_t bucket_hdim_v, bool has_bi
     return configs;
 }
 
+// TODO WIP - Currently not used, additinal configs will be added later
 static std::vector<PipelineConfig>
 GetPipelinesGfx950(std::size_t bucket_hdim, std::size_t bucket_hdim_v, bool has_bias)
 {

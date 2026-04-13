@@ -23,16 +23,16 @@ include(Embed)
 file(GLOB_RECURSE KERNEL_FILES CONFIGURE_DEPENDS
     ${CK_ROOT}/include/ck/*.hpp)
 
-add_embed_library(ck_headers ${KERNEL_FILES} RELATIVE ${CK_ROOT}/include)
+add_embed_library(ck_headers ${KERNEL_FILES} RELATIVE ${CK_ROOT}/include SANITIZE)
 
 # Embed CK Tile headers (ck_tile/*.hpp) for FMHA RTC API
 file(GLOB_RECURSE CK_TILE_KERNEL_FILES CONFIGURE_DEPENDS
     ${CK_ROOT}/include/ck_tile/*.hpp)
-add_embed_library(ck_tile_headers ${CK_TILE_KERNEL_FILES} RELATIVE ${CK_ROOT}/include)
+add_embed_library(ck_tile_headers ${CK_TILE_KERNEL_FILES} RELATIVE ${CK_ROOT}/include SANITIZE)
 # Embed codegen device headers (wrapper.hpp for FMHA RTC)
 file(GLOB_RECURSE CK_CODEGEN_DEVICE_FILES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ck/host/device_fmha_fwd/fmha_fwd_wrapper.hpp)
-add_embed_library(ck_codegen_headers ${CK_CODEGEN_DEVICE_FILES} RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+add_embed_library(ck_codegen_headers ${CK_CODEGEN_DEVICE_FILES} RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/include SANITIZE)
 
 add_compile_options(-std=c++20)
 
