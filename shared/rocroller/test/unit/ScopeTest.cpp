@@ -232,31 +232,13 @@ namespace ScopeTest
         Settings::getInstance()->set(Settings::Scheduler, sched);
         EXPECT_NO_THROW(m_context->schedule(generate(kgraph, m_context->kernel())));
 
-        auto expected = R"(
-            "coord1" -> "to_cntrl_1_5"
-            "to_cntrl_1_5"[label="5->1: DEST", shape=cds]
-            "cntrl5" -> "to_coord_5_1"
-            "to_coord_5_1"[label="5->1: DEST", shape=cds]
-            "coord2" -> "to_cntrl_2_6"
-            "to_cntrl_2_6"[label="6->2: DEST", shape=cds]
-            "cntrl6" -> "to_coord_6_2"
-            "to_coord_6_2"[label="6->2: DEST", shape=cds]
-            "coord3" -> "to_cntrl_3_7"
-            "to_cntrl_3_7"[label="7->3: DEST", shape=cds]
-            "cntrl7" -> "to_coord_7_3"
-            "to_coord_7_3"[label="7->3: DEST", shape=cds]
-            "coord1" -> "to_cntrl_1_8"
-            "to_cntrl_1_8"[label="8->1: DEST", shape=cds]
-            "cntrl8" -> "to_coord_8_1"
-            "to_coord_8_1"[label="8->1: DEST", shape=cds]
-            "coord4" -> "to_cntrl_4_9"
-            "to_cntrl_4_9"[label="9->4: DEST", shape=cds]
-            "cntrl9" -> "to_coord_9_4"
-            "to_coord_9_4"[label="9->4: DEST", shape=cds]
-        )";
-
-        EXPECT_EQ(NormalizedSource(expected),
-                  NormalizedSource(kgraph.mapper.toDOT("coord", "cntrl", true)));
+        // Verify mapper DEST connections: each assign control node connects to its target VGPR coord.
+        // assign1 (dst1=11) and assign4 (dst1=(44+dst3)*dst3) both write to dst1.
+        EXPECT_EQ(kgraph.mapper.get(assign1, NaryArgument::DEST), dst1);
+        EXPECT_EQ(kgraph.mapper.get(assign2, NaryArgument::DEST), dst2);
+        EXPECT_EQ(kgraph.mapper.get(assign3, NaryArgument::DEST), dst3);
+        EXPECT_EQ(kgraph.mapper.get(assign4, NaryArgument::DEST), dst1);
+        EXPECT_EQ(kgraph.mapper.get(assign5, NaryArgument::DEST), dst4);
     }
 
     auto schedulers()
