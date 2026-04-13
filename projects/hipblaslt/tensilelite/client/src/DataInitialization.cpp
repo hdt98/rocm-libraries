@@ -115,7 +115,7 @@ namespace TensileLite
 
         using BitWidth        = uint8_t;
         using Size            = uint64_t;
-        using SwizzleCacheKey = std::tuple<BitWidth, Size, Size, SwizzleSlabLayoutType>;
+        using SwizzleCacheKey = std::tuple<BitWidth, Size, Size, SwizzleSlabLayoutType, Size, Size>;
         using SwizzleCacheVal = ::Tensor::Manipulation::Tensor;
         using SwizzleCache    = LRUCache<SwizzleCacheKey, SwizzleCacheVal>;
         static thread_local SwizzleCache g_swizzleCache;
@@ -448,11 +448,21 @@ namespace TensileLite
         /// The source tensor has shape {M_padded, K_padded} with K varying fastest
         /// (TN layout).  The scatter must extract each 16×32 sub-tile using strided
         /// access because contiguous memory spans the full K dimension, not just 32.
+        ///
+        /// @param miwtM  MIWaveTile in M-direction (MIWT_M from MatrixInstruction).
+        ///               1 = single-wave (original layout, each 512-byte block holds
+        ///               one 16×32 M-tile); >1 = multi-wave interleaved (each block
+        ///               holds miwtM M-tiles × 16 K-elements so that a single
+        ///               buffer_load_b128 feeds miwtM consecutive WMMA inputs).
+        /// @param wvgM   MIWaveGroup in M-direction (WvG_M from MatrixInstruction).
+        ///               Controls block interleaving order across wave groups.
         static void shuffleFp8SlabRdna4(const void* src,
                                         void*       dst,
                                         size_t      M_padded,
                                         size_t      K_padded,
-                                        size_t      elementBytes)
+                                        size_t      elementBytes,
+                                        size_t      miwtM = 1,
+                                        size_t      wvgM  = 1)
         {
             constexpr size_t MI_M = 16;
             constexpr size_t MI_K = 32;
@@ -461,35 +471,182 @@ namespace TensileLite
             if(M_padded % MI_M != 0 || K_padded % MI_K != 0)
                 throw std::runtime_error(
                     "shuffleFp8SlabRdna4: dimensions must be multiples of 16×32");
+
             const auto* srcB = static_cast<const unsigned char*>(src);
             auto*       dstB = static_cast<unsigned char*>(dst);
 
             const size_t nMtiles = M_padded / MI_M;
             const size_t nKtiles = K_padded / MI_K;
 
-            for(size_t mt = 0; mt < nMtiles; ++mt)
+            if(miwtM <= 1)
             {
-                for(size_t kt = 0; kt < nKtiles; ++kt)
+                // ============================================================
+                // Original single-wave scatter (miwtM == 1).
+                //
+                // Each 512-byte destination block corresponds to exactly one
+                // 16×32 source sub-tile (one M-tile, one K-tile).  A single
+                // buffer_load_b128 fills G2LA[0:3]; the kernel then uses:
+                //   G2LA[0:1] for WMMA at K[0:15]   (same M-tile)
+                //   G2LA[2:3] for WMMA at K[16:31]   (same M-tile)
+                //
+                // Scatter formula (per slab, i = 0..511):
+                //   seg = i/8, eis = i%8, g = seg/8
+                //   row = (seg%2==0) ? g : g+8
+                //   col = (seg%8)/2 * 8 + eis
+                //   dst[row*32 + col] = src[i]
+                // ============================================================
+                for(size_t mt = 0; mt < nMtiles; ++mt)
                 {
-                    unsigned char* pd
-                        = dstB + mt * MI_M * K_padded + kt * (MI_M * MI_K);
-                    for(size_t i = 0; i < MI_M * MI_K; ++i)
+                    for(size_t kt = 0; kt < nKtiles; ++kt)
                     {
-                        const size_t mLocal = i / MI_K;
-                        const size_t kLocal = i % MI_K;
-                        const size_t srcOff
-                            = (mt * MI_M + mLocal) * K_padded + (kt * MI_K + kLocal);
+                        unsigned char* pd
+                            = dstB + mt * MI_M * K_padded + kt * (MI_M * MI_K);
+                        for(size_t i = 0; i < MI_M * MI_K; ++i)
+                        {
+                            const size_t mLocal = i / MI_K;
+                            const size_t kLocal = i % MI_K;
+                            const size_t srcOff
+                                = (mt * MI_M + mLocal) * K_padded + (kt * MI_K + kLocal);
 
-                        const uint32_t seg = static_cast<uint32_t>(i / 8);
-                        const uint32_t eis = static_cast<uint32_t>(i % 8);
-                        const uint32_t g   = seg / 8u;
-                        const uint32_t row = (seg % 2u) == 0u ? g : (g + 8u);
-                        const uint32_t col = (seg % 8u) / 2u * 8u + eis;
-                        const size_t   o
-                            = static_cast<size_t>(row) * MI_K + static_cast<size_t>(col);
-                        pd[o] = srcB[srcOff];
+                            const uint32_t seg = static_cast<uint32_t>(i / 8);
+                            const uint32_t eis = static_cast<uint32_t>(i % 8);
+                            const uint32_t g   = seg / 8u;
+                            const uint32_t row = (seg % 2u) == 0u ? g : (g + 8u);
+                            const uint32_t col = (seg % 8u) / 2u * 8u + eis;
+                            const size_t   o
+                                = static_cast<size_t>(row) * MI_K + static_cast<size_t>(col);
+                            pd[o] = srcB[srcOff];
+                        }
                     }
                 }
+            }
+            else
+            {
+                // ============================================================
+                // Multi-wave interleaved scatter (miwtM > 1).
+                //
+                // Background: for MIWT_M > 1 the codegen maps a single
+                // buffer_load_b128 (16 FP8 = 4 VGPRs) to *multiple* WMMA
+                // instructions that target *different* M-tile accumulators:
+                //
+                //   G2LA[0:1] → WMMA for M-tile 0
+                //   G2LA[2:3] → WMMA for M-tile 1    (same load!)
+                //
+                // This means the first 8 bytes of each thread's load must
+                // contain M-tile 0's WMMA input, and the next 8 bytes must
+                // contain M-tile 1's WMMA input (for miwtM == 2).
+                //
+                // Each 512-byte block now covers miwtM M-tiles × 16 K-elements
+                // (one "K-half" of a 32-element K-tile).  The total data per
+                // block is miwtM × 16 rows × 16 K-elems = 512 when miwtM == 2.
+                //
+                // Block ordering in the destination buffer follows the kernel's
+                // graTileOffsets formula:
+                //
+                //   block_idx = kh * numKr * wvgM + mg * numKr + kt
+                //
+                // where:
+                //   mg  = M-group index (0..wvgM-1) within a workgroup chunk
+                //   kh  = K-half index (0 or 1) within a K-tile
+                //   kt  = K-tile index (0..numKr-1)
+                //
+                // Within a block, for source element A[mt*16 + m, kt*32 + kh*16 + k]:
+                //   mtx  = M-tile index within group (0..miwtM-1)
+                //   kByte = k % 8
+                //   kRow  = k / 8  (0 or 1; selects first/second half of threads)
+                //   dst_pos = kRow * 256 + m * 16 + mtx * 8 + kByte
+                //
+                // The kRow split mirrors the WMMA lane mapping:
+                //   lanes 0..15  (threads 0..15):  row m, K[0..7]
+                //   lanes 16..31 (threads 16..31): row m, K[8..15]
+                // ============================================================
+
+                const size_t mtPerWg  = miwtM * wvgM;
+                const size_t nWgsCeil = (nMtiles + mtPerWg - 1) / mtPerWg;
+                const size_t numKr    = nKtiles;
+                const size_t wgBytes  = mtPerWg * numKr * (MI_M * MI_K);
+                const size_t bufSize  = M_padded * K_padded;
+
+                std::memset(dstB, 0, bufSize);
+
+                // std::cerr << "[DBG-ILV] M=" << M_padded << " K=" << K_padded
+                //           << " miwtM=" << miwtM << " wvgM=" << wvgM
+                //           << " nMtiles=" << nMtiles << " nWgsCeil=" << nWgsCeil
+                //           << " numKr=" << numKr << " wgBytes=" << wgBytes
+                //           << " bufSize=" << bufSize << "\n";
+
+                for(size_t wg = 0; wg < nWgsCeil; ++wg)
+                {
+                    const size_t mtBase = wg * mtPerWg;
+
+                    for(size_t mg = 0; mg < wvgM; ++mg)
+                    {
+                        for(size_t kh = 0; kh < 2; ++kh)
+                        {
+                            for(size_t kt = 0; kt < numKr; ++kt)
+                            {
+                                const size_t blockIdx
+                                    = kh * numKr * wvgM + mg * numKr + kt;
+                                const size_t blockOff
+                                    = wg * wgBytes + blockIdx * 512;
+
+                                if(blockOff + 512 > bufSize)
+                                    continue;
+
+                                unsigned char* pd = dstB + blockOff;
+
+                                for(size_t mtx = 0; mtx < miwtM; ++mtx)
+                                {
+                                    // Wave M-group mg handles M-tiles at stride wvgM:
+                                    //   wave 0 → M-tiles {0, 2, ...}, wave 1 → {1, 3, ...}
+                                    // Previous (incorrect for wvgM>1):
+                                    //   mt = mtBase + mg * miwtM + mtx;
+                                    const size_t mt = mtBase + mg + mtx * wvgM;
+                                    if(mt >= nMtiles)
+                                        continue;
+
+                                    for(size_t m = 0; m < MI_M; ++m)
+                                    {
+                                        for(size_t k = 0; k < 16; ++k)
+                                        {
+                                            const size_t srcOff
+                                                = (mt * MI_M + m) * K_padded
+                                                  + (kt * MI_K + kh * 16 + k);
+                                            const size_t kByte = k % 8;
+                                            const size_t kRow  = k / 8;
+                                            const size_t dstPos
+                                                = kRow * 256
+                                                  + m * 16
+                                                  + mtx * 8
+                                                  + kByte;
+                                            pd[dstPos] = srcB[srcOff];
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // if(M_padded == 64 && K_padded == 32)
+                // {
+                //     std::cerr << "[DBG-ILV] src[0..15]:";
+                //     for(int i = 0; i < 16; ++i)
+                //         std::cerr << " " << (int)srcB[i];
+                //     std::cerr << "\n[DBG-ILV] src[512..527]:";
+                //     for(int i = 512; i < 528; ++i)
+                //         std::cerr << " " << (int)srcB[i];
+                //     std::cerr << "\n[DBG-ILV] dst block0[0..31]:";
+                //     for(int i = 0; i < 32; ++i)
+                //         std::cerr << " " << (int)dstB[i];
+                //     std::cerr << "\n[DBG-ILV] dst block0[256..287]:";
+                //     for(int i = 256; i < 288; ++i)
+                //         std::cerr << " " << (int)dstB[i];
+                //     std::cerr << "\n[DBG-ILV] dst block1[512..543]:";
+                //     for(int i = 512; i < 544; ++i)
+                //         std::cerr << " " << (int)dstB[i];
+                //     std::cerr << "\n";
+                // }
             }
         }
 
@@ -2300,14 +2457,26 @@ namespace TensileLite
                         m_swizzleSlabLayoutType, problem, i, desc.dataType(), MiK, MiKv, PackK);
                     auto                          unrolledSize = desc.sizes()[0];
                     auto                          tiledSize    = desc.sizes()[1];
+                    // For FP8 RDNA4 multi-wave, M must be padded to MacroTile_M
+                    // (= MiM_N * miwtM * wvgM) so the interleaved scatter has room
+                    // for all M-tile slots, including empty ones in partial workgroups.
+                    size_t mGranularity = MiM_N;
+                    if(m_swizzleSlabLayoutType == SwizzleSlabLayoutType::SWZ_SLAB_RDNA4
+                       && desc.elementBytes() == 1
+                       && m_fp8SwizzleMiwtM * m_fp8SwizzleWvgM > 1)
+                    {
+                        mGranularity = MiM_N * m_fp8SwizzleMiwtM * m_fp8SwizzleWvgM;
+                    }
                     ::Tensor::Manipulation::Shape paddedShape{
-                        ((tiledSize / MiM_N) + !!(tiledSize % MiM_N)) * MiM_N,
+                        ((tiledSize + mGranularity - 1) / mGranularity) * mGranularity,
                         (unrolledSize / (MiK * PackK) + !!(unrolledSize % (MiK * PackK))) * MiK
                             * PackK};
                     auto swizzleKey = std::make_tuple(toBitWidth(desc.dataType()),
                                                       unrolledSize,
                                                       tiledSize,
-                                                      m_swizzleSlabLayoutType);
+                                                      m_swizzleSlabLayoutType,
+                                                      m_fp8SwizzleMiwtM,
+                                                      m_fp8SwizzleWvgM);
 
                     if(g_swizzleCache.count(swizzleKey))
                     {
@@ -2345,64 +2514,9 @@ namespace TensileLite
                                                     shuffled.as<void>(),
                                                     paddedShape[0],
                                                     paddedShape[1],
-                                                    paddedTensor.getElementSize());
-
-                                if(paddedShape[0] <= 16 && paddedShape[1] <= 32)
-                                {
-                                    auto* sb = static_cast<const unsigned char*>(
-                                        paddedTensor.as<void>());
-                                    auto* db = static_cast<const unsigned char*>(
-                                        shuffled.as<void>());
-                                    size_t n = paddedShape[0] * paddedShape[1];
-                                    std::cerr << "[DBG-FP8-SWZ] paddedShape=(" << paddedShape[0]
-                                              << "," << paddedShape[1] << ") total=" << n
-                                              << "\n";
-                                    std::cerr << "[DBG-FP8-SWZ] src[0..31]: ";
-                                    for(size_t z = 0; z < 32 && z < n; ++z)
-                                        std::cerr << (unsigned)sb[z] << " ";
-                                    std::cerr << "\n";
-                                    std::cerr << "[DBG-FP8-SWZ] dst[0..31] (tid0): ";
-                                    for(size_t z = 0; z < 32 && z < n; ++z)
-                                        std::cerr << (unsigned)db[z] << " ";
-                                    std::cerr << "\n";
-                                    std::cerr << "[DBG-FP8-SWZ] dst[256..287] (tid16): ";
-                                    for(size_t z = 256; z < 288 && z < n; ++z)
-                                        std::cerr << (unsigned)db[z] << " ";
-                                    std::cerr << "\n";
-
-                                    std::cerr << "[DBG-FP8-SWZ] expected tid0 bytes [0..15]:\n";
-                                    std::cerr << "  G2LA[0:1] = src[0..7] = ";
-                                    for(size_t z = 0; z < 8; ++z)
-                                        std::cerr << (unsigned)sb[z] << " ";
-                                    std::cerr << "\n  G2LA[2:3] = src[16..23] = ";
-                                    for(size_t z = 16; z < 24; ++z)
-                                        std::cerr << (unsigned)sb[z] << " ";
-                                    std::cerr << "\n";
-                                    std::cerr << "[DBG-FP8-SWZ] expected tid16 bytes [256..271]:\n";
-                                    std::cerr << "  G2LA[0:1] = src[8..15] = ";
-                                    for(size_t z = 8; z < 16; ++z)
-                                        std::cerr << (unsigned)sb[z] << " ";
-                                    std::cerr << "\n  G2LA[2:3] = src[24..31] = ";
-                                    for(size_t z = 24; z < 32; ++z)
-                                        std::cerr << (unsigned)sb[z] << " ";
-                                    std::cerr << "\n";
-
-                                    bool match = true;
-                                    for(size_t z = 0; z < 8; ++z)
-                                        if(db[z] != sb[z])
-                                            match = false;
-                                    for(size_t z = 0; z < 8; ++z)
-                                        if(db[8 + z] != sb[16 + z])
-                                            match = false;
-                                    for(size_t z = 0; z < 8; ++z)
-                                        if(db[256 + z] != sb[8 + z])
-                                            match = false;
-                                    for(size_t z = 0; z < 8; ++z)
-                                        if(db[264 + z] != sb[24 + z])
-                                            match = false;
-                                    std::cerr << "[DBG-FP8-SWZ] scatter check tid0+tid16: "
-                                              << (match ? "PASS" : "FAIL") << "\n";
-                                }
+                                                    paddedTensor.getElementSize(),
+                                                    m_fp8SwizzleMiwtM,
+                                                    m_fp8SwizzleWvgM);
 
                                 return shuffled;
                             }

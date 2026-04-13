@@ -1092,6 +1092,21 @@ int main(int argc, const char* argv[])
                         throw std::runtime_error("Could not find a solution");
 
                     {
+                        auto& sm     = solution->sizeMapping;
+                        size_t miwtM = 1;
+                        size_t wvgM  = 1;
+                        if(sm.matrixInstruction[0] > 0 && sm.waveGroup[0] > 0)
+                        {
+                            miwtM = sm.macroTile.x
+                                    / (sm.matrixInstruction[0] * sm.waveGroup[0]);
+                            wvgM  = sm.waveGroup[0];
+                        }
+                        dataInit->setFp8SwizzleTileParams(miwtM, wvgM);
+                        inputs    = dataInit->prepareGPUInputs(problem);
+                        inputArr[0] = inputs;
+                    }
+
+                    {
                         ScopedTimer timer("pre_solution");
                         listeners.preSolution(solution.get());
                     }

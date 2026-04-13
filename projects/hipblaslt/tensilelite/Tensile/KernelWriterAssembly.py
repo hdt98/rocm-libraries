@@ -3798,7 +3798,10 @@ class KernelWriterAssembly(KernelWriter):
                 module.addModuleAsFlatItems(self.alignTo(stmp, "SizeL", tP["swizzleK"]))
                 module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=1, comment="SWZ-%s align: (sizeL-1)"%tc))
               elif tP["isA"] and idx == kernel["ProblemType"]["Index0"]:
-                module.addModuleAsFlatItems(self.alignTo(stmp, "SizeI", 16))
+                # Align SizeI to MacroTile0 so the SRD covers the full
+                # workgroup block even when M < MacroTile_M (partial WG).
+                swzAlignM = kernel["MacroTile0"]
+                module.addModuleAsFlatItems(self.alignTo(stmp, "SizeI", swzAlignM))
                 module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=1, comment="SWZ-%s align: (sizeM-1)"%tc))
               elif tP["isB"] and idx == kernel["ProblemType"]["Index1"]:
                 module.addModuleAsFlatItems(self.alignTo(stmp, "SizeJ", 16))
@@ -14761,6 +14764,13 @@ class KernelWriterAssembly(KernelWriter):
       if isNLL:
         # NLL case, no (non DTV) global load A, B in no load loop. Reset numGlobalReadNonDTV
         numGlobalReadNonDTV = 0
+        if numRegsIn1set == 0:
+          # When fewer DTV loads than LoopIters (e.g. single buffer_load_b128 for FP8 swizzle
+          # with LoopIters=2), the formula yields needToWait = numGlobalReadDTV regardless of u.
+          # In the main loop this is safe because subsequent s_wait_loadcnt for LDS writes
+          # forces the old DTV load to complete. In NLL there are no such subsequent waits,
+          # so we must wait for all outstanding DTV loads here.
+          needToWait = 0
       if kernel["PrefetchGlobalRead"] >= 2:
         # PGR=2 case, add numGlobalReadNonDTV for second set of prefetch
         needToWait += numGlobalReadNonDTV

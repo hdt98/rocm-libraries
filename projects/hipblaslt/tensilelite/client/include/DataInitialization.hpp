@@ -154,6 +154,14 @@ namespace TensileLite
                                std::shared_ptr<TensileLite::Hardware const> hardware = nullptr);
             ~DataInitialization();
 
+            /// Set FP8 swizzle tile parameters for multi-wave configurations.
+            /// Must be called before prepareGPUInputs() when the solution changes.
+            void setFp8SwizzleTileParams(size_t miwtM, size_t wvgM)
+            {
+                m_fp8SwizzleMiwtM = miwtM;
+                m_fp8SwizzleWvgM  = wvgM;
+            }
+
             /**
              * Returns a ContractionInputs object with pointers to CPU memory,
              * suitable for using to calculate reference results.
@@ -1040,6 +1048,11 @@ namespace TensileLite
 
             /// From \ref m_gpuProcessor; used with swizzle slab MiK/MiKv/PackK and LRU cache keys.
             SwizzleSlabLayoutType m_swizzleSlabLayoutType = SwizzleSlabLayoutType::SWZ_SLAB_UNKNOWN;
+
+            /// FP8 swizzle multi-wave tile parameters (solution-dependent).
+            /// Set per-solution via setFp8SwizzleTileParams() before prepareGPUInputs().
+            size_t m_fp8SwizzleMiwtM = 1;
+            size_t m_fp8SwizzleWvgM  = 1;
         };
 
         template <>
