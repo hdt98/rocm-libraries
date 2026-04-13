@@ -54,27 +54,29 @@ namespace rocRoller
         void setIsTransposedLoad(int tileTag, KernelGraph& graph)
         {
             auto conns = graph.mapper.getCoordinateConnections(tileTag);
-            AssertFatal(conns.size() == 1,
+
+            int loadLDSTileOpTag = -1;
+            for(auto const& conn : conns)
+            {
+                auto e = graph.control.getElement(conn.control);
+                if(std::holds_alternative<LoadLDSTile>(std::get<Operation>(e)))
+                {
+                    AssertFatal(loadLDSTileOpTag == -1,
+                                "Macrotile(",
+                                tileTag,
+                                ") is connected to more than 1 LoadLDSTile in control graph!");
+                    loadLDSTileOpTag = conn.control;
+                }
+            }
+            AssertFatal(loadLDSTileOpTag != -1,
                         "Macrotile(",
                         tileTag,
-                        ") is connected to more than 1 operation in control graph!");
-            auto opTag = conns[0].control;
-            auto e     = graph.control.getElement(opTag);
-            std::visit(rocRoller::overloaded{[&](LoadLDSTile& op) {
-                                                 auto newLoadLDSTile(op);
-                                                 newLoadLDSTile.isTransposedTile = true;
-                                                 graph.control.setElement(opTag, newLoadLDSTile);
-                                             },
-                                             [&](auto& op) {
-                                                 Throw<FatalError>("Unexpected control node ",
-                                                                   op.name(),
-                                                                   "(",
-                                                                   opTag,
-                                                                   ") connected to MacroTile(",
-                                                                   tileTag,
-                                                                   ")");
-                                             }},
-                       std::get<Operation>(e));
+                        ") is not connected to any LoadLDSTile in control graph!");
+
+            auto op = std::get<LoadLDSTile>(
+                std::get<Operation>(graph.control.getElement(loadLDSTileOpTag)));
+            op.isTransposedTile = true;
+            graph.control.setElement(loadLDSTileOpTag, op);
         }
 
         template <GPUArchitectureGFX target>
