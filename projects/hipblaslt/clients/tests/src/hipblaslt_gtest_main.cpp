@@ -322,9 +322,17 @@ int main(int argc, char** argv)
     // On Windows, parallel GPU execution is not supported
     if(has_num_gpus_flag)
     {
-        hipblaslt_cerr << "Warning: --num_gpus is not supported on Windows. Ignoring flag." << std::endl;
+        hipblaslt_cerr << "Error: --num_gpus is not supported on Windows." << std::endl;
+        return 1;
     }
 #else
+    // Check for invalid --num_gpus values
+    if(has_num_gpus_flag && num_gpus <= 1)
+    {
+        hipblaslt_cerr << "Error: --num_gpus requires a value greater than 1." << std::endl;
+        return 1;
+    }
+
     // If parallel GPUs requested, use parallel execution
     if(num_gpus > 1)
     {
@@ -343,35 +351,6 @@ int main(int argc, char** argv)
         return run_tests_parallel_gpus(argc, argv, num_gpus, gtest_output_base);
     }
 #endif
-
-    // For single GPU or Windows, remove --num_gpus if present
-    if(has_num_gpus_flag)
-    {
-        std::sort(indices_to_remove.begin(), indices_to_remove.end(), std::greater<int>());
-        for(int idx : indices_to_remove)
-        {
-            // Skip --gtest_output indices, only remove --num_gpus
-            bool is_num_gpus = false;
-            if(idx < argc)
-            {
-                std::string arg = argv[idx];
-                if(arg.find("--num_gpus") == 0 ||
-                   (idx > 0 && std::string(argv[idx - 1]) == "--num_gpus"))
-                {
-                    is_num_gpus = true;
-                }
-            }
-
-            if(is_num_gpus)
-            {
-                for(int i = idx; i + 1 < argc; i++)
-                {
-                    argv[i] = argv[i + 1];
-                }
-                argc--;
-            }
-        }
-    }
 
     // Set signal handler
     hipblaslt_test_sigaction();
