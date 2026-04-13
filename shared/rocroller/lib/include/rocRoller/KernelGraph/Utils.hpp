@@ -826,6 +826,31 @@ namespace rocRoller
         std::deque<int> controlStack(int control, ControlGraph::ControlGraph const& graph);
 
         /**
+         * @brief Reorder SubDimension indices from physical (fastest-first)
+         * to semantic (MacroTile) order when the layout is transposed.
+         *
+         * For 2D: swaps sdims[0] and sdims[1].
+         * For 4D (pretiled): swaps sdims[0]/[1] and sdims[2]/[3].
+         * No-op if transposed is false.
+         */
+        inline void ReorderSubDimsForMacroTile(std::vector<int>& sdims, bool transposed)
+        {
+            if(!transposed)
+                return;
+
+            if(sdims.size() == 2)
+            {
+                std::swap(sdims[0], sdims[1]);
+            }
+            else if(sdims.size() == 4)
+            {
+                // For pretiled: {PTXTile, PTYTile, X, Y} -> {PTYTile, PTXTile, Y, X}
+                std::swap(sdims[0], sdims[1]);
+                std::swap(sdims[2], sdims[3]);
+            }
+        }
+
+        /**
          * @brief Connect all nodes in A with all nodes in B using edge with EdgeType
          */
         template <typename EdgeType>

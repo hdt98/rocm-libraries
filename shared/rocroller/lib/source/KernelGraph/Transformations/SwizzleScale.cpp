@@ -278,22 +278,8 @@ namespace rocRoller
                 }
                 graph.coordinates.addElement(Split(), std::vector<int>{user}, sDims);
 
-                // SubDimensions are in physical fastest-first order, but MacroTile
-                // expects semantic M,N,K order. For transposed matrices, we need to
-                // swap the SubDimension indices to match MacroTile's semantic ordering.
-                if(params->transposeMemoryAccess[macTile.layoutType])
-                {
-                    if(sDims.size() == 2)
-                    {
-                        std::swap(sDims[0], sDims[1]);
-                    }
-                    else if(sDims.size() == 4)
-                    {
-                        // For pretiled: {PTXTile, PTYTile, X, Y} -> {PTYTile, PTXTile, Y, X}
-                        std::swap(sDims[0], sDims[1]);
-                        std::swap(sDims[2], sDims[3]);
-                    }
-                }
+                ReorderSubDimsForMacroTile(sDims,
+                                           params->transposeMemoryAccess[macTile.layoutType]);
 
                 int nMac0, nMac1;
                 std::tie(nMac0, iMac0, nMac1, iMac1)

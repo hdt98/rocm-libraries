@@ -1947,22 +1947,7 @@ namespace rocRoller
 
                 auto tile = graph.coordinates.getNode<MacroTile>(tileTag);
 
-                // SubDimensions are in physical fastest-first order, but MacroTile
-                // expects semantic M,N,K order. For transposed matrices, we need to
-                // swap the SubDimension indices to match MacroTile's semantic ordering.
-                if(m_params->transposeMemoryAccess[tile.layoutType])
-                {
-                    if(sdims.size() == 2)
-                    {
-                        std::swap(sdims[0], sdims[1]);
-                    }
-                    else if(sdims.size() == 4)
-                    {
-                        // For pretiled: {PTXTile, PTYTile, X, Y} -> {PTYTile, PTXTile, Y, X}
-                        std::swap(sdims[0], sdims[1]);
-                        std::swap(sdims[2], sdims[3]);
-                    }
-                }
+                ReorderSubDimsForMacroTile(sdims, m_params->transposeMemoryAccess[tile.layoutType]);
                 AssertFatal(tile.rank == 2, "Rank /= 2 not implemented yet.");
 
                 logger->debug("  User({}), MacroTile({}), Size: {}", userTag, tileTag, tile.sizes);
@@ -2151,22 +2136,7 @@ namespace rocRoller
                     sdims[i] = reindexer.coordinates.at(sdims[i]);
                 AssertFatal(sdims.size() >= 2);
 
-                // SubDimensions are in physical fastest-first order, but MacroTile
-                // expects semantic M,N,K order. For transposed matrices, we need to
-                // swap the SubDimension indices to match MacroTile's semantic ordering.
-                if(m_params->transposeMemoryAccess[tile.layoutType])
-                {
-                    if(sdims.size() == 2)
-                    {
-                        std::swap(sdims[0], sdims[1]);
-                    }
-                    else if(sdims.size() == 4)
-                    {
-                        // For pretiled: {PTXTile, PTYTile, X, Y} -> {PTYTile, PTXTile, Y, X}
-                        std::swap(sdims[0], sdims[1]);
-                        std::swap(sdims[2], sdims[3]);
-                    }
-                }
+                ReorderSubDimsForMacroTile(sdims, m_params->transposeMemoryAccess[tile.layoutType]);
 
                 std::vector<DeferredConnection> connections;
 
