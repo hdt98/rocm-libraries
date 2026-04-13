@@ -887,7 +887,14 @@ hipsolverStatus_t hipsolverDnXsytrs_bufferSize(hipsolverDnHandle_t handle,
                                                size_t*             lworkOnHost)
 try
 {
+    if(!handle)
+        return HIPSOLVER_STATUS_NOT_INITIALIZED;
+
+    if(!A || !devIpiv || !B || !lworkOnDevice || !lworkOnHost)
+        return HIPSOLVER_STATUS_INVALID_VALUE;
+
     *lworkOnDevice = 0;
+    *lworkOnHost = 0;
     return HIPSOLVER_STATUS_NOT_SUPPORTED;
 }
 catch(...)
