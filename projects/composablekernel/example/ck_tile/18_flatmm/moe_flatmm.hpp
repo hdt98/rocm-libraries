@@ -140,6 +140,55 @@ struct is_8bit_type
 {
 };
 
+// Tile config for MX MoE (fp4xfp4, fp8xfp4) — gfx950 only
+struct MXMoeFlatmmConfig16
+{
+    static constexpr ck_tile::index_t M_Tile = 32;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 256;
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 128;
+
+    static constexpr bool kPadM = false;
+    static constexpr bool kPadN = false;
+    static constexpr bool kPadK = false;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool UseStructuredSparsity = false;
+
+    static constexpr int kBlockPerCu                = 1;
+    static constexpr int TileParitionerGroupNum     = 8;
+    static constexpr int TileParitionerM01          = 4;
+    static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
+    static constexpr ck_tile::index_t NumWaveGroups = 1;
+    static constexpr bool DoubleSmemBuffer          = false;
+
+    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
+    static constexpr bool TiledMMAPermuteN = false;
+};
+
+struct MXGemmTypeConfig_fp4xfp4
+{
+    using ADataType   = ck_tile::pk_fp4_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
+struct MXGemmTypeConfig_fp8xfp4
+{
+    using ADataType   = ck_tile::fp8_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
 auto create_args(int argc, char* argv[])
 {
     ck_tile::ArgParser arg_parser;
@@ -160,7 +209,7 @@ auto create_args(int argc, char* argv[])
                 "gemm1_gate_only by default.")
         .insert("validate", "1", "0. No validation, 1. Validation on CPU.")
         .insert("warmup", "50", "number of iterations before benchmark the kernel")
-        .insert("prec", "fp16", "data type. fp16/bf16/fp8/bf8")
+        .insert("prec", "fp16", "data type. fp16/bf16/fp8/bf8/fp4xfp4/fp8xfp4")
         .insert(
             "warp_tile", "0", "0: 16x16, 1: 32x32, 2: 16x16x128 (950 only), 3: 32x32x64 (950 only)")
         .insert("repeat", "10", "number of iterations to benchmark the kernel.");
