@@ -2045,6 +2045,15 @@ class Solution(collections.abc.Mapping):
       reject(state, printRejectionReason, "Currently TDMA and TDMB must be enabled simultaneously")
       return
 
+    # Wave-separated TDM splits waves by parity (even=A, odd=B) and requires
+    # numComp = numWaves//2 to be a power of two; equivalently, numWaves
+    # itself must be a power of two (>= 2).
+    if state["enableTDMA"] and state["enableTDMB"]:
+      numWaves = state["MIWaveGroup"][0] * state["MIWaveGroup"][1]
+      if numWaves > 1 and (numWaves & (numWaves - 1)) != 0:
+        reject(state, printRejectionReason, f"Wave-separated TDM requires prod(MIWaveGroup)={numWaves} to be a power of two")
+        return
+
     # DepthU == -1?
     if state["DepthU"] == -1:
       depthuList = [1024,512,256,128,64,32,16]
