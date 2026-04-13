@@ -9,8 +9,8 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 
 * Added functions:
   * getrfBatched
-    * hipsolverSgetrfBatched_bufferSize, hipsolverDgetrfBatched_bufferSize, hipsolverCgetrfBatched_bufferSize, hipsolverZgetrfBatched_bufferSize
-    * hipsolverSgetrfBatched, hipsolverDgetrfBatched, hipsolverCgetrfBatched, hipsolverZgetrfBatched
+    * hipsolverSgetrfBatched_bufferSize, hipsolverDgetrfBatched_bufferSize, hipsolverCgetrfBatched_bufferSize, and hipsolverZgetrfBatched_bufferSize
+    * hipsolverSgetrfBatched, hipsolverDgetrfBatched, hipsolverCgetrfBatched, and hipsolverZgetrfBatched
 
 ### Changed
 ### Removed
