@@ -214,20 +214,21 @@ function(add_instance_library INSTANCE_NAME)
     set(result ${result} PARENT_SCOPE)
 endfunction(add_instance_library INSTANCE_NAME)
 
-# Helper macro to add layout-specific instance objects to CK_DEVICE_CONV_INSTANCES
+# Helper function to add layout-specific instance objects to CK_DEVICE_CONV_INSTANCES
 # Usage: ADD_CONV_LAYOUT_INSTANCES(operation_name layout1 layout2 ...)
 # Example: ADD_CONV_LAYOUT_INSTANCES(grouped_conv3d_fwd_convscale ndhwgc gndhwc)
-macro(ADD_CONV_LAYOUT_INSTANCES OP_NAME)
+function(ADD_CONV_LAYOUT_INSTANCES OP_NAME)
     foreach(layout ${ARGN})
         set(target_name "device_${OP_NAME}_${layout}_instance")
         if(TARGET ${target_name})
             list(APPEND CK_DEVICE_CONV_INSTANCES $<TARGET_OBJECTS:${target_name}>)
-            message(STATUS "Added ${target_name} to CK_DEVICE_CONV_INSTANCES")
+            message(VERBOSE "Added ${target_name} to CK_DEVICE_CONV_INSTANCES")
         else()
-            message(STATUS "Target ${target_name} does not exist (may be filtered by MIOPEN_REQ_LIBS_ONLY)")
+            message(VERBOSE "Target ${target_name} does not exist (may be filtered by MIOPEN_REQ_LIBS_ONLY)")
         endif()
     endforeach()
-endmacro()
+    set(CK_DEVICE_CONV_INSTANCES ${CK_DEVICE_CONV_INSTANCES} PARENT_SCOPE)
+endfunction()
 
 
 file(GLOB dir_list LIST_DIRECTORIES true *)
