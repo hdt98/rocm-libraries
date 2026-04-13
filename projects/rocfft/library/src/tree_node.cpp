@@ -1,4 +1,4 @@
-// Copyright (C) 2020 - 2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2020 - 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -661,7 +661,7 @@ void CommPointToPoint::Print(rocfft_ostream& os, const int indent) const
 }
 
 #ifdef ROCFFT_RCCL_ENABLE
-// RCCL AllToAll implementation (currently unused - kept for potential future use)
+// RCCL AllToAll implementation
 void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
                                     void*                 in_buffer[],
                                     void*                 out_buffer[],
@@ -696,7 +696,15 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
     }
 
     // RCCL collectives must be called from ALL devices simultaneously.
-    // use ncclGroupStart/End to batch all calls together
+    // use ncclGroupStart/End to batch all calls together.
+    //
+    // In-place alltoall (sendbuf == recvbuf): the pack step above
+    // writes each device's a2a buffer with layout
+    //   slot[dst_rank] at offset dst_rank * count_per_rank
+    // which is exactly what ncclAllToAll expects as send layout.
+    // After the in-place collective, slot[i] contains data received
+    // from rank i, which the subsequent unpack step reads from
+    // offset src_rank * count_per_rank.
     {
         rocfft_rccl::Group group; // ncclGroupStart called in constructor
 

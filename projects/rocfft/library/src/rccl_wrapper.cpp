@@ -127,17 +127,19 @@ namespace rocfft_rccl
             return {};
         }
 
-        if(devices.empty())
+        // need at least 2 devices for a meaningful communicator
+        if(devices.size() < 2)
         {
             return {};
         }
 
-        // create world communicator if necessary
+        // create communicator scoped to the requested devices.
+        // the communicator is cached in comm_world for reuse by
+        // subsequent plans with the same device set.
         if(!comm_world)
         {
-            int ndevices = 0;
-            if(hipGetDeviceCount(&ndevices) != hipSuccess || ndevices < 2)
-                return {};
+            const int ndevices = static_cast<int>(devices.size());
+
             auto new_comm   = std::make_shared<Communicator>();
             new_comm->pimpl = std::make_unique<Impl>();
 
@@ -158,25 +160,41 @@ namespace rocfft_rccl
             if(hipGetDevice(&original_device) != hipSuccess)
                 throw std::runtime_error("hipGetDevice failed during RCCL communicator init");
 
+            // comms is indexed by rank (not device_id); device_to_rank
+            // maps device_id -> rank for lookup in get_comm().
             new_comm->pimpl->comms.resize(ndevices, nullptr);
 
             // init one communicator per device using ncclCommInitRank,
-            // batched inside a group call for single-process efficiency
+            // batched inside a group call for single-process efficiency.
+            // use try/catch to guarantee ncclGroupEnd is called even if
+            // hipSetDevice throws between ncclGroupStart and ncclGroupEnd.
+            // ranks are assigned in sorted device-id order (std::set).
             ncclGroupStart();
-            for(int i = 0; i < ndevices; ++i)
+            try
             {
-                if(hipSetDevice(i) != hipSuccess)
-                    throw std::runtime_error("hipSetDevice failed for device " + std::to_string(i));
-                new_comm->pimpl->device_to_rank[i] = i;
-                result = ncclCommInitRank(&new_comm->pimpl->comms[i], ndevices, id, i);
-                if(result != ncclSuccess)
+                int rank = 0;
+                for(int dev : devices)
                 {
-                    ncclGroupEnd();
-                    if(hipSetDevice(original_device) != hipSuccess)
-                        throw std::runtime_error("hipSetDevice failed restoring device "
-                                                 + std::to_string(original_device));
-                    return {};
+                    if(hipSetDevice(dev) != hipSuccess)
+                        throw std::runtime_error("hipSetDevice failed for device "
+                                                 + std::to_string(dev));
+                    new_comm->pimpl->device_to_rank[dev] = rank;
+                    result = ncclCommInitRank(&new_comm->pimpl->comms[rank], ndevices, id, rank);
+                    if(result != ncclSuccess)
+                    {
+                        ncclGroupEnd();
+                        if(hipSetDevice(original_device) != hipSuccess)
+                            throw std::runtime_error("hipSetDevice failed restoring device "
+                                                     + std::to_string(original_device));
+                        return {};
+                    }
+                    ++rank;
                 }
+            }
+            catch(...)
+            {
+                ncclGroupEnd();
+                throw;
             }
             result = ncclGroupEnd();
 
@@ -200,10 +218,13 @@ namespace rocfft_rccl
     void* Communicator::get_comm(int device_id) const
     {
 #ifdef ROCFFT_RCCL_ENABLE
+        // look up the NCCL rank for this device and index into
+        // comms by rank (not device_id) so this stays correct
+        // even if device ids are non-contiguous or reordered.
         auto it = pimpl->device_to_rank.find(device_id);
         if(it == pimpl->device_to_rank.end())
             return nullptr;
-        return &pimpl->comms[device_id];
+        return &pimpl->comms[it->second];
 #else
         return nullptr;
 #endif
