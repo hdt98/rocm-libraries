@@ -31,7 +31,7 @@ namespace mxDataGeneratorTest
             using DGenDT = typename rrDT2DGenDT<rrDT>::type;
 
             auto dataType = TypeInfo<rrDT>::Var.dataType;
-            // Transposed: swap dimensions so fastest stride is first
+            // dimension with the fastest stride is the first (dim2)
             TensorDescriptor desc(dataType, {dim2, dim1});
 
             uint32_t seed = 9861u;
