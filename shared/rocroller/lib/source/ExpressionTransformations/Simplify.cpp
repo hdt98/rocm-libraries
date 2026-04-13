@@ -1,6 +1,7 @@
 // Copyright Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include <bit>
 #include <rocRoller/Expression.hpp>
 
 template <typename T>
@@ -134,6 +135,59 @@ namespace rocRoller
                     if((elementSize == 4u or elementSize == 8u) and (rhs >= elementSize * 8u))
                     {
                         return literal(0, resultVarType);
+                    }
+                }
+
+                if constexpr(std::same_as<ShiftType, LogicalShiftR>)
+                {
+                    if(resultVarType.getElementSize() == 4)
+                    {
+                        if(auto const* andExpr = std::get_if<BitwiseAnd>(lhs.get()))
+                        {
+                            // BitwiseAnd is commutative: find which operand is the constant mask
+                            ExpressionPtr maskExpr = nullptr;
+                            ExpressionPtr varExpr  = nullptr;
+
+                            if(evaluationTimes(andExpr->rhs)[EvaluationTime::Translate])
+                            {
+                                maskExpr = andExpr->rhs;
+                                varExpr  = andExpr->lhs;
+                            }
+                            else if(evaluationTimes(andExpr->lhs)[EvaluationTime::Translate])
+                            {
+                                maskExpr = andExpr->lhs;
+                                varExpr  = andExpr->rhs;
+                            }
+
+                            if(maskExpr)
+                            {
+                                auto                    maskVal = evaluate(maskExpr);
+                                std::optional<uint32_t> maskBits;
+
+                                if(auto p = std::get_if<uint32_t>(&maskVal))
+                                    maskBits = *p;
+                                else if(auto p = std::get_if<int32_t>(&maskVal))
+                                    maskBits = static_cast<uint32_t>(*p);
+
+                                if(maskBits.has_value())
+                                {
+                                    uint32_t m = *maskBits;
+                                    uint32_t K = static_cast<uint32_t>(rhs);
+
+                                    // Contiguous low-bits mask: m > 0 and (m & (m+1)) == 0
+                                    // Then m = (1<<N)-1 where N = countr_zero(m+1)
+                                    if(m != 0 && (m & (m + 1)) == 0)
+                                    {
+                                        uint32_t N = static_cast<uint32_t>(std::countr_zero(m + 1));
+
+                                        if(K < N && N <= 32)
+                                        {
+                                            return bfe(DataType::UInt32, varExpr, K, N - K);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
