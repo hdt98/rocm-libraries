@@ -336,17 +336,8 @@ std::shared_ptr<RocRollerGemmKernel> RocRollerGemmKernel::generate(std::shared_p
         = command->addOperation(rocRoller::Operations::Scalar(DataType::Float)); // beta
     auto tagLoadBeta = command->addOperation(rocRoller::Operations::T_Load_Scalar(tagScalarBeta));
 
-    // Explicit free/bound indices for physical dimension ordering
-    Operations::FreeIndex  freeDimsA, freeDimsB;
-    Operations::BoundIndex boundDims;
-    freeDimsA.ab = freeDimsA.d = 0;
-    freeDimsB.ab = freeDimsB.d = 1;
-    boundDims.a                = 1;
-    boundDims.b                = 0;
-    if(gemm->kernelType.transA)
-        std::swap(freeDimsA.ab, boundDims.a);
-    if(gemm->kernelType.transB)
-        std::swap(freeDimsB.ab, boundDims.b);
+    auto [freeDimsA, freeDimsB, boundDims]
+        = Operations::MakeGemmIndices(gemm->kernelType.transA, gemm->kernelType.transB);
 
     auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
         mulInputA,

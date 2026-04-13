@@ -46,5 +46,27 @@ namespace rocRoller
             os << "BoundIndex(a=" << idx.a << ", b=" << idx.b << ")";
             return os;
         }
+
+        /**
+         * Create FreeIndex/BoundIndex for a standard GEMM: A[M,K] * B[K,N] -> D[M,N].
+         *
+         * Applies the transpose swap pattern for physical dimension ordering:
+         * - transA swaps freeDimsA.ab with boundDims.a
+         * - transB swaps freeDimsB.ab with boundDims.b
+         */
+        inline std::tuple<FreeIndex, FreeIndex, BoundIndex> MakeGemmIndices(bool transA,
+                                                                            bool transB)
+        {
+            FreeIndex  freeDimsA{0, 0};
+            FreeIndex  freeDimsB{1, 1};
+            BoundIndex boundDims{1, 0};
+
+            if(transA)
+                std::swap(freeDimsA.ab, boundDims.a);
+            if(transB)
+                std::swap(freeDimsB.ab, boundDims.b);
+
+            return {freeDimsA, freeDimsB, boundDims};
+        }
     }
 }

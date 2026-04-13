@@ -261,18 +261,9 @@ namespace rocRoller
                     auto tagLoadBeta
                         = command->addOperation(Operations::T_Load_Scalar(m_tagScalarBeta));
 
-                    Operations::FreeIndex  freeDimsA, freeDimsB;
-                    Operations::BoundIndex boundDims;
-
-                    freeDimsA.ab = freeDimsA.d = 0;
-                    freeDimsB.ab = freeDimsB.d = 1;
-                    boundDims.a                = 1;
-                    boundDims.b                = 0;
-
-                    if(solutionParams.types.transA == TransposeType::T)
-                        std::swap(freeDimsA.ab, boundDims.a);
-                    if(solutionParams.types.transB == TransposeType::T)
-                        std::swap(freeDimsB.ab, boundDims.b);
+                    auto [freeDimsA, freeDimsB, boundDims] = Operations::MakeGemmIndices(
+                        solutionParams.types.transA == TransposeType::T,
+                        solutionParams.types.transB == TransposeType::T);
 
                     auto tagAB = command->addOperation(Operations::T_Mul(mulInputA,
                                                                          mulInputB,

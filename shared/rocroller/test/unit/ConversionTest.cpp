@@ -153,10 +153,8 @@ namespace rocRollerTest
         auto tagTensorC = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeC)); // C
         auto tagLoadC   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorC));
 
-        // Create standard matrix multiply: A[M,K] * B[K,N] -> D[M,N]
-        rocRoller::Operations::FreeIndex  freeDimsA{0, 0}; // A's free dim 0 -> D's dim 0
-        rocRoller::Operations::FreeIndex  freeDimsB{1, 1}; // B's free dim 1 -> D's dim 1
-        rocRoller::Operations::BoundIndex boundDims{1, 0}; // Contract A's dim 1 with B's dim 0
+        auto [freeDimsA, freeDimsB, boundDims]
+            = rocRoller::Operations::MakeGemmIndices(false, false);
 
         auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
             tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
@@ -282,10 +280,8 @@ namespace rocRollerTest
         auto tagTensorB = command->addOperation(rocRoller::Operations::Tensor(2, dataTypeAB)); // B
         auto tagLoadB   = command->addOperation(rocRoller::Operations::T_Load_Tiled(tagTensorB));
 
-        // Create standard matrix multiply: A[M,K] * B[K,N] -> D[M,N]
-        rocRoller::Operations::FreeIndex  freeDimsA{0, 0}; // A's free dim 0 -> D's dim 0
-        rocRoller::Operations::FreeIndex  freeDimsB{1, 1}; // B's free dim 1 -> D's dim 1
-        rocRoller::Operations::BoundIndex boundDims{1, 0}; // Contract A's dim 1 with B's dim 0
+        auto [freeDimsA, freeDimsB, boundDims]
+            = rocRoller::Operations::MakeGemmIndices(false, false);
 
         auto tagAB = command->addOperation(rocRoller::Operations::T_Mul(
             tagLoadA, tagLoadB, {freeDimsA}, {freeDimsB}, {boundDims})); // A * B
