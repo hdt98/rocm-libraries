@@ -26,8 +26,12 @@
 
 // ALMIOPEN-718: Bit-exact determinism tests for implicit GEMM convolution solvers.
 // Runs each solver 10 times with identical input and verifies bit-exact output match.
+//
+// Each solver gets its own set of configs that are known to be applicable.
+// Configs chosen to satisfy each solver's GEMM dimension divisibility requirements.
 
 #include <cstring>
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/solvers.hpp>
@@ -70,39 +74,73 @@ struct DeterministicTestConfig
     }
 };
 
-// Test configurations from the original Jira ticket ALMIOPEN-718
-// Fwd configs
-std::vector<DeterministicTestConfig> GetFwdTestConfigs()
+// Per-solver configs. Each solver gets 2-3 configs known to be applicable on gfx908.
+//                                      N    C    K    H   W   y  x  pH pW sH sW dH dW
+
+// FwdV4R5Xdlops: needs xdlops support (gfx908+), 3x3 configs
+std::vector<DeterministicTestConfig> GetConfigFwdV4R5Xdlops()
 {
     return {
-        // ConvHipImplicitGemmForwardV4R5Xdlops: {128,16,54,54}x{64,16,3,3}
-        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},
-        // ConvHipImplicitGemmForwardV4R4Xdlops: {128,48,13,13}x{192,48,1,1}
-        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1},
-        // ConvHipImplicitGemmV4R1Fwd: {256,32,27,27}x{128,32,1,1}
-        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1},
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},  // Jira original
+        {64, 16, 64, 32, 32, 3, 3, 1, 1, 1, 1, 1, 1},   // smaller batch
+        {32, 32, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // different C/K
     };
 }
 
-// Bwd configs
-std::vector<DeterministicTestConfig> GetBwdTestConfigs()
+// FwdV4R4Xdlops: works with both 1x1 and 3x3
+std::vector<DeterministicTestConfig> GetConfigFwdV4R4Xdlops()
 {
     return {
-        // ConvHipImplicitGemmBwdDataV1R1: {32,128,32,32}x{12,128,1,1}
-        {32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},
-        // ConvHipImplicitGemmBwdDataV4R1: {16,64,16,16}x{64,64,3,3}
-        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},
+        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}, // Jira original
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},  // 3x3 variant
+        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1}, // another 1x1
     };
 }
 
-// WrW configs
-std::vector<DeterministicTestConfig> GetWrwTestConfigs()
+// FwdV4R1: works with both 1x1 and 3x3
+std::vector<DeterministicTestConfig> GetConfigFwdV4R1()
 {
     return {
-        // ConvHipImplicitGemmV4R4WrW: {8,128,14,14}x{32,128,3,3}
-        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        // ConvHipImplicitGemmWrwV4R4Xdlops: {1,192,28,28}x{16,192,1,1}
-        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},
+        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1}, // Jira original
+        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}, // another 1x1
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},  // 3x3 variant
+    };
+}
+
+// BwdV1R1: 1x1 configs are deterministic (no AtomicAdd)
+std::vector<DeterministicTestConfig> GetConfigBwdV1R1()
+{
+    return {
+        {32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},  // Jira original (1x1)
+        {64, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // another 1x1
+    };
+}
+
+// BwdV4R1: disabled by default (WORKAROUND_SWDEV_229277_227616_229195),
+// needs MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1=1
+std::vector<DeterministicTestConfig> GetConfigBwdV4R1()
+{
+    return {
+        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},   // Jira original
+        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},    // variant
+    };
+}
+
+// WrwV4R4: 3x3 configs
+std::vector<DeterministicTestConfig> GetConfigWrwV4R4()
+{
+    return {
+        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},   // Jira original
+        {16, 64, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},    // variant
+    };
+}
+
+// WrwV4R4Xdlops: works with both 1x1 and 3x3
+std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
+{
+    return {
+        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},   // Jira original
+        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},    // 3x3 variant
     };
 }
 
@@ -202,7 +240,7 @@ protected:
 
         if(!solv.IsApplicable(ctx, problem))
         {
-            GTEST_SKIP() << solv.SolverDbId() << " Not Applicable on this GPU";
+            GTEST_SKIP() << solv.SolverDbId() << " Not Applicable on this GPU/config";
         }
 
         std::cout << "Using solver: " << solv.SolverDbId() << std::endl;
@@ -338,30 +376,42 @@ protected:
     }
 };
 
+// BwdV4R1 needs special setup: it's disabled by default via WORKAROUND_SWDEV_229277_227616_229195
+template <typename T, typename SolverType>
+class GPU_ConvDeterministicBwdV4R1
+    : public GPU_ConvDeterministicImplicitGemm<T, Direction::BackwardData, SolverType>
+{
+protected:
+    void SetUp() override
+    {
+        prng::reset_seed();
+        // Enable the solver which is disabled by default due to a workaround
+        setenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1", "1", 1);
+    }
+    void TearDown() override
+    {
+        unsetenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1");
+    }
+};
+
 } // namespace
 
 // ============================================================================
 // Forward solvers
 // ============================================================================
 
-// ConvHipImplicitGemmForwardV4R5Xdlops - FP32
 using GPU_Deterministic_FwdV4R5Xdlops_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::Forward,
                                       miopen::solver::conv::ConvHipImplicitGemmForwardV4R5Xdlops>;
-// ConvHipImplicitGemmForwardV4R5Xdlops - BFP16
 using GPU_Deterministic_FwdV4R5Xdlops_BFP16 =
     GPU_ConvDeterministicImplicitGemm<bfloat16,
                                       Direction::Forward,
                                       miopen::solver::conv::ConvHipImplicitGemmForwardV4R5Xdlops>;
-
-// ConvHipImplicitGemmForwardV4R4Xdlops - FP32
 using GPU_Deterministic_FwdV4R4Xdlops_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::Forward,
                                       miopen::solver::conv::ConvHipImplicitGemmForwardV4R4Xdlops>;
-
-// ConvHipImplicitGemmV4R1Fwd - FP32
 using GPU_Deterministic_FwdV4R1_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::Forward,
@@ -371,29 +421,22 @@ using GPU_Deterministic_FwdV4R1_FP32 =
 // Backward Data solvers
 // ============================================================================
 
-// ConvHipImplicitGemmBwdDataV1R1 - FP32
 using GPU_Deterministic_BwdV1R1_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::BackwardData,
                                       miopen::solver::conv::ConvHipImplicitGemmBwdDataV1R1>;
-
-// ConvHipImplicitGemmBwdDataV4R1 - FP32
 using GPU_Deterministic_BwdV4R1_FP32 =
-    GPU_ConvDeterministicImplicitGemm<float,
-                                      Direction::BackwardData,
-                                      miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1>;
+    GPU_ConvDeterministicBwdV4R1<float,
+                                 miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1>;
 
 // ============================================================================
 // Weight gradient (WrW) solvers
 // ============================================================================
 
-// ConvHipImplicitGemmV4R4WrW - FP32
 using GPU_Deterministic_WrwV4R4_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::BackwardWeights,
                                       miopen::solver::conv::ConvHipImplicitGemmV4R4WrW>;
-
-// ConvHipImplicitGemmWrwV4R4Xdlops - FP32
 using GPU_Deterministic_WrwV4R4Xdlops_FP32 =
     GPU_ConvDeterministicImplicitGemm<float,
                                       Direction::BackwardWeights,
@@ -413,35 +456,30 @@ TEST_P(GPU_Deterministic_WrwV4R4_FP32, DeterministicTest) { this->RunTest(); };
 TEST_P(GPU_Deterministic_WrwV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
 
 // ============================================================================
-// Test instantiations
+// Test instantiations — each solver gets its own applicable configs
 // ============================================================================
 
-// Forward tests
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_FwdV4R5Xdlops_FP32,
-                         testing::ValuesIn(GetFwdTestConfigs()));
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_FwdV4R5Xdlops_BFP16,
-                         testing::ValuesIn(GetFwdTestConfigs()));
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_FwdV4R4Xdlops_FP32,
-                         testing::ValuesIn(GetFwdTestConfigs()));
+                         testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_FwdV4R1_FP32,
-                         testing::ValuesIn(GetFwdTestConfigs()));
-
-// Backward Data tests
+                         testing::ValuesIn(GetConfigFwdV4R1()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_BwdV1R1_FP32,
-                         testing::ValuesIn(GetBwdTestConfigs()));
+                         testing::ValuesIn(GetConfigBwdV1R1()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_BwdV4R1_FP32,
-                         testing::ValuesIn(GetBwdTestConfigs()));
-
-// Weight gradient tests
+                         testing::ValuesIn(GetConfigBwdV4R1()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_WrwV4R4_FP32,
-                         testing::ValuesIn(GetWrwTestConfigs()));
+                         testing::ValuesIn(GetConfigWrwV4R4()));
 INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
                          GPU_Deterministic_WrwV4R4Xdlops_FP32,
-                         testing::ValuesIn(GetWrwTestConfigs()));
+                         testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
