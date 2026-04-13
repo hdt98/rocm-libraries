@@ -39,24 +39,14 @@ def build_catch2_tag_expression(test_tags, exclude_tags):
     across each include clause to get correct semantics:
       [a] ~[x],[b] ~[x]  means  ([a] AND NOT [x]) OR ([b] AND NOT [x])
     """
-    include_tags = []
-    if test_tags:
-        for tag in test_tags:
-            if tag != "[]":
-                include_tags.append(tag)
+    include_tags = [tag for tag in test_tags if tag != "[]"] if test_tags else []
 
-    exclude_parts = []
-    if exclude_tags:
-        for tag in exclude_tags:
-            exclude_parts.append(f"~{tag}")
+    exclude_parts = [f"~{tag}" for tag in exclude_tags] if exclude_tags else []
 
     exclude_str = " ".join(exclude_parts) if exclude_parts else ""
 
-    if not include_tags and not exclude_str:
-        return ""
-
     if not include_tags:
-        return exclude_str
+        return exclude_str or ""
 
     if not exclude_str:
         return ",".join(include_tags)
