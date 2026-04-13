@@ -3,6 +3,8 @@
 
 #include <rocRoller/Expression.hpp>
 
+#include <bit>
+
 template <typename T>
 constexpr auto cast_to_unsigned(T val)
 {
@@ -23,6 +25,31 @@ namespace rocRoller
          * - Modulo by 1
          * - Shift by 0
          */
+
+        static bool tryExtractUint64(CommandArgumentValue const& val, uint64_t& out)
+        {
+            if(auto* p = std::get_if<uint32_t>(&val))
+            {
+                out = *p;
+                return true;
+            }
+            if(auto* p = std::get_if<int32_t>(&val))
+            {
+                out = static_cast<uint32_t>(*p);
+                return true;
+            }
+            if(auto* p = std::get_if<uint64_t>(&val))
+            {
+                out = *p;
+                return true;
+            }
+            if(auto* p = std::get_if<int64_t>(&val))
+            {
+                out = static_cast<uint64_t>(*p);
+                return true;
+            }
+            return false;
+        }
 
         template <typename T>
         concept CIntegral = std::integral<T> && !std::same_as<bool, T>;
@@ -128,12 +155,50 @@ namespace rocRoller
                 if(CIsAnyOf<ShiftType, ShiftL, LogicalShiftR>)
                 {
                     auto const elementSize = resultVarType.getElementSize();
-                    //
-                    // Literal 0 can only accept Int32/UInt32/Int64/UInt64/Half/Float/Double
-                    //
                     if((elementSize == 4u or elementSize == 8u) and (rhs >= elementSize * 8u))
                     {
                         return literal(0, resultVarType);
+                    }
+                }
+                if constexpr(std::is_same_v<ShiftType, LogicalShiftR>)
+                {
+                    if(lhs && std::holds_alternative<BitwiseAnd>(*lhs))
+                    {
+                        auto const& andExpr = std::get<BitwiseAnd>(*lhs);
+                        uint32_t    elBits  = resultVarType.getElementSize() * 8;
+                        uint32_t    S       = static_cast<uint32_t>(rhs);
+
+                        // Try to extract the mask from either operand of the BitwiseAnd
+                        auto tryFoldBFE = [&](ExpressionPtr const& maskArg,
+                                              ExpressionPtr const& dataArg) -> ExpressionPtr {
+                            if(!evaluationTimes(maskArg)[EvaluationTime::Translate])
+                                return nullptr;
+
+                            uint64_t umask = 0;
+                            if(!tryExtractUint64(evaluate(maskArg), umask))
+                                return nullptr;
+
+                            // mask must be > 0 and of the form (1 << N) - 1
+                            if(umask == 0 || !std::has_single_bit(umask + 1))
+                                return nullptr;
+
+                            uint32_t N = static_cast<uint32_t>(std::countr_zero(umask + 1));
+                            if(S >= N)
+                                return literal(0, resultVarType);
+
+                            uint32_t width = N - S;
+                            if(S + width <= elBits)
+                                return bfe(resultVarType.dataType, dataArg, S, width);
+
+                            return nullptr;
+                        };
+
+                        // BitwiseAnd(data, mask) - mask on RHS
+                        if(auto rv = tryFoldBFE(andExpr.rhs, andExpr.lhs))
+                            return rv;
+                        // BitwiseAnd(mask, data) - mask on LHS (commutative)
+                        if(auto rv = tryFoldBFE(andExpr.lhs, andExpr.rhs))
+                            return rv;
                     }
                 }
 
@@ -164,6 +229,31 @@ namespace rocRoller
             {
                 if(rhs == 0)
                     return literal(0, resultVarType);
+                if(lhs && std::holds_alternative<LogicalShiftR>(*lhs))
+                {
+                    auto const& shrExpr = std::get<LogicalShiftR>(*lhs);
+                    if(evaluationTimes(shrExpr.rhs)[EvaluationTime::Translate])
+                    {
+                        using UT   = std::make_unsigned_t<RHS>;
+                        auto umask = static_cast<uint64_t>(static_cast<UT>(rhs));
+
+                        if(umask > 0 && std::has_single_bit(umask + 1))
+                        {
+                            uint32_t W = static_cast<uint32_t>(std::countr_zero(umask + 1));
+
+                            // Extract shift amount via get_if (avoids std::visit)
+                            uint64_t S64 = 0;
+                            if(tryExtractUint64(evaluate(shrExpr.rhs), S64))
+                            {
+                                uint32_t S      = static_cast<uint32_t>(S64);
+                                uint32_t elBits = resultVarType.getElementSize() * 8;
+                                if(S + W <= elBits)
+                                    return bfe(resultVarType.dataType, shrExpr.lhs, S, W);
+                            }
+                        }
+                    }
+                }
+
                 return nullptr;
             }
 
