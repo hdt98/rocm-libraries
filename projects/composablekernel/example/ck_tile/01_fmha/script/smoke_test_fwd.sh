@@ -332,10 +332,14 @@ run_fp8fp32_tests
 
 if [ $TEST_STREAM_SINK -eq 1 ] ; then
     run_sink_mask_tests
+else
+    echo ">>> Skipping StreamLLM sink tests (use -m to enable)"
 fi
 
 if [ $TEST_GPTOSS_SINK -eq 1 ] ; then
     run_sink_init_tests
+else
+    echo ">>> Skipping GPT-OSS sink tests (use -g to enable)"
 fi
 
 if [ $TEST_APPENDKV -eq 1 ] ; then

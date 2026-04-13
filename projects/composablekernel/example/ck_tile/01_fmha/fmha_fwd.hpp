@@ -1427,10 +1427,10 @@ struct fmha_fwd_traits_
     static constexpr bool kUseTrLoad                 = kUseTrLoad_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
-                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasStreamSink =
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
     static constexpr bool kHasGptOssSink =
-        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <ck_tile::index_t HDim_,
@@ -1543,10 +1543,10 @@ struct fmha_fwd_pagedkv_traits_
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kSkipMinSeqlenQ            = kSkipMinSeqlenQ_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
-                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasStreamSink =
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
     static constexpr bool kHasGptOssSink =
-        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <typename Traits_, typename Arch = void>
@@ -1598,10 +1598,10 @@ struct fmha_fwd_splitkv_traits_
     static constexpr bool kPadDv                     = kPadDv_;
     static constexpr bool kIsPagedKV                 = kIsPagedKV_;
     static constexpr ck_tile::FmhaSinkMode kSinkMode = kSinkMode_;
-    static constexpr bool kHasStreamSink = (kSinkMode == ck_tile::FmhaSinkMode::kStreamLLM ||
-                                            kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+    static constexpr bool kHasStreamSink =
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
     static constexpr bool kHasGptOssSink =
-        (kSinkMode == ck_tile::FmhaSinkMode::kGptOss || kSinkMode == ck_tile::FmhaSinkMode::kBoth);
+        ck_tile::FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <typename Traits_, typename Arch = void>

@@ -830,6 +830,9 @@ def write_blobs(
     mask_impl,
     sink_modes=("none",),
 ) -> None:
+    # sink_modes is intentionally not forwarded: batch_prefill does not yet support
+    # StreamLLM/GPT-OSS sink kernels. The parameter exists only for API uniformity
+    # with other fwd handlers. Non-"none" modes are silently treated as "none".
     api_pool, kernels = get_fwd_blobs(kernel_filter, receipt, optdim_list, mask_impl)
     for kernel in kernels:
         write_single_fwd_kernel(kernel, output_dir)
@@ -845,6 +848,7 @@ def list_blobs(
     mask_impl,
     sink_modes=("none",),
 ) -> None:
+    # sink_modes is intentionally not forwarded: see write_blobs for rationale.
     with file_path.open("a") as f:
         _, kernels = get_fwd_blobs(kernel_filter, receipt, optdim_list, mask_impl)
         for kernel in kernels:

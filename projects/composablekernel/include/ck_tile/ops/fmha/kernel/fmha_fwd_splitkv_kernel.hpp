@@ -7,6 +7,7 @@
 #include "ck_tile/ops/common.hpp"
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
+#include "ck_tile/ops/fmha/pipeline/tile_fmha_traits.hpp"
 
 #include <string>
 #include <type_traits>
@@ -104,7 +105,7 @@ struct FmhaFwdSplitKVKernel
             (kHasLogitsSoftCap ? "_logits" : "_nlogits" ) + (BiasEnum == BlockAttentionBiasEnum::NO_BIAS ? _SS_("_nbias") : (_SS_("_") + BlockAttentionBiasEnumToStr<BiasEnum>::name)) +
             (kHasMask ? "_" + _SS_(FmhaMask::name) : "_nmask") + (kStoreLSE ? "_lse" : "_nlse" ) +
             (kDoFp8StaticQuant ? "_squant" : "_nsquant") + (kIsPagedKV ? "_pagedkv" : "_npagedkv" ) +
-            (!kHasStreamSink && !kHasGptOssSink ? "_nsink" : kHasStreamSink && !kHasGptOssSink ? "_ssink" : !kHasStreamSink && kHasGptOssSink ? "_gsink" : "_bsink");
+            ck_tile::FmhaSinkNameSuffix<kHasStreamSink, kHasGptOssSink>();
         #undef _SS_
         #undef _TS_
         // clang-format on

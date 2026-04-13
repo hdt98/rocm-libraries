@@ -495,6 +495,9 @@ def write_blobs(
     mask_impl,
     sink_modes=("none",),
 ) -> None:
+    # sink_modes is intentionally not forwarded: appendkv does not support sink kernels.
+    # The parameter exists only for API uniformity with other fwd handlers.
+    # Non-"none" modes are silently treated as "none".
     api_pool, kernels = get_fwd_appendkv_blobs(
         targets, kernel_filter, receipt, mask_impl, optdim_list
     )
@@ -512,6 +515,7 @@ def list_blobs(
     mask_impl,
     sink_modes=("none",),
 ) -> None:
+    # sink_modes is intentionally not forwarded: see write_blobs for rationale.
     with file_path.open("a") as f:
         _, kernels = get_fwd_appendkv_blobs(
             targets, kernel_filter, receipt, mask_impl, optdim_list

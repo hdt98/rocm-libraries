@@ -37,6 +37,10 @@ handlers = dict(
 )
 assert 0 < len(handlers)
 
+# APIs that do not support sink modes (sink_modes is not forwarded to their handlers).
+# These APIs predate the StreamLLM/GPT-OSS sink split and have no sink kernel variants.
+_APIS_WITHOUT_SINK = {"bwd"}
+
 
 def write_blobs(
     targets: List[str],
@@ -57,7 +61,7 @@ def write_blobs(
 
     for api, kernel_filter in zip(api_list, filters_list):
         handler = handlers[api][HandlerId.WRITE_BLOBS]
-        if api == "bwd":
+        if api in _APIS_WITHOUT_SINK:
             handler(targets, output_dir, kernel_filter, receipt, optdim_list, mask_impl)
         else:
             handler(
@@ -90,7 +94,7 @@ def list_blobs(
 
     for api, kernel_filter in zip(api_list, filters_list):
         handler = handlers[api][HandlerId.LIST_BLOBS]
-        if api == "bwd":
+        if api in _APIS_WITHOUT_SINK:
             handler(targets, file_path, kernel_filter, receipt, optdim_list, mask_impl)
         else:
             handler(
