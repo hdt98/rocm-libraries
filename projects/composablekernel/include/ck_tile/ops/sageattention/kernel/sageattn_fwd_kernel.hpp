@@ -15,7 +15,6 @@
 #include <utility>
 #include <variant>
 
-#define CK_TILE_FMHA_HANDLE_XOR_LENGTH_FOLD 0
 // S[seqlen_q, seqlen_k] = Q[seqlen_q, hdim_q] @ K[seqlen_k, hdim_q]
 // S'[seqlen_q, seqlen_k] = S[seqlen_q, seqlen_k] * Scale[1]
 // P[seqlen_q, seqlen_k] = Softmax(S'[seqlen_q, seqlen_k])
@@ -883,8 +882,8 @@ struct SageAttnFwdKernel
                     batch_offset_v_descale;
 
                 // BLOCKSCALE: one q_descale per tile (kBlockScaleSizeQ from traits, typically 128)
-                size_t idx      = i_m0 / PipelineProblem::kBlockScaleSizeQ;
-                float q_descale = q_descale_ptr[idx];
+                const index_t idx = i_m0 / PipelineProblem::kBlockScaleSizeQ;
+                float q_descale   = q_descale_ptr[idx];
 
                 return SageAttnPipeline{}(
                     q_dram_window,
@@ -914,10 +913,12 @@ struct SageAttnFwdKernel
                 constexpr index_t kWarpSize       = get_warp_size();
                 constexpr index_t kGemm0MPerWarp =
                     SageShape::Gemm0WarpTile::at(number<0>{});
-                static_assert(SageAttnPipeline::kM0 * kWarpSize ==
-                                  kGemm0MPerWarp * SageAttnPipeline::kBlockSize,
-                              "PERWARP/PERTHREAD q_descale: kM0 * warp_size must equal "
-                              "Gemm0 MPerWarp * block_size");
+                constexpr index_t kNumWarps = SageShape::NumWarps;
+
+                static_assert(kWarpSize == 64, "kWarpSize must be 64");
+                static_assert(SageAttnPipeline::kM0 == kGemm0MPerWarp * kNumWarps,
+                              "PERWARP/PERTHREAD q_descale: kM0 must equal "
+                              "Gemm0 MPerWarp * NumWarps");
                 static_assert(kWarpSize % kGemm0MPerWarp == 0,
                               "PERWARP/PERTHREAD: warp_size must be divisible by Gemm0 MPerWarp");
                 if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)

@@ -78,7 +78,11 @@ struct BlockSageAttentionPipelineQRKSVSAsync
     }();
     static constexpr index_t kAlignmentO = Policy::template GetAlignmentO<Problem>();
 
-    // For BLOCKSCALE: shift value for exp2(x + shift) to scale P to [0, 2^shift]
+    // FP8 softmax shift constants to map softmax output into representable FP8 range
+    // OCP E4M3 FP8: max exponent = 8, max value ~240 (2^8 * 1.875)
+    //   Use shift=8.0 so exp2(s - m - 8) maps softmax to [0, 2^8] range
+    // FNUZ E4M3 FP8: max exponent = 7, max value ~120 (2^7 * 1.875)
+    //   Use shift=7.0 so exp2(s - m - 7) maps softmax to [0, 2^7] range
     static constexpr float OCP_FP8_SHIFT  = 8.0f;
     static constexpr float FNUZ_FP8_SHIFT = 7.0f;
 
@@ -311,7 +315,8 @@ struct BlockSageAttentionPipelineQRKSVSAsync
             BlockSageAttnShape::Gemm0WarpTile::at(number<0>{});
         static_assert(kGemm0MPerWarp == 32);
         constexpr index_t kWarpSz = get_warp_size();
-        index_t thread_idx        = (threadIdx.x % kWarpSz) / kGemm0MPerWarp;
+        // sub_warp_idx is 0 or 1, indicating which half of the warp (used for PERTHREAD K-scale indexing)
+        index_t sub_warp_idx = (threadIdx.x % kWarpSz) / kGemm0MPerWarp;
         // main loop
         do
         {
@@ -346,7 +351,7 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                 const index_t k_scale_start_idx = k_global_start / Problem::kBlockScaleSizeK;
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
-                    k_scales_reg[i] = k_descale_ptr[k_scale_start_idx + 2 * i + thread_idx];
+                    k_scales_reg[i] = k_descale_ptr[k_scale_start_idx + 2 * i + sub_warp_idx];
             }
 
             // STAGE 1, QK gemm
@@ -411,33 +416,51 @@ struct BlockSageAttentionPipelineQRKSVSAsync
 
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
+                // PERTHREAD: kBlockScaleSizeK=16
+                // The s_acc tile distribution is determined by WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution,
+                // which guarantees each thread processes exactly 16 consecutive elements in the K dimension.
+                // This distribution is inherent to the MFMA 32x32x16 instruction with kKIter=2 and TransposedC layout.
+                // Therefore, col_offset >> 4 correctly maps thread-local elements to K scale indices.
+                static_assert(Problem::kBlockScaleSizeK == 16,
+                              "PERTHREAD: kBlockScaleSizeK must be 16");
+
                 float combined_scales_reg[kNumKScalesPT] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_reg[i];
                 constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
-                    int count = 0;
+                    index_t col_offset = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        s_acc(i_j_idx) *= combined_scales_reg[count >> 4];
-                        count++;
+                        // col_offset counts columns in distributed view
+                        // Divide by 16 (>>4) to map to K scale groups (kBlockScaleSizeK=16)
+                        const index_t scale_idx = col_offset >> 4;
+                        s_acc(i_j_idx) *= combined_scales_reg[scale_idx];
+                        col_offset++;
                     });
                 });
             }
             else if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP)
             {
+                // PERWARP: kBlockScaleSizeK=64, i.e., 64 global K elements share one scale
+                // Distribution: thread_i and thread_(i+32) interleave to cover K dimension
+                // In each thread's view, every 32 idx1 steps correspond to 64 global K elements
                 float combined_scales_reg[kNumKScalesPW] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPW; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_perwarp[i];
                 constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
-                    int count = 0;
+                    index_t col_offset = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        s_acc(i_j_idx) *= combined_scales_reg[count >> 5];
-                        count++;
+                        // col_offset counts columns in distributed view
+                        // When N0=64: each thread has 32 elements; when N0=128: each thread has 64 elements
+                        // Divide by 32 (>>5) to map to K scale groups (kBlockScaleSizeK=64)
+                        const index_t scale_idx = col_offset >> 5;
+                        s_acc(i_j_idx) *= combined_scales_reg[scale_idx];
+                        col_offset++;
                     });
                 });
             }
