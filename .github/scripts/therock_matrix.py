@@ -114,7 +114,7 @@ additional_options = {
             "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
         ],
         "projects_to_test": ["hipkernelprovider"],
-        "project_to_add": "",
+        "project_to_add": None,
     },
     "rocwmma": {
         "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
@@ -153,7 +153,7 @@ def collect_projects_to_run(subtrees):
                     project_options_to_add["projects_to_test"]
                 )
             # If `project_to_add` is not included, only run build and tests for the optional project
-            else:
+            elif project_to_add:
                 projects.add(project_to_add)
                 project_map[project_to_add]["cmake_options"] = project_options_to_add[
                     "cmake_options"
@@ -161,6 +161,12 @@ def collect_projects_to_run(subtrees):
                 project_map[project_to_add]["projects_to_test"] = (
                     project_options_to_add["projects_to_test"]
                 )
+            # No parent project - create standalone entry
+            else:
+                project_map[project] = {
+                    "cmake_options": project_options_to_add["cmake_options"],
+                    "projects_to_test": project_options_to_add["projects_to_test"],
+                }
 
     # Check for potential dependencies
     to_remove_from_project_map = []
