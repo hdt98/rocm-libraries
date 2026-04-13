@@ -56,7 +56,9 @@ using DeviceConvBwdWeightInstance =
         1,           
         1,   
         S<1, 8, 1, 8>,                  
-        2>; // CBlockTransferScalarPerVector_NWaveNPerXdl
+        2, // CBlockTransferScalarPerVector_NWaveNPerXdl
+        ck::BlockGemmPipelineScheduler::Intrawave,
+        ck::BlockGemmPipelineVersion::v5>;
                                           
 
 
@@ -82,7 +84,7 @@ int main(int argc, char* argv[])
     }
 
     // Only CPU verification, we want GPU code generated only for the conv kernel.
-    run_grouped_conv_bwd_weight<3, true>(config, conv_param);
+    run_grouped_conv_bwd_weight<3, false>(config, conv_param);
 
     return 1;
 }
