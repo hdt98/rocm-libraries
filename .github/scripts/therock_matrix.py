@@ -6,6 +6,7 @@ import os
 
 subtree_to_project_map = {
     "dnn-providers/hipblaslt-provider": "hipblaslt-provider",
+    "dnn-providers/hip-kernel-provider": "hip-kernel-provider",
     "dnn-providers/miopen-provider": "miopen-provider",
     "projects/composablekernel": "miopen",
     "projects/hipblas": "blas",
@@ -79,6 +80,7 @@ additional_options = {
         "cmake_options": [
             "-DTHEROCK_ENABLE_HIPBLASLTPROVIDER=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
+            "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
             "-DTHEROCK_ENABLE_HIPDNN_SAMPLES=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
         ],
@@ -88,6 +90,7 @@ additional_options = {
             "hipdnn-samples",
             "miopenprovider",
             "hipblasltprovider",
+            "hipkernelprovider",
         ],
         "project_to_add": "miopen",
     },
@@ -105,6 +108,12 @@ additional_options = {
         ],
         "projects_to_test": ["hipblasltprovider"],
         "project_to_add": "blas",
+    },
+    "hip-kernel-provider": {
+        "cmake_options": [
+            "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
+        ],
+        "projects_to_test": ["hipkernelprovider"],
     },
     "rocwmma": {
         "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
