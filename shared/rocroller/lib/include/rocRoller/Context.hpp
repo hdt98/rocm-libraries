@@ -28,7 +28,6 @@
 #include <rocRoller/InstructionValues/RegisterAllocator_fwd.hpp>
 #include <rocRoller/InstructionValues/Register_fwd.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager_fwd.hpp>
-#include <rocRoller/KernelGraph/ScopeManager_fwd.hpp>
 #include <rocRoller/KernelOptions.hpp>
 #include <rocRoller/Operations/Scratch_fwd.hpp>
 #include <rocRoller/ScheduledInstructions_fwd.hpp>
@@ -123,16 +122,6 @@ namespace rocRoller
          */
         Expression::ExpressionPtr getScratchAmount(Operations::ScratchPolicy policy) const;
 
-        /**
-         * @brief Get register scope manager.
-         */
-        std::shared_ptr<KernelGraph::ScopeManager> getScopeManager() const;
-
-        /**
-         * @brief Set register scope manager.
-         */
-        void setScopeManager(std::shared_ptr<KernelGraph::ScopeManager>);
-
         friend class ::ContextFixture;
 
     private:
@@ -160,11 +149,10 @@ namespace rocRoller
         std::shared_ptr<LDSAllocator>          m_ldsAllocator;
         std::array<Expression::ExpressionPtr, static_cast<size_t>(Operations::ScratchPolicy::Count)>
                                                    m_scratchSizes;
-        std::shared_ptr<CopyGenerator>             m_copier;
-        std::shared_ptr<BranchGenerator>           m_brancher;
-        std::shared_ptr<CrashKernelGenerator>      m_crasher;
-        std::shared_ptr<RandomGenerator>           m_random;
-        std::shared_ptr<KernelGraph::ScopeManager> m_scope;
+        std::shared_ptr<CopyGenerator>        m_copier;
+        std::shared_ptr<BranchGenerator>      m_brancher;
+        std::shared_ptr<CrashKernelGenerator> m_crasher;
+        std::shared_ptr<RandomGenerator>      m_random;
 
         std::string   m_assemblyFileName;
         KernelOptions m_kernelOptions;

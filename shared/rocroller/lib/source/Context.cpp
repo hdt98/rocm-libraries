@@ -253,16 +253,6 @@ namespace rocRoller
         return stream << "Context " << ctx.get();
     }
 
-    std::shared_ptr<KernelGraph::ScopeManager> Context::getScopeManager() const
-    {
-        return m_scope;
-    }
-
-    void Context::setScopeManager(std::shared_ptr<KernelGraph::ScopeManager> scope)
-    {
-        m_scope = scope;
-    }
-
     void Context::setKernel(AssemblyKernelPtr assemblyKernel)
     {
         m_kernel = assemblyKernel;

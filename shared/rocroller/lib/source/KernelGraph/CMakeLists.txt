@@ -14,7 +14,6 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/NodeSchedulingUtils.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/RegisterTagManager.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Reindexer.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ScopeManager.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/Utils.cpp"
 )
 

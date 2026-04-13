@@ -1324,20 +1324,6 @@ namespace rocRoller
             return (sdSize + tileSizeExpr - one) / tileSizeExpr;
         }
 
-        bool hasDeallocate(const KernelGraph& graph, int registerTag)
-        {
-            for(auto const& connection : graph.mapper.getCoordinateConnections(registerTag))
-            {
-                if(std::holds_alternative<CG::Deallocate>(
-                       graph.control.getNode(connection.control)))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         void orderMemoryNodes(KernelGraph&                         graph,
                               std::set<std::pair<int, int>> const& pairs,
                               bool                                 ordered)

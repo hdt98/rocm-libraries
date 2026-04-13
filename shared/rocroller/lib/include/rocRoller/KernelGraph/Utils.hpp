@@ -753,15 +753,6 @@ namespace rocRoller
         Expression::ExpressionPtr tileCeilDivide(Expression::ExpressionPtr sdSize, int tileSize);
 
         /**
-         * @brief Identifies whether a registerTag has an associated deallocate node.
-         *
-         * @param graph
-         * @param registerTag
-         *
-         */
-        bool hasDeallocate(const KernelGraph& graph, int tag);
-
-        /**
          * @brief For LDS load/stores, follow DataFlow edges from the
          * LDS node to find the associated User node.
          */

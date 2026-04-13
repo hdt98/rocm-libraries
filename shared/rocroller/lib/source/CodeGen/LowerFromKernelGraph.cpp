@@ -24,7 +24,6 @@
 #include <rocRoller/KernelGraph/CoordinateGraph/Transformer.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager.hpp>
-#include <rocRoller/KernelGraph/ScopeManager.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/Scheduling/Scheduler.hpp>
 #include <rocRoller/Utilities/Error.hpp>
@@ -295,10 +294,6 @@ namespace rocRoller
             {
                 m_context->registerTagManager()->initialize(*m_graph);
 
-                auto scope = std::make_shared<ScopeManager>(m_context, m_graph);
-                m_context->setScopeManager(scope);
-                scope->pushNewScope();
-
                 //
                 // Fill in workgroup indexes and workitem indexes for each transformer
                 //
@@ -314,31 +309,12 @@ namespace rocRoller
                 co_yield generate(init);
                 auto body = m_graph->control.getOutputNodeIndices<Body>(tag).to<std::set>();
                 co_yield generate(body);
-                scope->popAndReleaseScope();
-
-                m_context->setScopeManager(nullptr);
             }
 
             Generator<Instruction> operator()(int tag, Scope const&)
             {
-                auto scope   = m_context->getScopeManager();
-                auto message = concatenate("Scope ", tag);
-
-                // Under the current implementation,
-                //  - All new DataFlow allocations are associated with the top scope
-                //    regardless of if this is correct
-                //  - When the scope is popped, all DataFlow registers in that are freed.
-                //
-                // Until this is changed, we need to lock the scheduler here.
-
-                co_yield Instruction::Lock(Scheduling::Dependency::Branch, "Lock " + message);
-                scope->pushNewScope();
-
                 auto body = m_graph->control.getOutputNodeIndices<Body>(tag).to<std::set>();
                 co_yield generate(body);
-
-                scope->popAndReleaseScope();
-                co_yield Instruction::Unlock("Unlock " + message);
             }
 
             Generator<Instruction> operator()(int tag, ConditionalOp const& op)
@@ -637,8 +613,6 @@ namespace rocRoller
                 co_yield Instruction::Comment(
                     concatenate("Assign dim(", dimTag, ") = ", assign.expression));
 
-                auto scope = m_context->getScopeManager();
-
                 if(assign.strideExpressionAttributes)
                 {
                     co_yield Instruction::Comment("Assign stride expression");
@@ -646,12 +620,9 @@ namespace rocRoller
                         dimTag,
                         m_fastArith(assign.expression),
                         assign.strideExpressionAttributes.value());
-                    scope->addRegister(dimTag);
                 }
                 else
                 {
-                    scope->addRegister(dimTag);
-
                     auto deferred = expressionHasNoneDT(assign.expression)
                                     && !m_context->registerTagManager()->hasRegister(dimTag);
 

@@ -108,7 +108,6 @@ target_sources(rocroller-tests
         "${CMAKE_CURRENT_SOURCE_DIR}/RegisterLivenessObserverTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/SchedulerTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/ScopeTest.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/ScopeManagerTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/SourceMatcherTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/StreamTest.cpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/SupportedInstructionObserverTest.cpp"

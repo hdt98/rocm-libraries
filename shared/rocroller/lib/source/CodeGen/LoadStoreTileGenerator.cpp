@@ -20,7 +20,6 @@
 #include <rocRoller/KernelGraph/CoordinateGraph/Transformer.hpp>
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/RegisterTagManager.hpp>
-#include <rocRoller/KernelGraph/ScopeManager.hpp>
 #include <rocRoller/KernelGraph/Transforms/LowerTile_details.hpp>
 #include <rocRoller/KernelGraph/Utils.hpp>
 #include <rocRoller/Scheduling/Scheduler.hpp>
@@ -251,7 +250,6 @@ namespace rocRoller
                 {
                     auto tmp = m_context->registerTagManager()->getRegister(baseTag);
                     co_yield generate(info.data, info.data->expression() + tmp->expression());
-                    m_context->getScopeManager()->addRegister(offsetTag);
                     m_context->registerTagManager()->addRegister(offsetTag, info.data);
                 }
                 else
@@ -262,7 +260,6 @@ namespace rocRoller
                         getOffsetDataTypeFromGraph(info.tag, *m_graph, isStorePartOfGlobalToLDS),
                         1);
                     info.rowOffsetReg->setName(concatenate("Offset", offsetTag));
-                    m_context->getScopeManager()->addRegister(offsetTag);
 
                     // Copy base to new offset register
                     auto baseReg = m_context->registerTagManager()->getRegister(baseTag);

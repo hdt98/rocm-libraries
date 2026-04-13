@@ -181,8 +181,6 @@ target_sources(rocroller
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/RegisterTagManager_fwd.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/RegisterTagManager_impl.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/Reindexer.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/ScopeManager.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/ScopeManager_fwd.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/StructUtils.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/TopoVisitor.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/rocRoller/KernelGraph/TopoVisitor_impl.hpp"
