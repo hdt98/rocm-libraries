@@ -116,7 +116,7 @@ ENV PATH="/opt/codeql/codeql:${PATH}"
 # ROCprof Trace Decoder for thread trace with rocprofiler-sdk
 WORKDIR /tmp
 RUN wget -nv -O rocprof-trace-decoder.deb https://github.com/ROCm/rocprof-trace-decoder/releases/download/0.1.4/rocprof-trace-decoder-ubuntu-22.04-0.1.4-Linux.deb \
-    && apt-get install -y --no-install-recommends rocprof-trace-decoder.deb \
+    && apt-get install -y --no-install-recommends ./rocprof-trace-decoder.deb \
     && rm -rf /tmp/* /var/lib/apt/lists/*
 
 # ROCM
