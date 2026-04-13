@@ -740,11 +740,19 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
 
 void CommRCCLAllToAll::Wait()
 {
-    // synchronize all streams
-    for(auto& stream : streams)
+    // synchronize all streams, setting the correct device context
+    // for each (streams are in the same order as local locations)
+    size_t stream_idx = 0;
+    for(const auto& loc : locations)
     {
-        if(stream && hipStreamSynchronize(stream) != hipSuccess)
-            throw std::runtime_error("hipStreamSynchronize failed for RCCL AllToAll");
+        if(loc.comm_rank == local_comm_rank)
+        {
+            rocfft_scoped_device dev(loc.device);
+            if(streams[stream_idx] && hipStreamSynchronize(streams[stream_idx]) != hipSuccess)
+                throw std::runtime_error("hipStreamSynchronize failed for RCCL AllToAll on device "
+                                         + std::to_string(loc.device));
+            ++stream_idx;
+        }
     }
 }
 
