@@ -1311,36 +1311,19 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             grid_size = 0;
                         }
 
-                        // Build flat descriptors for group_count=1 fast path
+                        // Build packed descriptors for group_count=1 fast path
                         if constexpr(NDimSpatial == 2 && !CTranspose)
                         {
                             // K must be >= AK1 to ensure K0 = K/AK1 >= 1; otherwise
                             // the flat descriptor would have K0=0 which is invalid.
                             if(num_group_ == 1 && a_g_n_k_wos_lengths[2] >= AK1)
                             {
-                                const auto flat_descs = MakeFlatABCGridDescriptor<2>(
-                                    conv_N_per_block_,
-                                    a_g_n_k_wos_lengths[2],
-                                    b_g_k_c_xs_lengths[2],
-                                    e_g_n_c_wis_lengths[3],
-                                    e_g_n_c_wis_lengths[4],
-                                    a_g_n_k_wos_lengths[3],
-                                    a_g_n_k_wos_lengths[4],
-                                    b_g_k_c_xs_lengths[3],
-                                    b_g_k_c_xs_lengths[4],
-                                    conv_filter_strides[0],
-                                    conv_filter_strides[1],
-                                    conv_filter_dilations[0],
-                                    conv_filter_dilations[1],
-                                    input_left_pads[0],
-                                    input_left_pads[1],
-                                    input_right_pads[0],
-                                    input_right_pads[1],
-                                    tildes[0],
-                                    tildes[1]);
-                                flat_a_container_.push_back(flat_descs[I0]);
-                                flat_b_container_.push_back(flat_descs[I1]);
-                                flat_c_container_.push_back(flat_descs[I2]);
+                                flat_a_container_.push_back(
+                                    conv_to_gemm_transform_.MakeADescriptor_AK0_M_AK1_Packed());
+                                flat_b_container_.push_back(
+                                    conv_to_gemm_transform_.MakeBDescriptor_BK0_N_BK1_Packed());
+                                flat_c_container_.push_back(
+                                    conv_to_gemm_transform_.MakeCDescriptor_M_N_Packed());
                             }
                         }
                     }
