@@ -1290,11 +1290,9 @@ struct CommRCCLGrouped : public MultiPlanItem
     };
 
     CommRCCLGrouped(rocfft_rccl::Communicator& _rccl,
-                    int                        _local_comm_rank,
                     rocfft_precision           _precision,
                     rocfft_array_type          _arrayType)
         : rccl(_rccl)
-        , local_comm_rank(_local_comm_rank)
         , precision(_precision)
         , arrayType(_arrayType)
     {
@@ -1362,7 +1360,6 @@ struct CommRCCLGrouped : public MultiPlanItem
 
 private:
     rocfft_rccl::Communicator& rccl;
-    const int                  local_comm_rank;
     const rocfft_precision     precision;
     const rocfft_array_type    arrayType;
 

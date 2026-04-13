@@ -20,12 +20,8 @@
 
 #include "rccl_wrapper.h"
 #include "logging.h"
-#include <algorithm>
-#include <iostream>
-#include <iterator>
 #include <map>
 #include <mutex>
-#include <numeric>
 #include <stdexcept>
 
 namespace rocfft_rccl

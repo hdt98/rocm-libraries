@@ -2354,12 +2354,12 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     {
         // grouped send/recv path (general case)
 
-        auto rcclGrouped = std::make_unique<CommRCCLGrouped>(
-            *rccl, local_comm_rank, precision, desc.inArrayType);
-        rcclGrouped->group       = itemGroup;
+        auto rcclGrouped   = std::make_unique<CommRCCLGrouped>(*rccl, precision, desc.inArrayType);
+        rcclGrouped->group = itemGroup;
         rcclGrouped->description = "RCCL grouped send/recv";
 
         std::vector<size_t> packItems;
+        packBufs.reserve(packBufs.size() + 2 * cross_device_count);
 
         for(const auto& info : intersections)
         {
@@ -2369,7 +2369,6 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             const auto& inBrick  = inField.bricks[info.inBrickIdx];
             const auto& outBrick = outField.bricks[info.outBrickIdx];
 
-            packBufs.reserve(packBufs.size() + 2);
             TempBufferLease& pack = packBufs.emplace_back(
                 tempBuffers, local_comm_rank, inBrick.location, info.count, elem_size);
             TempBufferLease& recv = packBufs.emplace_back(
