@@ -209,6 +209,26 @@ struct ConvConfigComputeV5 : public ConvConfigBase
 };
 
 template <typename PrecType>
+struct ConvConfigComputeV6 : public ConvConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 256;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 32;
+
+    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t N_Warp = 2;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 32;
+    static constexpr ck_tile::index_t N_Warp_Tile = 32;
+    static constexpr ck_tile::index_t K_Warp_Tile = 16;
+
+    static constexpr bool DoubleSmemBuffer          = false;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_V6;
+    static constexpr ck_tile::index_t NumWaveGroups = 1;
+};
+
+template <typename PrecType>
 struct ConvConfigComputeV3_merged_groups : public ConvConfigBase
 {
     static constexpr ck_tile::index_t VectorSizeA = 4;
@@ -319,7 +339,9 @@ template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V1>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV1<PipelineProblem>;
+    using GemmPipeline =
+        ck_tile::GemmPipelineAGmemBGmemCRegV1<PipelineProblem,
+                                              ck_tile::GroupedConvUniversalPipelineAgBgCrPolicy>;
     template <typename PipelineProblem>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAGmemBGmemCRegV1<PipelineProblem>;
 };
@@ -328,7 +350,9 @@ template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::BASIC_V2>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAGmemBGmemCRegV2<PipelineProblem>;
+    using GemmPipeline =
+        ck_tile::GemmPipelineAGmemBGmemCRegV2<PipelineProblem,
+                                              ck_tile::GroupedConvUniversalPipelineAgBgCrPolicy>;
     template <typename PipelineProblem>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAGmemBGmemCRegV2<PipelineProblem>;
 };
@@ -337,14 +361,18 @@ template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::MEMORY>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAgBgCrMem<PipelineProblem>;
+    using GemmPipeline =
+        ck_tile::GemmPipelineAgBgCrMem<PipelineProblem,
+                                       ck_tile::GroupedConvUniversalPipelineAgBgCrPolicy>;
 };
 
 template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V3>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;
+    using GemmPipeline =
+        ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem,
+                                          ck_tile::GroupedConvUniversalPipelineAgBgCrPolicy>;
 };
 
 template <>
@@ -359,4 +387,11 @@ struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V5>
 {
     template <typename PipelineProblem>
     using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV5<PipelineProblem>;
+};
+
+template <>
+struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V6>
+{
+    template <typename PipelineProblem>
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV6<PipelineProblem>;
 };

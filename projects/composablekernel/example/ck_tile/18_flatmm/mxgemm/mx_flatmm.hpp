@@ -23,7 +23,7 @@
 // For others:  these map to MXFlatmmConfigBase16 (16x16 warp tile)
 // GEMM config with 16x16 warp tile
 
-template <typename FlatmmConfig,
+template <typename MXFlatmmArchTraits,
           typename ADataType,
           typename BDataType,
           typename DsDatatype,

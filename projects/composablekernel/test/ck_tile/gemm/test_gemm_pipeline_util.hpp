@@ -12,6 +12,18 @@
 #include "ck_tile/core/numeric/math.hpp"
 #include "ck_tile/host/permute_pk_int4.hpp"
 
+enum struct GemmPipelineType
+{
+    Mem,
+    CompV3,
+    CompV4,
+    CompV6,
+    CompAsync,
+    CompAsyncEightWaves,
+    CompTDMV1,
+    CompTDMV2
+};
+
 template <typename Layout>
 static constexpr inline auto is_row_major(Layout layout_)
 {
@@ -19,7 +31,9 @@ static constexpr inline auto is_row_major(Layout layout_)
                                                  ck_tile::tensor_layout::gemm::RowMajor>>{};
 }
 
-template <typename PrecType, ck_tile::index_t M_Warp_Tile>
+template <typename PrecType,
+          ck_tile::index_t M_Warp_Tile,
+          GemmPipelineType PipelineType = GemmPipelineType::CompV3>
 constexpr ck_tile::index_t get_k_warp_tile()
 {
 #if CK_TILE_USE_WMMA
@@ -41,7 +55,12 @@ constexpr ck_tile::index_t get_k_warp_tile()
     return 16;
 #endif
 #else
-    if constexpr(M_Warp_Tile == 32)
+    if constexpr(PipelineType == GemmPipelineType::CompAsyncEightWaves)
+        return 128;
+    // CompAsyncConfig16x16x128
+    else if constexpr(PipelineType == GemmPipelineType::CompAsync && M_Warp_Tile == 16)
+        return 128;
+    else if constexpr(M_Warp_Tile == 32)
         return 16;
     else
         return 32;
@@ -68,17 +87,6 @@ auto calculate_rtol_atol(const ck_tile::index_t K,
     // Use higher threshold
     return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
 }
-
-enum struct GemmPipelineType
-{
-    Mem,
-    CompV3,
-    CompV4,
-    CompV6,
-    CompAsync,
-    CompTDMV1,
-    CompTDMV2
-};
 
 template <GemmPipelineType PT, typename Problem>
 struct GemmPipelineTypeSelector;
@@ -126,6 +134,15 @@ struct GemmPipelineTypeSelector<GemmPipelineType::CompAsync, Problem>
     using pipeline      = ck_tile::GemmPipelineAgBgCrCompAsync<Problem>;
 
     static constexpr auto GetName() { return "GemmPipelineAgBgCrCompAsync"; }
+};
+
+template <typename Problem>
+struct GemmPipelineTypeSelector<GemmPipelineType::CompAsyncEightWaves, Problem>
+{
+    using base_pipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<Problem>;
+    using pipeline      = ck_tile::GemmPipelineAgBgCrCompAsyncEightWaves<Problem>;
+
+    static constexpr auto GetName() { return "GemmPipelineAgBgCrCompAsyncEightWaves"; }
 };
 
 template <typename Problem>
@@ -201,8 +218,9 @@ class TestCkTileGemmPipeline : public ::testing::Test
 
     static constexpr ck_tile::index_t M_Warp_Tile = std::tuple_element_t<10, Tuple>{};
     static constexpr ck_tile::index_t N_Warp_Tile = std::tuple_element_t<11, Tuple>{};
-    static constexpr ck_tile::index_t K_Warp_Tile = ck_tile::max(
-        get_k_warp_tile<ADataType, M_Warp_Tile>(), get_k_warp_tile<BDataType, N_Warp_Tile>());
+    static constexpr ck_tile::index_t K_Warp_Tile =
+        ck_tile::max(get_k_warp_tile<ADataType, M_Warp_Tile, PipelineType>(),
+                     get_k_warp_tile<BDataType, N_Warp_Tile, PipelineType>());
 
     using AComputeDataType = ADataType;
     using BComputeDataType =
@@ -221,7 +239,8 @@ class TestCkTileGemmPipeline : public ::testing::Test
     template <bool PadM, bool PadN, bool PadK, bool Preshuffle>
     void invoke_gemm(const ck_tile::GemmHostArgs& args, const ck_tile::stream_config& s)
     {
-        constexpr ck_tile::index_t M_Warp = 2;
+        constexpr ck_tile::index_t M_Warp =
+            PipelineType == GemmPipelineType::CompAsyncEightWaves ? 4 : 2;
         constexpr ck_tile::index_t N_Warp = 2;
         constexpr ck_tile::index_t K_Warp = 1;
 
@@ -386,6 +405,7 @@ class TestCkTileGemmPipeline : public ::testing::Test
         }
         // for TDM it used tdm_epilogue which don't support split-k
         if constexpr(PipelineType == GemmPipelineType::CompV4 ||
+                     PipelineType == GemmPipelineType::CompAsyncEightWaves ||
                      PipelineType == GemmPipelineType::CompTDMV1 ||
                      PipelineType == GemmPipelineType::CompTDMV2 ||
                      std::is_same_v<BDataType, ck_tile::pk_int4_t>)

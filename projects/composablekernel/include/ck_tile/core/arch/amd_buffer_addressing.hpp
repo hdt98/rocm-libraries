@@ -493,50 +493,50 @@ struct buffer_load_if<8, pre_nop>
                          : "+v"(reinterpret_cast<mbuf_t&>(value))
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag), "s"(saved_exec)
                          : "memory");
+#endif
     }
-#endif
-    };
+};
 
-    template <bool pre_nop>
-    struct buffer_load_if<4, pre_nop>
+template <bool pre_nop>
+struct buffer_load_if<4, pre_nop>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag           = 0,
+                                   bool_constant<pre_nop> = {})
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag           = 0,
-                                       bool_constant<pre_nop> = {})
-        {
-            static_assert(sizeof(T) == 4);
-            using mbuf_t = typename impl::buffer_load_trait<4, T>::payload_t;
+        static_assert(sizeof(T) == 4);
+        using mbuf_t = typename impl::buffer_load_trait<4, T>::payload_t;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            if constexpr(pre_nop)
-            {
-                asm volatile("s_nop 4\n"
-                             "s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
-                             : "memory");
-            }
-            else
-            {
-                asm volatile("s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset),                                            // 2
-                               "s"(res),                                                 // 3
-                               "n"(i_offset),                                            // 4
-                               "v"(flag)                                                 // 5
-                             : "memory");
-            }
+        unsigned saved_exec;
+        if constexpr(pre_nop)
+        {
+            asm volatile("s_nop 4\n"
+                         "s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
+                         : "memory");
+        }
+        else
+        {
+            asm volatile("s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_dword %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
+                         : "memory");
+        }
 #else
         auto saved_exec = __builtin_amdgcn_read_exec();
         if constexpr(pre_nop)
@@ -555,49 +555,49 @@ struct buffer_load_if<8, pre_nop>
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag), "s"(saved_exec)
                          : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <bool pre_nop>
-    struct buffer_load_if<2, pre_nop>
+template <bool pre_nop>
+struct buffer_load_if<2, pre_nop>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag           = 0,
+                                   bool_constant<pre_nop> = {})
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag           = 0,
-                                       bool_constant<pre_nop> = {})
-        {
-            static_assert(sizeof(T) == 4);
-            using mbuf_t = typename impl::buffer_load_trait<2, T>::payload_t;
+        static_assert(sizeof(T) == 4);
+        using mbuf_t = typename impl::buffer_load_trait<2, T>::payload_t;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            if constexpr(pre_nop)
-            {
-                asm volatile("s_nop 4\n"
-                             "s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
-                             : "memory");
-            }
-            else
-            {
-                asm volatile("s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset),                                            // 2
-                               "s"(res),                                                 // 3
-                               "n"(i_offset),                                            // 4
-                               "v"(flag)                                                 // 5
-                             : "memory");
-            }
+        unsigned saved_exec;
+        if constexpr(pre_nop)
+        {
+            asm volatile("s_nop 4\n"
+                         "s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
+                         : "memory");
+        }
+        else
+        {
+            asm volatile("s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_ushort %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
+                         : "memory");
+        }
 #else
         auto saved_exec = __builtin_amdgcn_read_exec();
         if constexpr(pre_nop)
@@ -616,49 +616,49 @@ struct buffer_load_if<8, pre_nop>
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag), "s"(saved_exec)
                          : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <bool pre_nop>
-    struct buffer_load_if<1, pre_nop>
+template <bool pre_nop>
+struct buffer_load_if<1, pre_nop>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag           = 0,
+                                   bool_constant<pre_nop> = {})
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag           = 0,
-                                       bool_constant<pre_nop> = {})
-        {
-            static_assert(sizeof(T) == 4);
-            using mbuf_t = typename impl::buffer_load_trait<1, T>::payload_t;
+        static_assert(sizeof(T) == 4);
+        using mbuf_t = typename impl::buffer_load_trait<1, T>::payload_t;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            if constexpr(pre_nop)
-            {
-                asm volatile("s_nop 4\n"
-                             "s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
-                             : "memory");
-            }
-            else
-            {
-                asm volatile("s_mov_b32 %0, exec_lo\n"
-                             "v_cmpx_le_u32 1, %5\n"
-                             "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
-                             "s_mov_b32 exec_lo, %0"
-                             : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
-                             : "v"(v_offset),                                            // 2
-                               "s"(res),                                                 // 3
-                               "n"(i_offset),                                            // 4
-                               "v"(flag)                                                 // 5
-                             : "memory");
-            }
+        unsigned saved_exec;
+        if constexpr(pre_nop)
+        {
+            asm volatile("s_nop 4\n"
+                         "s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag)
+                         : "memory");
+        }
+        else
+        {
+            asm volatile("s_mov_b32 %0, exec_lo\n"
+                         "v_cmpx_le_u32 1, %5\n"
+                         "buffer_load_ubyte %1, %2, %3, null offen offset:%4\n"
+                         "s_mov_b32 exec_lo, %0"
+                         : "=&s"(saved_exec), "+v"(reinterpret_cast<mbuf_t&>(value)) // 1
+                         : "v"(v_offset),                                            // 2
+                           "s"(res),                                                 // 3
+                           "n"(i_offset),                                            // 4
+                           "v"(flag)                                                 // 5
+                         : "memory");
+        }
 #else
         auto saved_exec = __builtin_amdgcn_read_exec();
         using mbuf_t    = typename impl::buffer_load_trait<1, T>::payload_t;
@@ -678,8 +678,8 @@ struct buffer_load_if<8, pre_nop>
                          : "v"(v_offset), "s"(res), "n"(i_offset), "v"(flag), "s"(saved_exec)
                          : "memory");
 #endif
-        }
-    };
+    }
+};
 #endif
 
 #pragma clang diagnostic pop // "-Wundefined-reinterpret-cast"
@@ -702,10 +702,10 @@ struct buffer_store<16>
         __builtin_amdgcn_raw_buffer_store_b128(
             bit_cast<mbuf_t>(value), cast_to_amdgpu_buffer_rsrc_t(res), v_offset, s_offset, 0);
 #elif defined(__gfx12__) || defined(__gfx13__)
-            asm volatile("buffer_store_dwordx4 %0, %1, %2, null offen offset:%3"
-                         :
-                         : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
-                         : "memory");
+        asm volatile("buffer_store_dwordx4 %0, %1, %2, null offen offset:%3"
+                     :
+                     : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
+                     : "memory");
 #else
         asm volatile("buffer_store_dwordx4 %0, %1, %2, 0 offen offset:%3"
                      :
@@ -733,10 +733,10 @@ struct buffer_store<8>
         __builtin_amdgcn_raw_buffer_store_b64(
             bit_cast<mbuf_t>(value), cast_to_amdgpu_buffer_rsrc_t(res), v_offset, s_offset, 0);
 #elif defined(__gfx12__) || defined(__gfx13__)
-            asm volatile("buffer_store_dwordx2 %0, %1, %2, null offen offset:%3"
-                         :
-                         : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
-                         : "memory");
+        asm volatile("buffer_store_dwordx2 %0, %1, %2, null offen offset:%3"
+                     :
+                     : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
+                     : "memory");
 #else
         asm volatile("buffer_store_dwordx2 %0, %1, %2, 0 offen offset:%3"
                      :
@@ -764,10 +764,10 @@ struct buffer_store<4>
         __builtin_amdgcn_raw_buffer_store_b32(
             bit_cast<mbuf_t>(value), cast_to_amdgpu_buffer_rsrc_t(res), v_offset, s_offset, 0);
 #elif defined(__gfx12__) || defined(__gfx13__)
-            asm volatile("buffer_store_dword %0, %1, %2, null offen offset:%3"
-                         :
-                         : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
-                         : "memory");
+        asm volatile("buffer_store_dword %0, %1, %2, null offen offset:%3"
+                     :
+                     : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
+                     : "memory");
 #else
         asm volatile("buffer_store_dword %0, %1, %2, 0 offen offset:%3"
                      :
@@ -795,10 +795,10 @@ struct buffer_store<2>
         __builtin_amdgcn_raw_buffer_store_b16(
             bit_cast<mbuf_t>(value), cast_to_amdgpu_buffer_rsrc_t(res), v_offset, s_offset, 0);
 #elif defined(__gfx12__) || defined(__gfx13__)
-            asm volatile("buffer_store_short %0, %1, %2, null offen offset:%3"
-                         :
-                         : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
-                         : "memory");
+        asm volatile("buffer_store_short %0, %1, %2, null offen offset:%3"
+                     :
+                     : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
+                     : "memory");
 #else
         asm volatile("buffer_store_short %0, %1, %2, 0 offen offset:%3"
                      :
@@ -826,10 +826,10 @@ struct buffer_store<1>
         __builtin_amdgcn_raw_buffer_store_b8(
             bit_cast<mbuf_t>(value), cast_to_amdgpu_buffer_rsrc_t(res), v_offset, s_offset, 0);
 #elif defined(__gfx12__) || defined(__gfx13__)
-            asm volatile("buffer_store_byte %0, %1, %2, null offen offset:%3"
-                         :
-                         : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
-                         : "memory");
+        asm volatile("buffer_store_byte %0, %1, %2, null offen offset:%3"
+                     :
+                     : "v"(bit_cast<mbuf_t>(value)), "v"(v_offset), "s"(res), "n"(i_offset)
+                     : "memory");
 #else
         asm volatile("buffer_store_byte %0, %1, %2, 0 offen offset:%3"
                      :
@@ -858,32 +858,32 @@ struct buffer_store_if
     }
 };
 #else
-    template <>
-    struct buffer_store_if<16>
+template <>
+struct buffer_store_if<16>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(const T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag = 1)
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(const T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag = 1)
-        {
-            static_assert(sizeof(T) == 16);
-            using mbuf_t = fp32x4_t;
+        static_assert(sizeof(T) == 16);
+        using mbuf_t = fp32x4_t;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            asm volatile("s_mov_b32 %0, exec_lo\n"
-                         "v_cmpx_le_u32 1, %5\n"
-                         "buffer_store_dwordx4 %1, %2, %3, null offen offset:%4\n"
-                         "s_mov_b32 exec_lo, %0"
-                         : "=&s"(saved_exec)             // 0
-                         : "v"(bit_cast<mbuf_t>(value)), // 1
-                           "v"(v_offset),                // 2
-                           "s"(res),                     // 3
-                           "n"(i_offset),                // 4
-                           "v"(flag)                     // 5
-                         : "memory");
+        unsigned saved_exec;
+        asm volatile("s_mov_b32 %0, exec_lo\n"
+                     "v_cmpx_le_u32 1, %5\n"
+                     "buffer_store_dwordx4 %1, %2, %3, null offen offset:%4\n"
+                     "s_mov_b32 exec_lo, %0"
+                     : "=&s"(saved_exec)             // 0
+                     : "v"(bit_cast<mbuf_t>(value)), // 1
+                       "v"(v_offset),                // 2
+                       "s"(res),                     // 3
+                       "n"(i_offset),                // 4
+                       "v"(flag)                     // 5
+                     : "memory");
 #else
         auto save_exec = __builtin_amdgcn_read_exec();
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
@@ -898,35 +898,35 @@ struct buffer_store_if
                        "s"(save_exec)
                      : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <>
-    struct buffer_store_if<8>
+template <>
+struct buffer_store_if<8>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(const T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag = 1)
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(const T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag = 1)
-        {
-            static_assert(sizeof(T) == 8);
-            using mbuf_t = ext_vector_t<typename T::value_type, T::size()>;
+        static_assert(sizeof(T) == 8);
+        using mbuf_t = ext_vector_t<typename T::value_type, T::size()>;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            asm volatile("s_mov_b32 %0, exec_lo\n"
-                         "v_cmpx_le_u32 1, %5\n"
-                         "buffer_store_dwordx2 %1, %2, %3, null offen offset:%4\n"
-                         "s_mov_b32 exec_lo, %0"
-                         : "=&s"(saved_exec)             // 0
-                         : "v"(bit_cast<mbuf_t>(value)), // 1
-                           "v"(v_offset),                // 2
-                           "s"(res),                     // 3
-                           "n"(i_offset),                // 4
-                           "v"(flag)                     // 5
-                         : "memory");
+        unsigned saved_exec;
+        asm volatile("s_mov_b32 %0, exec_lo\n"
+                     "v_cmpx_le_u32 1, %5\n"
+                     "buffer_store_dwordx2 %1, %2, %3, null offen offset:%4\n"
+                     "s_mov_b32 exec_lo, %0"
+                     : "=&s"(saved_exec)             // 0
+                     : "v"(bit_cast<mbuf_t>(value)), // 1
+                       "v"(v_offset),                // 2
+                       "s"(res),                     // 3
+                       "n"(i_offset),                // 4
+                       "v"(flag)                     // 5
+                     : "memory");
 #else
         auto saved_exec = __builtin_amdgcn_read_exec();
         // TODO: ugly. rocm-6.0/6.1 seems neet bit_cast to same base type to avoid scratch
@@ -942,35 +942,35 @@ struct buffer_store_if
                        "s"(save_exec)
                      : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <>
-    struct buffer_store_if<4>
+template <>
+struct buffer_store_if<4>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(const T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag = 1)
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(const T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag = 1)
-        {
-            static_assert(sizeof(T) == 4);
-            using mbuf_t = float;
+        static_assert(sizeof(T) == 4);
+        using mbuf_t = float;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            asm volatile("s_mov_b32 %0, exec_lo\n"
-                         "v_cmpx_le_u32 1, %5\n"
-                         "buffer_store_dword %1, %2, %3, null offen offset:%4\n"
-                         "s_mov_b32 exec_lo, %0"
-                         : "=&s"(saved_exec)             // 0
-                         : "v"(bit_cast<mbuf_t>(value)), // 1
-                           "v"(v_offset),                // 2
-                           "s"(res),                     // 3
-                           "n"(i_offset),                // 4
-                           "v"(flag)                     // 5
-                         : "memory");
+        unsigned saved_exec;
+        asm volatile("s_mov_b32 %0, exec_lo\n"
+                     "v_cmpx_le_u32 1, %5\n"
+                     "buffer_store_dword %1, %2, %3, null offen offset:%4\n"
+                     "s_mov_b32 exec_lo, %0"
+                     : "=&s"(saved_exec)             // 0
+                     : "v"(bit_cast<mbuf_t>(value)), // 1
+                       "v"(v_offset),                // 2
+                       "s"(res),                     // 3
+                       "n"(i_offset),                // 4
+                       "v"(flag)                     // 5
+                     : "memory");
 #else
         auto save_exec = __builtin_amdgcn_read_exec();
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
@@ -985,35 +985,35 @@ struct buffer_store_if
                        "s"(save_exec)
                      : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <>
-    struct buffer_store_if<2>
+template <>
+struct buffer_store_if<2>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(const T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag = 1)
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(const T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag = 1)
-        {
-            static_assert(sizeof(T) == 2);
-            using mbuf_t = short;
+        static_assert(sizeof(T) == 2);
+        using mbuf_t = short;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            asm volatile("s_mov_b32 %0, exec_lo\n"
-                         "v_cmpx_le_u32 1, %5\n"
-                         "buffer_store_short %1, %2, %3, null offen offset:%4\n"
-                         "s_mov_b32 exec_lo, %0"
-                         : "=&s"(saved_exec)             // 0
-                         : "v"(bit_cast<mbuf_t>(value)), // 1
-                           "v"(v_offset),                // 2
-                           "s"(res),                     // 3
-                           "n"(i_offset),                // 4
-                           "v"(flag)                     // 5
-                         : "memory");
+        unsigned saved_exec;
+        asm volatile("s_mov_b32 %0, exec_lo\n"
+                     "v_cmpx_le_u32 1, %5\n"
+                     "buffer_store_short %1, %2, %3, null offen offset:%4\n"
+                     "s_mov_b32 exec_lo, %0"
+                     : "=&s"(saved_exec)             // 0
+                     : "v"(bit_cast<mbuf_t>(value)), // 1
+                       "v"(v_offset),                // 2
+                       "s"(res),                     // 3
+                       "n"(i_offset),                // 4
+                       "v"(flag)                     // 5
+                     : "memory");
 #else
         auto save_exec = __builtin_amdgcn_read_exec();
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
@@ -1028,35 +1028,35 @@ struct buffer_store_if
                        "s"(save_exec)
                      : "memory");
 #endif
-        }
-    };
+    }
+};
 
-    template <>
-    struct buffer_store_if<1>
+template <>
+struct buffer_store_if<1>
+{
+    template <typename T>
+    CK_TILE_DEVICE void operator()(const T& value,
+                                   int32x4_t res /*buffer resource*/,
+                                   index_t v_offset,
+                                   index_t /*s_offset*/,
+                                   index_t i_offset /*max 0xFFF*/,
+                                   index_t flag = 1)
     {
-        template <typename T>
-        CK_TILE_DEVICE void operator()(const T& value,
-                                       int32x4_t res /*buffer resource*/,
-                                       index_t v_offset,
-                                       index_t /*s_offset*/,
-                                       index_t i_offset /*max 0xFFF*/,
-                                       index_t flag = 1)
-        {
-            static_assert(sizeof(T) == 4);
-            using mbuf_t = float;
+        static_assert(sizeof(T) == 4);
+        using mbuf_t = float;
 #if(defined(__gfx12__) || defined(__gfx13__))
-            unsigned saved_exec;
-            asm volatile("s_mov_b32 %0, exec_lo\n"
-                         "v_cmpx_le_u32 1, %5\n"
-                         "buffer_store_byte %1, %2, %3, null offen offset:%4\n"
-                         "s_mov_b32 exec_lo, %0"
-                         : "=&s"(saved_exec)             // 0
-                         : "v"(bit_cast<mbuf_t>(value)), // 1
-                           "v"(v_offset),                // 2
-                           "s"(res),                     // 3
-                           "n"(i_offset),                // 4
-                           "v"(flag)                     // 5
-                         : "memory");
+        unsigned saved_exec;
+        asm volatile("s_mov_b32 %0, exec_lo\n"
+                     "v_cmpx_le_u32 1, %5\n"
+                     "buffer_store_byte %1, %2, %3, null offen offset:%4\n"
+                     "s_mov_b32 exec_lo, %0"
+                     : "=&s"(saved_exec)             // 0
+                     : "v"(bit_cast<mbuf_t>(value)), // 1
+                       "v"(v_offset),                // 2
+                       "s"(res),                     // 3
+                       "n"(i_offset),                // 4
+                       "v"(flag)                     // 5
+                     : "memory");
 #else
         auto save_exec = __builtin_amdgcn_read_exec();
         asm volatile("v_cmpx_le_u32 exec, 1, %4\n"
@@ -1071,8 +1071,8 @@ struct buffer_store_if
                        "s"(save_exec)
                      : "memory");
 #endif
-        }
-    };
+    }
+};
 #endif
 
 CK_TILE_DEVICE void buffer_load_fence(index_t cnt = 0)
@@ -1080,7 +1080,7 @@ CK_TILE_DEVICE void buffer_load_fence(index_t cnt = 0)
 #if defined(__gfx13__)
     asm volatile("s_wait_loadcnt %0" : : "n"(cnt) : "memory");
 #else
-        asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
+    asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
 #endif
 }
 
@@ -1326,7 +1326,7 @@ CK_TILE_DEVICE void buffer_load_fence(index_t cnt = 0, T&... o)
 #if defined(__gfx13__)
     asm volatile("s_wait_loadcnt %0" : : "n"(cnt) : "memory");
 #else
-        asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
+    asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
 #endif
     impl::insert_dummy_dep(o...);
 }
@@ -1336,7 +1336,7 @@ CK_TILE_DEVICE void buffer_store_fence(index_t cnt = 0)
 #if defined(__gfx13__)
     asm volatile("s_wait_loadcnt %0" : : "n"(cnt) : "memory");
 #else
-        asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
+    asm volatile("s_waitcnt vmcnt(%0)" : : "n"(cnt) : "memory");
 #endif
 }
 
@@ -1619,36 +1619,36 @@ CK_TILE_DEVICE_EXTERN float llvm_amdgcn_raw_buffer_atomic_add_fp32(
     index_t soffset,
     index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32.v4i32");
 #else
-    CK_TILE_DEVICE_EXTERN fp16x2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
-        fp16x2_t vdata,
-        int32x4_t rsrc,
-        index_t voffset,
-        index_t soffset,
-        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16");
+CK_TILE_DEVICE_EXTERN fp16x2_t llvm_amdgcn_raw_buffer_atomic_add_fp16x2(
+    fp16x2_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2f16");
 
-    // buffer atomic-add bf16
-    // TODO: Replace with bf16x2_t, but llvm builins only accept cktile_bf16x2_t now.
-    CK_TILE_DEVICE_EXTERN bf16x2_t llvm_amdgcn_raw_buffer_atomic_add_bf16x2(
-        bf16x2_t vdata,
-        int32x4_t rsrc,
-        index_t voffset,
-        index_t soffset,
-        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16");
+// buffer atomic-add bf16
+// TODO: Replace with bf16x2_t, but llvm builins only accept cktile_bf16x2_t now.
+CK_TILE_DEVICE_EXTERN bf16x2_t llvm_amdgcn_raw_buffer_atomic_add_bf16x2(
+    bf16x2_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.v2bf16");
 
-    // buffer atomic-add i32
-    CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
-        int32_t vdata,
-        int32x4_t rsrc,
-        index_t voffset,
-        index_t soffset,
-        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32");
+// buffer atomic-add i32
+CK_TILE_DEVICE_EXTERN int32_t llvm_amdgcn_raw_buffer_atomic_add_i32(
+    int32_t vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.add.i32");
 
-    CK_TILE_DEVICE_EXTERN float llvm_amdgcn_raw_buffer_atomic_add_fp32(
-        float vdata,
-        int32x4_t rsrc,
-        index_t voffset,
-        index_t soffset,
-        index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32");
+CK_TILE_DEVICE_EXTERN float llvm_amdgcn_raw_buffer_atomic_add_fp32(
+    float vdata,
+    int32x4_t rsrc,
+    index_t voffset,
+    index_t soffset,
+    index_t glc_slc) __asm("llvm.amdgcn.raw.buffer.atomic.fadd.f32");
 #endif
 
 // buffer atomic-max fp64
@@ -2248,7 +2248,7 @@ CK_TILE_DEVICE void amd_async_buffer_load(CK_TILE_LDS_ADDR T* smem,
                   "wrong! only support in dword, dwordx3, dwordx4");
     src_wave_addr_offset = 0;
 #else
-        static_assert(bytes == 4, "wrong! not implemented vector size");
+    static_assert(bytes == 4, "wrong! not implemented vector size");
 #endif
 
     // Set up v_offset:
@@ -2877,6 +2877,9 @@ CK_TILE_DEVICE void amd_buffer_atomic_max_impl(const thread_buffer<T, N> src_thr
     }
 }
 
+template <typename T>
+using has_type = typename T::type;
+
 // buffer_load requires:
 //   1) p_src_wave must point to global memory space
 //   2) p_src_wave must be a wavewise pointer.
@@ -2907,12 +2910,48 @@ amd_buffer_load_invalid_element_return_zero(const T* p_src_wave,
     return amd_buffer_load_impl<T, N, coherence>(
         src_wave_buffer_resource, src_addr_shift + src_thread_addr_offset, 0);
 #else
-        thread_buffer<T, N> tmp = amd_buffer_load_impl<T, N, coherence>(
-            src_wave_buffer_resource, src_thread_addr_offset, 0);
-        if constexpr(oob_conditional_check)
-            return src_thread_element_valid ? tmp : thread_buffer<T, N>{numeric<T>::zero()};
-        else
-            return tmp;
+    if constexpr(oob_conditional_check)
+    {
+        if(!src_thread_element_valid)
+        {
+            if constexpr(is_detected<has_type, T>::value)
+            {
+                // Use vector_t for not valid elements to avoid permute instructions.
+                // Get raw type from structure
+                using vector_t = typename T::type __attribute__((ext_vector_type(N)));
+                if constexpr(sizeof(vector_t) != sizeof(typename T::type) * N)
+                {
+                    // Not possible to use set_as
+                    return thread_buffer<T, N>{numeric<T>::zero()};
+                }
+                else
+                {
+                    thread_buffer<T, N> tmp;
+                    tmp.template set_as<vector_t>(number<0>{},
+                                                  vector_t{numeric<typename T::type>::zero()});
+                    return tmp;
+                }
+            }
+            else
+            {
+                // Use vector_t for not valid elements to avoid permute instructions.
+                using vector_t = T __attribute__((ext_vector_type(N)));
+                if constexpr(sizeof(vector_t) != sizeof(T) * N)
+                {
+                    // Not possible to use set_as
+                    return thread_buffer<T, N>{numeric<T>::zero()};
+                }
+                else
+                {
+                    thread_buffer<T, N> tmp;
+                    tmp.template set_as<vector_t>(number<0>{}, vector_t{numeric<T>::zero()});
+                    return tmp;
+                }
+            }
+        }
+    }
+    return amd_buffer_load_impl<T, N, coherence>(
+        src_wave_buffer_resource, src_thread_addr_offset, 0);
 #endif
 }
 
@@ -2936,13 +2975,48 @@ amd_buffer_load_invalid_element_return_customized_value(const T* p_src_wave,
 
     index_t src_thread_addr_offset = src_thread_element_offset * sizeof(T);
 
-    thread_buffer<T, N> tmp =
-        amd_buffer_load_impl<T, N, coherence>(src_wave_buffer_resource, src_thread_addr_offset, 0);
-
     if constexpr(oob_conditional_check)
-        return src_thread_element_valid ? tmp : thread_buffer<T, N>{customized_value};
-    else
-        return tmp;
+    {
+        if(!src_thread_element_valid)
+        {
+            if constexpr(is_detected<has_type, T>::value)
+            {
+                // Use vector_t for not valid elements to avoid permute instructions.
+                // Get raw type from structure
+                using vector_t = typename T::type __attribute__((ext_vector_type(N)));
+                if constexpr(sizeof(vector_t) != sizeof(typename T::type) * N)
+                {
+                    // Not possible to use set_as
+                    return thread_buffer<T, N>{customized_value};
+                }
+                else
+                {
+                    thread_buffer<T, N> tmp;
+                    tmp.template set_as<vector_t>(
+                        number<0>{}, vector_t{static_cast<typename T::type>(customized_value)});
+                    return tmp;
+                }
+            }
+            else
+            {
+                // Use vector_t for not valid elements to avoid permute instructions.
+                using vector_t = T __attribute__((ext_vector_type(N)));
+                if constexpr(sizeof(vector_t) != sizeof(T) * N)
+                {
+                    // Not possible to use set_as
+                    return thread_buffer<T, N>{customized_value};
+                }
+                else
+                {
+                    thread_buffer<T, N> tmp;
+                    tmp.template set_as<vector_t>(number<0>{}, vector_t{customized_value});
+                    return tmp;
+                }
+            }
+        }
+    }
+    return amd_buffer_load_impl<T, N, coherence>(
+        src_wave_buffer_resource, src_thread_addr_offset, 0);
 }
 
 template <typename T,
@@ -3104,19 +3178,19 @@ CK_TILE_DEVICE void amd_buffer_store(const thread_buffer<T, N>& src_thread_data,
     amd_buffer_store_impl<T, N, coherence>(
         src_thread_data, dst_wave_buffer_resource, dst_addr_shift + dst_thread_addr_offset, 0);
 #else
-        if constexpr(oob_conditional_check)
-        {
-            if(dst_thread_element_valid)
-            {
-                amd_buffer_store_impl<T, N, coherence>(
-                    src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
-            }
-        }
-        else
+    if constexpr(oob_conditional_check)
+    {
+        if(dst_thread_element_valid)
         {
             amd_buffer_store_impl<T, N, coherence>(
                 src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
         }
+    }
+    else
+    {
+        amd_buffer_store_impl<T, N, coherence>(
+            src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
+    }
 #endif
 }
 
@@ -3167,11 +3241,11 @@ CK_TILE_DEVICE void amd_buffer_atomic_add(const thread_buffer<T, N>& src_thread_
     amd_buffer_atomic_add_impl<T, N>(
         src_thread_data, dst_wave_buffer_resource, dst_addr_shift + dst_thread_addr_offset, 0);
 #else
-        if(dst_thread_element_valid)
-        {
-            amd_buffer_atomic_add_impl<T, N>(
-                src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
-        }
+    if(dst_thread_element_valid)
+    {
+        amd_buffer_atomic_add_impl<T, N>(
+            src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
+    }
 #endif
 }
 
@@ -3236,11 +3310,11 @@ CK_TILE_DEVICE void amd_buffer_atomic_max(const thread_buffer<T, N>& src_thread_
     amd_buffer_atomic_max_impl<T, N>(
         src_thread_data, dst_wave_buffer_resource, dst_addr_shift + dst_thread_addr_offset, 0);
 #else
-        if(dst_thread_element_valid)
-        {
-            amd_buffer_atomic_max_impl<T, N>(
-                src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
-        }
+    if(dst_thread_element_valid)
+    {
+        amd_buffer_atomic_max_impl<T, N>(
+            src_thread_data, dst_wave_buffer_resource, dst_thread_addr_offset, 0);
+    }
 #endif
 }
 
@@ -3314,7 +3388,7 @@ amd_tdm_load(const TDMDescriptor<DataType, TensorRank, IsGatherMode>& descriptor
                                             static_cast<index_t>(coherence));
     }
 #else
-        ignore = descriptor;
+    ignore = descriptor;
 #endif
 }
 
@@ -3346,7 +3420,7 @@ amd_tdm_store(const TDMDescriptor<DataType, TensorRank, IsGatherMode>& descripto
                                                static_cast<index_t>(coherence));
     }
 #else
-        ignore = descriptor;
+    ignore = descriptor;
 #endif
 }
 

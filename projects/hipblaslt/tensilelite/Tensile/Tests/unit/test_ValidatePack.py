@@ -38,8 +38,7 @@ class TestValidatePackBF16(CMSValidationTestBase):
     def setUp(self, kernel_updates: Optional[dict[str, Any]] = None) -> None:
         super().setUp(kernel_updates)
     
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_packs_start_and_end_at_correct_indices(sched, kernel_dict, codePathIdx)
+    validator_passes = [add_local_read_constraints, add_pack_constraints]
 
     def test_passing(self):
         """
@@ -223,8 +222,7 @@ class TestValidatePackBF16PLRPack(CMSValidationTestBase):
         kernel_updates["UsePLRPack"] = True
         super().setUp(kernel_updates)
     
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_packs_start_and_end_at_correct_indices(sched, kernel_dict, codePathIdx)
+    validator_passes = [add_local_read_constraints, add_pack_constraints]
 
     def test_passing_plr_pack(self):
         """
@@ -385,8 +383,7 @@ class TestValidatePackTF32(CMSValidationTestBase):
         self.q4s = self.q3e + 1
         self.q4e = self.num_vmfma - 1
     
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_packs_start_and_end_at_correct_indices(sched, kernel_dict, codePathIdx)
+    validator_passes = [add_local_read_constraints, add_pack_constraints]
     
     def test_passing(self):
         """
@@ -640,8 +637,7 @@ class TestValidatePackTF32CrossPackInterleaving(CMSValidationTestBase):
         kernel_updates["MIWaveTileB"] = 4
         super().setUp(kernel_updates)
     
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_packs_start_and_end_at_correct_indices(sched, kernel_dict, codePathIdx)
+    validator_passes = [add_local_read_constraints, add_pack_constraints]
     
     def test_passing_interleaved(self):
         """
@@ -761,8 +757,7 @@ class TestValidatePackTF32MultipleGroups(CMSValidationTestBase):
         self.q4s = self.q3e + 1
         self.q4e = self.num_vmfma - 1
     
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_packs_start_and_end_at_correct_indices(sched, kernel_dict, codePathIdx)
+    validator_passes = [add_local_read_constraints, add_pack_constraints]
     
     def test_passing_two_groups_consecutive(self):
         """

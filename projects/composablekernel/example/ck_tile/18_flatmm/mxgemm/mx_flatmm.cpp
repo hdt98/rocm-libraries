@@ -20,7 +20,7 @@ static constexpr inline auto is_row_major(Layout layout_)
                                                  ck_tile::tensor_layout::gemm::RowMajor>>{};
 }
 
-template <typename FlatmmConfig,
+template <typename MXFlatmmArchTraits,
           typename ADataType,
           typename BDataType,
           typename DsDatatype,
@@ -43,17 +43,18 @@ float invoke_mx_flatmm(ck_tile::DeviceMem& a_dev_buf,
                        ck_tile::index_t stride_A,
                        ck_tile::index_t stride_B,
                        ck_tile::index_t stride_C,
-                       ck_tile::index_t kbatch,
                        ScaleA scale_a,
                        ScaleB scale_b,
                        int n_warmup,
                        int n_repeat)
 {
+    using FlatmmConfig = typename MXFlatmmArchTraits::Config;
+
     ck_tile::ScaleFlatmmHostArgs<ScaleA, ScaleB> args = {a_dev_buf.GetDeviceBuffer(),
                                                          b_shuffle_dev_buf.GetDeviceBuffer(),
                                                          {},
                                                          c_dev_buf.GetDeviceBuffer(),
-                                                         kbatch,
+                                                         1,
                                                          M,
                                                          N,
                                                          K,
@@ -88,8 +89,8 @@ float invoke_mx_flatmm(ck_tile::DeviceMem& a_dev_buf,
 
     using BaseFlatmmPipeline = ck_tile::BaseFlatmmPipelineAGmemBGmemCRegV1<GemmPipelineProblem>;
 
-    const ck_tile::index_t k_grain     = args.k_batch * FlatmmConfig::K_Tile;
-    const ck_tile::index_t k_split     = (K + k_grain - 1) / k_grain * FlatmmConfig::K_Tile;
+    const ck_tile::index_t k_grain     = FlatmmConfig::K_Tile;
+    const ck_tile::index_t k_split     = (K + k_grain - 1) / k_grain * k_grain;
     const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(k_split);
     const bool has_hot_loop            = BaseFlatmmPipeline::BlockHasHotloop(num_loop);
     const ck_tile::TailNumber tail_num = BaseFlatmmPipeline::GetBlockLoopTailNum(num_loop);
@@ -98,29 +99,24 @@ float invoke_mx_flatmm(ck_tile::DeviceMem& a_dev_buf,
         [&](auto has_hot_loop_, auto tail_num_) {
             constexpr auto has_hot_loop_v = has_hot_loop_.value;
             constexpr auto tail_num_v     = tail_num_.value;
-            auto invoke_splitk_path       = [&](auto split_k_) {
-                return mx_flatmm_calc<FlatmmConfig,
-                                            ADataType,
-                                            BDataType,
-                                            DsDatatype,
-                                            AccDataType,
-                                            CDataType,
-                                            ALayout,
-                                            BLayout,
-                                            DsLayout,
-                                            CLayout,
-                                            ScaleA,
-                                            ScaleB,
-                                            UsePersistentKernel,
-                                            CDEElementWise,
-                                            split_k_.value,
-                                            has_hot_loop_v,
-                                            tail_num_v>(
-                    args,
-                    ck_tile::stream_config{nullptr, true, 1, n_warmup, n_repeat, true, true, 50});
-            };
-            return (args.k_batch == 1) ? invoke_splitk_path(std::false_type{})
-                                       : invoke_splitk_path(std::true_type{});
+            return mx_flatmm_calc<MXFlatmmArchTraits,
+                                  ADataType,
+                                  BDataType,
+                                  DsDatatype,
+                                  AccDataType,
+                                  CDataType,
+                                  ALayout,
+                                  BLayout,
+                                  DsLayout,
+                                  CLayout,
+                                  ScaleA,
+                                  ScaleB,
+                                  UsePersistentKernel,
+                                  CDEElementWise,
+                                  false,
+                                  has_hot_loop_v,
+                                  tail_num_v>(
+                args, ck_tile::stream_config{nullptr, true, 1, n_warmup, n_repeat, true, true, 50});
         },
         has_hot_loop,
         tail_num);
@@ -157,74 +153,24 @@ auto create_args(int argc, char* argv[])
         .insert("stride_b", "0", "Tensor B stride")
         .insert("stride_c", "0", "Tensor C stride")
         .insert("v", "1", "0. No validation, 1. Validation on CPU, 2. Validation on GPU")
-        .insert(
-            "mx_prec", "fp4xfp4", "data type for activation and weight, support: fp4xfp4, fp8xfp8")
+        .insert("mx_prec",
+                "fp4xfp4",
+                "data type for activation and weight, support: fp4xfp4, fp6xfp6, fp8xfp8, fp8xfp4 "
+                "and fp4xfp8")
         .insert("warmup", "50", "number of iterations before benchmark the kernel")
         .insert("repeat", "100", "number of iterations to benchmark the kernel")
         .insert("timer", "gpu", "gpu:gpu timer, cpu:cpu timer")
-        .insert("split_k", "1", "splitK value")
         .insert("init", "0", "0:random, 1:constant(1)")
         .insert("persistent", "0", "0: no persistent, 1: persistent kernel")
-        .insert("warp_tile",
-                "0",
-                "0: 16x16, 1: 32x32, 2: 16x16x128 (950 only), 3: 32x32x64 (950 only)");
+        .insert("warp_tile", "0", "0: 16x16x128 on gfx950.");
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
 }
 
-template <ck_tile::index_t N_Warp_Tile, typename dtype>
-auto preShuffleWeight(ck_tile::HostTensor<dtype>& src)
-{
-    auto src_lengths          = src.get_lengths();
-    const int K               = src_lengths[0];
-    const int N               = src_lengths[1];
-    constexpr int packed_size = ck_tile::numeric_traits<dtype>::PackedSize;
-    int KPack =
-        std::is_same_v<dtype, ck_tile::pk_fp6x16_t> ? 32 : 16 * packed_size; // fp4/fp6:32 or fp8:16
-    int NLane = CurrentArchTraits::template GetNLane<N_Warp_Tile>();
-    int KLane = ck_tile::get_warp_size() / NLane;
-    int K0    = K / (KLane * KPack);
-
-    ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor({N * K}, {1}));
-
-    // K -> K0 KLane KPack
-    // N -> N0 NLane
-    // N, K -> N0 K0 KLane NLane KPack
-    for(int n = 0; n < N; ++n)
-    {
-        for(int k = 0; k < K; k += packed_size)
-        {
-            int n0 = n / NLane;
-            int n1 = n % NLane;
-
-            int k0    = k / (KLane * KPack);
-            int tempk = k % (KLane * KPack);
-            int k1    = tempk / KPack;
-            int k2    = tempk % KPack;
-
-            int outputIndex = n0 * KPack * NLane * KLane * K0 + k0 * KPack * NLane * KLane +
-                              k1 * KPack * NLane + n1 * KPack + k2;
-
-            shuffled(outputIndex) = src(k, n);
-        }
-    }
-    return shuffled;
-}
-
-template <class FlatmmConfig, bool KLast, typename dtype>
-auto preShuffleScale(ck_tile::HostTensor<dtype>& src)
-{
-    return CurrentArchTraits::template preShuffleScale<FlatmmConfig, KLast>(src);
-}
-
 #include "run_mx_flatmm.inc"
 
-int run_mx_flatmm_example(int argc, char* argv[])
+int run_mx_flatmm_example(const ck_tile::ArgParser& arg_parser)
 {
-    auto [result, arg_parser] = create_args(argc, argv);
-    if(!result)
-        return -1;
-
     using Row = ck_tile::tensor_layout::gemm::RowMajor;
     using Col = ck_tile::tensor_layout::gemm::ColumnMajor;
 
@@ -232,6 +178,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
     std::string a_layout = arg_parser.get_str("a_layout");
     std::string b_layout = arg_parser.get_str("b_layout");
     int persistent_opt   = arg_parser.get_int("persistent");
+
+    std::cout << "Using default warptile of 16x16x128." << std::endl;
 
     if(a_layout == "R" && b_layout == "C")
     {
@@ -241,8 +189,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
                 return run_mx_flatmm_with_layouts<ck_tile::pk_fp4_t,
                                                   ck_tile::pk_fp4_t,
                                                   ck_tile::fp16_t,
-                                                  MXfp4_FlatmmConfig16,
-                                                  false>(argc, argv, Row{}, Col{}, Row{});
+                                                  MXFlatmm_FP4FP4_Traits,
+                                                  false>(arg_parser, Row{}, Col{}, Row{});
             else
                 throw std::runtime_error("Only non-persistent kernels are supported currently!");
         }
@@ -252,8 +200,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
                 return run_mx_flatmm_with_layouts<ck_tile::pk_fp6x16_t,
                                                   ck_tile::pk_fp6x16_t,
                                                   ck_tile::fp16_t,
-                                                  MXfp6_FlatmmConfig16,
-                                                  false>(argc, argv, Row{}, Col{}, Row{});
+                                                  MXFlatmm_FP6FP6_Traits,
+                                                  false>(arg_parser, Row{}, Col{}, Row{});
             else
                 throw std::runtime_error("Only support non-persistent kernel now!");
         }
@@ -263,8 +211,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
                 return run_mx_flatmm_with_layouts<ck_tile::fp8_t,
                                                   ck_tile::fp8_t,
                                                   ck_tile::fp16_t,
-                                                  MXfp8_FlatmmConfig16,
-                                                  false>(argc, argv, Row{}, Col{}, Row{});
+                                                  MXFlatmm_FP8FP8_Traits,
+                                                  false>(arg_parser, Row{}, Col{}, Row{});
             else
                 throw std::runtime_error("Only support non-persistent kernel now!");
         }
@@ -274,8 +222,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
                 return run_mx_flatmm_with_layouts<ck_tile::fp8_t,
                                                   ck_tile::pk_fp4_t,
                                                   ck_tile::fp16_t,
-                                                  MXf8f4_FlatmmConfig16,
-                                                  false>(argc, argv, Row{}, Col{}, Row{});
+                                                  MXFlatmm_FP8FP4_Traits,
+                                                  false>(arg_parser, Row{}, Col{}, Row{});
             else
                 throw std::runtime_error("Only support non-persistent kernel now!");
         }
@@ -285,8 +233,8 @@ int run_mx_flatmm_example(int argc, char* argv[])
                 return run_mx_flatmm_with_layouts<ck_tile::pk_fp4_t,
                                                   ck_tile::fp8_t,
                                                   ck_tile::fp16_t,
-                                                  MXf4f8_FlatmmConfig16,
-                                                  false>(argc, argv, Row{}, Col{}, Row{});
+                                                  MXFlatmm_FP4FP8_Traits,
+                                                  false>(arg_parser, Row{}, Col{}, Row{});
             else
                 throw std::runtime_error("Only support non-persistent kernel now!");
         }
@@ -311,7 +259,7 @@ int main(int argc, char* argv[])
         int warp_tile = arg_parser.get_int("warp_tile");
         if(warp_tile == 0)
         {
-            return run_mx_flatmm_example(argc, argv);
+            return run_mx_flatmm_example(arg_parser);
         }
         else if(warp_tile == 1)
         {

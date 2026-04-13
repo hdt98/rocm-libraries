@@ -37,6 +37,7 @@ struct amdgcn_mma<fp16_t,
                   16u,
                   CtrlFlags,
                   CompilerTarget,
+                  MmaOpFamily::DENSE,
                   enable_if_target_family_gfx13_t<CompilerTarget>>
 {
     // Wmma operation type

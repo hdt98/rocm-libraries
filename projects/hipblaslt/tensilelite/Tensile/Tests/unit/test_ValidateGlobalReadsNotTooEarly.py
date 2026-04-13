@@ -24,146 +24,21 @@ from Tensile.Components.CMSValidator import verify_global_reads_not_too_early, g
 from rocisa.instruction import SBarrier, SWaitCnt
 from cms_validation_base import CMSValidationTestBase
 
-class TestHelperFunctions:
-    def test_get_most_recent_basic(self):
-        """
-        Test of utility function used to determine how many of the most recent ds_read
-        operations are for A, and how many are for B.
-        """
-
-        def get_most_recent_local_reads_without_lr1(indices, counts, A, B, aBeforeB):
-            """
-            Assume that LRA0 appears before LRB0 within mfma index slots, and
-            don't include LRA1 or LRB1 in the analysis.
-            """
-            positions = {"LRA1": -1, "LRB1": -1, "LRA0": 1 - aBeforeB, "LRB0": aBeforeB}
-
-            localReads = [
-                ("LRA0", A),
-                ("LRB0", B),
-                ("LRA1", []),
-                ("LRB1", []),
-            ]
-            localReads.sort(key=lambda x: positions[x[0]])
-
-            history = {}
-            for symbol, values in localReads:
-                for v in values:
-                    if v not in history:
-                        history[v] = []
-                    history[v].append(symbol)
-            history = sorted(history.items(), key=lambda t: t[0])
-
-            mr = get_most_recent_local_reads(indices, counts, history)
-            filtered = []
-            for l in mr:
-                filtered.append({"A": l["LRA0"], "B": l["LRB0"]})
-            return filtered
-
-        A = [0, 1, 4, 6, 8, 9]
-        B = [2, 6, 7]
-        #         0 1 2 3 4 5 6 7 8 9
-        #         ===================
-        # A       x x     x   x   x x
-        # B           x       x x
-        # index     ^
-        #
-        # Looking backwards from (and including) index=1, find the
-        # counts=2 most recent appearances of A or B. How many
-        # are A and how many are B?
-        indices = [1]
-        counts = [2]
-        aBeforeB = True
-        bBeforeA = not aBeforeB
-        result = get_most_recent_local_reads_without_lr1(
-            indices, counts, A, B, aBeforeB
-        )
-        expected0 = [{"A": 2, "B": 0}]
-        assert result == expected0
-
-        # A similar example, but with a different index and count.
-        #         0 1 2 3 4 5 6 7 8 9
-        #         ===================
-        # A       x x     x   x   x x
-        # B           x       x x
-        # index               ^
-        indices = [6]
-        counts = [4]
-        result = get_most_recent_local_reads_without_lr1(
-            indices, counts, A, B, aBeforeB
-        )
-        expected1 = [{"A": 2, "B": 2}]
-        assert result == expected1
-
-        # Multiple indices and counts are handled independently
-        indices = [1, 6]
-        counts = [2, 4]
-        result = get_most_recent_local_reads_without_lr1(
-            indices, counts, A, B, aBeforeB
-        )
-        assert result == [expected0[0], expected1[0]]
-
-        A = [1, 1, 1]
-        B = [1, 1, 2]
-        #    0 1 2 4 5 ...
-        #    =============
-        # A  0 3 0 0 0 ...
-        # B  0 2 1 0 0 ....
-        indices = [5, 5, 5]
-        counts = [6, 2, 0]
-
-        # index=5, count=6 : A:3 B:3
-        #
-        # index=5, count=2 : the most recent going back from index=5 is a
-        # B at index 2. We need 1 more (count=2), but at index 1 there are
-        # As and Bs. We use that A happens before B within the index (
-        # and so as we're going in reverse chronological order, we take B).
-        #
-        # index=5, count=0: A:0 B:0
-        result = get_most_recent_local_reads_without_lr1(
-            indices, counts, A, B, aBeforeB
-        )
-        assert result == [{"A": 3, "B": 3}, {"A": 0, "B": 2}, {"A": 0, "B": 0}]
-
-        # Changed so that B is before A.
-        result = get_most_recent_local_reads_without_lr1(
-            indices, counts, A, B, bBeforeA
-        )
-        assert result == [{"A": 3, "B": 3}, {"A": 1, "B": 1}, {"A": 0, "B": 0}]
-
-    def test_get_most_recent(self):
-        """
-        Testing that within vmfma index ordering is correctly handled.
-        """
-
-        indices = [10, 10, 10, 10]
-        counts = [1, 2, 3, 4]
-
-        history = [[7, ["LRA0", "LRA1", "LRB0", "LRB1"]]]
-        foo = get_most_recent_local_reads(indices, counts, history)
-        # counts = 1
-        assert foo[0] == {"LRA0": 0, "LRB0": 0, "LRA1": 0, "LRB1": 1}
-        # counts = 2
-        assert foo[1] == {"LRA0": 0, "LRB0": 1, "LRA1": 0, "LRB1": 1}
-        # counts = 3
-        assert foo[2] == {"LRA0": 0, "LRB0": 1, "LRA1": 1, "LRB1": 1}
-        # counts = 4
-        assert foo[3] == {"LRA0": 1, "LRB0": 1, "LRA1": 1, "LRB1": 1}
-
-        history = [[7, ["LRB1", "LRB0", "LRA1", "LRA0"]]]
-        foo = get_most_recent_local_reads(indices, counts, history)
-        assert foo[0] == {"LRA0": 1, "LRB0": 0, "LRA1": 0, "LRB1": 0}
-        assert foo[1] == {"LRA0": 1, "LRB0": 0, "LRA1": 1, "LRB1": 0}
-        assert foo[2] == {"LRA0": 1, "LRB0": 1, "LRA1": 1, "LRB1": 0}
-        assert foo[3] == {"LRA0": 1, "LRB0": 1, "LRA1": 1, "LRB1": 1}
-
 class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
-    def validation_function(self, sched, kernel_dict, codePathIdx):
-        return verify_global_reads_not_too_early(sched, kernel_dict, codePathIdx)
+    """
+    Tests for the Timeline-based verify_grs_not_too_early validation.
+
+    num_vmfma = 8 for the default kernel (MIWaveTileA=2, MIWaveTileB=2, DepthU=64, MI[2]=32).
+    Valid vmfma indices are [-1, 7].
+
+    Since the Timeline class requires DirectToLds=True, GR schedules must contain
+    paired entries: even indices are m0-pointer-updates (ignored), odd indices are actual
+    buffer_loads. For example, GRA: [[3, 5]] means m0-update at 3, load at 5.
+    """
+    validator_passes = [add_gr_not_too_early_constraints]
 
     def setUp(self):
         super().setUp()
-        self.kernel["DirectToLds"] = False
 
     def test_basic(self):
         """
@@ -221,10 +96,8 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
         ]
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
-            "Failed to verify that all local reads for B (LRB0) are complete before the first global read for B is issued. "
-            "Last local read for B issued at vmfma_index:0. "
-            "First global read for B issued at vmfma_index:2. "
-            "1 waitcnt operation(s) in [1, 3) provide upper bounds on the number of outstanding LRB0 operations: [1] <-- none of these is 0."
+            "GRB @ idx=2 is issued too early. "
+            "Must be issued after idx=5, which is when LRB0 is guaranteed done."
         )
 
     def test_interleave_gr_and_lrs(self):
@@ -541,7 +414,6 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
             SBarrier(comment=""),
         ]
-        self.kernel["SwapGlobalReadOrder"] = True
         self.validate(optSchedule, syncCode, 1, None, None, 0, None)
 
     def test_negative_swap_global_read_order(self):
@@ -564,7 +436,6 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
             SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
             SBarrier(comment=""),
         ]
-        self.kernel["SwapGlobalReadOrder"] = True
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
             "Failed to verify that all local reads for B (LRB0) are complete before the first global read for B is issued. "
@@ -633,8 +504,8 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
             "LRB0": [[5]],
             # The first barrier after the waitcnt is at index 6. Too late.
             "SYNC": [[1, 5, 5, 5, 6]],
-            "GRA": [[5]],
-            "GRB": [[5]],
+            "GRA": [[5,5]],
+            "GRB": [[5,5]],
         }
         syncCode = [
             SBarrier(),
@@ -686,8 +557,8 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
             "LRA0": [[5]],
             "LRB0": [[5]],
             "SYNC": [[5, 5]],
-            "GRA": [[5]],
-            "GRB": [[5]],
+            "GRA": [[5,5]],
+            "GRB": [[5,5]],
         }
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier()]
         self.validate(optSchedule, syncCode, 1, None, None, 0, None)
@@ -707,10 +578,8 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier()]
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
-            "Failed to verify that all local reads for B (LRB0) are complete before the first global read for B is issued. "
-            "Last local read for B issued at vmfma_index:5. "
-            "First global read for B issued at vmfma_index:5. "
-            "0 waitcnt operation(s) in [5, 5) provide upper bounds on the number of outstanding LRB0 operations: [] <-- none of these is 0."
+            "GRB @ idx=5 is issued too early. "
+            "Must be issued after idx=5, which is when LRB0 is guaranteed done."
         )
 
     def test_within_mfma_index_order_sync_before_local_read_for_a(self):
@@ -723,16 +592,14 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
             "LRB0": [[5]],
             "SYNC": [[5,5]],
             "LRA0": [[5]],
-            "GRA": [[5]],
-            "GRB": [[5]],
+            "GRA": [[5,5]],
+            "GRB": [[5,5]],
         }
         syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier()]
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
-            "Failed to verify that all local reads for A (LRA0) are complete before the first global read for A is issued. "
-            "Last local read for A issued at vmfma_index:5. "
-            "First global read for A issued at vmfma_index:5. "
-            "0 waitcnt operation(s) in [6, 6) provide upper bounds on the number of outstanding LRA0 operations: [] <-- none of these is 0."
+            "GRA @ idx=5 is issued too early. "
+            "Must be issued after idx=5 (of next iteration), which is when LRA0 is guaranteed done."
         )
 
     def test_within_mfma_index_order_no_sync_for_global_read_a(self):
@@ -756,10 +623,8 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
         ]
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
-            "Failed to verify that all local reads for A (LRA0) are complete before the first global read for A is issued. "
-            "Last local read for A issued at vmfma_index:5. "
-            "First global read for A issued at vmfma_index:5. "
-            "0 waitcnt operation(s) in [6, 6) provide upper bounds on the number of outstanding LRA0 operations: [] <-- none of these is 0."
+            "GRA @ idx=5 is issued too early. "
+            "Must be issued after idx=6, which is when LRA0 is guaranteed done."
         )
 
     def test_within_mfma_index_order_sync_after_gra_too_late(self):
@@ -874,10 +739,256 @@ class TestValidateGlobalReadsNotTooEarly(CMSValidationTestBase):
         ]
         self.validate(
             optSchedule, syncCode, 1, None, None, 0,
-            "Failed to verify that all local reads for A (LRA0) are complete before the first global read for A is issued. "
-            "Last local read for A issued at vmfma_index:3. "
-            "First global read for A issued at vmfma_index:4. "
-            "1 waitcnt operation(s) in [3, 5) provide upper bounds on the number of outstanding LRA0 operations: [1] <-- none of these is 0."
+            "GRA @ idx=4 is issued too early. "
+            "Must be issued after idx=3 (of next iteration), which is when LRA0 is guaranteed done."
+        )
+
+    def test_multiple_grs_all_safe(self):
+        """
+        Multiple GRA loads at different indices, all after LRA0 guaranteed.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "LRA0": [[0]],
+            "LRB0": [[1]],
+            "SYNC": [[2, 3]],
+            "GRA": [[3, 4, 4, 5, 5, 6]],
+            "GRB": [[6, 7]],
+        }
+        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier(comment="")]
+        self.validate(optSchedule, syncCode, 1, None, None, 0, None)
+
+    def test_negative_one_gr_too_early(self):
+        """
+        First GRA load at 2 is before SWaitCnt at 3. GR issued before LR0 guaranteed.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "LRA0": [[0]],
+            "LRB0": [[1]],
+            "GRA": [[1, 2, 5, 6, 6, 7]],
+            "SYNC": [[3, 4]],
+            "GRB": [[6, 7]],
+        }
+        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier(comment="")]
+        self.validate(
+            optSchedule, syncCode, 1, None, None, 0,
+            "GRA @ idx=2 is issued too early. "
+            "Must be issued after idx=3, which is when LRA0 is guaranteed done."
+        )
+
+    def test_negative_lrb0_not_guaranteed_by_waitcnt_at_same_index_as_lra0(self):
+        """
+        Exercises a bug in get_most_recent_local_reads where a local read (LRA0)
+        issued at the same vmfma index as a SWaitCnt -- but AFTER it in within-index
+        ordering -- is incorrectly counted as a "recent" read by the SWaitCnt.
+
+        Setup (modelled after 256x160x64 TN code path 1):
+          - LRB0 issued at vmfma [0, 1]  (2 reads, all before the sync)
+          - LRA0 issued at vmfma [2]    (1 read, same index as the sync)
+          - SYNC at vmfma 2: SWaitCnt(dscnt=1) then SBarrier
+          - GRB starts at vmfma 3
+
+        Dict key order: SYNC < LRB0 < LRA0 < GRB, so within vmfma 14 the
+        execution order is:  SWaitCnt -> SBarrier -> (LRB0: nothing) -> LRA0 -> ...
+
+        At the moment the SWaitCnt(dscnt=1) fires, only 2 LRB0 reads are outstanding
+        (LRA0 at vmfma 2 hasn't been issued yet).  After dscnt=1, at most 1 remains,
+        and that 1 is a LRB0.  GRB at vmfma 3 therefore starts while 1 LRB0 may
+        still be in flight -- a data hazard.
+
+        The validator used to incorrectly pass because get_most_recent_local_reads saw
+        LRA0 at vmfma 3 in its history and attributes the 1 outstanding read to it.
+        (reporting LRB0: 0 outstanding).
+        """
+        assert self.num_vmfma == 8
+
+        optSchedule = {
+            "SYNC": [[-1, 2, 2]],
+            "LRB0": [[0, 1]],
+            "LRA0": [[2]],
+            "GRB":  [[3, 3]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment="pre-loop wait"),
+            SWaitCnt(dscnt=1, vlcnt=-1, vscnt=-1, comment="Wait for LRB0 -- but leaves 1 outstanding"),
+            SBarrier(comment=""),
+        ]
+        # Should FAIL: dscnt=1 leaves 1 LRB0 outstanding when GRB starts at 15.
+        self.validate(
+            optSchedule, syncCode, 1, None, None, 0,
+            "GRB @ idx=3 is issued too early. "
+            "Must be issued after idx=-1 (of next iteration), which is when LRB0 is guaranteed done."
+        )
+
+
+class TestValidateGlobalReadsNotTooEarlyDtlPlusLdsBuf(CMSValidationTestBase):
+    """
+    Tests for DtlPlusLdsBuf=True support in add_gr_not_too_early_constraints.
+
+    With DtlPlusLdsBuf=True, GRs in iteration N write to a different LDS block than
+    same-iteration LR0s, so there is no same-iteration dependency. Instead, GRs depend
+    on the *previous* iteration's LR0s (cross-iteration dependency).
+    """
+    validator_passes = [add_gr_not_too_early_constraints]
+
+    def setUp(self):
+        super().setUp()
+        self.kernel["DtlPlusLdsBuf"] = True
+
+    def test_basic(self):
+        """
+        Same schedule as the standard test_basic. Should pass.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "LRA0": [[0]],
+            "LRB0": [[1]],
+            "SYNC": [[3, 3]],
+            "GRA": [[5, 5]],
+            "GRB": [[6, 6]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        self.validate(optSchedule, syncCode, 1, None, None, 0, None)
+
+    def test_gr_before_same_iter_sync_safe(self):
+        """
+        GRA load at 2 is before the SWaitCnt at 3 in the same iteration.
+        Without DtlPlusLdsBuf this would fail (same-iteration LRA0's guaranteed_by=3 > GRA=2).
+        With DtlPlusLdsBuf, GRA depends on ML-1's LRA0, which is guaranteed by ML-1's
+        SWaitCnt at (loop=0, vmfma=3). GRA at (loop=1, vmfma=2) > (loop=0, vmfma=3).
+        ML-1's SBarrier at (loop=0, vmfma=4) provides the required barrier.
+        
+        Should pass.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "LRA0": [[0]],
+            "LRB0": [[1]],
+            "GRA": [[1, 2]],
+            "SYNC": [[3, 4]],
+            "GRB": [[6, 6]],
+        }
+        syncCode = [SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""), SBarrier(comment="")]
+        self.validate(optSchedule, syncCode, 1, None, None, 0, None)
+
+    def test_negative_prev_iter_lr0_not_guaranteed(self):
+        """
+        ML-1's LRA0 is at index 5, AFTER ML-1's SWaitCnt(dscnt=0) at index 3.
+        So ML-1's LRA0 is NOT guaranteed within ML-1. It's guaranteed by ML's SWaitCnt
+        at (loop=1, vmfma=3). ML's GRA at (loop=1, vmfma=2) < (loop=1, vmfma=3) -> too early.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "SYNC": [[3, 4]],
+            "LRA0": [[5]],
+            "LRB0": [[1]],
+            "GRA": [[2, 2]],
+            "GRB": [[6, 6]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        self.validate(
+            optSchedule, syncCode, 1, None, None, 0,
+            "GRA @ idx=2 is issued too early. "
+            "Must be issued after idx=3, which is when LRA0 is guaranteed done."
+        )
+
+    def test_swap_global_read_order(self):
+        """
+        SwapGlobalReadOrder + DtlPlusLdsBuf: GRA depends on prev LRB0, GRB depends on prev LRA0.
+        Both are guaranteed within ML-1. Should pass.
+        """
+        assert self.num_vmfma == 8
+        self.kernel["SwapGlobalReadOrder"] = True
+        optSchedule = {
+            "SYNC": [[1,2, 5, 6]],
+            "GRA": [[6, 7]],
+            "LRA0": [[0]],
+            "GRB": [[2, 3]],
+            "LRB0": [[4]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment=""),
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment=""),
+        ]
+        self.validate(optSchedule, syncCode, 1, None, None, 0, None)
+
+    def test_negative_swap_global_read_order(self):
+        """
+        SwapGlobalReadOrder + DtlPlusLdsBuf: GRA depends on prev LRB0 (swapped).
+        ML-1's LRB0 is at index 5, AFTER ML-1's SWaitCnt at 3. So ML-1's LRB0
+        is guaranteed by ML's SWaitCnt at (loop=1, vmfma=3).
+        GRA at (loop=1, vmfma=2) < (loop=1, vmfma=3) -> too early.
+        """
+        assert self.num_vmfma == 8
+        self.kernel["SwapGlobalReadOrder"] = True
+        optSchedule = {
+            "LRA0": [[0]],
+            "LRB0": [[5]],
+            "SYNC": [[3, 4]],
+            "GRA": [[2, 2]],
+            "GRB": [[7, 7]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        self.validate(
+            optSchedule, syncCode, 1, None, None, 0,
+            "GRA (Swapped, loading B) @ idx=2 is issued too early. "
+            "Must be issued after idx=3, which is when LRB0 is guaranteed done."
+        )
+
+    def test_multiple_lr0s(self):
+        """
+        Multiple LRA0s in previous iteration, all guaranteed by ML-1's SWaitCnt(dscnt=0).
+        max(guaranteed_by) selects the LR0 with the highest guaranteed_by. Both are at (0,3).
+        GRA at (1,5) > (0,3). Should pass.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "LRA0": [[0, 2]],
+            "LRB0": [[1]],
+            "SYNC": [[3, 4]],
+            "GRA": [[5, 5]],
+            "GRB": [[6, 6]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        self.validate(optSchedule, syncCode, 1, None, None, 0, None)
+
+    def test_negative_multiple_lr0s_one_not_guaranteed(self):
+        """
+        Two LRA0s in previous iteration: one at 0 (guaranteed by ML-1's SWaitCnt at 3)
+        and one at 5 (NOT guaranteed within ML-1, guaranteed by ML's SWaitCnt at 3).
+        max(guaranteed_by) = (loop=1, vmfma=3). GRA at (1,2) < (1,3) -> too early.
+        """
+        assert self.num_vmfma == 8
+        optSchedule = {
+            "SYNC": [[3, 4]],
+            "LRA0": [[0, 5]],
+            "LRB0": [[1]],
+            "GRA": [[2, 2]],
+            "GRB": [[6, 6]],
+        }
+        syncCode = [
+            SWaitCnt(dscnt=0, vlcnt=-1, vscnt=-1, comment=""),
+            SBarrier(comment="")
+        ]
+        self.validate(
+            optSchedule, syncCode, 1, None, None, 0,
+            "GRA @ idx=2 is issued too early. "
+            "Must be issued after idx=3, which is when LRA0 is guaranteed done."
         )
 
     def test_multiple_grs_all_safe(self):

@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/core/numeric/pk_fp4.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
 #include "ck_tile/ops/epilogue.hpp"
 #include "ck_tile/ops/gemm.hpp"
@@ -249,6 +250,27 @@ struct GemmConfigComputeV6 : public GemmConfigBase
 };
 
 template <typename PrecType>
+struct GemmConfigComputeAsync : public GemmConfigBase
+{
+    static constexpr ck_tile::index_t M_Tile = 64;
+    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t K_Tile = 256;
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 128;
+
+    static constexpr bool DoubleSmemBuffer          = true;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::COMPUTE_ASYNC;
+    static constexpr ck_tile::index_t NumWaveGroups = 1;
+    static constexpr bool UseStructuredSparsity     = false;
+};
+
+template <typename PrecType>
 struct GemmConfigPreshuffleDecode : public GemmConfigBase
 {
     static constexpr ck_tile::index_t M_Tile = 16;
@@ -393,6 +415,15 @@ struct GemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, int32_t>
     using BDataType   = ck_tile::int8_t;
     using AccDataType = int32_t;
     using CDataType   = int32_t;
+};
+
+template <>
+struct GemmTypeConfig<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, ck_tile::half_t>
+{
+    using ADataType   = ck_tile::pk_fp4_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
 };
 
 template <>

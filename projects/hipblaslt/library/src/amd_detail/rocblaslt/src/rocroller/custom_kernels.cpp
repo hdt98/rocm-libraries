@@ -236,7 +236,6 @@ rocblaslt_status runCustomKernel(std::shared_ptr<GemmKernel>        gemm,
                   << " error: " << hipGetErrorString(error) << std::endl;
         return rocblaslt_status_internal_error;
     }
-
     if(hipError_t error = hipExtModuleLaunchKernel(function,
                                                    grid.x,
                                                    grid.y,

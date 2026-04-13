@@ -22,6 +22,8 @@ using CompV3    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType:
 using CompV4    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV4>;
 using CompV6    = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompV6>;
 using CompAsync = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompAsync>;
+using CompAsyncEightWaves =
+    ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompAsyncEightWaves>;
 using CompTDMV1 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompTDMV1>;
 using CompTDMV2 = ck_tile::integral_constant<GemmPipelineType, GemmPipelineType::CompTDMV2>;
 
@@ -35,6 +37,7 @@ using I16  = ck_tile::number<16>;
 using I32  = ck_tile::number<32>;
 using I64  = ck_tile::number<64>;
 using I128 = ck_tile::number<128>;
+using I192 = ck_tile::number<192>;
 using I256 = ck_tile::number<256>;
 
 // clang-format off
@@ -282,6 +285,38 @@ using CompAsyncConfig = std::tuple<ALayout,
                                    Intrawave,
                                    CompAsync>;
 
+template <typename ALayout, typename BLayout, typename CLayout, typename InputType>
+using CompAsyncConfig16x16x128 = std::tuple<ALayout,
+                                            BLayout,
+                                            CLayout,
+                                            InputType, // AType
+                                            InputType, // BType
+                                            F32,       // AccType
+                                            F16,       // OutputType
+                                            I64,       // MBlockTileSize
+                                            I64,       // NBlockTileSize
+                                            I128,      // KBlockTileSize
+                                            I16,       // MWarpTileSize
+                                            I16,       // NWarpTileSize
+                                            Intrawave,
+                                            CompAsync>;
+
+template <typename ALayout, typename BLayout, typename CLayout, typename InputType>
+using CompAsyncEightWavesConfig = std::tuple<ALayout,
+                                             BLayout,
+                                             CLayout,
+                                             InputType, // AType
+                                             InputType, // BType
+                                             F32,       // AccType
+                                             F16,       // OutputType
+                                             I192,      // MBlockTileSize
+                                             I256,      // NBlockTileSize
+                                             I128,      // KBlockTileSize
+                                             I16,       // MWarpTileSize
+                                             I16,       // NWarpTileSize
+                                             Intrawave,
+                                             CompAsyncEightWaves>;
+
 using KernelTypesCompAsync = ::testing::Types<CompAsyncConfig<Row, Row, Row, F16>,
                                               CompAsyncConfig<Row, Col, Row, F16>,
                                               CompAsyncConfig<Col, Row, Row, F16>,
@@ -290,8 +325,14 @@ using KernelTypesCompAsync = ::testing::Types<CompAsyncConfig<Row, Row, Row, F16
                                               CompAsyncConfig<Row, Col, Row, F8>,
                                               CompAsyncConfig<Col, Row, Row, F8>,
                                               CompAsyncConfig<Col, Col, Row, F8>>;
-// clang-format off
 
+using KernelTypesCompAsync16x16x128 = ::testing::Types<CompAsyncConfig16x16x128<Row, Col, Row, F4>,
+                                                       CompAsyncConfig16x16x128<Row, Col, Row, F8>>;
+
+using KernelTypesCompAsyncEightWaves =
+    ::testing::Types<CompAsyncEightWavesConfig<Row, Col, Row, F8>>;
+
+// clang-format off
 using KernelTypesCompV6 = ::testing::Types<
     std::tuple<    Row,     Row,     Row,       F16,       F16,         F32,       F16,        I256,        I256,         I64,        I32,        I32, Intrawave,        CompV6>,
     std::tuple<    Col,     Row,     Row,       F16,       F16,         F32,       F16,        I256,        I256,         I64,        I32,        I32, Intrawave,        CompV6>,
