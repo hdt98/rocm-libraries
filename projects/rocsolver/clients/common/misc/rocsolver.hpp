@@ -12800,4 +12800,176 @@ inline rocblas_status rocsolver_csrrf_solve(rocblas_handle handle,
     return rocsolver_dcsrrf_solve(handle, n, nrhs, nnzT, ptrT, indT, valT, pivP, pivQ, B, ldb,
                                   rfinfo);
 }
+
+/******************** SYTRS ********************/
+// normal only (no batched/strided variants)
+inline rocblas_status rocsolver_sytrs(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_fill uplo,
+                                      rocblas_int n,
+                                      rocblas_int nrhs,
+                                      float* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ipiv,
+                                      rocblas_stride stP,
+                                      float* B,
+                                      rocblas_int ldb,
+                                      rocblas_stride stB,
+                                      rocblas_int bc)
+{
+    return rocsolver_ssytrs(handle, uplo, n, nrhs, A, lda, ipiv, B, ldb);
+}
+
+inline rocblas_status rocsolver_sytrs(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_fill uplo,
+                                      rocblas_int n,
+                                      rocblas_int nrhs,
+                                      double* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ipiv,
+                                      rocblas_stride stP,
+                                      double* B,
+                                      rocblas_int ldb,
+                                      rocblas_stride stB,
+                                      rocblas_int bc)
+{
+    return rocsolver_dsytrs(handle, uplo, n, nrhs, A, lda, ipiv, B, ldb);
+}
+
+inline rocblas_status rocsolver_sytrs(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_fill uplo,
+                                      rocblas_int n,
+                                      rocblas_int nrhs,
+                                      rocblas_float_complex* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ipiv,
+                                      rocblas_stride stP,
+                                      rocblas_float_complex* B,
+                                      rocblas_int ldb,
+                                      rocblas_stride stB,
+                                      rocblas_int bc)
+{
+    return rocsolver_csytrs(handle, uplo, n, nrhs, A, lda, ipiv, B, ldb);
+}
+
+inline rocblas_status rocsolver_sytrs(bool STRIDED,
+                                      rocblas_handle handle,
+                                      rocblas_fill uplo,
+                                      rocblas_int n,
+                                      rocblas_int nrhs,
+                                      rocblas_double_complex* A,
+                                      rocblas_int lda,
+                                      rocblas_stride stA,
+                                      rocblas_int* ipiv,
+                                      rocblas_stride stP,
+                                      rocblas_double_complex* B,
+                                      rocblas_int ldb,
+                                      rocblas_stride stB,
+                                      rocblas_int bc)
+{
+    return rocsolver_zsytrs(handle, uplo, n, nrhs, A, lda, ipiv, B, ldb);
+}
+
+/******************** GEEV ********************/
+// normal only (no batched/strided variants)
+// real types: eigenvalues returned as separate wr/wi arrays
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     float* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     float* wr,
+                                     float* wi,
+                                     rocblas_stride stW,
+                                     float* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     float* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return rocsolver_sgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     double* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     double* wr,
+                                     double* wi,
+                                     rocblas_stride stW,
+                                     double* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     double* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    return rocsolver_dgeev(handle, jobvl, jobvr, n, A, lda, wr, wi, VL, ldvl, VR, ldvr, info);
+}
+
+// complex types: eigenvalues returned as single w array
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_float_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     rocblas_float_complex* w,
+                                     float* /*wi_unused*/,
+                                     rocblas_stride stW,
+                                     rocblas_float_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_float_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    // NOTE: rwork parameter not exposed via this wrapper; pass nullptr
+    return rocsolver_cgeev(handle, jobvl, jobvr, n, A, lda, w, VL, ldvl, VR, ldvr, nullptr, info);
+}
+
+inline rocblas_status rocsolver_geev(bool STRIDED,
+                                     rocblas_handle handle,
+                                     rocblas_evect jobvl,
+                                     rocblas_evect jobvr,
+                                     rocblas_int n,
+                                     rocblas_double_complex* A,
+                                     rocblas_int lda,
+                                     rocblas_stride stA,
+                                     rocblas_double_complex* w,
+                                     double* /*wi_unused*/,
+                                     rocblas_stride stW,
+                                     rocblas_double_complex* VL,
+                                     rocblas_int ldvl,
+                                     rocblas_stride stVL,
+                                     rocblas_double_complex* VR,
+                                     rocblas_int ldvr,
+                                     rocblas_stride stVR,
+                                     rocblas_int* info,
+                                     rocblas_int bc)
+{
+    // NOTE: rwork parameter not exposed via this wrapper; pass nullptr
+    return rocsolver_zgeev(handle, jobvl, jobvr, n, A, lda, w, VL, ldvl, VR, ldvr, nullptr, info);
+}
 /********************************************************/

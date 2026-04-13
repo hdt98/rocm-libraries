@@ -2544,6 +2544,16 @@ void zsytf2_(char* uplo, int* n, rocblas_double_complex* A, int* lda, int* ipiv,
 
 void ssytrf_(char* uplo, int* n, float* A, int* lda, int* ipiv, float* work, int* lwork, int* info);
 void dsytrf_(char* uplo, int* n, double* A, int* lda, int* ipiv, double* work, int* lwork, int* info);
+
+void ssytrs_(char* uplo, int* n, int* nrhs, float* A, int* lda, int* ipiv, float* B, int* ldb, int* info);
+void dsytrs_(char* uplo, int* n, int* nrhs, double* A, int* lda, int* ipiv, double* B, int* ldb, int* info);
+void csytrs_(char* uplo, int* n, int* nrhs, rocblas_float_complex* A, int* lda, int* ipiv, rocblas_float_complex* B, int* ldb, int* info);
+void zsytrs_(char* uplo, int* n, int* nrhs, rocblas_double_complex* A, int* lda, int* ipiv, rocblas_double_complex* B, int* ldb, int* info);
+
+void sgeev_(char* jobvl, char* jobvr, int* n, float* A, int* lda, float* wr, float* wi, float* VL, int* ldvl, float* VR, int* ldvr, float* work, int* lwork, int* info);
+void dgeev_(char* jobvl, char* jobvr, int* n, double* A, int* lda, double* wr, double* wi, double* VL, int* ldvl, double* VR, int* ldvr, double* work, int* lwork, int* info);
+void cgeev_(char* jobvl, char* jobvr, int* n, rocblas_float_complex* A, int* lda, rocblas_float_complex* w, rocblas_float_complex* VL, int* ldvl, rocblas_float_complex* VR, int* ldvr, rocblas_float_complex* work, int* lwork, float* rwork, int* info);
+void zgeev_(char* jobvl, char* jobvr, int* n, rocblas_double_complex* A, int* lda, rocblas_double_complex* w, rocblas_double_complex* VL, int* ldvl, rocblas_double_complex* VR, int* ldvr, rocblas_double_complex* work, int* lwork, double* rwork, int* info);
 void csytrf_(char* uplo,
              int* n,
              rocblas_float_complex* A,
@@ -7693,6 +7703,156 @@ void cpu_sytrf<rocblas_double_complex>(rocblas_fill uplo,
 {
     char uploC = rocblas2char_fill(uplo);
     zsytrf_(&uploC, &n, A, &lda, ipiv, work, &lwork, info);
+}
+
+// sytrs
+template <>
+void cpu_sytrs<float>(rocblas_fill uplo,
+                      rocblas_int n,
+                      rocblas_int nrhs,
+                      float* A,
+                      rocblas_int lda,
+                      rocblas_int* ipiv,
+                      float* B,
+                      rocblas_int ldb)
+{
+    rocblas_int info;
+    char uploC = rocblas2char_fill(uplo);
+    ssytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<double>(rocblas_fill uplo,
+                       rocblas_int n,
+                       rocblas_int nrhs,
+                       double* A,
+                       rocblas_int lda,
+                       rocblas_int* ipiv,
+                       double* B,
+                       rocblas_int ldb)
+{
+    rocblas_int info;
+    char uploC = rocblas2char_fill(uplo);
+    dsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<rocblas_float_complex>(rocblas_fill uplo,
+                                      rocblas_int n,
+                                      rocblas_int nrhs,
+                                      rocblas_float_complex* A,
+                                      rocblas_int lda,
+                                      rocblas_int* ipiv,
+                                      rocblas_float_complex* B,
+                                      rocblas_int ldb)
+{
+    rocblas_int info;
+    char uploC = rocblas2char_fill(uplo);
+    csytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+template <>
+void cpu_sytrs<rocblas_double_complex>(rocblas_fill uplo,
+                                       rocblas_int n,
+                                       rocblas_int nrhs,
+                                       rocblas_double_complex* A,
+                                       rocblas_int lda,
+                                       rocblas_int* ipiv,
+                                       rocblas_double_complex* B,
+                                       rocblas_int ldb)
+{
+    rocblas_int info;
+    char uploC = rocblas2char_fill(uplo);
+    zsytrs_(&uploC, &n, &nrhs, A, &lda, ipiv, B, &ldb, &info);
+}
+
+// geev
+template <>
+void cpu_geev<float, float>(rocblas_evect jobvl,
+                            rocblas_evect jobvr,
+                            rocblas_int n,
+                            float* A,
+                            rocblas_int lda,
+                            float* wr,
+                            float* wi,
+                            float* VL,
+                            rocblas_int ldvl,
+                            float* VR,
+                            rocblas_int ldvr,
+                            float* work,
+                            rocblas_int lwork,
+                            float* /*rwork*/,
+                            rocblas_int* info)
+{
+    char jobvlC = rocblas2char_evect(jobvl);
+    char jobvrC = rocblas2char_evect(jobvr);
+    sgeev_(&jobvlC, &jobvrC, &n, A, &lda, wr, wi, VL, &ldvl, VR, &ldvr, work, &lwork, info);
+}
+
+template <>
+void cpu_geev<double, double>(rocblas_evect jobvl,
+                              rocblas_evect jobvr,
+                              rocblas_int n,
+                              double* A,
+                              rocblas_int lda,
+                              double* wr,
+                              double* wi,
+                              double* VL,
+                              rocblas_int ldvl,
+                              double* VR,
+                              rocblas_int ldvr,
+                              double* work,
+                              rocblas_int lwork,
+                              double* /*rwork*/,
+                              rocblas_int* info)
+{
+    char jobvlC = rocblas2char_evect(jobvl);
+    char jobvrC = rocblas2char_evect(jobvr);
+    dgeev_(&jobvlC, &jobvrC, &n, A, &lda, wr, wi, VL, &ldvl, VR, &ldvr, work, &lwork, info);
+}
+
+template <>
+void cpu_geev<rocblas_float_complex, float>(rocblas_evect jobvl,
+                                            rocblas_evect jobvr,
+                                            rocblas_int n,
+                                            rocblas_float_complex* A,
+                                            rocblas_int lda,
+                                            rocblas_float_complex* wr,
+                                            float* /*wi_unused*/,
+                                            rocblas_float_complex* VL,
+                                            rocblas_int ldvl,
+                                            rocblas_float_complex* VR,
+                                            rocblas_int ldvr,
+                                            rocblas_float_complex* work,
+                                            rocblas_int lwork,
+                                            float* rwork,
+                                            rocblas_int* info)
+{
+    char jobvlC = rocblas2char_evect(jobvl);
+    char jobvrC = rocblas2char_evect(jobvr);
+    cgeev_(&jobvlC, &jobvrC, &n, A, &lda, wr, VL, &ldvl, VR, &ldvr, work, &lwork, rwork, info);
+}
+
+template <>
+void cpu_geev<rocblas_double_complex, double>(rocblas_evect jobvl,
+                                              rocblas_evect jobvr,
+                                              rocblas_int n,
+                                              rocblas_double_complex* A,
+                                              rocblas_int lda,
+                                              rocblas_double_complex* wr,
+                                              double* /*wi_unused*/,
+                                              rocblas_double_complex* VL,
+                                              rocblas_int ldvl,
+                                              rocblas_double_complex* VR,
+                                              rocblas_int ldvr,
+                                              rocblas_double_complex* work,
+                                              rocblas_int lwork,
+                                              double* rwork,
+                                              rocblas_int* info)
+{
+    char jobvlC = rocblas2char_evect(jobvl);
+    char jobvrC = rocblas2char_evect(jobvr);
+    zgeev_(&jobvlC, &jobvrC, &n, A, &lda, wr, VL, &ldvl, VR, &ldvr, work, &lwork, rwork, info);
 }
 
 // bdsvdx

@@ -145,6 +145,153 @@ HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXpotrs(hipsolverDnHandle_t handle,
                                                      int64_t             ldb,
                                                      int*                info);
 
+// Feature macro: indicates hipSOLVER has 64-bit DnX extensions for
+// syevd, syevBatched, geev, and sytrs (matching cuSOLVER >= 11.7.2 functionality)
+#define HIPSOLVER_HAS_64BIT_SOLVER_EXTENSIONS
+
+// syevd
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXsyevd_bufferSize(hipsolverDnHandle_t handle,
+                                                                 hipsolverDnParams_t params,
+                                                                 hipsolverEigMode_t  jobz,
+                                                                 hipsolverFillMode_t uplo,
+                                                                 int64_t             n,
+                                                                 hipDataType         dataTypeA,
+                                                                 const void*         A,
+                                                                 int64_t             lda,
+                                                                 hipDataType         dataTypeW,
+                                                                 const void*         W,
+                                                                 hipDataType         computeType,
+                                                                 size_t* workspaceInBytesOnDevice,
+                                                                 size_t* workspaceInBytesOnHost);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXsyevd(hipsolverDnHandle_t handle,
+                                                      hipsolverDnParams_t params,
+                                                      hipsolverEigMode_t  jobz,
+                                                      hipsolverFillMode_t uplo,
+                                                      int64_t             n,
+                                                      hipDataType         dataTypeA,
+                                                      void*               A,
+                                                      int64_t             lda,
+                                                      hipDataType         dataTypeW,
+                                                      void*               W,
+                                                      hipDataType         computeType,
+                                                      void*               bufferOnDevice,
+                                                      size_t  workspaceInBytesOnDevice,
+                                                      void*               bufferOnHost,
+                                                      size_t  workspaceInBytesOnHost,
+                                                      int*                info);
+
+// geev
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXgeev_bufferSize(hipsolverDnHandle_t handle,
+                                                                hipsolverDnParams_t params,
+                                                                hipsolverEigMode_t  jobvl,
+                                                                hipsolverEigMode_t  jobvr,
+                                                                int64_t             n,
+                                                                hipDataType         dataTypeA,
+                                                                const void*         A,
+                                                                int64_t             lda,
+                                                                hipDataType         dataTypeW,
+                                                                const void*         W,
+                                                                hipDataType         dataTypeVL,
+                                                                const void*         VL,
+                                                                int64_t             ldvl,
+                                                                hipDataType         dataTypeVR,
+                                                                const void*         VR,
+                                                                int64_t             ldvr,
+                                                                hipDataType         computeType,
+                                                                size_t* workspaceInBytesOnDevice,
+                                                                size_t* workspaceInBytesOnHost);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXgeev(hipsolverDnHandle_t handle,
+                                                     hipsolverDnParams_t params,
+                                                     hipsolverEigMode_t  jobvl,
+                                                     hipsolverEigMode_t  jobvr,
+                                                     int64_t             n,
+                                                     hipDataType         dataTypeA,
+                                                     void*               A,
+                                                     int64_t             lda,
+                                                     hipDataType         dataTypeW,
+                                                     void*               W,
+                                                     hipDataType         dataTypeVL,
+                                                     void*               VL,
+                                                     int64_t             ldvl,
+                                                     hipDataType         dataTypeVR,
+                                                     void*               VR,
+                                                     int64_t             ldvr,
+                                                     hipDataType         computeType,
+                                                     void*               bufferOnDevice,
+                                                     size_t  workspaceInBytesOnDevice,
+                                                     void*               bufferOnHost,
+                                                     size_t  workspaceInBytesOnHost,
+                                                     int*                info);
+
+// syevBatched
+HIPSOLVER_EXPORT hipsolverStatus_t
+    hipsolverDnXsyevBatched_bufferSize(hipsolverDnHandle_t handle,
+                                       hipsolverDnParams_t params,
+                                       hipsolverEigMode_t  jobz,
+                                       hipsolverFillMode_t uplo,
+                                       int64_t             n,
+                                       hipDataType         dataTypeA,
+                                       const void*         A,
+                                       int64_t             lda,
+                                       hipDataType         dataTypeW,
+                                       const void*         W,
+                                       hipDataType         computeType,
+                                       size_t* workspaceInBytesOnDevice,
+                                       size_t* workspaceInBytesOnHost,
+                                       int64_t             batchSize);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXsyevBatched(hipsolverDnHandle_t handle,
+                                                            hipsolverDnParams_t params,
+                                                            hipsolverEigMode_t  jobz,
+                                                            hipsolverFillMode_t uplo,
+                                                            int64_t             n,
+                                                            hipDataType         dataTypeA,
+                                                            void*               A,
+                                                            int64_t             lda,
+                                                            hipDataType         dataTypeW,
+                                                            void*               W,
+                                                            hipDataType         computeType,
+                                                            void*  bufferOnDevice,
+                                                            size_t workspaceInBytesOnDevice,
+                                                            void*  bufferOnHost,
+                                                            size_t workspaceInBytesOnHost,
+                                                            int*                info,
+                                                            int64_t             batchSize);
+
+// sytrs
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXsytrs_bufferSize(hipsolverDnHandle_t handle,
+                                                                 hipsolverFillMode_t uplo,
+                                                                 int64_t             n,
+                                                                 int64_t             nrhs,
+                                                                 hipDataType         dataTypeA,
+                                                                 const void*         A,
+                                                                 int64_t             lda,
+                                                                 const int64_t*      ipiv,
+                                                                 hipDataType         dataTypeB,
+                                                                 const void*         B,
+                                                                 int64_t             ldb,
+                                                                 size_t* workspaceInBytesOnDevice,
+                                                                 size_t* workspaceInBytesOnHost);
+
+HIPSOLVER_EXPORT hipsolverStatus_t hipsolverDnXsytrs(hipsolverDnHandle_t handle,
+                                                      hipsolverFillMode_t uplo,
+                                                      int64_t             n,
+                                                      int64_t             nrhs,
+                                                      hipDataType         dataTypeA,
+                                                      const void*         A,
+                                                      int64_t             lda,
+                                                      const int64_t*      ipiv,
+                                                      hipDataType         dataTypeB,
+                                                      void*               B,
+                                                      int64_t             ldb,
+                                                      void*               bufferOnDevice,
+                                                      size_t  workspaceInBytesOnDevice,
+                                                      void*               bufferOnHost,
+                                                      size_t  workspaceInBytesOnHost,
+                                                      int*                info);
+
 #ifdef __cplusplus
 }
 #endif

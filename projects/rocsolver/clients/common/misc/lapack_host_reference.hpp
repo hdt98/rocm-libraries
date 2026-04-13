@@ -836,6 +836,33 @@ void cpu_sytrf(rocblas_fill uplo,
                rocblas_int* info);
 
 template <typename T>
+void cpu_sytrs(rocblas_fill uplo,
+               rocblas_int n,
+               rocblas_int nrhs,
+               T* A,
+               rocblas_int lda,
+               rocblas_int* ipiv,
+               T* B,
+               rocblas_int ldb);
+
+template <typename T, typename W>
+void cpu_geev(rocblas_evect jobvl,
+              rocblas_evect jobvr,
+              rocblas_int n,
+              T* A,
+              rocblas_int lda,
+              T* wr,
+              W* wi,
+              T* VL,
+              rocblas_int ldvl,
+              T* VR,
+              rocblas_int ldvr,
+              T* work,
+              rocblas_int lwork,
+              W* rwork,
+              rocblas_int* info);
+
+template <typename T>
 void cpu_bdsvdx(rocblas_fill uplo,
                 rocblas_svect svect,
                 rocblas_srange srange,

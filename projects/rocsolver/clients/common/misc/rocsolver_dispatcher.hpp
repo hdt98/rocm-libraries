@@ -92,6 +92,8 @@
 #include "common/lapack/testing_potf2_potrf.hpp"
 #include "common/lapack/testing_potri.hpp"
 #include "common/lapack/testing_potrs.hpp"
+#include "common/lapack/testing_sytrs.hpp"
+#include "common/lapack/testing_geev.hpp"
 #include "common/lapack/testing_syev_heev.hpp"
 #include "common/lapack/testing_syevd_heevd.hpp"
 #include "common/lapack/testing_syevdj_heevdj.hpp"
@@ -312,6 +314,8 @@ class rocsolver_dispatcher
             {"sytrf", testing_sytf2_sytrf<false, false, 1, T>},
             {"sytrf_batched", testing_sytf2_sytrf<true, true, 1, T>},
             {"sytrf_strided_batched", testing_sytf2_sytrf<false, true, 1, T>},
+            // sytrs
+            {"sytrs", testing_sytrs<false, false, T>},
             // geblttrf_npvt
             {"geblttrf_npvt", testing_geblttrf_npvt<false, false, T>},
             {"geblttrf_npvt_batched", testing_geblttrf_npvt<true, true, T>},
@@ -381,6 +385,8 @@ class rocsolver_dispatcher
             {"sygst", testing_sygsx_hegsx<false, false, 1, T>},
             {"sygst_batched", testing_sygsx_hegsx<true, true, 1, T>},
             {"sygst_strided_batched", testing_sygsx_hegsx<false, true, 1, T>},
+            // geev
+            {"geev", testing_geev<false, false, T>},
             // syev
             {"syev", testing_syev_heev<false, false, T>},
             {"syev_batched", testing_syev_heev<true, true, T>},

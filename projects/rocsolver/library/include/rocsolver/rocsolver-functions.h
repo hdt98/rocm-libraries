@@ -26049,6 +26049,196 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrf_strided_batched(rocblas_handle 
                                                                  rocblas_int* info,
                                                                  const rocblas_int batch_count);
 //! @}
+
+/*! @{
+    \brief SYTRS solves a system of linear equations A * X = B with a symmetric
+    indefinite matrix A using the factorization computed by \ref rocsolver_ssytrf "SYTRF".
+
+    \details
+    The factorization has the form A = U * D * U^T or A = L * D * L^T where D is
+    block diagonal with 1-by-1 and 2-by-2 diagonal blocks, and U (or L) is a product
+    of permutation and unit upper (or lower) triangular matrices.
+
+    @param[in]
+    handle          rocblas_handle.
+    @param[in]
+    uplo            rocblas_fill.\n
+                    Specifies whether the factor stored in A is upper or lower triangular.
+    @param[in]
+    n               rocblas_int. n >= 0.\n
+                    The order of the matrix A.
+    @param[in]
+    nrhs            rocblas_int. nrhs >= 0.\n
+                    The number of right hand sides.
+    @param[in]
+    A               pointer to type. Array on the GPU of dimension lda*n.\n
+                    The block diagonal matrix D and the multipliers used to obtain
+                    the factor U or L as computed by SYTRF.
+    @param[in]
+    lda             rocblas_int. lda >= max(1,n).\n
+                    The leading dimension of A.
+    @param[in]
+    ipiv            pointer to rocblas_int. Array on the GPU of dimension n.\n
+                    The pivot indices from SYTRF.
+    @param[in,out]
+    B               pointer to type. Array on the GPU of dimension ldb*nrhs.\n
+                    On entry, the right hand side matrix B.
+                    On exit, the solution matrix X.
+    @param[in]
+    ldb             rocblas_int. ldb >= max(1,n).\n
+                    The leading dimension of B.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ssytrs(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int nrhs,
+                                                 float* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 float* B,
+                                                 const rocblas_int ldb);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dsytrs(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int nrhs,
+                                                 double* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 double* B,
+                                                 const rocblas_int ldb);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_csytrs(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int nrhs,
+                                                 rocblas_float_complex* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 rocblas_float_complex* B,
+                                                 const rocblas_int ldb);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zsytrs(rocblas_handle handle,
+                                                 const rocblas_fill uplo,
+                                                 const rocblas_int n,
+                                                 const rocblas_int nrhs,
+                                                 rocblas_double_complex* A,
+                                                 const rocblas_int lda,
+                                                 const rocblas_int* ipiv,
+                                                 rocblas_double_complex* B,
+                                                 const rocblas_int ldb);
+//! @}
+
+/*! @{
+    \brief GEEV computes the eigenvalues and optionally the eigenvectors of a general
+    n-by-n matrix A.
+
+    \details
+    The right eigenvector v(j) of A satisfies A * v(j) = lambda(j) * v(j) where
+    lambda(j) is its eigenvalue. The left eigenvector u(j) satisfies u(j)^H * A = lambda(j) * u(j)^H.
+
+    For real types, eigenvalues are returned as separate real (wr) and imaginary (wi) parts.
+    For complex types, eigenvalues are returned as a single complex array w.
+
+    This implementation uses LAPACK geev on host as the computational backend.
+
+    @param[in]
+    handle          rocblas_handle.
+    @param[in]
+    jobvl           rocblas_evect.\n
+                    Specifies whether to compute left eigenvectors.
+    @param[in]
+    jobvr           rocblas_evect.\n
+                    Specifies whether to compute right eigenvectors.
+    @param[in]
+    n               rocblas_int. n >= 0.\n
+                    The order of the matrix A.
+    @param[in,out]
+    A               pointer to type. Array on the GPU of dimension lda*n.\n
+                    On entry, the matrix A. On exit, A is overwritten.
+    @param[in]
+    lda             rocblas_int. lda >= max(1,n).\n
+                    The leading dimension of A.
+    @param[out]
+    wr              pointer to real type. Array on the GPU of dimension n.\n
+                    (real types only) The real parts of the eigenvalues.
+    @param[out]
+    wi              pointer to real type. Array on the GPU of dimension n.\n
+                    (real types only) The imaginary parts of the eigenvalues.
+    @param[out]
+    VL              pointer to type. Array on the GPU of dimension ldvl*n.\n
+                    If jobvl = rocblas_evect_original, the left eigenvectors.
+    @param[in]
+    ldvl            rocblas_int. ldvl >= 1; ldvl >= n if jobvl = rocblas_evect_original.
+    @param[out]
+    VR              pointer to type. Array on the GPU of dimension ldvr*n.\n
+                    If jobvr = rocblas_evect_original, the right eigenvectors.
+    @param[in]
+    ldvr            rocblas_int. ldvr >= 1; ldvr >= n if jobvr = rocblas_evect_original.
+    @param[out]
+    info            pointer to rocblas_int on the GPU.\n
+                    If info = 0, successful exit.
+                    If info > 0, the QR algorithm failed to compute all eigenvalues.
+    ********************************************************************/
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_sgeev(rocblas_handle handle,
+                                                const rocblas_evect jobvl,
+                                                const rocblas_evect jobvr,
+                                                const rocblas_int n,
+                                                float* A,
+                                                const rocblas_int lda,
+                                                float* wr,
+                                                float* wi,
+                                                float* VL,
+                                                const rocblas_int ldvl,
+                                                float* VR,
+                                                const rocblas_int ldvr,
+                                                rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dgeev(rocblas_handle handle,
+                                                const rocblas_evect jobvl,
+                                                const rocblas_evect jobvr,
+                                                const rocblas_int n,
+                                                double* A,
+                                                const rocblas_int lda,
+                                                double* wr,
+                                                double* wi,
+                                                double* VL,
+                                                const rocblas_int ldvl,
+                                                double* VR,
+                                                const rocblas_int ldvr,
+                                                rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_cgeev(rocblas_handle handle,
+                                                const rocblas_evect jobvl,
+                                                const rocblas_evect jobvr,
+                                                const rocblas_int n,
+                                                rocblas_float_complex* A,
+                                                const rocblas_int lda,
+                                                rocblas_float_complex* w,
+                                                rocblas_float_complex* VL,
+                                                const rocblas_int ldvl,
+                                                rocblas_float_complex* VR,
+                                                const rocblas_int ldvr,
+                                                float* rwork,
+                                                rocblas_int* info);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zgeev(rocblas_handle handle,
+                                                const rocblas_evect jobvl,
+                                                const rocblas_evect jobvr,
+                                                const rocblas_int n,
+                                                rocblas_double_complex* A,
+                                                const rocblas_int lda,
+                                                rocblas_double_complex* w,
+                                                rocblas_double_complex* VL,
+                                                const rocblas_int ldvl,
+                                                rocblas_double_complex* VR,
+                                                const rocblas_int ldvr,
+                                                double* rwork,
+                                                rocblas_int* info);
+//! @}
+
 /*! @{
     \brief The GEBLTTRF_NPVT functions compute the LU factorization of a block tridiagonal matrix without partial pivoting.
 

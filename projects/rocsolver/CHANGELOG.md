@@ -7,6 +7,10 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ### Added
 
 * Support added for the gfx1150, gfx1152, and gfx1153 architectures
+* Non-symmetric eigenvalue decomposition
+    * GEEV (with embedded MAGMA GPU-accelerated Hessenberg reduction)
+* Symmetric indefinite triangular solve with Bunch-Kaufman pivoting
+    * SYTRS
 * Computation of different matrix norms
     * LANGE
     * LANGE_64

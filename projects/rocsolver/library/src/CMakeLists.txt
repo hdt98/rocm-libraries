@@ -97,6 +97,7 @@ set(rocsolver_lapack_source
   lapack/roclapack_sytrf.cpp
   lapack/roclapack_sytrf_batched.cpp
   lapack/roclapack_sytrf_strided_batched.cpp
+  lapack/roclapack_sytrs.cpp
   #- block-tridiagonal matrices
   lapack/roclapack_geblttrf_npvt.cpp
   lapack/roclapack_geblttrf_npvt_batched.cpp
@@ -225,6 +226,10 @@ set(rocsolver_lapack_source
   lapack/roclapack_sygvdx_hegvdx_strided_batched.cpp
   lapack/roclapack_syevdx_heevdx_inplace.cpp
   lapack/roclapack_sygvdx_hegvdx_inplace.cpp
+  #### General Eigensolvers ####
+  ###############################
+  #- non-symmetric eigenvalue decomposition (LAPACK-backed)
+  lapack/roclapack_geev.cpp
 )
 
 set(rocsolver_auxiliary_source
@@ -375,6 +380,21 @@ set(common_source
   ${PROJECT_SOURCE_DIR}/common/src/common_host_helpers.cpp
 )
 
+# MAGMA source files for GPU-accelerated geev (BSD-3-Clause, Univ. of Tennessee)
+file(GLOB magma_src_files "${CMAKE_CURRENT_SOURCE_DIR}/magma/src/*.cpp")
+file(GLOB magma_interface_files "${CMAKE_CURRENT_SOURCE_DIR}/magma/interface_hip/*.cpp")
+file(GLOB magma_control_files "${CMAKE_CURRENT_SOURCE_DIR}/magma/control/*.cpp")
+file(GLOB magma_kernel_files "${CMAKE_CURRENT_SOURCE_DIR}/magma/magmablas_hip/*.cpp")
+set(rocsolver_magma_source
+  ${magma_src_files}
+  ${magma_interface_files}
+  ${magma_control_files}
+  ${magma_kernel_files}
+)
+set_source_files_properties(${rocsolver_magma_source} PROPERTIES
+  COMPILE_DEFINITIONS "MAGMA_HAVE_HIP;ADD_;MAGMA_NOAFFINITY;HIPBLAS_V2"
+)
+
 if(USE_HIPCXX)
   set_source_files_properties(
     ${common_source}
@@ -395,9 +415,14 @@ add_library(rocsolver
   ${rocsolver_auxiliary_source}
   ${rocsolver_lapack_source}
   ${rocsolver_refact_source}
+  ${rocsolver_magma_source}
 )
 
 add_library(roc::rocsolver ALIAS rocsolver)
+
+# MAGMA's host-side LAPACK/BLAS functions are implemented directly in C++
+# in magma/control/lapack_host_impl.cpp — no external LAPACK/BLAS/CBLAS/gfortran dependency.
+set(MAGMA_LAPACK_DEPS "")
 
 target_link_libraries(rocsolver
   PUBLIC
@@ -405,6 +430,7 @@ target_link_libraries(rocsolver
   PRIVATE
     $<BUILD_INTERFACE:rocsolver-common> # https://gitlab.kitware.com/cmake/cmake/-/issues/15415
     roc::rocprim
+    ${MAGMA_LAPACK_DEPS}
     $<$<PLATFORM_ID:Linux>:--rtlib=compiler-rt>
     $<$<PLATFORM_ID:Linux>:--unwindlib=libgcc>
 )
@@ -472,6 +498,9 @@ target_include_directories(rocsolver
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/magma/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/magma/control
+    ${CMAKE_CURRENT_SOURCE_DIR}/magma
 )
 
 set_target_properties(rocsolver PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging")

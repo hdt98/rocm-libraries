@@ -86,6 +86,7 @@ set(hipsolverRf_test_source
 set(others_test_source
   determinism_gtest.cpp
   params_gtest.cpp
+  dense64_extensions_gtest.cpp
 )
 
 add_executable(hipsolver-test ${others_test_source} ${hipsolverDn_test_source} ${hipsolverRf_test_source})

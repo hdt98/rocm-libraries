@@ -44,6 +44,7 @@ set(roclapack_test_source
   lapack/getrf_large_gtest.cpp
   lapack/potf2_potrf_gtest.cpp
   lapack/sytf2_sytrf_gtest.cpp
+  lapack/sytrs_gtest.cpp
   lapack/geblttrf_gtest.cpp
   # orthogonal factorizations
   lapack/geqr2_geqrf_gtest.cpp
@@ -72,6 +73,8 @@ set(roclapack_test_source
   lapack/syevdx_heevdx_gtest.cpp
   lapack/sygvx_hegvx_gtest.cpp
   lapack/sygvdx_hegvdx_gtest.cpp
+  # general eigensolvers
+  lapack/geev_gtest.cpp
 )
 
 set(rocauxiliary_test_source

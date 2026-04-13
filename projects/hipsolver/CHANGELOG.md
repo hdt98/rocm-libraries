@@ -6,6 +6,14 @@ Full documentation for hipSOLVER is available at the [hipSOLVER Documentation](h
 ## (Unreleased) hipSOLVER
 
 ### Added
+
+* 64-bit API extensions for eigenvalue and LDL operations
+    * hipsolverDnXsyevd / hipsolverDnXsyevd_bufferSize
+    * hipsolverDnXsyevBatched / hipsolverDnXsyevBatched_bufferSize
+    * hipsolverDnXgeev / hipsolverDnXgeev_bufferSize
+    * hipsolverDnXsytrs / hipsolverDnXsytrs_bufferSize
+* Added HIPSOLVER_HAS_64BIT_SOLVER_EXTENSIONS feature macro
+
 ### Changed
 ### Removed
 ### Optimized

@@ -129,6 +129,7 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_gels.cpp
     common/lapack/testing_gebd2_gebrd.cpp
     common/lapack/testing_sytf2_sytrf.cpp
+    common/lapack/testing_sytrs.cpp
     common/lapack/testing_sytxx_hetxx.cpp
     common/lapack/testing_sygsx_hegsx.cpp
     common/lapack/testing_syev_heev.cpp
@@ -143,6 +144,7 @@ if(BUILD_CLIENTS_BENCHMARKS OR BUILD_CLIENTS_TESTS)
     common/lapack/testing_sygvdx_hegvdx.cpp
     common/lapack/testing_sygvj_hegvj.cpp
     common/lapack/testing_sygvx_hegvx.cpp
+    common/lapack/testing_geev.cpp
     common/lapack/testing_geblttrf_npvt.cpp
     common/lapack/testing_geblttrf_npvt_interleaved.cpp
     common/lapack/testing_geblttrs_npvt.cpp

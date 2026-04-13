@@ -56,6 +56,7 @@ if(NOT "${HIP_PLATFORM}" STREQUAL "nvidia")
       "${CMAKE_CURRENT_SOURCE_DIR}/amd_detail/dlopen/rocsparse.cpp"
     )
   endif()
+
 else()
   set(hipsolver_source
     "${CMAKE_CURRENT_SOURCE_DIR}/nvidia_detail/hipsolver_conversions.cpp"
