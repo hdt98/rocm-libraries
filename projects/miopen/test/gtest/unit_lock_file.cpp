@@ -177,14 +177,12 @@ TEST(CPU_UnitTestLockFile_NONE, BlockingLockBothTypes)
         // the blocking call before sampling.
         about_to_lock_future.wait();
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)),
-                  std::future_status::ready)
+        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)), std::future_status::ready)
             << "lock() returned before the holder released";
 
         lockfile1.unlock();
 
-        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)),
-                  std::future_status::ready)
+        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)), std::future_status::ready)
             << "lock() never unblocked after holder released";
 
         t.join();
@@ -210,14 +208,12 @@ TEST(CPU_UnitTestLockFile_NONE, BlockingLockBothTypes)
 
         about_to_lock_future.wait();
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)),
-                  std::future_status::ready)
+        EXPECT_NE(acquired_future.wait_for(std::chrono::milliseconds(0)), std::future_status::ready)
             << "lock_shared() returned before the exclusive holder released";
 
         exclusive_lock.unlock();
 
-        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)),
-                  std::future_status::ready)
+        EXPECT_EQ(acquired_future.wait_for(std::chrono::seconds(5)), std::future_status::ready)
             << "lock_shared() never unblocked after exclusive holder released";
 
         t.join();
