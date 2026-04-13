@@ -30,9 +30,9 @@ namespace
         return numDevices;
     }
 
-    // CPU GEMM for INT8 (accumulate in int32, saturate to int8 output)
+    // CPU GEMM for INT8 inputs with INT32 output
     void cpuGEMM_INT8(const std::vector<int8_t>& A, const std::vector<int8_t>& B,
-                      std::vector<int8_t>& C, int64_t M, int64_t N, int64_t K)
+                      std::vector<int32_t>& C, int64_t M, int64_t N, int64_t K)
     {
         for(int64_t i = 0; i < M; ++i)
         {
@@ -43,9 +43,7 @@ namespace
                 {
                     sum += static_cast<int32_t>(A[i * K + k]) * static_cast<int32_t>(B[k * N + j]);
                 }
-                // Saturate to int8 range
-                sum = std::max(-128, std::min(127, sum));
-                C[i * N + j] = static_cast<int8_t>(sum);
+                C[i * N + j] = sum;
             }
         }
     }
@@ -87,16 +85,22 @@ namespace
         }
     }
 
-    // Verify INT8 results with tolerance
-    bool verifyResult_INT8(const std::vector<int8_t>& result, const std::vector<int8_t>& expected,
-                            int tolerance = 2)
+    // Verify INT32 results (output of INT8 GEMM)
+    bool verifyResult_INT32(const std::vector<int32_t>& result, const std::vector<int32_t>& expected)
     {
-        if(result.size() != expected.size()) return false;
+        if(result.size() != expected.size())
+        {
+            hipblaslt_cout << "Size mismatch: result.size()=" << result.size()
+                          << ", expected.size()=" << expected.size() << std::endl;
+            return false;
+        }
 
         for(size_t i = 0; i < result.size(); ++i)
         {
-            if(std::abs(static_cast<int>(result[i]) - static_cast<int>(expected[i])) > tolerance)
+            if(result[i] != expected[i])
             {
+                hipblaslt_cout << "Value mismatch at index " << i << ": result=" << result[i]
+                              << ", expected=" << expected[i] << std::endl;
                 return false;
             }
         }
@@ -105,13 +109,16 @@ namespace
 
     // Verify FP16 results (for FP8 tests)
     bool verifyResult_FP16(const std::vector<_Float16>& result, const std::vector<_Float16>& expected,
-                            float tolerance = 0.5f)
+                            float rel_tolerance = 0.05f)
     {
         if(result.size() != expected.size()) return false;
 
         for(size_t i = 0; i < result.size(); ++i)
         {
-            if(std::abs(static_cast<float>(result[i]) - static_cast<float>(expected[i])) > tolerance)
+            float r = static_cast<float>(result[i]);
+            float e = static_cast<float>(expected[i]);
+            float threshold = rel_tolerance * std::max(std::abs(e), 1.0f);
+            if(std::abs(r - e) > threshold)
             {
                 return false;
             }
@@ -136,8 +143,8 @@ namespace
         // Prepare host data for all batches
         std::vector<std::vector<int8_t>> h_A_batches(total_batches);
         std::vector<std::vector<int8_t>> h_B_batches(total_batches);
-        std::vector<std::vector<int8_t>> h_C_expected(total_batches);
-        std::vector<std::vector<int8_t>> h_C_result(total_batches);
+        std::vector<std::vector<int32_t>> h_C_expected(total_batches);
+        std::vector<std::vector<int32_t>> h_C_result(total_batches);
 
         for(int64_t b = 0; b < total_batches; ++b)
         {
@@ -155,7 +162,8 @@ namespace
 
         // Multi-GPU execution
         std::vector<hipblasLtHandle_t> handles(numDevices);
-        std::vector<int8_t*> d_A(numDevices), d_B(numDevices), d_C(numDevices);
+        std::vector<int8_t*> d_A(numDevices), d_B(numDevices);
+        std::vector<int32_t*> d_C(numDevices);
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
@@ -168,7 +176,7 @@ namespace
             // Allocate for all local batches
             hipMalloc(&d_A[dev], M * K * local_batches * sizeof(int8_t));
             hipMalloc(&d_B[dev], K * N * local_batches * sizeof(int8_t));
-            hipMalloc(&d_C[dev], M * N * local_batches * sizeof(int8_t));
+            hipMalloc(&d_C[dev], M * N * local_batches * sizeof(int32_t));
 
             // Copy data for all local batches
             for(int64_t lb = 0; lb < local_batches; ++lb)
@@ -184,8 +192,8 @@ namespace
             hipblasLtMatrixLayout_t matA, matB, matC, matD;
             hipblasLtMatrixLayoutCreate(&matA, HIP_R_8I, M, K, M);
             hipblasLtMatrixLayoutCreate(&matB, HIP_R_8I, K, N, K);
-            hipblasLtMatrixLayoutCreate(&matC, HIP_R_8I, M, N, M);
-            hipblasLtMatrixLayoutCreate(&matD, HIP_R_8I, M, N, M);
+            hipblasLtMatrixLayoutCreate(&matC, HIP_R_32I, M, N, M);
+            hipblasLtMatrixLayoutCreate(&matD, HIP_R_32I, M, N, M);
 
             // Set batch count and strides
             hipblasLtMatrixLayoutSetAttribute(matA, HIPBLASLT_MATRIX_LAYOUT_BATCH_COUNT,
@@ -210,18 +218,38 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32I, HIP_R_32I);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
+            void* d_workspace = nullptr;
+            hipMalloc(&d_workspace, workspace_size);
+
             int32_t alpha = 1, beta = 0;
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           d_workspace, workspace_size, 0);
+
+            hipFree(d_workspace);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             // Copy results back
             for(int64_t lb = 0; lb < local_batches; ++lb)
             {
                 int64_t global_batch = batch_start + lb;
                 hipMemcpy(h_C_result[global_batch].data(), d_C[dev] + lb * M * N,
-                         M * N * sizeof(int8_t), hipMemcpyDeviceToHost);
+                         M * N * sizeof(int32_t), hipMemcpyDeviceToHost);
             }
 
             hipDeviceSynchronize();
@@ -237,10 +265,22 @@ namespace
         bool all_correct = true;
         for(int64_t b = 0; b < total_batches; ++b)
         {
-            if(!verifyResult_INT8(h_C_result[b], h_C_expected[b], 2))
+            if(!verifyResult_INT32(h_C_result[b], h_C_expected[b]))
             {
                 all_correct = false;
                 hipblaslt_cout << "Batch " << b << " verification FAILED!" << std::endl;
+                // Print first few mismatches for debugging
+                int mismatch_count = 0;
+                for(size_t i = 0; i < std::min(h_C_result[b].size(), size_t(10)); ++i)
+                {
+                    if(h_C_result[b][i] != h_C_expected[b][i])
+                    {
+                        hipblaslt_cout << "  Element " << i << ": GPU=" << h_C_result[b][i]
+                                      << ", CPU=" << h_C_expected[b][i] << std::endl;
+                        mismatch_count++;
+                        if(mismatch_count >= 5) break;
+                    }
+                }
                 break;
             }
         }
@@ -345,11 +385,31 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_16F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
+            void* d_workspace = nullptr;
+            hipMalloc(&d_workspace, workspace_size);
+
             float alpha = 1.0f, beta = 0.0f;
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           d_workspace, workspace_size, 0);
+
+            hipFree(d_workspace);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             for(int64_t lb = 0; lb < local_batches; ++lb)
             {
@@ -371,7 +431,7 @@ namespace
         bool all_correct = true;
         for(int64_t b = 0; b < total_batches; ++b)
         {
-            if(!verifyResult_FP16(h_C_result[b], h_C_expected[b], 0.5f))
+            if(!verifyResult_FP16(h_C_result[b], h_C_expected[b]))
             {
                 all_correct = false;
                 hipblaslt_cout << "Batch " << b << " verification FAILED!" << std::endl;
@@ -458,10 +518,29 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
+            void* d_workspace = nullptr;
+            hipMalloc(&d_workspace, workspace_size);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           d_workspace, workspace_size, 0);
+
+            hipFree(d_workspace);
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             hipMemcpy(h_C_result.data() + M_start * N, d_C[dev], M_local * N * sizeof(float),
                      hipMemcpyDeviceToHost);

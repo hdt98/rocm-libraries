@@ -38,6 +38,7 @@ namespace
 
         void wait()
         {
+            std::unique_lock<std::mutex> lock(mtx);
             int gen = generation.load();
             int arr = arrived.fetch_add(1) + 1;
 
@@ -46,18 +47,19 @@ namespace
                 // Last thread to arrive - reset and notify all
                 arrived.store(0);
                 generation.fetch_add(1);
+                lock.unlock();
                 cv.notify_all();
             }
             else
             {
                 // Wait for barrier to open
-                std::unique_lock<std::mutex> lock(mtx);
                 cv.wait(lock, [this, gen]() { return generation.load() != gen; });
             }
         }
 
         void reset(int participants)
         {
+            std::lock_guard<std::mutex> lock(mtx);
             arrived.store(0);
             generation.store(0);
             num_participants = participants;
@@ -71,7 +73,7 @@ namespace
         struct Group
         {
             std::atomic<int> arrived;
-            std::atomic<bool> ready;
+            std::atomic<int> generation;
             std::mutex mtx;
             std::condition_variable cv;
             int num_members;
@@ -89,7 +91,7 @@ namespace
             for(size_t g = 0; g < group_sizes.size(); ++g)
             {
                 groups[g].arrived = 0;
-                groups[g].ready = false;
+                groups[g].generation = 0;
                 groups[g].num_members = group_sizes[g];
                 total_threads += group_sizes[g];
             }
@@ -111,32 +113,31 @@ namespace
             int group_id = thread_to_group[thread_id];
             Group& group = groups[group_id];
 
+            std::unique_lock<std::mutex> lock(group.mtx);
+            int gen = group.generation.load();
+
             // Phase 1: Local group barrier
             int arr = group.arrived.fetch_add(1) + 1;
 
             if(arr == group.num_members)
             {
-                // Last thread in group
+                // Last thread in group - reset and proceed to global barrier
                 group.arrived.store(0);
+                lock.unlock();
 
                 // Phase 2: Global barrier (one representative per group)
                 global_barrier.wait();
 
-                // Notify group members
-                group.ready.store(true);
+                // After global barrier, increment generation to release waiting threads
+                lock.lock();
+                group.generation.fetch_add(1);
+                lock.unlock();
                 group.cv.notify_all();
             }
             else
             {
-                // Wait for group to be released
-                std::unique_lock<std::mutex> lock(group.mtx);
-                group.cv.wait(lock, [&group]() { return group.ready.load(); });
-            }
-
-            // Reset ready flag for next barrier
-            if(arr == 1)
-            {
-                group.ready.store(false);
+                // Wait for group barrier to complete
+                group.cv.wait(lock, [&group, gen]() { return group.generation.load() != gen; });
             }
         }
     };
@@ -161,9 +162,10 @@ namespace
             // Wait for all threads to reach barrier
             barrier.wait();
 
-            // After barrier, all should have incremented counter
+            // After barrier, counter should be at least numDevices
+            // (Some threads may have already started phase 2)
             int count = counter.load();
-            EXPECT_EQ(count, numDevices) << "Not all threads reached barrier";
+            EXPECT_GE(count, numDevices) << "Not all threads reached barrier";
 
             // Record arrival order for phase 2
             arrival_order[device_id] = counter.fetch_add(1);
@@ -218,8 +220,9 @@ namespace
             // Hierarchical barrier (local group first, then global)
             barrier.wait(thread_id);
 
-            // After barrier, all threads completed phase 1
-            EXPECT_EQ(phase1_complete.load(), numDevices);
+            // After barrier, all threads should have completed phase 1
+            // (Some may have already started phase 2)
+            EXPECT_GE(phase1_complete.load(), numDevices);
 
             // Phase 2 work
             phase2_complete.fetch_add(1);

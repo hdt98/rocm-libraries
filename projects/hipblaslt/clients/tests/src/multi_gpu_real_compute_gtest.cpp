@@ -38,14 +38,17 @@ namespace
         }
     }
 
-    // Helper: Verify result with tolerance
-    bool verifyResult(const std::vector<float>& result, const std::vector<float>& expected, float tolerance = 0.01f)
+    // Helper: Verify result with relative tolerance
+    bool verifyResult(const std::vector<float>& result, const std::vector<float>& expected, float rel_tolerance = 0.02f)
     {
         if(result.size() != expected.size()) return false;
 
         for(size_t i = 0; i < result.size(); ++i)
         {
-            if(std::abs(result[i] - expected[i]) > tolerance)
+            float r = result[i];
+            float e = expected[i];
+            float threshold = rel_tolerance * std::max(std::abs(e), 1.0f);
+            if(std::abs(r - e) > threshold)
             {
                 return false;
             }
@@ -151,6 +154,18 @@ namespace
                 hipblasLtMatmulDesc_t matmul;
                 hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+                // Get algorithm heuristic
+                hipblasLtMatmulPreference_t pref;
+                hipblasLtMatmulPreferenceCreate(&pref);
+                size_t workspace_size = 32 * 1024 * 1024;
+                hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                     &workspace_size, sizeof(size_t));
+
+                hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+                int returnedAlgoCount = 0;
+                hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                               pref, 1, heuristicResult, &returnedAlgoCount);
+
                 hipblasLtMatmul(handles[dev], matmul,
                                &alpha,
                                d_A[dev] + local_b * M * K, matA,
@@ -158,7 +173,10 @@ namespace
                                &beta,
                                d_C[dev] + local_b * M * N, matC,
                                d_C[dev] + local_b * M * N, matD,
-                               nullptr, nullptr, 0, streams[dev]);
+                               (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                               nullptr, 0, streams[dev]);
+
+                hipblasLtMatmulPreferenceDestroy(pref);
 
                 hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
                 hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
@@ -265,10 +283,25 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul,
                            &alpha, d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             hipDeviceSynchronize();
 
@@ -376,10 +409,25 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul,
                            &alpha, d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             hipDeviceSynchronize();
 

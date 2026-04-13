@@ -54,13 +54,16 @@ namespace
     }
 
     bool verifyResult_FP16(const std::vector<_Float16>& result, const std::vector<_Float16>& expected,
-                            float tolerance = 0.1f)
+                            float rel_tolerance = 0.05f)
     {
         if(result.size() != expected.size()) return false;
 
         for(size_t i = 0; i < result.size(); ++i)
         {
-            if(std::abs(static_cast<float>(result[i]) - static_cast<float>(expected[i])) > tolerance)
+            float r = static_cast<float>(result[i]);
+            float e = static_cast<float>(expected[i]);
+            float threshold = rel_tolerance * std::max(std::abs(e), 1.0f);
+            if(std::abs(r - e) > threshold)
             {
                 return false;
             }
@@ -154,23 +157,40 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matX, matW, matOut, matOut,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             // Compute Q = X * W_q
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_X[dev], matX, d_W_q[dev], matW,
                            &beta, d_Q[dev], matOut, d_Q[dev], matOut,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
             // Compute K = X * W_k
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_X[dev], matX, d_W_k[dev], matW,
                            &beta, d_K[dev], matOut, d_K[dev], matOut,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
             // Compute V = X * W_v
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_X[dev], matX, d_W_v[dev], matW,
                            &beta, d_V[dev], matOut, d_V[dev], matOut,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             // Copy results
             hipMemcpy(h_Q_result.data() + M_start * N, d_Q[dev], M_local * N * sizeof(_Float16), hipMemcpyDeviceToHost);
@@ -187,9 +207,9 @@ namespace
         }
 
         // Verify
-        bool q_correct = verifyResult_FP16(h_Q_result, h_Q_expected, 0.1f);
-        bool k_correct = verifyResult_FP16(h_K_result, h_K_expected, 0.1f);
-        bool v_correct = verifyResult_FP16(h_V_result, h_V_expected, 0.1f);
+        bool q_correct = verifyResult_FP16(h_Q_result, h_Q_expected);
+        bool k_correct = verifyResult_FP16(h_K_result, h_K_expected);
+        bool v_correct = verifyResult_FP16(h_V_result, h_V_expected);
 
         // Cleanup
         for(int dev = 0; dev < numDevices; ++dev)
@@ -270,10 +290,25 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matX, matW, matY, matY,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_X[dev], matX, d_W[dev], matW,
                            &beta, d_Y[dev], matY, d_Y[dev], matY,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             // Copy column slice of result back
             std::vector<_Float16> h_Y_slice(M * N_local);
@@ -297,7 +332,7 @@ namespace
                           << ":" << (N_start + N_local) << "]" << std::endl;
         }
 
-        bool correct = verifyResult_FP16(h_Y_result, h_Y_expected, 0.1f);
+        bool correct = verifyResult_FP16(h_Y_result, h_Y_expected);
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
@@ -386,10 +421,25 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matX, matW, matY, matY,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_X[dev], matX, d_W[dev], matW,
                            &beta, d_Y[dev], matY, d_Y[dev], matY,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             h_Y_partials[dev].resize(M * N);
             hipMemcpy(h_Y_partials[dev].data(), d_Y[dev], M * N * sizeof(_Float16), hipMemcpyDeviceToHost);
@@ -414,7 +464,7 @@ namespace
             }
         }
 
-        bool correct = verifyResult_FP16(h_Y_result, h_Y_expected, 0.1f);
+        bool correct = verifyResult_FP16(h_Y_result, h_Y_expected);
 
         for(int dev = 0; dev < numDevices; ++dev)
         {

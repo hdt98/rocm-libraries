@@ -80,14 +80,24 @@ namespace
         }
 
         // Attempt oversized allocation on GPU 0 to test OOM handling
-        _Float16* d_oversized = nullptr;
-        size_t oversized = (size_t)100 * 1024 * 1024 * 1024; // 100GB (should fail)
         EXPECT_EQ(hipSetDevice(0), hipSuccess);
+
+        // Get actual GPU memory info to determine truly oversized allocation
+        size_t free_mem = 0, total_mem = 0;
+        hipError_t mem_info_err = hipMemGetInfo(&free_mem, &total_mem);
+        EXPECT_EQ(mem_info_err, hipSuccess);
+
+        // Request 2x total memory to ensure OOM
+        size_t oversized = total_mem * 2;
+        hipblaslt_cout << "GPU 0: Total memory: " << (total_mem / (1024*1024*1024)) << " GB, "
+                       << "Requesting: " << (oversized / (1024*1024*1024)) << " GB" << std::endl;
+
+        _Float16* d_oversized = nullptr;
         hipError_t oom_err = hipMalloc(&d_oversized, oversized);
 
         if(oom_err != hipSuccess)
         {
-            hipblaslt_cout << "GPU 0: Oversized allocation properly failed with error" << std::endl;
+            hipblaslt_cout << "GPU 0: Oversized allocation properly failed with error code " << oom_err << std::endl;
         }
         else
         {

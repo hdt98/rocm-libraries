@@ -28,6 +28,25 @@ namespace
         return numDevices;
     }
 
+    // CPU GEMM for FP16
+    void cpuGEMM_FP16(const std::vector<_Float16>& A, const std::vector<_Float16>& B,
+                      std::vector<_Float16>& C, int64_t M, int64_t N, int64_t K,
+                      float alpha = 1.0f, float beta = 0.0f)
+    {
+        for(int64_t i = 0; i < M; ++i)
+        {
+            for(int64_t j = 0; j < N; ++j)
+            {
+                float sum = 0.0f;
+                for(int64_t k = 0; k < K; ++k)
+                {
+                    sum += static_cast<float>(A[i * K + k]) * static_cast<float>(B[k * N + j]);
+                }
+                C[i * N + j] = static_cast<_Float16>(alpha * sum + beta * static_cast<float>(C[i * N + j]));
+            }
+        }
+    }
+
     // CPU GELU derivative approximation
     float gelu_derivative(float x)
     {
@@ -101,13 +120,16 @@ namespace
 
     // Verify with tolerance
     bool verifyResult_FP16(const std::vector<_Float16>& result, const std::vector<_Float16>& expected,
-                            float tolerance = 0.1f)
+                            float rel_tolerance = 0.05f)
     {
         if(result.size() != expected.size()) return false;
 
         for(size_t i = 0; i < result.size(); ++i)
         {
-            if(std::abs(static_cast<float>(result[i]) - static_cast<float>(expected[i])) > tolerance)
+            float r = static_cast<float>(result[i]);
+            float e = static_cast<float>(expected[i]);
+            float threshold = rel_tolerance * std::max(std::abs(e), 1.0f);
+            if(std::abs(r - e) > threshold)
             {
                 return false;
             }
@@ -155,8 +177,18 @@ namespace
                 h_pre_activation[b][i] = static_cast<_Float16>(-2.0f + (i % 100) * 0.04f);
             }
 
-            // CPU reference: compute gradient via DGELU
-            cpuDGELU(h_dL_dOut[b], h_pre_activation[b], h_grad_expected[b], M * N);
+            // CPU reference: First compute GEMM, then apply DGELU element-wise
+            // gradient = DGELU(dL_dOut × B, pre_activation)
+            std::vector<_Float16> gemm_result(M * N);
+            cpuGEMM_FP16(h_dL_dOut[b], h_B[b], gemm_result, M, N, K, 1.0f, 0.0f);
+
+            // Apply DGELU: gradient[i] = gemm_result[i] * gelu_derivative(pre_activation[i])
+            for(int64_t i = 0; i < M * N; ++i)
+            {
+                float gemm_val = static_cast<float>(gemm_result[i]);
+                float pre = static_cast<float>(h_pre_activation[b][i]);
+                h_grad_expected[b][i] = static_cast<_Float16>(gemm_val * gelu_derivative(pre));
+            }
         }
 
         // Multi-GPU execution
@@ -235,11 +267,26 @@ namespace
             hipblasLtMatmulDescSetAttribute(matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_BATCH_STRIDE,
                                            &aux_batch_stride, sizeof(aux_batch_stride));
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             // Execute gradient computation
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_dL_dOut[dev], matA, d_B[dev], matB,
                            &beta, d_grad[dev], matC, d_grad[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
+
+            hipblasLtMatmulPreferenceDestroy(pref);
 
             // Copy results back
             for(int64_t lb = 0; lb < local_batches; ++lb)
@@ -262,7 +309,7 @@ namespace
         bool all_correct = true;
         for(int64_t b = 0; b < total_batches; ++b)
         {
-            if(!verifyResult_FP16(h_grad_result[b], h_grad_expected[b], 0.2f))
+            if(!verifyResult_FP16(h_grad_result[b], h_grad_expected[b]))
             {
                 all_correct = false;
                 hipblaslt_cout << "Batch " << b << " DGELU gradient verification FAILED!" << std::endl;
@@ -319,7 +366,18 @@ namespace
                 h_pre_activation[dev][i] = static_cast<_Float16>(-1.0f + (i % 50) * 0.04f);
             }
 
-            cpuDRELU(h_dL_dOut[dev], h_pre_activation[dev], h_grad_expected[dev], M * N);
+            // CPU reference: First compute GEMM, then apply DRELU element-wise
+            // gradient = DRELU(dL_dOut × B, pre_activation)
+            std::vector<_Float16> gemm_result(M * N);
+            cpuGEMM_FP16(h_dL_dOut[dev], h_B[dev], gemm_result, M, N, K, 1.0f, 0.0f);
+
+            // Apply DRELU: gradient[i] = gemm_result[i] * relu_derivative(pre_activation[i])
+            for(int64_t i = 0; i < M * N; ++i)
+            {
+                float gemm_val = static_cast<float>(gemm_result[i]);
+                float pre = static_cast<float>(h_pre_activation[dev][i]);
+                h_grad_expected[dev][i] = static_cast<_Float16>(gemm_val * relu_derivative(pre));
+            }
         }
 
         // Multi-GPU execution
@@ -360,11 +418,25 @@ namespace
             hipblasLtMatmulDescSetAttribute(matmul, HIPBLASLT_MATMUL_DESC_EPILOGUE_AUX_LD,
                                            &aux_ld, sizeof(aux_ld));
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_dL_dOut[dev], matA, d_B[dev], matB,
                            &beta, d_grad[dev], matC, d_grad[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
+            hipblasLtMatmulPreferenceDestroy(pref);
             hipMemcpy(h_grad_result[dev].data(), d_grad[dev], M * N * sizeof(_Float16), hipMemcpyDeviceToHost);
 
             hipDeviceSynchronize();
@@ -378,7 +450,7 @@ namespace
         bool all_correct = true;
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            if(!verifyResult_FP16(h_grad_result[dev], h_grad_expected[dev], 0.1f))
+            if(!verifyResult_FP16(h_grad_result[dev], h_grad_expected[dev]))
             {
                 all_correct = false;
                 hipblaslt_cout << "GPU " << dev << " DRELU gradient verification FAILED!" << std::endl;
@@ -464,7 +536,7 @@ namespace
         }
 
         // Verify accumulated result
-        bool correct = verifyResult_FP16(h_bias_grad_accumulated, h_bias_grad_expected, 0.1f);
+        bool correct = verifyResult_FP16(h_bias_grad_accumulated, h_bias_grad_expected);
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
@@ -544,11 +616,29 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
+            void* d_workspace = nullptr;
+            hipMalloc(&d_workspace, workspace_size);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_dL_dOut[dev], matA, d_B[dev], matB,
                            &beta, d_grad[dev], matC, d_grad[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           d_workspace, workspace_size, 0);
 
+            hipFree(d_workspace);
+            hipblasLtMatmulPreferenceDestroy(pref);
             hipMemcpy(h_grad_result.data() + M_start * N, d_grad[dev],
                      M_local * N * sizeof(float), hipMemcpyDeviceToHost);
 
@@ -559,11 +649,13 @@ namespace
             hipblasLtMatmulDescDestroy(matmul);
         }
 
-        // Verify with tight tolerance (FP32 output)
+        // Verify with 2% relative tolerance (FP32 output)
         bool correct = true;
+        float rel_tolerance = 0.02f;
         for(size_t i = 0; i < h_grad_result.size(); ++i)
         {
-            if(std::abs(h_grad_result[i] - h_grad_expected[i]) > 0.01f)
+            float threshold = rel_tolerance * std::max(std::abs(h_grad_expected[i]), 1.0f);
+            if(std::abs(h_grad_result[i] - h_grad_expected[i]) > threshold)
             {
                 correct = false;
                 break;

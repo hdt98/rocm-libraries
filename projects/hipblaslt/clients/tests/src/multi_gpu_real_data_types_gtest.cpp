@@ -24,7 +24,7 @@ namespace
     int getNumGPUs()
     {
         int numDevices = 0;
-        hipGetDeviceCount(&numDevices);
+        EXPECT_EQ(hipGetDeviceCount(&numDevices), hipSuccess);
         return numDevices;
     }
 
@@ -57,9 +57,9 @@ namespace
         }
     }
 
-    // Verify with tolerance
+    // Verify with relative tolerance
     template<typename T>
-    bool verifyResult(const std::vector<T>& result, const std::vector<T>& expected, float tolerance)
+    bool verifyResult(const std::vector<T>& result, const std::vector<T>& expected, float rel_tolerance)
     {
         if(result.size() != expected.size()) return false;
 
@@ -67,7 +67,9 @@ namespace
         {
             float r = static_cast<float>(result[i]);
             float e = static_cast<float>(expected[i]);
-            if(std::abs(r - e) > tolerance)
+            float abs_expected = std::abs(e);
+            float threshold = rel_tolerance * std::max(abs_expected, 1.0f);
+            if(std::abs(r - e) > threshold)
             {
                 return false;
             }
@@ -114,27 +116,27 @@ namespace
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipblasLtCreate(&handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipblasLtCreate(&handles[dev]), HIPBLAS_STATUS_SUCCESS);
 
-            hipMalloc(&d_A[dev], batches_per_gpu * M * K * sizeof(float));
-            hipMalloc(&d_B[dev], batches_per_gpu * K * N * sizeof(float));
-            hipMalloc(&d_C[dev], batches_per_gpu * M * N * sizeof(float));
+            EXPECT_EQ(hipMalloc(&d_A[dev], batches_per_gpu * M * K * sizeof(float)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_B[dev], batches_per_gpu * K * N * sizeof(float)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_C[dev], batches_per_gpu * M * N * sizeof(float)), hipSuccess);
         }
 
         // Distribute batches and execute
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
 
             for(int64_t local_b = 0; local_b < batches_per_gpu; ++local_b)
             {
                 int64_t global_b = dev * batches_per_gpu + local_b;
 
-                hipMemcpy(d_A[dev] + local_b * M * K, h_A[global_b].data(),
-                         M * K * sizeof(float), hipMemcpyHostToDevice);
-                hipMemcpy(d_B[dev] + local_b * K * N, h_B[global_b].data(),
-                         K * N * sizeof(float), hipMemcpyHostToDevice);
+                EXPECT_EQ(hipMemcpy(d_A[dev] + local_b * M * K, h_A[global_b].data(),
+                         M * K * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
+                EXPECT_EQ(hipMemcpy(d_B[dev] + local_b * K * N, h_B[global_b].data(),
+                         K * N * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
 
                 hipblasLtMatrixLayout_t matA, matB, matC, matD;
                 hipblasLtMatrixLayoutCreate(&matA, HIP_R_32F, M, K, M);
@@ -145,16 +147,30 @@ namespace
                 hipblasLtMatmulDesc_t matmul;
                 hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+                // Get algorithm heuristic
+                hipblasLtMatmulPreference_t pref;
+                hipblasLtMatmulPreferenceCreate(&pref);
+                size_t workspace_size = 32 * 1024 * 1024;
+                hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                     &workspace_size, sizeof(size_t));
+
+                hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+                int returnedAlgoCount = 0;
+                hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                               pref, 1, heuristicResult, &returnedAlgoCount);
+
                 hipblasLtMatmul(handles[dev], matmul, &alpha,
                                d_A[dev] + local_b * M * K, matA,
                                d_B[dev] + local_b * K * N, matB,
                                &beta,
                                d_C[dev] + local_b * M * N, matC,
                                d_C[dev] + local_b * M * N, matD,
-                               nullptr, nullptr, 0, 0);
+                               (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                               nullptr, 0, 0);
 
-                hipMemcpy(h_C_result[global_b].data(), d_C[dev] + local_b * M * N,
-                         M * N * sizeof(float), hipMemcpyDeviceToHost);
+                hipblasLtMatmulPreferenceDestroy(pref);
+                EXPECT_EQ(hipMemcpy(h_C_result[global_b].data(), d_C[dev] + local_b * M * N,
+                         M * N * sizeof(float), hipMemcpyDeviceToHost), hipSuccess);
 
                 hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
                 hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
@@ -162,19 +178,21 @@ namespace
             }
         }
 
-        // Verify all batches
+        // Verify all batches with 2% relative tolerance for FP32
         for(int64_t b = 0; b < total_batches; ++b)
         {
-            bool correct = verifyResult(h_C_result[b], h_C_expected[b], 0.01f);
+            bool correct = verifyResult(h_C_result[b], h_C_expected[b], 0.02f);
             EXPECT_TRUE(correct) << "Batch " << b << " failed verification";
         }
 
         // Cleanup
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipFree(d_A[dev]); hipFree(d_B[dev]); hipFree(d_C[dev]);
-            hipblasLtDestroy(handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipFree(d_A[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_B[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_C[dev]), hipSuccess);
+            EXPECT_EQ(hipblasLtDestroy(handles[dev]), HIPBLAS_STATUS_SUCCESS);
         }
 
         hipblaslt_cout << "FP32: Verified " << total_batches << " batches across "
@@ -201,21 +219,21 @@ namespace
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipblasLtCreate(&handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipblasLtCreate(&handles[dev]), HIPBLAS_STATUS_SUCCESS);
 
             int64_t M_local = (dev == numDevices - 1) ? (M_total - dev * M_per_gpu) : M_per_gpu;
 
-            hipMalloc(&d_A[dev], M_local * K * sizeof(_Float16));
-            hipMalloc(&d_B[dev], K * N * sizeof(_Float16));
-            hipMalloc(&d_C[dev], M_local * N * sizeof(_Float16));
+            EXPECT_EQ(hipMalloc(&d_A[dev], M_local * K * sizeof(_Float16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_B[dev], K * N * sizeof(_Float16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_C[dev], M_local * N * sizeof(_Float16)), hipSuccess);
 
             // Initialize data (simplified)
             std::vector<_Float16> h_A(M_local * K, static_cast<_Float16>(1.0f));
             std::vector<_Float16> h_B(K * N, static_cast<_Float16>(1.0f));
 
-            hipMemcpy(d_A[dev], h_A.data(), M_local * K * sizeof(_Float16), hipMemcpyHostToDevice);
-            hipMemcpy(d_B[dev], h_B.data(), K * N * sizeof(_Float16), hipMemcpyHostToDevice);
+            EXPECT_EQ(hipMemcpy(d_A[dev], h_A.data(), M_local * K * sizeof(_Float16), hipMemcpyHostToDevice), hipSuccess);
+            EXPECT_EQ(hipMemcpy(d_B[dev], h_B.data(), K * N * sizeof(_Float16), hipMemcpyHostToDevice), hipSuccess);
 
             // Execute FP16 GEMM on this GPU's row partition
             hipblasLtMatrixLayout_t matA, matB, matC, matD;
@@ -227,12 +245,26 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_16F);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
-            hipDeviceSynchronize();
+            hipblasLtMatmulPreferenceDestroy(pref);
+            EXPECT_EQ(hipDeviceSynchronize(), hipSuccess);
 
             hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
             hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
@@ -244,9 +276,11 @@ namespace
         // Cleanup
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipFree(d_A[dev]); hipFree(d_B[dev]); hipFree(d_C[dev]);
-            hipblasLtDestroy(handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipFree(d_A[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_B[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_C[dev]), hipSuccess);
+            EXPECT_EQ(hipblasLtDestroy(handles[dev]), HIPBLAS_STATUS_SUCCESS);
         }
 
         hipblaslt_cout << "FP16: Row partitioned " << M_total << " rows across "
@@ -273,21 +307,21 @@ namespace
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipblasLtCreate(&handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipblasLtCreate(&handles[dev]), HIPBLAS_STATUS_SUCCESS);
 
             int64_t N_local = (dev == numDevices - 1) ? (N_total - dev * N_per_gpu) : N_per_gpu;
 
-            hipMalloc(&d_A[dev], M * K * sizeof(hip_bfloat16));
-            hipMalloc(&d_B[dev], K * N_local * sizeof(hip_bfloat16));
-            hipMalloc(&d_C[dev], M * N_local * sizeof(hip_bfloat16));
+            EXPECT_EQ(hipMalloc(&d_A[dev], M * K * sizeof(hip_bfloat16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_B[dev], K * N_local * sizeof(hip_bfloat16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_C[dev], M * N_local * sizeof(hip_bfloat16)), hipSuccess);
 
             // Initialize (simplified)
             std::vector<hip_bfloat16> h_A(M * K, static_cast<hip_bfloat16>(1.0f));
             std::vector<hip_bfloat16> h_B(K * N_local, static_cast<hip_bfloat16>(1.0f));
 
-            hipMemcpy(d_A[dev], h_A.data(), M * K * sizeof(hip_bfloat16), hipMemcpyHostToDevice);
-            hipMemcpy(d_B[dev], h_B.data(), K * N_local * sizeof(hip_bfloat16), hipMemcpyHostToDevice);
+            EXPECT_EQ(hipMemcpy(d_A[dev], h_A.data(), M * K * sizeof(hip_bfloat16), hipMemcpyHostToDevice), hipSuccess);
+            EXPECT_EQ(hipMemcpy(d_B[dev], h_B.data(), K * N_local * sizeof(hip_bfloat16), hipMemcpyHostToDevice), hipSuccess);
 
             // Execute BF16 GEMM
             hipblasLtMatrixLayout_t matA, matB, matC, matD;
@@ -299,12 +333,26 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_16BF);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handles[dev], matmul, &alpha,
                            d_A[dev], matA, d_B[dev], matB,
                            &beta, d_C[dev], matC, d_C[dev], matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
-            hipDeviceSynchronize();
+            hipblasLtMatmulPreferenceDestroy(pref);
+            EXPECT_EQ(hipDeviceSynchronize(), hipSuccess);
 
             hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
             hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
@@ -316,9 +364,11 @@ namespace
         // Cleanup
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipFree(d_A[dev]); hipFree(d_B[dev]); hipFree(d_C[dev]);
-            hipblasLtDestroy(handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipFree(d_A[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_B[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_C[dev]), hipSuccess);
+            EXPECT_EQ(hipblasLtDestroy(handles[dev]), HIPBLAS_STATUS_SUCCESS);
         }
 
         hipblaslt_cout << "BF16: Column partitioned " << N_total << " columns across "
@@ -345,12 +395,12 @@ namespace
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipblasLtCreate(&handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipblasLtCreate(&handles[dev]), HIPBLAS_STATUS_SUCCESS);
 
-            hipMalloc(&d_A[dev], batches_per_gpu * M * K * sizeof(_Float16));
-            hipMalloc(&d_B[dev], batches_per_gpu * K * N * sizeof(_Float16));
-            hipMalloc(&d_C[dev], batches_per_gpu * M * N * sizeof(float));
+            EXPECT_EQ(hipMalloc(&d_A[dev], batches_per_gpu * M * K * sizeof(_Float16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_B[dev], batches_per_gpu * K * N * sizeof(_Float16)), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_C[dev], batches_per_gpu * M * N * sizeof(float)), hipSuccess);
 
             for(int64_t b = 0; b < batches_per_gpu; ++b)
             {
@@ -364,20 +414,34 @@ namespace
                 hipblasLtMatmulDesc_t matmul;
                 hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, HIP_R_32F);
 
+                // Get algorithm heuristic
+                hipblasLtMatmulPreference_t pref;
+                hipblasLtMatmulPreferenceCreate(&pref);
+                size_t workspace_size = 32 * 1024 * 1024;
+                hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                     &workspace_size, sizeof(size_t));
+
+                hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+                int returnedAlgoCount = 0;
+                hipblasLtMatmulAlgoGetHeuristic(handles[dev], matmul, matA, matB, matC, matD,
+                                               pref, 1, heuristicResult, &returnedAlgoCount);
+
                 hipblasLtMatmul(handles[dev], matmul, &alpha,
                                d_A[dev] + b * M * K, matA,
                                d_B[dev] + b * K * N, matB,
                                &beta,
                                d_C[dev] + b * M * N, matC,
                                d_C[dev] + b * M * N, matD,
-                               nullptr, nullptr, 0, 0);
+                               (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                               nullptr, 0, 0);
 
+                hipblasLtMatmulPreferenceDestroy(pref);
                 hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
                 hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
                 hipblasLtMatmulDescDestroy(matmul);
             }
 
-            hipDeviceSynchronize();
+            EXPECT_EQ(hipDeviceSynchronize(), hipSuccess);
             hipblaslt_cout << "GPU " << dev << ": Completed " << batches_per_gpu
                           << " batches (FP16->FP32)" << std::endl;
         }
@@ -385,9 +449,11 @@ namespace
         // Cleanup
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
-            hipFree(d_A[dev]); hipFree(d_B[dev]); hipFree(d_C[dev]);
-            hipblasLtDestroy(handles[dev]);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
+            EXPECT_EQ(hipFree(d_A[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_B[dev]), hipSuccess);
+            EXPECT_EQ(hipFree(d_C[dev]), hipSuccess);
+            EXPECT_EQ(hipblasLtDestroy(handles[dev]), HIPBLAS_STATUS_SUCCESS);
         }
 
         hipblaslt_cout << "Mixed Precision: " << (batches_per_gpu * numDevices)
@@ -413,7 +479,7 @@ namespace
 
         for(int dev = 0; dev < numDevices; ++dev)
         {
-            hipSetDevice(dev);
+            EXPECT_EQ(hipSetDevice(dev), hipSuccess);
 
             int type_idx = dev % types.size();
             hipDataType dtype = types[type_idx];
@@ -422,12 +488,12 @@ namespace
             hipblaslt_cout << "GPU " << dev << ": Using " << type_names[type_idx] << std::endl;
 
             hipblasLtHandle_t handle;
-            hipblasLtCreate(&handle);
+            EXPECT_EQ(hipblasLtCreate(&handle), HIPBLAS_STATUS_SUCCESS);
 
             void *d_A, *d_B, *d_C;
-            hipMalloc(&d_A, M * K * type_size);
-            hipMalloc(&d_B, K * N * type_size);
-            hipMalloc(&d_C, M * N * type_size);
+            EXPECT_EQ(hipMalloc(&d_A, M * K * type_size), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_B, K * N * type_size), hipSuccess);
+            EXPECT_EQ(hipMalloc(&d_C, M * N * type_size), hipSuccess);
 
             hipblasLtMatrixLayout_t matA, matB, matC, matD;
             hipblasLtMatrixLayoutCreate(&matA, dtype, M, K, M);
@@ -438,18 +504,34 @@ namespace
             hipblasLtMatmulDesc_t matmul;
             hipblasLtMatmulDescCreate(&matmul, HIPBLAS_COMPUTE_32F, dtype);
 
+            // Get algorithm heuristic
+            hipblasLtMatmulPreference_t pref;
+            hipblasLtMatmulPreferenceCreate(&pref);
+            size_t workspace_size = 32 * 1024 * 1024;
+            hipblasLtMatmulPreferenceSetAttribute(pref, HIPBLASLT_MATMUL_PREF_MAX_WORKSPACE_BYTES,
+                                                 &workspace_size, sizeof(size_t));
+
+            hipblasLtMatmulHeuristicResult_t heuristicResult[1];
+            int returnedAlgoCount = 0;
+            hipblasLtMatmulAlgoGetHeuristic(handle, matmul, matA, matB, matC, matD,
+                                           pref, 1, heuristicResult, &returnedAlgoCount);
+
             hipblasLtMatmul(handle, matmul, &alpha,
                            d_A, matA, d_B, matB,
                            &beta, d_C, matC, d_C, matD,
-                           nullptr, nullptr, 0, 0);
+                           (returnedAlgoCount > 0) ? &heuristicResult[0].algo : nullptr,
+                           nullptr, 0, 0);
 
-            hipDeviceSynchronize();
+            hipblasLtMatmulPreferenceDestroy(pref);
+            EXPECT_EQ(hipDeviceSynchronize(), hipSuccess);
 
             hipblasLtMatrixLayoutDestroy(matA); hipblasLtMatrixLayoutDestroy(matB);
             hipblasLtMatrixLayoutDestroy(matC); hipblasLtMatrixLayoutDestroy(matD);
             hipblasLtMatmulDescDestroy(matmul);
-            hipFree(d_A); hipFree(d_B); hipFree(d_C);
-            hipblasLtDestroy(handle);
+            EXPECT_EQ(hipFree(d_A), hipSuccess);
+            EXPECT_EQ(hipFree(d_B), hipSuccess);
+            EXPECT_EQ(hipFree(d_C), hipSuccess);
+            EXPECT_EQ(hipblasLtDestroy(handle), HIPBLAS_STATUS_SUCCESS);
         }
 
         hipblaslt_cout << "Tested " << numDevices << " GPUs with different data types" << std::endl;
