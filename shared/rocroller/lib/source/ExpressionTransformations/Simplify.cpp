@@ -704,20 +704,6 @@ namespace rocRoller
             return BitFieldExtract{{extracted}, expr.outputDataType, offset, expr.width};
         }
 
-        static std::optional<CommandArgumentValue>
-            bitwiseNotValue(CommandArgumentValue const& maskVal)
-        {
-            if(auto p = std::get_if<int32_t>(&maskVal))
-                return CommandArgumentValue(static_cast<int32_t>(~static_cast<uint32_t>(*p)));
-            if(auto p = std::get_if<uint32_t>(&maskVal))
-                return CommandArgumentValue(~(*p));
-            if(auto p = std::get_if<int64_t>(&maskVal))
-                return CommandArgumentValue(static_cast<int64_t>(~static_cast<uint64_t>(*p)));
-            if(auto p = std::get_if<uint64_t>(&maskVal))
-                return CommandArgumentValue(~(*p));
-            return std::nullopt;
-        }
-
         struct SimplifyExpressionVisitor
         {
             template <CUnary Expr>
@@ -752,97 +738,6 @@ namespace rocRoller
                 Reinterpret cpy = expr;
                 cpy.arg         = call(expr.arg);
                 return std::make_shared<Expression>(cpy);
-            }
-
-            ExpressionPtr operator()(Subtract const& expr) const
-            {
-                // Algebraic identity: x - (x & m) = x & ~m
-                // Valid for any integer mask in two's complement modular arithmetic.
-                // Check on ORIGINAL expression tree where shared sub-expression
-                // pointers guarantee the two 'x' references are the same value.
-                if(auto const* andExpr = std::get_if<BitwiseAnd>(expr.rhs.get()))
-                {
-                    // BitwiseAnd is commutative: the constant mask may be on either side
-                    ExpressionPtr constOp = nullptr;
-
-                    if(identical(expr.lhs, andExpr->lhs)
-                       && evaluationTimes(andExpr->rhs)[EvaluationTime::Translate])
-                    {
-                        constOp = andExpr->rhs;
-                    }
-                    else if(identical(expr.lhs, andExpr->rhs)
-                            && evaluationTimes(andExpr->lhs)[EvaluationTime::Translate])
-                    {
-                        constOp = andExpr->lhs;
-                    }
-
-                    if(constOp)
-                    {
-                        auto maskVal    = evaluate(constOp);
-                        auto complement = bitwiseNotValue(maskVal);
-                        if(complement.has_value())
-                        {
-                            auto resultVarType = resultVariableType(expr);
-                            // Simplify the shared 'x' sub-expression once
-                            auto simplifiedX = call(expr.lhs);
-                            auto rv          = simplifiedX & literal(complement.value());
-
-                            if(resultVariableType(rv) != resultVarType)
-                            {
-                                AssertFatal(!resultVarType.isPointer(),
-                                            ShowValue(expr),
-                                            ShowValue(rv),
-                                            ShowValue(resultVarType));
-                                rv = convert(resultVarType.dataType, rv);
-                            }
-                            copyComment(rv, expr);
-                            return rv;
-                        }
-                    }
-                }
-
-                // Standard CBinary simplification (replicated from the template handler)
-                auto resultVarType = resultVariableType(expr);
-
-                auto lhs = call(expr.lhs);
-                auto rhs = call(expr.rhs);
-
-                bool eval_lhs = evaluationTimes(lhs)[EvaluationTime::Translate];
-                bool eval_rhs = evaluationTimes(rhs)[EvaluationTime::Translate];
-
-                auto          simplifier = SimplifyByConstant<Subtract>{resultVarType};
-                ExpressionPtr rv         = nullptr;
-
-                if(eval_lhs && eval_rhs)
-                {
-                    rv = literal(evaluate(Subtract({lhs, rhs})));
-                }
-                // Subtract is NOT commutative, so no commutative eval_lhs branch
-                else if(eval_rhs)
-                {
-                    rv = simplifier.call(lhs, evaluate(rhs));
-                }
-                else if(eval_lhs)
-                {
-                    auto simplifierLHS = SimplifyByConstantLHS<Subtract>{resultVarType};
-                    rv                 = simplifierLHS.call(evaluate(lhs), rhs);
-                }
-
-                if(rv != nullptr)
-                {
-                    if(resultVariableType(rv) != resultVarType)
-                    {
-                        AssertFatal(!resultVarType.isPointer(),
-                                    ShowValue(expr),
-                                    ShowValue(rv),
-                                    ShowValue(resultVarType));
-                        rv = convert(resultVarType.dataType, rv);
-                    }
-                    copyComment(rv, expr);
-                    return rv;
-                }
-
-                return std::make_shared<Expression>(Subtract({lhs, rhs, expr.comment}));
             }
 
             template <CBinary Expr>
