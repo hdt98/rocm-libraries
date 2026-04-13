@@ -41,3 +41,8 @@ repos:
         - dos2unix
         - clang-format==18.1.3
         pass_filenames: false
+    -   id: no-unconditional-preprocessor-if
+        name: "Forbid bare #if 0 / #if 1 (add a comment explaining why)"
+        language: pygrep
+        entry: '^\s*#\s*if\s+(0|1)\s*$'
+        types: [c++]

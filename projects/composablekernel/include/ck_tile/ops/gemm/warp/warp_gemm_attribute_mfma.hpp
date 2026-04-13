@@ -498,7 +498,7 @@ struct WarpGemmAttributeMfmaTransposedCDistribution_SwizzleB
         tuple<sequence<0, 0>>,
         sequence<2>,
         sequence<1>>;
-#if 0
+#if 0 // disabled: conditional code block
     using BWarpDstrEncoding = tile_distribution_encoding<
         sequence<>,
         tuple<sequence<Impl::kAMLane / (Impl::kABKPerLane * Impl::kABKLane * 2),
@@ -730,7 +730,7 @@ struct WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB
         tuple<sequence<0, 0>>,
         sequence<2>,
         sequence<1>>;
-#if 0
+#if 0 // disabled: conditional code block
     using BWarpDstrEncoding = tile_distribution_encoding<
         sequence<>,
         tuple<sequence<Impl::kAMLane / (Impl::kABKPerLane * Impl::kABKLane * 2),

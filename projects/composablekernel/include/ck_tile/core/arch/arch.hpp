@@ -1076,7 +1076,7 @@ CK_TILE_DEVICE void block_sync_lds_direct_load()
 
 CK_TILE_DEVICE void s_nop(index_t cnt = 0)
 {
-#if 1
+#if 1 // alt: active branch of conditional toggle
     asm volatile("s_nop %0" : : "n"(cnt) :);
 #else
     __builtin_amdgcn_sched_barrier(cnt);

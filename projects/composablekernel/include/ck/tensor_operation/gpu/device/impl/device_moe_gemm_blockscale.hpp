@@ -353,7 +353,7 @@ struct DeviceMoeGemmBlockScale
                     throw std::runtime_error("todo: only v1 & v2 support now");
                 }
             }
-#if 1
+#if 1 // alt: active branch of conditional toggle
             else
             {
                 // Tail number always 1

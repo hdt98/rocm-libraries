@@ -891,8 +891,8 @@ struct Merge_v1_carry_check
 
                 do_carry = idx_low_tmp >= low_lengths_[i];
 
-#if 0
-                // TODO: use exec-mask inline asm, which use 1 VALU
+#if 0 // todo: use exec-mask inline asm for 1-VALU carry adjustment
+      // TODO: use exec-mask inline asm, which use 1 VALU
                 if(do_carry)
                 {
                     idx_diff_low(i) -= low_lengths_[i];
@@ -928,8 +928,8 @@ struct Merge_v1_carry_check
 
                 do_borrow = idx_low_tmp < 0;
 
-#if 0
-                // TODO: use exec-mask inline asm
+#if 0 // todo: use exec-mask inline asm for 1-VALU borrow adjustment
+      // TODO: use exec-mask inline asm
                 if(do_borrow)
                 {
                     idx_diff_low(i) += low_lengths_[i];
@@ -967,7 +967,7 @@ struct Merge_v1_carry_check
                                               const UpIdx& idx_up_new,
                                               Number<Hack>) const
     {
-#if 1
+#if 1 // alt: active branch of conditional toggle
         UpdateLowerIndex_1a(idx_diff_low, idx_diff_up, idx_low, idx_up_new, Number<Hack>{});
 #elif 0
         UpdateLowerIndex_1b(idx_diff_low, idx_diff_up, idx_low, idx_up_new, Number<Hack>{});

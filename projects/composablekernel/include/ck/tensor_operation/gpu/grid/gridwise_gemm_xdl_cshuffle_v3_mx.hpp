@@ -1075,8 +1075,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                 }
             }
         }
-#if 0
-        // check gridwise gemm pipeline
+#if 0 // disabled: pipeline prefetch-stage validity check
+      // check gridwise gemm pipeline
         const auto num_k_loop = karg.AK0 / (KPerBlock / AK1Value);
 
         if constexpr(BlkGemmPipelineVer != BlockGemmPipelineVersion::v1)

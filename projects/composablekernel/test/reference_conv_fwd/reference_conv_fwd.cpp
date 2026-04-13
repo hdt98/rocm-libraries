@@ -90,7 +90,7 @@ run_reference_convolution_forward(const ck::utils::conv::ConvParam& conv_param,
 // are disabled
 // TODO: add more tests, which comply with assumption about dimension order of reference convolution
 // and add tests for more physical layout
-#if 0
+#if 0 // todo: incomplete implementation
 TEST(ReferenceConvolutionFWD, Conv2DGNHWC)
 {
     ck::utils::conv::ConvParam conv_param(2,

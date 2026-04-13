@@ -858,7 +858,7 @@ struct DeviceGroupedGemm_Xdl_Multi_ABD_Fixed_NK
                sizeof(GroupedGemmMultiABDKernelArgument<NumATensor, NumBTensor, NumDTensor>);
     }
 
-#if 0
+#if 0 // disabled: workspace for split-K barriers (not yet needed)
     size_t GetWorkSpaceSize(const BaseArgument* p_arg) const override
     {
         auto arg = *dynamic_cast<const Argument*>(p_arg);

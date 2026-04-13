@@ -814,7 +814,7 @@ struct GridwiseGemm_xdl_cshuffle_v2
         {
             return;
         }
-#if 0
+#if 0 // debug: print workgroup-to-tile mapping and CU/SE/XCC info
         if(threadIdx.x == 0){
             printf("Hardware assigned No. %03d workgroup of logical C tile (%02d, %02d) on %d th XCC Die, %d th SE, %d th CU\n",
                get_block_1d_id(),

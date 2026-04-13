@@ -997,7 +997,7 @@ CK_TILE_DEVICE void insert_dummy_dep_per_dword(array<float, N>& b)
         asm volatile(" " : : "v"(b.get(number<i>{})) : "memory");
     });
 }
-#if 1
+#if 1 // alt: active branch of conditional toggle
 // below specialization just merge size() of dwords into single section
 template<>
 CK_TILE_DEVICE void insert_dummy_dep_per_dword<2>(array<float, 2>& b)

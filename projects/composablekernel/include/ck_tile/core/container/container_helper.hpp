@@ -127,7 +127,7 @@ CK_TILE_HOST_DEVICE constexpr auto container_reorder_given_old2new(sequence<Is..
     return container_reorder_given_new2old(old_seq, new2old);
 }
 
-#if 0
+#if 0 // alt: alternative implementation
 // rocm-4.1 compiler would crash for recursive lambda
 template <typename Container,
           typename Reduce,
@@ -239,7 +239,7 @@ template <typename TData, index_t NSize, typename Reduce, typename Init>
 CK_TILE_HOST_DEVICE constexpr auto
 container_reverse_exclusive_scan(const array<TData, NSize>& x, Reduce f, Init init)
 {
-#if 0
+#if 0 // disabled: conditional code block
     array<TData, NSize> y;
 
     TData r = init;
@@ -276,7 +276,7 @@ container_reverse_exclusive_scan(const sequence<Is...>& seq, Reduce f, number<In
     return reverse_exclusive_scan_sequence(seq, f, number<Init>{});
 }
 
-#if 0
+#if 0 // disabled: conditional code block
 // rocm4.1 compiler would crash with recursive lambda
 template <typename... Xs, typename Reduce, typename Init>
 CK_TILE_HOST_DEVICE constexpr auto
@@ -468,7 +468,7 @@ CK_TILE_HOST_DEVICE constexpr auto sequence_to_tuple_of_number(sequence<Is...>)
         number<Seq::size()>{});
 }
 
-#if 0
+#if 0 // disabled: conditional code block
 #define TO_TUPLE_OF_SEQUENCE(a_of_b_impl, a_size, bs_sizes)             \
     [a_of_b_impl, a_size, bs_sizes] {                                   \
         return ck_tile::generate_tuple(                                 \

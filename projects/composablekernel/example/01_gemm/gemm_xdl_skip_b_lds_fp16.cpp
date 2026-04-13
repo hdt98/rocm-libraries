@@ -29,7 +29,7 @@ using DeviceGemmInstance = ck::tensor_operation::device::DeviceGemmXdlSkipBLds
         //###########|  Type|  Type|  Type|    Type|        |        |        | Elementwise| Elementwise| Elementwise|Spacialization|  Size| Block| Block| Block|   |  XDL|  XDL|  Per|  Per|   ThreadCluster|  ThreadCluster| SrcAccessOrder|   SrcVectorDim|      SrcScalar|      DstScalar| AddExtraM|       SrcScalar|  buffer| SrcDstVectorDim|       DstScalar|
         //###########|      |      |      |        |        |        |        |   Operation|   Operation|   Operation|              |      |      |      |      |   |     |     | Wave| Wave| Lengths_K0_M_K1|   ArrangeOrder|               |               |      PerVector|   PerVector_K1|          |       PerVector|  size  |                |       PerVector|
         //###########|      |      |      |        |        |        |        |            |            |            |              |      |      |      |      |   |     |     |     |     |                |               |               |               |               |               |          |                |        |                |                |
-#if 0       
+#if 0 // disabled: conditional code block
                     <   F16,   F16,   F16,     F32,     Row,     Col,     Row, PassThrough, PassThrough, PassThrough,   GemmDefault,   256,    16,   64,     4,  8,   16,   16,    1,    1,     S<16, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,      true,            8,       8,        7,               1>;
 using ADataType   = ck::half_t;
 using BDataType   = ck::half_t;
@@ -84,7 +84,7 @@ int main(int argc, char* argv[])
     bool time_kernel     = false;
 
     // GEMM shape
-#if 1
+#if 1 // alt: active branch of conditional toggle
     ck::index_t M = 16;
     ck::index_t N = 64 * 120;
     ck::index_t K = 4096;
@@ -232,7 +232,7 @@ int main(int argc, char* argv[])
 
         ref_invoker.Run(ref_argument);
 
-#if 0
+#if 0 // debug: diagnostic output
         {
             show_2d_matrix(std::cout << "a : ", a_m_k) << std::endl;
             show_2d_matrix(std::cout << "b: ", b_k_n) << std::endl;

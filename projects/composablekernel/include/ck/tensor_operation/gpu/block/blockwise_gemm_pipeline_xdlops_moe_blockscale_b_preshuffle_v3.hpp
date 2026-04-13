@@ -538,7 +538,7 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_v3<
                                a_thread_buf);
         });
 
-#if 0
+#if 0 // alt: explicit per-scale MFMA accumulation loop
         static_for<0, xdlops_gemm.GetRegSizePerXdlops(), 1>{}([&](auto t) {
             c_thread_buf_per_scale.GetVectorTypeReference(Number<0>{})
                 .template AsType<AccDataType>()(Number<t>{}) = 0;

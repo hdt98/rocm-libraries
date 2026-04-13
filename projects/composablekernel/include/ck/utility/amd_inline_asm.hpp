@@ -284,7 +284,7 @@ __device__ void amd_assembly_outer_product_1x4(half16_t a,
 __device__ void
 amd_assembly_outer_product_1x2(int8x4_t a, int8x4_t b0, int8x4_t b1, int32_t& c0, int32_t& c1)
 {
-#if 1
+#if 1 // alt: active branch of conditional toggle
     asm volatile("\n \
             v_dot4_i32_i8 %0, %2, %3, %0\n \
             v_dot4_i32_i8 %1, %2, %4, %1\n \
@@ -315,7 +315,7 @@ __device__ void amd_assembly_outer_product_1x4(int8x4_t a,
                                                int32_t& c2,
                                                int32_t& c3)
 {
-#if 1
+#if 1 // alt: active branch of conditional toggle
     asm volatile("\n \
             v_dot4_i32_i8 %0, %4, %5, %0\n \
             v_dot4_i32_i8 %1, %4, %6, %1\n \

@@ -30,7 +30,7 @@ static constexpr bool PermuteA = false;
 static constexpr bool PermuteB = false;
 static constexpr int KPack     = 32; // int4 -> 32, fp8 -> 16, fp16 -> 8
 // clang-format off
-#if 0
+#if 0 // disabled: conditional code block
 using DeviceGemmV2Instance = 
     ck::tensor_operation::device::DeviceGemm_Xdl_CShuffleV3_BPreshuffle<
         ALayout,   BLayout,  CLayout,   

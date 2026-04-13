@@ -54,7 +54,7 @@
 // implementing the "memory address space" attribute
 // https://llvm.org/docs/AMDGPUUsage.html#amdgpu-address-spaces-table
 // WA for https://github.com/ROCm/composable_kernel/issues/1946
-#if 0
+#if 0 // workaround: compiler/runtime issue
 #define CK_TILE_GENERIC_ADDR __attribute__((address_space(0)))
 #define CK_TILE_GLOBAL_ADDR __attribute__((address_space(1)))
 #define CK_TILE_LDS_ADDR __attribute__((address_space(3)))

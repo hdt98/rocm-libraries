@@ -70,7 +70,7 @@ struct FusedMoeGemmPipeline_FlatmmUk
 
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize()
     {
-#if 1
+#if 1 // alt: active branch of conditional toggle
         constexpr index_t smem_0 = Policy::template GetUK_0<Problem>().GetSmemSize();
         constexpr index_t smem_1 = Policy::template GetUK_1<Problem>().GetSmemSize();
         constexpr index_t smem_bridge =

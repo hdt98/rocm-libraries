@@ -75,10 +75,10 @@ struct DynamicQuantEpilogue
     CK_TILE_DEVICE static constexpr auto MakeSmoothInputScaleTileDistribution()
     {
         using S = BlockShape;
-#if 0
-        // don't remove this
-        // Note that if we set encoding purposely like this, you will result in compile fail
-        // TODO: sm_scale create local-scratch to accept arbitrary acc input (with same length)
+#if 0 // todo: incomplete implementation
+      // don't remove this
+      // Note that if we set encoding purposely like this, you will result in compile fail
+      // TODO: sm_scale create local-scratch to accept arbitrary acc input (with same length)
         return make_static_tile_distribution(
             tile_distribution_encoding<
                 sequence<S::Repeat_M, S::WarpPerBlock_M, S::ThreadPerWarp_M>,

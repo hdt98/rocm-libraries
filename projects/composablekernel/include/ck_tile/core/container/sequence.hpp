@@ -502,7 +502,7 @@ struct sequence_reverse<sequence<Ns...>>
 // template <index_t... Ns>
 // using sequence_reverse_t = typename sequence_reverse<Ns...>::type;
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 template <typename Reduce, typename Seq, typename... Seqs>
 struct sequence_reduce
 {
@@ -933,7 +933,7 @@ CK_TILE_HOST_DEVICE constexpr auto pick_sequence_elements_by_ids(Seq, sequence<I
     return sequence<Seq::get(number<Is>{})...>{};
 }
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 namespace detail {
 template <typename WorkSeq, typename RemainSeq, typename RemainMask>
 struct pick_sequence_elements_by_mask_impl

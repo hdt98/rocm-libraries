@@ -718,7 +718,7 @@ struct GridwiseGemm_bk0mk1_bk0nk1_mn_xdlops_streamk
                 // block synchronization
                 wg_barrier.wait_eq(reduction_idx, tile_acc_offset_end - tile_acc_offset_start);
 
-#if 0
+#if 0 // debug: print stream-K reduction tile offsets
                 if(threadIdx.x == 0) {
                     printf("bid:%d, rid:%d, os:%d,%d, spatial:%d,%d\n", static_cast<int>(blockIdx.x),
                         reduction_idx, __builtin_amdgcn_readfirstlane(tile_acc_offset_start), __builtin_amdgcn_readfirstlane(tile_acc_offset_end),

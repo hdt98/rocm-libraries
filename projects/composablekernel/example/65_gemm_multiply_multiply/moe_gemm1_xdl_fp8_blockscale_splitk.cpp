@@ -118,7 +118,7 @@ static constexpr ck::index_t IsSplitK    = true;  // splitk gemm1
 static constexpr ck::index_t ActOP       = 0;     // 0: gelu_and_mul, 1: silu_and_mul
 static constexpr bool MulRoutedWeight    = false; // splitk gemm1 does not do routedWeight.
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 static constexpr ck::index_t MPerBlock           = 64;
 static constexpr ck::index_t NPerBlock           = 128;
 static constexpr ck::index_t MNPerXDL            = 16;
@@ -182,7 +182,7 @@ int main(int argc, char* argv[])
     bool do_verification = true;
     int init_method      = 1;
     bool time_kernel     = true;
-#if 1
+#if 1 // alt: active branch of conditional toggle
     // GEMM shape
     ck::index_t N = 1536;
     ck::index_t K = 4096;

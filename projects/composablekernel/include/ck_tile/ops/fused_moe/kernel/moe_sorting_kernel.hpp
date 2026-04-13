@@ -1414,7 +1414,7 @@ CK_TILE_HOST index_t moe_sorting_get_workspace_size(int tokens_,
                                                     int topk_,
                                                     int dispatch_policy_)
 {
-#if 1
+#if 1 // alt: active branch of conditional toggle
     // return 0;
     if(dispatch_policy_ == 0)
     {
@@ -3031,7 +3031,7 @@ struct MoeSortingMultiPhaseKernel_P23
                 }
 
                 r_t x_r;
-#if 0
+#if 0 // disabled: conditional code block
                 if constexpr(index_pack != 1)
                 {
                     // shuffle, we must have contiguout thread holds contiguout token

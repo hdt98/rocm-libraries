@@ -175,7 +175,7 @@ int main(int argc, char* argv[])
     std::cout << "b1_k_n: " << b1_k_n.mDesc << std::endl;
     std::cout << "e_m_n: " << e_m_n_host_result.mDesc << std::endl;
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     switch(init_method)
     {
     case 0: break;
@@ -216,7 +216,7 @@ int main(int argc, char* argv[])
         b1_k_n.GenerateTensorValue(GeneratorTensor_3<B1DataType>{0, 1.0});
     }
 #endif
-#if 0
+#if 0 // debug: diagnostic output
     for(int im =0; im< (M + Scale_Block_M - 1) / Scale_Block_M; im++){
         float row_sum = .0;
         for(int ik =0; ik< (K + Scale_Block_K - 1) / Scale_Block_K; ik++){
@@ -336,7 +336,7 @@ int main(int argc, char* argv[])
 
         ref_invoker.Run(ref_argument);
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
         for(int m = 0; m < M; ++m)
         {
             for(int n = 0; n < N; ++n)

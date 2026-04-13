@@ -109,8 +109,8 @@ struct tile_distribution
 
     CK_TILE_HOST_DEVICE static constexpr auto get_lengths()
     {
-#if 0
-        // FIXME: tensor_adaptor::GetBottomDimensionLengths is wrong. re-enable this after it's fixed
+#if 0 // todo: incomplete implementation
+      // FIXME: tensor_adaptor::GetBottomDimensionLengths is wrong. re-enable this after it's fixed
         ps_ys_to_xs_.GetBottomDimensionLengths();
 #else
         return generate_tuple(
@@ -136,7 +136,7 @@ struct tile_distribution
         return DstrEncode{};
     }
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     // Calculate Replication index [R0, R1, ...] based on Partion index
     // FIXME: very nasty implementation
     template <typename PartitionIndex>

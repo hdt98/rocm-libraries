@@ -236,7 +236,7 @@ struct DeviceBatchedGemmSoftmaxGemmPermute_Xdl_CShuffle
     // TODO ANT: implement bias combination
     static_assert(NumD1Tensor == 0, "Gemm1 Bias addition is unimplemented");
 
-#if 0
+#if 0 // todo: add gemm dimension aliases
     // TODO ANT: use alias
     static constexpr index_t NumDimGemm0M = NumDimM;
     static constexpr index_t NumDimGemm0N = NumDimN;

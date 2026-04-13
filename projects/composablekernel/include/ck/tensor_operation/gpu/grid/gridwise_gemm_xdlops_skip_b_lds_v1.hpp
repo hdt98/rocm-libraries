@@ -523,7 +523,7 @@ struct GridwiseGemm_k0mk1_k0nk1_mn_xdlops_skip_b_lds_v1
         const auto wave_id     = GetWaveIdx();
         const auto wave_k_n_id = GetWaveKNIdx(wave_id[I2]);
 
-#if 0
+#if 0 // debug: print block/wave/thread mapping info
         const index_t block_id  = get_block_1d_id();
         const index_t thread_id = get_thread_local_1d_id();
         printf("block id: %d  m blockid: %d n block id: %d ,thread id: %d, wave id :{%d %d %d} "

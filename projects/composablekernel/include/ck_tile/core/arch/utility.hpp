@@ -30,7 +30,7 @@ CK_TILE_DEVICE void m0_inc_with_memory(index_t v)
 template <typename T>
 CK_TILE_DEVICE T warp_shuffle_up(const T& v_local, uint32_t lane_delta)
 {
-#if 0
+#if 0 // disabled: conditional code block
     return  __shfl_up(v_local, lane_delta);
 #elif 1
     static_assert(sizeof(T) == sizeof(int32_t), "wrong!");
@@ -47,7 +47,7 @@ CK_TILE_DEVICE T warp_shuffle_up(const T& v_local, uint32_t lane_delta)
 template <typename T>
 CK_TILE_DEVICE T warp_shuffle_down(const T& v_local, uint32_t lane_delta)
 {
-#if 0
+#if 0 // disabled: conditional code block
     return  __shfl_down(v_local, lane_delta);
 #elif 1
     static_assert(sizeof(T) == sizeof(int32_t), "wrong!");
@@ -77,7 +77,7 @@ CK_TILE_DEVICE auto warp_shuffle_down_pair(const T& v_local)
 template <typename T>
 CK_TILE_DEVICE T warp_shuffle(const T& v_local, uint32_t src_lane)
 {
-#if 0
+#if 0 // disabled: conditional code block
     return  __shfl(v_local, src_lane);
 #elif 1
     if constexpr(sizeof(int32_t) > sizeof(T))

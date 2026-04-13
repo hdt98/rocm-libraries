@@ -382,7 +382,7 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v3<BlockGemmPipelineSch
         }
         else if constexpr(stage.value == 1)
         {
-#if 0
+#if 0 // alt: finer-grained DS write/read interleaving schedule
             constexpr auto staged_num_ds_write_a_per_ds_read_a =
                 num_ds_write_inst_a / staged_num_ds_read_inst_a;
             constexpr auto staged_num_mfma_per_ds_write_a = staged_num_mfma / num_ds_write_inst_a;

@@ -24,7 +24,7 @@
 namespace ck {
 namespace profiler {
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 template <bool KLast>
 void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, int K)
 {
@@ -273,7 +273,7 @@ bool profile_gemm_mx_impl(int do_verification,
         break;
     }
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     preShuffleScaleBuffer<ck::is_same_v<ALayout, Row>>(a_m_k_scale.mData.data(),
                                                        a_shuffled_scale.mData.data(),
                                                        Scale_Padded_M,

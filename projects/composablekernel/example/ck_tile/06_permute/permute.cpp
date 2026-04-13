@@ -359,7 +359,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
     if(do_validation)
     {
         reference_permute(x, y, perm);
-#if 0
+#if 0 // debug: diagnostic output
         if constexpr (std::is_same_v<float, DataType>){
             // using itype = to_integer_type<sizeof(DataType)>;
             fflush(stdout);

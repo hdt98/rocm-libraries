@@ -60,7 +60,7 @@ __device__ void block_sync_lds_direct_load()
 
 __device__ void s_nop()
 {
-#if 1
+#if 1 // alt: active branch of conditional toggle
     asm volatile("\
     s_nop 0 \n \
     " ::);

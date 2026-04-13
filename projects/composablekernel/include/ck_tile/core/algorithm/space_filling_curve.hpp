@@ -86,7 +86,7 @@ struct space_filling_curve
     template <index_t AccessIdx1d>
     static CK_TILE_HOST_DEVICE constexpr Index _get_index(number<AccessIdx1d>)
     {
-#if 0
+#if 0 // todo: incomplete implementation
         /*
          * \todo: tensor_adaptor::calculate_bottom_index does NOT return constexpr as expected.
          */

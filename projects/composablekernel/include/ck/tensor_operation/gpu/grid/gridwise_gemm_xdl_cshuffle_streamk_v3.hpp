@@ -1682,7 +1682,7 @@ struct GridwiseGemm_xdl_cshuffle_streamk_v3
                                                CShuffleBlockTransferScalarPerVector_NPerBlock),
                           CElementwiseOperation{}};
 
-#if 0
+#if 0 // debug: print stream-K reduction tile offsets
                 if(threadIdx.x == 0) {
                     printf("bid:%d, rid:%d, os:%d,%d, spatial:%d,%d\n", static_cast<int>(blockIdx.x),
                         reduction_idx, __builtin_amdgcn_readfirstlane(tile_acc_offset_start), __builtin_amdgcn_readfirstlane(tile_acc_offset_end),

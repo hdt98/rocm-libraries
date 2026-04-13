@@ -1020,7 +1020,7 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3_b_preshuffle
         }
 
         // check gridwise gemm pipeline
-#if 1
+#if 1 // alt: active branch of conditional toggle
         const auto num_k_loop = karg.AK0 / (KPerBlock / AK1Value);
 
         if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)

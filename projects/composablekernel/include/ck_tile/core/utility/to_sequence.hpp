@@ -5,7 +5,7 @@
 #include "ck_tile/core/container/sequence.hpp"
 // TODO: use c++20 nontype template with struct to implement this
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 // clang happen to support this feature (__cpp_generic_lambdas >= 201707) in c++17 mode
 #define TO_SEQUENCE(a, n)                                                                    \
     _Pragma("clang diagnostic push") _Pragma(                                                \

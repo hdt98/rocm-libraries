@@ -249,8 +249,8 @@ int main(int argc, char* argv[])
         // B[N0, N1, K0]
         std::vector<ck::index_t> b_ns_ks_lengths{N0, N1, K0};
         std::vector<ck::index_t> b_ns_ks_strides{N1 * K0, K0, 1};
-#if 0
-        // D[M0, N0, M1, N1, M2]
+#if 0 // disabled: conditional code block
+      // D[M0, N0, M1, N1, M2]
         std::vector<ck::index_t> d_ms_ns_lengths{M0, M1, M2, N0, N1};
         std::vector<ck::index_t> d_ms_ns_strides{0, 0, 0, N1, 1};
         // E[M0, N0, M1, N1, M2]

@@ -386,7 +386,7 @@ TEST(MXBF8, DeviceScaledConvert)
     /// Test round to nearest even
     EXPECT_EQ(out[i++], 1024.0f / 4.0f) << "out[i-1]: " << out[i - 1];
     EXPECT_TRUE(std::isnan(out[i++])) << "out[i-1]: " << out[i - 1];
-#if 1
+#if 1 // alt: active branch of conditional toggle
     EXPECT_TRUE(std::isinf(out[i++])) << "out[i-1]: " << out[i - 1];
     EXPECT_TRUE(std::isinf(out[i++])) << "out[i-1]: " << out[i - 1];
     EXPECT_TRUE(std::isinf(out[i++])) << "out[i-1]: " << out[i - 1];

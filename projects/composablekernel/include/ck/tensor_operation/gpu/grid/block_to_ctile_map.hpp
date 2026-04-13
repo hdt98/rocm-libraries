@@ -138,7 +138,7 @@ struct BlockToCTileMap_M00_N0_M01Adapt<MPerBlock, NPerBlock, void>
         __device__ constexpr BlockToCTileMap_M00_N0_M01Adapt(index_t M, index_t N, index_t M01 = 8)
         : M_(M), N_(N), M01_(M01)
     {
-#if 0
+#if 0 // debug: print M00_N0_M01Adapt tile-map ctor params
         if(get_thread_global_1d_id()==0){
             printf("Ctor called, M= %d, N= %d, M01 = %d\n", M_, N_, M01_);
         }
@@ -418,7 +418,7 @@ struct BlockToCTileMap_N00_M0_N01Adapt<MPerBlock, NPerBlock, void>
     __host__ __device__ BlockToCTileMap_N00_M0_N01Adapt(index_t M, index_t N, index_t N01 = 8)
         : M_(M), N_(N), N01_(N01)
     {
-#if 0
+#if 0 // debug: print N00_M0_N01Adapt tile-map ctor params
         if(get_thread_global_1d_id()==0){
             printf("Ctor called, M= %d, N= %d, N01 = %d\n", M_, N_, N01_);
         }
@@ -1185,7 +1185,7 @@ struct BlockToCTileMap_GemmStreamK
             eqav_tiles_little     = MDiv(upper_little / k_iters_per_tile.get());
         }
 
-#if 0
+#if 0 // debug: print stream-K partitioning parameters
         printf("cu:%d, occupancy:%d, grids:%d, num_tiles:%d, dp_tiles:%d, sk_num_big_blocks:%d, "
                "sk_num_blocks:%d, "
                "sk_total_iters:%d, dp_start_block_idx:%d, dp_iters_per_block:%d, dp_num_blocks:%d, "

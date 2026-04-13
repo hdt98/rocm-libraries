@@ -132,7 +132,7 @@ using CDEElementOp = MulABScaleExpertWeight; // combine MulRoutedWeight = true
 
 // using CDEElementOp = MulABScale; // combine MulRoutedWeight = true
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 void preShuffleBuffer(const I4* src, I4* dst, int N, int K, int NXdl)
 {
     int NLane = NXdl;
@@ -337,7 +337,7 @@ int main(int argc, char* argv[])
     // do GEMM
     auto device_op = DeviceOpInstance{};
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     preShuffleBuffer(b0_e_n_k.mData.data(),
                      b0_preshuffled.mData.data(),
                      N * experts,

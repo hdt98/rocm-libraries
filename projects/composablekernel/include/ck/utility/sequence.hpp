@@ -521,7 +521,7 @@ struct sequence_reverse<Sequence<>>
     using type = Sequence<>;
 };
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 template <typename Reduce, typename Seq, typename... Seqs>
 struct sequence_reduce
 {

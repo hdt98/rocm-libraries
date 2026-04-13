@@ -493,7 +493,7 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
         a_blockwise_copy.RunRead(a_grid_desc, a_grid_buf);
         a_blockwise_copy.MoveSrcSliceWindow(a_grid_desc, a_block_copy_step);
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
         static_for<0, MRepeat, 1>{}([&](auto m0) {
             a_scale_thread_copy.Run(a_scale_grid_desc,
                                     a_scale_grid_buf,
@@ -550,7 +550,7 @@ struct BlockwiseGemmXdlops_pipeline_blockscale_bpreshuffle_v3<BlockGemmPipelineS
                                a_thread_buf);
         });
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
         static_for<0, xdlops_gemm.GetRegSizePerXdlops(), 1>{}([&](auto t) {
             c_thread_buf_per_scale.GetVectorTypeReference(Number<0>{})
                 .template AsType<AccDataType>()(Number<t>{}) = 0;

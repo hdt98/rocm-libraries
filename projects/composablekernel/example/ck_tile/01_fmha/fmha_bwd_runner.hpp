@@ -129,7 +129,7 @@ bwd_result fmha_bwd_run(mode_enum mode,
     bool use_kpadding =
         mode == mode_enum::group && (!seqlen_kpads.empty() && seqlen_kpads[0] != -1);
 
-#if 0
+#if 0 // debug: diagnostic output
     std::cout << "use_qpadding: " << use_qpadding << std::endl;
     std::cout << "use_kpadding: " << use_kpadding << std::endl;
     std::cout << "seqlen_qs: " << seqlen_qs << std::endl;

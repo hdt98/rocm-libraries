@@ -21,7 +21,7 @@ using OutLayout = ck::tensor_layout::convolution::NDHWC;
 
 constexpr ck::index_t InOutRank  = 5;
 constexpr ck::index_t WindowRank = 3;
-#if 0
+#if 0 // disabled: conditional code block
 constexpr auto ReduceOpId  = ck::ReduceTensorOp::MAX;
 constexpr bool OutputIndex = false;
 #else

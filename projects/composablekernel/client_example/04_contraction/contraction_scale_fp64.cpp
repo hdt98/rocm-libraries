@@ -53,7 +53,7 @@ struct SimpleDeviceMem
 int main(int argc, char* argv[])
 {
 // kkn
-#if 1
+#if 1 // alt: active branch of conditional toggle
     // A[M0, M1, K0, K1]
     std::vector<ck::index_t> a_ms_ks_lengths{30, 128, 32, 64};
     std::vector<ck::index_t> a_ms_ks_strides{524288, 4096, 128, 1};

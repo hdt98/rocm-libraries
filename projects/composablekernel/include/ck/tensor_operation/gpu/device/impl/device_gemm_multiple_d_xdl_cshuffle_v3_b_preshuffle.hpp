@@ -367,12 +367,12 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3_BPreshuffle
                     throw std::runtime_error("todo: only v1 v2 and v3 support now");
                 }
             }
-#if 0
+#if 0 // disabled: no-main-loop kernel launch path
             else
             {
                 if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for no-main-loop case
                     if(arg.KBatch > 1)
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)

@@ -353,7 +353,7 @@ struct DeviceGemm_Xdl_CShuffleV3_BPreshuffle : public DeviceGemmV2BPreshuffle<AL
                     throw std::runtime_error("Only support pipeline ver v1, v2, v3 now!");
                 }
             }
-#if 0
+#if 0 // disabled: no-main-loop kernel launch path
             else
             {
                 // Tail number always 1

@@ -803,7 +803,7 @@ struct tuple_element<I, const ck_tile::tuple<Ts...>>
 
 } // namespace std
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 #define TO_TUPLE_OF_NUMBER(a, n)                                                             \
     _Pragma("clang diagnostic push") _Pragma(                                                \
         "clang diagnostic ignored \"-Wc++20-extensions\"")[a]<ck_tile::index_t... IDX_IDX_>( \

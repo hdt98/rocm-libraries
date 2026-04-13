@@ -22,7 +22,7 @@ using OutLayout = ck::tensor_layout::convolution::NDHWC;
 
 constexpr ck::index_t InOutRank  = 5;
 constexpr ck::index_t WindowRank = 3;
-#if 1
+#if 1 // alt: active branch of conditional toggle
 constexpr auto ReduceOpId  = ck::ReduceTensorOp::MAX;
 constexpr bool OutputIndex = true;
 #else

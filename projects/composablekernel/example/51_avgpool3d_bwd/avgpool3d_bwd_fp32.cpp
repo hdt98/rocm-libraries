@@ -13,7 +13,7 @@ using DOutDataType    = float;
 using DInDataType     = float;
 using ComputeDataType = float;
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
 using DOutLayout = ck::tensor_layout::convolution::NDHWC;
 using DInLayout  = ck::tensor_layout::convolution::NDHWC;
 #else

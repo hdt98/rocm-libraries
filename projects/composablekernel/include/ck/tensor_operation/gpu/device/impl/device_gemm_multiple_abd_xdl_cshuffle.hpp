@@ -193,7 +193,7 @@ struct DeviceGemmMultipleABD_Xdl_CShuffle : public DeviceGemmMultipleABD<AsLayou
                 if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 ||
                              BlkGemmPipelineVer == BlockGemmPipelineVersion::v3)
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for pipeline v1/v3
                     if(arg.KBatch > 1)
                     {
                         const auto kernel =
@@ -217,7 +217,7 @@ struct DeviceGemmMultipleABD_Xdl_CShuffle : public DeviceGemmMultipleABD<AsLayou
                 // Tail number could be One to Seven
                 else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v2)
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for pipeline v2
                     if(arg.KBatch > 1)
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::One)
@@ -447,7 +447,7 @@ struct DeviceGemmMultipleABD_Xdl_CShuffle : public DeviceGemmMultipleABD<AsLayou
                 // Tail number could be Odd or Even
                 else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for pipeline v4 (2-LDS)
                     if(arg.KBatch > 1)
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
@@ -498,7 +498,7 @@ struct DeviceGemmMultipleABD_Xdl_CShuffle : public DeviceGemmMultipleABD<AsLayou
                 }
                 else
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for other pipelines
                     if(arg.KBatch > 1)
                     {
                         if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
@@ -553,7 +553,7 @@ struct DeviceGemmMultipleABD_Xdl_CShuffle : public DeviceGemmMultipleABD<AsLayou
                 // Tail number always 1
                 if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v1)
                 {
-#if 0
+#if 0 // disabled: KBatch>1 AtomicAdd path for no-main-loop case
                     if(arg.KBatch > 1)
                     {
                         const auto kernel =

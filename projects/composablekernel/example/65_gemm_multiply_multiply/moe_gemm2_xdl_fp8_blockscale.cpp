@@ -133,7 +133,7 @@ static constexpr ck::index_t Scale_Block_N = 128;
 static constexpr ck::index_t Scale_Block_K = 128;
 static constexpr bool MulRoutedWeight      = true;
 
-#if 0
+#if 0 // disabled: conditional code block
 static constexpr ck::index_t MPerBlock = 32;
 static constexpr ck::index_t BLOCKSIZE = 256;
 static constexpr ck::index_t MXDLPerWave = 2;
@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
     constexpr ck::index_t sorted_tile_num = valid_tile_num + 3;
     ck::index_t sorted_size               = sorted_tile_num * MPerBlock;
     ck::index_t valid_size                = valid_tile_num * MPerBlock;
-#if 1
+#if 1 // alt: active branch of conditional toggle
     // GEMM shape
     ck::index_t N       = 6144;
     ck::index_t K       = 4096;

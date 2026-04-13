@@ -65,7 +65,7 @@ struct TopkSoftmaxWarpPerRowPipeline
 #endif
             // cast and pad input data
             auto w = [&]() {
-#if 0
+#if 0 // disabled: conditional code block
                 auto w_ = cast_tile<WeightType>(x);
 
                 constexpr auto span_2d = decltype(w_)::get_distributed_spans();

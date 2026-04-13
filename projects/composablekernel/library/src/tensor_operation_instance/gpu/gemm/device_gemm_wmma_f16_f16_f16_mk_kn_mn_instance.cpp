@@ -61,7 +61,7 @@ using device_gemm_wmma_f16_f16_f16_mk_kn_mn_instances = std::tuple<
         // 1 Wave
         DeviceGemmWmma_CShuffle<      Row,     Row,     Row,   F16,   F16,   F16,     F32,      F16, PassThrough, PassThrough, PassThrough, GemmMNKPadding,           1,    32,    16,    32,    64,  8,   16,   16,      1,       2,     S<2, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,      true,     S<2, 16, 1>,     S<0, 2, 1>,     S<0, 2, 1>,             1,              1,              8,      true,        1,        1,       S<1, 16, 1,  2>,                      8>,
         DeviceGemmWmma_CShuffle<      Row,     Row,     Row,   F16,   F16,   F16,     F32,      F16, PassThrough, PassThrough, PassThrough, GemmMNKPadding,           1,    32,    16,    16,    64,  8,   16,   16,      1,       1,     S<2, 16, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,      true,     S<2, 16, 1>,     S<0, 2, 1>,     S<0, 2, 1>,             1,              1,              8,      true,        1,        1,       S<1, 16, 1,  2>,                      8>
-#if 0
+#if 0 // disabled: conditional code block
         /* Prefetch 2, consume enormous vgpr resource*/
         // 8 Waves
         DeviceGemmWmma_CShuffle<      Row,     Row,     Row,   F16,   F16,   F16,     F32,      F16, PassThrough, PassThrough, PassThrough, GemmMNKPadding,           2,   256,   128,   128,    32,  8,   16,   16,      4,       2,     S<4, 64, 1>,     S<1, 0, 2>,     S<1, 0, 2>,              2,              8,              8,      true,     S<4, 64, 1>,     S<0, 2, 1>,     S<0, 2, 1>,             1,              2,              8,      true,        1,        1,       S<1, 32, 1,  8>,                      8>,

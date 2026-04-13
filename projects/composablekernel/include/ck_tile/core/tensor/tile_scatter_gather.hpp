@@ -474,8 +474,8 @@ struct tile_scatter_gather
                             bool_constant<oob_conditional_check>{});
                     }
                 }();
-#if 1
-                // write into distributed tensor
+#if 1 // alt: active branch of conditional toggle
+      // write into distributed tensor
                 static_for<0, Traits::ScalarPerVector, Traits::PackedSize>{}([&](auto j) {
                     constexpr auto idx_ys = generate_tuple(
                         [&](auto jj) {

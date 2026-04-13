@@ -496,7 +496,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                    cache_seqlen_ks.begin(),
                    [&](auto seqlen_k) { return seqlen_k - seqlen_knew; });
 
-#if 0
+#if 0 // debug: diagnostic output
     std::cout << "seqlen_qs: " << seqlen_qs << std::endl;
     std::cout << "seqlen_ks: " << seqlen_ks << std::endl;
     std::cout << "seqlen_qpads: " << seqlen_qpads << std::endl;

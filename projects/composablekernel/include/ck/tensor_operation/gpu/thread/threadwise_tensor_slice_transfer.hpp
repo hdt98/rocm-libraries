@@ -1356,9 +1356,9 @@ struct ThreadwiseTensorSliceTransfer_v4
             container_reorder_given_new2old(access_lengths, dim_access_order);
 
         static_ford<decltype(ordered_access_lengths)>{}([&](auto ordered_access_idx) {
-#if 0
-            // TODO: unable to compile
-            // position in slice window
+#if 0 // workaround: container_reorder_given_old2new fails to compile
+      // TODO: unable to compile
+      // position in slice window
             constexpr auto data_to_origin_disp_idx =
                 container_reorder_given_old2new(ordered_access_idx, dim_access_order) *
                 src_scalar_per_access;
@@ -1551,9 +1551,9 @@ struct ThreadwiseTensorSliceTransfer_v4
             container_reorder_given_new2old(access_lengths, dim_access_order);
 
         static_ford<decltype(ordered_access_lengths)>{}([&](auto ordered_access_idx) {
-#if 0
-            // TODO: unable to compile
-            // position in slice window
+#if 0 // workaround: container_reorder_given_old2new fails to compile
+      // TODO: unable to compile
+      // position in slice window
             constexpr auto data_to_origin_disp_idx =
                 container_reorder_given_old2new(ordered_access_idx, dim_access_order) *
                 src_scalar_per_access;

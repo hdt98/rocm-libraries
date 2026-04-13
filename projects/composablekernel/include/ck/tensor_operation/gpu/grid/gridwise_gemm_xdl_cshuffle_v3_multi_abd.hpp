@@ -1144,8 +1144,8 @@ struct GridwiseGemm_xdl_cshuffle_v3
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
 
-#if 0
-        // A matrix blockwise copy
+#if 0 // alt: single-tensor v4r1 A blockwise copy
+      // A matrix blockwise copy
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
                                                 AElementwiseOperation,
@@ -1206,8 +1206,8 @@ struct GridwiseGemm_xdl_cshuffle_v3
                                                 a_element_op};
 #endif
 
-#if 0
-        // B matrix blockwise copy
+#if 0 // alt: single-tensor v4r1 B blockwise copy
+      // B matrix blockwise copy
         auto b_blockwise_copy =
             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
                                                 BElementwiseOperation,
@@ -1323,7 +1323,7 @@ struct GridwiseGemm_xdl_cshuffle_v3
             c_element_op);
     }
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     template <bool HasMainKBlockLoop,
               InMemoryDataOperationEnum CGlobalMemoryDataOperation,
               TailNumber TailNum = TailNumber::Odd>
@@ -1405,8 +1405,8 @@ struct GridwiseGemm_xdl_cshuffle_v3
         constexpr auto b_block_desc_bk0_n_bk1 =
             GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch());
 
-#if 0
-        // A matrix blockwise copy
+#if 0 // alt: single-tensor v4r1 A blockwise copy (2-LDS path)
+      // A matrix blockwise copy
         auto a_blockwise_copy =
             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
                                                 AElementwiseOperation,
@@ -1468,8 +1468,8 @@ struct GridwiseGemm_xdl_cshuffle_v3
 
 #endif
 
-#if 0
-        // B matrix blockwise copy
+#if 0 // alt: single-tensor v4r1 B blockwise copy (2-LDS path)
+      // B matrix blockwise copy
         auto b_blockwise_copy =
             ThreadGroupTensorSliceTransfer_v4r1<ThisThreadBlock,
                                                 BElementwiseOperation,

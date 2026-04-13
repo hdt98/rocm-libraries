@@ -107,7 +107,7 @@ struct array
     CK_TILE_HOST_DEVICE constexpr const value_type& operator[](index_t i) const [[clang::lifetimebound]] { return get(i); }
     CK_TILE_HOST_DEVICE constexpr value_type& operator[](index_t i) [[clang::lifetimebound]]            { return get(i); }
     CK_TILE_HOST_DEVICE constexpr value_type& operator()(index_t i) [[clang::lifetimebound]]            { return get(i); }     // TODO: compatible
-#if 0
+#if 0 // todo: incomplete implementation
     template <typename ArrayLike>
     CK_TILE_HOST_DEVICE constexpr auto operator=(const ArrayLike& arr)
     {

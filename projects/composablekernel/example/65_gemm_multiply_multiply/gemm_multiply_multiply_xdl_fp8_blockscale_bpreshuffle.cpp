@@ -354,7 +354,7 @@ int main(int argc, char* argv[])
 
         ref_invoker.Run(ref_argument);
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
         for(int m = 0; m < M; ++m)
         {
             for(int n = 0; n < N; ++n)

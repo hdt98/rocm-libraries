@@ -196,7 +196,7 @@ CK_TILE_DEVICE void block_tile_reduce(AccDistributedTensor_& acc_tensor,
     constexpr auto I0 = number<0>{};
     constexpr auto I1 = number<1>{};
 
-#if 0
+#if 0 // disabled: conditional code block
     constexpr auto in_reduce_dims = sequence<InReduceDims...>{};
 
     constexpr index_t ndim_in        = InDistributedTensor_::get_num_of_dimension();

@@ -337,7 +337,7 @@ struct DeviceGemm_Xdl_WaveletModel_CShuffle : public DeviceGemm<ALayout,
         template <typename GridwiseGemm>
         float RunImp(const Argument& arg, const StreamConfig& stream_config = StreamConfig{})
         {
-#if 0
+#if 0 // debug: print grid descriptor dimensions
             {
                 std::cout << "arg.a_grid_desc_ak0_m_ak1_{"
                           << arg.a_grid_desc_ak0_m_ak1_.GetLength(I0) << ", "

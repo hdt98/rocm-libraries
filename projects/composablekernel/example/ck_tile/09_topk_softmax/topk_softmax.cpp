@@ -15,7 +15,7 @@
 #include "topk_softmax_api.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
-#if 0
+#if 0 // debug: diagnostic output
 template <typename T>
 void dump_host_tensor_2d(const ck_tile::HostTensor<T>& x)
 {

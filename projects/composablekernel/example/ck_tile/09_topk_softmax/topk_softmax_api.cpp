@@ -32,7 +32,7 @@ float topk_softmax(topk_softmax_trait t, topk_softmax_kargs a, ck_tile::stream_c
         using ts_input_type  = ck_tile::fp16_t;
         using ts_weight_type = float;
         using ts_index_type  = ck_tile::index_t;
-#if 1
+#if 1 // alt: active branch of conditional toggle
         if(t.experts <= 8)
         {
             TOPK_SOFTMAX_DISPATCH(8, true)
@@ -66,7 +66,7 @@ float topk_softmax(topk_softmax_trait t, topk_softmax_kargs a, ck_tile::stream_c
     }
     else if(t.input_type == "bf16" && t.weight_type == "fp32" && t.activation == "softmax")
     {
-#if 1
+#if 1 // alt: active branch of conditional toggle
         using ts_input_type  = ck_tile::bf16_t;
         using ts_weight_type = float;
         using ts_index_type  = ck_tile::index_t;
@@ -101,7 +101,7 @@ float topk_softmax(topk_softmax_trait t, topk_softmax_kargs a, ck_tile::stream_c
         using ts_input_type  = ck_tile::fp16_t;
         using ts_weight_type = float;
         using ts_index_type  = ck_tile::index_t;
-#if 1
+#if 1 // alt: active branch of conditional toggle
         if(t.experts <= 8)
         {
             TOPK_SOFTMAX_DISPATCH(8, false)
@@ -135,7 +135,7 @@ float topk_softmax(topk_softmax_trait t, topk_softmax_kargs a, ck_tile::stream_c
     }
     else if(t.input_type == "bf16" && t.weight_type == "fp32" && t.activation == "sigmoid")
     {
-#if 1
+#if 1 // alt: active branch of conditional toggle
         using ts_input_type  = ck_tile::bf16_t;
         using ts_weight_type = float;
         using ts_index_type  = ck_tile::index_t;

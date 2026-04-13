@@ -379,8 +379,8 @@ struct GridwiseGemmMultipleD_xdl_splitk_cshuffle
 
         const auto e_grid_desc_m_n = MakeEGridDescriptor_M_N<ELayout, GemmSpec>(M, N, StrideE);
 
-#if 0
-        // check tile size
+#if 0 // disabled: strict tile-size divisibility check (padding handles it)
+      // check tile size
         if(!(M % MPerBlock == 0 && N % NPerBlock == 0 && K % KPerBlock == 0))
         {
             return false;
@@ -635,7 +635,7 @@ struct GridwiseGemmMultipleD_xdl_splitk_cshuffle
             KPack,
             LoopSched>();
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
         if(block_work_idx[I0] == 0)
         {
             const index_t nThreadSize = CDEShuffleBlockTransferScalarPerVector_NPerBlock;

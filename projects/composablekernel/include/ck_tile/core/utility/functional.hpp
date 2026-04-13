@@ -290,7 +290,7 @@ struct unpack_impl<sequence<Is...>>
     template <typename F, typename X>
     CK_TILE_HOST_DEVICE constexpr auto operator()(F&& f, X&& x) const
     {
-#if 0
+#if 0 // disabled: conditional code block
         return std::forward<F>(f)(std::forward<X>(x).at(number<Is>{})...);
 #else
         return std::forward<F>(f)(std::forward<X>(x).template at<Is>()...);
@@ -308,7 +308,7 @@ struct unpack2_impl<sequence<Is...>, sequence<Js...>>
     template <typename F, typename X, typename Y>
     CK_TILE_HOST_DEVICE constexpr auto operator()(F&& f, X&& x, Y&& y) const
     {
-#if 0
+#if 0 // disabled: conditional code block
         return std::forward<F>(f)(std::forward<X>(x).at(number<Is>{})...,
                                   std::forward<Y>(y).at(number<Js>{})...);
 #else

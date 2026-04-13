@@ -1033,7 +1033,7 @@ struct GridwiseMoeGemmMXBNS
         }
 
         // check gridwise gemm pipeline
-#if 0
+#if 0 // disabled: pipeline prefetch-stage validity check
         const auto num_k_loop = karg.AK0 / (KPerBlock / AK1Value);
 
         if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)
@@ -1616,7 +1616,7 @@ struct GridwiseMoeGemmMXBNS
         }
     }
 
-#if 0
+#if 0 // todo: Run_2Lds dual-LDS path not yet implemented
     template <bool HasMainKBlockLoop,
               InMemoryDataOperationEnum CGlobalMemoryDataOperation,
               TailNumber TailNum = TailNumber::Odd>

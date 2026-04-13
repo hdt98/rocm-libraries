@@ -1310,7 +1310,7 @@ struct Silu
     };
 };
 
-#if 0
+#if 0 // disabled: conditional code block
 // Silu, the formular is not so good to do inline asm (dependency)
 // we put the code here purposely if in the future ppl want to try
 struct SiluAsm
@@ -1969,7 +1969,7 @@ struct Compose
 };
 
 // support fastconvert of int8 to fp16
-#if 0
+#if 0 // disabled: conditional code block
 template <typename InputDataType, typename OutputDataType, index_t RegPackNumber>
 struct FastNumericArrayConverter
 {

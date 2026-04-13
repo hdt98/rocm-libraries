@@ -327,7 +327,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
     }
 
 // leave it here for future debug purpose
-#if 0
+#if 0 // debug: diagnostic output
     a_host.loadtxt("../../ater/input_torch.txt");
 
     topk_ids_host.loadtxt("../../ater/topk_ids_torch.txt", "int");
@@ -346,7 +346,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
     std::cout << "------- @@@ " << __LINE__ << std::flush << std::endl;
 #endif
 
-#if 0
+#if 0 // debug: diagnostic output
     std::cout << "sorted_token_ids_host:" << sorted_token_ids_host << std::endl;
     std::cout << "num_sorted_tiles_host:" << num_sorted_tiles_host << std::endl;
     std::cout << "sorted_expert_ids_host:" << sorted_expert_ids_host << std::endl;

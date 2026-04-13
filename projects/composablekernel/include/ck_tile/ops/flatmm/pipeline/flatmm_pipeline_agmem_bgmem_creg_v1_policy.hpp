@@ -77,7 +77,7 @@ struct UniversalFlatmmPipelineAgBgCrPolicy
             return a_lds_block_desc;
         }
 /*xor*/
-#if 0
+#if 0 // disabled: conditional code block
         constexpr index_t kMPerBlock = Problem::BlockGemmShape::kM;
         constexpr index_t kKPerBlock = Problem::BlockGemmShape::kK;
         constexpr index_t kKPack     = GetSmemPackA<Problem>();

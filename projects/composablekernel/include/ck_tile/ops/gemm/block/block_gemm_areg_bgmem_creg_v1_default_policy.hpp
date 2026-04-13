@@ -35,7 +35,7 @@ struct BlockGemmARegBGmemCRegV1DefaultPolicy
                                        sequence<0, 1>>{});
     }
 
-#if 0
+#if 0 // disabled: conditional code block
     // 2d
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeBLdsBlockDescriptor()

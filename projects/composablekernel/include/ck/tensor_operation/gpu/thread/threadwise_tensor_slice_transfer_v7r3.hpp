@@ -267,7 +267,7 @@ struct ThreadwiseTensorSliceTransfer_v7r3
         });
     }
 
-#if 1
+#if 1 // alt: active branch of conditional toggle
     template <index_t ThreadScratchId = 0>
     __device__ void OOBCheck(Number<ThreadScratchId> thread_scratch_id = Number<ThreadScratchId>{})
     {

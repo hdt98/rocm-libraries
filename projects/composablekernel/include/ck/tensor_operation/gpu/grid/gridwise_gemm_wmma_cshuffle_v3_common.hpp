@@ -794,7 +794,7 @@ struct GridwiseGemm_wmma_cshuffle_v3_base
                                            make_tuple(Sequence<0>{}, Sequence<1>{}));
         // TODO: Investigate why this path is not used in the original
         // gridwise_gemm_xdl_cshuffle_v3.hpp
-#if 0
+#if 0 // alt: per-specialization C grid descriptor padding paths
 
         if constexpr(GemmSpec == GemmSpecialization::MNPadding ||
                      GemmSpec == GemmSpecialization::MNKPadding)

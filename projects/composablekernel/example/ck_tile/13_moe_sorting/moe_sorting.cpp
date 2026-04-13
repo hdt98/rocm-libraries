@@ -263,7 +263,7 @@ bool test_moe_sorting(ck_tile::ArgParser args)
     auto ms = moe_sorting(trait, karg, sc);
     // auto ms = moe_sorting_mp(trait, karg, sc);
 
-#if 0
+#if 0 // debug: diagnostic output
     {
     ck_tile::HostTensor<char> ws_host({workspace_size}, {1});
         moe_sorting_ws.FromDevice(ws_host.data());
