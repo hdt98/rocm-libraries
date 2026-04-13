@@ -24,12 +24,14 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <mutex>
 #include <numeric>
 #include <stdexcept>
 
 namespace rocfft_rccl
 {
     std::shared_ptr<Communicator> Communicator::comm_world;
+    static std::mutex             comm_world_mutex;
 
 #ifdef ROCFFT_RCCL_ENABLE
 
@@ -140,6 +142,10 @@ namespace rocfft_rccl
         // create communicator scoped to the requested devices.
         // the communicator is cached in comm_world for reuse by
         // subsequent plans with the same device set.
+        // guard with a mutex so concurrent plan creation from
+        // multiple threads does not race on comm_world.
+        std::lock_guard<std::mutex> lock(comm_world_mutex);
+
         if(!comm_world)
         {
             const int ndevices = static_cast<int>(devices.size());
