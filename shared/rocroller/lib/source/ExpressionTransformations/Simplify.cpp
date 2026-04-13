@@ -251,21 +251,6 @@ namespace rocRoller
                     return literal(0, resultVarType);
                 if(rhs == 1)
                     return lhs;
-
-                // Fold: C * ShiftL(x, N) -> (C << N) * x
-                // Valid because ShiftL(x, N) = x * 2^N, so C * x * 2^N = (C << N) * x.
-                // Saves one SALU instruction and one temporary SGPR per occurrence.
-                if(lhs && std::holds_alternative<ShiftL>(*lhs))
-                {
-                    auto const& shiftExpr = std::get<ShiftL>(*lhs);
-                    if(evaluationTimes(shiftExpr.rhs)[EvaluationTime::Translate])
-                    {
-                        auto foldedVal = evaluate(
-                            std::make_shared<Expression>(ShiftL{literal(rhs), shiftExpr.rhs}));
-                        return shiftExpr.lhs * literal(foldedVal);
-                    }
-                }
-
                 return nullptr;
             }
 
