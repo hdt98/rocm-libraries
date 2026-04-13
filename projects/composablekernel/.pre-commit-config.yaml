@@ -43,7 +43,9 @@ repos:
         pass_filenames: false
     -   id: clang-tidy-preprocessor
         name: clang-tidy (readability-avoid-unconditional-preprocessor-if)
-        entry: projects/composablekernel/script/run_clang_tidy.sh
-        language: script
+        entry: bash projects/composablekernel/script/run_clang_tidy.sh
+        language: python
         files: '^projects/composablekernel/'
+        additional_dependencies:
+        - clang-tidy==18.1.8
         pass_filenames: false
