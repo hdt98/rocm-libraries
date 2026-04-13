@@ -114,6 +114,7 @@ additional_options = {
             "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
         ],
         "projects_to_test": ["hipkernelprovider"],
+        "project_to_add": "",
     },
     "rocwmma": {
         "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
