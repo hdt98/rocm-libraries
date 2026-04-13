@@ -68,7 +68,22 @@ function(add_hiprand_link_test TEST_SOURCES)
             RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
     )
     rocm_install(TARGETS ${TEST_TARGET} COMPONENT tests)
-    add_relative_test(${TEST_TARGET} ${TEST_TARGET})
+
+    if(AMDGPU_TEST_TARGETS)
+      foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
+        add_relative_test("${AMDGPU_TARGET}-${TEST_TARGET}" ${TEST_TARGET} ${AMDGPU_TARGET})
+        set_tests_properties("${AMDGPU_TARGET}-${TEST_TARGET}"
+          PROPERTIES
+          RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
+        )
+      endforeach()
+    else()
+      add_relative_test("${TEST_TARGET}" ${TEST_TARGET} ${DEFAULT_GPU_RESOURCE})
+      set_tests_properties("${TEST_TARGET}"
+        PROPERTIES
+        RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
+      )
+    endif()
 endfunction()
 
 add_hiprand_link_test("test_hiprand_linkage.cpp;get_hiprand_version.cpp")

@@ -102,6 +102,9 @@ else()
   set(GTEST_ROOT "" CACHE INTERNAL "")
 endif()
 
+# Used by tests to define their RESOURCE_GROUPS
+set(DEFAULT_GPU_RESOURCE "gpus")
+
 mark_as_advanced(CMAKE_INSTALL_RPATH_USE_LINK_PATH)
 mark_as_advanced(HIPRAND_CONFIG_DIR)
 

@@ -219,6 +219,8 @@ if(BUILD_TEST)
   add_subdirectory(test)
 endif()
 
+set(DEFAULT_GPU_RESOURCE "gpus")
+
 # Benchmarks
 if(BUILD_BENCHMARK)
   if (ROCPRIM_PROJECT_IS_TOP_LEVEL)

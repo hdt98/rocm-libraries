@@ -3,6 +3,12 @@
 Documentation for rocRAND is available at
 [https://rocm.docs.amd.com/projects/rocRAND/en/latest/](https://rocm.docs.amd.com/projects/rocRAND/en/latest/)
 
+## rocRAND-4.4.0 for ROCm 7.12
+
+### Added
+
+* Added `generate_resource_spec.cpp` to the test directory. It is now built as a new target by CMake. It generates the resource spec file required by CTest when running tests in parallel.
+
 ## rocRAND 4.3.0 for ROCm 7.12
 
 ### Resolved issue

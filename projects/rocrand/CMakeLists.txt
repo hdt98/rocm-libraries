@@ -218,6 +218,9 @@ if (BUILD_TEST)
     add_subdirectory(test)
 endif()
 
+# Used by tests to define their RESOURCE_GROUPS
+set(DEFAULT_GPU_RESOURCE "gpus")
+
 # Benchmarks
 if (BUILD_BENCHMARK)
     rocm_package_setup_client_component(benchmarks)

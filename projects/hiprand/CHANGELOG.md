@@ -3,6 +3,12 @@
 Documentation for hipRAND is available at
 [https://rocm.docs.amd.com/projects/hipRAND/en/latest/](https://rocm.docs.amd.com/projects/hipRAND/en/latest/).
 
+## hipRAND-3.4.0 for ROCm 7.13
+
+### Added
+
+* Added `generate_resource_spec.cpp` to the test directory. It is now built as a new target by CMake. It generates the resource spec file required by CTest when running tests in parallel.
+
 ## hipRAND 3.2.0 for ROCM 7.12
 
 ### Added

@@ -30,5 +30,20 @@ set_target_properties(${test_rocrand}
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
 )
 
-add_relative_test(${test_rocrand} ${test_rocrand})
+if(AMDGPU_TEST_TARGETS)
+  foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
+    add_relative_test("${AMDGPU_TARGET}-${test_rocrand}" ${test_rocrand} ${AMDGPU_TARGET})
+    set_tests_properties("${AMDGPU_TARGET}-${test_rocrand}"
+      PROPERTIES
+      RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
+    )
+  endforeach()
+else()
+  add_relative_test("${test_rocrand}" ${test_rocrand} ${DEFAULT_GPU_RESOURCE})
+  set_tests_properties("${test_rocrand}"
+    PROPERTIES
+    RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
+  )
+endif()
+
 rocm_install(TARGETS ${test_rocrand} COMPONENT tests)

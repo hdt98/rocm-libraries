@@ -338,6 +338,18 @@ test:rocm:
   before_script:
     - !reference [".rocm:cmake-minimum", before_script]
     - !reference [".rocm:rocrand-install", before_script]
+  script:
+    - cd $CI_PROJECT_DIR/build
+    - ./generate_resource_spec resources.json
+    - cat ./resources.json
+    # Parallel execution (with other AMDGPU processes) can oversubscribe the SDMA queue.
+    # This causes the hipMemcpy to fail, which is not reported as an error by HIP.
+    # As a temporary workaround, disable the SDMA for test stability.
+    - HSA_ENABLE_SDMA=0 ctest
+      --output-on-failure
+      --repeat-until-fail 2
+      --resource-spec-file ./resources.json
+      --parallel $PARALLEL_JOBS
 
 test:nvcc:
   needs:

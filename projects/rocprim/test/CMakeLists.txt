@@ -32,7 +32,7 @@ set(COMMON_TEST_HEADER_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 set(PROFILE_DIR "${CMAKE_BINARY_DIR}/coverage-report")
 set_property(GLOBAL PROPERTY LLVM_COV_OBJECT_ARGS "")
 
-function(add_relative_test test_name test_target)
+function(add_relative_test test_name test_target resource_group)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")
         set(EXE_PATH ".")
@@ -57,6 +57,8 @@ function(add_relative_test test_name test_target)
       )
     endif()
     file(APPEND "${INSTALL_TEST_FILE}" "add_test(${test_name} \"../${EXE_NAME}\")\n")
+    # Set the resource group for the test. This must correspond to a gfxID present in resources.json.
+    file(APPEND "${INSTALL_TEST_FILE}" "set_tests_properties([=[${test_name}]=] PROPERTIES RESOURCE_GROUPS \"1,${resource_group}:1\")\n")
 endfunction()
 
 function(add_hip_test TEST_NAME TEST_SOURCES)
@@ -116,7 +118,24 @@ function(add_hip_test TEST_NAME TEST_SOURCES)
       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test"
   )
 
-  add_relative_test(${TEST_NAME} ${TEST_TARGET})
+  if(AMDGPU_TEST_TARGETS)
+    foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
+      add_relative_test("${AMDGPU_TARGET}-${TEST_NAME}" ${TEST_TARGET} ${AMDGPU_TARGET})
+      set_tests_properties("${AMDGPU_TARGET}-${TEST_NAME}"
+        PROPERTIES
+        RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
+        LABELS "hip;${AMDGPU_TARGET}"
+      )
+    endforeach()
+  else()
+    add_relative_test("${TEST_NAME}" ${TEST_TARGET} ${DEFAULT_GPU_RESOURCE})
+    set_tests_properties("${TEST_NAME}"
+      PROPERTIES
+      RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
+      LABELS "hip"
+    )
+  endif()
+            
   if (WIN32 AND NOT DEFINED DLLS_COPIED)
     set(DLLS_COPIED "YES")
     set(DLLS_COPIED ${DLLS_COPIED} PARENT_SCOPE)
@@ -132,6 +151,19 @@ function(add_hip_test TEST_NAME TEST_SOURCES)
     endforeach( file_i )
   endif()
 endfunction()
+
+# *****************************
+# Resource spec file generation
+# *****************************
+
+# We'll use this small program to detect available GPUs and build the resource JSON file.
+set(GEN_RES_SPEC_PATH ${CMAKE_SOURCE_DIR}/test/generate_resource_spec.cpp)
+add_executable(generate_resource_spec ${GEN_RES_SPEC_PATH})
+set_target_properties(generate_resource_spec PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+target_link_libraries(generate_resource_spec PRIVATE hip::host)
+# This test may still get the offload-compress flag passed. Since it does not include any kernel
+# code it will give an unused-command-line-argument warning.
+target_compile_options(generate_resource_spec PRIVATE "-Wno-unused-command-line-argument")
 
 # ****************************************************************************
 # Tests
@@ -157,3 +189,13 @@ if (ROCPRIM_INSTALL)
       RENAME "CTestTestfile.cmake"
   )
 endif()
+
+# Install the executable using the standard install command instead of rocm_install
+# since we want to put it in a custom DESTINATION (rocm_install does not support
+# the DESTINATION option for TARGETS).
+set_property(TARGET generate_resource_spec APPEND PROPERTY INSTALL_RPATH "$ORIGIN/../../lib")
+install(
+    TARGETS generate_resource_spec
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
+    COMPONENT tests
+)

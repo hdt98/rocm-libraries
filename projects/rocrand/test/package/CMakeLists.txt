@@ -84,7 +84,7 @@ file(GLOB rocrand_pkg_TEST_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/test_rocrand*.cpp)
 # Enable testing (ctest)
 enable_testing()
 
-function(add_relative_test test_name test_target)
+function(add_relative_test test_name test_target resource_group)
     get_target_property(EXE_PATH ${test_target} RUNTIME_OUTPUT_DIRECTORY)
     if(EXE_PATH STREQUAL "EXE_PATH-NOTFOUND")
         set(EXE_PATH ".")
@@ -99,6 +99,7 @@ function(add_relative_test test_name test_target)
     endif()
     file(RELATIVE_PATH rel_path "${CMAKE_CURRENT_BINARY_DIR}" "${EXE_PATH}/${EXE_NAME}")
     add_test(NAME "${test_name}" COMMAND "./${rel_path}")
+    file(APPEND "${INSTALL_TEST_FILE}" "set_tests_properties([=[${test_name}]=] PROPERTIES RESOURCE_GROUPS \"1,${resource_group}:1\")\n")
 endfunction()
 
 # Build
@@ -130,7 +131,23 @@ foreach(test_src ${rocrand_pkg_TEST_SRCS})
             target_compile_options(${test_name} PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:-xhip>")
         endif()
     endif()
-    add_relative_test(${test_name} ${test_name})
+
+    if(AMDGPU_TEST_TARGETS)
+      foreach(AMDGPU_TARGET IN LISTS AMDGPU_TEST_TARGETS)
+        add_relative_test("${AMDGPU_TARGET}-${test_name}" ${test_name} ${AMDGPU_TARGET})
+        set_tests_properties("${AMDGPU_TARGET}-${test_name}"
+          PROPERTIES
+          RESOURCE_GROUPS "1,${AMDGPU_TARGET}:1"
+        )
+      endforeach()
+    else()
+      add_relative_test("${test_name}" ${test_name} ${DEFAULT_GPU_RESOURCE})
+      set_tests_properties("${test_name}"
+        PROPERTIES
+        RESOURCE_GROUPS "1,${DEFAULT_GPU_RESOURCE}:1"
+      )
+    endif()
+    
     if (WIN32 AND NOT DEFINED DLLS_COPIED)
       set(DLLS_COPIED "YES")
       set(DLLS_COPIED ${DLLS_COPIED} PARENT_SCOPE)
