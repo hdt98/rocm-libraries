@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from ..Component import TensorDataMover
 from ..Common.DataType import DataType
 from typing import Mapping, Optional
