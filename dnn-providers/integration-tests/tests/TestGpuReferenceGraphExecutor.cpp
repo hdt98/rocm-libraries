@@ -5,10 +5,10 @@
 
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
-#include <cstring>
 #include <unordered_map>
 #include <vector>
 
@@ -171,20 +171,19 @@ std::vector<int64_t> computePackedStrides(const std::vector<int64_t>& dims)
 
 // Creates a minimal graph with a ConvolutionFwd node.
 // Uses symmetric padding (prePadding == postPadding == padding).
-flatbuffers::FlatBufferBuilder
-    createConvFwdGraph(int64_t xUid,
-                       int64_t wUid,
-                       int64_t yUid,
-                       const std::vector<int64_t>& xDims,
-                       const std::vector<int64_t>& wDims,
-                       const std::vector<int64_t>& yDims,
-                       const std::vector<int64_t>& xStrides,
-                       const std::vector<int64_t>& wStrides,
-                       const std::vector<int64_t>& yStrides,
-                       const std::vector<int64_t>& padding,
-                       const std::vector<int64_t>& convStride,
-                       const std::vector<int64_t>& dilation,
-                       DataType dataType)
+flatbuffers::FlatBufferBuilder createConvFwdGraph(int64_t xUid,
+                                                  int64_t wUid,
+                                                  int64_t yUid,
+                                                  const std::vector<int64_t>& xDims,
+                                                  const std::vector<int64_t>& wDims,
+                                                  const std::vector<int64_t>& yDims,
+                                                  const std::vector<int64_t>& xStrides,
+                                                  const std::vector<int64_t>& wStrides,
+                                                  const std::vector<int64_t>& yStrides,
+                                                  const std::vector<int64_t>& padding,
+                                                  const std::vector<int64_t>& convStride,
+                                                  const std::vector<int64_t>& dilation,
+                                                  DataType dataType)
 {
     flatbuffers::FlatBufferBuilder builder;
 
@@ -461,12 +460,11 @@ TEST(TestGpuReferenceGraphExecutor, ConvFwdBfp16Executes)
     SKIP_IF_NO_DEVICES();
 
     runConvFwdExecutorVsCpu<hipdnn_data_sdk::types::bfloat16>({1, 1, 4, 4}, // xDims
-                                                               {1, 1, 3, 3}, // wDims
-                                                               {1, 1, 2, 2}, // yDims
-                                                               {0, 0}, // padding
-                                                               {1, 1}, // stride
-                                                               {1, 1}, // dilation
-                                                               DataType::BFLOAT16,
-                                                               0.1);
+                                                              {1, 1, 3, 3}, // wDims
+                                                              {1, 1, 2, 2}, // yDims
+                                                              {0, 0}, // padding
+                                                              {1, 1}, // stride
+                                                              {1, 1}, // dilation
+                                                              DataType::BFLOAT16,
+                                                              0.1);
 }
-

@@ -63,11 +63,11 @@ public:
     void execute(const std::unordered_map<int64_t, void*>& variantPack) override
     {
         hipdnn_data_sdk::utilities::Tensor<XDataType> xTensor(_params.xTensor.dims,
-                                                               _params.xTensor.strides);
+                                                              _params.xTensor.strides);
         hipdnn_data_sdk::utilities::Tensor<WDataType> wTensor(_params.wTensor.dims,
-                                                               _params.wTensor.strides);
+                                                              _params.wTensor.strides);
         hipdnn_data_sdk::utilities::Tensor<OutputDataType> yTensor(_params.yTensor.dims,
-                                                                    _params.yTensor.strides);
+                                                                   _params.yTensor.strides);
 
         std::memcpy(xTensor.rawHostData(),
                     variantPack.at(_params.xTensor.uid),
@@ -76,16 +76,14 @@ public:
                     variantPack.at(_params.wTensor.uid),
                     wTensor.elementSpace() * sizeof(WDataType));
 
-        hipdnn_gpu_ref::GpuFpReferenceConvolution::fprop<XDataType,
-                                                          WDataType,
-                                                          OutputDataType,
-                                                          ComputeDataType>(xTensor,
-                                                                           wTensor,
-                                                                           yTensor,
-                                                                           _params.stride,
-                                                                           _params.dilation,
-                                                                           _params.prePadding,
-                                                                           _params.postPadding);
+        hipdnn_gpu_ref::GpuFpReferenceConvolution::
+            fprop<XDataType, WDataType, OutputDataType, ComputeDataType>(xTensor,
+                                                                         wTensor,
+                                                                         yTensor,
+                                                                         _params.stride,
+                                                                         _params.dilation,
+                                                                         _params.prePadding,
+                                                                         _params.postPadding);
 
         std::memcpy(variantPack.at(_params.yTensor.uid),
                     yTensor.rawHostData(),
@@ -141,18 +139,19 @@ public:
         }
 
         const auto& tensorMap = graph.getTensorMap();
-        GpuConvolutionFwdParams params(*tensorMap.at(nodeAttributes->x_tensor_uid()),
-                                       *tensorMap.at(nodeAttributes->w_tensor_uid()),
-                                       *tensorMap.at(nodeAttributes->y_tensor_uid()),
-                                       hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
-                                           nodeAttributes->pre_padding()),
-                                       hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
-                                           nodeAttributes->post_padding()),
-                                       hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
-                                           nodeAttributes->stride()),
-                                       hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
-                                           nodeAttributes->dilation()),
-                                       nodeAttributes->conv_mode());
+        GpuConvolutionFwdParams params(
+            *tensorMap.at(nodeAttributes->x_tensor_uid()),
+            *tensorMap.at(nodeAttributes->w_tensor_uid()),
+            *tensorMap.at(nodeAttributes->y_tensor_uid()),
+            hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
+                nodeAttributes->pre_padding()),
+            hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
+                nodeAttributes->post_padding()),
+            hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
+                nodeAttributes->stride()),
+            hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
+                nodeAttributes->dilation()),
+            nodeAttributes->conv_mode());
 
         return std::make_unique<
             GpuConvolutionFwdPlan<XDataType, WDataType, OutputDataType, ComputeDataType>>(

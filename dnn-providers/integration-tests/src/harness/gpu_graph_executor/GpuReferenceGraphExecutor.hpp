@@ -95,8 +95,7 @@ private:
             return detail::GpuPointwiseDummySignatureKey(node, tensorMap);
 
         case NodeAttrs::ConvolutionFwdAttributes:
-            return detail::GpuConvolutionFwdSignatureKey(
-                node, tensorMap, node.compute_data_type());
+            return detail::GpuConvolutionFwdSignatureKey(node, tensorMap, node.compute_data_type());
 
         // Node types with no GPU plan yet - throw descriptive error
         case NodeAttrs::BatchnormInferenceAttributes:
