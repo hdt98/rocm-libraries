@@ -1,8 +1,49 @@
 import yaml
 import sys
+import re
 import platform
 import argparse
 import contextlib
+
+# Allowlist patterns for YAML-sourced values
+_TAG_RE = re.compile(r"^~?\[[\w\-\.\*\/]*\]$")
+_IDENTIFIER_RE = re.compile(r"^[\w\-\.]+$")
+
+
+def validate_tag(tag):
+    """Validate that a tag matches expected Catch2 syntax: [name], ~[name], or []."""
+    if not isinstance(tag, str):
+        print(
+            f"Error: Tag must be a string, got {type(tag).__name__}: {tag!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if tag == "[]":
+        return
+    if not _TAG_RE.match(tag):
+        print(
+            f"Error: Invalid tag syntax: {tag!r} "
+            f"(expected pattern like [name], ~[name], or [])",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def validate_identifier(value):
+    """Validate that a value is a safe identifier (alphanumeric, hyphens, dots, underscores)."""
+    if not isinstance(value, str):
+        print(
+            f"Error: Identifier must be a string, got {type(value).__name__}: {value!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not _IDENTIFIER_RE.match(value):
+        print(
+            f"Error: Identifier contains unsafe characters: {value!r} "
+            f"(only alphanumerics, hyphens, dots, and underscores allowed)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
 
 def load_yaml(yaml_file):
@@ -120,6 +161,8 @@ def main():
         print(f"# Timeout multiplier: {timeout_multiplier}")
 
         for category_name, category_info in categories.items():
+            validate_identifier(category_name)
+
             test_tags = category_info.get("test_tags", [])
             exclude_tags = category_info.get("exclude_tags", [])
             if exclude_tags is None:
@@ -135,7 +178,15 @@ def main():
                 if exclude_tags_linux:
                     exclude_tags = exclude_tags + exclude_tags_linux
 
+            for tag in test_tags or []:
+                validate_tag(tag)
+            for tag in exclude_tags:
+                validate_tag(tag)
+
             labels = category_info.get("labels", [])
+            for label in labels:
+                validate_identifier(label)
+
             base_timeout = timeouts.get(category_name, 300)
             timeout = int(base_timeout * timeout_multiplier)
 

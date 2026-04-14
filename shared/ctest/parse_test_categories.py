@@ -6,6 +6,45 @@ import argparse
 import contextlib
 
 
+# Allowlist patterns for YAML-sourced values
+_IDENTIFIER_RE = re.compile(r"^[\w\-\.]+$")
+_GTEST_PATTERN_RE = re.compile(r"^[\w\*\.\-/]+$")
+
+
+def validate_identifier(value):
+    """Validate that a value is a safe identifier (alphanumeric, hyphens, dots, underscores)."""
+    if not isinstance(value, str):
+        print(
+            f"Error: Identifier must be a string, got {type(value).__name__}: {value!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not _IDENTIFIER_RE.match(value):
+        print(
+            f"Error: Identifier contains unsafe characters: {value!r} "
+            f"(only alphanumerics, hyphens, dots, and underscores allowed)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
+def validate_gtest_pattern(pattern):
+    """Validate that a gtest filter pattern contains only safe characters."""
+    if not isinstance(pattern, str):
+        print(
+            f"Error: Pattern must be a string, got {type(pattern).__name__}: {pattern!r}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    if not _GTEST_PATTERN_RE.match(pattern):
+        print(
+            f"Error: Invalid gtest pattern: {pattern!r} "
+            f"(only alphanumerics, wildcards, dots, hyphens, underscores, and slashes allowed)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def gpu_arch_matches(specific_arch, pattern_arch):
     """
     Check if a specific GPU architecture matches a pattern with X wildcards.
@@ -115,6 +154,8 @@ def main():
         category_data = {}
 
         for category_name, category_info in categories.items():
+            validate_identifier(category_name)
+
             patterns = category_info.get("test_patterns", [])
             if not patterns:
                 print(
@@ -137,6 +178,13 @@ def main():
                 exclude_linux = category_info.get("exclude_linux", [])
                 if exclude_linux:
                     exclude.extend(exclude_linux)
+
+            for p in patterns:
+                validate_gtest_pattern(p)
+            for e in exclude:
+                validate_gtest_pattern(e)
+            for label in labels:
+                validate_identifier(label)
 
             base_timeout = timeouts.get(category_name, 300)
             timeout = int(base_timeout * timeout_multiplier)
@@ -221,6 +269,7 @@ def main():
 
         ex_gpu_labels_to_process = set()
         for gpu_key, gpu_config in exclude_gpu_config.items():
+            validate_identifier(gpu_key)
             match = re.match(r"exclude_gpu_(gfx\w+)", gpu_key)
             if match:
                 gpu_labels = gpu_config.get("labels", [])
@@ -264,6 +313,9 @@ def main():
 
             if not all_applicable_patterns:
                 continue
+
+            for p in all_applicable_patterns:
+                validate_gtest_pattern(p)
 
             # Remove duplicates from all_applicable_patterns while preserving order
             seen = set()
