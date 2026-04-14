@@ -1649,7 +1649,7 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& ex
         else
         {
             fftBuf = std::make_shared<TempBufferLease>(
-                tempBuffers, local_comm_rank, execPlanPtr->location, in_elem_count, in_elem_size);
+                tempBuffers, local_comm_rank, execPlanPtr->location, in_elem_count * in_elem_size);
             gatherBuf = BufferPtr::temp(fftBuf->data());
         }
     }
@@ -1661,7 +1661,7 @@ void rocfft_plan_t::GatherScatterSingleDevicePlan(std::unique_ptr<ExecPlan>&& ex
         const auto   out_elem_size  = element_size(precision, desc.outArrayType);
         const size_t out_elem_count = desc.output_layout.buffer_element_count();
         fftOutBuf                   = std::make_shared<TempBufferLease>(
-            tempBuffers, local_comm_rank, execPlanPtr->location, out_elem_count, out_elem_size);
+            tempBuffers, local_comm_rank, execPlanPtr->location, out_elem_count * out_elem_size);
     }
 
     std::vector<size_t> gatherIndexes;
@@ -2518,8 +2518,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             a2aBufs.emplace_back(tempBuffers,
                                  local_comm_rank,
                                  inField.bricks[d].location,
-                                 ndevices * uniform_count,
-                                 elem_size);
+                                 ndevices * uniform_count * elem_size);
         }
 
         // build device_id -> brick index mapping for offset calculation
@@ -2638,9 +2637,9 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             const auto& outBrick = outField.bricks[info.outBrickIdx];
 
             TempBufferLease& pack = packBufs.emplace_back(
-                tempBuffers, local_comm_rank, inBrick.location, info.count, elem_size);
+                tempBuffers, local_comm_rank, inBrick.location, info.count * elem_size);
             TempBufferLease& recv = packBufs.emplace_back(
-                tempBuffers, local_comm_rank, outBrick.location, info.count, elem_size);
+                tempBuffers, local_comm_rank, outBrick.location, info.count * elem_size);
 
             auto packIdx
                 = AddMultiPlanItem(transpose_brick(local_comm_rank,

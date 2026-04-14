@@ -1250,11 +1250,11 @@ struct CommRCCLAllToAll : public MultiPlanItem
         }
     }
 
-    void ExecuteAsync(const rocfft_plan     plan,
-                      void*                 in_buffer[],
-                      void*                 out_buffer[],
-                      rocfft_execution_info info,
-                      size_t                multiPlanIdx,
+    void ExecuteAsync(const rocfft_plan                     plan,
+                      void*                                 in_buffer[],
+                      void*                                 out_buffer[],
+                      const rocfft_execution_info_internal& info,
+                      size_t                                multiPlanIdx,
                       const std::map<int, device_callback_t>&) override;
     void Wait() override;
 
@@ -1344,11 +1344,11 @@ struct CommRCCLGrouped : public MultiPlanItem
         transfers.push_back(std::move(t));
     }
 
-    void ExecuteAsync(const rocfft_plan     plan,
-                      void*                 in_buffer[],
-                      void*                 out_buffer[],
-                      rocfft_execution_info info,
-                      size_t                multiPlanIdx,
+    void ExecuteAsync(const rocfft_plan                     plan,
+                      void*                                 in_buffer[],
+                      void*                                 out_buffer[],
+                      const rocfft_execution_info_internal& info,
+                      size_t                                multiPlanIdx,
                       const std::map<int, device_callback_t>&) override;
     void Wait() override;
 

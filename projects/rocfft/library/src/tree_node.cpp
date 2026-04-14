@@ -662,11 +662,11 @@ void CommPointToPoint::Print(rocfft_ostream& os, const int indent) const
 
 #ifdef ROCFFT_RCCL_ENABLE
 // RCCL AllToAll implementation
-void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan     plan,
-                                    void*                 in_buffer[],
-                                    void*                 out_buffer[],
-                                    rocfft_execution_info info,
-                                    size_t                multiPlanIdx,
+void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan                     plan,
+                                    void*                                 in_buffer[],
+                                    void*                                 out_buffer[],
+                                    const rocfft_execution_info_internal& info,
+                                    size_t                                multiPlanIdx,
                                     const std::map<int, device_callback_t>&)
 {
     if(LOG_PLAN_ENABLED())
@@ -773,11 +773,11 @@ void CommRCCLAllToAll::Print(rocfft_ostream& os, const int indent) const
 }
 
 // RCCL grouped send/recv implementation
-void CommRCCLGrouped::ExecuteAsync(const rocfft_plan     plan,
-                                   void*                 in_buffer[],
-                                   void*                 out_buffer[],
-                                   rocfft_execution_info info,
-                                   size_t                multiPlanIdx,
+void CommRCCLGrouped::ExecuteAsync(const rocfft_plan                     plan,
+                                   void*                                 in_buffer[],
+                                   void*                                 out_buffer[],
+                                   const rocfft_execution_info_internal& info,
+                                   size_t                                multiPlanIdx,
                                    const std::map<int, device_callback_t>&)
 {
     if(LOG_PLAN_ENABLED())
@@ -881,11 +881,6 @@ void CommRCCLGrouped::Print(rocfft_ostream& os, const int indent) const
 }
 #endif // ROCFFT_RCCL_ENABLE
 
-void CommScatter::ExecuteAsync(const rocfft_plan     plan,
-                               void*                 in_buffer[],
-                               void*                 out_buffer[],
-                               rocfft_execution_info info,
-                               size_t                multiPlanIdx,
 void CommScatter::ExecuteAsync(const rocfft_plan                     plan,
                                void*                                 in_buffer[],
                                void*                                 out_buffer[],
