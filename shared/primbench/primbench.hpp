@@ -2710,14 +2710,6 @@ public:
             // For bools, explicitly output "true" or "false" instead of "0" or "1".
             if constexpr(std::is_same_v<T, bool>)
             {
-                if(default_val)
-                {
-                    std::cerr << "Error: Boolean flag --" << key
-                              << " cannot be registered with a default value of true. "
-                              << "Flags are implicitly false by default.\n";
-                    std::exit(EXIT_FAILURE);
-                }
-
                 oss << std::boolalpha << default_val;
             }
             // For vectors, join elements with spaces.
