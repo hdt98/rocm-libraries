@@ -111,6 +111,7 @@ additional_options = {
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
             "-DTHEROCK_ENABLE_HIPDNN_INTEGRATION_TESTS=ON",
             "-DTHEROCK_ENABLE_IREE_LIBS=ON",
+            "-DTHEROCK_COMPOSABLE_KERNEL_FOR_MIOPEN_ONLY=ON",
         ],
         "projects_to_test": [
             "hipdnn",
