@@ -78,10 +78,10 @@ struct TileFmhaTraits
     static constexpr bool kHasDropout       = kHasDropout_;
     static constexpr auto QScaleEnum        = QScaleEnum_;
     static constexpr index_t kBlockPerCu    = kBlockPerCu_;
-    static constexpr bool kSkipMinSeqlenQ    = kSkipMinSeqlenQ_;
-    static constexpr FmhaSinkMode kSinkMode  = kSinkMode_;
-    static constexpr bool kHasStreamSink     = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
-    static constexpr bool kHasGptOssSink     = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
+    static constexpr bool kSkipMinSeqlenQ   = kSkipMinSeqlenQ_;
+    static constexpr FmhaSinkMode kSinkMode = kSinkMode_;
+    static constexpr bool kHasStreamSink    = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <bool kPadSeqLenQ_ /* padding for seqlen_q */,
@@ -170,9 +170,9 @@ struct TileFmhaFwdPagedKVTraits
     static constexpr bool kDoFp8StaticQuant = kDoFp8StaticQuant_;
     static constexpr index_t kBlockPerCu    = kBlockPerCu_;
     static constexpr bool kSkipMinSeqlenQ   = kSkipMinSeqlenQ_;
-    static constexpr FmhaSinkMode kSinkMode  = kSinkMode_;
-    static constexpr bool kHasStreamSink     = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
-    static constexpr bool kHasGptOssSink     = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
+    static constexpr FmhaSinkMode kSinkMode = kSinkMode_;
+    static constexpr bool kHasStreamSink    = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
+    static constexpr bool kHasGptOssSink    = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <bool kPadSeqLenQ_ /* padding for seqlen_q */,
@@ -206,8 +206,8 @@ struct TileFmhaFwdSplitKVTraits
     static constexpr bool kMergeNumHeadGroupsSeqLenQ = kMergeNumHeadGroupsSeqLenQ_;
     static constexpr index_t kBlockPerCu             = kBlockPerCu_;
     static constexpr FmhaSinkMode kSinkMode          = kSinkMode_;
-    static constexpr bool kHasStreamSink             = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
-    static constexpr bool kHasGptOssSink             = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
+    static constexpr bool kHasStreamSink = FmhaSinkModeHelper<kSinkMode_>::kHasStreamSink;
+    static constexpr bool kHasGptOssSink = FmhaSinkModeHelper<kSinkMode_>::kHasGptOssSink;
 };
 
 template <bool kPadSeqLenQ_ /* padding for seqlen_q */,

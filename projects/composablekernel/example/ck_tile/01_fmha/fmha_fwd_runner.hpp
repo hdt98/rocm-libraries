@@ -1136,8 +1136,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
             traits.has_stream_sink     = mask.sink > 0 ? true : false; // StreamLLM sink
             // GPT-OSS sink: callers must pass exactly 0 (not epsilon) to disable.
             // This is an integer-exact float comparison; any non-zero value enables the sink.
-            traits.has_gptoss_sink     = init_sink_value != 0;
-            traits.has_lse             = lse;
+            traits.has_gptoss_sink = init_sink_value != 0;
+            traits.has_lse         = lse;
 
             if constexpr(std::is_same_v<fmha_fwd_traits, std::decay_t<decltype(traits)>>)
             {
