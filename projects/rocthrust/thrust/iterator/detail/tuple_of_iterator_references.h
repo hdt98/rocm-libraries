@@ -174,7 +174,7 @@ struct tuple_element<Id, THRUST_NS_QUALIFIER::detail::tuple_of_iterator_referenc
 #if _THRUST_HAS_DEVICE_SYSTEM_STD
     : _THRUST_STD::tuple_element<Id, _THRUST_STD::tuple<Ts...>>
 #else
-    : ::thrust::tuple_element<Id, ::thrust::tuple<Ts...>>
+    : THRUST_NS_QUALIFIER::tuple_element<Id, THRUST_NS_QUALIFIER::tuple<Ts...>>
 #endif
 {};
 
@@ -199,7 +199,7 @@ struct tuple_element<Id, THRUST_NS_QUALIFIER::detail::tuple_of_iterator_referenc
 #  if _THRUST_HAS_DEVICE_SYSTEM_STD
     : _THRUST_STD::tuple_element<Id, _THRUST_STD::tuple<Ts...>>
 #  else
-    : ::thrust::tuple_element<Id, ::thrust::tuple<Ts...>>
+    : THRUST_NS_QUALIFIER::tuple_element<Id, THRUST_NS_QUALIFIER::tuple<Ts...>>
 #  endif
 {};
 
