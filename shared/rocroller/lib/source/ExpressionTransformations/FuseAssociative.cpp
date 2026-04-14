@@ -62,6 +62,7 @@ namespace rocRoller
             template <typename RHS>
             ExpressionPtr operator()(RHS rhs)
             {
+                // Direct match: OP(OP(x, N), M) -> OP(x, N+M)
                 if(std::holds_alternative<OP>(*m_lhs))
                 {
                     auto lhs_op = std::get<OP>(*m_lhs);
@@ -78,6 +79,34 @@ namespace rocRoller
                         return std::make_shared<Expression>(operation);
                     }
                 }
+                if(auto const* conv = std::get_if<Convert>(m_lhs.get()))
+                {
+                    auto srcInfo = DataTypeInfo::Get(resultVariableType(conv->arg));
+                    auto dstInfo = DataTypeInfo::Get(conv->destinationType);
+
+                    if(srcInfo.isIntegral && dstInfo.isIntegral
+                       && srcInfo.elementBytes == dstInfo.elementBytes)
+                    {
+                        if(std::holds_alternative<OP>(*(conv->arg)))
+                        {
+                            auto inner_op = std::get<OP>(*(conv->arg));
+                            bool eval_inner_rhs
+                                = evaluationTimes(inner_op.rhs)[EvaluationTime::Translate];
+
+                            if(eval_inner_rhs)
+                            {
+                                OP combined;
+                                combined.lhs = inner_op.lhs;
+                                combined.rhs = simplify(
+                                    std::make_shared<Expression>(Add{inner_op.rhs, literal(rhs)}));
+
+                                return convert(conv->destinationType,
+                                               std::make_shared<Expression>(combined));
+                            }
+                        }
+                    }
+                }
+
                 return nullptr;
             }
 
