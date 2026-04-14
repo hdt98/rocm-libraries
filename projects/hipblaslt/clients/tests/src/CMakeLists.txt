@@ -74,4 +74,21 @@ target_sources(hipblaslt-test
         ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_ml_workloads_gtest.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_checkpoint_gtest.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_collectives_gtest.cpp
+        # NEW: Critical ML workload gap tests for 100% coverage (2024)
+        # Phase 1-2: BF16, Advanced Attention, KV Cache (P0 - Critical)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_bfloat16_gtest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_advanced_attention_gtest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_kv_cache_gtest.cpp
+        # Phase 3-4: Sequence Parallelism, RCCL Integration (P0-P1)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_sequence_parallel_gtest.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_rccl_collectives_gtest.cpp
+        # Phase 5: Modern Inference/Training Features (2024-2026) - Comprehensive Coverage
+        # Week 1-2: Weight Quantization (GPTQ, AWQ, INT4/INT8, W4A16)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_weight_quantization_gtest.cpp
+        # Week 3: Mixture of Experts (MoE) patterns (DeepSeek-V3, Mixtral, Gemini)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_moe_patterns_gtest.cpp
+        # Week 5: Speculative Decoding (vLLM, TensorRT-LLM, 3× speedup)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_speculative_decoding_gtest.cpp
+        # Week 6: ZeRO Optimizer Partitioning (DeepSpeed ZeRO-1/2/3, FSDP)
+        ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_zero_optimizer_gtest.cpp
 )
