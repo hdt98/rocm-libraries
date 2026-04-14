@@ -984,18 +984,11 @@ magma_queue_create_internal(
     stat = rocblas_set_stream( queue->rocblas__, queue->stream__ );
     check_xerror( stat, func, file, line );
 
-    hipsparseStatus_t stat2;
-    stat2 = hipsparseCreate( &queue->hipsparse__ );
-    check_xerror( stat2, func, file, line );
-    queue->own__ |= own_hipsparse;
-    stat2 = hipsparseSetStream( queue->hipsparse__, queue->stream__ );
-    check_xerror( stat2, func, file, line );
 
 #endif
 
     MAGMA_UNUSED( err );
     MAGMA_UNUSED( stat );
-    MAGMA_UNUSED( stat2 );
 }
 
 
@@ -1163,19 +1156,8 @@ magma_queue_create_from_hip_internal(
     stat  = rocblas_set_stream( queue->rocblas__, queue->stream__ );
     check_xerror( stat, func, file, line );
 
-    // allocate cusparse handle if given as NULL
-    hipsparseStatus_t stat2;
-    if ( hipsparse_handle == NULL ) {
-        stat2 = hipsparseCreate( &hipsparse_handle );
-        check_xerror( stat, func, file, line );
-        queue->own__ |= own_hipsparse;
-    }
-    queue->hipsparse__ = hipsparse_handle;
-    stat2 = hipsparseSetStream( queue->hipsparse__, queue->stream__ );
-    check_xerror( stat2, func, file, line );
-
     MAGMA_UNUSED( stat );
-    MAGMA_UNUSED( stat2 );
+    MAGMA_UNUSED( hipsparse_handle );
 }
 #endif
 
@@ -1220,11 +1202,7 @@ magma_queue_destroy_internal(
             check_xerror( stat, func, file, line );
             MAGMA_UNUSED( stat );
         }
-        if ( queue->hipsparse__ != NULL && (queue->own__ & own_hipsparse)) {
-            hipsparseStatus_t stat = hipsparseDestroy( queue->hipsparse__ );
-            check_xerror( stat, func, file, line );
-            MAGMA_UNUSED( stat );
-        }
+        // hipsparse handle management removed — rocsolver does not use sparse operations
     #endif
         if ( queue->stream__ != NULL && (queue->own__ & own_stream)) {
             hipError_t err = hipStreamDestroy( queue->stream__ );

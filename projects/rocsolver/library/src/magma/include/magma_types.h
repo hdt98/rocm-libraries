@@ -162,14 +162,14 @@ typedef double real_Double_t;
     #include <hip/hip_version.h>
     #include <hip/hip_runtime.h>
 
-    // hipblas/hipsparse headers
-    #if HIP_VERSION >= 50200000
+    // hipblas header
     #include <rocblas/rocblas.h>
-    #include <hipsparse/hipsparse.h>
-    #else
-    #include <rocblas/rocblas.h>
-    #include <hipsparse.h>
-    #endif
+
+    // hipsparse types used only for queue handle management (no sparse operations).
+    // Forward-declare as opaque types to avoid a hard dependency on hipsparse.
+    typedef void* hipsparseHandle_t;
+    typedef int   hipsparseStatus_t;
+    #define HIPSPARSE_STATUS_SUCCESS 0
 
     // this macro allows you to define an unsupported function (primarily from hipBLAS)
     // which will become a NOOP, and print an error message
