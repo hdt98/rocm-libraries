@@ -344,6 +344,46 @@ catch(...)
     return hipblas_exception_to_status();
 }
 
+hipblasStatus_t hipblasGetVersion(hipblasHandle_t handle, int* version)
+try
+{
+    if(!version)
+        return HIPBLAS_STATUS_INVALID_VALUE;
+
+    *version = hipblasVersionMajor * 1000 + hipblasVersionMinor * 100 + hipblasVersionPatch;
+    return HIPBLAS_STATUS_SUCCESS;
+}
+catch(...)
+{
+    return hipblas_exception_to_status();
+}
+
+hipblasStatus_t hipblasGetProperty(hipblasLibraryProperty_t type, int* value)
+try
+{
+    if(!value)
+        return HIPBLAS_STATUS_INVALID_VALUE;
+
+    switch(type)
+    {
+    case HIPBLAS_MAJOR_VERSION:
+        *value = hipblasVersionMajor;
+        return HIPBLAS_STATUS_SUCCESS;
+    case HIPBLAS_MINOR_VERSION:
+        *value = hipblasVersionMinor;
+        return HIPBLAS_STATUS_SUCCESS;
+    case HIPBLAS_PATCH_LEVEL:
+        *value = hipblasVersionPatch;
+        return HIPBLAS_STATUS_SUCCESS;
+    default:
+        return HIPBLAS_STATUS_INVALID_VALUE;
+    }
+}
+catch(...)
+{
+    return hipblas_exception_to_status();
+}
+
 hipblasStatus_t hipblasSetPointerMode(hipblasHandle_t handle, hipblasPointerMode_t mode)
 try
 {
