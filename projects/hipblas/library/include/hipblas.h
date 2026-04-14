@@ -324,7 +324,7 @@ typedef enum
 {
     HIPBLAS_MAJOR_VERSION = 0, /**< Major version number */
     HIPBLAS_MINOR_VERSION = 1, /**< Minor version number */
-    HIPBLAS_PATCH_LEVEL   = 2  /**< Patch level */
+    HIPBLAS_PATCH_LEVEL   = 2 /**< Patch level */
 } hipblasLibraryProperty_t;
 
 #ifdef __cplusplus

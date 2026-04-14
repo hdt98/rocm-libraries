@@ -103,8 +103,7 @@ namespace
     // Test hipblasGetProperty with NULL pointer (should fail)
     TEST(hipblas_version, getProperty_nullPointer)
     {
-        EXPECT_EQ(HIPBLAS_STATUS_INVALID_VALUE,
-                  hipblasGetProperty(HIPBLAS_MAJOR_VERSION, nullptr));
+        EXPECT_EQ(HIPBLAS_STATUS_INVALID_VALUE, hipblasGetProperty(HIPBLAS_MAJOR_VERSION, nullptr));
     }
 
     // Test hipblasGetProperty with invalid type (should fail)
