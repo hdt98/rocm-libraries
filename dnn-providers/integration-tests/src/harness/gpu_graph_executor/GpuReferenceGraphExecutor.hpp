@@ -94,12 +94,15 @@ private:
         case NodeAttrs::PointwiseAttributes:
             return detail::GpuPointwiseDummySignatureKey(node, tensorMap);
 
+        case NodeAttrs::ConvolutionFwdAttributes:
+            return detail::GpuConvolutionFwdSignatureKey(
+                node, tensorMap, node.compute_data_type());
+
         // Node types with no GPU plan yet - throw descriptive error
         case NodeAttrs::BatchnormInferenceAttributes:
         case NodeAttrs::BatchnormInferenceAttributesVarianceExt:
         case NodeAttrs::BatchnormBackwardAttributes:
         case NodeAttrs::BatchnormAttributes:
-        case NodeAttrs::ConvolutionFwdAttributes:
         case NodeAttrs::ConvolutionBwdAttributes:
         case NodeAttrs::ConvolutionWrwAttributes:
         case NodeAttrs::MatmulAttributes:

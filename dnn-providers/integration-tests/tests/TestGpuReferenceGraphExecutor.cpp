@@ -8,8 +8,13 @@
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
+#include <cstring>
 #include <unordered_map>
 #include <vector>
+
+#include <hipdnn_data_sdk/types.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 
 #include "harness/gpu_graph_executor/GpuReferenceGraphExecutor.hpp"
 
@@ -152,6 +157,162 @@ flatbuffers::FlatBufferBuilder createBatchnormInferenceGraph()
     return builder;
 }
 
+std::vector<int64_t> computePackedStrides(const std::vector<int64_t>& dims)
+{
+    std::vector<int64_t> strides(dims.size());
+    int64_t stride = 1;
+    for(auto i = static_cast<int>(dims.size()) - 1; i >= 0; --i)
+    {
+        strides[static_cast<size_t>(i)] = stride;
+        stride *= dims[static_cast<size_t>(i)];
+    }
+    return strides;
+}
+
+// Creates a minimal graph with a ConvolutionFwd node.
+// Uses symmetric padding (prePadding == postPadding == padding).
+flatbuffers::FlatBufferBuilder
+    createConvFwdGraph(int64_t xUid,
+                       int64_t wUid,
+                       int64_t yUid,
+                       const std::vector<int64_t>& xDims,
+                       const std::vector<int64_t>& wDims,
+                       const std::vector<int64_t>& yDims,
+                       const std::vector<int64_t>& xStrides,
+                       const std::vector<int64_t>& wStrides,
+                       const std::vector<int64_t>& yStrides,
+                       const std::vector<int64_t>& padding,
+                       const std::vector<int64_t>& convStride,
+                       const std::vector<int64_t>& dilation,
+                       DataType dataType)
+{
+    flatbuffers::FlatBufferBuilder builder;
+
+    std::vector<flatbuffers::Offset<TensorAttributes>> tensors;
+    tensors.push_back(
+        CreateTensorAttributesDirect(builder, xUid, "x", dataType, &xStrides, &xDims));
+    tensors.push_back(
+        CreateTensorAttributesDirect(builder, wUid, "w", dataType, &wStrides, &wDims));
+    tensors.push_back(
+        CreateTensorAttributesDirect(builder, yUid, "y", dataType, &yStrides, &yDims));
+
+    auto convAttrs = CreateConvolutionFwdAttributesDirect(builder,
+                                                          xUid,
+                                                          wUid,
+                                                          yUid,
+                                                          &padding,
+                                                          &padding,
+                                                          &convStride,
+                                                          &dilation,
+                                                          ConvMode::CROSS_CORRELATION);
+
+    std::vector<flatbuffers::Offset<Node>> nodes;
+    nodes.push_back(CreateNodeDirect(builder,
+                                     "conv_fwd_node",
+                                     DataType::FLOAT,
+                                     NodeAttributes::ConvolutionFwdAttributes,
+                                     convAttrs.Union()));
+
+    auto graph = CreateGraphDirect(
+        builder, "ConvFwdTestGraph", dataType, dataType, DataType::FLOAT, &tensors, &nodes);
+
+    builder.Finish(graph);
+    return builder;
+}
+
+template <typename T, typename ComputeT = float>
+void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
+                             const std::vector<int64_t>& wDims,
+                             const std::vector<int64_t>& yDims,
+                             const std::vector<int64_t>& padding,
+                             const std::vector<int64_t>& convStride,
+                             const std::vector<int64_t>& dilation,
+                             DataType dataType,
+                             double tolerance)
+{
+    constexpr int64_t X_UID = 10;
+    constexpr int64_t W_UID = 11;
+    constexpr int64_t Y_UID = 12;
+
+    auto xStrides = computePackedStrides(xDims);
+    auto wStrides = computePackedStrides(wDims);
+    auto yStrides = computePackedStrides(yDims);
+
+    auto graphBuilder = createConvFwdGraph(X_UID,
+                                           W_UID,
+                                           Y_UID,
+                                           xDims,
+                                           wDims,
+                                           yDims,
+                                           xStrides,
+                                           wStrides,
+                                           yStrides,
+                                           padding,
+                                           convStride,
+                                           dilation,
+                                           dataType);
+
+    // Compute element counts
+    size_t xCount = 1;
+    for(auto d : xDims)
+    {
+        xCount *= static_cast<size_t>(d);
+    }
+    size_t wCount = 1;
+    for(auto d : wDims)
+    {
+        wCount *= static_cast<size_t>(d);
+    }
+    size_t yCount = 1;
+    for(auto d : yDims)
+    {
+        yCount *= static_cast<size_t>(d);
+    }
+
+    // Allocate and fill input data
+    std::vector<T> xData(xCount);
+    std::vector<T> wData(wCount);
+    std::vector<T> gpuYData(yCount);
+
+    for(size_t i = 0; i < xCount; ++i)
+    {
+        xData[i] = T(static_cast<float>(i + 1));
+    }
+    for(size_t i = 0; i < wCount; ++i)
+    {
+        wData[i] = T(1.0f);
+    }
+
+    // Run GPU graph executor
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[X_UID] = xData.data();
+    variantPack[W_UID] = wData.data();
+    variantPack[Y_UID] = gpuYData.data();
+
+    GpuReferenceGraphExecutor gpuExecutor;
+    gpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), variantPack);
+
+    // Run CPU reference for comparison
+    hipdnn_data_sdk::utilities::Tensor<T> cpuX(xDims, xStrides);
+    hipdnn_data_sdk::utilities::Tensor<T> cpuW(wDims, wStrides);
+    hipdnn_data_sdk::utilities::Tensor<T> cpuY(yDims, yStrides);
+
+    std::memcpy(cpuX.rawHostData(), xData.data(), xCount * sizeof(T));
+    std::memcpy(cpuW.rawHostData(), wData.data(), wCount * sizeof(T));
+
+    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(
+        cpuX, cpuW, cpuY, convStride, dilation, padding, padding);
+
+    // Compare GPU executor output against CPU reference
+    const auto* cpuResult = static_cast<const T*>(cpuY.rawHostData());
+    for(size_t i = 0; i < yCount; ++i)
+    {
+        auto gpuVal = static_cast<float>(gpuYData[i]);
+        auto cpuVal = static_cast<float>(cpuResult[i]);
+        EXPECT_NEAR(gpuVal, cpuVal, tolerance) << "Mismatch at index " << i;
+    }
+}
+
 } // namespace
 
 TEST(TestGpuReferenceGraphExecutor, CanBeConstructed)
@@ -252,3 +413,60 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneMultiDimensional)
         EXPECT_FLOAT_EQ(output[i], input[i] + 1.0f) << "Mismatch at index " << i;
     }
 }
+
+TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32BasicExecutes)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runConvFwdExecutorVsCpu<float>({1, 1, 4, 4}, // xDims
+                                   {1, 1, 3, 3}, // wDims
+                                   {1, 1, 2, 2}, // yDims
+                                   {0, 0}, // padding
+                                   {1, 1}, // stride
+                                   {1, 1}, // dilation
+                                   DataType::FLOAT,
+                                   1e-5);
+}
+
+TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32WithPaddingExecutes)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runConvFwdExecutorVsCpu<float>({1, 1, 4, 4}, // xDims
+                                   {1, 1, 3, 3}, // wDims
+                                   {1, 1, 4, 4}, // yDims (same as input due to padding=1)
+                                   {1, 1}, // padding
+                                   {1, 1}, // stride
+                                   {1, 1}, // dilation
+                                   DataType::FLOAT,
+                                   1e-5);
+}
+
+TEST(TestGpuReferenceGraphExecutor, ConvFwdFp16Executes)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runConvFwdExecutorVsCpu<hipdnn_data_sdk::types::half>({1, 1, 4, 4}, // xDims
+                                                          {1, 1, 3, 3}, // wDims
+                                                          {1, 1, 2, 2}, // yDims
+                                                          {0, 0}, // padding
+                                                          {1, 1}, // stride
+                                                          {1, 1}, // dilation
+                                                          DataType::HALF,
+                                                          0.01);
+}
+
+TEST(TestGpuReferenceGraphExecutor, ConvFwdBfp16Executes)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runConvFwdExecutorVsCpu<hipdnn_data_sdk::types::bfloat16>({1, 1, 4, 4}, // xDims
+                                                               {1, 1, 3, 3}, // wDims
+                                                               {1, 1, 2, 2}, // yDims
+                                                               {0, 0}, // padding
+                                                               {1, 1}, // stride
+                                                               {1, 1}, // dilation
+                                                               DataType::BFLOAT16,
+                                                               0.1);
+}
+

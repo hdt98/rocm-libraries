@@ -13,6 +13,7 @@ target_include_directories(hipdnn_integration_tests_unit_tests
 target_link_libraries(hipdnn_integration_tests_unit_tests
     PRIVATE
         hip::host
+        hipdnn_gpu_ref
         hipdnn_test_sdk
         hipdnn_plugin_sdk
         GTest::gtest
