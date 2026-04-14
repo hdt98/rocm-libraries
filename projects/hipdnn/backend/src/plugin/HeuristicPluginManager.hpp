@@ -12,6 +12,7 @@
 #include "PluginCore.hpp"
 #include <hipdnn_backend/version.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/VersionUtils.hpp>
 
 namespace hipdnn_backend::plugin
 {

@@ -225,6 +225,9 @@ endif()
 add_subdirectory(test_sdk)
 add_subdirectory(plugin_sdk)
 
+# RFC 0007: Heuristic plugins
+add_subdirectory(plugins)
+
 add_subdirectory(tests)
 add_subdirectory(tools)
 

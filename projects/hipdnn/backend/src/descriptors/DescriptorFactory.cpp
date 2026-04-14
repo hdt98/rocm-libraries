@@ -18,6 +18,7 @@
 #include "EngineHeuristicDescriptor.hpp"
 #include "ExecutionPlanDescriptor.hpp"
 #include "GraphDescriptor.hpp"
+#include "heuristics/SelectionHeuristic.hpp"
 #include "HipdnnException.hpp"
 #include "KnobDescriptor.hpp"
 #include "KnobSettingDescriptor.hpp"

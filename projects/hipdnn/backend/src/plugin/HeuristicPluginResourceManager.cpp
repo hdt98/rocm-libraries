@@ -21,7 +21,7 @@ struct StaticHeuristicPluginState
     std::shared_ptr<HeuristicPluginManager> manager;
     std::set<std::filesystem::path> customPaths;
     hipdnnPluginLoadingMode_ext_t loadingMode = HIPDNN_PLUGIN_LOADING_ADDITIVE;
-    hipdnnPluginUnloadingMode_ext_t unloadingMode = HIPDNN_PLUGIN_UNLOADING_LAZY;
+    hipdnnPluginUnloadingMode_ext_t unloadingMode = HIPDNN_PLUGIN_UNLOAD_LAZY;
     bool handleActive = false;
 };
 
@@ -56,7 +56,7 @@ void resetManagerIfNeeded()
             "Destroy all handles first or use HIPDNN_PLUGIN_LOADING_ADDITIVE mode.");
     }
 
-    if(state.unloadingMode == HIPDNN_PLUGIN_UNLOADING_EAGER)
+    if(state.unloadingMode == HIPDNN_PLUGIN_UNLOAD_EAGER)
     {
         state.manager.reset();
     }
@@ -81,8 +81,9 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         try
         {
             // Set logging callback before creating handle
-            auto logStatus = plugin->setLoggingCallback(hipdnn_backend::logging::backendLoggingCallback);
-            if(logStatus != HIPDNN_HEURISTIC_STATUS_SUCCESS)
+            // Use heuristicLoggingCallback which handles the 3-parameter signature
+            auto logStatus = plugin->setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
+            if(logStatus != HIPDNN_PLUGIN_STATUS_SUCCESS)
             {
                 HIPDNN_BACKEND_LOG_WARN(
                     "Failed to set logging callback on heuristic plugin with policy ID {}",
@@ -90,7 +91,9 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
             }
 
             // Set log level (optional)
-            plugin->setLogLevel(hipdnn_backend::logging::getMinSeverity());
+            hipdnnSeverity_t level = HIPDNN_SEV_INFO;
+            hipdnn_backend::logging::getGlobalLogLevel(level);
+            plugin->setLogLevel(level);
 
             // Create plugin handle
             auto handle = plugin->createHandle();
@@ -192,8 +195,8 @@ void HeuristicPluginResourceManager::setPluginLogLevel(hipdnnSeverity_t level)
     for(const auto& plugin : plugins)
     {
         auto status = plugin->setLogLevel(level);
-        if(status != HIPDNN_HEURISTIC_STATUS_SUCCESS
-           && status != HIPDNN_HEURISTIC_STATUS_NOT_SUPPORTED)
+        if(status != HIPDNN_PLUGIN_STATUS_SUCCESS
+           && status != HIPDNN_PLUGIN_STATUS_INVALID_VALUE)
         {
             HIPDNN_BACKEND_LOG_WARN("Failed to set log level on heuristic plugin with policy ID {}",
                                    plugin->policyId());
@@ -212,6 +215,23 @@ hipdnnHeuristicHandle_t
 {
     auto it = _policyIdToHandle.find(policyId);
     if(it == _policyIdToHandle.end())
+    {
+        return nullptr;
+    }
+    return it->second;
+}
+
+const HeuristicPlugin*
+    HeuristicPluginResourceManager::getPluginForPolicyId(int64_t policyId) const
+{
+    auto handle = getHeuristicHandleForPolicyId(policyId);
+    if(handle == nullptr)
+    {
+        return nullptr;
+    }
+
+    auto it = _handleToPlugin.find(handle);
+    if(it == _handleToPlugin.end())
     {
         return nullptr;
     }

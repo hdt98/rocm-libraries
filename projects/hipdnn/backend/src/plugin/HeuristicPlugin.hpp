@@ -21,7 +21,7 @@ namespace hipdnn_backend::plugin
  *
  * Heuristic plugins are separate from engine plugins and do NOT implement PluginApi.h.
  */
-class HeuristicPlugin
+class HeuristicPlugin : public PluginBase
 {
 protected:
     // Protected constructor to prevent direct instantiation
@@ -31,14 +31,27 @@ protected:
     HeuristicPlugin();
 
 public:
+    // Virtual destructor for polymorphic class
+    virtual ~HeuristicPlugin() = default;
+
+
     // Module metadata (called before handle creation)
     virtual std::string_view apiVersion() const;
     virtual int64_t policyId() const;
     virtual std::string_view policyName() const;
     virtual std::string_view pluginVersion() const;
 
+    // Plugin type - heuristic plugins return UNSPECIFIED (they don't have their own type yet)
+    static hipdnnPluginType_t getPluginType() { return HIPDNN_PLUGIN_TYPE_UNSPECIFIED; }
+
     // Logging setup (called at module load time)
+    // 3-parameter version for heuristic-specific callback
+    hipdnnPluginStatus_t setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const;
+
+    // 2-parameter version for compatibility with PluginManagerBase
+    // This wraps the 2-param callback to provide a component prefix
     hipdnnPluginStatus_t setLoggingCallback(hipdnnCallback_t callback) const;
+
     hipdnnPluginStatus_t setLogLevel(hipdnnSeverity_t level) const;
 
     // Plugin handle lifecycle
@@ -112,7 +125,7 @@ private:
     hipdnnPluginStatus_t (*_funcGetPolicyId)(int64_t*);
     hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
     hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnCallback_t);
+    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnHeuristicLoggingCallback_t);
     hipdnnPluginStatus_t (*_funcSetLogLevel)(hipdnnSeverity_t);
     void (*_funcGetLastErrorString)(const char**);
 
@@ -138,8 +151,7 @@ private:
     hipdnnPluginStatus_t (*_funcPolicyFinalize)(hipdnnHeuristicPolicyDescriptor_t, int32_t*);
     hipdnnPluginStatus_t (*_funcPolicyGetSortedEngineIds)(hipdnnHeuristicPolicyDescriptor_t,
                                                           int64_t*,
-                                                          size_t,
-                                                          size_t*);
+                                                          uint32_t*);
 
     friend class PluginManagerBase<HeuristicPlugin>;
 };

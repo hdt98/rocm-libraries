@@ -37,6 +37,8 @@ typedef enum
     HIPDNN_PLUGIN_STATUS_INVALID_VALUE = 2,
     HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR = 3,
     HIPDNN_PLUGIN_STATUS_ALLOC_FAILED = 4,
+    HIPDNN_PLUGIN_STATUS_NOT_APPLICABLE = 5,     // Heuristic policy: not applicable
+    HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED = 6,    // Object not initialized
 } hipdnnPluginStatus_t;
 
 /**

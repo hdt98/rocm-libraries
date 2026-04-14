@@ -57,6 +57,20 @@ extern "C" {
  */
 
 /**
+ * @brief Logging callback type for heuristic plugins.
+ *
+ * This callback allows plugins to emit log messages with a component prefix.
+ * The host provides this callback via hipdnnHeuristicSetLoggingCallback.
+ *
+ * @param[in] severity Log severity level (HIPDNN_SEV_INFO, HIPDNN_SEV_WARN, etc.)
+ * @param[in] component_prefix Component name prefix (e.g., "[StaticOrdering] ", "[Config] ")
+ * @param[in] message The log message content
+ */
+typedef void (*hipdnnHeuristicLoggingCallback_t)(hipdnnSeverity_t severity,
+                                                  const char* component_prefix,
+                                                  const char* message);
+
+/**
  * @brief Opaque handle for a heuristic plugin session.
  *
  * This handle represents a long-lived session object per loaded heuristic module
@@ -153,12 +167,15 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
  * The host calls this once after loading the heuristic .so, before any other operations.
  * The plugin should store the callback and use it for all internal logging.
  *
+ * The callback signature allows plugins to include a component prefix (e.g., "[StaticOrdering] ")
+ * which helps identify log messages from specific heuristic policies.
+ *
  * @param[in] callback The logging callback function to use.
  *
  * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback);
+    hipdnnHeuristicSetLoggingCallback(hipdnnHeuristicLoggingCallback_t callback);
 
 /**
  * @brief Sets the log level for the plugin (optional).
@@ -384,30 +401,29 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
 /**
  * @brief Retrieves the sorted engine IDs after successful finalize.
  *
- * Valid only after Finalize returned with out_applied == 1. The plugin writes up to
- * out_capacity engine IDs into out_ids and sets *out_count to the number written.
+ * Valid only after Finalize returned with out_applied == 1.
  *
  * The output IDs must be a permutation or subset of the input IDs from SetEngineIds.
  * The host validates this constraint.
  *
+ * This function supports two usage patterns:
+ * 1. Query count: Pass engine_ids = nullptr to get the count in num_engines
+ * 2. Retrieve IDs: Pass non-null engine_ids and capacity in *num_engines,
+ *    receive actual count in *num_engines
+ *
  * @param[in] desc The policy descriptor.
- * @param[out] out_ids Array to receive the sorted engine IDs. Must have space for out_capacity IDs.
- * @param[in] out_capacity Maximum number of IDs to write to out_ids.
- * @param[out] out_count Pointer to receive the number of IDs written.
- *                       Set to min(full_sorted_length, out_capacity).
+ * @param[out] engine_ids Array to receive the sorted engine IDs, or nullptr to query count.
+ * @param[in,out] num_engines Input: capacity of engine_ids array (ignored if engine_ids is null).
+ *                            Output: number of IDs available/written.
  *
- * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success (even if only a prefix was returned),
- *         error code on failure.
- *
- * @note If out_capacity is smaller than the full sorted list, only a prefix is returned.
- *       This is NOT an error. Callers needing the full ordering must supply a buffer
- *       at least as large as the candidate count from SetEngineIds.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED if descriptor not finalized,
+ *         error code on other failures.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
-                                            int64_t* out_ids,
-                                            size_t out_capacity,
-                                            size_t* out_count);
+                                            int64_t* engine_ids,
+                                            uint32_t* num_engines);
 
 /** @} */ // End of HeuristicPolicySelection group
 

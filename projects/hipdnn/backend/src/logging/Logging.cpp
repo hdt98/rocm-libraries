@@ -607,5 +607,22 @@ hipdnnStatus_t getGlobalLogLevel(hipdnnSeverity_t& level)
     return HIPDNN_STATUS_SUCCESS;
 }
 
+void heuristicLoggingCallback(hipdnnSeverity_t severity,
+                              const char* component_prefix,
+                              const char* msg)
+{
+    // RFC 0007 Section 12: Heuristic plugin logging callback
+    // Combines component prefix and message, then forwards to backend logging
+    if(component_prefix != nullptr && msg != nullptr)
+    {
+        std::string combined = std::string(component_prefix) + msg;
+        backendLoggingCallback(severity, combined.c_str());
+    }
+    else if(msg != nullptr)
+    {
+        backendLoggingCallback(severity, msg);
+    }
+}
+
 } // namespace logging
 } // namespace hipdnn_backend

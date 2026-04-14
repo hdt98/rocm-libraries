@@ -4,6 +4,7 @@
 #include "HeuristicPlugin.hpp"
 
 #include "HipdnnException.hpp"
+#include "logging/Logging.hpp"
 
 namespace hipdnn_backend::plugin
 {
@@ -116,9 +117,20 @@ std::string_view HeuristicPlugin::pluginVersion() const
     return version;
 }
 
-hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
+hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const
 {
     return _funcSetLoggingCallback(callback);
+}
+
+// 2-parameter callback overload for PluginManagerBase compatibility
+// Uses the existing heuristicLoggingCallback which wraps 2-param to 3-param
+hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t /*callback*/) const
+{
+    // The heuristicLoggingCallback function in logging/Logging.cpp already
+    // wraps the backend's 2-param callback to the plugin's 3-param interface
+    // by combining component_prefix and message before calling backendLoggingCallback
+    // We ignore the passed callback and use the global heuristicLoggingCallback
+    return setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
 }
 
 hipdnnPluginStatus_t HeuristicPlugin::setLogLevel(hipdnnSeverity_t level) const
@@ -188,10 +200,10 @@ bool HeuristicPlugin::finalize(hipdnnHeuristicPolicyDescriptor_t desc) const
 std::vector<int64_t>
     HeuristicPlugin::getSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc) const
 {
-    // Query the count first
-    size_t count = 0;
+    // Query the count first (pass nullptr for engine_ids)
+    uint32_t count = 0;
     invokeHeuristicFunction(
-        "get sorted engine IDs count", _funcPolicyGetSortedEngineIds, desc, nullptr, 0, &count);
+        "get sorted engine IDs count", _funcPolicyGetSortedEngineIds, desc, nullptr, &count);
 
     if(count == 0)
     {
@@ -200,12 +212,11 @@ std::vector<int64_t>
 
     // Retrieve the actual IDs
     std::vector<int64_t> ids(count);
-    size_t actualCount = 0;
+    uint32_t actualCount = count;
     invokeHeuristicFunction("get sorted engine IDs",
                             _funcPolicyGetSortedEngineIds,
                             desc,
                             ids.data(),
-                            count,
                             &actualCount);
 
     ids.resize(actualCount);

@@ -90,6 +90,17 @@ public:
     virtual hipdnnHeuristicHandle_t getHeuristicHandleForPolicyId(int64_t policyId) const;
 
     /**
+     * @brief Get the HeuristicPlugin pointer for a given policy ID.
+     *
+     * Returns the HeuristicPlugin* that implements the given policy ID.
+     * Returns nullptr if no plugin with that policy ID is loaded.
+     *
+     * @param policyId The policy ID (int64_t from engineNameToId)
+     * @return The plugin pointer, or nullptr if not found
+     */
+    virtual const HeuristicPlugin* getPluginForPolicyId(int64_t policyId) const;
+
+    /**
      * @brief Set device properties on all loaded heuristic plugin handles.
      *
      * Calls hipdnnHeuristicHandleSetDeviceProperties on each loaded plugin handle
