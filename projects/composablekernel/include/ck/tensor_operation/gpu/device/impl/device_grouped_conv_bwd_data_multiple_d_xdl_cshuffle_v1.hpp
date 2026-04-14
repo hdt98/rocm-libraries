@@ -1713,7 +1713,9 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 if constexpr(NDimSpatial == 2 && !CTranspose)
                 {
                     auto launch_flat_desc_gemm_kernel =
-                        [&](auto has_main_loop_tag, index_t flat_idx) -> float {
+                        [&](auto has_main_loop_tag,
+                            index_t flat_idx,
+                            bool with_preprocess) -> float {
                         constexpr bool has_main_loop = has_main_loop_tag.value;
                         const auto kernel =
                             kernel_gemm_xdlops_v2r3<
@@ -1730,51 +1732,33 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                         const index_t flat_desc_grid_size =
                             NonGroupedGridwiseGemm64::Block2CTileMap::CalculateGridSize(
                                 M_len, N_len);
-                        return launch_and_time_kernel_with_preprocess(
-                            stream_config,
-                            clear_workspace,
-                            kernel,
-                            dim3(flat_desc_grid_size),
-                            dim3(BlockSize),
-                            0,
-                            p_a_grid,
-                            p_b_grid,
-                            p_e_grid,
-                            arg.flat_a_container_[flat_idx],
-                            arg.flat_b_container_[flat_idx],
-                            flat_c);
-                    };
-
-                    auto launch_flat_desc_gemm_kernel_no_preprocess =
-                        [&](auto has_main_loop_tag, index_t flat_idx) -> float {
-                        constexpr bool has_main_loop = has_main_loop_tag.value;
-                        const auto kernel =
-                            kernel_gemm_xdlops_v2r3<
-                                NonGroupedGridwiseGemm64,
-                                ABDataType,
-                                EDataType,
-                                FlatAGridDesc_K0_M_K1,
-                                FlatBGridDesc_K0_N_K1,
-                                FlatCGridDesc_M_N,
-                                has_main_loop>;
-                        const auto& flat_c = arg.flat_c_container_[flat_idx];
-                        const index_t M_len = flat_c.GetLength(I0);
-                        const index_t N_len = flat_c.GetLength(I1);
-                        const index_t flat_desc_grid_size =
-                            NonGroupedGridwiseGemm64::Block2CTileMap::CalculateGridSize(
-                                M_len, N_len);
-                        return launch_and_time_kernel(
-                            stream_config,
-                            kernel,
-                            dim3(flat_desc_grid_size),
-                            dim3(BlockSize),
-                            0,
-                            p_a_grid,
-                            p_b_grid,
-                            p_e_grid,
-                            arg.flat_a_container_[flat_idx],
-                            arg.flat_b_container_[flat_idx],
-                            flat_c);
+                        if(with_preprocess)
+                            return launch_and_time_kernel_with_preprocess(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(flat_desc_grid_size),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                p_e_grid,
+                                arg.flat_a_container_[flat_idx],
+                                arg.flat_b_container_[flat_idx],
+                                flat_c);
+                        else
+                            return launch_and_time_kernel(
+                                stream_config,
+                                kernel,
+                                dim3(flat_desc_grid_size),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                p_e_grid,
+                                arg.flat_a_container_[flat_idx],
+                                arg.flat_b_container_[flat_idx],
+                                flat_c);
                     };
 
                     if(arg.num_group_ == 1 &&
@@ -1792,24 +1776,12 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                             const bool flat_desc_has_main_loop =
                                 NonGroupedGridwiseGemm64::CalculateHasMainKBlockLoop(
                                     padded_K0 * AK1);
-                            if(i == 0)
-                            {
-                                if(flat_desc_has_main_loop)
-                                    ave_time += launch_flat_desc_gemm_kernel(
-                                        integral_constant<bool, true>{}, flat_idx);
-                                else
-                                    ave_time += launch_flat_desc_gemm_kernel(
-                                        integral_constant<bool, false>{}, flat_idx);
-                            }
+                            if(flat_desc_has_main_loop)
+                                ave_time += launch_flat_desc_gemm_kernel(
+                                    integral_constant<bool, true>{}, flat_idx, i == 0);
                             else
-                            {
-                                if(flat_desc_has_main_loop)
-                                    ave_time += launch_flat_desc_gemm_kernel_no_preprocess(
-                                        integral_constant<bool, true>{}, flat_idx);
-                                else
-                                    ave_time += launch_flat_desc_gemm_kernel_no_preprocess(
-                                        integral_constant<bool, false>{}, flat_idx);
-                            }
+                                ave_time += launch_flat_desc_gemm_kernel(
+                                    integral_constant<bool, false>{}, flat_idx, i == 0);
                         }
                     }
                 }
