@@ -322,7 +322,8 @@ struct UniversalGemmKernel
         IsStreamK,
         StreamKKernelArgs,
         UniversalGemmKernelArgs<AsLayout::size(), BsLayout::size(), DsLayout::size()>>;
-    using Kernel = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
+    using Kernel     = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
+    using StreamKOps = StreamKReductionOps<TilePartitioner, GemmPipeline, StreamKKernelArgs>;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
@@ -1281,9 +1282,220 @@ struct UniversalGemmKernel
         }
     }
 
+    /**
+     * @brief Runs the main Stream - K algorithm.
+     * @param kargs Stream - K kernel arguments.
+     * @param cta_idx The current Stream - K workgroup's index.
+     * @param smem_ptr_0 Pointer to LDS.
+     * @note It is assumed that the first Stream - K workgroup has a `cta_idx` of zero. If a
+     * non-persistent data-parallel (DP) section is used, then a Stream-K workgroup's `cta_idx`
+     * *should be something like `blockIdx.x` minus number of DP workgroups.
+     */
+    CK_TILE_DEVICE
+    void StreamKGemm(KernelArgs& kargs, index_t cta_idx, void* smem_ptr_0) const
+    {
+        const StreamKOps sk_ops{};
+        index_t iter_start, iter_end;
+        kargs.tile_partitioner.get_iter_boundaries(iter_start, iter_end, cta_idx);
+
+        while(iter_start < iter_end)
+        {
+            // Get the 1D tile index in the C tensor that this workgroup will work in for this
+            // iteration of the loop.
+            index_t tile_idx =
+                amd_wave_read_first_lane(kargs.tile_partitioner.get_tile_index(iter_start));
+
+            // Get the start and end boundaries for the current tile.
+            index_t tile_iter_start, tile_iter_end;
+            kargs.tile_partitioner.get_tile_boundaries(tile_iter_start, tile_iter_end, tile_idx);
+
+            // Get the start and end iteration within the current tile for the workgroup.
+            index_t local_iter_start = amd_wave_read_first_lane(
+                kargs.tile_partitioner.get_local_iter(iter_start, tile_iter_start));
+            index_t local_iter_end =
+                amd_wave_read_first_lane(kargs.tile_partitioner.get_local_iter_end(
+                    tile_iter_start, iter_end, tile_iter_end));
+
+            // Get the iteration length.
+            index_t num_loop_sk = local_iter_end - local_iter_start;
+
+            // Determine the total size along the K dimension the workgroup is using in this
+            // iteration (used to construct tensor views).
+            index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
+
+            // Get the K offsets for the A and B tensors
+            auto [i_k_a, i_k_b] = GetKOffsets<AsLayout, BsLayout>(
+                local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
+
+            if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
+            {
+                const auto c_macro_tile_idx =
+                    kargs.tile_partitioner.get_output_tile_index(tile_idx);
+                const index_t i_m = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
+                const index_t i_n = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+                RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a},
+                        {static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b},
+                        {/*ds_ptr*/},
+                        static_cast<EDataType*>(kargs.e_ptr),
+                        smem_ptr_0,
+                        kargs,
+                        num_loop_sk,
+                        i_m,
+                        i_n,
+                        k_size);
+            }
+            else if(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear ||
+                    TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Tree)
+            {
+                const auto c_macro_tile_idx =
+                    kargs.tile_partitioner.get_output_tile_index(tile_idx);
+                index_t i_m = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
+                index_t i_n = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+                const ADataType* a_ptr = static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a;
+                const BDataType* b_ptr = static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b;
+                EDataType* c_ptr       = static_cast<EDataType*>(kargs.e_ptr);
+
+                // Create block windows using specialized methods
+                const auto& as_block_window = MakeABlockWindows({a_ptr}, kargs, k_size, i_m);
+                const auto& bs_block_window = MakeBBlockWindows({b_ptr}, kargs, k_size, i_n);
+                const auto& ds_block_window = MakeDBlockWindows({/*ds_ptr*/}, kargs, i_m, i_n);
+
+                // Since num_loop can vary per WG and per iteration of the Stream-K while loop,
+                // we compute has_hot_loop and tail_num here. This is a similar pattern used by
+                // grouped GEMM. In this case, we call the GemmPipeline's operator() function
+                // that takes both has_hot_loop and tail_num.
+                const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
+                const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
+
+                // Run GEMM cooperatively by whole workgroup.
+                const auto& c_block_tile = GemmPipeline{}(as_block_window[I0],
+                                                          bs_block_window[I0],
+                                                          num_loop_sk,
+                                                          has_hot_loop,
+                                                          tail_num,
+                                                          smem_ptr_0);
+
+                auto tile_started = iter_start == tile_iter_start;
+                auto tile_ended   = iter_end >= tile_iter_end;
+
+                if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear)
+                {
+                    if(!tile_started)
+                    {
+                        sk_ops.StorePartial(kargs, cta_idx, c_block_tile);
+                        sk_ops.SignalStorePartialDone(kargs, cta_idx);
+                    }
+                    else
+                    {
+                        auto accum_block_tile = c_block_tile;
+                        if(!tile_ended)
+                        {
+                            const index_t iter_per_tile =
+                                kargs.tile_partitioner.get_iters_per_tile();
+                            const index_t iter_per_cta =
+                                kargs.tile_partitioner.get_iters_per_sk_cta();
+                            const index_t extra_iters = kargs.tile_partitioner.get_extra_iters();
+                            int accum_iters           = local_iter_end - local_iter_start;
+                            int next_cta              = cta_idx + 1;
+
+                            while(accum_iters < iter_per_tile)
+                            {
+                                sk_ops.WaitStorePartialDone(kargs, next_cta);
+
+                                using BlockType = remove_cvref_t<decltype(c_block_tile)>;
+                                sk_ops.AddBlockTile(
+                                    accum_block_tile,
+                                    sk_ops.template LoadPartial<typename BlockType::DataType>(
+                                        kargs, next_cta, c_block_tile.get_tile_distribution()));
+
+                                accum_iters += iter_per_cta + (next_cta < extra_iters);
+                                ++next_cta;
+                            }
+                        }
+
+                        auto c_block_window = MakeCBlockWindows<TilePartitioner::MemoryOperation>(
+                            c_ptr, kargs, i_m, i_n);
+                        EpiloguePipeline{}(
+                            c_block_window, accum_block_tile, ds_block_window, smem_ptr_0);
+                    }
+                }
+                else // Tree Reduction
+                {
+                    auto accum_block_tile      = c_block_tile;
+                    index_t tile_local_cta_idx = amd_wave_read_first_lane(
+                        kargs.tile_partitioner.get_tile_local_cta_index(tile_iter_start, cta_idx));
+
+                    index_t stride = amd_wave_read_first_lane(1);
+
+                    for(;; stride <<= 1)
+                    {
+                        const index_t partner_cta_idx = amd_wave_read_first_lane(cta_idx + stride);
+                        const index_t partner_start_iter = amd_wave_read_first_lane(
+                            kargs.tile_partitioner.get_start_iter(partner_cta_idx));
+                        bool partner_in_tile =
+                            amd_wave_read_first_lane(partner_start_iter < tile_iter_end);
+
+                        // If the partner of the workgroup who started the tile is not in this tile,
+                        // then the work for this tile is done and results can be stored in the C
+                        // tensor.
+                        if(tile_started && !partner_in_tile)
+                        {
+                            auto c_block_window =
+                                MakeCBlockWindows<TilePartitioner::MemoryOperation>(
+                                    c_ptr, kargs, i_m, i_n);
+                            EpiloguePipeline{}(
+                                c_block_window, accum_block_tile, ds_block_window, smem_ptr_0);
+                            break;
+                        }
+
+                        // It's this workgroup's turn to read from partials.
+                        if(tile_local_cta_idx % (stride << 1) == 0)
+                        {
+                            // If this workgroup's partner is in the tile then it can read from
+                            // partials and accumulate results.
+                            if(partner_in_tile)
+                            {
+                                sk_ops.WaitStorePartialDone(kargs, partner_cta_idx);
+                                using BlockType = remove_cvref_t<decltype(c_block_tile)>;
+                                sk_ops.AddBlockTile(
+                                    accum_block_tile,
+                                    sk_ops.template LoadPartial<typename BlockType::DataType>(
+                                        kargs,
+                                        partner_cta_idx,
+                                        c_block_tile.get_tile_distribution()));
+                            }
+                        }
+                        // Otherwise, it's this workgroup's turn to write to partials. All
+                        // workgroups, except the workgroup who starts the tile, will write to
+                        // partials.
+                        else
+                        {
+                            sk_ops.StorePartial(kargs, cta_idx, accum_block_tile);
+                            sk_ops.SignalStorePartialDone(kargs, cta_idx);
+                            // Once the workgroup writes to partials, it has no more work to do for
+                            // this tile.
+                            break;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                static_assert(
+                    "An implementation does not exist for the chosen reduction strategy.");
+            }
+
+            // Prepare for next Stream-K loop iteration.
+            iter_start = tile_iter_end;
+            block_sync_lds();
+        }
+    }
+
     // Non-persistent kernel entry point
-    template <bool U = !PersistentKernel, typename = std::enable_if_t<U>>
-    CK_TILE_DEVICE void operator()(KernelArgs kargs) const
+    template <bool U = PersistentKernel, bool V = IsStreamK>
+    CK_TILE_DEVICE std::enable_if_t<!U && !V> operator()(KernelArgs kargs) const
     {
         const auto blockId  = amd_wave_read_first_lane(blockIdx.x);
         const auto [iM, iN] = TilePartitioner{kargs.M, kargs.N}.GetOutputTileIndex(blockId);
@@ -1320,9 +1532,54 @@ struct UniversalGemmKernel
             as_ptr, bs_ptr, kargs.ds_ptr, e_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
     }
 
+    /**
+     * @brief Entry point for the Stream-K Kernel with non-persistent DP.
+     *
+     * @par Overview
+     *     For the Non-Persistent kernel, each data parallel workgroup will
+     *     compute the results for their assigned macro-tile by calling `BaseGemm()`.
+     *     The Stream-K workgroups will do their assigned work by calling
+     *     `StreamKGemm()`, which calls `BaseGemm()` in the Stream-K loop.
+     */
+    template <bool U = PersistentKernel, bool V = IsStreamK>
+    CK_TILE_DEVICE std::enable_if_t<!U && V> operator()(KernelArgs kargs) const
+    {
+        // Allocate LDS
+        __shared__ char smem_ptr_0[GetSmemSize()];
+
+        index_t block_idx   = ck_tile::get_block_1d_id();
+        index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
+        index_t dp_ctas     = kargs.tile_partitioner.get_dp_ctas();
+        bool is_dp_ctas     = block_idx < kargs.tile_partitioner.get_dp_ctas();
+
+        // Check if at the data parallel section
+        if(is_dp_ctas)
+        {
+            const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(block_idx);
+            const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
+            const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
+                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
+                    {/*ds_ptr*/},
+                    static_cast<EDataType*>(kargs.e_ptr),
+                    smem_ptr_0,
+                    kargs,
+                    dp_num_loop,
+                    i_m,
+                    i_n,
+                    kargs.K);
+        }
+        else
+        {
+            // Stream-K
+            StreamKGemm(kargs, block_idx - dp_ctas, smem_ptr_0);
+        }
+    }
+
     // Persistent kernel entry point
-    template <bool U = PersistentKernel, typename = std::enable_if_t<U>, typename = void>
-    CK_TILE_DEVICE void operator()(KernelArgs kargs) const
+    template <bool U = PersistentKernel, bool V = IsStreamK>
+    CK_TILE_DEVICE std::enable_if_t<U && !V> operator()(KernelArgs kargs) const
     {
         const auto grid_size = amd_wave_read_first_lane(get_grid_size());
         const auto num_tiles =
@@ -1416,6 +1673,50 @@ struct UniversalGemmKernel
                 break;
             }
         }
+    }
+
+    /**
+     * @brief Entry point for the Stream-K Kernel with persistent DP.
+     *
+     * @par Overview
+     *     For the Persistent kernel, each workgroup will first compute their
+     *     assigned data-parallel tiles. Each data parallel tile will be computed
+     *     by calling `BaseGemm()`. Then the workgroups will proceed with the
+     *     Stream-K portion by calling `StreamKGemm()`, which calls `BaseGemm()`
+     *     in the Stream-K loop.
+     */
+    template <bool U = PersistentKernel, bool V = IsStreamK>
+    CK_TILE_DEVICE std::enable_if_t<U && V> operator()(KernelArgs kargs) const
+    {
+        // Allocate LDS
+        __shared__ char smem_ptr_0[GetSmemSize()];
+
+        index_t block_idx   = ck_tile::get_block_1d_id();
+        index_t dp_num_loop = kargs.tile_partitioner.get_iters_per_tile();
+
+        // Data-parallel section
+        for(index_t tile_idx = block_idx; tile_idx < kargs.tile_partitioner.get_dp_tiles();
+            tile_idx += kargs.tile_partitioner.get_max_active_wgs())
+        {
+            const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
+            const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
+            const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
+                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
+                    {/*ds_ptr*/},
+                    static_cast<EDataType*>(kargs.e_ptr),
+                    smem_ptr_0,
+                    kargs,
+                    dp_num_loop,
+                    i_m,
+                    i_n,
+                    kargs.K);
+            block_sync_lds();
+        }
+
+        // Stream-K section
+        StreamKGemm(kargs, block_idx, smem_ptr_0);
     }
 };
 } // namespace ck_tile
