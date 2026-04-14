@@ -33,7 +33,7 @@ namespace rocRoller
         RR_EMPTY_STRUCT_WITH_NAME(Kernel);
 
         /**
-         * Scope - represents a register scope.
+         * Scope - represents a group of operations.
          */
         RR_EMPTY_STRUCT_WITH_NAME(Scope);
 
