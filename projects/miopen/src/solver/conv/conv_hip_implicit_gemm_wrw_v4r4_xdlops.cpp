@@ -1105,9 +1105,15 @@ bool ConvHipImplicitGemmWrwV4R4Xdlops::IsApplicable(const ExecutionContext& ctx,
     int gemm_m       = -1;
     int gemm_n       = -1;
     int gemm_k_total = -1;
+    int GemmKBlock   = -1;
 
-    std::tie(std::ignore, gemm_m, gemm_n, gemm_k_total, std::ignore, std::ignore) =
+    std::tie(std::ignore, gemm_m, gemm_n, gemm_k_total, GemmKBlock, std::ignore) =
         config.CalculateGemmSizeAndGemmKBlock(ctx, problem);
+
+    // In deterministic mode, reject configs where GemmKBlock > 1
+    // because GemmKBlock > 1 uses AtomicAdd for K-reduction (non-deterministic).
+    if(problem.GetConv().attribute.deterministic && GemmKBlock > 1)
+        return false;
 
     return static_ck::IsValidGridGemmXdlops(gemm_m, gemm_n, gemm_k_total);
 }
