@@ -20,6 +20,7 @@
 #include "ck/library/utility/check_err.hpp"
 #include "ck/library/utility/fill.hpp"
 #include "ck/utility/blkgemmpipe_scheduler.hpp"
+#include "preshuffle_common.hpp"
 
 using ::ck::DeviceMem;
 using ::ck::HostTensorDescriptor;
@@ -87,54 +88,6 @@ struct MulABScaleExpertWeight
 };
 
 using CDEElementOp = MulABScaleExpertWeight;
-
-// A, B Scale preshuffle
-template <bool KLast>
-void preShuffleScaleBuffer(ck::e8m0_bexp_t* src, ck::e8m0_bexp_t* dst, int MN, int K)
-{
-    int MNXdlPack = 2;
-    int KXdlPack  = 2;
-
-    int XdlMNThread = 16;
-    int XdlKThread  = 64 / XdlMNThread;
-
-    int K0 = K / KXdlPack / XdlKThread; // KRepeat
-
-    // The 4 16x128 building blocks will be packed into 1 32x256 for F4
-    // The 8 16x16x128 mfma will be packed into 1 32x32x256 for F4
-
-    // unfold the MN32xK(256/32) scale buffer
-    //    4            16             2           2
-    // To XdlKThread-> XdlMNThread -> KXdlPack -> MNXdlPack
-    // Then, MNRepeat->KRepeat
-
-    for(int n = 0; n < MN; ++n)
-    {
-        for(int k = 0; k < K; ++k)
-        {
-            int n0    = n / (XdlMNThread * MNXdlPack); // i MNRepeat
-            int tempn = n % (XdlMNThread * MNXdlPack);
-            int n1    = tempn % XdlMNThread; // i XdlMNThread
-            int n2    = tempn / XdlMNThread; // i MNXdlPack
-
-            int k0    = k / (XdlKThread * KXdlPack); // i KRepeat
-            int tempk = k % (XdlKThread * KXdlPack);
-            int k1    = tempk % XdlKThread; // i XdlKThread
-            int k2    = tempk / XdlKThread; // i KXdlPack
-
-            int outputIndex = n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
-                              k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
-                              k1 * MNXdlPack * KXdlPack * XdlMNThread + n1 * MNXdlPack * KXdlPack +
-                              k2 * MNXdlPack + n2;
-            // src[n * K + k] = ck::type_convert<ck::e8m0_bexp_t>(static_cast<float>(powf(2.0f, n2 +
-            // k2 * MNXdlPack)));
-            if constexpr(KLast)
-                dst[outputIndex] = src[n * K + k];
-            else
-                dst[outputIndex] = src[k * MN + n];
-        }
-    }
-}
 
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
