@@ -224,6 +224,9 @@ namespace rocRoller
             streamJoin(msg, subTileSizes, ",");
             msg << ")";
 
+            if(nonTemporal)
+                msg << " [nt]";
+
             return msg.str();
         }
 

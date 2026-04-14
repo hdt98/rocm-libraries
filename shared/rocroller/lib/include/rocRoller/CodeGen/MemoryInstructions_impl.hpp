@@ -586,7 +586,7 @@ namespace rocRoller
         auto ctx = m_context.lock();
         co_yield addLargerOffset2Addr(offset, addr, "buffer_load_dword");
 
-        std::string offsetModifier = "", glc = "", slc = "", lds = "";
+        std::string offsetModifier = "", glc = "", slc = "", nt = "", lds = "";
         if(buffOpts.offen || offset == 0)
         {
             offsetModifier += "offset: 0";
@@ -602,6 +602,10 @@ namespace rocRoller
         if(buffOpts.slc)
         {
             slc += "slc";
+        }
+        if(buffOpts.nt)
+        {
+            nt += "nt";
         }
         if(buffOpts.lds)
         {
@@ -636,7 +640,7 @@ namespace rocRoller
             co_yield_(Instruction("buffer_load_" + opEnd,
                                   {dest},
                                   {addr, sgprSrd, soffset},
-                                  {"offen", offsetModifier, glc, slc, lds},
+                                  {"offen", offsetModifier, glc, slc, nt, lds},
                                   "Load value"));
         }
         else
@@ -656,7 +660,7 @@ namespace rocRoller
                     concatenate("buffer_load_dword", width == 1 ? "" : "x" + std::to_string(width)),
                     {dest->subset(Generated(iota(count, count + width)))},
                     {addr, sgprSrd, soffset},
-                    {"offen", offsetModifier, glc, slc, lds},
+                    {"offen", offsetModifier, glc, slc, nt, lds},
                     "Load value"));
                 count += width;
             }
@@ -693,7 +697,7 @@ namespace rocRoller
                         ShowValue(numBytes));
         }
 
-        std::string offsetModifier = "offset: 0", glc = "", slc = "", lds = "lds";
+        std::string offsetModifier = "offset: 0", glc = "", slc = "", nt = "", lds = "lds";
         if(buffOpts.glc)
         {
             glc += "glc";
@@ -701,6 +705,10 @@ namespace rocRoller
         if(buffOpts.slc)
         {
             slc += "slc";
+        }
+        if(buffOpts.nt)
+        {
+            nt += "nt";
         }
 
         auto sgprSrd = buffDesc;
@@ -737,7 +745,7 @@ namespace rocRoller
         co_yield_(Instruction("buffer_load_" + opEnd,
                               {},
                               {data, sgprSrd, soffset},
-                              {"offen", offsetModifier, glc, slc, lds},
+                              {"offen", offsetModifier, glc, slc, nt, lds},
                               "Load value direct to lds"));
 
         if(ctx->kernelOptions()->alwaysWaitAfterLoad)

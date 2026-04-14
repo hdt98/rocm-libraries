@@ -77,6 +77,9 @@ namespace rocRoller
 
         msg << ShowValue(m_splitStoreTileIntoWaveBlocks);
 
+        msg << ShowValue(nonTemporalA);
+        msg << ShowValue(nonTemporalB);
+
         return msg.str();
     }
 
@@ -281,6 +284,15 @@ namespace rocRoller
         if(!m_commandParameters)
             m_commandParameters = std::make_shared<CommandParameters>();
 
+        if((m_commandParameters->nonTemporalA || m_commandParameters->nonTemporalB)
+           && !m_context->targetArchitecture().target().isCDNA4GPU())
+        {
+            Log::warn("nonTemporalA/B is only supported on GFX950; flags ignored for {}.",
+                      m_context->targetArchitecture().target().toString());
+            m_commandParameters->nonTemporalA = false;
+            m_commandParameters->nonTemporalB = false;
+        }
+
         // TODO: Determine the correct kernel dimensions
         if(m_commandParameters->getManualKernelDimension() > 0)
             m_context->kernel()->setKernelDimensions(
@@ -337,6 +349,8 @@ namespace rocRoller
         transforms.push_back(std::make_shared<KernelGraph::Simplify>());
         transforms.push_back(
             std::make_shared<KernelGraph::AddLDSPadding>(m_context, m_commandParameters));
+        transforms.push_back(
+            std::make_shared<KernelGraph::SetNonTemporal>(m_commandParameters));
         transforms.push_back(std::make_shared<KernelGraph::ConstantPropagation>());
         transforms.push_back(std::make_shared<KernelGraph::FuseExpressions>());
 

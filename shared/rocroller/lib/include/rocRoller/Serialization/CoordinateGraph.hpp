@@ -150,6 +150,7 @@ namespace rocRoller
 
                 iot::mapRequired(io, "sizes", dim.sizes);
                 iot::mapRequired(io, "subTileSizes", dim.subTileSizes);
+                iot::mapOptional(io, "nonTemporal", dim.nonTemporal);
             }
 
             static void mapping(IO& io, KernelGraph::CoordinateGraph::MacroTile& dim)

@@ -136,6 +136,9 @@ namespace rocRoller
         std::map<LayoutType, std::pair<int, int>> ldsPadding
             = {{LayoutType::MATRIX_A, {0, 0}}, {LayoutType::MATRIX_B, {0, 0}}};
 
+        bool nonTemporalA = false;
+        bool nonTemporalB = false;
+
     private:
         std::map<Operations::OperationTag, KernelGraph::CoordinateGraph::Dimension> m_dimInfo;
         std::optional<std::array<unsigned int, 3>>                                  m_workgroupSize;

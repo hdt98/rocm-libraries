@@ -943,6 +943,7 @@ namespace rocRoller
                                    .varType          = load.varType,
                                    .isTransposedTile = false,
                                    .isPadded         = tile.paddingBytes() > 0};
+            info.bufOpts.nt = tile.nonTemporal;
             co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords);
         }
 
@@ -1042,7 +1043,7 @@ namespace rocRoller
                                    .data    = ldsOffset,
                                    .varType = varType,
                                    .bufDesc = nullptr,
-                                   .bufOpts = {}};
+                                   .bufOpts = {.nt = tile.nonTemporal}};
             co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords)
                 .map(MemoryInstructions::addExtraDst(ldsAllocation));
         }
@@ -1128,6 +1129,10 @@ namespace rocRoller
             auto memoryKind = MemoryInstructions::MemoryKind::Buffer;
             if(macTile.memoryType == MemoryType::WAVE_FROM_GLOBAL)
             {
+                AssertFatal(!macTile.nonTemporal,
+                            "nonTemporal is not supported for WAVE_FROM_GLOBAL (global_load) tiles;"
+                            " nt modifier only applies to buffer_load instructions.",
+                            ShowValue(macTileTag));
                 memoryKind = MemoryInstructions::MemoryKind::Global;
             }
 
@@ -1137,6 +1142,7 @@ namespace rocRoller
                                    .n       = numVgpr,
                                    .data    = nullptr,
                                    .varType = load.varType};
+            info.bufOpts.nt = macTile.nonTemporal;
 
             co_yield moveTile<MemoryInstructions::MemoryDirection::Load>(info, coords);
         }

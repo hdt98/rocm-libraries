@@ -347,6 +347,14 @@ namespace rocRoller
             std::vector<uint> padBytesOfDim;
 
             /**
+             * When true, buffer_load instructions for this tile will use the
+             * non-temporal modifier ("nt"), bypassing the L2 cache on GFX950.
+             * Set via the SetNonTemporal graph transformation from
+             * CommandParameters::nonTemporalA / nonTemporalB.
+             */
+            bool nonTemporal = false;
+
+            /**
              * Construct MacroTile dimension with deferred rank etc.
              */
             MacroTile();
