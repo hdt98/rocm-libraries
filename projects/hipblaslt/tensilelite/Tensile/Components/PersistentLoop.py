@@ -22,7 +22,7 @@
 
 from rocisa.code import Module, Label
 from rocisa.container import vgpr, sgpr
-from rocisa.instruction import VMovB32, SCmpGeU32
+from rocisa.instruction import VMovB32, SCmpGeU32, SLongBranchNegative
 from ..Component import Component
 import abc
 
@@ -128,8 +128,14 @@ class PersistentLoopOn(PersistentLoop):
         module = Module("PersistentLoop On closePersistentLoop")
         skCloseLoopLabel = Label("SK_CloseLoop", "")
         module.add(skCloseLoopLabel)
-        # endIter = "StreamKIterEnd" if kernel["StreamK"] == 1 else "TotalIters"
-        endIter = "TotalIters" if kernel["StreamK"] == 2 else "StreamKIterEnd"
-        module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr(endIter), comment="Check if done all StreamK iterations"))
-        module.add(writer.longBranchScc0(Label("PersistentLoopStart", ""), posNeg=-1))
+        if kernel["StreamK"] == 4:
+            # module.add(SCmpGeU32(src0=sgpr("StreamKTileIdx"), src1=sgpr("SKTiles"), comment="Check if done all StreamK tiles"))
+            with writer.allocTmpSgpr(3) as tmpSgprInfo:
+                module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))
+            # a=0
+        else:
+            # endIter = "StreamKIterEnd" if kernel["StreamK"] == 1 else "TotalIters"
+            endIter = "TotalIters" if kernel["StreamK"] == 2 else "StreamKIterEnd"
+            module.add(SCmpGeU32(src0=sgpr("StreamKIter"), src1=sgpr(endIter), comment="Check if done all StreamK iterations"))
+            module.add(writer.longBranchScc0(Label("PersistentLoopStart", ""), posNeg=-1))
         return module

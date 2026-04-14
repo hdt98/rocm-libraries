@@ -5957,7 +5957,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("Beta", numSgprBeta, numSgprBeta)
       self.states.numSgprBeta = numSgprBeta
 
-    if kernel["StreamK"]:
+    if kernel["StreamK"] == 4:
+      self.defineSgpr("ItersPerTile", 1)
+      self.defineSgpr("TotalTiles", 1)
+      self.defineSgpr("skTiles", 1)
+      self.defineSgpr("SKItersPerWI", 1)
+      self.defineSgpr("skGrid", 1)
+      self.states.numSgprStreamK += 5
+    elif kernel["StreamK"]:
       # StreamK args
       self.defineSgpr("ItersPerTile", 1)
       self.defineSgpr("MagicNumberItersPerTile", 1)
@@ -5995,7 +6002,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["GlobalSplitU"] != 0:
       self.defineSgpr("GSU", 1)  # Can't move to the front because of the preload arguments
 
-    if kernel["StreamK"]:
+    if kernel["StreamK"] == 4:
+      self.defineSgpr("StreamKIdx", 1)
+      self.defineSgpr("StreamKTileIdx", 1)
+      self.defineSgpr("StreamKLocalStart", 1)
+      self.defineSgpr("StreamKLocalEnd", 1)
+      if kernel["StreamKAtomic"] == 0:
+        self.defineSgpr("SrdWS", 4, 4)
+    elif kernel["StreamK"]:
       # StreamK vars
       self.defineSgpr("StreamKIdx", 1)
       self.defineSgpr("StreamKIter", 1)

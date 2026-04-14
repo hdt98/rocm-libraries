@@ -205,7 +205,14 @@ class SignatureDefault(Signature):
         userArgumentsInfo.gemmArgumentSize += userArgumentsInfo.alphaMaxSize
         userArgumentsInfo.gemmArgumentSize += userArgumentsInfo.betaMaxSize
 
-        if kernel["StreamK"]:
+        if kernel["StreamK"] == 4:
+            signature.addArg("ItersPerTile",                       SVK.SIG_VALUE, "u32")
+            signature.addArg("TotalTiles",                         SVK.SIG_VALUE, "u32")
+            signature.addArg("SKTiles",                            SVK.SIG_VALUE, "u32")
+            signature.addArg("SKItersPerWI",                       SVK.SIG_VALUE, "u32")
+            signature.addArg("SKGrid",                             SVK.SIG_VALUE, "u32")
+            userArgumentsInfo.gemmArgumentSize += 20
+        elif kernel["StreamK"]:
             # StreamK args
             signature.addArg("ItersPerTile",                       SVK.SIG_VALUE, "u32")
             signature.addArg("MagicNumberItersPerTile",            SVK.SIG_VALUE, "u32")

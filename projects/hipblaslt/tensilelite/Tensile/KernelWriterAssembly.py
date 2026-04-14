@@ -1059,6 +1059,8 @@ class KernelWriterAssembly(KernelWriter):
       module.addComment0("StreamK Parallel Reduction Assignments")
       module.add(RegSet("s", "sgprSkSplit", "sgprskTiles", 0))
       module.add(RegSet("s", "sgprSkPartialIdx", "sgprBeta", 0))
+    elif kernel["StreamK"] == 4:
+      module.add(RegSet("s", "sgprSkPartialIdx", "sgprBeta", 0))
 
     module.addSpaceLine()
     module.addComment0("Size Assignments")
@@ -11747,7 +11749,7 @@ class KernelWriterAssembly(KernelWriter):
 
     (fullVws, elements, fullVws_1, elements_1) = self.notLocalFullTileElements(kernel)
     # print("len(elements)= ", len(elements_1))
-    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3)
+    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3 and kernel["StreamK"] != 4)
     module = Module("notLocalSplitUGlobalWrite")
     module.add(self.globalWriteElements(kernel, tPA, tPB, fullVws, fullVws_1, elements, elements_1, noGSUBranch=noGSUBranch))
 
@@ -11793,7 +11795,7 @@ class KernelWriterAssembly(KernelWriter):
     vectorWidths   = [fullVw, edgeVw]
     vectorWidths_1 = [fullVw_1, edgeVw_1]
 
-    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3)
+    noGSUBranch = (kernel["GlobalSplitU"] == 0 and kernel["StreamK"] != 3 and kernel["StreamK"] != 4)
     module = Module("localSplitUGlobalWrite")
     module.add(self.globalWriteElements(kernel, tPA, tPB, vectorWidths, vectorWidths_1, elements_f0, elements_f1, noGSUBranch=noGSUBranch))
     self.cleanupGlobalWrite(kernel)
@@ -14683,6 +14685,9 @@ class KernelWriterAssembly(KernelWriter):
     imod.add(loopComponent.closePersistentLoop(self, kernel))
     if addLabel:
       imod.add(Label("KernelEnd", ""))
+
+      skComponent = Component.StreamK.find(self)
+      imod.add(skComponent.kernelEnd(self, kernel))
 
       # TODO- refine this part, put outside of this function
       if kernel["ProblemType"]["OutputAmaxD"]:
