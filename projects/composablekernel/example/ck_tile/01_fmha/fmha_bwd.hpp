@@ -546,6 +546,77 @@ struct fmha_bwd_traits
     bool is_store_randval;
     bool is_deterministic;
     // TODO: padding check is inside this api
+
+    // Legacy constructor for backward compatibility (old 10-field API)
+    fmha_bwd_traits(int hdim_q_,
+                    int hdim_v_,
+                    std::string data_type_,
+                    bool is_group_mode_,
+                    mask_enum mask_type_,
+                    bias_enum bias_type_,
+                    bool has_dbias_,
+                    bool has_dropout_,
+                    bool is_store_randval_,
+                    bool is_deterministic_)
+        : seqlen_q(0),
+          seqlen_k(0),
+          batch(0),
+          max_seqlen_q(0),
+          max_seqlen_k(0),
+          hdim_q(hdim_q_),
+          hdim_v(hdim_v_),
+          nhead_q(0),
+          nhead_k(0),
+          data_type(std::move(data_type_)),
+          is_group_mode(is_group_mode_),
+          mask_type(mask_type_),
+          bias_type(bias_type_),
+          has_dbias(has_dbias_),
+          has_dropout(has_dropout_),
+          is_store_randval(is_store_randval_),
+          is_deterministic(is_deterministic_)
+    {
+    }
+
+    // Full constructor for new 17-field API (replaces aggregate initialization)
+    fmha_bwd_traits(int seqlen_q_,
+                    int seqlen_k_,
+                    int batch_,
+                    int max_seqlen_q_,
+                    int max_seqlen_k_,
+                    int hdim_q_,
+                    int hdim_v_,
+                    int nhead_q_,
+                    int nhead_k_,
+                    std::string data_type_,
+                    bool is_group_mode_,
+                    mask_enum mask_type_,
+                    bias_enum bias_type_,
+                    bool has_dbias_,
+                    bool has_dropout_,
+                    bool is_store_randval_,
+                    bool is_deterministic_)
+        : seqlen_q(seqlen_q_),
+          seqlen_k(seqlen_k_),
+          batch(batch_),
+          max_seqlen_q(max_seqlen_q_),
+          max_seqlen_k(max_seqlen_k_),
+          hdim_q(hdim_q_),
+          hdim_v(hdim_v_),
+          nhead_q(nhead_q_),
+          nhead_k(nhead_k_),
+          data_type(std::move(data_type_)),
+          is_group_mode(is_group_mode_),
+          mask_type(mask_type_),
+          bias_type(bias_type_),
+          has_dbias(has_dbias_),
+          has_dropout(has_dropout_),
+          is_store_randval(is_store_randval_),
+          is_deterministic(is_deterministic_)
+    {
+    }
+
+    fmha_bwd_traits() = default;
 };
 
 template <typename T0 /*dot_do_o_trait*/,
