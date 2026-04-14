@@ -31,7 +31,6 @@ from Tensile.Common import state, state_key_ordering, IsaInfo
 from Tensile.Common.Architectures import gfxToIsa
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import internalParameters
-from Tensile.Common.Utilities import printExit
 from Tensile.SolutionStructs import Solution as OriginalSolution
 from Tensile.SolutionStructs.Problem import getBiasDataTypeListDefault
 from Tensile.Toolchain.Component import Assembler
@@ -222,15 +221,7 @@ class ProblemType:
         rv.setConstStrideBias = []
 
         if 'UseBias' in d:
-            useBiasValue = d['UseBias']
-            # Validate that UseBias is an integer, not a boolean
-            if isinstance(useBiasValue, bool):
-                printExit(f"UseBias must be an integer (0, 1, 2, or 3), got boolean value: {useBiasValue}. "
-                         "Use 0 for no bias, 1 for M direction, 2 for N direction, or 3 for both M and N directions.")
-            # Validate that UseBias is in the valid range
-            if not isinstance(useBiasValue, int) or useBiasValue not in [0, 1, 2, 3]:
-                printExit(f"UseBias must be 0, 1, 2, or 3. Got: {useBiasValue}")
-            rv.useBias = useBiasValue
+            rv.useBias = d['UseBias']
             if 'BiasDataTypeList' in d:
                 d["BiasDataTypeList"].sort()  # Sort to make sure names are unique
                 rv.biasDataTypeWhiteList = d['BiasDataTypeList']
@@ -263,15 +254,7 @@ class ProblemType:
 
         rv.useScaleAlphaVec = 0
         if 'UseScaleAlphaVec' in d:
-            useScaleAlphaVecValue = d['UseScaleAlphaVec']
-            # Validate that UseScaleAlphaVec is an integer, not a boolean
-            if isinstance(useScaleAlphaVecValue, bool):
-                printExit(f"UseScaleAlphaVec must be an integer (0, 1, 2, or 3), got boolean value: {useScaleAlphaVecValue}. "
-                         "Use 0 for disabled, 1 for M direction, 2 for N direction, or 3 for both M and N directions.")
-            # Validate that UseScaleAlphaVec is in the valid range
-            if not isinstance(useScaleAlphaVecValue, int) or useScaleAlphaVecValue not in [0, 1, 2, 3]:
-                printExit(f"UseScaleAlphaVec must be 0, 1, 2, or 3. Got: {useScaleAlphaVecValue}")
-            rv.useScaleAlphaVec = useScaleAlphaVecValue
+            rv.useScaleAlphaVec = d['UseScaleAlphaVec']
 
         rv.batched = d['Batched']
 
