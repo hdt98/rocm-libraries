@@ -104,6 +104,7 @@ class ABMatrixInfo(MatrixInfo):
   numVgprLocalWriteSwapAddr: int  = -1
   startVgprLocalWriteSwapAddr: int= -1
   numSgprGlobalReadIncs: int     = -1
+  useConstSgprGlobalReadIncs: bool = False
   numPackCvt: int                = 0
   useTransposeCodeThis: bool     = False
   useTransposeCodeNext: bool     = False
@@ -224,6 +225,7 @@ class StateValues:
   globalReadIncsUseVgpr: bool            = False
   groOffsetInMacroTile: int              = 0
   use64bShadowLimit: bool                = True
+  use64bShadowLimitMX: bool              = False
   preventVgprOverflowDuringNewTile: int  = -1
   interleaveStoreVmcnt: bool             = False
   srdShiftLeft:dict                      = field(init=False)
@@ -5194,8 +5196,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.asmAssert = Assert(self.states.laneSGPRCount, kernel["WavefrontSize"], self.db["EnableAsserts"])
 
     self.states.tailloopInNll = kernel["TailloopInNll"]
-    # remove staggerU code for tailloopInNll (cannot support staggerU)
-    self.states.staggerUCode = not self.states.tailloopInNll
+    # remove staggerU code for the following cases
+    # - tailloopInNll (cannot support staggerU)
+    # - gfx950 + MX (rebase path disables staggerU for MX to control SGPR usage)
+    self.states.staggerUCode = True
+    if self.states.tailloopInNll or \
+       ((kernel["ISA"][0] == 9) and (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"])):
+      self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
       tluA = kernel["ProblemType"]["TLUA"]
@@ -5587,6 +5594,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # use 64-bit buffer limit shadow register
     # but not implemented or tested
     self.states.use64bShadowLimit = kernel["Use64bShadowLimit"] and kernel["BufferLoad"]
+    self.states.use64bShadowLimitMX = kernel["Use64bShadowLimitMX"] and kernel["BufferLoad"]
 
     # Check if the address setup code for LWA and GRO causes register growth.
     # This is not an error condition but bears further investigation.
@@ -5605,9 +5613,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.srdShiftLeft["A"] = kernel["GlobalReadVectorWidthA"]
     self.states.srdShiftLeft["B"] = kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["MXBlockA"]:
-      self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthA"]
+      # Keep gfx950 behavior aligned with rebase MX path.
+      if kernel["ISA"][0] == 9:
+        self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthMXSA"]
+      else:
+        self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthA"]
     if kernel["ProblemType"]["MXBlockB"]:
-      self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthB"]
+      if kernel["ISA"][0] == 9:
+        self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthMXSB"]
+      else:
+        self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       self.states.srdShiftLeft["Metadata"] = kernel["GlobalReadVectorWidthMetadata"]
 
@@ -5889,7 +5904,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.b.numVgprValu = self.states.b.numVgprValuPerBlock * kernel["InnerUnroll"]
 
       if kernel["ProblemType"]["MXBlockA"]:
-        self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"] * kernel["MIInputPerThreadMXSA"] // self.states.bpr
+        # Keep gfx950 aligned with the rebase branch packing: one VGPR slot per
+        # MI wave-tile element. Newer gfx12x0 logic keeps the existing E8B32 sizing.
+        if kernel["ISA"][0] == 9:
+          self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileA"]
+        else:
+          # Use ceil for sub-dword MX data so small wave tiles still allocate at
+          # least one VGPR block (e.g., 2xU8 should not floor to zero with bpr=4).
+          self.states.mxsa.numVgprValuPerBlock = roundUp((kernel["MIWaveTileMXSA"] * kernel["MIInputPerThreadMXSA"]) / self.states.bpr)
         if kernel["DirectToVgprMXSA"] and not (self.states.packDTVA or self.states.convDTVA):
           self.states.mxsa.numVgprValuPerBlock = 0
         self.states.mxsa.numVgprValu = self.states.mxsa.numVgprValuPerBlock * valuBlocksA
@@ -5897,7 +5919,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.states.mxsa.numVgprValu = self.states.mxsa.numVgprValuPerBlock * kernel["InnerUnroll"]
 
       if kernel["ProblemType"]["MXBlockB"]:
-        self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"] * kernel["MIInputPerThreadMXSB"] // self.states.bpr
+        if kernel["ISA"][0] == 9:
+          self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileB"]
+        else:
+          # Same ceil rule as MXSA to avoid zero-VGPR allocation for legal MXSB shapes.
+          self.states.mxsb.numVgprValuPerBlock = roundUp((kernel["MIWaveTileMXSB"] * kernel["MIInputPerThreadMXSB"]) / self.states.bpr)
         if kernel["DirectToVgprMXSB"] and not (self.states.packDTVB or self.states.convDTVB):
           self.states.mxsb.numVgprValuPerBlock = 0
         self.states.mxsb.numVgprValu = self.states.mxsb.numVgprValuPerBlock * valuBlocksB
@@ -6435,13 +6461,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # VGPR Assignment
     ####################################
     vgprIdx = 0
+    useRebase950MxVgprLayout = kernel["ISA"][0] == 9 and (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"])
 
-    if bool(kernel["ProblemType"]["MXBlockA"]) ^ bool(kernel["ProblemType"]["MXBlockB"]):
+    if (not useRebase950MxVgprLayout) and (bool(kernel["ProblemType"]["MXBlockA"]) ^ bool(kernel["ProblemType"]["MXBlockB"])):
       self.states.startMXDummyValuVgpr = vgprIdx
       vgprIdx += 2
 
     # TODO: alignment hack, figure out a better solution
-    if kernel["ProblemType"]["MXBlockA"]:
+    if kernel["ProblemType"]["MXBlockA"] and (not useRebase950MxVgprLayout):
       self.states.mxsa.startVgprValu = vgprIdx
       vgprIdx += self.states.mxsa.numVgprValu
       numVgprValuPackMXSA = 0
@@ -6469,7 +6496,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           vgprIdx = self.states.mxsa.startVgprValu  \
               + max(self.states.mxsa.numVgprValu + numVgprValuPackMXSA, self.states.mxsa.numVgprG2LAllocated)
 
-    if kernel["ProblemType"]["MXBlockB"]:
+    if kernel["ProblemType"]["MXBlockB"] and (not useRebase950MxVgprLayout):
       # TODO: alignment hack, figure out a better solution
       if(self.states.archCaps["VgprBank"]):
         residual = (vgprIdx % 4)
@@ -6508,7 +6535,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           vgprIdx = self.states.mxsb.startVgprValu  \
               + max(self.states.mxsb.numVgprValu + numVgprValuPackMXSB, self.states.mxsb.numVgprG2LAllocated)
 
-    if kernel["ProblemType"]["MXBlockA"]:
+    if kernel["ProblemType"]["MXBlockA"] and (not useRebase950MxVgprLayout):
       if self.states.mxsa.startVgprG2L is None and self.states.mxsa.numVgprG2LAllocated > 0:
         # TODO: alignment hack, figure out a better solution
         vgprIdx = ((vgprIdx+1)//2)*2
@@ -6518,7 +6545,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         else:
           vgprIdx += self.states.mxsa.numVgprG2LAllocated
 
-    if kernel["ProblemType"]["MXBlockB"]:
+    if kernel["ProblemType"]["MXBlockB"] and (not useRebase950MxVgprLayout):
       if self.states.mxsb.startVgprG2L is None and self.states.mxsb.numVgprG2LAllocated > 0:
         # TODO: alignment hack, figure out a better solution
         vgprIdx = ((vgprIdx+1)//2)*2
@@ -6570,9 +6597,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["BufferLoad"]:
       self.startVgprGlobalReadOffsetA = vgprIdx
       vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.a.numVgprGlobalReadOffsets
+      if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+        self.startVgprGlobalReadOffsetMXSA = vgprIdx
+        vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.mxsa.numVgprGlobalReadOffsets
       self.startVgprGlobalReadOffsetB = vgprIdx
       vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.b.numVgprGlobalReadOffsets
-      if kernel["ProblemType"]["MXBlockA"]:
+      if (not useRebase950MxVgprLayout) and kernel["ProblemType"]["MXBlockA"]:
         self.startVgprGlobalReadOffsetMXSA = vgprIdx
         vgprIdx += 1 if kernel["_UseSgprForGRO"] else self.states.mxsa.numVgprGlobalReadOffsets
       if kernel["ProblemType"]["MXBlockB"]:
@@ -6590,9 +6620,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       vgprIdx = ((vgprIdx+1)//2)*2
       self.startVgprGlobalReadAddressesA = vgprIdx
       vgprIdx += numVgprGlobalReadAddressesA
+      if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+        self.startVgprGlobalReadAddressesMXSA = vgprIdx
+        vgprIdx += numVgprGlobalReadAddressesMXSA
       self.startVgprGlobalReadAddressesB = vgprIdx
       vgprIdx += numVgprGlobalReadAddressesB
-      if kernel["ProblemType"]["MXBlockA"]:
+      if (not useRebase950MxVgprLayout) and kernel["ProblemType"]["MXBlockA"]:
         self.startVgprGlobalReadAddressesMXSA = vgprIdx
         vgprIdx += numVgprGlobalReadAddressesMXSA
       if kernel["ProblemType"]["MXBlockB"]:
@@ -6603,11 +6636,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.a.startVgprLocalWriteAddr = vgprIdx
       vgprIdx += self.states.a.numVgprLocalWriteAddr
 
+    if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+      if not kernel["LocalWriteUseSgprMXSA"]:
+        self.states.mxsa.startVgprLocalWriteAddr = vgprIdx
+        vgprIdx += self.states.mxsa.numVgprLocalWriteAddr
+
     if not kernel["LocalWriteUseSgprB"]:
       self.states.b.startVgprLocalWriteAddr = vgprIdx
       vgprIdx += self.states.b.numVgprLocalWriteAddr
 
-    if kernel["ProblemType"]["MXBlockA"]:
+    if (not useRebase950MxVgprLayout) and kernel["ProblemType"]["MXBlockA"]:
       if not kernel["LocalWriteUseSgprMXSA"]:
         self.states.mxsa.startVgprLocalWriteAddr = vgprIdx
         vgprIdx += self.states.mxsa.numVgprLocalWriteAddr
@@ -6626,9 +6664,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     self.startVgprGlobalReadIncsA = vgprIdx
     vgprIdx += numVgprGlobalReadIncsA
+    if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+      self.startVgprGlobalReadIncsMXSA = vgprIdx
+      vgprIdx += numVgprGlobalReadIncsMXSA
     self.startVgprGlobalReadIncsB = vgprIdx
     vgprIdx += numVgprGlobalReadIncsB
-    if kernel["ProblemType"]["MXBlockA"]:
+    if (not useRebase950MxVgprLayout) and kernel["ProblemType"]["MXBlockA"]:
       self.startVgprGlobalReadIncsMXSA = vgprIdx
       vgprIdx += numVgprGlobalReadIncsMXSA
     if kernel["ProblemType"]["MXBlockB"]:
@@ -6669,8 +6710,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # Need backup for the first LocalReadAddr only (others will be calculated from the first one)
       self.states.a.startVgprLocalReadAddrOrig = vgprIdx
       vgprIdx += 1 if self.states.a.numVgprLocalReadAddr > 0 else 0
+      if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+        self.states.mxsa.startVgprLocalReadAddrOrig = vgprIdx
+        vgprIdx += 1 if self.states.mxsa.numVgprLocalReadAddr > 0 else 0
       self.states.b.startVgprLocalReadAddrOrig = vgprIdx
       vgprIdx += 1 if self.states.b.numVgprLocalReadAddr > 0 else 0
+      if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockB"]:
+        self.states.mxsb.startVgprLocalReadAddrOrig = vgprIdx
+        vgprIdx += 1 if self.states.mxsb.numVgprLocalReadAddr > 0 else 0
 
     # ----------------------------
     # TODO: alignment hack, figure out a better solution
@@ -6715,6 +6762,34 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx = self.states.a.startVgprValu  \
             + max(self.states.a.numVgprValu + numVgprValuPackA, self.states.a.numVgprG2LAllocated)
 
+    if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockA"]:
+      vgprIdx = ((vgprIdx+1)//2)*2
+      self.states.mxsa.startVgprValu = vgprIdx
+      vgprIdx += self.states.mxsa.numVgprValu
+      numVgprValuPackMXSA = 0
+      if not kernel["UnrollMajorLDSMXSA"]:
+        self.states.mxsa.startVgprValuPack = vgprIdx
+        if self.states.lrvwTileMXSA > 1:
+          numVgprValuPackMXSA = ceil(kernel["VectorWidthMXSA"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidthMXSA"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThreadMXSA"]
+          if self.states.packDTVA:
+            # pack DTV case, double the number
+            numVgprValuPackMXSA *= 2
+        else:
+          numVgprValuPackMXSA = self.states.mxsa.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackMXSA * int(4 - 1)
+      vgprIdx += numVgprValuPackMXSA
+      self.states.mxsa.startVgprG2L = None
+      if not kernel["DirectToLdsMXSA"] or self.do["KeepDirectToLdsAlloc"]:
+        # DirectToVgpr + pack or input conversion case, overlap G2L and ValuPack
+        if self.states.packDTVA:
+          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValuPack
+        elif self.states.convDTVA:
+          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValu
+        # Keep gfx950 path aligned with rebase register accounting.
+        if (not kernel["PrefetchGlobalRead"]): # g2l can overlap valu
+          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValu
+          vgprIdx = self.states.mxsa.startVgprValu  \
+              + max(self.states.mxsa.numVgprValu + numVgprValuPackA, self.states.mxsa.numVgprG2LAllocated)
+
     # TODO: alignment hack, figure out a better solution
     if(self.states.archCaps["VgprBank"]):
       residual = (vgprIdx % 4)
@@ -6754,6 +6829,39 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.b.startVgprG2L = self.states.b.startVgprValu
         vgprIdx = self.states.b.startVgprValu \
             + max(self.states.b.numVgprValu + numVgprValuPackB, self.states.b.numVgprG2LAllocated)
+
+    if useRebase950MxVgprLayout and kernel["ProblemType"]["MXBlockB"]:
+      if(self.states.archCaps["VgprBank"]):
+        residual = (vgprIdx % 4)
+        if (residual % 2) == 0:
+          # if 2-aligned bank(bank0 and bank2), move to bank1 or bank3.
+          vgprIdx += 1
+      else:
+        vgprIdx = ((vgprIdx+1)//2)*2
+      self.states.mxsb.startVgprValu = vgprIdx
+      vgprIdx += self.states.mxsb.numVgprValu
+      numVgprValuPackMXSB = 0
+      if not kernel["UnrollMajorLDSMXSB"]:
+        self.states.mxsb.startVgprValuPack = vgprIdx
+        if self.states.lrvwTileMXSB > 1:
+          numVgprValuPackMXSB = ceil(kernel["VectorWidthMXSB"] / self.states.bpr) * kernel["MIWaveTileB"] // kernel["VectorWidthMXSB"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThreadMXSB"]
+          if self.states.packDTVB:
+            # pack DTV case, double the number
+            numVgprValuPackMXSB *= 2
+        else:
+          numVgprValuPackMXSB = self.states.mxsb.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackMXSB * int(4 - 1)
+      vgprIdx += numVgprValuPackMXSB
+      self.states.mxsb.startVgprG2L = None
+      if not kernel["DirectToLdsMXSB"] or self.do["KeepDirectToLdsAlloc"]:
+        # DirectToVgpr + pack  or input conversion case, overlap G2L and ValuPack
+        if self.states.packDTVB:
+          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValuPack
+        elif self.states.convDTVB:
+          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValu
+        if (not kernel["PrefetchGlobalRead"]): # g2l can overlap valu
+          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValu
+          vgprIdx = self.states.mxsb.startVgprValu \
+              + max(self.states.mxsb.numVgprValu + numVgprValuPackMXSB, self.states.mxsb.numVgprG2LAllocated)
 
 
 
@@ -6820,6 +6928,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         vgprIdx += self.states.a.numVgprG2LAllocated
 
+    if kernel["ProblemType"]["MXBlockA"]:
+      if self.states.mxsa.startVgprG2L is None and self.states.mxsa.numVgprG2LAllocated > 0:
+        # TODO: alignment hack, figure out a better solution
+        vgprIdx = ((vgprIdx+1)//2)*2
+        self.states.mxsa.startVgprG2L = vgprIdx;
+        if ("ULSGRODoubleG2L" in kernel) and kernel["ULSGRODoubleG2L"] == 1:
+          vgprIdx += self.states.mxsa.numVgprG2LAllocated * 2
+        else:
+          vgprIdx += self.states.mxsa.numVgprG2LAllocated
+
     if self.states.b.startVgprG2L is None and self.states.b.numVgprG2LAllocated > 0:
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
@@ -6828,6 +6946,16 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx += self.states.b.numVgprG2LAllocated*2
       else:
         vgprIdx += self.states.b.numVgprG2LAllocated
+
+    if kernel["ProblemType"]["MXBlockB"]:
+      if self.states.mxsb.startVgprG2L is None and self.states.mxsb.numVgprG2LAllocated > 0:
+        # TODO: alignment hack, figure out a better solution
+        vgprIdx = ((vgprIdx+1)//2)*2
+        self.states.mxsb.startVgprG2L = vgprIdx;
+        if ("ULSGRODoubleG2L" in kernel) and kernel["ULSGRODoubleG2L"] == 1:
+          vgprIdx += self.states.mxsb.numVgprG2LAllocated * 2
+        else:
+          vgprIdx += self.states.mxsb.numVgprG2LAllocated
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       if self.states.m.startVgprG2L is None:
@@ -6902,6 +7030,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.states.b.numVgprLocalWriteSwapAddr > 0:
       self.states.b.startVgprLocalWriteSwapAddr = vgprIdx
       vgprIdx += 1
+    if kernel["ProblemType"]["MXBlockA"]:
+      if self.states.mxsa.numVgprLocalWriteSwapAddr > 0:
+        self.states.mxsa.startVgprLocalWriteSwapAddr = vgprIdx
+        vgprIdx += 1
+    if kernel["ProblemType"]["MXBlockB"]:
+      if self.states.mxsb.numVgprLocalWriteSwapAddr > 0:
+        self.states.mxsb.startVgprLocalWriteSwapAddr = vgprIdx
+        vgprIdx += 1
 
     # X32F Emulation initializations
     # meaning of variables
@@ -7161,12 +7297,43 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.m.numSgprGlobalReadIncs = 0
     else:
       self.states.a.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
-      self.states.b.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
       if kernel["ProblemType"]["MXBlockA"]:
         self.states.mxsa.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
+      self.states.b.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
       if kernel["ProblemType"]["MXBlockB"]:
         self.states.mxsb.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
       self.states.m.numSgprGlobalReadIncs = kernel["ProblemType"]["NumIndicesSummation"] * self.states.rpgo
+      # check for constSgprGlobalReadInc
+      # use const version of GlobalReadInc for the following case
+      # - StreamK (not GSU)
+      # - no staggerUCode
+      # - TLUA false for A, TLUB false for B
+      # - numSgprGlobalReadIncs is 1
+      if kernel["StreamK"] and (not self.states.staggerUCode):
+        if kernel["ProblemType"]["TLUA"] == False:
+          if self.states.a.numSgprGlobalReadIncs == 1:
+            # use const GR Inc
+            self.states.a.useConstSgprGlobalReadIncs = True
+            # do not allocate GRInc sgpr
+            self.states.a.numSgprGlobalReadIncs = 0
+          if kernel["ProblemType"]["MXBlockA"]:
+            if self.states.mxsa.numSgprGlobalReadIncs == 1:
+              # use const GR Inc
+              self.states.mxsa.useConstSgprGlobalReadIncs = True
+              # do not allocate GRInc sgpr
+              self.states.mxsa.numSgprGlobalReadIncs = 0
+        if kernel["ProblemType"]["TLUB"] == False:
+          if self.states.b.numSgprGlobalReadIncs == 1:
+            # use const GR Inc
+            self.states.b.useConstSgprGlobalReadIncs = True
+            # do not allocate GRInc sgpr
+            self.states.b.numSgprGlobalReadIncs = 0
+          if kernel["ProblemType"]["MXBlockB"]:
+            if self.states.mxsb.numSgprGlobalReadIncs == 1:
+              # use const GR Inc
+              self.states.mxsb.useConstSgprGlobalReadIncs = True
+              # do not allocate GRInc sgpr
+              self.states.mxsb.numSgprGlobalReadIncs = 0
 
     ########################################
     # SGPR Assignment according to AMDGPU-ABI

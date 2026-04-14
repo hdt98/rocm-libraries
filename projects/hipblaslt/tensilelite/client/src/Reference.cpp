@@ -1349,10 +1349,12 @@ namespace TensileLite
             }
 
             // Convert void* to pointers
-            typename Inputs::AType const* aPtr = (typename Inputs::AType const*)inputs.a;
-            typename Inputs::BType const* bPtr = (typename Inputs::BType const*)inputs.b;
-            typename Inputs::CType const* cPtr = (typename Inputs::CType const*)inputs.c;
-            typename Inputs::DType*       dPtr = (typename Inputs::DType*)inputs.d;
+            typename Inputs::AType const* aPtr    = (typename Inputs::AType const*)inputs.a;
+            typename Inputs::BType const* bPtr    = (typename Inputs::BType const*)inputs.b;
+            typename Inputs::CType const* cPtr    = (typename Inputs::CType const*)inputs.c;
+            typename Inputs::DType*       dPtr    = (typename Inputs::DType*)inputs.d;
+            E8 const*                     mxsaPtr = (E8 const*)inputs.mxsa;
+            E8 const*                     mxsbPtr = (E8 const*)inputs.mxsb;
 
             auto const& freeIndicesA = problem.freeIndicesA();
             auto const& freeIndicesB = problem.freeIndicesB();
@@ -1532,21 +1534,19 @@ namespace TensileLite
                                     problem, inputs, aPtr, bPtr, aIdx, bIdx, aConjugate, bConjugate);
                             }
 
-                            Accumulator mxScale(1);
+                            float mxScale = 1.0f;
                             if (problem.mxBlockA())
                             {
                                 size_t mxsaI = (boundIndices[0].aMirror ? (boundSize[0] - i - 1) : i) / problem.mxBlockA();
                                 size_t mxsaIdx = mxsaIndex + (mxsaI * mxsaStride);
-                                Accumulator sa = abs(GetValue<Accumulator>(mxsa.dataType(), inputs.mxsa, mxsaIdx, 0));
-                                mxScale = multiply<Accumulator>(mxScale, sa);
+                                mxScale        = multiply<float>(mxScale, mxsaPtr[mxsaIdx]);
                             }
 
                             if (problem.mxBlockB())
                             {
                                 size_t mxsbI = (boundIndices[0].bMirror ? (boundSize[0] - i - 1) : i) / problem.mxBlockB();
                                 size_t mxsbIdx = mxsbIndex + (mxsbI * mxsbStride);
-                                Accumulator sb = abs(GetValue<Accumulator>(mxsb.dataType(), inputs.mxsb, mxsbIdx, 0));
-                                mxScale = multiply<Accumulator>(mxScale, sb);
+                                mxScale        = multiply<float>(mxScale, mxsbPtr[mxsbIdx]);
                             }
                             value += multiply<Accumulator>(val, mxScale);
                         }

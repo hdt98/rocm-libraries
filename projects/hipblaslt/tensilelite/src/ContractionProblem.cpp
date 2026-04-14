@@ -686,6 +686,11 @@ namespace TensileLite
         calcArithmeticIntensity();
     }
 
+    void ContractionProblemGemm::setMXScaleA(int mxBlockA, std::vector<size_t> saStride)
+    {
+        setMXScaleA(rocisa::DataType::E8, mxBlockA, saStride);
+    }
+
     void ContractionProblemGemm::setMXScaleA(rocisa::DataType mxTypeA, int mxBlockA, std::vector<size_t> saStride)
     {
         m_mxBlockA = mxBlockA;
@@ -695,9 +700,19 @@ namespace TensileLite
         {
             std::vector<size_t> saSizes = m_tensors[ContractionProblemGemm::TENSOR::A].sizes();
             saSizes[m_boundIndices[0].a] = saSizes[m_boundIndices[0].a] / mxBlockA;
-            TensorDescriptor mxsa("mx-a", mxTypeA, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
+            TensorDescriptor mxsa("mx-a",
+                                  mxTypeA,
+                                  saSizes.begin(),
+                                  saSizes.end(),
+                                  saStride.begin(),
+                                  saStride.end());
             m_tensors[ContractionProblemGemm::TENSOR::MXSA] = mxsa;
         }
+    }
+
+    void ContractionProblemGemm::setMXScaleB(int mxBlockB, std::vector<size_t> sbStride)
+    {
+        setMXScaleB(rocisa::DataType::E8, mxBlockB, sbStride);
     }
 
     void ContractionProblemGemm::setMXScaleB(rocisa::DataType mxTypeB, int mxBlockB, std::vector<size_t> sbStride)
@@ -709,7 +724,12 @@ namespace TensileLite
         {
             std::vector<size_t> sbSizes = m_tensors[ContractionProblemGemm::TENSOR::B].sizes();
             sbSizes[m_boundIndices[0].b] = sbSizes[m_boundIndices[0].b] / mxBlockB;
-            TensorDescriptor mxsb("mx-b", mxTypeB, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
+            TensorDescriptor mxsb("mx-b",
+                                  mxTypeB,
+                                  sbSizes.begin(),
+                                  sbSizes.end(),
+                                  sbStride.begin(),
+                                  sbStride.end());
             m_tensors[ContractionProblemGemm::TENSOR::MXSB] = mxsb;
         }
     }

@@ -1193,9 +1193,22 @@ namespace TensileLite
             {
                 std::string initName = "init-" + m_vdata[i].name;
                 std::string typeName = m_vdata[i].name + "-type";
+                std::string legacyInitName;
+                if(m_vdata[i].name == "mx-a")
+                    legacyInitName = "init-mxScaleA";
+                else if(m_vdata[i].name == "mx-b")
+                    legacyInitName = "init-mxScaleB";
+                else if(m_vdata[i].name == "mxScaleA")
+                    legacyInitName = "init-mx-a";
+                else if(m_vdata[i].name == "mxScaleB")
+                    legacyInitName = "init-mx-b";
                 if(args.count(initName))
                 {
                     m_vdata[i].init = args[initName].as<InitMode>();
+                }
+                else if(!legacyInitName.empty() && args.count(legacyInitName))
+                {
+                    m_vdata[i].init = args[legacyInitName].as<InitMode>();
                 }
                 else if(m_vdata[i].name == "Synchronizer")
                 {

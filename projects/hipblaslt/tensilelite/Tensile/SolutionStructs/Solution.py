@@ -478,6 +478,10 @@ class Solution(collections.abc.Mapping):
       if not "MIInputPerThreadA" in state:
         state["MIInputPerThreadA"] = state["MIInputPerThread"]
         state["MIInputPerThreadB"] = state["MIInputPerThread"]
+      if state["ProblemType"]["MXBlockA"]:
+        state['MIInputPerThreadMXSA'] = 1 # TODO: state['MIInputPerThread'] // state["ProblemType"]["MXBlock"]
+      if state["ProblemType"]["MXBlockB"]:
+        state['MIInputPerThreadMXSB'] = 1 # TODO: state['MIInputPerThread'] // state["ProblemType"]["MXBlock"]
 
     elif EnableMatrixInstruction == False:
       state["ThreadTile0"] = state["ThreadTile"][0]
@@ -519,6 +523,17 @@ class Solution(collections.abc.Mapping):
       reject(state, "WaveSplitK currently only support dot2 kernel.")
       return
 
+    useRebase950MxAsemPath = (state["ISA"] == IsaVersion(9,5,0)) and \
+                             (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])
+
+    # Keep gfx950 MX ASEM behavior aligned with the rebase path.
+    # For non-TLU MX kernels, keep ASEM a multiple of 32 instead of collapsing it for StreamK.
+    if useRebase950MxAsemPath and \
+       ((not state["ProblemType"]["TLUA"]) or (not state["ProblemType"]["TLUB"])):
+      minASEMforMX = 32
+      if state["AssertSummationElementMultiple"] % minASEMforMX != 0:
+        state["AssertSummationElementMultiple"] = minASEMforMX
+
     # tail loop optimization
     state["tailLoopOptA"] = True
     state["tailLoopOptB"] = True
@@ -550,14 +565,22 @@ class Solution(collections.abc.Mapping):
     # TLU case, we check AF{0,1}EM instead of ASEM.
     # TLU + ShiftPtr case, we can use wider global read for TailLoop. Enable Tailloop opt for DTL
     # (ShiftPtr is default and not set to state["EdgeType"] yet here)
-    if ((aemA * bpeA) % 4 != 0 or not state["BufferLoad"]):
+    if ((aemA * bpeA) % 4 != 0 or not state["BufferLoad"] or \
+       (useRebase950MxAsemPath and state["ProblemType"]["MXBlockA"])):
       if (not state["ProblemType"]["TLUA"]) and state["DirectToLdsA"] and not state["DirectToVgprA"]:
         state["NonDTLTailLoopA"] = True
         state["tailLoopOptA"] = False
-    if ((aemB * bpeB) % 4 != 0 or not state["BufferLoad"]):
+        if useRebase950MxAsemPath and state["ProblemType"]["MXBlockA"]:
+          state["NonDTLTailLoopMXSA"] = True
+          state["tailLoopOptMXSA"] = False
+    if ((aemB * bpeB) % 4 != 0 or not state["BufferLoad"] or \
+       (useRebase950MxAsemPath and state["ProblemType"]["MXBlockB"])):
       if (not state["ProblemType"]["TLUB"]) and state["DirectToLdsB"] and not state["DirectToVgprB"]:
         state["NonDTLTailLoopB"] = True
         state["tailLoopOptB"] = False
+        if useRebase950MxAsemPath and state["ProblemType"]["MXBlockB"]:
+          state["NonDTLTailLoopMXSB"] = True
+          state["tailLoopOptMXSB"] = False
 
     if (state["ISA"] != (9, 4, 2) and state["ISA"] != (9, 5, 0)) or \
        (state["ProblemType"]["Sparse"]) or \
@@ -572,6 +595,11 @@ class Solution(collections.abc.Mapping):
       state["tailLoopOptA"] = False
     if (not state["ProblemType"]["TLUB"]) and (state["DirectToVgprB"]):
       state["tailLoopOptB"] = False
+    if useRebase950MxAsemPath:
+      state["tailLoopOptA"] = False
+      state["tailLoopOptB"] = False
+      state["tailLoopOptMXSA"] = False
+      state["tailLoopOptMXSB"] = False
     if state["ProblemType"]["MXBlockA"] and state["DirectToVgprMXSA"]:
       state["tailLoopOptMXSA"] = False
     if state["ProblemType"]["MXBlockB"] and state["DirectToVgprMXSB"]:
@@ -1168,6 +1196,8 @@ class Solution(collections.abc.Mapping):
       if state["AssignedDerivedParameters"]:
         return
     state["AssignedDerivedParameters"] = False
+    useRebase950MxAsemPath = (state["ISA"] == IsaVersion(9,5,0)) and \
+                             (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])
 
     for s in Solution.InternalKeys:
       if '_'+s not in state:
@@ -1202,7 +1232,8 @@ class Solution(collections.abc.Mapping):
       return
 
     if state["StreamK"] != 0:
-      state["AssertSummationElementMultiple"] = 1 # Cannot keep ASEM with Stream-K
+      if not useRebase950MxAsemPath:
+        state["AssertSummationElementMultiple"] = 1 # Cannot keep ASEM with Stream-K
       state["GlobalSplitU"] = 0 # Cannot enable both Stream-K and GSU
       state["InternalSupportParams"]["SupportUserGSU"] = False # Disable UserGSU for Stream-K
       state["GlobalSplitUAlgorithm"] = "MultipleBuffer" # Set default Algorithm
@@ -1784,8 +1815,23 @@ class Solution(collections.abc.Mapping):
       # how stagger iteration is wrapped when unroll loop exits
       state["StaggerU"] = 0
 
+    useRebase950MxRouting = state["ISA"] == IsaVersion(9, 5, 0)
     if state["ProblemType"]["MXBlockA"]:
-      if not state["DirectToVgprA"]:
+      if useRebase950MxRouting:
+        state["DirectToVgprMXSA"] = state["DirectToVgprA"]
+        state["ThreadTileMXSA"] = state["ThreadTileA"]
+        state["SubGroupMXSA"] = state["SubGroupA"]
+        state["MacroTileMXSA"] = state["MacroTileA"]
+        state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
+        state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
+        state["DirectToLdsMXSA"] = state["DirectToLdsA"]
+        state["LocalWriteUseSgprMXSA"] = state["DirectToLdsMXSA"]
+        state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
+        state["VectorWidthMXSA"] = state["VectorWidthA"]
+        state["MIWaveTileMXSA"] = state["MIWaveTileA"]
+        state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
+      elif not state["DirectToVgprA"]:
         state["ThreadTileMXSA"] = state["ThreadTileA"]
         state["SubGroupMXSA"] = state["SubGroupA"]
         state["MacroTileMXSA"] = state["MacroTileA"]
@@ -1800,7 +1846,21 @@ class Solution(collections.abc.Mapping):
         state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
 
     if state["ProblemType"]["MXBlockB"]:
-      if not state["DirectToVgprB"]:
+      if useRebase950MxRouting:
+        state["DirectToVgprMXSB"] = state["DirectToVgprB"]
+        state["ThreadTileMXSB"] = state["ThreadTileB"]
+        state["SubGroupMXSB"] = state["SubGroupB"]
+        state["MacroTileMXSB"] = state["MacroTileB"]
+        state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
+        state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
+        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
+        state["DirectToLdsMXSB"] = state["DirectToLdsB"]
+        state["LocalWriteUseSgprMXSB"] = state["DirectToLdsMXSB"]
+        state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
+        state["VectorWidthMXSB"] = state["VectorWidthB"]
+        state["MIWaveTileMXSB"] = state["MIWaveTileB"]
+        state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
+      elif not state["DirectToVgprB"]:
         state["ThreadTileMXSB"] = state["ThreadTileB"]
         state["SubGroupMXSB"] = state["SubGroupB"]
         state["MacroTileMXSB"] = state["MacroTileB"]
@@ -2059,8 +2119,9 @@ class Solution(collections.abc.Mapping):
         if state["ProblemType"]["TransposeB"]:
           state["AssertFree1ElementMultiple"] = 16
 
-    state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockA"], state["AssertSummationElementMultiple"])
-    state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockB"], state["AssertSummationElementMultiple"])
+    if not useRebase950MxAsemPath:
+      state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockA"], state["AssertSummationElementMultiple"])
+      state["AssertSummationElementMultiple"] = max(state["ProblemType"]["MXBlockB"], state["AssertSummationElementMultiple"])
 
     # We have the real "1LDSBuffer" value now, so we have to test the rejection condition here
     # TODO-
@@ -2165,8 +2226,13 @@ class Solution(collections.abc.Mapping):
           else:
             optPadA //= 2
             readRegsA //= 2
-        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > 6 or readRegsB > 6):
-          reject(state, "LocalReadVectorWidth results in attemping to read LDS larger than b192, reject")
+        maxReadRegs = 6
+        if state["ISA"] == IsaVersion(9, 5, 0):
+          # Rebase gfx950 path rejects kernels above b128 LDS read width.
+          maxReadRegs = 4
+        if (not isaInfoMap[isa].asmCaps['HasWMMA']) and (readRegsA > maxReadRegs or readRegsB > maxReadRegs):
+          maxReadBytes = maxReadRegs * 32
+          reject(state, f"LocalReadVectorWidth results in attemping to read LDS larger than b{maxReadBytes}, reject")
           return ldsPadA, ldsPadB, ldsPadM
         if state["EnableMatrixInstruction"]:
           # for readRegs = 1 or 4, we need to double pad for MI16x16xNx1 to avoid bank conflict.
@@ -2275,6 +2341,12 @@ class Solution(collections.abc.Mapping):
 
         ldsPadMXSA = 4 * 2 if (state["LdsPadMXSA"] == -1) else state["LdsPadMXSA"]
         ldsPadMXSB = 4 * 2 if (state["LdsPadMXSB"] == -1) else state["LdsPadMXSB"]
+        if state["ISA"] == IsaVersion(9, 5, 0):
+          # Rebase gfx950 path has no dedicated MX pad stream.
+          if state["LdsPadMXSA"] == -1:
+            ldsPadMXSA = 0
+          if state["LdsPadMXSB"] == -1:
+            ldsPadMXSB = 0
 
         if state["TDMInst"]:
           pads = {"A": ldsPadA * state["ProblemType"]["MacDataTypeA"].numBytes(), "B": ldsPadB * state["ProblemType"]["MacDataTypeB"].numBytes(), "MXSA": ldsPadMXSA, "MXSB": ldsPadMXSB}
@@ -2296,6 +2368,10 @@ class Solution(collections.abc.Mapping):
 
       def calcMXSLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
         LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
+        if state["ISA"] == IsaVersion(9, 5, 0):
+          if LdsBlockSizePerPad == -1:
+            return 0
+          return LdsBlockSizePerPad
         bpe = 1 # MX scale size
         multiple = 256 if isa[:2] == (12, 5) else 128
         if LdsBlockSizePerPad == -1:
@@ -2350,6 +2426,12 @@ class Solution(collections.abc.Mapping):
           return (0, 0)
         if state["DirectToVgpr%s"%mxTc]:
           return (0, 0)
+        if ("MXS" in mxTc) and (state["ISA"] == IsaVersion(9, 5, 0)):
+          # Match rebase gfx950 path: MX scales use fixed 64B alignment and no
+          # fp8-derived alignment expansion, otherwise offsets drift by +256.
+          ldsNumBytes = state["_DepthU%s"%mxTc] * state["MacroTile%s"%mxTc]
+          ldsNumBytesAligned = roundUpToNearestMultiple(ldsNumBytes, 64)
+          return (ldsNumBytes, ldsNumBytesAligned)
 
         bpe = state["ProblemType"]["DataType%s"%tc].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc].numBytes()
         bpe = 1 if ("MXS" in mxTc) else bpe
@@ -2709,6 +2791,9 @@ class Solution(collections.abc.Mapping):
             sameLayout = state["ProblemType"]["TLU%s"%tc] != state["UnrollMajorLDS%s"%tc]
             state["UseGeneralizedNLCOne%s"%tc] = grwidth != 8 and sameLayout \
               and state["WaveSeparateGlobalRead%s"%tc] == 0 and not state["DirectToVgpr%s"%tc]
+            # Match rebase behavior: GNLCOne is disabled for MX scale tensors.
+            if state["ProblemType"]["MXBlock%s"%tc]:
+              state["UseGeneralizedNLCOne%s"%tc] = False
           else:
             state["UseGeneralizedNLCOne%s"%tc] = False
         state["UseGeneralizedNLCOneMetadata"] = False
@@ -3264,18 +3349,24 @@ class Solution(collections.abc.Mapping):
          (state["PrefetchGlobalRead"] == 0) or \
          state["NoTailLoop"] or \
          (state["DepthU"] <=1 or (state["DepthU"] & (state["DepthU"] - 1) != 0)) or \
-         state["LocalSplitU"] > 1:
+         state["LocalSplitU"] > 1 or \
+         useRebase950MxAsemPath:
         state["TailloopInNll"] = False
 
       # need restrictions for TailloopInNll
       if state["TailloopInNll"]:
+        # need to disable SuppressNoLoadLoop
+        state["SuppressNoLoadLoop"] = False
+
+      # disable StaggerUcode
+      # - TailloopInNll
+      # - gfx950 MX + StreamK (avoid SGPR pressure, keep rebase behavior)
+      if state["TailloopInNll"] or (useRebase950MxAsemPath and state["StreamK"]):
         # need to disable StaggerU
         state["StaggerU"] = 0
         state["StaggerUMapping"] = 0
         state["StaggerUStride"] = 0
-        # need to disable SuppressNoLoadLoop
-        state["SuppressNoLoadLoop"] = False
-        state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for TailloopInNll
+        state["InternalSupportParams"]["SupportCustomStaggerU"] = False # Disable CustomStaggerU for no StagggerU code
 
     # Determine if we can load directly-to-Vgpr
     # need to check after state["LocalReadVectorWidth"] = -1 is resolved
@@ -3603,17 +3694,27 @@ class Solution(collections.abc.Mapping):
     # number of minimum GR inc inst per MFMA
     # default 1
     # Set at least 2 for gfx950 + MI16 + smaller MT case
+    # Set 3 for MX (number of GRInc is doubled)
     if state["MinGRIncPerMfma"] == -1:
       state["MinGRIncPerMfma"] = 1
       if isa == (9, 5, 0):
-        if state["EnableMatrixInstruction"] and state["MatrixInstM"] == 16 and state["MatrixInstK"] == 1:
-          if numMFMA<=32:
-            state["MinGRIncPerMfma"] = 2
-          if numMFMA<=16:
+        if state["EnableMatrixInstruction"] and state["MatrixInstM"] == 16 and state["MatrixInstB"] == 1:
+          if numMFMA<=16 or (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
             state["MinGRIncPerMfma"] = 3
+          elif numMFMA<=32:
+            state["MinGRIncPerMfma"] = 2
 
     # calculate ldsPad
     state["LdsPadA"], state["LdsPadB"], state["LdsPadMetadata"], state["LdsPadMXSA"], state["LdsPadMXSB"] = calcLdsPad(isaInfoMap)
+    useRebase950MxLdsPadPath = (state["ISA"] == IsaVersion(9,5,0)) and \
+                               (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])
+    # Keep gfx950 MX LDS placement aligned with rebase path.
+    # Rebase does not pad MXSA/MXSB LDS regions for this flow.
+    if useRebase950MxLdsPadPath:
+      state["LdsPadMXSA"] = 0
+      state["LdsPadMXSB"] = 0
+      state["LdsBlockSizePerPadMXSA"] = 0
+      state["LdsBlockSizePerPadMXSB"] = 0
 
     if state["GlobalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() == 32 and state["LdsPadA"] == 16 // state["ProblemType"]["MacDataTypeA"].numBytes():
       if auto_LdsBlockSizePerPadA_for_mix:

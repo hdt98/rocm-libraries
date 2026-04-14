@@ -53,8 +53,10 @@ namespace TensileLite
             , m_f32XdlMathOp(rocisa::DataType::Float)
             , m_activationComputeType(rocisa::DataType::Float)
             , m_useUserArgs(false)
-            , m_mxBlockA(args["mx-a-block"].as<int>())
-            , m_mxBlockB(args["mx-b-block"].as<int>())
+            , m_mxBlockA(args.count("mx-block-a") ? args["mx-block-a"].as<int>()
+                                                  : args["mx-a-block"].as<int>())
+            , m_mxBlockB(args.count("mx-block-b") ? args["mx-block-b"].as<int>()
+                                                  : args["mx-b-block"].as<int>())
             , m_swizzleTensorA(false)
             , m_swizzleTensorB(false)
             , m_metadataLayout(args["metadata-layout"].as<int>())
@@ -130,6 +132,9 @@ namespace TensileLite
                     m_tensorStrides[i] = std::vector<std::vector<size_t>>();
                 }
             }
+            // Internal branch uses E8 as the MX scale storage type.
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA] = rocisa::DataType::E8;
+            m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB] = rocisa::DataType::E8;
             // Get constant types
             for(size_t i = 0; i < constants.size(); i++)
             {
@@ -441,11 +446,11 @@ namespace TensileLite
                             rv.back().setUseDeviceUserArguments(m_useUserArgs);
                             if(m_mxBlockA)
                             {
-                                rv.back().setMXScaleA(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA], m_mxBlockA);
+                                rv.back().setMXScaleA(m_mxBlockA);
                             }
                             if(m_mxBlockB)
                             {
-                                rv.back().setMXScaleB(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB], m_mxBlockB);
+                                rv.back().setMXScaleB(m_mxBlockB);
                             }
                         }
                     }

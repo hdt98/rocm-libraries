@@ -1048,6 +1048,7 @@ namespace TensileLite
             return m_maxProblemSize;
         }
 
+        void setMXScaleA(int mxBlock, std::vector<size_t> saStride = {});
         void setMXScaleA(rocisa::DataType mxType, int mxBlock, std::vector<size_t> saStride = {});
 
         size_t mxBlockA() const
@@ -1060,6 +1061,7 @@ namespace TensileLite
             return m_mxTypeA;
         }
 
+        void setMXScaleB(int mxBlock, std::vector<size_t> sbStride = {});
         void setMXScaleB(rocisa::DataType mxType, int mxBlock, std::vector<size_t> sbStride = {});
 
         size_t mxBlockB() const
