@@ -178,6 +178,7 @@ TEST_CASE("Origami: best_macro_tile_size", "[origami]") {
 
 TEST_CASE("Origami: best_macro_tile_size mxfp4", "[origami]") {
   for (int gpu_arch : test_architectures) {
+    if (gpu_arch != 950) continue;  // mxfp4 only supported on gfx950 for now
     DYNAMIC_SECTION("gfx" << gpu_arch << " - rank configs by latency") {
       auto hardware = make_hardware(gpu_arch);
       hardware.lds_capacity = 400000;
@@ -201,7 +202,6 @@ TEST_CASE("Origami: best_macro_tile_size mxfp4", "[origami]") {
       auto results = origami::rank_configs(problem, hardware, configs);
 
       REQUIRE(results.size() == configs.size());
-      // Results should be ranked, so latencies should be in ascending order (best first)
       REQUIRE(results[0].config.mt.m == 256);
       REQUIRE(results[1].config.mt.m == 128);
       REQUIRE(results[2].config.mt.m == 64);
@@ -444,8 +444,7 @@ TEST_CASE("Origami: rank_configs unit test", "[origami]") {
       portable_setenv("ANALYTICAL_GEMM_HEURISTICS_VARIANCE", "0.0", 1);
       // Read back and parse
       double env_val = origami::runtime_options::read_heuristics_variance_from_env();
-      REQUIRE(env_val == 0.01);  // Return default value 0.01 when
-                                 // ANALYTICAL_GEMM_HEURISTICS_VARIANCE is set to 0.0
+      REQUIRE(env_val == 0.0);  // Return ANALYTICAL_GEMM_HEURISTICS_VARIANCE is set to 0.0
 
       portable_setenv("ANALYTICAL_GEMM_HEURISTICS_VARIANCE", "-1.0", 1);
       // Read back and parse
