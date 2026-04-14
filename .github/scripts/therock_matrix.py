@@ -59,6 +59,12 @@ project_map = {
         "cmake_options": ["-DTHEROCK_ENABLE_FFT=ON", "-DTHEROCK_ENABLE_RAND=ON"],
         "projects_to_test": ["hipfft", "rocfft"],
     },
+    "hip-kernel-provider": {
+        "cmake_options": [
+            "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
+        ],
+        "projects_to_test": ["hipkernelprovider"],
+    },
 }
 
 # For certain math components, they are optional during building and testing.
@@ -109,13 +115,6 @@ additional_options = {
         "projects_to_test": ["hipblasltprovider"],
         "project_to_add": "blas",
     },
-    "hip-kernel-provider": {
-        "cmake_options": [
-            "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
-        ],
-        "projects_to_test": ["hipkernelprovider"],
-        "project_to_add": None,
-    },
     "rocwmma": {
         "cmake_options": ["-DTHEROCK_ENABLE_ROCWMMA=ON"],
         "projects_to_test": ["rocwmma"],
@@ -153,7 +152,7 @@ def collect_projects_to_run(subtrees):
                     project_options_to_add["projects_to_test"]
                 )
             # If `project_to_add` is not included, only run build and tests for the optional project
-            elif project_to_add:
+            else:
                 projects.add(project_to_add)
                 project_map[project_to_add]["cmake_options"] = project_options_to_add[
                     "cmake_options"
@@ -161,12 +160,6 @@ def collect_projects_to_run(subtrees):
                 project_map[project_to_add]["projects_to_test"] = (
                     project_options_to_add["projects_to_test"]
                 )
-            # No parent project - create standalone entry
-            else:
-                project_map[project] = {
-                    "cmake_options": project_options_to_add["cmake_options"],
-                    "projects_to_test": project_options_to_add["projects_to_test"],
-                }
 
     # Check for potential dependencies
     to_remove_from_project_map = []
