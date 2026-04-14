@@ -1707,84 +1707,77 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 };
 
                 // Dispatch: use flat-descriptor path (non-grouped GEMM) for G=1,
-                // NDim=2. Lambdas are scoped here so they are only instantiated
-                // when the flat-descriptor types are valid.
+                // NDim=2. The non-grouped kernel uses packed (flat) descriptors
+                // with fewer transform layers, avoiding the grouped GEMM overhead.
                 bool used_flat_desc = false;
                 if constexpr(NDimSpatial == 2 && !CTranspose)
                 {
-                    auto launch_flat_desc_gemm_kernel =
-                        [&](auto has_main_loop_tag,
-                            index_t flat_idx,
-                            bool with_preprocess) -> float {
-                        constexpr bool has_main_loop = has_main_loop_tag.value;
-                        const auto kernel =
-                            kernel_gemm_xdlops_v2r3<
-                                NonGroupedGridwiseGemm64,
-                                ABDataType,
-                                EDataType,
-                                FlatAGridDesc_K0_M_K1,
-                                FlatBGridDesc_K0_N_K1,
-                                FlatCGridDesc_M_N,
-                                has_main_loop>;
-                        const auto& flat_c = arg.flat_c_container_[flat_idx];
-                        const index_t M_len = flat_c.GetLength(I0);
-                        const index_t N_len = flat_c.GetLength(I1);
-                        const index_t flat_desc_grid_size =
-                            NonGroupedGridwiseGemm64::Block2CTileMap::CalculateGridSize(
-                                M_len, N_len);
-                        if(with_preprocess)
-                            return launch_and_time_kernel_with_preprocess(
-                                stream_config,
-                                clear_workspace,
-                                kernel,
-                                dim3(flat_desc_grid_size),
-                                dim3(BlockSize),
-                                0,
-                                p_a_grid,
-                                p_b_grid,
-                                p_e_grid,
-                                arg.flat_a_container_[flat_idx],
-                                arg.flat_b_container_[flat_idx],
-                                flat_c);
-                        else
-                            return launch_and_time_kernel(
-                                stream_config,
-                                kernel,
-                                dim3(flat_desc_grid_size),
-                                dim3(BlockSize),
-                                0,
-                                p_a_grid,
-                                p_b_grid,
-                                p_e_grid,
-                                arg.flat_a_container_[flat_idx],
-                                arg.flat_b_container_[flat_idx],
-                                flat_c);
-                    };
-
                     if(arg.num_group_ == 1 &&
                        !arg.flat_a_container_.empty())
                     {
                         used_flat_desc = true;
-                        for(index_t i = 0; i < gemms_count_for_set; ++i)
+                        const index_t flat_idx = gemm_set_id;
+                        const auto& flat_a = arg.flat_a_container_[flat_idx];
+                        const auto& flat_b = arg.flat_b_container_[flat_idx];
+                        const auto& flat_c = arg.flat_c_container_[flat_idx];
+                        const index_t padded_K0 = flat_a.GetLength(I0);
+                        const bool flat_desc_has_main_loop =
+                            NonGroupedGridwiseGemm64::CalculateHasMainKBlockLoop(
+                                padded_K0 * AK1);
+                        const index_t flat_grid_size =
+                            NonGroupedGridwiseGemm64::Block2CTileMap::CalculateGridSize(
+                                flat_c.GetLength(I0), flat_c.GetLength(I1));
+                        if(flat_desc_has_main_loop)
                         {
-                            const index_t flat_idx =
-                                gemm_set_id * MaxGroupedGemmGroupsNum + i;
-                            if(flat_idx >= static_cast<index_t>(arg.flat_a_container_.size()))
-                                break;
-                            const index_t padded_K0 =
-                                arg.flat_a_container_[flat_idx].GetLength(I0);
-                            const bool flat_desc_has_main_loop =
-                                NonGroupedGridwiseGemm64::CalculateHasMainKBlockLoop(
-                                    padded_K0 * AK1);
-                            if(flat_desc_has_main_loop)
-                                ave_time += launch_flat_desc_gemm_kernel(
-                                    integral_constant<bool, true>{}, flat_idx, i == 0);
-                            else
-                                ave_time += launch_flat_desc_gemm_kernel(
-                                    integral_constant<bool, false>{}, flat_idx, i == 0);
+                            const auto kernel =
+                                kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
+                                                         ABDataType,
+                                                         EDataType,
+                                                         FlatAGridDesc_K0_M_K1,
+                                                         FlatBGridDesc_K0_N_K1,
+                                                         FlatCGridDesc_M_N,
+                                                         true>;
+                            ave_time += launch_and_time_kernel_with_preprocess(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(flat_grid_size),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                p_e_grid,
+                                flat_a,
+                                flat_b,
+                                flat_c);
+                        }
+                        else
+                        {
+                            const auto kernel =
+                                kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
+                                                         ABDataType,
+                                                         EDataType,
+                                                         FlatAGridDesc_K0_M_K1,
+                                                         FlatBGridDesc_K0_N_K1,
+                                                         FlatCGridDesc_M_N,
+                                                         false>;
+                            ave_time += launch_and_time_kernel_with_preprocess(
+                                stream_config,
+                                clear_workspace,
+                                kernel,
+                                dim3(flat_grid_size),
+                                dim3(BlockSize),
+                                0,
+                                p_a_grid,
+                                p_b_grid,
+                                p_e_grid,
+                                flat_a,
+                                flat_b,
+                                flat_c);
                         }
                     }
                 }
+                
                 if(!used_flat_desc)
                 {
                     if(has_loop_in_all_gemm)
