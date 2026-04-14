@@ -1110,6 +1110,15 @@ def run_aiter_tests(Map conf=[:]){
             try{
                 sh "rocminfo"
                 sh "python3 --version"
+                // Patch CK with workspace version and rebuild aiter
+                sh """
+                    CK_SRC=\${WORKSPACE}/projects/composablekernel
+                    rm -rf /home/jenkins/workspace/ck
+                    cp -r \$CK_SRC /home/jenkins/workspace/ck
+                    rm -rf /home/jenkins/workspace/aiter/3rdparty/composable_kernel
+                    cp -r \$CK_SRC /home/jenkins/workspace/aiter/3rdparty/composable_kernel
+                    cd /home/jenkins/workspace/aiter && python3 setup.py develop
+                """
                 sh "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8.py"
                 sh "python3 /home/jenkins/workspace/aiter/op_tests/test_gemm_a8w8_blockscale.py"
                 sh "python3 /home/jenkins/workspace/aiter/op_tests/test_mha.py"
@@ -1163,8 +1172,49 @@ def run_pytorch_tests(Map conf=[:]){
             try{
                 sh "rocminfo"
                 sh "python3 --version"
+                sh "pip install --upgrade pandas"
+                // Update PyTorch to viable/strict
+                sh "cd /tmp/pytorch && git reset --hard HEAD"
+                sh "cd /tmp/pytorch && git clean -fdx"
+                sh "cd /tmp/pytorch && git submodule foreach --recursive git reset --hard HEAD"
+                sh "cd /tmp/pytorch && git submodule foreach --recursive git clean -fdx"
+                sh "cd /tmp/pytorch && git fetch --depth 1 origin viable/strict"
+                sh "cd /tmp/pytorch && git checkout FETCH_HEAD"
+                sh "cd /tmp/pytorch && git submodule update --init --recursive --depth 1"
+                // Patch CK in PyTorch third_party with workspace version
+                sh """
+                    CK_SRC=\${WORKSPACE}/projects/composablekernel
+                    for dest in /tmp/pytorch/third_party/composable_kernel \
+                                /tmp/pytorch/third_party/aiter/3rdparty/composable_kernel \
+                                /tmp/pytorch/third_party/fbgemm/external/composable_kernel \
+                                /tmp/pytorch/third_party/flash-attention/csrc/composable_kernel; do
+                        if [ -d \$dest ]; then
+                            rm -rf \$dest
+                            cp -r \$CK_SRC \$dest
+                        fi
+                    done
+                """
+                sh "rm -rf /tmp/pytorch/build"
                 sh "python3 /tmp/pytorch/tools/amd_build/build_amd.py"
-                sh "USE_ROCM_CK_SDPA=1 PYTORCH_ROCM_ARCH=gfx942 python /tmp/pytorch/setup.py develop"
+                sh """cd /tmp/pytorch && \
+                    CMAKE_CXX_STANDARD=20 \
+                    USE_ROCM_CK_SDPA=1 \
+                    USE_ROCM_CK_GEMM=1 \
+                    USE_DISTRIBUTED=0 \
+                    USE_NNPACK=0 \
+                    USE_XNNPACK=0 \
+                    USE_MKLDNN=0 \
+                    BUILD_TEST=0 \
+                    USE_FBGEMM=0 \
+                    USE_KINETO=0 \
+                    USE_FLASH_ATTENTION=1 \
+                    USE_MEM_EFF_ATTENTION=0 \
+                    USE_GLOO=0 \
+                    USE_NCCL=0 \
+                    USE_OPENMP=0 \
+                    USE_MSLK=0 \
+                    PYTORCH_ROCM_ARCH=gfx942 \
+                    python setup.py develop"""
             }
             catch(e){
                 echo "Throwing error exception while building Pytorch"
