@@ -16,6 +16,7 @@
 #include "ck/utility/workgroup_barrier.hpp"
 #include "ck/utility/reduction_functions_accumulate.hpp"
 #include "ck/tensor_operation/gpu/grid/gridwise_gemm_xdl_cshuffle_common.hpp"
+#include "ck/tensor_operation/gpu/grid/gridwise_gemm_descriptor_helper.hpp"
 
 namespace ck {
 
@@ -324,65 +325,15 @@ struct GridwiseGemm_xdl_cshuffle_streamk_v3
     __device__ static auto MakeAGridDescriptor_AK0_M_AK1(
         index_t M, index_t MPad, index_t K, index_t KPad, index_t StrideA, index_t AK0)
     {
-        const auto a_grid_desc_mraw_kraw = [&]() {
-            if constexpr(is_same_v<tensor_layout::gemm::RowMajor, ALayout>)
-            {
-                return make_naive_tensor_descriptor(make_tuple(M, K), make_tuple(StrideA, I1));
-            }
-            else if constexpr(is_same_v<tensor_layout::gemm::ColumnMajor, ALayout>)
-            {
-                return make_naive_tensor_descriptor(make_tuple(M, K), make_tuple(I1, StrideA));
-            }
-        }();
-
-        // Pad both M and K to be multiples of the block sizes
-        const auto a_grid_desc_m_k =
-            transform_tensor_descriptor(a_grid_desc_mraw_kraw,
-                                        make_tuple(make_right_pad_transform(M, MPad - M),
-                                                   make_right_pad_transform(K, KPad - K)),
-                                        make_tuple(Sequence<0>{}, Sequence<1>{}),
-                                        make_tuple(Sequence<0>{}, Sequence<1>{}));
-
-        const auto a_grid_desc_ak0_m_ak1 = transform_tensor_descriptor(
-            a_grid_desc_m_k,
-            make_tuple(make_unmerge_transform(make_tuple(AK0, AK1Value)),
-                       make_pass_through_transform(MPad)),
-            make_tuple(Sequence<1>{}, Sequence<0>{}),
-            make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
-
-        return a_grid_desc_ak0_m_ak1;
+        return ck::MakeAGridDescriptor_AK0_M_AK1<ALayout, GemmSpec, AK1Value, index_t>(
+            M, MPad, K, KPad, StrideA, AK0);
     }
 
     __device__ static auto MakeBGridDescriptor_BK0_N_BK1(
         index_t K, index_t KPad, index_t N, index_t NPad, index_t StrideB, index_t BK0)
     {
-        const auto b_grid_desc_nraw_kraw = [&]() {
-            if constexpr(is_same<tensor_layout::gemm::RowMajor, BLayout>::value)
-            {
-                return make_naive_tensor_descriptor(make_tuple(N, K), make_tuple(I1, StrideB));
-            }
-            else if constexpr(is_same<tensor_layout::gemm::ColumnMajor, BLayout>::value)
-            {
-                return make_naive_tensor_descriptor(make_tuple(N, K), make_tuple(StrideB, I1));
-            }
-        }();
-
-        // Pad both N and K to be multiples of the block sizes
-        const auto b_grid_desc_n_k =
-            transform_tensor_descriptor(b_grid_desc_nraw_kraw,
-                                        make_tuple(make_right_pad_transform(N, NPad - N),
-                                                   make_right_pad_transform(K, KPad - K)),
-                                        make_tuple(Sequence<0>{}, Sequence<1>{}),
-                                        make_tuple(Sequence<0>{}, Sequence<1>{}));
-
-        const auto b_grid_desc_bk0_n_bk1 = transform_tensor_descriptor(
-            b_grid_desc_n_k,
-            make_tuple(make_unmerge_transform(make_tuple(BK0, BK1Value)),
-                       make_pass_through_transform(NPad)),
-            make_tuple(Sequence<1>{}, Sequence<0>{}),
-            make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
-
-        return b_grid_desc_bk0_n_bk1;
+        return ck::MakeBGridDescriptor_BK0_N_BK1<BLayout, GemmSpec, BK1Value, index_t>(
+            K, KPad, N, NPad, StrideB, BK0);
     }
 
     template <typename ABlockDesc_AK0_M_AK1>
