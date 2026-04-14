@@ -68,6 +68,9 @@
 "project: miopen":
 - changed-files:
   - any-glob-to-any-file: 'projects/miopen/**/*'
+  - any-glob-to-any-file: 'projects/composablekernel/include/ck/tensor_operation/**/*conv*'
+  - any-glob-to-any-file: 'projects/composablekernel/include/ck/library/utility/*conv*'
+  - any-glob-to-any-file: 'projects/composablekernel/library/src/tensor_operation_instance/gpu/**/*conv*'
 
 "project: miopen-provider":
 - changed-files:
