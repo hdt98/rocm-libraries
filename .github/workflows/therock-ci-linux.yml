@@ -43,7 +43,7 @@ jobs:
         with:
           repository: "ROCm/TheRock"
           path: TheRock
-          ref: 854d2c3f2c333aa9a9c84a05b0ac543cdc227127 # multi-GPU support
+          ref: 5e90c0e8384515f8473b67e50a142d3a914bf1bb # multi-GPU support
 
       - name: Install python deps
         run: |
