@@ -1992,7 +1992,7 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
 
         // find number of sub-blocks
         I levs = stedc_num_levels(n);
-        I blks = 1 << levs;
+        I blks = static_cast<I>(1) << levs;
 
         // initialize identity matrix in V
         // if evect is tridiagonal we can store V directly in C
