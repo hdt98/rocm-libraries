@@ -2720,7 +2720,43 @@ struct ConvCkIgemmFwdV6r1DlopsNchw final : ConvTunableSolver<PerformanceConvCkIg
                              const PerformanceConvCkIgemmFwdV6r1DlopsNchw&) const override;
 };
 
-struct MIOPEN_INTERNALS_EXPORT ConvHipConv final : ConvSolver
+struct PerformanceConfigConvHipConv : PerfConfigBase<PerformanceConfigConvHipConv>
+{
+    int algorithm      = -1;
+    int kernel_variant = -1;
+    int config_idx     = -1;
+
+    // Transient state for iteration during search (not serialized).
+    int index = 0;
+    struct ValidConfig
+    {
+        int algorithm;
+        int kernel_variant;
+        int config_idx;
+    };
+    std::vector<ValidConfig> valid_configs;
+
+    PerformanceConfigConvHipConv() = default;
+    PerformanceConfigConvHipConv(bool) {}
+
+    template <class Self, class F>
+    static void Visit(Self&& self, F f)
+    {
+        f(self.algorithm, "algorithm");
+        f(self.kernel_variant, "kernel_variant");
+        f(self.config_idx, "config_idx");
+    }
+
+    MIOPEN_INTERNALS_EXPORT void HeuristicInit(const ExecutionContext&,
+                                               const miopen::conv::ProblemDescription&);
+    MIOPEN_INTERNALS_EXPORT bool SetNextValue(const miopen::conv::ProblemDescription&);
+    MIOPEN_INTERNALS_EXPORT bool IsValidValue() const;
+    MIOPEN_INTERNALS_EXPORT bool IsValid(const ExecutionContext&,
+                                         const miopen::conv::ProblemDescription&) const;
+    MIOPEN_INTERNALS_EXPORT bool operator==(const PerformanceConfigConvHipConv& other) const;
+};
+
+struct MIOPEN_INTERNALS_EXPORT ConvHipConv final : ConvTunableSolver<PerformanceConfigConvHipConv>
 {
     const std::string& SolverDbId() const override { return GetSolverDbId<ConvHipConv>(); }
 
@@ -2729,13 +2765,23 @@ struct MIOPEN_INTERNALS_EXPORT ConvHipConv final : ConvSolver
     bool IsDynamic() const override { return true; }
     float GetWti(const ExecutionContext&, const miopen::conv::ProblemDescription&) const override
     {
-        return 0.5f;
+        return 1.0f;
     }
     size_t GetWorkspaceSize(const ExecutionContext&,
                             const miopen::conv::ProblemDescription&) const override;
     bool MayNeedWorkspace() const override { return true; }
+    PerformanceConfigConvHipConv
+    GetDefaultPerformanceConfig(const ExecutionContext&,
+                                const miopen::conv::ProblemDescription&) const override;
+    bool IsValidPerformanceConfig(const ExecutionContext&,
+                                  const miopen::conv::ProblemDescription&,
+                                  const PerformanceConfigConvHipConv&) const override;
+    PerformanceConfigConvHipConv Search(const ExecutionContext&,
+                                        const miopen::conv::ProblemDescription&,
+                                        const AnyInvokeParams& invoke_ctx) const override;
     ConvSolution GetSolution(const ExecutionContext&,
-                             const miopen::conv::ProblemDescription&) const override;
+                             const miopen::conv::ProblemDescription&,
+                             const PerformanceConfigConvHipConv&) const override;
 };
 
 struct MIOPEN_INTERNALS_EXPORT ConvDirectNaiveConvFwd final : ConvSolver

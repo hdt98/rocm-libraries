@@ -2,6 +2,7 @@
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/env.hpp>
+#include <miopen/generic_search.hpp>
 #include <miopen/handle.hpp>
 #include <miopen/hipoc_kernel.hpp>
 #include <miopen/stringutils.hpp>
@@ -9,6 +10,8 @@
 #include <miopen/tensor_ops.hpp>
 
 #include <hipconv/hipconv.hpp>
+
+#include <hip/hip_runtime.h>
 
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_HIPCONV)
 
@@ -73,6 +76,116 @@ static hipconv::Conv2dParams ToHipconvParams(const ProblemDescription& problem)
     return par;
 }
 
+static hipconv::KernelConfig ToKernelConfig(const PerformanceConfigConvHipConv& config)
+{
+    return {static_cast<hipconv::Algorithm>(config.algorithm),
+            config.kernel_variant,
+            config.config_idx};
+}
+
+static std::optional<hipconv::Arch> GetCurrentArch()
+{
+    int device = 0;
+    if(hipGetDevice(&device) != hipSuccess)
+        return std::nullopt;
+    hipDeviceProp_t props{};
+    if(hipGetDeviceProperties(&props, device) != hipSuccess)
+        return std::nullopt;
+    return hipconv::parse_arch(props.gcnArchName);
+}
+
+// ===================== PerformanceConfigConvHipConv =====================
+
+static void InitValidConfigs(PerformanceConfigConvHipConv& self,
+                             hipconv::Arch arch,
+                             const ProblemDescription& problem)
+{
+    const auto par  = ToHipconvParams(problem);
+    const auto cfgs = hipconv::get_valid_configs(arch, par);
+
+    self.valid_configs.clear();
+    self.valid_configs.reserve(cfgs.size());
+    for(const auto& c : cfgs)
+        self.valid_configs.push_back(
+            {static_cast<int>(c.algorithm), c.kernel_variant, c.config_idx});
+
+    if(!self.valid_configs.empty())
+    {
+        self.index          = 0;
+        self.algorithm      = self.valid_configs[0].algorithm;
+        self.kernel_variant = self.valid_configs[0].kernel_variant;
+        self.config_idx     = self.valid_configs[0].config_idx;
+    }
+}
+
+void PerformanceConfigConvHipConv::HeuristicInit(const ExecutionContext& ctx,
+                                                 const ProblemDescription& problem)
+{
+    const auto arch_opt = hipconv::parse_arch(ctx.GetStream().GetDeviceName());
+    if(!arch_opt.has_value())
+        return;
+    InitValidConfigs(*this, *arch_opt, problem);
+}
+
+bool PerformanceConfigConvHipConv::SetNextValue(const ProblemDescription& problem)
+{
+    if(valid_configs.empty())
+    {
+        const auto arch_opt = GetCurrentArch();
+        if(!arch_opt.has_value())
+            return false;
+        InitValidConfigs(*this, *arch_opt, problem);
+        return true;
+    }
+    if(index + 1 < static_cast<int>(valid_configs.size()))
+    {
+        ++index;
+        algorithm      = valid_configs[index].algorithm;
+        kernel_variant = valid_configs[index].kernel_variant;
+        config_idx     = valid_configs[index].config_idx;
+    }
+    else
+    {
+        return false;
+    }
+    return true;
+}
+
+bool PerformanceConfigConvHipConv::IsValidValue() const
+{
+    return algorithm >= 0 && kernel_variant >= 0 && config_idx >= 0;
+}
+
+bool PerformanceConfigConvHipConv::IsValid(const ExecutionContext& ctx,
+                                           const ProblemDescription& problem) const
+{
+    if(!IsValidValue())
+        return false;
+
+    const auto arch_opt = hipconv::parse_arch(ctx.GetStream().GetDeviceName());
+    if(!arch_opt.has_value())
+        return false;
+
+    const auto par  = ToHipconvParams(problem);
+    const auto cfgs = hipconv::get_valid_configs(*arch_opt, par);
+    const auto kcfg = ToKernelConfig(*this);
+    for(const auto& c : cfgs)
+    {
+        if(c.algorithm == kcfg.algorithm && c.kernel_variant == kcfg.kernel_variant &&
+           c.config_idx == kcfg.config_idx)
+            return true;
+    }
+    return false;
+}
+
+bool PerformanceConfigConvHipConv::operator==(const PerformanceConfigConvHipConv& other) const
+{
+    return algorithm == other.algorithm && kernel_variant == other.kernel_variant &&
+           config_idx == other.config_idx;
+}
+
+// ===================== ConvHipConv =====================
+
 bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_CONV_HIPCONV))
@@ -115,8 +228,32 @@ size_t ConvHipConv::GetWorkspaceSize(const ExecutionContext&,
     return static_cast<size_t>(k) * y * x * c_per_group * sizeof(float);
 }
 
+PerformanceConfigConvHipConv
+ConvHipConv::GetDefaultPerformanceConfig(const ExecutionContext& ctx,
+                                         const ProblemDescription& problem) const
+{
+    PerformanceConfigConvHipConv config;
+    config.HeuristicInit(ctx, problem);
+    return config;
+}
+
+bool ConvHipConv::IsValidPerformanceConfig(const ExecutionContext& ctx,
+                                           const ProblemDescription& problem,
+                                           const PerformanceConfigConvHipConv& config) const
+{
+    return config.IsValid(ctx, problem);
+}
+
+PerformanceConfigConvHipConv ConvHipConv::Search(const ExecutionContext& ctx,
+                                                 const ProblemDescription& problem,
+                                                 const AnyInvokeParams& invoke_ctx) const
+{
+    return GenericSearch(*this, ctx, problem, invoke_ctx);
+}
+
 ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
-                                      const ProblemDescription& problem) const
+                                      const ProblemDescription& problem,
+                                      const PerformanceConfigConvHipConv& config) const
 {
     ConvSolution result;
 
@@ -126,12 +263,7 @@ ConvSolution ConvHipConv::GetSolution(const ExecutionContext& ctx,
 
     const auto arch = arch_opt.value();
     const auto par  = ToHipconvParams(problem);
-
-    const auto cfg_opt = hipconv::find_config(arch, par);
-    if(!cfg_opt.has_value())
-        MIOPEN_THROW("ConvHipConv: no applicable kernel config found.");
-
-    const auto cfg = cfg_opt.value();
+    const auto cfg  = ToKernelConfig(config);
 
     if(problem.IsDirectionBackwardWrW())
     {
