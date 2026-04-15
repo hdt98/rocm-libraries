@@ -395,44 +395,37 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
         devName, args, ctx.GetStream().GetMaxHardwareComputeUnits(), problem, kernelVersion);
     auto perfmodel_result = shader_model->ComputeWti(problem.IsFp32());
     auto nGroups          = perfmodel_result.n_groups;
-    const bool isGfx12    = StartsWith(devName, "gfx12");
-
     args.SetShaderParams(nGroups, flags, 0, 0);
 
     // Kernel name and file
-    std::string versionStr;
-    std::string archStr;
-    if(isGfx12)
-    {
-        versionStr =
-            (kernelVersion == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_1" : "_v4_9_1";
-        archStr = "_gfx12";
-    }
-    else
-    {
-        versionStr =
-            (kernelVersion == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_0" : "_v4_7_0";
-        archStr = "_gfx9";
-    }
+    const auto versionStr =
+        +[](ShaderModelFactory::KernelVersion kv, const std::string& dn) -> std::string {
+        if(StartsWith(dn, "gfx12"))
+            return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_1" : "_v4_9_1";
+        return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_0" : "_v4_7_0";
+    }(kernelVersion, devName);
+
+    const auto archStr = +[](const std::string& dn) -> std::string {
+        if(StartsWith(dn, "gfx94"))
+            return "_gfx9";
+        if(StartsWith(dn, "gfx12"))
+            return "_gfx12";
+        MIOPEN_THROW(miopenStatusInternalError);
+    }(devName);
 
     const std::string dTypeStr  = "_fp16_fp32acc";
     const std::string strideStr = "_stride1";
-    std::string winoVariantStr;
-    if constexpr(Winodata == 2 && Winofilter == 3)
-    {
-        winoVariantStr = "_f2x3";
-    }
-    else
-    {
-        static_assert(Winodata == 2 && Winofilter == 3);
-    }
+    const auto winoVariantStr   = +[]() -> std::string {
+        if constexpr(Winodata == 2 && Winofilter == 3)
+            return "_f2x3";
+        else
+            static_assert(Winodata == 2 && Winofilter == 3);
+    }();
 
-    // e.g. (gfx12, V4_6):  miopenSp3AsmConvRage_v4_6_1_gfx12_fp16_fp32acc_f2x3_stride1
-    // e.g. (gfx942, V4_6): miopenSp3AsmConvRage_v4_6_0_gfx9_fp16_fp32acc_f2x3_stride1
+    // e.g. miopenSp3AsmConvRage_v4_6_1_gfx12_fp16_fp32acc_f2x3_stride1
     std::string kernelName =
         "miopenSp3AsmConvRage" + versionStr + archStr + dTypeStr + winoVariantStr + strideStr;
-    // e.g. (gfx12, V4_6):  Conv_Winograd_Rage_v4_6_1_fp16_fp32acc_f2x3_stride1.s
-    // e.g. (gfx942, V4_6): Conv_Winograd_Rage_v4_6_0_fp16_fp32acc_f2x3_stride1.s
+    // e.g. Conv_Winograd_Rage_v4_6_1_fp16_fp32acc_f2x3_stride1.s
     std::string kernelFile =
         "Conv_Winograd_Rage" + versionStr + dTypeStr + winoVariantStr + strideStr + ".s";
 
@@ -447,10 +440,10 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
         {"ROCM_METADATA_VERSION", 5},
     };
     kernelInfo.comp_options = options.GenerateFor(kbp::GcnAsm{});
-    kernelInfo.comp_options += std::string(" -mcumode");
+    kernelInfo.comp_options += std::string(" -mcumode -mwavefrontsize64");
 
     uint64_t wgSize = 768U; // value for gfx942
-    if(isGfx12)
+    if(StartsWith(devName, "gfx12"))
     {
         wgSize = 384U;
     }
