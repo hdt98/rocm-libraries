@@ -152,6 +152,8 @@ size_t hardware_t::get_default_num_xcds(architecture_t arch) {
     case architecture_t::gfx1151: return 1;
     case architecture_t::gfx1152: return 1;
     case architecture_t::gfx1153: return 1;
+    // TODO: Update this with real value
+    case architecture_t::gfx1250: return 1;
     default:
       throw std::runtime_error(
           std::string("No default XCD count for architecture ") +
