@@ -127,57 +127,46 @@ struct MemoryEcosystem
 
     static bool AbleToAllocate(const std::vector<size_t>& vram_blocks, const size_t reserved_bytes = 0)
     {
-        const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
-
-        return AbleToAllocate(info, vram_blocks, reserved_bytes);
-
-        if(reserved_bytes > info.shared_ram)
-            return false;
-
-        const auto free_shared_vram = info.shared_ram - reserved_bytes;
-        size_t used_ded = 0;
-        size_t used_shared = 0;
-
-        for(auto block : vram_blocks)
-        {
-            if(info.dedicated_vram >= used_ded + block)
-            {
-                used_ded += block;
-            }
-            else if(free_shared_vram >= used_shared + block)
-            {
-                used_shared += block;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
+#ifndef _WIN32
         return true;
+#else
+        const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
+        return AbleToAllocate(info, vram_blocks, reserved_bytes);
+#endif
+    }
+
+    static bool AbleToAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+    {
+        auto reserved = std::accumulate(cpu_blocks.begin(), cpu_blocks.end(), 0);
+        return AbleToAllocate(info, vram_blocks, reserved);
     }
 
     static bool AbleToAllocate(const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
     {
-        auto reserved = std::accumulate(cpu_blocks.begin(), cpu_blocks.end(), 0);
-
-        return AbleToAllocate(vram_blocks, reserved);
+#ifndef _WIN32
+        return true;
+#else
+        const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
+        return AbleToAllocate(info, vram_blocks, reserved);
+#endif
     }
 
-    static bool CouldAllocate(const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+    static bool CouldAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
     {
         auto sorted_blocks = vram_blocks;
         std::sort(sorted_blocks.begin(), sorted_blocks.end(), std::greater<size_t>());
 
-        return AbleToAllocate(sorted_blocks, cpu_blocks);
+        return AbleToAllocate(info, sorted_blocks, cpu_blocks);
     }
 
     static bool CouldAllocate(const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
     {
-        auto sorted_blocks = vram_blocks;
-        std::sort(sorted_blocks.begin(), sorted_blocks.end(), std::greater<size_t>());
-
-        return AbleToAllocate(sorted_blocks, cpu_blocks);
+#ifndef _WIN32
+        return true;
+#else
+        const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
+        return AbleToAllocate(info, sorted_blocks, cpu_blocks);
+#endif
     }
 };
 
