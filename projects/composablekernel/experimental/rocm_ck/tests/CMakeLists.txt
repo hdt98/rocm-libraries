@@ -97,3 +97,12 @@ add_dependencies(rocm_ck_tests test_fmha_bwd_compat)
 # =============================================================================
 
 add_subdirectory(compile_fail)
+
+# =============================================================================
+# GPU integration tests (opt-in, requires HIP)
+# =============================================================================
+
+option(ROCM_CK_GPU_TESTS "Build GPU integration tests (requires HIP)" OFF)
+if(ROCM_CK_GPU_TESTS)
+    add_subdirectory(gpu)
+endif()
