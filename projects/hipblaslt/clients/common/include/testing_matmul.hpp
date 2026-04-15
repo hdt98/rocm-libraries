@@ -3987,34 +3987,28 @@ void testing_matmul_with_bias(const Arguments& arg,
                         hipblaslt_cout << "  Splitting into " << subProblems.size()
                                       << " sub-problems:" << std::endl;
 
-                        // Extract kernel info once (same for all sub-problems)
-                        std::string solutionName = "";
-                        std::string kernelName = "";
-                        if(arg.print_kernel_info)
-                        {
-                            solutionName = hipblaslt_ext::getSolutionNameFromAlgo(
-                                handle, heuristicResult[sol].algo);
-                            kernelName = hipblaslt_ext::getKernelNameFromAlgo(
-                                handle, heuristicResult[sol].algo);
-                        }
-
                         for(size_t sp = 0; sp < subProblems.size(); sp++)
                         {
                             const auto& sub = subProblems[sp];
 
-                            hipblaslt_cout << "  [" << sp << "] " << sub.m_size << "x" << sub.n_size
+                            hipblaslt_cout << std::endl;
+                            hipblaslt_cout << "  Sub-problem [" << sp << "]: " << sub.m_size << "x" << sub.n_size
                                           << "x" << sub.k_size
-                                          << " @ (" << sub.m_offset << "," << sub.n_offset << ")"
-                                          << " | Est.WGs: " << sub.expected_workgroups;
+                                          << " @ offset (" << sub.m_offset << "," << sub.n_offset << ")"
+                                          << " | Est.WGs: " << sub.expected_workgroups
+                                          << std::endl;
 
+                            // Print kernel info for THIS sub-problem execution
                             if(arg.print_kernel_info)
                             {
-                                hipblaslt_cout << std::endl
-                                              << "      Solution: " << solutionName << std::endl
-                                              << "      Kernel: " << kernelName;
-                            }
+                                std::string solutionName = hipblaslt_ext::getSolutionNameFromAlgo(
+                                    handle, heuristicResult[sol].algo);
+                                std::string kernelName = hipblaslt_ext::getKernelNameFromAlgo(
+                                    handle, heuristicResult[sol].algo);
 
-                            hipblaslt_cout << std::endl;
+                                hipblaslt_cout << "    Solution: " << solutionName << std::endl;
+                                hipblaslt_cout << "    Kernel:   " << kernelName << std::endl;
+                            }
 
                             // Create matrix layout descriptors for this sub-problem
                             hipblasLtMatrixLayout_t matA_sub, matB_sub, matC_sub, matD_sub;
