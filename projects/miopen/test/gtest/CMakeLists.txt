@@ -78,6 +78,7 @@ function(add_gtest TEST_NAME TEST_CPP)
   add_executable(${TEST_NAME} ${TEST_CPP})
   if(WIN32)
     target_compile_definitions(${TEST_NAME} PRIVATE NOMINMAX)
+    target_link_libraries(${TEST_NAME} dxgi.lib)
   endif()
 
   add_dependencies(tests ${TEST_NAME})

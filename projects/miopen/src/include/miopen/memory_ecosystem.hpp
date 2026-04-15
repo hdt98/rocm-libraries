@@ -5,6 +5,7 @@
 
 #ifdef _WIN32
 #include <dxgi1_4.h>
+#include <wchar.h>
 #endif
 #include <algorithm>
 #include <functional>
