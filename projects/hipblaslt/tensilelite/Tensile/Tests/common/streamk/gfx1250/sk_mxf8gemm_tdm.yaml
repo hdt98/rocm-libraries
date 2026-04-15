@@ -11,7 +11,7 @@ GlobalParameters:
   DataInitTypeMXSA: 3
   DataInitTypeMXSB: 3
   DataInitTypeAlpha: 1
-  DataInitTypeBeta: 0
+  DataInitTypeBeta: 1
   Architecture: gfx1250
   PrintLevel: 2
   PrintSolutionRejectionReason: True
