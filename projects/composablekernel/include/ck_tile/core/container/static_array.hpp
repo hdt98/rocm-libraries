@@ -28,5 +28,9 @@ struct static_array
     CK_TILE_HOST_DEVICE constexpr T& operator[](index_t i) { return elems[i]; }
 
     CK_TILE_HOST_DEVICE static constexpr index_t size() { return N; }
+
+    /// Defaulted equality for C++20 structural NTTP support.
+    /// Required so static_array can be used as a member of NTTP structs.
+    constexpr bool operator==(const static_array&) const = default;
 };
 } // namespace ck_tile
