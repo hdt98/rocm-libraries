@@ -806,12 +806,9 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                                                c_thread_buf,
                                                                num_k_block_main_loop);
 
-        // Write output: use no-shuffle direct VGPR-to-global path when there are no D
-        // tensors to fuse, avoiding LDS usage and sync barriers in the epilogue.
-        // Conditions: (1) no D tensors, (2) scalar-per-vector is 1 because
-        // RunEpilogueNoShuffle has a per-thread slice of 1 along N2, (3) PassThrough
-        // element-wise op because the no-shuffle path converts directly from AccDataType
-        // to EDataType without an intermediate CShuffleDataType step.
+        // Use RunEpilogueNoShuffle from gridwise_common (the base class) for
+        // direct VGPR-to-global output when conditions are met:
+        // (1) no D tensors, (2) scalar-per-vector is 1, (3) PassThrough element-wise op.
         if constexpr(NumDTensor == 0 && CDEShuffleBlockTransferScalarPerVector_NPerBlock == 1 &&
                      is_same_v<CDEElementwiseOperation,
                                tensor_operation::element_wise::PassThrough>)
