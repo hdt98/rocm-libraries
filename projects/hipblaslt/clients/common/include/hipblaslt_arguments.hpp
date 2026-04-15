@@ -184,6 +184,12 @@ struct Arguments
 
     bool flush;
     int  tensile_solution_selection_method;
+    bool multi_macrotile;
+
+    // Multi-MacroTile options
+    int32_t split_strategy;      // 0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d
+    int32_t num_splits;           // Manual override for number of splits (0=auto)
+    int32_t target_wgs_per_split; // Target workgroups per split for optimization
 
     /*************************************************************************
      *                     End Of Arguments                                  *
@@ -282,7 +288,11 @@ struct Arguments
     OPER(print_solution_found) SEP   \
     OPER(print_kernel_info) SEP      \
     OPER(flush) SEP                  \
-    OPER(tensile_solution_selection_method) SEP
+    OPER(tensile_solution_selection_method) SEP \
+    OPER(multi_macrotile) SEP        \
+    OPER(split_strategy) SEP         \
+    OPER(num_splits) SEP             \
+    OPER(target_wgs_per_split) SEP
 
     // clang-format on
 

@@ -39,6 +39,7 @@
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
 #include "mxDataGen.hpp"
+#include "multi_macrotile.hpp"
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -1395,6 +1396,26 @@ void testing_matmul(const Arguments& arg)
     hipblasltSetRotatingBufferSizeValue(arg.rotating);
     hipblasltSetColdIterationsValue(arg.cold_iters);
     hipblasltSetHotIterationsValue(arg.iters);
+
+    // Multi-MacroTile validation
+    if(arg.multi_macrotile)
+    {
+        if(arg.timing)
+        {
+            hipblaslt_cerr << "WARNING: multi_macrotile is currently only supported in verification mode (without --timing). "
+                          << "Performance benchmarking with multi_macrotile will be added in the future." << std::endl;
+        }
+        if(arg.grouped_gemm > 0)
+        {
+            hipblaslt_cerr << "ERROR: multi_macrotile is not supported with grouped_gemm." << std::endl;
+            return;
+        }
+        if(arg.api_method != 0) // 0 = C API
+        {
+            hipblaslt_cerr << "ERROR: multi_macrotile currently only works with C API (api_method c), not with extension API." << std::endl;
+            return;
+        }
+    }
 
     // integer_exact: skip gfx11 only for 16-bit A (fp16/bf16)—GPU vs CPU exact match unreliable there;
     // f32/f64 (and TF32x1 f32 path) still run on Navi.
@@ -3923,23 +3944,154 @@ void testing_matmul_with_bias(const Arguments& arg,
                 else
                 {
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
-                                                          matmul[0][0],
-                                                          alpha_in[0],
-                                                          dA[0].buf(),
-                                                          matA[0],
-                                                          dB[0].buf(),
-                                                          matB[0],
-                                                          &(h_beta[0]),
-                                                          dC[0].buf(),
-                                                          matC[0],
-                                                          (*dDp)[0].buf(),
-                                                          matD[0],
-                                                          &heuristicResult[sol].algo,
-                                                          *dWorkspace,
-                                                          workspace_size,
-                                                          stream),
-                                          HIPBLAS_STATUS_SUCCESS);
+
+                    // Multi-MacroTile support: split problem into sub-problems
+                    if(arg.multi_macrotile && gemm_count == 1)
+                    {
+                        // Get device properties for CU count
+                        hipDeviceProp_t deviceProps;
+                        CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));
+                        int num_CUs = deviceProps.multiProcessorCount;
+
+                        // Estimate MacroTile size from algorithm (if available)
+                        // TODO: Extract actual MT size from heuristicResult[sol].algo
+                        // For now, use common defaults
+                        int estimated_mt_m = 128;
+                        int estimated_mt_n = 128;
+
+                        // Split the problem with intelligent strategy
+                        auto subProblems = splitGemmProblem(
+                            M[0], N[0], K[0],
+                            lda[0], ldb[0], ldc[0], ldd[0], lde[0],
+                            transA, transB,
+                            arg.a_type, arg.b_type, arg.c_type,
+                            arg.d_type, arg.aux_type, arg.bias_type,
+                            arg.split_strategy,
+                            arg.num_splits,
+                            arg.target_wgs_per_split,
+                            estimated_mt_m,
+                            estimated_mt_n,
+                            num_CUs,
+                            arg.user_allocated_workspace,  // Available memory
+                            workspace_size);                // Workspace needed
+
+                        // Print splitting information
+                        const char* strategy_names[] = {"Auto", "Workgroup", "Memory", "M-only", "N-only", "2D"};
+                        hipblaslt_cout << "Multi-MacroTile: Using "
+                                      << strategy_names[std::min(arg.split_strategy, 5)]
+                                      << " strategy" << std::endl;
+                        hipblaslt_cout << "  Problem: " << M[0] << "x" << N[0] << "x" << K[0]
+                                      << ", CUs: " << num_CUs
+                                      << ", Target WGs/split: " << arg.target_wgs_per_split
+                                      << std::endl;
+                        hipblaslt_cout << "  Splitting into " << subProblems.size()
+                                      << " sub-problems:" << std::endl;
+
+                        // Extract kernel info once (same for all sub-problems)
+                        std::string solutionName = "";
+                        std::string kernelName = "";
+                        if(arg.print_kernel_info)
+                        {
+                            solutionName = hipblaslt_ext::getSolutionNameFromAlgo(
+                                handle, heuristicResult[sol].algo);
+                            kernelName = hipblaslt_ext::getKernelNameFromAlgo(
+                                handle, heuristicResult[sol].algo);
+                        }
+
+                        for(size_t sp = 0; sp < subProblems.size(); sp++)
+                        {
+                            const auto& sub = subProblems[sp];
+
+                            hipblaslt_cout << "  [" << sp << "] " << sub.m_size << "x" << sub.n_size
+                                          << "x" << sub.k_size
+                                          << " @ (" << sub.m_offset << "," << sub.n_offset << ")"
+                                          << " | Est.WGs: " << sub.expected_workgroups;
+
+                            if(arg.print_kernel_info)
+                            {
+                                hipblaslt_cout << std::endl
+                                              << "      Solution: " << solutionName << std::endl
+                                              << "      Kernel: " << kernelName;
+                            }
+
+                            hipblaslt_cout << std::endl;
+
+                            // Create matrix layout descriptors for this sub-problem
+                            hipblasLtMatrixLayout_t matA_sub, matB_sub, matC_sub, matD_sub;
+
+                            // Matrix A dimensions depend on transpose and which dimension is split
+                            int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                            int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(
+                                &matA_sub, arg.a_type, matA_rows, matA_cols, lda[0]));
+
+                            // Matrix B dimensions depend on transpose and which dimension is split
+                            int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                            int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(
+                                &matB_sub, arg.b_type, matB_rows, matB_cols, ldb[0]));
+
+                            // Matrix C: always sub.m_size x sub.n_size
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(
+                                &matC_sub, arg.c_type, sub.m_size, sub.n_size, ldc[0]));
+
+                            // Matrix D: always sub.m_size x sub.n_size
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutCreate(
+                                &matD_sub, arg.d_type, sub.m_size, sub.n_size, ldd[0]));
+
+                            // Calculate pointers with offsets
+                            void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                            void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                            void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                            void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                            // Execute sub-problem
+                            EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
+                                                                  matmul[0][0],
+                                                                  alpha_in[0],
+                                                                  A_ptr,
+                                                                  matA_sub,
+                                                                  B_ptr,
+                                                                  matB_sub,
+                                                                  &(h_beta[0]),
+                                                                  C_ptr,
+                                                                  matC_sub,
+                                                                  D_ptr,
+                                                                  matD_sub,
+                                                                  &heuristicResult[sol].algo,
+                                                                  *dWorkspace,
+                                                                  workspace_size,
+                                                                  stream),
+                                                  HIPBLAS_STATUS_SUCCESS);
+
+                            // Clean up sub-problem descriptors
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matA_sub));
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matB_sub));
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matC_sub));
+                            CHECK_HIPBLASLT_ERROR(hipblasLtMatrixLayoutDestroy(matD_sub));
+                        }
+                    }
+                    else
+                    {
+                        // Original single-kernel execution
+                        EXPECT_HIPBLAS_STATUS(hipblasLtMatmul(handle,
+                                                              matmul[0][0],
+                                                              alpha_in[0],
+                                                              dA[0].buf(),
+                                                              matA[0],
+                                                              dB[0].buf(),
+                                                              matB[0],
+                                                              &(h_beta[0]),
+                                                              dC[0].buf(),
+                                                              matC[0],
+                                                              (*dDp)[0].buf(),
+                                                              matD[0],
+                                                              &heuristicResult[sol].algo,
+                                                              *dWorkspace,
+                                                              workspace_size,
+                                                              stream),
+                                              HIPBLAS_STATUS_SUCCESS);
+                    }
                 }
             }
             else

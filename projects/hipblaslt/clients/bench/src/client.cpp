@@ -617,6 +617,22 @@ try
         value<bool>(&arg.dump_matrix)->default_value(false),
         "Dump input and output matrices to a file.")
 
+        ("multi_macrotile",
+        value<bool>(&arg.multi_macrotile)->default_value(false),
+        "Split the GEMM matrix and solve with multiple kernels using different MacroTiles")
+
+        ("split_strategy",
+        value<int32_t>(&arg.split_strategy)->default_value(0),
+        "Splitting strategy: 0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d")
+
+        ("num_splits",
+        value<int32_t>(&arg.num_splits)->default_value(0),
+        "Number of splits (0=auto, 2-16=manual). Only used with --multi_macrotile")
+
+        ("target_wgs_per_split",
+        value<int32_t>(&arg.target_wgs_per_split)->default_value(256),
+        "Target workgroups per split for alignment optimization")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");
