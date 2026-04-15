@@ -6,6 +6,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Added
 
+* Add linear solver routine SYTRS and routine SYTRS2 for use with symmetric factorization SYTRF
 * Support added for the gfx1150, gfx1152, and gfx1153 architectures
 * Computation of different matrix norms
     * LANGE
