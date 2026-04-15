@@ -17,38 +17,57 @@ enum StreamKReductionStrategy : uint32_t
 /**
  * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset
  * is the starting macro tile index in the K dimension for the workgroup.
- * @return A tuple containing the offsets into the A and B tensors accounting for the
+ * @return A tuple of arrays containing the offsets into the A and B tensors accounting for the
  * layouts of A and B.
  * @note The default case is that A is assumed to be row major and B is assumed to be column
  * major.
  */
-template <typename ALayout, typename BLayout, index_t KPerBlock>
-CK_TILE_DEVICE static tuple<index_t, index_t>
-GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+template <typename AsLayout,
+          typename BsLayout,
+          index_t KPerBlock,
+          index_t NumATensor,
+          index_t NumBTensor>
+CK_TILE_DEVICE static tuple<std::array<index_t, NumATensor>, std::array<index_t, NumBTensor>>
+GetKOffsets(index_t iter_offset,
+            const std::array<index_t, NumATensor>& stride_as,
+            const std::array<index_t, NumBTensor>& stride_bs)
 {
-    index_t stride_offset_a;
-    index_t stride_offset_b;
-    if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
-    {
-        stride_offset_a = stride_a;
-    }
-    else
-    {
-        stride_offset_a = 1;
-    }
 
-    if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
-    {
-        stride_offset_b = stride_b;
-    }
-    else
-    {
-        stride_offset_b = 1;
-    }
+    std::array<index_t, NumATensor> a_k_offsets;
+    std::array<index_t, NumBTensor> b_k_offsets;
 
     index_t base_offset = iter_offset * KPerBlock;
 
-    return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
+    static_for<0, NumATensor, 1>{}([&](auto i) {
+        using AiLayout = std::tuple_element_t<i.value, AsLayout>;
+        index_t stride_offset_a;
+        if constexpr(std::is_same_v<AiLayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
+        {
+            stride_offset_a = stride_as[i];
+        }
+        else
+        {
+            stride_offset_a = 1;
+        }
+        a_k_offsets[i] = base_offset * stride_offset_a;
+    });
+
+    static_for<0, NumBTensor, 1>{}([&](auto i) {
+        using BiLayout = std::tuple_element_t<i.value, BsLayout>;
+        index_t stride_offset_b;
+        if constexpr(std::is_same_v<BiLayout, ck_tile::tensor_layout::gemm::RowMajor>)
+        {
+            stride_offset_b = stride_bs[i];
+        }
+        else
+        {
+            stride_offset_b = 1;
+        }
+
+        b_k_offsets[i] = base_offset * stride_offset_b;
+    });
+
+    return ck_tile::make_tuple(a_k_offsets, b_k_offsets);
 }
 
 CK_TILE_HOST static int NumCU()

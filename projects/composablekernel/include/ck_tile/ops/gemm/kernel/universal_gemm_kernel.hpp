@@ -281,23 +281,23 @@ struct UniversalGemmKernel
 
     static_assert(!GemmPipeline::BlockGemmShape::PermuteA, "Not implemented!");
 
-    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<>
+    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>
     {
         StreamKKernelArgs(
             const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
             index_t max_active_wgs)
-            : UniversalGemmKernelArgs{host_args.as_ptr,
-                                      host_args.bs_ptr,
-                                      host_args.ds_ptr,
-                                      host_args.e_ptr,
-                                      host_args.M,
-                                      host_args.N,
-                                      host_args.K,
-                                      host_args.stride_As,
-                                      host_args.stride_Bs,
-                                      host_args.stride_Ds,
-                                      host_args.stride_E,
-                                      host_args.k_batch},
+            : UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>{host_args.as_ptr,
+                                                                          host_args.bs_ptr,
+                                                                          host_args.ds_ptr,
+                                                                          host_args.e_ptr,
+                                                                          host_args.M,
+                                                                          host_args.N,
+                                                                          host_args.K,
+                                                                          host_args.stride_As,
+                                                                          host_args.stride_Bs,
+                                                                          host_args.stride_Ds,
+                                                                          host_args.stride_E,
+                                                                          host_args.k_batch},
               // The workspace pointer is set to nullptr because we must first
               // instantiate the TilePartitioner to get the necessary size
               workspace_ptr{nullptr},
@@ -1324,20 +1324,32 @@ struct UniversalGemmKernel
             index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
 
             // Get the K offsets for the A and B tensors
-            auto [i_k_a, i_k_b] = GetKOffsets<AsLayout, BsLayout>(
-                local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
+            auto [i_k_as, i_k_bs] =
+                GetKOffsets<AsLayout, BsLayout>(local_iter_start, kargs.stride_As, kargs.stride_Bs);
+
+            const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
+            const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
+            const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+            std::array<const ADataType*, NumATensor> as_ptr;
+            static_for<0, NumATensor, 1>{}([&](auto i) {
+                as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) + i_k_as[i];
+            });
+
+            std::array<const BDataType*, NumBTensor> bs_ptr;
+            static_for<0, NumBTensor, 1>{}([&](auto i) {
+                bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]) + i_k_bs[i];
+            });
+
+            EDataType* e_ptr = static_cast<EDataType*>(kargs.e_ptr);
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
             {
-                const auto c_macro_tile_idx =
-                    kargs.tile_partitioner.get_output_tile_index(tile_idx);
-                const index_t i_m = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
-                const index_t i_n = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
 
-                RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a},
-                        {static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b},
-                        {/*ds_ptr*/},
-                        static_cast<EDataType*>(kargs.e_ptr),
+                RunGemm(as_ptr,
+                        bs_ptr,
+                        kargs.ds_ptr,
+                        e_ptr,
                         smem_ptr_0,
                         kargs,
                         num_loop_sk,
@@ -1348,34 +1360,19 @@ struct UniversalGemmKernel
             else if(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Linear ||
                     TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Tree)
             {
-                const auto c_macro_tile_idx =
-                    kargs.tile_partitioner.get_output_tile_index(tile_idx);
-                index_t i_m = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
-                index_t i_n = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
-
-                const ADataType* a_ptr = static_cast<const ADataType*>(kargs.as_ptr[0]) + i_k_a;
-                const BDataType* b_ptr = static_cast<const BDataType*>(kargs.bs_ptr[0]) + i_k_b;
-                EDataType* c_ptr       = static_cast<EDataType*>(kargs.e_ptr);
 
                 // Create block windows using specialized methods
-                const auto& as_block_window = MakeABlockWindows({a_ptr}, kargs, k_size, i_m);
-                const auto& bs_block_window = MakeBBlockWindows({b_ptr}, kargs, k_size, i_n);
-                const auto& ds_block_window = MakeDBlockWindows({/*ds_ptr*/}, kargs, i_m, i_n);
-
-                // Since num_loop can vary per WG and per iteration of the Stream-K while loop,
-                // we compute has_hot_loop and tail_num here. This is a similar pattern used by
-                // grouped GEMM. In this case, we call the GemmPipeline's operator() function
-                // that takes both has_hot_loop and tail_num.
-                const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
-                const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
+                const auto& as_block_window = MakeABlockWindows(as_ptr, kargs, k_size, i_m);
+                const auto& bs_block_window = MakeBBlockWindows(bs_ptr, kargs, k_size, i_n);
+                const auto& ds_block_window = MakeDBlockWindows(kargs.ds_ptr, kargs, i_m, i_n);
 
                 // Run GEMM cooperatively by whole workgroup.
-                const auto& c_block_tile = GemmPipeline{}(as_block_window[I0],
-                                                          bs_block_window[I0],
-                                                          num_loop_sk,
-                                                          has_hot_loop,
-                                                          tail_num,
-                                                          smem_ptr_0);
+                const auto& c_block_tile = GemmPipeline{}.template operator()(as_block_window,
+                                                                              AElementWise{},
+                                                                              bs_block_window,
+                                                                              BElementWise{},
+                                                                              num_loop_sk,
+                                                                              smem_ptr_0);
 
                 auto tile_started = iter_start == tile_iter_start;
                 auto tile_ended   = iter_end >= tile_iter_end;
@@ -1416,7 +1413,7 @@ struct UniversalGemmKernel
                         }
 
                         auto c_block_window = MakeCBlockWindows<TilePartitioner::MemoryOperation>(
-                            c_ptr, kargs, i_m, i_n);
+                            e_ptr, kargs, i_m, i_n);
                         EpiloguePipeline{}(
                             c_block_window, accum_block_tile, ds_block_window, smem_ptr_0);
                     }
@@ -1444,7 +1441,7 @@ struct UniversalGemmKernel
                         {
                             auto c_block_window =
                                 MakeCBlockWindows<TilePartitioner::MemoryOperation>(
-                                    c_ptr, kargs, i_m, i_n);
+                                    e_ptr, kargs, i_m, i_n);
                             EpiloguePipeline{}(
                                 c_block_window, accum_block_tile, ds_block_window, smem_ptr_0);
                             break;
@@ -1552,17 +1549,27 @@ struct UniversalGemmKernel
         index_t dp_ctas     = kargs.tile_partitioner.get_dp_ctas();
         bool is_dp_ctas     = block_idx < kargs.tile_partitioner.get_dp_ctas();
 
-        // Check if at the data parallel section
+        // Check if has the data parallel section
         if(is_dp_ctas)
         {
             const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(block_idx);
             const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
             const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
 
-            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
-                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
-                    {/*ds_ptr*/},
-                    static_cast<EDataType*>(kargs.e_ptr),
+            std::array<const ADataType*, NumATensor> as_ptr;
+            static_for<0, NumATensor, 1>{}(
+                [&](auto i) { as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]); });
+
+            std::array<const BDataType*, NumBTensor> bs_ptr;
+            static_for<0, NumBTensor, 1>{}(
+                [&](auto i) { bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]); });
+
+            EDataType* e_ptr = static_cast<EDataType*>(kargs.e_ptr);
+
+            RunGemm(as_ptr,
+                    bs_ptr,
+                    kargs.ds_ptr,
+                    e_ptr,
                     smem_ptr_0,
                     kargs,
                     dp_num_loop,
@@ -1702,10 +1709,20 @@ struct UniversalGemmKernel
             const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
             const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
 
-            RunGemm({static_cast<const ADataType*>(kargs.as_ptr[0])},
-                    {static_cast<const BDataType*>(kargs.bs_ptr[0])},
-                    {/*ds_ptr*/},
-                    static_cast<EDataType*>(kargs.e_ptr),
+            std::array<const ADataType*, NumATensor> as_ptr;
+            static_for<0, NumATensor, 1>{}(
+                [&](auto i) { as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]); });
+
+            std::array<const BDataType*, NumBTensor> bs_ptr;
+            static_for<0, NumBTensor, 1>{}(
+                [&](auto i) { bs_ptr[i] = static_cast<const BDataType*>(kargs.bs_ptr[i]); });
+
+            EDataType* e_ptr = static_cast<EDataType*>(kargs.e_ptr);
+
+            RunGemm(as_ptr,
+                    bs_ptr,
+                    kargs.ds_ptr,
+                    e_ptr,
                     smem_ptr_0,
                     kargs,
                     dp_num_loop,
