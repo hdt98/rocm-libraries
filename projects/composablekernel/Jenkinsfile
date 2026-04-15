@@ -1196,9 +1196,10 @@ def run_pytorch_tests(Map conf=[:]){
                 """
                 sh "rm -rf /tmp/pytorch/build"
                 sh "python3 /tmp/pytorch/tools/amd_build/build_amd.py"
+                // TODO: Enable USE_ROCM_CK_SDPA once aiter's mha_bwd.cu is updated for CK fmha_bwd_traits
                 sh """cd /tmp/pytorch && \
                     CMAKE_CXX_STANDARD=20 \
-                    USE_ROCM_CK_SDPA=1 \
+                    USE_ROCM_CK_SDPA=0 \
                     USE_ROCM_CK_GEMM=1 \
                     USE_DISTRIBUTED=0 \
                     USE_NNPACK=0 \

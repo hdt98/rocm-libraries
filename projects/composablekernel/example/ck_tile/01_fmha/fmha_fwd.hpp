@@ -1827,8 +1827,8 @@ struct fmha_fwd_traits
           bias_type(bias_type_),
           has_lse(has_lse_),
           has_dropout(has_dropout_),
-          qscale_type(do_fp8_static_quant_ ? quant_scale_enum::static_quant
-                                           : quant_scale_enum::no_quant),
+          qscale_type(do_fp8_static_quant_ ? quant_scale_enum::pertensor
+                                           : quant_scale_enum::no_scale),
           skip_min_seqlen_q(skip_min_seqlen_q_),
           has_sink(false)
     {
