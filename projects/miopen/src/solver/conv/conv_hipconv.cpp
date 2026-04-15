@@ -4,6 +4,8 @@
 #include <miopen/env.hpp>
 #include <miopen/generic_search.hpp>
 #include <miopen/handle.hpp>
+
+#include <algorithm>
 #include <miopen/hipoc_kernel.hpp>
 #include <miopen/stringutils.hpp>
 #include <miopen/solver/problem_description_interpreter.hpp>
@@ -169,13 +171,10 @@ bool PerformanceConfigConvHipConv::IsValid(const ExecutionContext& ctx,
     const auto par  = ToHipconvParams(problem);
     const auto cfgs = hipconv::get_valid_configs(*arch_opt, par);
     const auto kcfg = ToKernelConfig(*this);
-    for(const auto& c : cfgs)
-    {
-        if(c.algorithm == kcfg.algorithm && c.kernel_variant == kcfg.kernel_variant &&
-           c.config_idx == kcfg.config_idx)
-            return true;
-    }
-    return false;
+    return std::ranges::any_of(cfgs, [&](const auto& c) {
+        return c.algorithm == kcfg.algorithm && c.kernel_variant == kcfg.kernel_variant &&
+               c.config_idx == kcfg.config_idx;
+    });
 }
 
 bool PerformanceConfigConvHipConv::operator==(const PerformanceConfigConvHipConv& other) const
