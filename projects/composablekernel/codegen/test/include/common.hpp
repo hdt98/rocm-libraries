@@ -40,7 +40,7 @@ inline std::vector<rtc::src_file> create_tile_headers_for_test()
     std::vector<rtc::src_file> result;
     std::transform(headers.begin(), headers.end(), std::back_inserter(result), [](auto& p) {
         // Legacy workaround: hipRTC requires a whitespace before the content (reason unknown)
-        return rtc::src_file{p.first, std::move(" " + std::move(p.second))};
+        return rtc::src_file{p.first, " " + std::move(p.second)};
     });
     return result;
 }

@@ -181,7 +181,7 @@ GetPipelinesGfx9(std::size_t bucket_hdim, std::size_t bucket_hdim_v, bool has_bi
     return configs;
 }
 
-// TODO WIP - Currently not used, additinal configs will be added later
+// TODO WIP - Currently not used, additional configs will be added later
 static std::vector<PipelineConfig>
 GetPipelinesGfx950(std::size_t bucket_hdim, std::size_t bucket_hdim_v, bool has_bias)
 {
