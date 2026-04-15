@@ -2126,7 +2126,7 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
                             }
                         }
                         // there can only be 2 block sizes: ns[0] and ns[0]+1
-                        std::array<std::vector<rocblas_int>, 2> uniform_batch;
+                        std::array<std::vector<I>, 2> uniform_batch;
                         uniform_batch[0].reserve(n_merges);
                         uniform_batch[1].reserve(n_merges);
                         for(I i = 0, ps = 0; i < n_merges; ps += ns[i++])
