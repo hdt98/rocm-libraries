@@ -1173,7 +1173,7 @@ class KernelComponentFactoryGfx950(
                 ["no", "pertensor"],
                 ["no", "causal"],
             ):
-                pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f", F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
+                pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f", F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="none"))  # fmt: skip
 
         elif dtype in cls._DT_MXFP8 or dtype in cls._DT_MXFP4:
             # no need dropout kernels
@@ -1412,7 +1412,7 @@ def get_product(receipt: int) -> Product:
             cond &= kernel_ctx.pipeline.F_bias in ["no", "alibi"]
             cond &= kernel_ctx.pipeline.F_qscale == "no"
             cond &= kernel_ctx.pipeline.F_skip == "f"
-            cond &= kernel_ctx.pipeline.F_sink == "f"
+            cond &= kernel_ctx.pipeline.F_sink == "none"
             # FlashAttention direct fwd wrappers always use softcap disabled and LSE enabled.
             cond &= kernel_ctx.pipeline.F_logits == "f"
             cond &= kernel_ctx.pipeline.F_lse == "t"
