@@ -1066,14 +1066,6 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                         # TODO: rocm 6.2 compiler problem if using qr_async for bias case
                         pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                         pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
-                    elif mask not in ("s_no", "no") and (
-                        (bias == "no" and dropout == "t")
-                        or (bias == "alibi" and dropout == "f")
-                    ):
-                        # TODO: compiler problem with qr_async for IsMasking=true +
-                        # (no_bias+dropout) or (alibi+ndropout) combinations
-                        pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
-                        pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     else:
                         pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "f", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                         pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
