@@ -6,7 +6,7 @@ A hipDNN plugin that provides GPU kernel implementations using HIP and HIPRTC fo
 
 ## Overview
 
-The HIP Kernel Provider is a hipDNN plugin that implements operations using custom HIP kernels compiled at runtime via HIPRTC.
+The HIP Kernel Provider is a hipDNN plugin that implements operations using custom HIP kernels compiled at runtime via HIPRTC
 
 ## Architecture
 
