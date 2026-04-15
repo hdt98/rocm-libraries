@@ -20,12 +20,13 @@ set_directory_properties(PROPERTIES CMAKE_CONFIGURE_DEPENDS "${CODE_GEN_SCRIPTS}
 
 list(JOIN INST_TARGETS , SAGEATTN_TARGETS_ARG)
 
-# Only generate FWD API, only common head dimensions (64, 128)
+# Only generate FWD API, only supported head dimension (128)
+# Note: Only d=128, d_v=128 has kernel tile definitions in sageattn_fwd.py
 set(SAGEATTN_FWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
   --targets ${SAGEATTN_TARGETS_ARG}
   --api sageattn_fwd
-  --optdim 64,128
+  --optdim 128
 )
 
 # Generate list of kernels to build

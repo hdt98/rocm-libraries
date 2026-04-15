@@ -283,6 +283,7 @@ struct SageAttnFwdKernel
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
         {
             using PipelineProblem = typename SageAttnPipeline::Problem;
+
             if(block_scale_size_q != PipelineProblem::kBlockScaleSizeQ ||
                block_scale_size_k != PipelineProblem::kBlockScaleSizeK)
             {
@@ -398,6 +399,7 @@ struct SageAttnFwdKernel
                      QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
         {
             using PipelineProblem = typename SageAttnPipeline::Problem;
+
             if(block_scale_size_q != PipelineProblem::kBlockScaleSizeQ ||
                block_scale_size_k != PipelineProblem::kBlockScaleSizeK)
             {

@@ -486,11 +486,22 @@ struct BlockSageAttentionPipelineQRKSVS
                 static_assert(Problem::kBlockScaleSizeK == 16,
                               "PERTHREAD: kBlockScaleSizeK must be 16");
 
+                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB + TransposedC
+                // This ensures the distribution has 16 consecutive K elements per thread
+                using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
+                constexpr auto WarpGemmCfg = BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                using WarpGemm0Type = remove_cvref_t<decltype(WarpGemmCfg.template at<0>())>;
+                using ExpectedWarpGemmI8 = WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
+                using ExpectedWarpGemmFp8 = WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
+                static_assert(std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
+                              std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
+                              "PERTHREAD requires WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for 16 consecutive K elements");
+
+                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 float combined_scales_reg[kNumKScalesPT] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_reg[i];
-                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
                     index_t col_offset = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
@@ -509,11 +520,22 @@ struct BlockSageAttentionPipelineQRKSVS
                 // Distribution: thread_i and thread_(i+32) interleave to cover K dimension
                 // In each thread's view, every 32 idx1 steps correspond to 64 global K elements
 
+                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB + TransposedC
+                // This ensures each thread has 16 consecutive elements, and warp-level grouping is correct
+                using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
+                constexpr auto WarpGemmCfg = BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                using WarpGemm0Type = remove_cvref_t<decltype(WarpGemmCfg.template at<0>())>;
+                using ExpectedWarpGemmI8 = WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
+                using ExpectedWarpGemmFp8 = WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
+                static_assert(std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
+                              std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
+                              "PERWARP requires WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for correct K element grouping");
+
+                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 float combined_scales_reg[kNumKScalesPW] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPW; i++)
                     combined_scales_reg[i] = q_descale_value * k_scales_perwarp[i];
-                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
                 sweep_tile_span(s_acc_spans[number<0>{}], [&](auto idx0) {
                     index_t col_offset = 0;
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
@@ -715,6 +737,9 @@ struct BlockSageAttentionPipelineQRKSVS
                      Problem::QScaleEnum == ck_tile::BlockSageAttentionQuantScaleEnum::PERWARP ||
                      Problem::QScaleEnum == ck_tile::BlockSageAttentionQuantScaleEnum::PERTHREAD)
         {
+            // Ensure all V LDS reads from the last gemm_1 complete before reusing K/V LDS space
+            block_sync_lds();
+
             // V is col-major, each column (channel) has its own scale
             // o_acc shape: [M0, N1] where N1 is hdim_v
             // v_descale_ptr points to per-channel scales [hdim_v]

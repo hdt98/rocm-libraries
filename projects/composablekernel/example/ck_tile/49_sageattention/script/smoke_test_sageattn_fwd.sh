@@ -55,18 +55,18 @@ run_fp8bf16_smoke() {
     for qscale in 2 3; do
         for perm in 0 1; do
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
-                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=2 -h_k=1 -d=16 -d_v=64 -s=55 -s_k=256 \
+                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=2 -h_k=1 -d=128 -d_v=128 -s=55 -s_k=256 \
                 -mask=1
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
                 -kname=$KNAME $COMMON_ARGS -mode=0 -b=1 -h=3 -d=128 -s=100 -s_k=51 -mask=0
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
-                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=1 -d=16 -d_v=128 -s=99 -s_k=256 \
+                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=1 -d=128 -d_v=128 -s=99 -s_k=256 \
                 -mask=1
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
                 -kname=$KNAME $COMMON_ARGS -mode=0 -b=1 -h=2 -h_k=1 -d=128 -s=1024 -s_k=256 \
                 -mask=2
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
-                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=1 -d=128 -d_v=32 -s=3 -s_k=99 -mask=2
+                -kname=$KNAME $COMMON_ARGS -mode=0 -b=2 -h=1 -d=128 -d_v=128 -s=3 -s_k=99 -mask=2
             run_exe -prec=fp8bf16 -init=3 -qscale=$qscale -iperm=$perm -operm=$perm -vlayout=r \
                 -kname=$KNAME $COMMON_ARGS -mode=0 -b=3 -h=2 -h_k=1 -d=128 -s=200 -s_k=520 \
                 -mask=t:128,30
@@ -98,10 +98,10 @@ run_fp8bf16_extras() {
 # Group mode + physical padding (same intent as FMHA run_padding_smoke_tests, Sage-only flags).
 run_group_and_padding_smoke() {
     run_exe -prec=fp8bf16 -init=3 -qscale=3 -iperm=0 -operm=0 -vlayout=r -kname=$KNAME \
-        $COMMON_ARGS -mode=1 -b=3 -h=2 -h_k=1 -d=64 -s=50,60,40 -s_k=128,256,192 -mask=1
+        $COMMON_ARGS -mode=1 -b=3 -h=2 -h_k=1 -d=128 -s=50,60,40 -s_k=128,256,192 -mask=1
     # group + PERTHREAD: block_scale_seqstart_* must be allocated (same as bs/pw)
     run_exe -prec=fp8bf16 -init=3 -qscale=4 -iperm=0 -operm=0 -vlayout=r -kname=$KNAME \
-        $COMMON_ARGS -mode=1 -b=3 -h=2 -h_k=1 -d=64 -s=50,60,40 -s_k=128,256,192 -mask=1
+        $COMMON_ARGS -mode=1 -b=3 -h=2 -h_k=1 -d=128 -s=50,60,40 -s_k=128,256,192 -mask=1
     run_exe -prec=fp8bf16 -init=3 -qscale=3 -iperm=0 -operm=0 -vlayout=r -kname=$KNAME \
         $COMMON_ARGS -mode=1 -b=4 -h=8 -h_k=8 -d=128 -s=1024,768,512,256 -s_k=1024,768,512,256 \
         -mask=0 -s_qpad=1152,896,576,320 -s_kpad=1152,896,576,320
@@ -115,7 +115,7 @@ run_bf16_pipeline_smoke() {
     run_exe -prec=bf16 -init=1 -qscale=n -iperm=0 -operm=0 -vlayout=r -kname=$KNAME \
         $COMMON_ARGS -mode=0 -b=2 -h=2 -d=128 -s=128 -s_k=128 -mask=1
     run_exe -prec=bf16 -init=1 -qscale=n -iperm=1 -operm=1 -vlayout=r -kname=$KNAME \
-        $COMMON_ARGS -mode=0 -b=1 -h=4 -h_k=1 -d=64 -s=256 -s_k=128 -mask=t:32,32
+        $COMMON_ARGS -mode=0 -b=1 -h=4 -h_k=1 -d=128 -s=256 -s_k=128 -mask=t:32,32
 }
 
 # int8 / int4 × fp8×bf16 (hdim divisible by 8 for int4)

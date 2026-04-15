@@ -331,7 +331,12 @@ class SageAttnFwdApiTrait:
             if self.dvpad == "t":
                 return f"true /*a.hdim_v % {bk0submax} != 0*/"  # TODO: order of get_pipelines() matters! (ugly)
             else:
-                return f"a.hdim_v % {bk0submax} == 0"
+                # F_dvpad="f": Causal mask requires hdim_v <= kN1 (num_tile_n1 == 1 for tile reversal)
+                #              Non-causal requires hdim_v % kN1 == 0 (epilogue writes full tiles)
+                if self.mask == "causal":
+                    return f"(a.hdim_v % {bk0submax} == 0) && (a.hdim_v <= {self.bn1})"
+                else:
+                    return f"(a.hdim_v % {bk0submax} == 0) && (a.hdim_v % {self.bn1} == 0)"
         else:
             assert False
 
@@ -722,7 +727,8 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         "gfx9", preprocessor_check="defined(__gfx9__) && !defined(__gfx950__)"
     )
 
-    _DT_FP16_BF16 = ("fp16", "bf16")
+    # Note: fp16 is not supported by SageAttention (only bf16 + fp8/int quantization)
+    _DT_BF16 = ("bf16",)
     _DT_FP8BF16 = ("fp8bf16",)
     _DT_I8FP8BF16 = ("i8fp8bf16",)
     _DT_I4FP8BF16 = ("i4fp8bf16",)
@@ -730,7 +736,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     @classmethod
     def supported_dtypes(cls) -> Tuple[str]:
         return (
-            cls._DT_FP16_BF16
+            cls._DT_BF16
             + cls._DT_FP8BF16
             + cls._DT_I8FP8BF16
             + cls._DT_I4FP8BF16
@@ -740,7 +746,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
     # this is current supported tile size per hdim
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
-        if dtype in cls._DT_FP16_BF16:
+        if dtype in cls._DT_BF16:
             return {
                 (128, 128) : [SageAttnFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
             }  # fmt: skip
@@ -767,7 +773,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         # TODO: currently for qr pipeline, let "t" padding to appear later!!
         # TODO: how to design this more generic?
         pipelines = []
-        if dtype in cls._DT_FP16_BF16:
+        if dtype in cls._DT_BF16:
             qscale = "no"
             skip = "f"  # skip: only false
             for mask, vlayout in itertools.product(
@@ -834,7 +840,7 @@ class KernelComponentFactoryGfx950(
         # gfx950 has MaxLoadSizeInBytes=16 (dwordx4), causing KVector=16 for int8/fp8
         # NumIssues = MPerBlock or NPerBlock / (LaneGroups * NumWarps) = PerBlock / 128
         # To avoid NumIssues=0, we need MPerBlock >= 128 and NPerBlock >= 128
-        if dtype not in cls._DT_FP16_BF16:
+        if dtype not in cls._DT_BF16:
             for key in result:
                 result[key] = [tile for tile in result[key] if tile.F_bm0 >= 128 and tile.F_bn0 >= 128]
 
@@ -861,7 +867,7 @@ class CustomFactory(KernelComponentFactoryGfx9, CompatibilityRuleFactoryGfx9):
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
         result = KernelComponentFactoryGfx9.get_hdim_tile_size_dict(dtype)
-        if dtype in cls._DT_FP16_BF16:
+        if dtype in cls._DT_BF16:
             if (128, 128) in result.keys():
                 result[(128, 128)].insert(0, SageAttnFwdTileSize( 64, 128, 64, 128, 64,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("get_num_blocks(128) < num_cus * min_cu_util_rate")))  # fmt: skip
         return result
@@ -894,9 +900,11 @@ class Product:
 
 def get_product(receipt: int) -> Product:
     def fit(problem_ctx: ProblemContext, kernel_ctx: KernelContext) -> bool:
-        if problem_ctx.dtype in ["fp16", "bf16"]:
+        # bf16 (no quantization) should not have qscale
+        if problem_ctx.dtype == "bf16":
             if kernel_ctx.pipeline.F_qscale != "no":
                 return False
+
         return True
 
     return Product(name="All tiles", rule=fit)

@@ -48,6 +48,8 @@ auto get_elimit<SageAttentionFwdBf16>(std::string /*init_method*/)
 template <>
 auto get_elimit<SageAttentionFwdFp8Bf16>(std::string /*init_method*/)
 {
+    // atol=0.18: Q, K, V quantization (FP8 E4M3 ~0.0625/element) + 2 GEMM accumulations
+    // + softmax sensitivity. Empirically tuned; tightening below 0.15 causes false positives.
     double rtol = 1e-2;
     double atol = 1.8e-1;
     return ck_tile::make_tuple(rtol, atol);
@@ -56,6 +58,8 @@ auto get_elimit<SageAttentionFwdFp8Bf16>(std::string /*init_method*/)
 template <>
 auto get_elimit<SageAttentionFwdI8Fp8Bf16>(std::string /*init_method*/)
 {
+    // atol=0.18: K, V still FP8 (dominant error source). Matches FP8×FP8 despite
+    // lower Q quantization error (int8 ~0.0078 vs fp8 ~0.0625) to avoid test fragility.
     double rtol = 1e-2;
     double atol = 1.8e-1;
     return ck_tile::make_tuple(rtol, atol);
@@ -64,6 +68,8 @@ auto get_elimit<SageAttentionFwdI8Fp8Bf16>(std::string /*init_method*/)
 template <>
 auto get_elimit<SageAttentionFwdI4Fp8Bf16>(std::string /*init_method*/)
 {
+    // atol=0.19: +0.01 over FP8 due to coarse Q quantization (int4 ~0.125, only 16 levels).
+    // Attention pattern becomes "blocky"; softmax amplifies logit clustering.
     double rtol = 1e-2;
     double atol = 1.9e-1;
     return ck_tile::make_tuple(rtol, atol);
