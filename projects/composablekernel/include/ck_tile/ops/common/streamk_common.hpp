@@ -15,74 +15,74 @@ enum StreamKReductionStrategy : uint32_t
 };
 
 /**
-     * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset
-     * is the starting macro tile index in the K dimension for the workgroup.
-     * @return A tuple containing the offsets into the A and B tensors accounting for the
-     * layouts of A and B.
-     * @note The default case is that A is assumed to be row major and B is assumed to be column
-     * major.
-     */
-    template <typename ALayout, typename BLayout, index_t KPerBlock>
-    CK_TILE_DEVICE static tuple<index_t, index_t>
-    GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+ * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset
+ * is the starting macro tile index in the K dimension for the workgroup.
+ * @return A tuple containing the offsets into the A and B tensors accounting for the
+ * layouts of A and B.
+ * @note The default case is that A is assumed to be row major and B is assumed to be column
+ * major.
+ */
+template <typename ALayout, typename BLayout, index_t KPerBlock>
+CK_TILE_DEVICE static tuple<index_t, index_t>
+GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+{
+    index_t stride_offset_a;
+    index_t stride_offset_b;
+    if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
     {
-        index_t stride_offset_a;
-        index_t stride_offset_b;
-        if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
-        {
-            stride_offset_a = stride_a;
-        }
-        else
-        {
-            stride_offset_a = 1;
-        }
-
-        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
-        {
-            stride_offset_b = stride_b;
-        }
-        else
-        {
-            stride_offset_b = 1;
-        }
-
-        index_t base_offset = iter_offset * KPerBlock;
-
-        return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
+        stride_offset_a = stride_a;
     }
+    else
+    {
+        stride_offset_a = 1;
+    }
+
+    if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
+    {
+        stride_offset_b = stride_b;
+    }
+    else
+    {
+        stride_offset_b = 1;
+    }
+
+    index_t base_offset = iter_offset * KPerBlock;
+
+    return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
+}
 
 CK_TILE_HOST static int NumCU()
-    {
-        hipDeviceProp_t dev_prop;
-        hipDevice_t dev;
-        ck_tile::hip_check_error(hipGetDevice(&dev));
-        ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
-        int num_cu = dev_prop.multiProcessorCount;
+{
+    hipDeviceProp_t dev_prop;
+    hipDevice_t dev;
+    ck_tile::hip_check_error(hipGetDevice(&dev));
+    ck_tile::hip_check_error(hipGetDeviceProperties(&dev_prop, dev));
+    int num_cu = dev_prop.multiProcessorCount;
 
-        return num_cu;
-    }
+    return num_cu;
+}
 
-    /**
-     * @brief Computes the occupancy (i.e. maximum number of active blocks per CU) for the
-     * kernel
-     * @return The occupancy
-     * @note This function queries the maximum occupancy of the kernel using
-     * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
-     */
+/**
+ * @brief Computes the occupancy (i.e. maximum number of active blocks per CU) for the
+ * kernel
+ * @return The occupancy
+ * @note This function queries the maximum occupancy of the kernel using
+ * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
+ */
 template <typename Kernel, typename KernelArgs, index_t kBlockSize>
-    CK_TILE_HOST static int Occupancy()
-    {
-        int occupancy;
+CK_TILE_HOST static int Occupancy()
+{
+    int occupancy;
 
-        // Since occupancy of 1 is valid for stream k, we set min_num_block_per_cu to 1
-        constexpr int min_block_per_cu = 1;
-        const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
+    // Since occupancy of 1 is valid for stream k, we set min_num_block_per_cu to 1
+    constexpr int min_block_per_cu = 1;
+    const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
 
-        ck_tile::hip_check_error(
-            hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
+    ck_tile::hip_check_error(
+        hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));
 
-        return max(occupancy, 1);
-    }
+    return max(occupancy, 1);
+}
 
 /// @brief StreamK reduction helpers: partial store/load, flag signaling, and tile accumulation.
 ///        Shared by StreamK GEMM and StreamK conv bwd weight kernels.

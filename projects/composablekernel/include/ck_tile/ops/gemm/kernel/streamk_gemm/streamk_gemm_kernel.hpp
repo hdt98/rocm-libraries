@@ -204,9 +204,10 @@ struct StreamKKernel
      * select their own to assist with test reproducibility, etc.
      * @return The kernel arguments for Stream-K.
      */
-    CK_TILE_HOST static StreamKKernelArgs MakeKernelArgs(const StreamKHostArgs& host_args,
-                                                         int num_cu    = NumCU(),
-                                                         int occupancy = Occupancy<Kernel, KernelArgs, kBlockSize>())
+    CK_TILE_HOST static StreamKKernelArgs
+    MakeKernelArgs(const StreamKHostArgs& host_args,
+                   int num_cu    = NumCU(),
+                   int occupancy = Occupancy<Kernel, KernelArgs, kBlockSize>())
     {
         const index_t max_active_wgs = num_cu * occupancy;
 
