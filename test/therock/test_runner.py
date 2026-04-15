@@ -12,9 +12,14 @@ TEST_TYPE: Test category to run - one of "quick", "standard", "comprehensive", o
     Defaults to "quick". Invalid values fall back to "quick" with an error message.
 AMDGPU_FAMILIES: Parsed to extract GPU architecture (e.g., "gfx1151")
 
+Command-line arguments:
+--multigpu: Enable multi-GPU testing mode. Uses multi_gpu test category and 8 GPUs.
+    Requires at least 2 GPUs and exits gracefully if insufficient GPUs found.
+
 The script discovers GPU-specific labels via ctest --print-labels and runs the appropriate tests for the current GPU architecture.
 """
 
+import argparse
 import logging
 import os
 import re
@@ -23,12 +28,19 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="Generic test runner for ROCm components")
+parser.add_argument(
+    "--multigpu", action="store_true", help="Enable multi-GPU testing mode"
+)
+args = parser.parse_args()
+
 THEROCK_BIN_DIR = os.getenv("THEROCK_BIN_DIR")
 SCRIPT_DIR = Path(__file__).resolve().parent
 THEROCK_DIR = Path(
     os.environ.get("THEROCK_DIR") or SCRIPT_DIR.parent.parent.parent
 ).resolve()
-VALID_TEST_CATEGORIES = {"quick", "standard", "comprehensive", "full"}
+VALID_TEST_CATEGORIES = {"quick", "standard", "comprehensive", "full", "multi_gpu"}
 TEST_TYPE = os.getenv("TEST_TYPE", "quick")
 AMDGPU_FAMILIES = os.getenv("AMDGPU_FAMILIES")
 
@@ -38,6 +50,7 @@ AMDGPU_FAMILIES = os.getenv("AMDGPU_FAMILIES")
 COMPONENT_DIR_MAPPING = {
     "miopen": "MIOpen",
     "rocblas": "rocblas",
+    "rocblas-multigpu": "rocblas",  # Map multi-GPU variant to same component
     "rocrand": "rocRAND",
     "hiprand": "hipRAND",
     "rocthrust": "rocthrust",
@@ -88,6 +101,22 @@ environ_vars["ROCM_PATH"] = str(ROCM_PATH)
 
 logging.basicConfig(level=logging.INFO)
 
+# Multi-GPU setup (if --multigpu flag is set)
+if args.multigpu:
+    # Add parent directory to path for github_actions_api imports
+    sys.path.insert(0, str(SCRIPT_DIR.parent))
+    from github_actions_api import get_visible_gpu_count
+
+    gpu_count = get_visible_gpu_count(env=environ_vars, therock_bin_dir=THEROCK_BIN_DIR)
+    logging.info(f"Multi-GPU mode: {gpu_count} GPUs visible")
+
+    # Safety check - need at least 2 GPUs for multi-GPU tests
+    MIN_GPU_COUNT = 2
+    if gpu_count < MIN_GPU_COUNT:
+        logging.error(
+            f"Insufficient GPUs for multi-GPU testing: {gpu_count} < {MIN_GPU_COUNT}"
+        )
+        sys.exit(0)  # Exit gracefully (not an error)
 
 def find_matching_gpu_arch(gpu_arch: str, available_gpu_archs: set[str]) -> str | None:
     """
@@ -216,15 +245,19 @@ def build_ctest_command(category, gpu_arch, available_gpu_archs):
 
 
 def main():
-    category = TEST_TYPE.lower() if TEST_TYPE else "quick"
-    if category not in VALID_TEST_CATEGORIES:
-        print(
-            f"ERROR: Invalid TEST_TYPE '{TEST_TYPE}'. "
-            f"Must be one of: {', '.join(sorted(VALID_TEST_CATEGORIES))}. "
-            f"Falling back to 'quick'.",
-            file=sys.stderr,
-        )
-        category = "quick"
+    # Use multi_gpu category when --multigpu flag is set, otherwise use TEST_TYPE
+    if args.multigpu:
+        category = "multi_gpu"
+    else:
+        category = TEST_TYPE.lower() if TEST_TYPE else "quick"
+        if category not in VALID_TEST_CATEGORIES:
+            print(
+                f"ERROR: Invalid TEST_TYPE '{TEST_TYPE}'. "
+                f"Must be one of: {', '.join(sorted(VALID_TEST_CATEGORIES))}. "
+                f"Falling back to 'quick'.",
+                file=sys.stderr,
+            )
+            category = "quick"
 
     gpu_arch = ""
     if AMDGPU_FAMILIES:

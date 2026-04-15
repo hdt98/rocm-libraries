@@ -71,7 +71,12 @@ jobs:
     with:
       artifact_run_id: ${{  github.run_id }}
       amdgpu_families: ${{ inputs.amdgpu_families }}
-      test_runs_on: ${{ inputs.test_runs_on }}
+      test_runs_on: >-
+        ${{
+          matrix.components.multi_gpu_runner != '' &&
+            matrix.components.multi_gpu_runner ||
+            inputs.test_runs_on
+        }}
       platform: ${{ inputs.platform }}
       component: ${{ toJSON(matrix.components) }}
     secrets: inherit
