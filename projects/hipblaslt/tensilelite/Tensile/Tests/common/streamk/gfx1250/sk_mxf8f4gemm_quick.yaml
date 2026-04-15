@@ -100,8 +100,12 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 256]
-          - Exact: [512, 512, 1, 512]
+          - Exact: [127, 127, 1, 1024]
+          - Exact: [128, 128, 1, 1024]
+          - Exact: [129, 129, 1, 1024]
+          - Exact: [127, 127, 1, 1056]
+          - Exact: [128, 128, 1, 1056]
+          - Exact: [129, 129, 1, 1056]
         - ActivationArgs:
           - [Enum: none]
 
@@ -172,8 +176,12 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 256]
-          - Exact: [512, 512, 1, 512]
+          # - Exact: [127, 127, 1, 1024]
+          - Exact: [128, 128, 1, 1024]
+          # - Exact: [129, 129, 1, 1024]
+          # - Exact: [127, 127, 1, 1056]
+          - Exact: [128, 128, 1, 1056]
+          # - Exact: [129, 129, 1, 1056]
         - ActivationArgs:
           - [Enum: none]
 
@@ -244,8 +252,12 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 256]
-          - Exact: [512, 512, 1, 512]
+          # - Exact: [127, 127, 1, 1024]
+          - Exact: [128, 128, 1, 1024]
+          # - Exact: [129, 129, 1, 1024]
+          # - Exact: [127, 127, 1, 1056]
+          - Exact: [128, 128, 1, 1056]
+          # - Exact: [129, 129, 1, 1056]
         - ActivationArgs:
           - [Enum: none]
 
@@ -316,7 +328,11 @@ BenchmarkProblems:
       BenchmarkJoinParameters:
       BenchmarkFinalParameters:
         - ProblemSizes:
-          - Exact: [128, 128, 1, 256]
-          - Exact: [512, 512, 1, 512]
+          # - Exact: [127, 127, 1, 1024]
+          - Exact: [128, 128, 1, 1024]
+          # - Exact: [129, 129, 1, 1024]
+          # - Exact: [127, 127, 1, 1056]
+          - Exact: [128, 128, 1, 1056]
+          # - Exact: [129, 129, 1, 1056]
         - ActivationArgs:
           - [Enum: none]
