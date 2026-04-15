@@ -90,8 +90,18 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
 endforeach()
 
 # --- Compile each variant x architecture into .hsaco code objects ---
-# Uses --cuda-device-only to produce raw code objects without host stubs.
-# -std=c++20 is required for struct NTTPs and consteval.
+# --cuda-device-only produces an offload bundle containing the AMDGPU code object.
+# hipModuleLoadData requires the bundle format, so we keep it as-is.
+#
+# Optimization flags match production CK:
+#   -O3 -DNDEBUG        Full optimization, disable asserts (removes device runtime bloat)
+#   -fno-unwind-tables   Remove unwind tables from code objects
+#   -amdgpu-function-calls=false / -amdgpu-early-inline-all=true
+#                        Aggressive inlining — CK kernels must be fully inlined
+#
+# Profiling:
+#   --amdgpu-use-amdgpu-trackers=1   Enable AMD profiling tool support
+
 set(HSACO_FILES "")
 foreach(variant IN LISTS KERNEL_VARIANTS)
     # Per-variant arch override: use ${variant}_GPU_TARGETS if defined, else GPU_TARGETS
@@ -109,6 +119,12 @@ foreach(variant IN LISTS KERNEL_VARIANTS)
                     --cuda-device-only
                     -x hip
                     -std=c++20
+                    -O3
+                    -DNDEBUG
+                    -fno-unwind-tables
+                    -mllvm -amdgpu-function-calls=false
+                    -mllvm -amdgpu-early-inline-all=true
+                    -mllvm --amdgpu-use-amdgpu-trackers=1
                     --rocm-path=${KPACK_ROCM_PATH}
                     -I${CK_INCLUDE_DIR}
                     -I${CMAKE_CURRENT_SOURCE_DIR}
