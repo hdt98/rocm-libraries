@@ -85,22 +85,3 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
                          CPU_UnitTestConvSolverHipImplicitGemmV4R4WrWDevApplicabilityWrw_NONE,
                          testing::Combine(testing::Values(GetTestParams()),
                                           testing::Values(GetConvTestCases(miopenFloat)[0])));
-
-// DEBUG: Deterministic test cases for ALMIOPEN-718 investigation
-auto GetConvDeterministicTestCases(miopenDataType_t datatype)
-{
-    using TestCase = miopen::unit_tests::ConvTestCase;
-    return std::vector{
-        TestCase{{datatype, {8, 128, 14, 14}},
-                 {datatype, {32, 128, 3, 3}},
-                 datatype,
-                 {{1, 1}, {1, 1}, {1, 1}, 1, true}},
-    };
-}
-
-INSTANTIATE_TEST_SUITE_P(
-    DEBUG_Deterministic_GPU,
-    GPU_UnitTestConvSolverHipImplicitGemmV4R4WrW_FP32,
-    testing::Combine(testing::Values(GetTestParams()),
-                     testing::Values(miopenConvolutionAlgoImplicitGEMM),
-                     testing::ValuesIn(GetConvDeterministicTestCases(miopenFloat))));
