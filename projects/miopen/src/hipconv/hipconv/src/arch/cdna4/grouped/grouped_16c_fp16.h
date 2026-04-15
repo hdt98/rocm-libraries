@@ -32,6 +32,10 @@ struct Config
 
     int n_fold = 8;
 
+    int stride = 1;
+
+    int dilation = 1;
+
     hipconv::Direction direction = hipconv::Direction::Fprop;
 
     constexpr int block_c() const { return group_size * waves_per_wg; }
@@ -50,6 +54,15 @@ constexpr Config configs[] = {
     {.waves_per_wg = 3, .direction = hipconv::Direction::Dgrad},
     {.waves_per_wg = 2, .direction = hipconv::Direction::Dgrad},
     {.waves_per_wg = 1, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 16, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 8, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 7, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 6, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 5, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 4, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 3, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 2, .dilation = 2, .direction = hipconv::Direction::Dgrad},
+    {.waves_per_wg = 1, .dilation = 2, .direction = hipconv::Direction::Dgrad},
     {.waves_per_wg = 16},
     {.waves_per_wg = 8},
     {.waves_per_wg = 7},
@@ -59,6 +72,15 @@ constexpr Config configs[] = {
     {.waves_per_wg = 3},
     {.waves_per_wg = 2},
     {.waves_per_wg = 1},
+    {.waves_per_wg = 16, .stride = 2},
+    {.waves_per_wg = 8, .stride = 2},
+    {.waves_per_wg = 7, .stride = 2},
+    {.waves_per_wg = 6, .stride = 2},
+    {.waves_per_wg = 5, .stride = 2},
+    {.waves_per_wg = 4, .stride = 2},
+    {.waves_per_wg = 3, .stride = 2},
+    {.waves_per_wg = 2, .stride = 2},
+    {.waves_per_wg = 1, .stride = 2},
 };
 
 constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
@@ -68,6 +90,22 @@ inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
     if(par.direction != cfg.direction)
     {
         return false;
+    }
+
+    if(cfg.direction == hipconv::Direction::Dgrad)
+    {
+        // Dgrad swaps stride <-> dilation relative to forward params
+        if(par.dilation_h != cfg.stride || par.dilation_w != cfg.stride)
+            return false;
+        if(par.stride_h != cfg.dilation || par.stride_w != cfg.dilation)
+            return false;
+    }
+    else
+    {
+        if(par.stride_h != cfg.stride || par.stride_w != cfg.stride)
+            return false;
+        if(par.dilation_h != cfg.dilation || par.dilation_w != cfg.dilation)
+            return false;
     }
 
     // Require that the number of groups per work-group evenly divides the total number of
@@ -86,11 +124,12 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 
     // Compute the grid size.
     // For Dgrad the output is the input gradient (width = par.w, not par.q).
-    const int out_q    = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
-    auto blocks_w      = divup(out_q, BLOCK_Q);
-    auto blocks_w_n    = blocks_w * cfg.n_fold;
-    auto blocks_c      = divup(par.c, cfg.block_c());
-    auto blocks_n_fold = divup(par.n, cfg.n_fold);
+    const int out_q          = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    const int output_block_q = BLOCK_Q / cfg.stride;
+    auto blocks_w            = divup(out_q, output_block_q);
+    auto blocks_w_n          = blocks_w * cfg.n_fold;
+    auto blocks_c            = divup(par.c, cfg.block_c());
+    auto blocks_n_fold       = divup(par.n, cfg.n_fold);
 
     LaunchParams launch;
     launch.grid       = dim3(blocks_w_n, blocks_c, blocks_n_fold);
@@ -133,8 +172,10 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
 
     static_assert(sizeof(uint4) / sizeof(__half) == 8, "Expected 8 halves per uint4 vector");
 
-    // Number of input columns loaded by each workgroup (output columns plus halo)
-    constexpr int BLOCK_W = BLOCK_Q + (cfg.kw - 1);
+    // Number of input columns loaded by each workgroup (output columns plus halo).
+    // For dilation > 1, the dilated input is wider but we load only the real (non-zero)
+    // compact columns.
+    constexpr int BLOCK_W = divup(BLOCK_Q + (cfg.kw - 1), cfg.dilation);
 
     // uint4 vectors per channels fiber
     constexpr int BLOCK_C8 = cfg.block_c() / 8;
@@ -142,8 +183,11 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // Each wave process a single group of channels.
     constexpr int BLOCK_GROUPS = cfg.waves_per_wg;
 
+    // Output block width after subsampling for stride > 1.
+    constexpr int OUTPUT_BLOCK_Q = BLOCK_Q / cfg.stride;
+
     // Vectors to store (center only)
-    constexpr int STORE_VECS = BLOCK_Q * BLOCK_C8;
+    constexpr int STORE_VECS = OUTPUT_BLOCK_Q * BLOCK_C8;
 
     constexpr int NUM_INPUT_LDS_BUFFERS = 2;
 
@@ -153,7 +197,7 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     constexpr int INPUT_LDS_BUFFER_SIZE_C4 = INPUT_LDS_BUFFER_SIZE_C8 * 2;
 
     // Size of LDS buffer for outputs (swizzled, no padding needed)
-    constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * BLOCK_Q;
+    constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * OUTPUT_BLOCK_Q;
 
     // Weight LDS: all K-rows for this block, in uint4 units.
     // Each K-row is kh * kw * GROUP_SIZE_8 uint4 elements; total K-rows = BLOCK_GROUPS *
@@ -196,6 +240,10 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     const size_t wi_stride    = (size_t)wi * C8;
     const size_t wo_stride    = (size_t)wo * C8;
 
+    // Effective (dilated) input height: for dilation > 1, the kernel iterates over
+    // hi_eff virtual rows but only loads real data for rows divisible by dilation.
+    const int hi_eff = (cfg.dilation > 1) ? (hi - 1) * cfg.dilation + 1 : hi;
+
     // Map threads to LDS input buffer addresses linearly.
     // This supports __builtin_amdgcn_raw_ptr_buffer_load_lds
     auto store_input_lds = &input_lds[tid];
@@ -208,10 +256,25 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     uint32_t input_voffset;
 
     // Map threads to global memory input buffer using a swizzle.
-    using Sw             = SwizzleT<cfg.block_c()>;
-    const int col        = Sw::x(tid);
-    const int c8_thread  = Sw::c8(tid);
-    const int global_col = (block_q - px) + col;
+    using Sw            = SwizzleT<cfg.block_c()>;
+    const int col       = Sw::x(tid);
+    const int c8_thread = Sw::c8(tid);
+
+    // For dilation > 1, compute the first compact column that maps to LDS col 0.
+    int compact_base = 0;
+    int global_col;
+    if constexpr(cfg.dilation > 1)
+    {
+        int ds = block_q - px; // dilated start position
+        // ceil(ds / dilation): positive branch uses standard ceiling formula,
+        // negative branch relies on C++ truncation-toward-zero giving ceiling.
+        compact_base = (ds >= 0) ? (ds + cfg.dilation - 1) / cfg.dilation : ds / cfg.dilation;
+        global_col   = compact_base + col;
+    }
+    else
+    {
+        global_col = (block_q - px) + col;
+    }
     // Trailing threads in partial waves are masked by EXEC (buffer_load_lds
     // honors the active mask; see ISA §9.1.9 "Memory Buffer Load to LDS").
     const bool load_active = (tid < (BLOCK_W)*BLOCK_C8);
@@ -233,7 +296,7 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     {
         auto weight_bytes = static_cast<size_t>(groups * cfg.group_size) * cfg.kh * cfg.kw *
                             cfg.group_size * sizeof(half);
-        auto weight_rsrc  = __builtin_amdgcn_make_buffer_rsrc(
+        auto weight_rsrc = __builtin_amdgcn_make_buffer_rsrc(
             const_cast<_Float16*>(wei), 0, weight_bytes, rsrc_data_format);
         uint32_t voffset_base = block_k * cfg.kh * cfg.kw * cfg.group_size * sizeof(half);
 
@@ -300,14 +363,30 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     uint4* store_output_global   = nullptr;
     if(store_active)
     {
-        const int c8    = tid % BLOCK_C8;
-        const int q     = block_q + col;
-        load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
-        if(q < wo)
+        const int c8 = tid % BLOCK_C8;
+        if constexpr(cfg.stride == 2)
         {
-            const int K8        = C / 8;
-            store_output_global = reinterpret_cast<uint4*>(out) + (size_t)block_n * ho * wo * K8 +
-                                  (size_t)q * K8 + block_c8 + c8;
+            const int q_out = (block_q / 2) + col;
+            load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
+            if(q_out < wo)
+            {
+                const int K8        = C / 8;
+                store_output_global = reinterpret_cast<uint4*>(out) +
+                                      (size_t)block_n * ho * wo * K8 + (size_t)q_out * K8 +
+                                      block_c8 + c8;
+            }
+        }
+        else
+        {
+            const int q     = block_q + col;
+            load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
+            if(q < wo)
+            {
+                const int K8        = C / 8;
+                store_output_global = reinterpret_cast<uint4*>(out) +
+                                      (size_t)block_n * ho * wo * K8 + (size_t)q * K8 + block_c8 +
+                                      c8;
+            }
         }
     }
 
@@ -315,15 +394,41 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     // lane_q, wave_group, and lane_c4 are constant per thread; hoisting avoids
     // recomputing the swizzle (which contains %) inside the hot loop.
     int input_lds_offsets[cfg.kw];
+    bool input_lds_mask[cfg.kw]; // only meaningful for dilation > 1
     static_for<cfg.kw>(
         [&]<int S>()
         {
-            input_lds_offsets[S] =
-                Sw::offset_uint2(lane_q + S, wave_group * GROUP_SIZE_4 + lane_c4);
+            if constexpr(cfg.dilation > 1)
+            {
+                int dilated_global = (block_q - px) + lane_q + S;
+                // C++ % truncates toward zero, so -1 % 2 == -1 (not 0); == 0 is correct.
+                bool is_real = (dilated_global % cfg.dilation == 0);
+                int lds_col  = is_real ? (dilated_global / cfg.dilation - compact_base) : 0;
+                input_lds_offsets[S] =
+                    Sw::offset_uint2(lds_col, wave_group * GROUP_SIZE_4 + lane_c4);
+                input_lds_mask[S] = is_real;
+            }
+            else
+            {
+                input_lds_offsets[S] =
+                    Sw::offset_uint2(lane_q + S, wave_group * GROUP_SIZE_4 + lane_c4);
+                input_lds_mask[S] = true;
+            }
         });
 
     // Pre-compute the output LDS swizzle offset (thread-constant).
-    const int output_lds_offset = Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4);
+    int output_lds_offset;
+    bool output_lane_active;
+    if constexpr(cfg.stride == 2)
+    {
+        output_lane_active = (lane_q % 2 == 0);
+        output_lds_offset  = Sw::offset_uint2(lane_q / 2, wave_group * GROUP_SIZE_4 + lane_c4);
+    }
+    else
+    {
+        output_lane_active = true;
+        output_lds_offset  = Sw::offset_uint2(lane_q, wave_group * GROUP_SIZE_4 + lane_c4);
+    }
 
     // Circular buffer of accumulators.
     constexpr auto Zero = fp32x4_t{0.f, 0.f, 0.f, 0.f};
@@ -334,8 +439,8 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
     int tic = 1;
     int toc = 0;
 
-    // Main loop iterates over input rows.
-    for(int y_base = 0; y_base + cfg.kh <= hi; y_base += cfg.kh)
+    // Main loop iterates over input rows (dilated rows for dilation > 1).
+    for(int y_base = 0; y_base + cfg.kh <= hi_eff; y_base += cfg.kh)
     {
         // Inner loop unrolls the main loop by a factor of kh, the number of filter rows.
         // static_for makes the loop indices compile-time constants.
@@ -348,16 +453,34 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
 
                 int y = y_base + Y_LOCAL;
 
-                if(load_active && (y + 1) < hi)
+                if constexpr(cfg.dilation > 1)
                 {
-                    __builtin_amdgcn_raw_ptr_buffer_load_lds(
-                        input_rsrc,
-                        store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
-                        16,
-                        input_voffset + (y + 1) * wi_stride * sizeof(uint4),
-                        0,
-                        0,
-                        0);
+                    // Only load real (non-dilated-zero) rows.
+                    if(load_active && (y + 1) % cfg.dilation == 0 && (y + 1) / cfg.dilation < hi)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                            input_rsrc,
+                            store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
+                            16,
+                            input_voffset + ((y + 1) / cfg.dilation) * wi_stride * sizeof(uint4),
+                            0,
+                            0,
+                            0);
+                    }
+                }
+                else
+                {
+                    if(load_active && (y + 1) < hi_eff)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                            input_rsrc,
+                            store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
+                            16,
+                            input_voffset + (y + 1) * wi_stride * sizeof(uint4),
+                            0,
+                            0,
+                            0);
+                    }
                 }
 
                 static_for<cfg.kw>(
@@ -366,7 +489,14 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                         const uint2* lds_ptr = reinterpret_cast<const uint2*>(input_lds) +
                                                toc * INPUT_LDS_BUFFER_SIZE_C4 +
                                                input_lds_offsets[S];
-                        auto input_reg       = *(const fp16x4_t*)lds_ptr;
+                        auto input_reg = *(const fp16x4_t*)lds_ptr;
+
+                        if constexpr(cfg.dilation > 1)
+                        {
+                            bool row_is_real = (y % cfg.dilation == 0);
+                            if(!row_is_real || !input_lds_mask[S])
+                                input_reg = fp16x4_t{0, 0, 0, 0};
+                        }
 
                         static_for<cfg.kh>(
                             [&]<int R>()
@@ -400,49 +530,90 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
 
                 constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
                 int p_out             = y + py - (cfg.kh - 1);
-                if(p_out >= 0 && p_out < ho)
+                if constexpr(cfg.stride == 2)
                 {
-                    __half2 halves[2];
-                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
-                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
-                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+                    if(p_out >= 0 && (p_out % 2) == 0 && (p_out / 2) < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        if(output_lane_active)
+                            store_output_lds[output_lds_offset] =
+                                *reinterpret_cast<const uint2*>(&out_reg);
 
-                    __syncthreads(); // load_output_lds fully written
+                        __syncthreads();
 
-                    if(store_output_global)
-                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                        if(store_output_global)
+                            store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+                    }
+                }
+                else
+                {
+                    if(p_out >= 0 && p_out < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        store_output_lds[output_lds_offset] =
+                            *reinterpret_cast<const uint2*>(&out_reg);
+
+                        __syncthreads();
+
+                        if(store_output_global)
+                            store_output_global[p_out * wo_stride] = *load_output_lds;
+                    }
                 }
                 acc[P_FLUSH] = Zero;
             });
     }
 
-    // Remainder: the hi % kh leftover rows share the same structure as the main
+    // Remainder: the hi_eff % kh leftover rows share the same structure as the main
     // loop — y_base is a multiple of kh so Y_LOCAL = y % kh, giving constexpr P.
     {
-        int y_rem_base = (hi / cfg.kh) * cfg.kh;
+        int y_rem_base = (hi_eff / cfg.kh) * cfg.kh;
         static_for<cfg.kh>(
             [&]<int Y_LOCAL>()
             {
-                if(Y_LOCAL >= hi % cfg.kh)
+                if(Y_LOCAL >= hi_eff % cfg.kh)
                     return;
                 int y = y_rem_base + Y_LOCAL;
 
                 wait_vmcnt<0>();
                 __syncthreads();
 
-                if(load_active && (y + 1) < hi)
+                if constexpr(cfg.dilation > 1)
                 {
-                    __builtin_amdgcn_raw_ptr_buffer_load_lds(
-                        input_rsrc,
-                        store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
-                        16,
-                        input_voffset + (y + 1) * wi_stride * sizeof(uint4),
-                        0,
-                        0,
-                        0);
+                    if(load_active && (y + 1) % cfg.dilation == 0 && (y + 1) / cfg.dilation < hi)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                            input_rsrc,
+                            store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
+                            16,
+                            input_voffset + ((y + 1) / cfg.dilation) * wi_stride * sizeof(uint4),
+                            0,
+                            0,
+                            0);
+                    }
+                }
+                else
+                {
+                    if(load_active && (y + 1) < hi_eff)
+                    {
+                        __builtin_amdgcn_raw_ptr_buffer_load_lds(
+                            input_rsrc,
+                            store_input_lds + tic * INPUT_LDS_BUFFER_SIZE_C8,
+                            16,
+                            input_voffset + (y + 1) * wi_stride * sizeof(uint4),
+                            0,
+                            0,
+                            0);
+                    }
                 }
 
                 static_for<cfg.kw>(
@@ -451,7 +622,14 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
                         const uint2* lds_ptr = reinterpret_cast<const uint2*>(input_lds) +
                                                toc * INPUT_LDS_BUFFER_SIZE_C4 +
                                                input_lds_offsets[S];
-                        fp16x4_t input_reg   = *(const fp16x4_t*)lds_ptr;
+                        fp16x4_t input_reg = *(const fp16x4_t*)lds_ptr;
+
+                        if constexpr(cfg.dilation > 1)
+                        {
+                            bool row_is_real = (y % cfg.dilation == 0);
+                            if(!row_is_real || !input_lds_mask[S])
+                                input_reg = fp16x4_t{0, 0, 0, 0};
+                        }
 
                         static_for<cfg.kh>(
                             [&]<int R>()
@@ -481,58 +659,109 @@ __device__ void conv2d_grouped_16c_fp16_cdna4_nhwc_impl(const _Float16* __restri
 
                 constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
                 int p_out             = y + py - (cfg.kh - 1);
-                if(p_out >= 0 && p_out < ho)
+                if constexpr(cfg.stride == 2)
                 {
-                    __half2 halves[2];
-                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
-                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
-                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+                    if(p_out >= 0 && (p_out % 2) == 0 && (p_out / 2) < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        if(output_lane_active)
+                            store_output_lds[output_lds_offset] =
+                                *reinterpret_cast<const uint2*>(&out_reg);
 
-                    __syncthreads(); // output_lds fully written
+                        __syncthreads();
 
-                    if(store_output_global)
-                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                        if(store_output_global)
+                            store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+                    }
+                }
+                else
+                {
+                    if(p_out >= 0 && p_out < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        store_output_lds[output_lds_offset] =
+                            *reinterpret_cast<const uint2*>(&out_reg);
+
+                        __syncthreads();
+
+                        if(store_output_global)
+                            store_output_global[p_out * wo_stride] = *load_output_lds;
+                    }
                 }
                 acc[P_FLUSH] = Zero;
             });
     }
 
     // Flush output rows whose last input contribution (at filter row kh-1) would land at
-    // y >= hi (out of bounds). These rows were never flushed by the main/remainder loops.
+    // y >= hi_eff (out of bounds). These rows were never flushed by the main/remainder loops.
     // An output row p_out is last touched at input row y = p_out + kh-1 - py; it needs
-    // flushing when that y >= hi, i.e. p_out >= hi - kh + 1 + py.
+    // flushing when that y >= hi_eff, i.e. p_out >= hi_eff - kh + 1 + py.
     //
-    for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
+    // For stride=2 the loop iterates over stride-1 output rows and subsamples.
     {
-        __syncthreads(); // separate prior LDS reads from this iteration's writes
-        int p_idx = (p_out - py + cfg.kh) % cfg.kh;
-        fp32x4_t slot;
-        dispatch<cfg.kh>(p_idx,
-                         [&]<int P>()
-                         {
-                             slot   = acc[P];
-                             acc[P] = Zero;
-                         });
+        const int ho_stride1 = hi_eff + 2 * py - (cfg.kh - 1);
+        const int tail_end   = (cfg.stride == 2) ? ho_stride1 : ho;
+        for(int p_out = hi_eff - cfg.kh + 1 + py; p_out < tail_end; p_out++)
+        {
+            if constexpr(cfg.stride == 2)
+            {
+                if(p_out % 2 != 0 || p_out / 2 >= ho)
+                    continue;
+            }
 
-        __half2 halves[2];
-        halves[0]    = __float22half2_rn({slot[0], slot[1]});
-        halves[1]    = __float22half2_rn({slot[2], slot[3]});
-        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+            __syncthreads(); // separate prior LDS reads from this iteration's writes
+            int p_idx = (p_out - py + cfg.kh) % cfg.kh;
+            fp32x4_t slot;
+            dispatch<cfg.kh>(p_idx,
+                             [&]<int P>()
+                             {
+                                 slot   = acc[P];
+                                 acc[P] = Zero;
+                             });
 
-        auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-        store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            __half2 halves[2];
+            halves[0]    = __float22half2_rn({slot[0], slot[1]});
+            halves[1]    = __float22half2_rn({slot[2], slot[3]});
+            auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-        __syncthreads(); // output_lds fully written
+            auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+            if constexpr(cfg.stride == 2)
+            {
+                if(output_lane_active)
+                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            }
+            else
+            {
+                store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            }
 
-        if(store_output_global)
-            store_output_global[p_out * wo_stride] = *load_output_lds;
+            __syncthreads(); // output_lds fully written
+
+            if constexpr(cfg.stride == 2)
+            {
+                if(store_output_global)
+                    store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+            }
+            else
+            {
+                if(store_output_global)
+                    store_output_global[p_out * wo_stride] = *load_output_lds;
+            }
+        }
     }
 }
 
-// Compute grouped convolution with stride 1 and group size 16.
+// Compute grouped convolution with stride 1 or 2 and group size 16.
 //
 // This kernel assumes the number of input and output channels is the same.
 //
@@ -668,7 +897,7 @@ constexpr KernelVariant make_variant()
                 return false;
             if(par.c % 16 != 0)
                 return false;
-            if(par.stride_h != 1 || par.stride_w != 1)
+            if((par.stride_h != 1 && par.stride_h != 2) || (par.stride_w != 1 && par.stride_w != 2))
                 return false;
             if(par.dilation_h != 1 || par.dilation_w != 1)
                 return false;

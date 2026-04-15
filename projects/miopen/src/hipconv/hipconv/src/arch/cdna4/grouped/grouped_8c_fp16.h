@@ -32,6 +32,8 @@ struct Config
 
     int n_fold = 8;
 
+    int stride = 1;
+
     hipconv::Direction direction = hipconv::Direction::Fprop;
 
     constexpr int block_c() const { return group_size * waves_per_wg; }
@@ -59,6 +61,15 @@ constexpr Config configs[] = {
     {.waves_per_wg = 3},
     {.waves_per_wg = 2},
     {.waves_per_wg = 1},
+    {.waves_per_wg = 16, .stride = 2},
+    {.waves_per_wg = 8, .stride = 2},
+    {.waves_per_wg = 7, .stride = 2},
+    {.waves_per_wg = 6, .stride = 2},
+    {.waves_per_wg = 5, .stride = 2},
+    {.waves_per_wg = 4, .stride = 2},
+    {.waves_per_wg = 3, .stride = 2},
+    {.waves_per_wg = 2, .stride = 2},
+    {.waves_per_wg = 1, .stride = 2},
 };
 
 constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
@@ -66,6 +77,11 @@ constexpr int NUM_CONFIGS = sizeof(configs) / sizeof(configs[0]);
 inline bool is_valid_config(const hipconv::Conv2dParams& par, const Config& cfg)
 {
     if(par.direction != cfg.direction)
+        return false;
+
+    if(par.stride_h != cfg.stride || par.stride_w != cfg.stride)
+        return false;
+    if(par.dilation_h != 1 || par.dilation_w != 1)
         return false;
 
     // Require that the number of groups per work-group evenly divides the total number of
@@ -82,11 +98,12 @@ inline LaunchParams get_launch_params(int config_idx, const hipconv::Conv2dParam
 {
     const auto& cfg = configs[config_idx];
 
-    const int out_q    = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
-    auto blocks_w      = divup(out_q, BLOCK_Q);
-    auto blocks_w_n    = blocks_w * cfg.n_fold;
-    auto blocks_c      = divup(par.c, cfg.block_c());
-    auto blocks_n_fold = divup(par.n, cfg.n_fold);
+    const int out_q          = (cfg.direction == hipconv::Direction::Dgrad) ? par.w : par.q;
+    const int output_block_q = BLOCK_Q / cfg.stride;
+    auto blocks_w            = divup(out_q, output_block_q);
+    auto blocks_w_n          = blocks_w * cfg.n_fold;
+    auto blocks_c            = divup(par.c, cfg.block_c());
+    auto blocks_n_fold       = divup(par.n, cfg.n_fold);
 
     LaunchParams launch;
     launch.grid       = dim3(blocks_w_n, blocks_c, blocks_n_fold);
@@ -142,8 +159,11 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // Each wave processes a single group of channels.
     constexpr int BLOCK_GROUPS = cfg.waves_per_wg;
 
+    // Output block width after subsampling for stride > 1.
+    constexpr int OUTPUT_BLOCK_Q = BLOCK_Q / cfg.stride;
+
     // Vectors to store (output only)
-    constexpr int STORE_VECS = BLOCK_Q * BLOCK_C8;
+    constexpr int STORE_VECS = OUTPUT_BLOCK_Q * BLOCK_C8;
 
     constexpr int NUM_INPUT_LDS_BUFFERS = 2;
 
@@ -151,7 +171,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     constexpr int INPUT_LDS_BUFFER_SIZE_C8 = BLOCK_C8 * BLOCK_W;
 
     // Size of LDS buffer for outputs (swizzled, no padding needed)
-    constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * BLOCK_Q;
+    constexpr int OUTPUT_LDS_BUFFER_SIZE = BLOCK_C8 * OUTPUT_BLOCK_Q;
 
     // Weight LDS: all K-rows for this block, in uint4 units.
     // Each uint4 holds one (k, r, s) tap: all 8 input channels.
@@ -228,7 +248,7 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     {
         auto weight_bytes = static_cast<size_t>(groups * cfg.group_size) * cfg.kh * cfg.kw *
                             cfg.group_size * sizeof(half);
-        auto weight_rsrc  = __builtin_amdgcn_make_buffer_rsrc(
+        auto weight_rsrc = __builtin_amdgcn_make_buffer_rsrc(
             const_cast<_Float16*>(wei), 0, weight_bytes, rsrc_data_format);
         uint32_t voffset_base = block_k * cfg.kh * cfg.kw * cfg.group_size * sizeof(half);
 
@@ -309,14 +329,30 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     uint4* store_output_global   = nullptr;
     if(store_active)
     {
-        const int c8    = tid % BLOCK_C8;
-        const int q     = block_q + col;
-        load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
-        if(q < wo)
+        const int c8 = tid % BLOCK_C8;
+        if constexpr(cfg.stride == 2)
         {
-            const int K8        = C / 8;
-            store_output_global = reinterpret_cast<uint4*>(out) + (size_t)block_n * ho * wo * K8 +
-                                  (size_t)q * K8 + block_c8 + c8;
+            const int q_out = (block_q / 2) + col;
+            load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
+            if(q_out < wo)
+            {
+                const int K8        = C / 8;
+                store_output_global = reinterpret_cast<uint4*>(out) +
+                                      (size_t)block_n * ho * wo * K8 + (size_t)q_out * K8 +
+                                      block_c8 + c8;
+            }
+        }
+        else
+        {
+            const int q     = block_q + col;
+            load_output_lds = &output_lds[Sw::offset_uint4(col, c8)];
+            if(q < wo)
+            {
+                const int K8        = C / 8;
+                store_output_global = reinterpret_cast<uint4*>(out) +
+                                      (size_t)block_n * ho * wo * K8 + (size_t)q * K8 + block_c8 +
+                                      c8;
+            }
         }
     }
 
@@ -330,8 +366,20 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
     // The result matrix row encodes (q_tile, k) via the GT structure.
     const int result_n        = ResultLayout::outer(lane);
     const int result_row      = ResultLayout::inner(lane, 0);
-    const int output_col      = 2 * result_n + GT::q(result_row);
     const int c4_within_group = result_row / 4 % 2;
+    bool output_lane_active;
+    int output_col;
+    if constexpr(cfg.stride == 2)
+    {
+        // With stride=2, only q=0 outputs are valid (q=1 is discarded).
+        output_lane_active = (GT::q(result_row) == 0);
+        output_col         = result_n;
+    }
+    else
+    {
+        output_lane_active = true;
+        output_col         = 2 * result_n + GT::q(result_row);
+    }
     const int output_lds_offset =
         Sw::offset_uint2(output_col, wave_group * GROUP_SIZE_4 + c4_within_group);
 
@@ -389,20 +437,44 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
 
                 constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
                 int p_out             = y + py - (cfg.kh - 1);
-                if(p_out >= 0 && p_out < ho)
+                if constexpr(cfg.stride == 2)
                 {
-                    __half2 halves[2];
-                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
-                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
-                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+                    if(p_out >= 0 && (p_out % 2) == 0 && (p_out / 2) < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        if(output_lane_active)
+                            store_output_lds[output_lds_offset] =
+                                *reinterpret_cast<const uint2*>(&out_reg);
 
-                    __syncthreads(); // output_lds fully written
+                        __syncthreads();
 
-                    if(store_output_global)
-                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                        if(store_output_global)
+                            store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+                    }
+                }
+                else
+                {
+                    if(p_out >= 0 && p_out < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        store_output_lds[output_lds_offset] =
+                            *reinterpret_cast<const uint2*>(&out_reg);
+
+                        __syncthreads(); // output_lds fully written
+
+                        if(store_output_global)
+                            store_output_global[p_out * wo_stride] = *load_output_lds;
+                    }
                 }
                 acc[P_FLUSH] = Zero;
             });
@@ -453,50 +525,100 @@ __device__ void conv2d_grouped_8c_fp16_cdna4_nhwc_impl(const _Float16* __restric
 
                 constexpr int P_FLUSH = (Y_LOCAL + 1) % cfg.kh;
                 int p_out             = y + py - (cfg.kh - 1);
-                if(p_out >= 0 && p_out < ho)
+                if constexpr(cfg.stride == 2)
                 {
-                    __half2 halves[2];
-                    halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
-                    halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
-                    auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+                    if(p_out >= 0 && (p_out % 2) == 0 && (p_out / 2) < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-                    auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        if(output_lane_active)
+                            store_output_lds[output_lds_offset] =
+                                *reinterpret_cast<const uint2*>(&out_reg);
 
-                    __syncthreads(); // output_lds fully written
+                        __syncthreads();
 
-                    if(store_output_global)
-                        store_output_global[p_out * wo_stride] = *load_output_lds;
+                        if(store_output_global)
+                            store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+                    }
+                }
+                else
+                {
+                    if(p_out >= 0 && p_out < ho)
+                    {
+                        __half2 halves[2];
+                        halves[0]    = __float22half2_rn({acc[P_FLUSH][0], acc[P_FLUSH][1]});
+                        halves[1]    = __float22half2_rn({acc[P_FLUSH][2], acc[P_FLUSH][3]});
+                        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+
+                        auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+                        store_output_lds[output_lds_offset] =
+                            *reinterpret_cast<const uint2*>(&out_reg);
+
+                        __syncthreads(); // output_lds fully written
+
+                        if(store_output_global)
+                            store_output_global[p_out * wo_stride] = *load_output_lds;
+                    }
                 }
                 acc[P_FLUSH] = Zero;
             });
     }
 
     // Flush output rows whose last input contribution would land at y >= hi.
-    for(int p_out = hi - cfg.kh + 1 + py; p_out < ho; p_out++)
     {
-        __syncthreads(); // separate prior LDS reads from this iteration's writes
-        int p_idx = (p_out - py + cfg.kh) % cfg.kh;
-        fp32x4_t slot;
-        dispatch<cfg.kh>(p_idx,
-                         [&]<int P>()
-                         {
-                             slot   = acc[P];
-                             acc[P] = Zero;
-                         });
+        const int ho_stride1 = hi + 2 * py - (cfg.kh - 1);
+        const int tail_end   = (cfg.stride == 2) ? ho_stride1 : ho;
+        for(int p_out = hi - cfg.kh + 1 + py; p_out < tail_end; p_out++)
+        {
+            if constexpr(cfg.stride == 2)
+            {
+                if(p_out % 2 != 0 || p_out / 2 >= ho)
+                    continue;
+            }
 
-        __half2 halves[2];
-        halves[0]    = __float22half2_rn({slot[0], slot[1]});
-        halves[1]    = __float22half2_rn({slot[2], slot[3]});
-        auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
+            __syncthreads(); // separate prior LDS reads from this iteration's writes
+            int p_idx = (p_out - py + cfg.kh) % cfg.kh;
+            fp32x4_t slot;
+            dispatch<cfg.kh>(p_idx,
+                             [&]<int P>()
+                             {
+                                 slot   = acc[P];
+                                 acc[P] = Zero;
+                             });
 
-        auto* store_output_lds              = reinterpret_cast<uint2*>(output_lds);
-        store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            __half2 halves[2];
+            halves[0]    = __float22half2_rn({slot[0], slot[1]});
+            halves[1]    = __float22half2_rn({slot[2], slot[3]});
+            auto out_reg = *reinterpret_cast<const fp16x4_t*>(halves);
 
-        __syncthreads(); // output_lds fully written
+            auto* store_output_lds = reinterpret_cast<uint2*>(output_lds);
+            if constexpr(cfg.stride == 2)
+            {
+                if(output_lane_active)
+                    store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            }
+            else
+            {
+                store_output_lds[output_lds_offset] = *reinterpret_cast<const uint2*>(&out_reg);
+            }
 
-        if(store_output_global)
-            store_output_global[p_out * wo_stride] = *load_output_lds;
+            __syncthreads(); // output_lds fully written
+
+            if constexpr(cfg.stride == 2)
+            {
+                if(store_output_global)
+                    store_output_global[(p_out / 2) * wo_stride] = *load_output_lds;
+            }
+            else
+            {
+                if(store_output_global)
+                    store_output_global[p_out * wo_stride] = *load_output_lds;
+            }
+        }
     }
 }
 
@@ -629,8 +751,20 @@ constexpr KernelVariant make_variant()
                 return false;
             if(par.c % 8 != 0)
                 return false;
-            if(par.stride_h != 1 || par.stride_w != 1)
-                return false;
+            // Dgrad of stride=2 fprop requires dilation=2, which would
+            // require a different Toeplitz matrix size than the 16x32
+            // used for stride=1. This is not yet implemented.
+            if(par.direction == hipconv::Direction::Dgrad)
+            {
+                if(par.stride_h != 1 || par.stride_w != 1)
+                    return false;
+            }
+            else
+            {
+                if((par.stride_h != 1 && par.stride_h != 2) ||
+                   (par.stride_w != 1 && par.stride_w != 2))
+                    return false;
+            }
             if(par.dilation_h != 1 || par.dilation_w != 1)
                 return false;
             if(par.pad_h > par.kh - 1 || par.pad_w > par.kw - 1)
