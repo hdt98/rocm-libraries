@@ -349,6 +349,137 @@ struct fmha_fwd_args
 
     ck_tile::index_t block_scale_size_q;
     ck_tile::index_t block_scale_size_kv;
+
+    // Legacy constructor for backward compatibility (old API without descale/block_scale/sink/head
+    // fields)
+    fmha_fwd_args(const void* q_ptr_,
+                  const void* k_ptr_,
+                  const void* v_ptr_,
+                  const void* bias_ptr_,
+                  void* rand_val_ptr_,
+                  void* lse_ptr_,
+                  void* o_ptr_,
+                  const void* seqstart_q_ptr_,
+                  const void* seqstart_k_ptr_,
+                  const void* seqlen_q_ptr_,
+                  const void* seqlen_k_ptr_,
+                  const void* cu_seqlen_q_ptr_,
+                  const void* cu_seqlen_k_ptr_,
+                  ck_tile::index_t seqlen_q_,
+                  ck_tile::index_t seqlen_k_,
+                  ck_tile::index_t batch_,
+                  ck_tile::index_t max_seqlen_q_,
+                  ck_tile::index_t hdim_q_,
+                  ck_tile::index_t hdim_v_,
+                  ck_tile::index_t nhead_q_,
+                  ck_tile::index_t nhead_k_,
+                  float scale_s_,
+                  float logits_soft_cap_,
+                  ck_tile::index_t stride_q_,
+                  ck_tile::index_t stride_k_,
+                  ck_tile::index_t stride_v_,
+                  ck_tile::index_t stride_bias_,
+                  ck_tile::index_t stride_randval_,
+                  ck_tile::index_t stride_o_,
+                  ck_tile::index_t nhead_stride_q_,
+                  ck_tile::index_t nhead_stride_k_,
+                  ck_tile::index_t nhead_stride_v_,
+                  ck_tile::index_t nhead_stride_bias_,
+                  ck_tile::index_t nhead_stride_randval_,
+                  ck_tile::index_t nhead_stride_lse_,
+                  ck_tile::index_t nhead_stride_o_,
+                  ck_tile::index_t batch_stride_q_,
+                  ck_tile::index_t batch_stride_k_,
+                  ck_tile::index_t batch_stride_v_,
+                  ck_tile::index_t batch_stride_bias_,
+                  ck_tile::index_t batch_stride_randval_,
+                  ck_tile::index_t batch_stride_lse_,
+                  ck_tile::index_t batch_stride_o_,
+                  ck_tile::index_t window_size_left_,
+                  ck_tile::index_t window_size_right_,
+                  ck_tile::index_t sink_size_,
+                  ck_tile::index_t mask_type_,
+                  ck_tile::index_t min_seqlen_q_,
+                  float p_drop_,
+                  bool s_randval_,
+                  std::variant<std::pair<uint64_t, uint64_t>, std::pair<const void*, const void*>>
+                      drop_seed_offset_)
+        : q_ptr(q_ptr_),
+          k_ptr(k_ptr_),
+          v_ptr(v_ptr_),
+          bias_ptr(bias_ptr_),
+          q_descale_ptr(nullptr),
+          k_descale_ptr(nullptr),
+          v_descale_ptr(nullptr),
+          rand_val_ptr(rand_val_ptr_),
+          lse_ptr(lse_ptr_),
+          o_ptr(o_ptr_),
+          seqstart_q_ptr(seqstart_q_ptr_),
+          seqstart_k_ptr(seqstart_k_ptr_),
+          seqlen_q_ptr(seqlen_q_ptr_),
+          seqlen_k_ptr(seqlen_k_ptr_),
+          cu_seqlen_q_ptr(cu_seqlen_q_ptr_),
+          cu_seqlen_k_ptr(cu_seqlen_k_ptr_),
+          block_scale_seqstart_q_ptr(nullptr),
+          block_scale_seqstart_k_ptr(nullptr),
+          seqstart_v_scale_ptr(nullptr),
+          sink_ptr(nullptr),
+          seqlen_q(seqlen_q_),
+          seqlen_k(seqlen_k_),
+          batch(batch_),
+          max_seqlen_q(max_seqlen_q_),
+          hdim_q(hdim_q_),
+          hdim_v(hdim_v_),
+          nhead_q(nhead_q_),
+          nhead_k(nhead_k_),
+          num_head_q_total(0),
+          head_start(0),
+          scale_s(scale_s_),
+          logits_soft_cap(logits_soft_cap_),
+          stride_q(stride_q_),
+          stride_k(stride_k_),
+          stride_v(stride_v_),
+          stride_bias(stride_bias_),
+          stride_randval(stride_randval_),
+          stride_o(stride_o_),
+          stride_q_descale(0),
+          stride_k_descale(0),
+          stride_v_descale(0),
+          nhead_stride_q(nhead_stride_q_),
+          nhead_stride_k(nhead_stride_k_),
+          nhead_stride_v(nhead_stride_v_),
+          nhead_stride_bias(nhead_stride_bias_),
+          nhead_stride_randval(nhead_stride_randval_),
+          nhead_stride_lse(nhead_stride_lse_),
+          nhead_stride_o(nhead_stride_o_),
+          nhead_stride_q_descale(0),
+          nhead_stride_k_descale(0),
+          nhead_stride_v_descale(0),
+          batch_stride_q(batch_stride_q_),
+          batch_stride_k(batch_stride_k_),
+          batch_stride_v(batch_stride_v_),
+          batch_stride_bias(batch_stride_bias_),
+          batch_stride_randval(batch_stride_randval_),
+          batch_stride_lse(batch_stride_lse_),
+          batch_stride_o(batch_stride_o_),
+          batch_stride_q_descale(0),
+          batch_stride_k_descale(0),
+          batch_stride_v_descale(0),
+          window_size_left(window_size_left_),
+          window_size_right(window_size_right_),
+          sink_size(sink_size_),
+          mask_type(mask_type_),
+          min_seqlen_q(min_seqlen_q_),
+          p_drop(p_drop_),
+          s_randval(s_randval_),
+          drop_seed_offset(drop_seed_offset_),
+          block_scale_size_q(0),
+          block_scale_size_kv(0)
+    {
+    }
+
+    // Default constructor
+    fmha_fwd_args() = default;
 };
 
 struct fmha_fwd_pagedkv_args
@@ -1672,6 +1803,69 @@ struct fmha_fwd_traits
     bool skip_min_seqlen_q = false;
     bool has_sink          = false;
     // TODO: padding check is inside this api
+
+    // Legacy constructor for backward compatibility (old API with do_fp8_static_quant bool)
+    fmha_fwd_traits(int hdim_q_,
+                    int hdim_v_,
+                    std::string data_type_,
+                    bool is_group_mode_,
+                    bool is_v_rowmajor_,
+                    bool has_logits_soft_cap_,
+                    mask_enum mask_type_,
+                    bias_enum bias_type_,
+                    bool has_lse_,
+                    bool has_dropout_,
+                    bool do_fp8_static_quant_,
+                    bool skip_min_seqlen_q_ = false)
+        : hdim_q(hdim_q_),
+          hdim_v(hdim_v_),
+          data_type(std::move(data_type_)),
+          is_group_mode(is_group_mode_),
+          is_v_rowmajor(is_v_rowmajor_),
+          has_logits_soft_cap(has_logits_soft_cap_),
+          mask_type(mask_type_),
+          bias_type(bias_type_),
+          has_lse(has_lse_),
+          has_dropout(has_dropout_),
+          qscale_type(do_fp8_static_quant_ ? quant_scale_enum::static_quant
+                                           : quant_scale_enum::no_quant),
+          skip_min_seqlen_q(skip_min_seqlen_q_),
+          has_sink(false)
+    {
+    }
+
+    // Full constructor for new API (replaces aggregate initialization)
+    fmha_fwd_traits(int hdim_q_,
+                    int hdim_v_,
+                    std::string data_type_,
+                    bool is_group_mode_,
+                    bool is_v_rowmajor_,
+                    bool has_logits_soft_cap_,
+                    mask_enum mask_type_,
+                    bias_enum bias_type_,
+                    bool has_lse_,
+                    bool has_dropout_,
+                    quant_scale_enum qscale_type_,
+                    bool skip_min_seqlen_q_,
+                    bool has_sink_)
+        : hdim_q(hdim_q_),
+          hdim_v(hdim_v_),
+          data_type(std::move(data_type_)),
+          is_group_mode(is_group_mode_),
+          is_v_rowmajor(is_v_rowmajor_),
+          has_logits_soft_cap(has_logits_soft_cap_),
+          mask_type(mask_type_),
+          bias_type(bias_type_),
+          has_lse(has_lse_),
+          has_dropout(has_dropout_),
+          qscale_type(qscale_type_),
+          skip_min_seqlen_q(skip_min_seqlen_q_),
+          has_sink(has_sink_)
+    {
+    }
+
+    // Default constructor
+    fmha_fwd_traits() = default;
 };
 float fmha_fwd(fmha_fwd_traits, fmha_fwd_args, const ck_tile::stream_config&);
 
