@@ -35,6 +35,7 @@
 #include <Tensile/hip/HipUtils.hpp>
 
 #include <cstddef>
+#include <sstream>
 
 namespace TensileLite
 {
@@ -489,14 +490,26 @@ namespace TensileLite
                               << ", size = " << result.maxElements[i] << std::endl;
 
                 // Skip validation if pointers are null or maxElements is 0
-                // (e.g., when UseBeta=false, tensor C may not be allocated)
+                // Only tensor C can be null when beta is zero (UseBeta=false)
                 if(resPtr == nullptr || refPtr == nullptr || result.maxElements[i] == 0)
                 {
-                    if(Debug::Instance().printTensorInfo())
-                        std::cout << "Skipping validation for tensor " << tensor.getName()
-                                  << " (resPtr=" << resPtr << ", refPtr=" << refPtr
-                                  << ", maxElements=" << result.maxElements[i] << ")" << std::endl;
-                    continue;
+                    // Tensor C is allowed to be null when beta is zero (not used)
+                    bool isTensorC = (static_cast<ContractionProblemGemm::TENSOR>(i) == ContractionProblemGemm::TENSOR::C);
+                    bool isBetaZero = (problem.beta() == 0.0);
+
+                    if(isTensorC && isBetaZero)
+                    {
+                        if(Debug::Instance().printTensorInfo())
+                            std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
+                        continue;
+                    }
+
+                    // For all other cases, null pointers are an error
+                    std::stringstream ss;
+                    ss << "Unexpected null pointer or zero elements for tensor " << tensor.getName()
+                       << " (resPtr=" << resPtr << ", refPtr=" << refPtr
+                       << ", maxElements=" << result.maxElements[i] << ")";
+                    throw std::runtime_error(ss.str());
                 }
 
                 rv &= checkResults(
@@ -705,9 +718,33 @@ namespace TensileLite
             size_t bytesToCopy = elementsToCopy * sizeof(ValidType);
 
             // Skip validation if pointers are null or no bytes to copy
-            // (e.g., when UseBeta=false, tensor C may not be allocated)
+            // Only tensor C can be null when beta is zero (UseBeta=false)
             if(result == nullptr || reference == nullptr || bytesToCopy == 0 || maxElement == 0)
-                return true;
+            {
+                // Tensor C is allowed to be null when beta is zero (not used)
+                bool isTensorC = (tensor.getName() == "C");
+                bool isBetaZero = false;
+                if(m_problem != nullptr)
+                {
+                    auto* gemmProblem = dynamic_cast<ContractionProblemGemm const*>(m_problem);
+                    if(gemmProblem != nullptr)
+                        isBetaZero = (gemmProblem->beta() == 0.0);
+                }
+
+                if(isTensorC && isBetaZero)
+                {
+                    if(Debug::Instance().printTensorInfo())
+                        std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
+                    return true;
+                }
+
+                // For all other cases, null pointers or no data to validate is an error
+                std::stringstream ss;
+                ss << "Unexpected null pointer or no data for tensor " << tensor.getName()
+                   << " (result=" << result << ", reference=" << reference
+                   << ", bytesToCopy=" << bytesToCopy << ", maxElement=" << maxElement << ")";
+                throw std::runtime_error(ss.str());
+            }
 
             if(m_cpuResultBufferSize < bytesToCopy || m_cpuResultBuffer.get() == nullptr)
                 allocateResultBuffer(bytesToCopy);

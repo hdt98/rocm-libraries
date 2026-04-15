@@ -741,9 +741,6 @@ class ProblemType(Mapping):
     for key in _defaultProblemType:
       assignParameterWithDefault(self.state, key, config, _defaultProblemType)
 
-    # Ensure UseBeta is always a boolean for proper YAML serialization
-    self.state["UseBeta"] = bool(self.state["UseBeta"])
-
     # adjusting all data types
     if "DataType" in config:
       self["DataType"]  = DataType(config["DataType"])

@@ -806,10 +806,10 @@ namespace TensileLite
             // Skip copy if no elements to copy or if pointers are null (e.g., when UseBeta=false, tensor C may not be allocated)
             if(totalElements > 0 && dst != nullptr && src != nullptr)
             {
-                HIP_CHECK_EXC(hipMemcpy(dst, src, descriptor.elementBytes() * totalElements, kind));
+                HIP_CHECK_EXC(hipMemcpy(
+                    dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));
+                //HIP_CHECK_EXC(hipMemcpy(dst, src, descriptor.elementBytes() * totalElements, kind));
             }
-            HIP_CHECK_EXC(hipMemcpy(
-                dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));
             return dst;
         }
 
