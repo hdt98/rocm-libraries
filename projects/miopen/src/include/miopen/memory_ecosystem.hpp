@@ -11,6 +11,9 @@
 #include <iostream>
 #include <vector>
 
+// This addresses a Windows-specific issue on low-memory APUs. It does not do
+// anything in linux yet. Linux support will be added if/when it is needed.
+
 namespace
 {
     inline float GiB(size_t bytes)
