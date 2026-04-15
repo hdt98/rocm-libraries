@@ -124,6 +124,19 @@ def makeValidMFMA():
     validMFMA["F8B8N"] = validMFMA["F8N"]
     validMFMA["B8F8N"] = validMFMA["F8N"]
     validMFMA["F4"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F6F6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["B6B6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F6B6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["B6F6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F8F6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F6F8"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F8F4"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F4F8"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F6F4"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F4F6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["B6F4"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F4B6"] = [[16,16,128,1], [32,32,64,1]]
+    validMFMA["F4F4"] = [[16,16,128,1], [32,32,64,1]]
     validMFMA["_format9"] = []
 
     for MFMA in [
@@ -424,6 +437,8 @@ validParameters = { # we need to make sure this matches develop
     "UseSgprForGRO": [-1, 0, 1],
     # Use a 64-bit shadow limit register to allow buffers larger than 2^32 bytes
     "Use64bShadowLimit": [True, False],
+    # Use a 64-bit shadow limit register for MXSA/B to allow buffers larger than 2^32 bytes
+    "Use64bShadowLimitMX": [True, False],
     # Assertion properties
     # These provide information or assertions that the problem size meets certain requirements
     # for sizes or alignments.  The kernel generator can use this information to produce

@@ -252,7 +252,7 @@ def validateMIParameters(
 
     if not isSparse:
         if hasMFMA:
-            if not (miDataType.toChar() in validMFMA and mi4 in validMFMA[miDataType.toChar()]):
+            if not (miDataTypeKey in validMFMA and mi4 in validMFMA[miDataTypeKey]):
                 if miDataType.isBFloat16() and mi4 in validMFMA["B1k"]:  # but is valid bf16 MFMA
                     assert solution["MFMA_BF16_1K"], elineno()
                 else:
