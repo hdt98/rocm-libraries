@@ -399,13 +399,13 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
 
     // Kernel name and file
     const auto versionStr =
-        +[](ShaderModelFactory::KernelVersion kv, const std::string& dn) -> std::string {
+        [](ShaderModelFactory::KernelVersion kv, const std::string& dn) -> std::string {
         if(StartsWith(dn, "gfx12"))
             return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_1" : "_v4_9_1";
         return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_0" : "_v4_7_0";
     }(kernelVersion, devName);
 
-    const auto archStr = +[](const std::string& dn) -> std::string {
+    const auto archStr = [](const std::string& dn) -> std::string {
         if(StartsWith(dn, "gfx94"))
             return "_gfx9";
         if(StartsWith(dn, "gfx12"))
@@ -415,7 +415,7 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
 
     const std::string dTypeStr  = "_fp16_fp32acc";
     const std::string strideStr = "_stride1";
-    const auto winoVariantStr   = +[]() -> std::string {
+    const auto winoVariantStr   = []() -> std::string {
         if constexpr(Winodata == 2 && Winofilter == 3)
             return "_f2x3";
         else
@@ -440,7 +440,7 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
         {"ROCM_METADATA_VERSION", 5},
     };
     kernelInfo.comp_options = options.GenerateFor(kbp::GcnAsm{});
-    kernelInfo.comp_options += std::string(" -mcumode -mwavefrontsize64");
+    kernelInfo.comp_options += std::string(" -mcumode");
 
     uint64_t wgSize = 768U; // value for gfx942
     if(StartsWith(devName, "gfx12"))
