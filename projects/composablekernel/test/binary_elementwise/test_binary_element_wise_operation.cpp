@@ -33,7 +33,7 @@ bool is_close(T a, T b, float rtol = 1e-5f, float atol = 1e-5f)
 // Add Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Add_float_float_float)
+TEST(BinaryElementWiseOp_Host, Add_float_float_float)
 {
     Add op;
     float y;
@@ -41,22 +41,30 @@ TEST(BinaryElementWiseOp, Add_float_float_float)
     EXPECT_FLOAT_EQ(y, 4.0f);
 }
 
-TEST(BinaryElementWiseOp, Add_float_float_half)
+TEST(BinaryElementWiseOp_Host, Add_double_double_double)
+{
+    Add op;
+    double y;
+    op(y, 1.5, 2.5);
+    EXPECT_DOUBLE_EQ(y, 4.0);
+}
+
+TEST(BinaryElementWiseOp_Host, Add_float_float_half)
 {
     // This tests the fix: should convert half_t to float, not the other way
     Add op;
     float y;
     float x0       = 1.0f + 1e-6f; // Value with precision beyond half_t
     half_t x1      = type_convert<half_t>(2.0f);
-    float expected = x0 + 2.0f; // Should preserve x0's full precision
+    // Reference: x1 promoted to float (not x0 demoted to half_t)
+    float expected = x0 + type_convert<float>(x1);
 
     op(y, x0, x1);
 
-    // The result should be close to the float computation
     EXPECT_FLOAT_EQ(y, expected);
 }
 
-TEST(BinaryElementWiseOp, Add_half_float_half)
+TEST(BinaryElementWiseOp_Host, Add_half_float_half)
 {
     // This tests the fix: should compute in float, then convert to half_t
     Add op;
@@ -73,7 +81,7 @@ TEST(BinaryElementWiseOp, Add_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Add_half_half_half)
+TEST(BinaryElementWiseOp_Host, Add_half_half_half)
 {
     Add op;
     half_t y;
@@ -85,7 +93,7 @@ TEST(BinaryElementWiseOp, Add_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(4.0f)));
 }
 
-TEST(BinaryElementWiseOp, Add_bhalf_bhalf_bhalf)
+TEST(BinaryElementWiseOp_Host, Add_bhalf_bhalf_bhalf)
 {
     Add op;
     bhalf_t y;
@@ -101,7 +109,7 @@ TEST(BinaryElementWiseOp, Add_bhalf_bhalf_bhalf)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Add_bhalf_float_bhalf)
+TEST(BinaryElementWiseOp_Host, Add_bhalf_float_bhalf)
 {
     Add op;
     bhalf_t y;
@@ -120,7 +128,7 @@ TEST(BinaryElementWiseOp, Add_bhalf_float_bhalf)
 // Multiply Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Multiply_float_float_float)
+TEST(BinaryElementWiseOp_Host, Multiply_float_float_float)
 {
     Multiply op;
     float y;
@@ -128,21 +136,30 @@ TEST(BinaryElementWiseOp, Multiply_float_float_float)
     EXPECT_FLOAT_EQ(y, 6.0f);
 }
 
-TEST(BinaryElementWiseOp, Multiply_float_float_half)
+TEST(BinaryElementWiseOp_Host, Multiply_double_double_double)
+{
+    Multiply op;
+    double y;
+    op(y, 2.0, 3.0);
+    EXPECT_DOUBLE_EQ(y, 6.0);
+}
+
+TEST(BinaryElementWiseOp_Host, Multiply_float_float_half)
 {
     // This tests the fix: should convert half_t to float
     Multiply op;
     float y;
     float x0       = 1.0f + 1e-6f;
     half_t x1      = type_convert<half_t>(2.0f);
-    float expected = x0 * 2.0f;
+    // Reference: x1 promoted to float (not x0 demoted to half_t)
+    float expected = x0 * type_convert<float>(x1);
 
     op(y, x0, x1);
 
     EXPECT_FLOAT_EQ(y, expected);
 }
 
-TEST(BinaryElementWiseOp, Multiply_half_float_half)
+TEST(BinaryElementWiseOp_Host, Multiply_half_float_half)
 {
     // This tests the fix: should compute in float, then convert
     Multiply op;
@@ -158,7 +175,7 @@ TEST(BinaryElementWiseOp, Multiply_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Multiply_half_half_half)
+TEST(BinaryElementWiseOp_Host, Multiply_half_half_half)
 {
     Multiply op;
     half_t y;
@@ -170,7 +187,7 @@ TEST(BinaryElementWiseOp, Multiply_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(6.0f)));
 }
 
-TEST(BinaryElementWiseOp, Multiply_bhalf_bhalf_bhalf)
+TEST(BinaryElementWiseOp_Host, Multiply_bhalf_bhalf_bhalf)
 {
     Multiply op;
     bhalf_t y;
@@ -185,7 +202,7 @@ TEST(BinaryElementWiseOp, Multiply_bhalf_bhalf_bhalf)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Multiply_bhalf_float_bhalf)
+TEST(BinaryElementWiseOp_Host, Multiply_bhalf_float_bhalf)
 {
     Multiply op;
     bhalf_t y;
@@ -204,7 +221,7 @@ TEST(BinaryElementWiseOp, Multiply_bhalf_float_bhalf)
 // Bilinear Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Bilinear_float_float_float)
+TEST(BinaryElementWiseOp_Host, Bilinear_float_float_float)
 {
     Bilinear op(2.0f, 3.0f);
     float y;
@@ -213,7 +230,16 @@ TEST(BinaryElementWiseOp, Bilinear_float_float_float)
     EXPECT_FLOAT_EQ(y, 8.0f);
 }
 
-TEST(BinaryElementWiseOp, Bilinear_half_half_half)
+TEST(BinaryElementWiseOp_Host, Bilinear_double_double_double)
+{
+    Bilinear op(2.0f, 3.0f);
+    double y;
+    op(y, 1.0, 2.0);
+    // y = alpha * x0 + beta * x1 = 2.0 * 1.0 + 3.0 * 2.0 = 8.0
+    EXPECT_DOUBLE_EQ(y, 8.0);
+}
+
+TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half)
 {
     // This tests the fix: should compute in float precision
     Bilinear op(2.0f, 3.0f);
@@ -230,7 +256,7 @@ TEST(BinaryElementWiseOp, Bilinear_half_half_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Bilinear_half_half_half_precision)
+TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision)
 {
     // Test that precision is maintained with small alpha/beta
     Bilinear op(0.001f, 0.002f);
@@ -247,7 +273,7 @@ TEST(BinaryElementWiseOp, Bilinear_half_half_half_precision)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Bilinear_half_float_half)
+TEST(BinaryElementWiseOp_Host, Bilinear_half_float_half)
 {
     Bilinear op(2.0f, 3.0f);
     half_t y;
@@ -262,7 +288,7 @@ TEST(BinaryElementWiseOp, Bilinear_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Bilinear_bhalf_bhalf_bhalf)
+TEST(BinaryElementWiseOp_Host, Bilinear_bhalf_bhalf_bhalf)
 {
     Bilinear op(2.0f, 3.0f);
     bhalf_t y;
@@ -281,7 +307,7 @@ TEST(BinaryElementWiseOp, Bilinear_bhalf_bhalf_bhalf)
 // Subtract Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Subtract_float_float_float)
+TEST(BinaryElementWiseOp_Host, Subtract_float_float_float)
 {
     Subtract op;
     float y;
@@ -289,7 +315,15 @@ TEST(BinaryElementWiseOp, Subtract_float_float_float)
     EXPECT_FLOAT_EQ(y, 2.0f);
 }
 
-TEST(BinaryElementWiseOp, Subtract_half_half_half)
+TEST(BinaryElementWiseOp_Host, Subtract_double_double_double)
+{
+    Subtract op;
+    double y;
+    op(y, 5.0, 3.0);
+    EXPECT_DOUBLE_EQ(y, 2.0);
+}
+
+TEST(BinaryElementWiseOp_Host, Subtract_half_half_half)
 {
     Subtract op;
     half_t y;
@@ -301,7 +335,7 @@ TEST(BinaryElementWiseOp, Subtract_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(2.0f)));
 }
 
-TEST(BinaryElementWiseOp, Subtract_bhalf_bhalf_bhalf)
+TEST(BinaryElementWiseOp_Host, Subtract_bhalf_bhalf_bhalf)
 {
     Subtract op;
     bhalf_t y;
@@ -321,7 +355,7 @@ TEST(BinaryElementWiseOp, Subtract_bhalf_bhalf_bhalf)
 // ScaleAdd Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, ScaleAdd_float_float_half)
+TEST(BinaryElementWiseOp_Host, ScaleAdd_float_float_half)
 {
     ScaleAdd op(2.0f);
     float y;
@@ -334,7 +368,7 @@ TEST(BinaryElementWiseOp, ScaleAdd_float_float_half)
     EXPECT_FLOAT_EQ(y, 7.0f);
 }
 
-TEST(BinaryElementWiseOp, ScaleAdd_float_float_bhalf)
+TEST(BinaryElementWiseOp_Host, ScaleAdd_float_float_bhalf)
 {
     ScaleAdd op(2.0f);
     float y;
@@ -350,7 +384,7 @@ TEST(BinaryElementWiseOp, ScaleAdd_float_float_bhalf)
 // Max/Min Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Max_float)
+TEST(BinaryElementWiseOp_Host, Max_float)
 {
     Max op;
     float y;
@@ -361,7 +395,7 @@ TEST(BinaryElementWiseOp, Max_float)
     EXPECT_FLOAT_EQ(y, 7.0f);
 }
 
-TEST(BinaryElementWiseOp, Max_half)
+TEST(BinaryElementWiseOp_Host, Max_half)
 {
     Max op;
     half_t y;
@@ -372,7 +406,7 @@ TEST(BinaryElementWiseOp, Max_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(5.0f)));
 }
 
-TEST(BinaryElementWiseOp, Min_float)
+TEST(BinaryElementWiseOp_Host, Min_float)
 {
     Min op;
     float y;
@@ -383,7 +417,7 @@ TEST(BinaryElementWiseOp, Min_float)
     EXPECT_FLOAT_EQ(y, 2.0f);
 }
 
-TEST(BinaryElementWiseOp, Min_half)
+TEST(BinaryElementWiseOp_Host, Min_half)
 {
     Min op;
     half_t y;
@@ -398,7 +432,7 @@ TEST(BinaryElementWiseOp, Min_half)
 // AddClamp Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, AddClamp_float)
+TEST(BinaryElementWiseOp_Host, AddClamp_float)
 {
     AddClamp op(0.0f, 10.0f);
     float y;
@@ -416,7 +450,25 @@ TEST(BinaryElementWiseOp, AddClamp_float)
     EXPECT_FLOAT_EQ(y, 10.0f);
 }
 
-TEST(BinaryElementWiseOp, AddClamp_half_float_half)
+TEST(BinaryElementWiseOp_Host, AddClamp_double)
+{
+    AddClamp op(0.0f, 10.0f);
+    double y;
+
+    // Normal case
+    op(y, 3.0, 4.0);
+    EXPECT_DOUBLE_EQ(y, 7.0);
+
+    // Clamp to floor
+    op(y, -5.0, 2.0);
+    EXPECT_DOUBLE_EQ(y, 0.0);
+
+    // Clamp to ceil
+    op(y, 8.0, 5.0);
+    EXPECT_DOUBLE_EQ(y, 10.0);
+}
+
+TEST(BinaryElementWiseOp_Host, AddClamp_half_float_half)
 {
     AddClamp op(0.0f, 10.0f);
     half_t y;
@@ -428,7 +480,7 @@ TEST(BinaryElementWiseOp, AddClamp_half_float_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(7.0f)));
 }
 
-TEST(BinaryElementWiseOp, AddClamp_half_half_half)
+TEST(BinaryElementWiseOp_Host, AddClamp_half_half_half)
 {
     AddClamp op(0.0f, 10.0f);
     half_t y;
@@ -440,7 +492,7 @@ TEST(BinaryElementWiseOp, AddClamp_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(7.0f)));
 }
 
-TEST(BinaryElementWiseOp, AddClamp_bhalf_float_bhalf)
+TEST(BinaryElementWiseOp_Host, AddClamp_bhalf_float_bhalf)
 {
     AddClamp op(0.0f, 10.0f);
     bhalf_t y;
@@ -459,7 +511,7 @@ TEST(BinaryElementWiseOp, AddClamp_bhalf_float_bhalf)
 // AddRelu Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, AddRelu_float)
+TEST(BinaryElementWiseOp_Host, AddRelu_float)
 {
     AddRelu op;
     float y;
@@ -473,7 +525,21 @@ TEST(BinaryElementWiseOp, AddRelu_float)
     EXPECT_FLOAT_EQ(y, 0.0f);
 }
 
-TEST(BinaryElementWiseOp, AddRelu_half_float_half)
+TEST(BinaryElementWiseOp_Host, AddRelu_double)
+{
+    AddRelu op;
+    double y;
+
+    // Positive result
+    op(y, 3.0, 4.0);
+    EXPECT_DOUBLE_EQ(y, 7.0);
+
+    // Negative sum -> relu to 0
+    op(y, -5.0, 2.0);
+    EXPECT_DOUBLE_EQ(y, 0.0);
+}
+
+TEST(BinaryElementWiseOp_Host, AddRelu_half_float_half)
 {
     AddRelu op;
     half_t y;
@@ -490,7 +556,7 @@ TEST(BinaryElementWiseOp, AddRelu_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, AddRelu_half_half_half)
+TEST(BinaryElementWiseOp_Host, AddRelu_half_half_half)
 {
     AddRelu op;
     half_t y;
@@ -502,7 +568,7 @@ TEST(BinaryElementWiseOp, AddRelu_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(7.0f)));
 }
 
-TEST(BinaryElementWiseOp, AddRelu_half_half_half_negative)
+TEST(BinaryElementWiseOp_Host, AddRelu_half_half_half_negative)
 {
     AddRelu op;
     half_t y;
@@ -514,7 +580,7 @@ TEST(BinaryElementWiseOp, AddRelu_half_half_half_negative)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(0.0f)));
 }
 
-TEST(BinaryElementWiseOp, AddRelu_bhalf_float_bhalf)
+TEST(BinaryElementWiseOp_Host, AddRelu_bhalf_float_bhalf)
 {
     AddRelu op;
     bhalf_t y;
@@ -534,7 +600,7 @@ TEST(BinaryElementWiseOp, AddRelu_bhalf_float_bhalf)
 // AddHardswish Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, AddHardswish_float)
+TEST(BinaryElementWiseOp_Host, AddHardswish_float)
 {
     AddHardswish op;
     float y;
@@ -552,7 +618,25 @@ TEST(BinaryElementWiseOp, AddHardswish_float)
     EXPECT_NEAR(y, 0.0f, 1e-5f);
 }
 
-TEST(BinaryElementWiseOp, AddHardswish_half)
+TEST(BinaryElementWiseOp_Host, AddHardswish_double)
+{
+    AddHardswish op;
+    double y;
+
+    // x = 0 -> hardswish(0) = 0
+    op(y, 0.0, 0.0);
+    EXPECT_NEAR(y, 0.0, 1e-10);
+
+    // x = 6 -> hardswish(6) = 6
+    op(y, 3.0, 3.0);
+    EXPECT_NEAR(y, 6.0, 1e-10);
+
+    // x = -3 -> hardswish(-3) = 0 (since b = x + 3 = 0)
+    op(y, -1.5, -1.5);
+    EXPECT_NEAR(y, 0.0, 1e-10);
+}
+
+TEST(BinaryElementWiseOp_Host, AddHardswish_half)
 {
     AddHardswish op;
     half_t y;
@@ -570,7 +654,7 @@ TEST(BinaryElementWiseOp, AddHardswish_half)
 // Note: These test current behavior. half_t version has precision TODO.
 // =============================================================================
 
-TEST(BinaryElementWiseOp, AddFastGelu_float)
+TEST(BinaryElementWiseOp_Host, AddFastGelu_float)
 {
     AddFastGelu op;
     float y;
@@ -584,7 +668,7 @@ TEST(BinaryElementWiseOp, AddFastGelu_float)
     EXPECT_NEAR(y, 1.9545f, 0.01f);
 }
 
-TEST(BinaryElementWiseOp, AddFastGelu_half_float_half)
+TEST(BinaryElementWiseOp_Host, AddFastGelu_half_float_half)
 {
     AddFastGelu op;
     half_t y;
@@ -597,7 +681,7 @@ TEST(BinaryElementWiseOp, AddFastGelu_half_float_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(1.9545f), 0.01f, 0.01f));
 }
 
-TEST(BinaryElementWiseOp, AddFastGelu_half_half_half)
+TEST(BinaryElementWiseOp_Host, AddFastGelu_half_half_half)
 {
     // TODO: This version computes in half_t - may have precision issues
     AddFastGelu op;
@@ -611,7 +695,7 @@ TEST(BinaryElementWiseOp, AddFastGelu_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(1.9545f), 0.05f, 0.05f));
 }
 
-TEST(BinaryElementWiseOp, AddFastGelu_bhalf_bhalf_bhalf)
+TEST(BinaryElementWiseOp_Host, AddFastGelu_bhalf_bhalf_bhalf)
 {
     AddFastGelu op;
     bhalf_t y;
@@ -628,7 +712,7 @@ TEST(BinaryElementWiseOp, AddFastGelu_bhalf_bhalf_bhalf)
 // MultiplyFastGelu Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, MultiplyFastGelu_float)
+TEST(BinaryElementWiseOp_Host, MultiplyFastGelu_float)
 {
     MultiplyFastGelu op;
     float y;
@@ -638,7 +722,7 @@ TEST(BinaryElementWiseOp, MultiplyFastGelu_float)
     EXPECT_NEAR(y, 1.9545f, 0.01f);
 }
 
-TEST(BinaryElementWiseOp, MultiplyFastGelu_half_float_half)
+TEST(BinaryElementWiseOp_Host, MultiplyFastGelu_half_float_half)
 {
     MultiplyFastGelu op;
     half_t y;
@@ -650,7 +734,7 @@ TEST(BinaryElementWiseOp, MultiplyFastGelu_half_float_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(1.9545f), 0.01f, 0.01f));
 }
 
-TEST(BinaryElementWiseOp, MultiplyFastGelu_half_half_half)
+TEST(BinaryElementWiseOp_Host, MultiplyFastGelu_half_half_half)
 {
     // TODO: This version computes in half_t - may have precision issues
     MultiplyFastGelu op;
@@ -667,7 +751,7 @@ TEST(BinaryElementWiseOp, MultiplyFastGelu_half_half_half)
 // AddSilu Tests
 // =============================================================================
 
-TEST(BinaryElementWiseOp, AddSilu_float)
+TEST(BinaryElementWiseOp_Host, AddSilu_float)
 {
     AddSilu op;
     float y;
@@ -682,7 +766,7 @@ TEST(BinaryElementWiseOp, AddSilu_float)
     EXPECT_NEAR(y, 1.7616f, 0.01f);
 }
 
-TEST(BinaryElementWiseOp, AddSilu_half_float_half)
+TEST(BinaryElementWiseOp_Host, AddSilu_half_float_half)
 {
     AddSilu op;
     half_t y;
@@ -694,7 +778,7 @@ TEST(BinaryElementWiseOp, AddSilu_half_float_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(1.7616f), 0.01f, 0.01f));
 }
 
-TEST(BinaryElementWiseOp, AddSilu_half_half_half)
+TEST(BinaryElementWiseOp_Host, AddSilu_half_half_half)
 {
     // TODO: This version computes in half_t - may have precision issues
     AddSilu op;
@@ -707,7 +791,7 @@ TEST(BinaryElementWiseOp, AddSilu_half_half_half)
     EXPECT_TRUE(is_close(y, type_convert<half_t>(1.7616f), 0.05f, 0.05f));
 }
 
-TEST(BinaryElementWiseOp, AddSilu_bhalf_float_bhalf)
+TEST(BinaryElementWiseOp_Host, AddSilu_bhalf_float_bhalf)
 {
     AddSilu op;
     bhalf_t y;
@@ -724,7 +808,7 @@ TEST(BinaryElementWiseOp, AddSilu_bhalf_float_bhalf)
 // These tests specifically verify the fixes we made don't regress
 // =============================================================================
 
-TEST(BinaryElementWiseOp, Add_float_float_half_precision_regression)
+TEST(BinaryElementWiseOp_Host, Add_float_float_half_precision_regression)
 {
     // Before fix: y = x0 + type_convert<half_t>(x1) would lose x0 precision
     // After fix:  y = x0 + type_convert<float>(x1) preserves x0 precision
@@ -741,7 +825,7 @@ TEST(BinaryElementWiseOp, Add_float_float_half_precision_regression)
     EXPECT_FLOAT_EQ(y, x0);
 }
 
-TEST(BinaryElementWiseOp, Multiply_half_float_half_precision_regression)
+TEST(BinaryElementWiseOp_Host, Multiply_half_float_half_precision_regression)
 {
     // Before fix: y = type_convert<half_t>(x0) * x1 lost precision in x0
     // After fix:  y = type_convert<half_t>(x0 * type_convert<float>(x1))
@@ -760,7 +844,7 @@ TEST(BinaryElementWiseOp, Multiply_half_float_half_precision_regression)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOp, Bilinear_half_half_half_precision_regression)
+TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision_regression)
 {
     // Before fix: computed entirely in half_t including alpha/beta
     // After fix:  promotes to float for computation
@@ -830,23 +914,24 @@ Y run_bilinear_on_device(X0 x0, X1 x1, Bilinear op)
 // Device Add Tests
 // -----------------------------------------------------------------------------
 
-TEST(BinaryElementWiseOpDevice, Add_float_float_float)
+TEST(BinaryElementWiseOp_Device, Add_float_float_float)
 {
     float y = run_binary_op_on_device<Add, float>(1.5f, 2.5f);
     EXPECT_FLOAT_EQ(y, 4.0f);
 }
 
-TEST(BinaryElementWiseOpDevice, Add_float_float_half)
+TEST(BinaryElementWiseOp_Device, Add_float_float_half)
 {
     // Test precision fix on device: should convert half_t to float, not the other way
     float x0       = 1.0f + 1e-6f; // Value with precision beyond half_t
     half_t x1      = type_convert<half_t>(2.0f);
     float y        = run_binary_op_on_device<Add, float>(x0, x1);
-    float expected = x0 + 2.0f;
+    // Reference: x1 promoted to float (not x0 demoted to half_t)
+    float expected = x0 + type_convert<float>(x1);
     EXPECT_FLOAT_EQ(y, expected);
 }
 
-TEST(BinaryElementWiseOpDevice, Add_half_float_half)
+TEST(BinaryElementWiseOp_Device, Add_half_float_half)
 {
     // Test precision fix on device: should compute in float, then convert to half_t
     float x0    = 1000.0f;
@@ -857,7 +942,7 @@ TEST(BinaryElementWiseOpDevice, Add_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOpDevice, Add_half_half_half)
+TEST(BinaryElementWiseOp_Device, Add_half_half_half)
 {
     half_t x0 = type_convert<half_t>(1.5f);
     half_t x1 = type_convert<half_t>(2.5f);
@@ -869,23 +954,24 @@ TEST(BinaryElementWiseOpDevice, Add_half_half_half)
 // Device Multiply Tests
 // -----------------------------------------------------------------------------
 
-TEST(BinaryElementWiseOpDevice, Multiply_float_float_float)
+TEST(BinaryElementWiseOp_Device, Multiply_float_float_float)
 {
     float y = run_binary_op_on_device<Multiply, float>(2.0f, 3.0f);
     EXPECT_FLOAT_EQ(y, 6.0f);
 }
 
-TEST(BinaryElementWiseOpDevice, Multiply_float_float_half)
+TEST(BinaryElementWiseOp_Device, Multiply_float_float_half)
 {
     // Test precision fix on device: should convert half_t to float
     float x0       = 1.0f + 1e-6f;
     half_t x1      = type_convert<half_t>(2.0f);
     float y        = run_binary_op_on_device<Multiply, float>(x0, x1);
-    float expected = x0 * 2.0f;
+    // Reference: x1 promoted to float (not x0 demoted to half_t)
+    float expected = x0 * type_convert<float>(x1);
     EXPECT_FLOAT_EQ(y, expected);
 }
 
-TEST(BinaryElementWiseOpDevice, Multiply_half_float_half)
+TEST(BinaryElementWiseOp_Device, Multiply_half_float_half)
 {
     // Test precision fix on device: should compute in float, then convert
     float x0    = 100.0f;
@@ -896,7 +982,7 @@ TEST(BinaryElementWiseOpDevice, Multiply_half_float_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOpDevice, Multiply_half_half_half)
+TEST(BinaryElementWiseOp_Device, Multiply_half_half_half)
 {
     half_t x0 = type_convert<half_t>(2.0f);
     half_t x1 = type_convert<half_t>(3.0f);
@@ -908,14 +994,14 @@ TEST(BinaryElementWiseOpDevice, Multiply_half_half_half)
 // Device Bilinear Tests
 // -----------------------------------------------------------------------------
 
-TEST(BinaryElementWiseOpDevice, Bilinear_float_float_float)
+TEST(BinaryElementWiseOp_Device, Bilinear_float_float_float)
 {
     // y = alpha * x0 + beta * x1 = 2.0 * 1.0 + 3.0 * 2.0 = 8.0
     float y = run_bilinear_on_device<float>(1.0f, 2.0f, Bilinear(2.0f, 3.0f));
     EXPECT_FLOAT_EQ(y, 8.0f);
 }
 
-TEST(BinaryElementWiseOpDevice, Bilinear_half_half_half)
+TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half)
 {
     // Test precision fix on device: should compute in float precision
     half_t x0   = type_convert<half_t>(1.0f);
@@ -926,7 +1012,7 @@ TEST(BinaryElementWiseOpDevice, Bilinear_half_half_half)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOpDevice, Bilinear_half_half_half_precision)
+TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision)
 {
     // Test precision with small alpha/beta on device
     half_t x0   = type_convert<half_t>(100.0f);
@@ -942,7 +1028,7 @@ TEST(BinaryElementWiseOpDevice, Bilinear_half_half_half_precision)
 // These tests specifically verify the fixes work correctly on GPU
 // -----------------------------------------------------------------------------
 
-TEST(BinaryElementWiseOpDevice, Add_float_float_half_precision_regression)
+TEST(BinaryElementWiseOp_Device, Add_float_float_half_precision_regression)
 {
     // Before fix: y = x0 + type_convert<half_t>(x1) would lose x0 precision
     // After fix:  y = x0 + type_convert<float>(x1) preserves x0 precision
@@ -952,7 +1038,7 @@ TEST(BinaryElementWiseOpDevice, Add_float_float_half_precision_regression)
     EXPECT_FLOAT_EQ(y, x0);
 }
 
-TEST(BinaryElementWiseOpDevice, Multiply_half_float_half_precision_regression)
+TEST(BinaryElementWiseOp_Device, Multiply_half_float_half_precision_regression)
 {
     // Before fix: y = type_convert<half_t>(x0) * x1 lost precision in x0
     // After fix:  y = type_convert<half_t>(x0 * type_convert<float>(x1))
@@ -964,7 +1050,7 @@ TEST(BinaryElementWiseOpDevice, Multiply_half_float_half_precision_regression)
     EXPECT_EQ(y, ref);
 }
 
-TEST(BinaryElementWiseOpDevice, Bilinear_half_half_half_precision_regression)
+TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision_regression)
 {
     // Before fix: computed entirely in half_t including alpha/beta
     // After fix:  promotes to float for computation

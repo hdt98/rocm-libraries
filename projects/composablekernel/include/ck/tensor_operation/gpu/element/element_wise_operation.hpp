@@ -136,11 +136,11 @@ struct AddHardswishAdd
     __host__ __device__ constexpr void operator()<half_t, half_t, half_t, half_t>(
         half_t& y, const half_t& x0, const half_t& x1, const half_t& x2) const
     {
-        float a = x0 + x1;
+        float a = type_convert<float>(x0) + type_convert<float>(x1);
         float b = a + float{3};
         float c = (b > 0) * (b > float{6} ? float{6} : b) * a * (1.0f / 6.0f);
-        float d = c + x2;
-        y       = d;
+        float d = c + type_convert<float>(x2);
+        y       = type_convert<half_t>(d);
     }
 };
 

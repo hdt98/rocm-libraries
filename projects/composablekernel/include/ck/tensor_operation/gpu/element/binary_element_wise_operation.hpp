@@ -571,10 +571,10 @@ struct AddHardswish
     __host__ __device__ constexpr void
     operator()<half_t>(half_t& y, const half_t& x0, const half_t& x1) const
     {
-        float a = x0 + x1;
+        float a = type_convert<float>(x0) + type_convert<float>(x1);
         float b = a + 3.0f;
         float c = (b > 0) * (b > 6.0f ? 6.0f : b) * a * (1.0f / 6.0f);
-        y       = c;
+        y       = type_convert<half_t>(c);
     };
 };
 
