@@ -704,6 +704,35 @@ struct UniversalGemmKernel
             }
         }
 
+        // Verify Stream-K conditions
+        if constexpr(IsStreamK)
+        {
+            // Stream-K can only be used with k_batch of 1
+            if(kargs.k_batch > 1)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("Stream-K can only be used when k_batch is 1!");
+                }
+
+                return false;
+            }
+
+            // Stream-K does not support multiple D tensors with the Atomic reduction strategy
+            // because multiple workgroups will run the Epilogue, applying the D tensors more than
+            // once.
+            if(NumDTensor > 0 && UseStreamK<TilePartitioner>::use_atomics)
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR(
+                        "Stream-K does not support D tensors with the Atomic reduction strategy!");
+                }
+
+                return false;
+            }
+        }
+
         return AsTensorIsValid && BsTensorIsValid && DTensorIsValid;
     }
 
