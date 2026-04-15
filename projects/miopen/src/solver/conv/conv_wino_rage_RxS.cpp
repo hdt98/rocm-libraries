@@ -398,8 +398,8 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
     args.SetShaderParams(nGroups, flags, 0, 0);
 
     // Kernel name and file
-    const auto versionStr =
-        [](ShaderModelFactory::KernelVersion kv, const std::string& dn) -> std::string {
+    const auto versionStr = [](ShaderModelFactory::KernelVersion kv,
+                               const std::string& dn) -> std::string {
         if(StartsWith(dn, "gfx12"))
             return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_1" : "_v4_9_1";
         return (kv == ShaderModelFactory::KernelVersion::V4_6) ? "_v4_6_0" : "_v4_7_0";
