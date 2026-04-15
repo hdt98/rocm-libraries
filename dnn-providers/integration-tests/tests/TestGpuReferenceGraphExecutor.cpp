@@ -413,7 +413,7 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneMultiDimensional)
     }
 }
 
-TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32BasicExecutes)
+TEST(TestGpuReferenceGraphExecutorFp32, ConvFwdBasicExecutes)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -427,7 +427,7 @@ TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32BasicExecutes)
                                    1e-5);
 }
 
-TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32WithPaddingExecutes)
+TEST(TestGpuReferenceGraphExecutorFp32, ConvFwdWithPaddingExecutes)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -441,7 +441,7 @@ TEST(TestGpuReferenceGraphExecutor, ConvFwdFp32WithPaddingExecutes)
                                    1e-5);
 }
 
-TEST(TestGpuReferenceGraphExecutor, ConvFwdFp16Executes)
+TEST(TestGpuReferenceGraphExecutorFp16, ConvFwdExecutes)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -455,7 +455,7 @@ TEST(TestGpuReferenceGraphExecutor, ConvFwdFp16Executes)
                                                           0.01);
 }
 
-TEST(TestGpuReferenceGraphExecutor, ConvFwdBfp16Executes)
+TEST(TestGpuReferenceGraphExecutorBfp16, ConvFwdExecutes)
 {
     SKIP_IF_NO_DEVICES();
 
