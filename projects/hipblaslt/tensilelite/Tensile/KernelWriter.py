@@ -37,7 +37,7 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB192, BufferLoadB32, Bu
   FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
   MXMFMAInstruction, MFMAInstruction, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpLeU32, \
   SMFMAInstruction, SNop, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
-  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VNop
+  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VReadfirstlaneB32, VNop
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType, DataTypeEnum
 
@@ -4049,6 +4049,23 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return module
 
   ##############################################################################
+  # StreamK Constants In VGPRs
+  ##############################################################################
+  def isStreamKConstantsToVgprEnabled(self, kernel):
+    return kernel["ISA"] == IsaVersion(12,5,0)
+
+  def allocStreamKConstSgpr(self, kernel, module, name):
+    if self.isStreamKConstantsToVgprEnabled(kernel):
+      sTmp = self.sgprPool.checkOut(1, name)
+      module.add(VReadfirstlaneB32(dst=sgpr(sTmp), src=vgpr(self.states.skConstVgprs[name])))
+      return sTmp
+    return name
+
+  def releaseStreamKConstSgpr(self, nameOrIdx):
+    if isinstance(nameOrIdx, int):
+      self.sgprPool.checkIn(nameOrIdx)
+
+  ##############################################################################
   # Move StreamK Constants to VGPRs
   ##############################################################################
   def moveStreamKConstantsToVgpr(self, kernel):
@@ -4109,8 +4126,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.add(self.defineAndResources(kernel, tensorParametersA, tensorParametersB, tPM))
     module.add(self.disableWmmaArbStall())
 
-    # SK constants are now moved to VGPRs inside defineAndResources,
-    # before defineVariableSgprs, so freed slots can be reused.
+    # gfx1250 moves SK constants to VGPRs inside defineAndResources so the
+    # freed SGPR slots can be reused before defineVariableSgprs runs.
 
     # Initialize stream-k loop
     skComponent = Component.StreamK.find(self)
@@ -7126,7 +7143,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.b.startVgprCvt = vgprIdx
       vgprIdx += numVgprsEmuB # for vgpr 32XEmulation B
 
-    if kernel["StreamK"]:
+    if kernel["StreamK"] and self.isStreamKConstantsToVgprEnabled(kernel):
       numSKConsts = 5  # ItersPerTile, MagicNumberItersPerTile, MagicShiftItersPerTile, SKItersPerWG, StreamKIdx
       if kernel["StreamK"] >= 2:
         numSKConsts += 2  # skGrid, skTiles
@@ -7409,7 +7426,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("GSU", 1)  # Can't move to the front because of the preload arguments
 
     if kernel["StreamK"]:
-      # StreamK vars (StreamKIdx moved to VGPR, see moveStreamKConstantsToVgpr)
+      # StreamK vars.
+      if not self.isStreamKConstantsToVgprEnabled(kernel):
+        self.defineSgpr("StreamKIdx", 1)
       self.defineSgpr("StreamKIter", 1)
       self.defineSgpr("StreamKIterEnd", 1)
       self.defineSgpr("StreamKLocalStart", 1)
@@ -7423,9 +7442,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.addSgprVarToPool("SrdC")
     if kernel["StreamK"] and kernel["StreamKAtomic"] == 0:
       self.addSgprVarToPool("SrdWS")
-    # SK constant SGPRs are NOT freed here — they are freed in
-    # moveStreamKConstantsToVgpr after their values have been copied to VGPRs.
-    # Freeing them here would allow temp allocs to clobber the kernel arguments.
+    # gfx1250 frees the SK constant SGPRs later in moveStreamKConstantsToVgpr
+    # after their values have been copied to VGPRs. Freeing them here would let
+    # temp allocs clobber kernel arguments before they are copied.
     #------------------------
     # Registers defined below this point are not available in the post-loop
     # Post-loop is after tail loop exits, ie the store code.
