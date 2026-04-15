@@ -53,7 +53,6 @@ protected:
     miopen::ActivationDescriptor activ_desc;
     tensor<T> bias;
     miopen::Allocator::ManageDataPtr bias_dev;
-    bool test_skipped = false;
     miopenActivationMode_t activ_mode;
     /*
     miopen::FusionPlanDescriptor fusePlanDesc;
@@ -73,10 +72,11 @@ protected:
 
     void SetUp() override
     {
-        test_skipped                                     = false;
         std::tie(activ_mode, conv_config, tensor_layout) = GetParam();
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
+        if(cfsb::test_skipped) { MIOPEN_LOG_E("Skipped from base!"); return; } // TRJS
+
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         bias       = tensor<T>{1, static_cast<size_t>(conv_config.k), 1, 1};
         bias.generate(tensor_elem_gen_integer{3});
@@ -97,7 +97,7 @@ protected:
 
     void TearDown() override
     {
-        if(test_skipped)
+        if(cfsb::test_skipped)
             return;
         ValidateResult();
     }

@@ -51,11 +51,12 @@ struct ConvActivInferTest : public ::testing::TestWithParam<std::tuple<miopenAct
 protected:
     void SetUp() override
     {
-        test_skipped = false;
         std::tie(activ_mode, conv_config, tensor_layout, activ_alpha, activ_beta, activ_gamma) =
             this->GetParam();
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
+        if(cfsb::test_skipped) { MIOPEN_LOG_E("Skipped from base!"); return; } // TRJS
+
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         std::fill(
             cfsb::output.begin(), cfsb::output.end(), std::numeric_limits<double>::quiet_NaN());
@@ -72,7 +73,7 @@ protected:
     }
     void TearDown() override
     {
-        if(test_skipped)
+        if(cfsb::test_skipped)
             return;
         conv_stats stats;
         cfsb::TearDownConv();
@@ -87,7 +88,6 @@ protected:
     }
     TestCaseType conv_config;
     miopen::ActivationDescriptor activ_desc;
-    bool test_skipped = false;
     miopenActivationMode_t activ_mode;
     miopen::FusionPlanDescriptor fusePlanDesc;
     miopen::OperatorArgs params;
