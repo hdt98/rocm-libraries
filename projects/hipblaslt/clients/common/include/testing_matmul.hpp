@@ -1402,8 +1402,7 @@ void testing_matmul(const Arguments& arg)
     {
         if(arg.timing)
         {
-            hipblaslt_cerr << "WARNING: multi_macrotile is currently only supported in verification mode (without --timing). "
-                          << "Performance benchmarking with multi_macrotile will be added in the future." << std::endl;
+            hipblaslt_cout << "INFO: Running multi_macrotile in verification-only mode (timing disabled)." << std::endl;
         }
         if(arg.grouped_gemm > 0)
         {
@@ -3948,6 +3947,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                     // Multi-MacroTile support: split problem into sub-problems
                     if(arg.multi_macrotile && gemm_count == 1)
                     {
+                        hipblaslt_cout << std::endl << "####### MULTI-MACROTILE EXECUTION STARTING #######" << std::endl << std::endl;
+
                         // Get device properties for CU count
                         hipDeviceProp_t deviceProps;
                         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));

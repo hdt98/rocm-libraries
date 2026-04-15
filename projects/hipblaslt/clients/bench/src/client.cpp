@@ -1026,6 +1026,15 @@ try
     }
 
     arg.norm_check_assert = false;
+
+    // If multi_macrotile is enabled, force timing OFF (only verification mode is supported)
+    if(arg.multi_macrotile)
+    {
+        std::cout << "DEBUG: multi_macrotile enabled, arg.timing before=" << arg.timing << std::endl;
+        arg.timing = 0;
+        std::cout << "DEBUG: multi_macrotile enabled, arg.timing after=" << arg.timing << std::endl;
+    }
+
     return run_bench_test(arg, filter, any_stride, props);
 }
 catch(const std::invalid_argument& exp)
