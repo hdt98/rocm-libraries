@@ -959,7 +959,75 @@ validParameters = { # we need to make sure this matches develop
     # 1: Use TDM for A
     # 2: Use TDM for B
     # 3: Use TDM for both A and B
-    "TDMInst": [0, 1, 2, 3]
+    "TDMInst": [0, 1, 2, 3],
+    # Bias support for GEMM operations
+    # 0: No bias
+    # 1: Bias vector on M direction
+    # 2: Bias vector on N direction
+    # 3: Bias vector on both M and N directions
+    "UseBias": [0, 1, 2, 3],
+    # Alpha vector scaling support
+    # 0: Disabled
+    # 1: Alpha vector on M direction
+    # 2: Alpha vector on N direction
+    # 3: Alpha vector on both M and N directions
+    "UseScaleAlphaVec": [0, 1, 2, 3],
+    # MX (microscaling) block size for matrix A
+    # 0: Disabled
+    # 16, 32: Valid MX block sizes
+    "MXBlockA": [0, 16, 32],
+    # MX (microscaling) block size for matrix B
+    # 0: Disabled
+    # 16, 32: Valid MX block sizes
+    "MXBlockB": [0, 16, 32],
+    # Enable beta scaling in GEMM operation (D = alpha*A*B + beta*C)
+    # False: beta is not used (beta = 0)
+    # True: beta is used
+    "UseBeta": [False, True],
+    # Enable auxiliary output matrix E
+    # False: E output is not used
+    # True: E output is used
+    "UseE": [False, True],
+    # Enable gradient computation
+    # False: gradient computation is not used
+    # True: gradient computation is used
+    "Gradient": [False, True],
+    # Enable scaling for C and D matrices
+    # False: scaling for C and D is not used
+    # True: scaling for C and D is used
+    "UseScaleCD": [False, True],
+    # Enable high precision accumulate
+    # False: standard precision accumulation
+    # True: high precision accumulation
+    "HighPrecisionAccumulate": [False, True],
+    # Enable silent high precision accumulate (no warning if downcast occurs)
+    # False: warnings enabled for precision downcasts
+    # True: silent mode for precision downcasts
+    "SilentHighPrecisionAccumulate": [False, True],
+    # Enable strided batched GEMM
+    # False: not strided batched
+    # True: strided batched GEMM
+    "StridedBatched": [False, True],
+    # Enable grouped GEMM
+    # False: not grouped GEMM
+    # True: grouped GEMM
+    "GroupedGemm": [False, True],
+    # Use initial strides for A and B matrices
+    # False: do not use initial strides for A and B
+    # True: use initial strides for A and B
+    "UseInitialStridesAB": [False, True],
+    # Use initial strides for C and D matrices
+    # False: do not use initial strides for C and D
+    # True: use initial strides for C and D
+    "UseInitialStridesCD": [False, True],
+    # Allow problems with no free dimensions
+    # False: do not allow problems with no free dimensions
+    # True: allow problems with no free dimensions
+    "AllowNoFreeDims": [False, True],
+    # Enable tile-aware solution selection
+    # False: disable tile-aware selection
+    # True: enable tile-aware selection
+    "TileAwareSelection": [False, True]
 }
 
 newMIValidParameters = {
