@@ -16,6 +16,7 @@
 #include "descriptors/EngineHeuristicDescriptor.hpp"
 #include "descriptors/GraphDescriptor.hpp"
 #include "handle/Handle.hpp"
+#include "heuristics/DeviceProperties.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"

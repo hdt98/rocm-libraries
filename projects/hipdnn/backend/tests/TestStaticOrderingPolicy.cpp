@@ -254,9 +254,9 @@ TEST_F(StaticOrderingPolicyTest, UnknownEngineIdsHandledGracefully)
 {
     // Engines with unknown IDs should be treated as middle-priority
     std::vector<int64_t> engines = {
-        0x1234567890ABCDEF, // Unknown ID
+        static_cast<int64_t>(0x1234567890ABCDEF), // Unknown ID
         engineNameToId("MIOpen"),
-        0xFEDCBA0987654321, // Another unknown ID
+        static_cast<int64_t>(0xFEDCBA0987654321), // Another unknown ID
     };
 
     std::vector<int64_t> sorted = engines;
