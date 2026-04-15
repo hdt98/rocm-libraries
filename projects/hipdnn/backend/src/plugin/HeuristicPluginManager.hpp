@@ -64,7 +64,7 @@ protected:
                                       + " already exists in the list of loaded heuristic plugins");
         }
 
-        // Validate policy ID ↔ policy name consistency (RFC §11, §5.3.1)
+        // Validate policy ID ↔ policy name consistency (RFC 0007 §11, §5.3.1)
         // If GetPolicyName is provided, engineNameToId(name) MUST equal GetPolicyId()
         auto policyNameView = plugin.policyName();
         if(!policyNameView.empty())
@@ -78,7 +78,7 @@ protected:
                     "Policy ID mismatch: GetPolicyId() returned " + std::to_string(policyId)
                         + " but engineNameToId(\"" + policyName + "\") = "
                         + std::to_string(expectedId)
-                        + ". Plugin must return consistent ID and name (RFC §11, §5.3.1)");
+                        + ". Plugin must return consistent ID and name (RFC 0007 §11, §5.3.1)");
             }
         }
     }
