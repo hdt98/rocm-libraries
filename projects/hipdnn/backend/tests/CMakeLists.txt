@@ -91,12 +91,16 @@ add_executable(
     TestFlatbufferUtilities.cpp
     TestHandle.cpp
     TestHelpers.cpp
+    TestHeuristicPluginIntegration.cpp
+    TestHeuristicPolicyFramework.cpp
     TestBackendLogger.cpp
     TestGraphLogger.cpp
+    heuristics/TestDeviceProperties.cpp
     TestUserLoggingApis.cpp
     TestPlatformUtils.cpp
     TestPlugin.cpp
     TestSharedLibrary.cpp
+    TestStaticOrderingPolicy.cpp
     TestVersion.cpp
     utilities/TestEngineOrdering.cpp
 )

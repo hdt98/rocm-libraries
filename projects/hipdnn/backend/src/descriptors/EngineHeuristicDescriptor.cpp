@@ -68,7 +68,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
         HIPDNN_BACKEND_LOG_DEBUG(
             "Using environment variable policy order: {} policies", policyNames.size());
     }
-    // 4. Default policy list per RFC Section 5.3
+    // 4. Default policy list per RFC 0007 Section 5.3
     else
     {
         policyNames = {
@@ -153,13 +153,13 @@ void EngineHeuristicDescriptor::finalize()
     // Get candidate engine IDs from engine plugins
     auto candidates = engineRm->getApplicableEngineIds(_graph.get(), _findFirst);
 
-    // RFC Section 6 & 13.2: Query and serialize device properties
+    // RFC 0007 Section 6 & 13.2: Query and serialize device properties
     auto devProps = heuristics::queryDeviceProperties();
     auto devicePropsSerialized = heuristics::serializeDeviceProperties(devProps);
     hipdnnPluginConstData_t devicePropsWrapper =
         heuristics::wrapSerializedDeviceProperties(devicePropsSerialized);
 
-    // RFC Section 13.1: Get serialized graph from GraphDescriptor
+    // RFC 0007 Section 13.1: Get serialized graph from GraphDescriptor
     hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
 
     // Resolve ordered policy IDs
@@ -233,7 +233,7 @@ void EngineHeuristicDescriptor::finalize()
         }
     }
 
-    // RFC Section 14.2: If no policy succeeded, throw exception
+    // RFC 0007 Section 14.2: If no policy succeeded, throw exception
     // No hidden fallback to utilities::sortEngineIds
     if(!success)
     {
