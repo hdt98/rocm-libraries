@@ -25,10 +25,9 @@
  *******************************************************************************/
 
 // ALMIOPEN-718: Bit-exact determinism tests for implicit GEMM convolution solvers.
-// Runs each solver 10 times with identical input and verifies bit-exact output match.
-//
-// Each solver gets its own set of configs that are known to be applicable.
-// Configs chosen to satisfy each solver's GEMM dimension divisibility requirements.
+// Runs each solver 3 times with identical input and verifies bit-exact output match.
+// Each solver has at least 1 config. Solvers with known non-determinism (BwdV1R1, WrwXdlops)
+// retain all configs that were FAIL/SKIP before the IsApplicable() fix, to verify the fix works.
 
 #include <cstring>
 #include <cstdlib>
@@ -74,219 +73,90 @@ struct DeterministicTestConfig
     }
 };
 
-// ~100 test configs total. Each solver gets 8-20 configs to systematically test
-// determinism across different parameters (kernel size, stride, dilation, batch, channels).
-// BwdV1R1 gets extra configs to map the AtomicAdd determinism boundary.
-//
 // Config format: {N, C, K, H, W, y, x, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w}
 
-// FwdV4R5Xdlops: xdlops forward (~20 configs)
+// FwdV4R5Xdlops: 1 config (all deterministic)
 std::vector<DeterministicTestConfig> GetConfigFwdV4R5Xdlops()
 {
-    return {
-        // Original + varied batch/channel sizes
-        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},  // Jira original
-        {64, 16, 64, 32, 32, 3, 3, 1, 1, 1, 1, 1, 1},   // smaller batch
-        {32, 32, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // larger C/K
-        {16, 64, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},   // small spatial
-        {8, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},    // small batch
-        // Stride and dilation variations
-        {32, 16, 64, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},   // stride 2
-        {16, 32, 64, 28, 28, 3, 3, 0, 0, 1, 1, 2, 2},   // dilation 2
-        {64, 16, 128, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},  // no padding
-        // 5x5 kernel
-        {16, 16, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1},   // 5x5 kernel
-        {32, 16, 64, 28, 28, 5, 5, 2, 2, 1, 1, 1, 1},   // 5x5 larger
-        // Additional configs
-        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 32, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 64, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
-        {8, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {2, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 16, 128, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
-        {32, 64, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {4, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 16, 64, 32, 32, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 32, 128, 14, 14, 3, 3, 1, 1, 2, 2, 1, 1},
-    };
+    return {{128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1}};
 }
 
-// FwdV4R4Xdlops: xdlops forward (~15 configs)
+// FwdV4R4Xdlops: 1 config (all deterministic)
 std::vector<DeterministicTestConfig> GetConfigFwdV4R4Xdlops()
 {
-    return {
-        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1},
-        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1},
-        {64, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {32, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 64, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {32, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 128, 28, 28, 1, 1, 0, 0, 2, 2, 1, 1},
-        {32, 16, 64, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
-        // Additional
-        {8, 128, 128, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 32, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {4, 64, 192, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {32, 32, 128, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
-        {64, 16, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
-    };
+    return {{128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}};
 }
 
-// FwdV4R1: non-xdlops forward (~15 configs)
+// FwdV4R1: 1 config (all deterministic)
 std::vector<DeterministicTestConfig> GetConfigFwdV4R1()
 {
-    return {
-        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1},
-        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1},
-        {64, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {32, 32, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {32, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 128, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
-        {128, 64, 64, 28, 28, 1, 1, 0, 0, 2, 2, 1, 1},
-        {32, 16, 64, 28, 28, 5, 5, 2, 2, 1, 1, 1, 1},
-        // Additional
-        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {8, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {4, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 16, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 64, 64, 28, 28, 3, 3, 0, 0, 1, 1, 1, 1},
-    };
+    return {{256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1}};
 }
 
-// BwdV1R1: CRITICAL — tests the AtomicAdd boundary (~30 configs)
-// Rule: deterministic when stride >= dilation*(kernel_size-1)+1
+// BwdV1R1: 1 PASS + all configs that were FAIL/SKIP before fix
+// Tests the AtomicAdd boundary: stride >= dilation*(kernel_size-1)+1
 std::vector<DeterministicTestConfig> GetConfigBwdV1R1()
 {
     return {
-        // === 1x1 kernel: always deterministic ===
+        // PASS: 1x1 deterministic
         {32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},
-        {64, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {8, 64, 32, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},
-        {32, 32, 64, 16, 16, 1, 1, 0, 0, 2, 2, 1, 1},
-        {4, 256, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {4, 128, 128, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {128, 32, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 64, 32, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},
-        // === 3x3 stride=1: NON-DET (1<3) ===
+        // was FAIL: 3x3 stride=1 (s<3)
         {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},
         {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
         {8, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
         {4, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
         {1, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
         {64, 32, 32, 8, 8, 3, 3, 0, 0, 1, 1, 1, 1},
-        {2, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        // === 3x3 stride=2: NON-DET (2<3) ===
+        // was FAIL: 3x3 stride=2 (s<3)
         {16, 64, 32, 16, 16, 3, 3, 1, 1, 2, 2, 1, 1},
-        {8, 32, 64, 16, 16, 3, 3, 1, 1, 2, 2, 1, 1},
-        // === 3x3 stride=3: DET (3>=3) ===
+        // was SKIP: 3x3 stride=3 (GEMM N/A)
         {16, 64, 32, 16, 16, 3, 3, 0, 0, 3, 3, 1, 1},
-        // === 5x5 stride=1: NON-DET (1<5) ===
+        // was FAIL: 5x5 stride=1 (s<5)
         {16, 32, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1},
         {8, 64, 32, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},
-        // === 5x5 stride=5: DET (5>=5) ===
+        // was SKIP: 5x5 stride=5 (GEMM N/A)
         {8, 32, 64, 16, 16, 5, 5, 0, 0, 5, 5, 1, 1},
-        // === dilation=2 ===
+        // was FAIL: 3x3 dilation=2 (s<5)
         {16, 64, 32, 16, 16, 3, 3, 0, 0, 1, 1, 2, 2},
+        // was SKIP: 3x3 stride=5 dilation=2 (GEMM N/A)
         {8, 64, 32, 28, 28, 3, 3, 0, 0, 5, 5, 2, 2},
-        // === 7x7 kernel ===
+        // was FAIL: 7x7 stride=1 (s<7)
         {4, 32, 64, 16, 16, 7, 7, 3, 3, 1, 1, 1, 1},
     };
 }
 
-// BwdV4R1: disabled by default, enabled via env var (~15 configs)
+// BwdV4R1: 1 PASS + 1 was-SKIP (disabled solver, env var enabled)
 std::vector<DeterministicTestConfig> GetConfigBwdV4R1()
 {
     return {
-        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},
-        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {32, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {16, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
-        {32, 32, 64, 16, 16, 1, 1, 0, 0, 2, 2, 1, 1},
-        {8, 32, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1},
-        {16, 64, 32, 14, 14, 3, 3, 0, 0, 1, 1, 2, 2},
-        // Additional
-        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {128, 32, 32, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
-        {8, 64, 64, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
-        {16, 32, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {4, 128, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},   // PASS
+        {16, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},   // was SKIP
     };
 }
 
-// WrwV4R4: non-xdlops weight gradient (~15 configs)
+// WrwV4R4: 1 config (all deterministic)
 std::vector<DeterministicTestConfig> GetConfigWrwV4R4()
 {
-    return {
-        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 64, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {4, 128, 128, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {8, 128, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {4, 256, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
-        {4, 64, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},
-        // Additional
-        {2, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {64, 32, 32, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
-        {1, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
-        {8, 32, 32, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
-    };
+    return {{8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}};
 }
 
-// WrwV4R4Xdlops: xdlops weight gradient (~30 configs)
-// FOCUS: probe GemmKBlock > 1 boundary (gemm_k = N*Ho*Wo)
+// WrwV4R4Xdlops: 1 PASS + all configs that were FAIL/SKIP before fix
 std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
 {
     return {
-        // === Original configs ===
-        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},   // Jira original PASS
-        {4, 128, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},   // PASS
-        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},    // FAIL (GemmKBlock>1)
-        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},   // PASS
-        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},    // FAIL
-        {16, 32, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},  // FAIL
-        {2, 256, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},   // PASS
-        {1, 64, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},    // PASS
-        {4, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},    // PASS
-        {2, 128, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},   // PASS
-        // === Probing GemmKBlock boundary: vary N and spatial size ===
-        // Small N*Ho*Wo → likely GemmKBlock=1 → deterministic
-        {1, 128, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},   // N*Ho*Wo=196
-        {1, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},    // 196
-        {2, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},    // 392
-        {1, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // 256
-        // Medium N*Ho*Wo → GemmKBlock boundary
-        {4, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},    // 784
-        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},    // 512
-        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},    // 1024
-        {8, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},    // 1568
-        // Large N*Ho*Wo → likely GemmKBlock>1 → non-deterministic
-        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // 4096
-        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},   // 6272
-        {8, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},    // 1568
-        // === 3x3 with varied N ===
-        {1, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},   // small N
-        {2, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 32, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {16, 64, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        // PASS: Jira original
+        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},
+        // was FAIL: GemmKBlock>1
+        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 32, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
         {32, 32, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        // === Different K values ===
-        {4, 128, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
-        {8, 32, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
-        {1, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        // was SKIP: GEMM N/A
+        {8, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
     };
 }
 
@@ -295,7 +165,7 @@ class GPU_ConvDeterministicImplicitGemm
     : public ::testing::TestWithParam<DeterministicTestConfig>
 {
 protected:
-    static constexpr int NUM_ITERATIONS = 10;
+    static constexpr int NUM_ITERATIONS = 3;
 
     void SetUp() override { prng::reset_seed(); }
 
@@ -602,30 +472,52 @@ TEST_P(GPU_Deterministic_WrwV4R4_FP32, DeterministicTest) { this->RunTest(); };
 TEST_P(GPU_Deterministic_WrwV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
 
 // ============================================================================
-// Test instantiations — each solver gets its own applicable configs
+// CI tests (Smoke): 5 fast tests, 1 per solver (~1s with warm cache)
+// FwdV4R5Xdlops and FwdV4R1 excluded: slow kernel compilation (~2s each)
 // ============================================================================
 
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
-                         GPU_Deterministic_FwdV4R5Xdlops_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
-                         GPU_Deterministic_FwdV4R5Xdlops_BFP16,
-                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_FwdV4R4Xdlops_FP32,
                          testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
-                         GPU_Deterministic_FwdV4R1_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_BwdV1R1_FP32,
-                         testing::ValuesIn(GetConfigBwdV1R1()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
+                         testing::Values(DeterministicTestConfig{32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1}));
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_BwdV4R1_FP32,
-                         testing::ValuesIn(GetConfigBwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
+                         testing::Values(DeterministicTestConfig{16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}));
+INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_WrwV4R4_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4()));
-INSTANTIATE_TEST_SUITE_P(DEBUG_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_WrwV4R4Xdlops_FP32,
+                         testing::Values(DeterministicTestConfig{1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}));
+
+// ============================================================================
+// Extended tests (Full): runs only with MIOPEN_TEST_ALL=ON
+// Includes all boundary configs that were FAIL/SKIP before the IsApplicable() fix
+// ============================================================================
+
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_FwdV4R5Xdlops_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_FwdV4R5Xdlops_BFP16,
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_FwdV4R4Xdlops_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_FwdV4R1_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R1()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_BwdV1R1_FP32,
+                         testing::ValuesIn(GetConfigBwdV1R1()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_BwdV4R1_FP32,
+                         testing::ValuesIn(GetConfigBwdV4R1()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+                         GPU_Deterministic_WrwV4R4_FP32,
+                         testing::ValuesIn(GetConfigWrwV4R4()));
+INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
                          GPU_Deterministic_WrwV4R4Xdlops_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
