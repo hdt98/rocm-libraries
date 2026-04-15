@@ -2028,7 +2028,7 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
         // launch merge for level k
         for(I k = 0; k < levs; ++k)
         {
-            I n_merges = 1 << (levs - k - 1);
+            I n_merges = static_cast<I>(1) << (levs - k - 1);
             ROCSOLVER_LAUNCH_KERNEL(stedc_update_splits, dim3(1, batch_count), dim3(STEDC_BDIM), (I) 0,
                                     stream, levs, k, n, splits);
 
