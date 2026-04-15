@@ -83,6 +83,20 @@ typedef enum
     /** @brief Find first mode: stop after finding any applicable engine (bool, extension) */
     HIPDNN_ATTR_ENGINEHEUR_FIND_FIRST_EXT = 105,
 
+    /**
+     * @brief Ordered list of heuristic policy names for engine selection (array of strings, extension)
+     *
+     * Specifies the policy order for the outer loop in RFC 0007. Each element is a UTF-8
+     * policy name string (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering").
+     * The backend hashes each name to an int64_t policy ID using engineNameToId.
+     *
+     * Overrides handle-level and environment variable defaults. If not set, the descriptor uses
+     * the handle's policy order, then HIPDNN_HEURISTIC_POLICY_ORDER env var, then built-in default.
+     *
+     * Type: HIPDNN_TYPE_CHAR (null-separated string array)
+     */
+    HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT = 106,
+
     /** @} */
 
     /**

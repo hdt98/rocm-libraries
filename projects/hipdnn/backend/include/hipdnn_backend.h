@@ -638,6 +638,64 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetEngineInfo_ext(hipdnnHandle_t hand
                                                              size_t* typeLen);
 
 /**
+ * @brief Gets the count of loaded heuristic policies.
+ *
+ * RFC 0007 Section 16: Returns the number of heuristic policy plugins that have been
+ * successfully loaded and validated by the backend. This count includes all policies
+ * available for use in the outer loop engine selection.
+ *
+ * @param[in]  handle       A valid hipDNN handle.
+ * @param[out] numPolicies  Pointer where the policy count will be stored.
+ *
+ * @retval HIPDNN_STATUS_SUCCESS           Success.
+ * @retval HIPDNN_STATUS_BAD_PARAM         Invalid handle or null pointer.
+ *
+ * @see hipdnnGetHeuristicPolicyInfo_ext for retrieving individual policy metadata
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHandle_t handle,
+                                                                        size_t* numPolicies);
+
+/**
+ * @brief Gets information about a loaded heuristic policy by index.
+ *
+ * RFC 0007 Section 16: Retrieves metadata for a heuristic policy plugin, including
+ * policy ID, policy name, plugin version, and API version. Policies are enumerated
+ * in the order they appear in the default policy list.
+ *
+ * This function uses a two-call pattern for string fields:
+ * 1. First call: Pass all string buffers as `nullptr` to query required sizes.
+ *    - Sets `policyNameLen`, `pluginVersionLen`, and `apiVersionLen` to the required
+ *      buffer sizes (including null terminator).
+ *
+ * 2. Second call: Pass allocated buffers with sizes set from the first call.
+ *
+ * @param[in]     handle            A valid hipDNN handle.
+ * @param[in]     policyIndex       Zero-based index of the policy to query.
+ * @param[out]    policyId          Pointer where the policy ID will be stored, or `nullptr` to skip.
+ * @param[out]    policyName        Buffer for the policy name, or `nullptr` to query size.
+ * @param[in,out] policyNameLen     Pointer to buffer size; updated with required size.
+ * @param[out]    pluginVersion     Buffer for the plugin version, or `nullptr` to query size.
+ * @param[in,out] pluginVersionLen  Pointer to buffer size; updated with required size.
+ * @param[out]    apiVersion        Buffer for the API version, or `nullptr` to query size.
+ * @param[in,out] apiVersionLen     Pointer to buffer size; updated with required size.
+ *
+ * @retval HIPDNN_STATUS_SUCCESS           Success.
+ * @retval HIPDNN_STATUS_BAD_PARAM         Invalid handle, null pointers, or out-of-range index.
+ * @retval HIPDNN_STATUS_INTERNAL_ERROR    Internal error.
+ *
+ * @see hipdnnGetHeuristicPolicyCount_ext for getting the total policy count
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHandle_t handle,
+                                                                       size_t policyIndex,
+                                                                       int64_t* policyId,
+                                                                       char* policyName,
+                                                                       size_t* policyNameLen,
+                                                                       char* pluginVersion,
+                                                                       size_t* pluginVersionLen,
+                                                                       char* apiVersion,
+                                                                       size_t* apiVersionLen);
+
+/**
  * @brief Returns hipdnn backend version string. Returns an error if nullptr is passed
  *
  * @deprecated Use hipdnnVersionString_ext instead
