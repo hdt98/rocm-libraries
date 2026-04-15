@@ -2,6 +2,7 @@
 // SPDX-License-Identifier:  MIT
 
 #include "heuristics/DeviceProperties.hpp"
+#include "HipdnnException.hpp"
 #include <gtest/gtest.h>
 #include <limits>
 
