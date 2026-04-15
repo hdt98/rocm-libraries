@@ -101,13 +101,13 @@ private:
             _params.out0Tensor, variantPack.at(_params.out0Tensor.uid));
 
         if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(
-            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
+               static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type>::pointwiseCompute(
                 _params.mode, *shallowOut0Tensor, *shallowIn0Tensor);
         }
         else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(
-            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
+                    static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             if(!_params.in1Tensor.has_value())
             {
@@ -136,7 +136,7 @@ private:
             _params.out0Tensor, variantPack.at(_params.out0Tensor.uid));
 
         if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(
-            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
+               static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             utilities::CpuReferencePointwiseImpl<OutputType, Input0Type>::pointwiseCompute(
                 _params.mode,
@@ -154,7 +154,7 @@ private:
                                                                       : 1.0f));
         }
         else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(
-            static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(_params.mode)))
+                    static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(_params.mode)))
         {
             if(!_params.in1Tensor.has_value())
             {
@@ -219,15 +219,18 @@ public:
 
         // Check that the operation is implemented
         auto mode = nodeAttributes->operation();
-        const auto dataSdkMode = static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(mode);
+        const auto dataSdkMode
+            = static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(mode);
         bool isImplemented = false;
         if(hipdnn_data_sdk::utilities::isUnaryPointwiseMode(dataSdkMode))
         {
-            isImplemented = hipdnn_data_sdk::utilities::isImplementedUnaryPointwiseMode(dataSdkMode);
+            isImplemented
+                = hipdnn_data_sdk::utilities::isImplementedUnaryPointwiseMode(dataSdkMode);
         }
         else if(hipdnn_data_sdk::utilities::isBinaryPointwiseMode(dataSdkMode))
         {
-            isImplemented = hipdnn_data_sdk::utilities::isImplementedBinaryPointwiseMode(dataSdkMode);
+            isImplemented
+                = hipdnn_data_sdk::utilities::isImplementedBinaryPointwiseMode(dataSdkMode);
         }
 
         if(!isImplemented)

@@ -330,8 +330,9 @@ void checkRMSnormTensorConfigSupported(
 }
 
 void checkRMSNormBwdTensorConfigSupported(
-    const hipdnn_data_sdk::data_objects::RMSNormBackwardAttributes& rmsNormBwdAttr,
-    const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+    const hipdnn_flatbuffers_sdk::data_objects::RMSNormBackwardAttributes& rmsNormBwdAttr,
+    const std::unordered_map<int64_t,
+                             const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
         tensorMap)
 {
     std::vector<int64_t> ioTensorIds = {rmsNormBwdAttr.dy_tensor_uid(),

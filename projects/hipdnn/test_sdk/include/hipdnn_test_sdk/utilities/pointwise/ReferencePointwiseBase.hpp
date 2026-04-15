@@ -289,7 +289,8 @@ private:
         }
 
         const PointwiseMode operation = attrs->operation();
-        const auto dataSdkOperation = static_cast<hipdnn_data_sdk::data_objects::PointwiseMode>(operation);
+        const auto dataSdkOperation
+            = static_cast<hipdnn_flatbuffers_sdk::data_objects::PointwiseMode>(operation);
 
         if(hipdnn_data_sdk::utilities::isImplementedUnaryPointwiseMode(dataSdkOperation))
         {
