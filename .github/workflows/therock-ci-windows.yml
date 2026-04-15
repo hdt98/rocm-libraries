@@ -47,7 +47,7 @@ jobs:
         with:
           repository: "ROCm/TheRock"
           path: "TheRock"
-          ref: 854d2c3f2c333aa9a9c84a05b0ac543cdc227127 # multi-GPU support
+          ref: a09c46074a57145142046f12a50ca1780f73fb60 # multi-GPU support
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

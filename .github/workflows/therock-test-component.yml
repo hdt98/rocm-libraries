@@ -70,7 +70,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           repository: "ROCm/TheRock"
-          ref: 5e90c0e8384515f8473b67e50a142d3a914bf1bb # multi-GPU support
+          ref: a09c46074a57145142046f12a50ca1780f73fb60 # multi-GPU support
 
       - name: Configure git for long paths on Windows
         if: ${{ runner.os == 'Windows' }}
