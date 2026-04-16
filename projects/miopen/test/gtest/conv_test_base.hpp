@@ -405,7 +405,7 @@ protected:
             GTEST_SKIP() << "Skipping due to unable to allocate enough memory";
         }
 
-        MemoryEcosystemInfo info{0, "spoof 8040S-16GB", 400000000ULL, 6300000000ULL, 5700000000};
+        MemoryEcosystemInfo info{0, 400000000ULL, 6300000000ULL, 5700000000};
         if(!MemoryEcosystem::AbleToAllocate(info, gpu_bufs, cpu_bufs))
         {
             test_skipped = true;
