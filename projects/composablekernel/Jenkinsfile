@@ -618,6 +618,24 @@ def run_dispatcher_heuristics(){
                python3 -m pytest heuristics/tests/ -v --tb=short """
 }
 
+// Runs all enabled nogpu dispatcher workloads sequentially on a single node.
+// Combining CPU/Heuristics/Stress into one sub-stage (vs. 3 declarative
+// sub-stages) is required to stay under the Jenkins 64KB CPS method-size limit.
+def run_dispatcher_nogpu_workloads(){
+    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean()) {
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
+            execute_cmd: build_and_run_dispatcher_cpu())
+    }
+    if (params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean()) {
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
+            execute_cmd: run_dispatcher_heuristics())
+    }
+    if (params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
+            execute_cmd: build_and_run_dispatcher_stress())
+    }
+}
+
 def cmake_build(Map conf=[:]){
 
     def config_targets = conf.get("config_targets","check")
@@ -1947,6 +1965,9 @@ pipeline {
             }
         }
 
+        // Dispatcher tests: 2 parallel branches (nogpu + gfx950) instead of 4
+        // sub-stages, to stay under the Jenkins CPS 64KB method-size limit.
+        // The nogpu branch runs CPU/Heuristics/Stress sequentially via a helper.
         stage("Run DISPATCHER Tests")
         {
             when {
@@ -1955,19 +1976,17 @@ pipeline {
             }
             parallel
             {
-                stage("Run DISPATCHER CPU Tests on nogpu")
+                stage("Run DISPATCHER nogpu Tests")
                 {
                     when {
                         beforeAgent true
-                        expression { params.RUN_DISPATCHER_CPU_TESTS.toBoolean() }
+                        expression { params.RUN_DISPATCHER_CPU_TESTS.toBoolean() ||
+                                     params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() ||
+                                     params.RUN_DISPATCHER_STRESS_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("nogpu") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = build_and_run_dispatcher_cpu()
-                    }
                     steps{
-                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        script { run_dispatcher_nogpu_workloads() }
                         cleanWs()
                     }
                 }
@@ -1981,38 +2000,6 @@ pipeline {
                     environment{
                         setup_args = "NO_CK_BUILD"
                         execute_args = build_and_run_dispatcher_gpu()
-                    }
-                    steps{
-                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        cleanWs()
-                    }
-                }
-                stage("Run DISPATCHER ML Heuristics Tests on nogpu")
-                {
-                    when {
-                        beforeAgent true
-                        expression { params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() }
-                    }
-                    agent{ label rocmnode("nogpu") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = run_dispatcher_heuristics()
-                    }
-                    steps{
-                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
-                        cleanWs()
-                    }
-                }
-                stage("Run DISPATCHER Stress Tests on nogpu")
-                {
-                    when {
-                        beforeAgent true
-                        expression { params.RUN_DISPATCHER_STRESS_TESTS.toBoolean() }
-                    }
-                    agent{ label rocmnode("nogpu") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = build_and_run_dispatcher_stress()
                     }
                     steps{
                         buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
