@@ -178,7 +178,9 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
                     Ash[kk] = akk;
                     // Fortran 1-based index
                     if(*info_bid == 0)
-                        *info_bid = kb * PANEL_SIZE + kcol + 1;
+                    {
+                        *info_bid = kb * PANEL_SIZE + kcol + 1 + row_offset;
+                    }
                 }
                 failed = true;
                 __syncthreads();
@@ -374,7 +376,7 @@ rocblas_status potf2_run_small(rocblas_handle handle,
         potf2_kernel_small<5, BS2, T, I, INFO, U>, potf2_kernel_small<6, BS2, T, I, INFO, U>,
         potf2_kernel_small<7, BS2, T, I, INFO, U>, potf2_kernel_small<8, BS2, T, I, INFO, U>};
     ROCSOLVER_LAUNCH_KERNEL(kernel[nb - 1], dim3(1, 1, batch_count), dim3(BS2, BS2, 1), lmemsize,
-                            stream, is_upper, n, A, shiftA, lda, strideA, info);
+                            stream, is_upper, n, A, shiftA, lda, strideA, info, row_offset);
 
     return rocblas_status_success;
 }
@@ -390,3 +392,4 @@ rocblas_status potf2_run_small(rocblas_handle handle,
         const I batch_count, const I row_offset)
 
 ROCSOLVER_END_NAMESPACE
+#undef ASSERT

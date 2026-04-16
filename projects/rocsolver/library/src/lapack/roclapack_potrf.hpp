@@ -116,8 +116,6 @@ void rocsolver_potrf_getMemorySize(const I n,
                                    size_t* size_iinfo,
                                    bool* optim_mem)
 {
-    // if quick return no need of workspace
-    if(n == 0 || batch_count == 0)
     {
         *size_scalars = 0;
         *size_work1 = 0;
@@ -127,6 +125,10 @@ void rocsolver_potrf_getMemorySize(const I n,
         *size_pivots = 0;
         *size_iinfo = 0;
         *optim_mem = true;
+    }
+    // if quick return no need of workspace
+    if(n == 0 || batch_count == 0)
+    {
         return;
     }
 
@@ -144,7 +146,7 @@ void rocsolver_potrf_getMemorySize(const I n,
     else
     {
         I jb = nb;
-        size_t s1, s2;
+        size_t s1{}, s2{};
 
         // size to store info about positiveness of each subblock
         *size_iinfo = sizeof(I) * batch_count;
@@ -157,8 +159,8 @@ void rocsolver_potrf_getMemorySize(const I n,
         {
             if(use_recursion_potrf)
             {
-                I const n1 = std::max(nb, I{rocsolver_previous_po2(n / 2)});
-                I const n2 = std::max(nb, n - n1);
+                I const n1 = std::max(I(1), n / 2);
+                I const n2 = n - n1;
 
                 // ----------------------------------
                 // U12 = U11' \ A12, note U12 has size n1 by n2
@@ -178,8 +180,8 @@ void rocsolver_potrf_getMemorySize(const I n,
         {
             if(use_recursion_potrf)
             {
-                I const n1 = std::max(nb, I{rocsolver_previous_po2(n / 2)});
-                I const n2 = std::max(nb, n - n1);
+                I const n1 = std::max(I(1), n / 2);
+                I const n2 = n - n1;
 
                 // ----------------------------------
                 // L21 = A21 / L11',  note L21 has size n2 by n1
@@ -408,7 +410,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
     }
 
     bool const use_upper_part = (uplo == rocblas_fill_upper);
-    I const n1 = std::max(1, rocsolver_previous_po2(n / 2));
+    I const n1 = std::max(I(1), n / 2);
     I const n2 = n - n1;
 
     if(use_upper_part)
