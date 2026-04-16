@@ -5,7 +5,7 @@
 .. _index:
 
 ===========================
-hipRAND documentation
+hipRAND documentation (preview)
 ===========================
 
 The hipRAND library is a wrapper library that lets you easily port NVIDIA CUDA applications that use the CUDA cuRAND library
