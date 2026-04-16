@@ -3993,6 +3993,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                         int warmup_iters = 5;
                         int timing_iters = 100;
 
+                        // Storage for kernel info per sub-problem
+                        std::vector<std::string> subproblem_solution_names(subProblems.size());
+                        std::vector<std::string> subproblem_kernel_names(subProblems.size());
+                        std::vector<int> subproblem_solution_indices(subProblems.size(), -1);
+
                         for(int warmup = 0; warmup < warmup_iters; warmup++)
                         {
                             for(size_t sp = 0; sp < subProblems.size(); sp++)
@@ -4058,6 +4063,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 int ret_tmp = 0;
                                 hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
 
+                                // Store kernel info on first iteration
+                                if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
+                                {
+                                    try {
+                                        subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                        subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                                        // Extract solution index from algo.data (first 4 bytes are int*)
+                                        int* solutionIndex = (int*)heur_tmp.algo.data;
+                                        subproblem_solution_indices[sp] = *solutionIndex;
+                                    } catch (...) {
+                                        subproblem_solution_names[sp] = "ERROR: Failed to get solution info";
+                                        subproblem_kernel_names[sp] = "ERROR";
+                                        subproblem_solution_indices[sp] = -1;
+                                    }
+                                }
+
                                 if(ret_tmp > 0)
                                 {
                                     void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
@@ -4093,6 +4114,29 @@ void testing_matmul_with_bias(const Arguments& arg,
                         hipblaslt_cout << "  Performance: " << std::fixed << std::setprecision(1) << gflops << " GFLOPS ("
                                       << std::setprecision(3) << (gflops / 1000.0) << " TFLOPS)" << std::endl;
                         hipblaslt_cout << std::endl;
+
+                        // Print kernel information for each sub-problem if requested
+                        if(arg.print_kernel_info)
+                        {
+                            hipblaslt_cout << "Kernel Information per Sub-problem:" << std::endl;
+                            for(size_t sp = 0; sp < subProblems.size(); sp++)
+                            {
+                                const auto& sub = subProblems[sp];
+                                hipblaslt_cout << "  Sub-problem [" << sp << "]: " << sub.m_size << "x" << sub.n_size
+                                              << "x" << sub.k_size << std::endl;
+                                if(subproblem_solution_indices[sp] >= 0)
+                                {
+                                    hipblaslt_cout << "    --Solution index: " << subproblem_solution_indices[sp] << std::endl;
+                                    hipblaslt_cout << "    --Solution name:  " << subproblem_solution_names[sp] << std::endl;
+                                    hipblaslt_cout << "    --Kernel name:    " << subproblem_kernel_names[sp] << std::endl;
+                                }
+                                else
+                                {
+                                    hipblaslt_cout << "    --No kernel info captured" << std::endl;
+                                }
+                            }
+                            hipblaslt_cout << std::endl;
+                        }
 
                         // Now do verification run with full output
                         for(size_t sp = 0; sp < subProblems.size(); sp++)
