@@ -52,7 +52,8 @@ void hipblaslt_init_device(ABC_dims                 ABC_dims,
                            size_t                   lda,
                            hipDataType              type,
                            size_t                   stride,
-                           size_t                   batch_count);
+                           size_t                   batch_count,
+                           int norm_dist_one_special_type = -1);
 
 /* ============================================================================================ */
 /*! \brief  matrix/vector initialization: */
@@ -280,11 +281,8 @@ inline void hipblaslt_init_sin(void*       A,
 
 // Initialize matrix so adjacent entries have alternating sign.
 // In gemm if either A or B are initialized with alternating
-// sign the reduction sum will be summing positive
-// and negative numbers, so it should not get too large.
-// This helps reduce floating point inaccuracies for 16bit
-// arithmetic where the exponent has only 5 bits, and the
-// mantissa 10 bits.
+// Checkerboard ± so first element of each row and column alternates; keeps
+// reduction sums from growing too large (helps 16bit with 5-bit exponent).
 template <typename T>
 inline void hipblaslt_init_alternating_sign(
     T* A, size_t M, size_t N, size_t lda, size_t stride = 0, size_t batch_count = 1)
