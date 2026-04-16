@@ -36,12 +36,16 @@
 // Split strategies
 enum class SplitStrategy
 {
-    Auto = 0,       // Automatically choose best strategy
-    Workgroup = 1,  // Optimize for workgroup alignment
-    Memory = 2,     // Split based on memory constraints
-    MOnly = 3,      // Force split along M dimension only
-    NOnly = 4,      // Force split along N dimension only
-    TwoD = 5        // 2D tiling (split both M and N)
+    Auto = 0,           // Automatically choose best strategy
+    Workgroup = 1,      // Optimize for workgroup alignment
+    Memory = 2,         // Split based on memory constraints
+    MOnly = 3,          // Force split along M dimension only
+    NOnly = 4,          // Force split along N dimension only
+    TwoD = 5,           // 2D tiling (split both M and N)
+    MacroTileAlign = 6, // MacroTile-aligned splitting (non-uniform)
+    PowerOf2 = 7,       // Power-of-2 biased splitting
+    CUBalanced = 8,     // CU-balanced for stream-parallel
+    Performance = 9     // Performance-based (query heuristics)
 };
 
 // Structure to describe a sub-problem for multi-MacroTile GEMM
@@ -287,6 +291,161 @@ inline int findOptimalSplitsForMemory(int64_t M, int64_t N, int64_t K,
     return 16; // Max splits if still doesn't fit
 }
 
+// MacroTile-aligned splitting: Find split sizes that align well with MacroTile
+inline std::vector<int64_t> computeMacroTileAlignedSplits(int64_t total_size,
+                                                           int num_splits,
+                                                           int macrotile_size)
+{
+    std::vector<int64_t> sizes(num_splits);
+
+    // Target: each split should be multiple of macrotile_size
+    int64_t base_size = (total_size / num_splits / macrotile_size) * macrotile_size;
+    int64_t remainder = total_size - (base_size * num_splits);
+
+    // Distribute base sizes
+    for(int i = 0; i < num_splits; i++)
+    {
+        sizes[i] = base_size;
+    }
+
+    // Distribute remainder by adding macrotile_size to splits
+    int splits_to_adjust = remainder / macrotile_size;
+    for(int i = 0; i < splits_to_adjust && i < num_splits; i++)
+    {
+        sizes[i] += macrotile_size;
+    }
+
+    // If there's still remainder, add to last split
+    int64_t final_remainder = total_size;
+    for(int i = 0; i < num_splits; i++)
+        final_remainder -= sizes[i];
+
+    if(final_remainder > 0)
+        sizes[num_splits - 1] += final_remainder;
+
+    return sizes;
+}
+
+// Power-of-2 biased splitting: Prefer power-of-2 or near-power-of-2 sizes
+inline std::vector<int64_t> computePowerOf2Splits(int64_t total_size, int num_splits)
+{
+    std::vector<int64_t> sizes;
+
+    // Find closest power-of-2 splits
+    int64_t remaining = total_size;
+
+    for(int i = 0; i < num_splits - 1 && remaining > 0; i++)
+    {
+        // Find largest power-of-2 <= remaining / (num_splits - i)
+        int64_t target = remaining / (num_splits - i);
+        int64_t pow2 = 1;
+        while(pow2 * 2 <= target)
+            pow2 *= 2;
+
+        // Allow slight deviation for better balance
+        int64_t size = pow2;
+        if(target - pow2 > pow2 / 4)  // If more than 25% away, use next power
+            size = pow2 * 2;
+
+        size = std::min(size, remaining);
+        sizes.push_back(size);
+        remaining -= size;
+    }
+
+    // Last split gets remainder
+    if(remaining > 0)
+        sizes.push_back(remaining);
+
+    return sizes;
+}
+
+// CU-balanced splitting: Distribute workgroups evenly across CUs
+inline std::vector<int64_t> computeCUBalancedSplits(int64_t total_size,
+                                                     int num_splits,
+                                                     int64_t other_dim,
+                                                     int macrotile_dim,
+                                                     int macrotile_other,
+                                                     int num_CUs)
+{
+    std::vector<int64_t> sizes;
+
+    // Target workgroups per split
+    int total_wgs = estimateWorkgroups(total_size, other_dim, macrotile_dim, macrotile_other);
+    int target_wgs_per_split = total_wgs / num_splits;
+    int target_CUs_per_split = num_CUs / num_splits;
+
+    int64_t remaining = total_size;
+
+    for(int i = 0; i < num_splits - 1 && remaining > 0; i++)
+    {
+        // Size that gives us target workgroups
+        // wgs = (size / macrotile) * (other_dim / macrotile_other)
+        // size = (target_wgs * macrotile * macrotile_other) / other_dim
+        int64_t size = ((int64_t)target_wgs_per_split * macrotile_dim * macrotile_other) / other_dim;
+
+        // Round to macrotile boundary
+        size = (size / macrotile_dim) * macrotile_dim;
+
+        // Ensure we don't exceed remaining
+        size = std::min(size, remaining);
+        size = std::max(size, (int64_t)macrotile_dim); // At least one macrotile
+
+        sizes.push_back(size);
+        remaining -= size;
+    }
+
+    // Last split gets remainder
+    if(remaining > 0)
+        sizes.push_back(remaining);
+
+    return sizes;
+}
+
+// Performance-based splitting: Would require heuristic queries (placeholder for now)
+// This is complex as it needs hipblasLtMatmulAlgoGetHeuristic calls
+// We'll implement a simplified version based on known good sizes
+inline std::vector<int64_t> computePerformanceSplits(int64_t total_size, int num_splits)
+{
+    // Placeholder: prefer sizes that are multiples of common optimal sizes
+    // Common optimal sizes: 2048, 4096, 5120, 6144, 8192, etc.
+    std::vector<int> good_sizes = {8192, 6144, 5120, 4096, 3072, 2048, 1024};
+
+    std::vector<int64_t> sizes;
+    int64_t remaining = total_size;
+
+    for(int i = 0; i < num_splits - 1 && remaining > 0; i++)
+    {
+        int64_t target = remaining / (num_splits - i);
+
+        // Find closest "good" size
+        int64_t best_size = target;
+        int64_t best_diff = std::abs(target - best_size);
+
+        for(int good : good_sizes)
+        {
+            if(good <= remaining)
+            {
+                int64_t diff = std::abs(target - good);
+                if(diff < best_diff)
+                {
+                    best_diff = diff;
+                    best_size = good;
+                }
+            }
+        }
+
+        best_size = std::min(best_size, remaining);
+        sizes.push_back(best_size);
+        remaining -= best_size;
+    }
+
+    // Last split gets remainder
+    if(remaining > 0)
+        sizes.push_back(remaining);
+
+    return sizes;
+}
+
 // Main splitting function with intelligent strategy selection
 inline std::vector<GemmSubProblem> splitGemmProblem(
     int64_t M, int64_t N, int64_t K,
@@ -360,6 +519,26 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             split_along_m = true;
             split_along_n = true;
             break;
+        case SplitStrategy::MacroTileAlign:
+            num_splits = 2;  // Start with 2-way split
+            split_along_m = true;
+            split_along_n = false;
+            break;
+        case SplitStrategy::PowerOf2:
+            num_splits = 2;  // Start with 2-way split
+            split_along_m = true;
+            split_along_n = false;
+            break;
+        case SplitStrategy::CUBalanced:
+            num_splits = 2;  // Start with 2-way split
+            split_along_m = true;
+            split_along_n = false;
+            break;
+        case SplitStrategy::Performance:
+            num_splits = 2;  // Start with 2-way split
+            split_along_m = true;
+            split_along_n = false;
+            break;
         }
     }
 
@@ -388,61 +567,140 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         return subProblems;
     }
 
+    // Compute split sizes based on strategy
+    std::vector<int64_t> m_split_sizes;
+    std::vector<int64_t> n_split_sizes;
+    bool use_intelligent_splits = false;
+
+    if(split_along_m && !split_along_n)
+    {
+        // Determine if we should use intelligent splitting
+        SplitStrategy strat = static_cast<SplitStrategy>(split_strategy);
+        if(strat == SplitStrategy::MacroTileAlign)
+        {
+            m_split_sizes = computeMacroTileAlignedSplits(M, num_splits, macrotile_m);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::PowerOf2)
+        {
+            m_split_sizes = computePowerOf2Splits(M, num_splits);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::CUBalanced)
+        {
+            m_split_sizes = computeCUBalancedSplits(M, num_splits, N, macrotile_m, macrotile_n, num_CUs);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::Performance)
+        {
+            m_split_sizes = computePerformanceSplits(M, num_splits);
+            use_intelligent_splits = true;
+        }
+    }
+    else if(!split_along_m && split_along_n)
+    {
+        SplitStrategy strat = static_cast<SplitStrategy>(split_strategy);
+        if(strat == SplitStrategy::MacroTileAlign)
+        {
+            n_split_sizes = computeMacroTileAlignedSplits(N, num_splits, macrotile_n);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::PowerOf2)
+        {
+            n_split_sizes = computePowerOf2Splits(N, num_splits);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::CUBalanced)
+        {
+            n_split_sizes = computeCUBalancedSplits(N, num_splits, M, macrotile_n, macrotile_m, num_CUs);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::Performance)
+        {
+            n_split_sizes = computePerformanceSplits(N, num_splits);
+            use_intelligent_splits = true;
+        }
+    }
+
     // Generate sub-problems based on split configuration
     if(split_along_m && !split_along_n)
     {
         // Split along M dimension only
+        int64_t m_offset = 0;
         for(int i = 0; i < num_splits; i++)
         {
-            int64_t m_start = (M * i) / num_splits;
-            int64_t m_end = (M * (i + 1)) / num_splits;
-            int64_t m_size = m_end - m_start;
+            int64_t m_size;
+            if(use_intelligent_splits)
+            {
+                m_size = m_split_sizes[i];
+            }
+            else
+            {
+                // Uniform splitting
+                int64_t m_start = (M * i) / num_splits;
+                int64_t m_end = (M * (i + 1)) / num_splits;
+                m_size = m_end - m_start;
+                m_offset = m_start;
+            }
 
             GemmSubProblem sub;
             sub.m_size = m_size;
             sub.n_size = N;
             sub.k_size = K;
-            sub.m_offset = m_start;
+            sub.m_offset = m_offset;
             sub.n_offset = 0;
-            sub.offset_A_bytes = calculateOffsetA(m_start, 0, lda, transA, a_type);
+            sub.offset_A_bytes = calculateOffsetA(m_offset, 0, lda, transA, a_type);
             sub.offset_B_bytes = 0;  // B is shared across all M splits
-            sub.offset_C_bytes = calculateOffsetCD(m_start, 0, ldc, c_type);
-            sub.offset_D_bytes = calculateOffsetCD(m_start, 0, ldd, d_type);
-            sub.offset_E_bytes = calculateOffsetCD(m_start, 0, lde, aux_type);
-            sub.offset_bias_bytes = calculateOffsetBias(m_start, bias_type);
+            sub.offset_C_bytes = calculateOffsetCD(m_offset, 0, ldc, c_type);
+            sub.offset_D_bytes = calculateOffsetCD(m_offset, 0, ldd, d_type);
+            sub.offset_E_bytes = calculateOffsetCD(m_offset, 0, lde, aux_type);
+            sub.offset_bias_bytes = calculateOffsetBias(m_offset, bias_type);
             sub.expected_workgroups = estimateWorkgroups(m_size, N, macrotile_m, macrotile_n);
             sub.macrotile_m = macrotile_m;
             sub.macrotile_n = macrotile_n;
 
             subProblems.push_back(sub);
+            m_offset += m_size;  // Update offset for next split
         }
     }
     else if(!split_along_m && split_along_n)
     {
         // Split along N dimension only
+        int64_t n_offset = 0;
         for(int i = 0; i < num_splits; i++)
         {
-            int64_t n_start = (N * i) / num_splits;
-            int64_t n_end = (N * (i + 1)) / num_splits;
-            int64_t n_size = n_end - n_start;
+            int64_t n_size;
+            if(use_intelligent_splits)
+            {
+                n_size = n_split_sizes[i];
+            }
+            else
+            {
+                // Uniform splitting
+                int64_t n_start = (N * i) / num_splits;
+                int64_t n_end = (N * (i + 1)) / num_splits;
+                n_size = n_end - n_start;
+                n_offset = n_start;
+            }
 
             GemmSubProblem sub;
             sub.m_size = M;
             sub.n_size = n_size;
             sub.k_size = K;
             sub.m_offset = 0;
-            sub.n_offset = n_start;
+            sub.n_offset = n_offset;
             sub.offset_A_bytes = 0;  // A is shared across all N splits
-            sub.offset_B_bytes = calculateOffsetB(n_start, 0, ldb, transB, b_type);
-            sub.offset_C_bytes = calculateOffsetCD(0, n_start, ldc, c_type);
-            sub.offset_D_bytes = calculateOffsetCD(0, n_start, ldd, d_type);
-            sub.offset_E_bytes = calculateOffsetCD(0, n_start, lde, aux_type);
+            sub.offset_B_bytes = calculateOffsetB(n_offset, 0, ldb, transB, b_type);
+            sub.offset_C_bytes = calculateOffsetCD(0, n_offset, ldc, c_type);
+            sub.offset_D_bytes = calculateOffsetCD(0, n_offset, ldd, d_type);
+            sub.offset_E_bytes = calculateOffsetCD(0, n_offset, lde, aux_type);
             sub.offset_bias_bytes = 0;  // Bias along M, not affected by N split
             sub.expected_workgroups = estimateWorkgroups(M, n_size, macrotile_m, macrotile_n);
             sub.macrotile_m = macrotile_m;
             sub.macrotile_n = macrotile_n;
 
             subProblems.push_back(sub);
+            n_offset += n_size;  // Update offset for next split
         }
     }
     else if(split_along_m && split_along_n)

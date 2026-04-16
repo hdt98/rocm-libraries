@@ -98,12 +98,12 @@ public:
 
         if (err != hipSuccess)
         {
-            std::cerr << "ERROR: hipModuleLoad failed for " << co_path << std::endl;
-            std::cerr << "  Error code: " << err << std::endl;
+            hipblaslt_cerr << "ERROR: hipModuleLoad failed for " << co_path << std::endl;
+            hipblaslt_cerr << "  Error code: " << err << std::endl;
             return nullptr;
         }
 
-        std::cout << "Loaded code object: " << co_path << std::endl;
+        hipblaslt_cout << "Loaded code object: " << co_path << std::endl;
 
         // Cache the module
         loaded_modules_[co_path] = module;
@@ -132,8 +132,8 @@ public:
 
         if (err != hipSuccess)
         {
-            std::cerr << "ERROR: hipModuleGetFunction failed for " << kernel_name << std::endl;
-            std::cerr << "  Error code: " << err << std::endl;
+            hipblaslt_cerr << "ERROR: hipModuleGetFunction failed for " << kernel_name << std::endl;
+            hipblaslt_cerr << "  Error code: " << err << std::endl;
 
             // Try demangled name (sometimes Tensile kernels are mangled)
             std::string demangled = tryDemangleName(kernel_name);
@@ -142,7 +142,7 @@ public:
                 err = hipModuleGetFunction(&kernel_func, module, demangled.c_str());
                 if (err == hipSuccess)
                 {
-                    std::cout << "  Success with demangled name: " << demangled << std::endl;
+                    hipblaslt_cout << "  Success with demangled name: " << demangled << std::endl;
                     kernel_functions_[kernel_name] = kernel_func;
                     return kernel_func;
                 }
@@ -151,7 +151,7 @@ public:
             return nullptr;
         }
 
-        std::cout << "Extracted kernel function: " << kernel_name << std::endl;
+        hipblaslt_cout << "Extracted kernel function: " << kernel_name << std::endl;
 
         // Cache the function
         kernel_functions_[kernel_name] = kernel_func;
@@ -320,16 +320,16 @@ inline KernelDispatchTable createKernelDispatchTable(
     std::string arch = getGpuArchitecture(device_id);
     std::string co_path = getCodeObjectPath(library_path, arch);
 
-    std::cout << "Multi-MacroTile Fused Kernel Extraction:" << std::endl;
-    std::cout << "  Library path: " << library_path << std::endl;
-    std::cout << "  GPU arch: " << arch << std::endl;
-    std::cout << "  Code object: " << co_path << std::endl;
+    hipblaslt_cout << "Multi-MacroTile Fused Kernel Extraction:" << std::endl;
+    hipblaslt_cout << "  Library path: " << library_path << std::endl;
+    hipblaslt_cout << "  GPU arch: " << arch << std::endl;
+    hipblaslt_cout << "  Code object: " << co_path << std::endl;
 
     // Load the code object
     hipModule_t module = ctx->loadCodeObject(co_path);
     if (!module)
     {
-        std::cerr << "ERROR: Failed to load code object" << std::endl;
+        hipblaslt_cerr << "ERROR: Failed to load code object" << std::endl;
         return table;
     }
 
@@ -350,19 +350,19 @@ inline KernelDispatchTable createKernelDispatchTable(
         }
         catch (...)
         {
-            std::cerr << "ERROR: Failed to get kernel name for sub-problem " << i << std::endl;
+            hipblaslt_cerr << "ERROR: Failed to get kernel name for sub-problem " << i << std::endl;
             continue;
         }
 
         if (kernel_name.empty())
         {
-            std::cerr << "ERROR: Empty kernel name for sub-problem " << i << std::endl;
+            hipblaslt_cerr << "ERROR: Empty kernel name for sub-problem " << i << std::endl;
             continue;
         }
 
-        std::cout << "  Sub-problem " << i << ":" << std::endl;
-        std::cout << "    Solution index: " << solution_idx << std::endl;
-        std::cout << "    Kernel name: " << kernel_name << std::endl;
+        hipblaslt_cout << "  Sub-problem " << i << ":" << std::endl;
+        hipblaslt_cout << "    Solution index: " << solution_idx << std::endl;
+        hipblaslt_cout << "    Kernel name: " << kernel_name << std::endl;
 
         // Check if we already have this kernel
         hipFunction_t kernel_func = ctx->getCachedFunction(kernel_name);
@@ -375,7 +375,7 @@ inline KernelDispatchTable createKernelDispatchTable(
 
         if (!kernel_func)
         {
-            std::cerr << "ERROR: Failed to extract kernel function" << std::endl;
+            hipblaslt_cerr << "ERROR: Failed to extract kernel function" << std::endl;
             continue;
         }
 
@@ -396,11 +396,11 @@ inline KernelDispatchTable createKernelDispatchTable(
             table.kernel_funcs[table.num_kernels] = reinterpret_cast<GemmKernelFunc>(kernel_func);
             table.num_kernels++;
 
-            std::cout << "    Added to dispatch table (entry " << table.num_kernels - 1 << ")" << std::endl;
+            hipblaslt_cout << "    Added to dispatch table (entry " << table.num_kernels - 1 << ")" << std::endl;
         }
     }
 
-    std::cout << "Kernel extraction complete: " << table.num_kernels << " unique kernels" << std::endl;
+    hipblaslt_cout << "Kernel extraction complete: " << table.num_kernels << " unique kernels" << std::endl;
 
     return table;
 }

@@ -623,7 +623,12 @@ try
 
         ("split_strategy",
         value<int32_t>(&arg.split_strategy)->default_value(0),
-        "Splitting strategy: 0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d")
+        "Splitting strategy:\n"
+        "  0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d,\n"
+        "  6=macrotile_align (non-uniform, MacroTile-aligned),\n"
+        "  7=power_of_2 (non-uniform, power-of-2 biased),\n"
+        "  8=cu_balanced (non-uniform, CU-balanced for stream-parallel),\n"
+        "  9=performance (non-uniform, performance-based)")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(0),

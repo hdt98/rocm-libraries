@@ -3982,9 +3982,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             workspace_size);                // Workspace needed
 
                         // Print splitting information
-                        const char* strategy_names[] = {"Auto", "Workgroup", "Memory", "M-only", "N-only", "2D"};
+                        const char* strategy_names[] = {
+                            "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
+                            "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance"
+                        };
                         hipblaslt_cout << "Multi-MacroTile: Using "
-                                      << strategy_names[std::min(arg.split_strategy, 5)]
+                                      << strategy_names[std::min(arg.split_strategy, 9)]
                                       << " strategy" << std::endl;
                         hipblaslt_cout << "  Problem: " << M[0] << "x" << N[0] << "x" << K[0]
                                       << ", CUs: " << num_CUs
@@ -3993,9 +3996,19 @@ void testing_matmul_with_bias(const Arguments& arg,
                         hipblaslt_cout << "  Splitting into " << subProblems.size()
                                       << " sub-problems:" << std::endl;
 
-                        // Warmup iterations
-                        int warmup_iters = 5;
-                        int timing_iters = 100;
+                        // Print individual split sizes
+                        for(size_t sp = 0; sp < subProblems.size(); sp++)
+                        {
+                            const auto& sub = subProblems[sp];
+                            hipblaslt_cout << "    [" << sp << "] " << sub.m_size << "x"
+                                          << sub.n_size << "x" << sub.k_size
+                                          << " (offset M=" << sub.m_offset << ", N=" << sub.n_offset << ")"
+                                          << std::endl;
+                        }
+
+                        // Warmup and timing iterations from command-line args
+                        int warmup_iters = arg.cold_iters;
+                        int timing_iters = arg.iters;
 
                         // Storage for kernel info per sub-problem
                         std::vector<std::string> subproblem_solution_names(subProblems.size());
@@ -4677,6 +4690,209 @@ void testing_matmul_with_bias(const Arguments& arg,
     }
     else
     {
+        // Multi-MacroTile timing path: execute multi-MT benchmarking and return early
+        if(arg.multi_macrotile && gemm_count == 1 && !arg.use_ext)
+        {
+            hipblaslt_cout << std::endl << "####### MULTI-MACROTILE TIMING EXECUTION #######" << std::endl << std::endl;
+
+            // Get device properties for CU count
+            hipDeviceProp_t deviceProps;
+            CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));
+            int num_CUs = deviceProps.multiProcessorCount;
+
+            // Estimate MacroTile size from algorithm (if available)
+            int macrotile_m = 128;  // Common default
+            int macrotile_n = 128;
+
+            // Split problem into sub-problems using chosen strategy
+            std::vector<GemmSubProblem> subProblems = splitGemmProblem(
+                M[0], N[0], K[0],
+                lda[0], ldb[0], ldc[0], ldd[0], lde[0],
+                transA, transB,
+                arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                Taux, Tbias,
+                arg.split_strategy,
+                arg.num_splits,
+                256,  // target_wgs
+                macrotile_m,
+                macrotile_n,
+                num_CUs,
+                512ULL * 1024 * 1024,  // available_memory
+                workspace_size
+            );
+
+            const char* strategy_names[] = {
+                "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
+                "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance"
+            };
+
+            hipblaslt_cout << "Multi-MacroTile: Using "
+                          << strategy_names[std::min(arg.split_strategy, 9)]
+                          << " strategy with " << subProblems.size()
+                          << " sub-problems:" << std::endl;
+
+            for(size_t sp = 0; sp < subProblems.size(); sp++)
+            {
+                const auto& sub = subProblems[sp];
+                hipblaslt_cout << "    [" << sp << "] " << sub.m_size << "x"
+                              << sub.n_size << "x" << sub.k_size
+                              << " (offset M=" << sub.m_offset << ", N=" << sub.n_offset << ")"
+                              << std::endl;
+            }
+
+            // Warmup and timing iterations from command-line args
+            int warmup_iters = arg.cold_iters;
+            int timing_iters = arg.iters;
+
+            // Storage for kernel info per sub-problem
+            std::vector<std::string> subproblem_solution_names(subProblems.size());
+            std::vector<std::string> subproblem_kernel_names(subProblems.size());
+            std::vector<int> subproblem_solution_indices(subProblems.size(), -1);
+
+            // Warmup iterations
+            for(int warmup = 0; warmup < warmup_iters; warmup++)
+            {
+                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                {
+                    const auto& sub = subProblems[sp];
+
+                    // Create temp matrix layouts
+                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
+                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
+                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                    // Query heuristic
+                    hipblasLtMatmulHeuristicResult_t heur_tmp;
+                    int ret_tmp = 0;
+                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
+
+                    if(ret_tmp > 0)
+                    {
+                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
+                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                    }
+
+                    hipblasLtMatrixLayoutDestroy(matA_tmp);
+                    hipblasLtMatrixLayoutDestroy(matB_tmp);
+                    hipblasLtMatrixLayoutDestroy(matC_tmp);
+                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                }
+            }
+
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+
+            // Timing iterations
+            auto start_time = std::chrono::high_resolution_clock::now();
+
+            for(int iter = 0; iter < timing_iters; iter++)
+            {
+                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                {
+                    const auto& sub = subProblems[sp];
+
+                    // Create temp matrix layouts
+                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
+                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
+                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                    // Query heuristic
+                    hipblasLtMatmulHeuristicResult_t heur_tmp;
+                    int ret_tmp = 0;
+                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
+
+                    // Store kernel info on first iteration
+                    if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
+                    {
+                        try {
+                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                            int* solutionIndex = (int*)heur_tmp.algo.data;
+                            subproblem_solution_indices[sp] = *solutionIndex;
+                        } catch (...) {
+                            subproblem_solution_names[sp] = "ERROR";
+                            subproblem_kernel_names[sp] = "ERROR";
+                            subproblem_solution_indices[sp] = -1;
+                        }
+                    }
+
+                    if(ret_tmp > 0)
+                    {
+                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
+                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                    }
+
+                    hipblasLtMatrixLayoutDestroy(matA_tmp);
+                    hipblasLtMatrixLayoutDestroy(matB_tmp);
+                    hipblasLtMatrixLayoutDestroy(matC_tmp);
+                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                }
+            }
+
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+            auto end_time = std::chrono::high_resolution_clock::now();
+
+            double total_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
+            double avg_time_us = (total_time_ms * 1000.0) / timing_iters;
+            double flops = 2.0 * M[0] * N[0] * K[0];
+            double gflops = (flops / avg_time_us) / 1000.0;
+
+            hipblaslt_cout << std::endl;
+            hipblaslt_cout << "Multi-MacroTile Performance:" << std::endl;
+            hipblaslt_cout << "  Iterations: " << timing_iters << " (after " << warmup_iters << " warmup)" << std::endl;
+            hipblaslt_cout << "  Average time: " << std::fixed << std::setprecision(2) << avg_time_us << " us" << std::endl;
+            hipblaslt_cout << "  Performance: " << std::fixed << std::setprecision(1) << gflops << " GFLOPS ("
+                          << std::setprecision(3) << (gflops / 1000.0) << " TFLOPS)" << std::endl;
+            hipblaslt_cout << std::endl;
+
+            // Print kernel information if requested
+            if(arg.print_kernel_info)
+            {
+                hipblaslt_cout << "Kernel Information per Sub-problem:" << std::endl;
+                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                {
+                    const auto& sub = subProblems[sp];
+                    hipblaslt_cout << "  Sub-problem [" << sp << "]: " << sub.m_size << "x" << sub.n_size
+                                  << "x" << sub.k_size << std::endl;
+                    if(subproblem_solution_indices[sp] >= 0)
+                    {
+                        hipblaslt_cout << "    --Solution index: " << subproblem_solution_indices[sp] << std::endl;
+                        hipblaslt_cout << "    --Solution name:  " << subproblem_solution_names[sp] << std::endl;
+                        hipblaslt_cout << "    --Kernel name:    " << subproblem_kernel_names[sp] << std::endl;
+                    }
+                    else
+                    {
+                        hipblaslt_cout << "    --No kernel info captured" << std::endl;
+                    }
+                }
+                hipblaslt_cout << std::endl;
+            }
+
+            // Early return - skip normal timing loop
+            return;
+        }
+
         // Get device information
         hipDeviceProp_t deviceProps;
         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));

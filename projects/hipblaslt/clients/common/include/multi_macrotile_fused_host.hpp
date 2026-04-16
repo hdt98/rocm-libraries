@@ -158,8 +158,8 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
     hipStream_t stream,
     int device_id)
 {
-    std::cout << "\n=== Fused Multi-MacroTile Batch Launch ===" << std::endl;
-    std::cout << "Number of sub-problems: " << subProblems.size() << std::endl;
+    hipblaslt_cout << "\n=== Fused Multi-MacroTile Batch Launch ===" << std::endl;
+    hipblaslt_cout << "Number of sub-problems: " << subProblems.size() << std::endl;
 
     // Create kernel dispatch table
     KernelDispatchTable dispatch_table = createKernelDispatchTable(
@@ -167,7 +167,7 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
 
     if (dispatch_table.num_kernels == 0)
     {
-        std::cerr << "ERROR: No kernels extracted, falling back to sequential" << std::endl;
+        hipblaslt_cerr << "ERROR: No kernels extracted, falling back to sequential" << std::endl;
         return hipErrorNotFound;
     }
 
@@ -195,7 +195,7 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
 
         if (!kernel_func)
         {
-            std::cerr << "ERROR: Kernel not found for solution index " << solution_idx << std::endl;
+            hipblaslt_cerr << "ERROR: Kernel not found for solution index " << solution_idx << std::endl;
             continue;
         }
 
@@ -244,13 +244,13 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
 
         launch_params.push_back(params);
 
-        std::cout << "Sub-problem " << i << ": Grid " << total_tiles
+        hipblaslt_cout << "Sub-problem " << i << ": Grid " << total_tiles
                   << " (" << tiles_m << "×" << tiles_n << ")"
                   << ", Block 256" << std::endl;
     }
 
     // Launch all kernels in batch
-    std::cout << "\nLaunching " << launch_params.size() << " kernels concurrently..." << std::endl;
+    hipblaslt_cout << "\nLaunching " << launch_params.size() << " kernels concurrently..." << std::endl;
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -265,7 +265,7 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
 
         if (err != hipSuccess)
         {
-            std::cerr << "ERROR: Kernel launch failed with error " << err << std::endl;
+            hipblaslt_cerr << "ERROR: Kernel launch failed with error " << err << std::endl;
             return err;
         }
     }
@@ -276,8 +276,8 @@ inline hipError_t executeFusedMultiMacrotileBatchLaunch(
     auto end = std::chrono::high_resolution_clock::now();
     double elapsed_us = std::chrono::duration<double, std::micro>(end - start).count();
 
-    std::cout << "Batch launch complete: " << elapsed_us << " μs" << std::endl;
-    std::cout << "=========================================\n" << std::endl;
+    hipblaslt_cout << "Batch launch complete: " << elapsed_us << " μs" << std::endl;
+    hipblaslt_cout << "=========================================\n" << std::endl;
 
     return sync_err;
 }
@@ -310,7 +310,7 @@ inline bool tryFusedMultiMacrotileDispatch(
 
     if (err != hipSuccess)
     {
-        std::cerr << "Fused dispatch failed, will fall back to sequential" << std::endl;
+        hipblaslt_cerr << "Fused dispatch failed, will fall back to sequential" << std::endl;
         return false;
     }
 
