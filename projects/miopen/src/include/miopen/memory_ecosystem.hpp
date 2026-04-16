@@ -5,14 +5,15 @@
 
 #ifdef _WIN32
 #include <dxgi1_4.h>
-#include <wchar.h>
 #endif
 #include <algorithm>
 #include <functional>
 #include <iostream>
 #include <vector>
 
-// This addresses a Windows-specific issue on low-memory APUs. It does not do
+#include <gtest/gtest.h>
+
+// This addresses a Windows-specific issue on low-memory APUs. MemoryEcosystem does not do
 // anything in linux yet. Linux support will be added if/when it is needed.
 
 namespace
@@ -151,6 +152,15 @@ struct MemoryEcosystem
         const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
         return AbleToAllocate(info, vram_blocks, cpu_blocks);
 #endif
+    }
+
+    static void SkipTestIfUnableToAllocate(const std::vector<size_t>& gpu_bufs, const std::vector<size_t>& cpu_bufs, bool& skip_flag)
+    {
+        if(!AbleToAllocate(gpu_bufs, cpu_bufs))
+        {
+            skip_flag = true;
+            GTEST_SKIP() << "Unable to allocate enough Dedicated + Shared VRAM";
+        }
     }
 };
 

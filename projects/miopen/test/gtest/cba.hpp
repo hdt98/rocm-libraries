@@ -86,7 +86,7 @@ protected:
     }
     void TearDown() override
     {
-        if(cfsb::test_skipped) { MIOPEN_LOG_E("skipped from base!"); return; }  // TRJS
+        if(cfsb::test_skipped) { return; }
 
         conv_stats stats;
         cfsb::TearDownConv();
