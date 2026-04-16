@@ -1,6 +1,13 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
+if(NOT ENABLE_HIP_KERNEL_PROVIDER)
+    message(WARNING
+            "You must explicitly turn on hip-kernel-provider using "
+            " -DENABLE_HIP_KERNEL_PROVIDER=ON in order to build it")
+    return()
+endif()
+
 cmake_minimum_required(VERSION 3.25.2)
 add_compile_definitions(__HIP_PLATFORM_AMD__)
 
