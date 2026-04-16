@@ -552,87 +552,22 @@ def build_and_run_fmha(String arch){
     return cmd
 }
 
-def dispatcher_common_cmake_args(){
-    // Returned as a string fragment; callers must append `..` (project root).
-    // Dispatcher tests are only validated on gfx950 — GPU target is hardcoded.
-    // BUILD_TESTING=OFF disables the root test/ subdir (FMHA/Pooling/etc.) so
-    // only the dispatcher subtree is built.
-    return """ -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
-               -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
-               -D CMAKE_HIP_COMPILER="${params.BUILD_COMPILER}" \
-               -D CMAKE_BUILD_TYPE=Release \
-               -D GPU_TARGETS=gfx950 \
-               -D BUILD_CK_DISPATCHER=ON \
-               -D BUILD_CK_DEVICE_INSTANCES=OFF \
-               -D BUILD_CK_TILE_ENGINE=OFF \
-               -D BUILD_CK_EXAMPLES=OFF \
-               -D BUILD_CK_TUTORIALS=OFF \
-               -D BUILD_CK_PROFILER=OFF \
-               -D BUILD_TESTING=OFF """
+// Dispatcher CI commands live in script/dispatcher_ci.sh (one mode per stage).
+// Keeping them out of the Jenkinsfile reduces Groovy CPS bytecode and lets
+// developers reproduce CI locally with `bash script/dispatcher_ci.sh <mode>`.
+def dispatcher_ci(String mode){
+    return "BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()} bash ../script/dispatcher_ci.sh ${mode}"
 }
 
-def build_and_run_dispatcher_cpu(){
-    // ctest is run from build/dispatcher (not the root build/), bypassing root's
-    // BUILD_TESTING gate. Dispatcher tests register individual labels — multiple
-    // -L flags AND-intersect; -LE excludes by label regex.
-    return """ cmake ${dispatcher_common_cmake_args()} \
-                -D BUILD_DISPATCHER_TESTS=ON \
-                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF .. && \
-               ninja -j${nthreads()} && \
-               cd dispatcher && \
-               ctest --output-on-failure -L dispatcher -L cpp && \
-               ctest --output-on-failure -L dispatcher -L python -LE 'stress|integration' """
-}
-
-def build_and_run_dispatcher_gpu(){
-    // Hardcoded to gfx950 — dispatcher GPU kernel tests are only validated on gfx950.
-    // Currently only runs python integration tests; cpp;gpu tests are skipped
-    // pending fix to dispatcher's tests/CMakeLists.txt SINGLE_KERNEL_HEADER path.
-    // BUILD_DISPATCHER_REAL_KERNEL_TESTS stays OFF since cpp;gpu tests are skipped.
-    // -LE stress excludes dispatcher_stress_test (labels dispatcher;python;stress;
-    // integration) which is gated separately via RUN_DISPATCHER_STRESS_TESTS.
-    return """ cmake ${dispatcher_common_cmake_args()} \
-                -D BUILD_DISPATCHER_TESTS=ON \
-                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF \
-                -D BUILD_DISPATCHER_EXAMPLES=ON .. && \
-               ninja -j${nthreads()} && \
-               cd dispatcher && \
-               ctest --output-on-failure -L dispatcher -L python -L integration -LE stress """
-}
-
-def build_and_run_dispatcher_stress(){
-    // Stress tests are excluded from PR runs (CPU/GPU stages) and only run when
-    // explicitly enabled (default: nightly via RUN_DISPATCHER_STRESS_TESTS=true).
-    // Runs on nogpu — all stress tests are pure Python autocorrect/random-config
-    // exercises that do not need a GPU.
-    return """ cmake ${dispatcher_common_cmake_args()} \
-                -D BUILD_DISPATCHER_TESTS=ON \
-                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF .. && \
-               ninja -j${nthreads()} && \
-               cd dispatcher && \
-               ctest --output-on-failure -L dispatcher -L stress """
-}
-
-def run_dispatcher_heuristics(){
-    return """ cd ../dispatcher && pip install -r requirements-ml.txt && \
-               python3 -m pytest heuristics/tests/ -v --tb=short """
-}
-
-// Runs all enabled nogpu dispatcher workloads sequentially on a single node.
-// Combining CPU/Heuristics/Stress into one sub-stage (vs. 3 declarative
-// sub-stages) is required to stay under the Jenkins 64KB CPS method-size limit.
 def run_dispatcher_nogpu_workloads(){
     if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
-            execute_cmd: build_and_run_dispatcher_cpu())
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('cpu'))
     }
     if (params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
-            execute_cmd: run_dispatcher_heuristics())
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('heuristics'))
     }
     if (params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release',
-            execute_cmd: build_and_run_dispatcher_stress())
+        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('stress'))
     }
 }
 
@@ -1965,9 +1900,6 @@ pipeline {
             }
         }
 
-        // Dispatcher tests: 2 parallel branches (nogpu + gfx950) instead of 4
-        // sub-stages, to stay under the Jenkins CPS 64KB method-size limit.
-        // The nogpu branch runs CPU/Heuristics/Stress sequentially via a helper.
         stage("Run DISPATCHER Tests")
         {
             when {
@@ -1997,12 +1929,8 @@ pipeline {
                         expression { params.RUN_DISPATCHER_GPU_TESTS.toBoolean() }
                     }
                     agent{ label rocmnode("gfx950") }
-                    environment{
-                        setup_args = "NO_CK_BUILD"
-                        execute_args = build_and_run_dispatcher_gpu()
-                    }
                     steps{
-                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('gpu'))
                         cleanWs()
                     }
                 }
