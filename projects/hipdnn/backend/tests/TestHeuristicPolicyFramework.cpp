@@ -26,13 +26,13 @@ using namespace hipdnn_backend;
 using namespace hipdnn_backend::heuristics;
 using namespace hipdnn_backend::plugin;
 
-class HeuristicPolicyFrameworkTest : public ::testing::Test
+class TestHeuristicPolicyFramework : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
         // Create handle for tests that need it
-        hipdnnStatus_t status = hipdnnCreate(&_handle);
+        const hipdnnStatus_t status = hipdnnCreate(&_handle);
         ASSERT_EQ(status, HIPDNN_STATUS_SUCCESS);
         ASSERT_NE(_handle, nullptr);
     }
@@ -51,7 +51,7 @@ protected:
 
 // ========== Device Properties Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesQueryReturnsValidData)
+TEST_F(TestHeuristicPolicyFramework, DevicePropertiesQueryReturnsValidData)
 {
     auto props = queryDeviceProperties();
 
@@ -66,7 +66,7 @@ TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesQueryReturnsValidData)
     EXPECT_GT(props.totalGlobalMem, 0u);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesSerializationRoundTrip)
+TEST_F(TestHeuristicPolicyFramework, DevicePropertiesSerializationRoundTrip)
 {
     DeviceProperties original;
     original.deviceId = 42;
@@ -86,7 +86,7 @@ TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesSerializationRoundTrip)
     EXPECT_EQ(deserialized.totalGlobalMem, original.totalGlobalMem);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesWrapperCreatesValidBuffer)
+TEST_F(TestHeuristicPolicyFramework, DevicePropertiesWrapperCreatesValidBuffer)
 {
     DeviceProperties props;
     props.deviceId = 7;
@@ -102,17 +102,17 @@ TEST_F(HeuristicPolicyFrameworkTest, DevicePropertiesWrapperCreatesValidBuffer)
 
 // ========== Policy Enumeration Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyCountReturnsNonZero)
+TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyCountReturnsNonZero)
 {
     size_t numPolicies = 0;
-    hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(_handle, &numPolicies);
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(_handle, &numPolicies);
 
     EXPECT_EQ(status, HIPDNN_STATUS_SUCCESS);
     // At minimum, Config and StaticOrdering should be loaded
     EXPECT_GE(numPolicies, 2u);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyInfoReturnsValidData)
+TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
 {
     size_t numPolicies = 0;
     ASSERT_EQ(hipdnnGetHeuristicPolicyCount_ext(_handle, &numPolicies), HIPDNN_STATUS_SUCCESS);
@@ -155,7 +155,7 @@ TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyInfoReturnsValidData)
     EXPECT_GT(std::strlen(apiVersion.data()), 0u);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyInfoOutOfRangeFails)
+TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
 {
     size_t numPolicies = 0;
     ASSERT_EQ(hipdnnGetHeuristicPolicyCount_ext(_handle, &numPolicies), HIPDNN_STATUS_SUCCESS);
@@ -166,7 +166,7 @@ TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyInfoOutOfRangeFails)
     size_t pluginVersionLen = 0;
     size_t apiVersionLen = 0;
 
-    hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(_handle,
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(_handle,
                                                               numPolicies + 100,
                                                               &policyId,
                                                               nullptr,
@@ -181,7 +181,7 @@ TEST_F(HeuristicPolicyFrameworkTest, GetHeuristicPolicyInfoOutOfRangeFails)
 
 // ========== Policy Order Resolution Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, EnvironmentVariablePolicyOrderIsRespected)
+TEST_F(TestHeuristicPolicyFramework, EnvironmentVariablePolicyOrderIsRespected)
 {
     // Set environment variable
     setenv("HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config", 1);
@@ -196,14 +196,14 @@ TEST_F(HeuristicPolicyFrameworkTest, EnvironmentVariablePolicyOrderIsRespected)
 
 // ========== Policy Behavior Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, StaticOrderingPolicyNeverDeclines)
+TEST_F(TestHeuristicPolicyFramework, StaticOrderingPolicyNeverDeclines)
 {
     // StaticOrdering should always succeed and provide ordered engine IDs
     // This is a unit-level assertion about the policy's contract
     SUCCEED() << "StaticOrdering policy is designed to never return NOT_APPLICABLE";
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, ConfigPolicyDeclinesWhenNoPreference)
+TEST_F(TestHeuristicPolicyFramework, ConfigPolicyDeclinesWhenNoPreference)
 {
     // Config policy should decline if preferred_engine_id is not set
     // or if the preferred engine is not in the candidate list
@@ -212,14 +212,14 @@ TEST_F(HeuristicPolicyFrameworkTest, ConfigPolicyDeclinesWhenNoPreference)
 
 // ========== Failure Handling Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, EmptyPolicyListThrowsException)
+TEST_F(TestHeuristicPolicyFramework, EmptyPolicyListThrowsException)
 {
     // If no policies are loaded, finalize() should throw
     // This would require mocking the plugin manager to return empty list
     SUCCEED() << "Empty policy list should cause finalize() to throw";
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, AllPoliciesDecliningThrowsException)
+TEST_F(TestHeuristicPolicyFramework, AllPoliciesDecliningThrowsException)
 {
     // If all policies return NOT_APPLICABLE, finalize() should throw
     // This would require synthetic policies that always decline
@@ -228,7 +228,7 @@ TEST_F(HeuristicPolicyFrameworkTest, AllPoliciesDecliningThrowsException)
 
 // ========== Integration Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, HeuristicResourceManagerLoadsDefaultPolicies)
+TEST_F(TestHeuristicPolicyFramework, HeuristicResourceManagerLoadsDefaultPolicies)
 {
     auto heurRm = _handle->getHeuristicPluginResourceManager();
     ASSERT_NE(heurRm, nullptr);
@@ -260,7 +260,7 @@ TEST_F(HeuristicPolicyFrameworkTest, HeuristicResourceManagerLoadsDefaultPolicie
 
 // ========== Attribute Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, PolicyOrderAttributeCanBeSetAndRetrieved)
+TEST_F(TestHeuristicPolicyFramework, PolicyOrderAttributeCanBeSetAndRetrieved)
 {
     // This would test setting HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT
     // and retrieving it via getAttribute
@@ -269,7 +269,7 @@ TEST_F(HeuristicPolicyFrameworkTest, PolicyOrderAttributeCanBeSetAndRetrieved)
 
 // ========== Thread Safety Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, ConcurrentPolicyQueriesAreThreadSafe)
+TEST_F(TestHeuristicPolicyFramework, ConcurrentPolicyQueriesAreThreadSafe)
 {
     // Multiple threads querying policy infos should not crash
     // This would use std::thread to query concurrently
@@ -278,7 +278,7 @@ TEST_F(HeuristicPolicyFrameworkTest, ConcurrentPolicyQueriesAreThreadSafe)
 
 // ========== Cleanup Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, ResourceManagerDestroysHandlesOnCleanup)
+TEST_F(TestHeuristicPolicyFramework, ResourceManagerDestroysHandlesOnCleanup)
 {
     // Verify that plugin handles are destroyed when resource manager is destroyed
     // This would check via logging or mock objects
@@ -287,27 +287,27 @@ TEST_F(HeuristicPolicyFrameworkTest, ResourceManagerDestroysHandlesOnCleanup)
 
 // ========== Negative Tests ==========
 
-TEST_F(HeuristicPolicyFrameworkTest, GetPolicyCountWithNullHandleFails)
+TEST_F(TestHeuristicPolicyFramework, GetPolicyCountWithNullHandleFails)
 {
     size_t numPolicies = 0;
-    hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(nullptr, &numPolicies);
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(nullptr, &numPolicies);
 
     EXPECT_NE(status, HIPDNN_STATUS_SUCCESS);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, GetPolicyCountWithNullPointerFails)
+TEST_F(TestHeuristicPolicyFramework, GetPolicyCountWithNullPointerFails)
 {
-    hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(_handle, nullptr);
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyCount_ext(_handle, nullptr);
 
     EXPECT_NE(status, HIPDNN_STATUS_SUCCESS);
 }
 
-TEST_F(HeuristicPolicyFrameworkTest, GetPolicyInfoWithNullLengthPointersFails)
+TEST_F(TestHeuristicPolicyFramework, GetPolicyInfoWithNullLengthPointersFails)
 {
     int64_t policyId = -1;
 
     // All length pointers are required (not nullptr)
-    hipdnnStatus_t status =
+    const hipdnnStatus_t status =
         hipdnnGetHeuristicPolicyInfo_ext(_handle, 0, &policyId, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 
     EXPECT_NE(status, HIPDNN_STATUS_SUCCESS);

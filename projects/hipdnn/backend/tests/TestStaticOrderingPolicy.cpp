@@ -21,12 +21,12 @@
 using namespace hipdnn_backend;
 using namespace hipdnn_data_sdk::utilities;
 
-class StaticOrderingPolicyTest : public ::testing::Test
+class TestStaticOrderingPolicy : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
-        hipdnnStatus_t status = hipdnnCreate(&_handle);
+        const hipdnnStatus_t status = hipdnnCreate(&_handle);
         ASSERT_EQ(status, HIPDNN_STATUS_SUCCESS);
         ASSERT_NE(_handle, nullptr);
     }
@@ -41,7 +41,7 @@ protected:
     }
 
     // Helper to get StaticOrdering policy ID
-    int64_t getStaticOrderingPolicyId() const
+    static int64_t getStaticOrderingPolicyId()
     {
         return engineNameToId("SelectionHeuristic::StaticOrdering");
     }
@@ -51,10 +51,10 @@ protected:
 
 // ========== Ordering Behavior Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, MIOpenEngineHasHighestPriority)
+TEST_F(TestStaticOrderingPolicy, MIOpenEngineHasHighestPriority)
 {
     // Verify that MIOpen engine is prioritized first
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("SomeOtherEngine"),
         engineNameToId("MIOpen"),
@@ -67,9 +67,9 @@ TEST_F(StaticOrderingPolicyTest, MIOpenEngineHasHighestPriority)
     EXPECT_EQ(sorted[0], engineNameToId("MIOpen"));
 }
 
-TEST_F(StaticOrderingPolicyTest, MIOpenDeterministicHasLowestPriority)
+TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicHasLowestPriority)
 {
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("MIOpen"),
         engineNameToId("SomeOtherEngine"),
@@ -82,9 +82,9 @@ TEST_F(StaticOrderingPolicyTest, MIOpenDeterministicHasLowestPriority)
     EXPECT_EQ(sorted.back(), engineNameToId("MIOpenDeterministic"));
 }
 
-TEST_F(StaticOrderingPolicyTest, OtherEnginesAreMiddlePriority)
+TEST_F(TestStaticOrderingPolicy, OtherEnginesAreMiddlePriority)
 {
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("CustomEngine1"),
         engineNameToId("MIOpen"),
@@ -103,7 +103,7 @@ TEST_F(StaticOrderingPolicyTest, OtherEnginesAreMiddlePriority)
     EXPECT_EQ(sorted[2], engineNameToId("CustomEngine2"));
 }
 
-TEST_F(StaticOrderingPolicyTest, StableWithinSamePriority)
+TEST_F(TestStaticOrderingPolicy, StableWithinSamePriority)
 {
     // Engines with same priority should maintain relative order
     std::vector<int64_t> engines = {
@@ -121,7 +121,7 @@ TEST_F(StaticOrderingPolicyTest, StableWithinSamePriority)
     EXPECT_EQ(sorted[2], engines[2]);
 }
 
-TEST_F(StaticOrderingPolicyTest, EmptyListRemainsEmpty)
+TEST_F(TestStaticOrderingPolicy, EmptyListRemainsEmpty)
 {
     std::vector<int64_t> engines;
     hipdnn_data_sdk::utilities::sortEngineIds(engines);
@@ -129,9 +129,9 @@ TEST_F(StaticOrderingPolicyTest, EmptyListRemainsEmpty)
     EXPECT_TRUE(engines.empty());
 }
 
-TEST_F(StaticOrderingPolicyTest, SingleEngineUnchanged)
+TEST_F(TestStaticOrderingPolicy, SingleEngineUnchanged)
 {
-    std::vector<int64_t> engines = {engineNameToId("MIOpen")};
+    const std::vector<int64_t> engines = {engineNameToId("MIOpen")};
 
     std::vector<int64_t> sorted = engines;
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
@@ -141,10 +141,10 @@ TEST_F(StaticOrderingPolicyTest, SingleEngineUnchanged)
 
 // ========== Consistency Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, BackendAndDataSdkSortingMatch)
+TEST_F(TestStaticOrderingPolicy, BackendAndDataSdkSortingMatch)
 {
     // Verify that backend utilities::sortEngineIds delegates to data_sdk
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("CustomEngine"),
         engineNameToId("MIOpen"),
@@ -161,7 +161,7 @@ TEST_F(StaticOrderingPolicyTest, BackendAndDataSdkSortingMatch)
 
 // ========== Policy-Specific Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, PolicyNeverDeclines)
+TEST_F(TestStaticOrderingPolicy, PolicyNeverDeclines)
 {
     // StaticOrdering should always succeed (never return NOT_APPLICABLE)
     // This is verified by checking that it's usable as a fallback policy
@@ -188,23 +188,23 @@ TEST_F(StaticOrderingPolicyTest, PolicyNeverDeclines)
 
 // ========== Known Engine IDs Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, MIOpenEngineIdIsRecognized)
+TEST_F(TestStaticOrderingPolicy, MIOpenEngineIdIsRecognized)
 {
-    int64_t miopenId = engineNameToId("MIOpen");
+    const int64_t miopenId = engineNameToId("MIOpen");
     EXPECT_EQ(miopenId, MIOPEN_ENGINE_ID);
 }
 
-TEST_F(StaticOrderingPolicyTest, MIOpenDeterministicIdIsRecognized)
+TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicIdIsRecognized)
 {
-    int64_t miopenDetId = engineNameToId("MIOpenDeterministic");
+    const int64_t miopenDetId = engineNameToId("MIOpenDeterministic");
     EXPECT_EQ(miopenDetId, MIOPEN_ENGINE_DETERMINISTIC_ID);
 }
 
 // ========== Complex Scenarios ==========
 
-TEST_F(StaticOrderingPolicyTest, ComplexMixedEngineList)
+TEST_F(TestStaticOrderingPolicy, ComplexMixedEngineList)
 {
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("Plugin1::Engine3"),
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("Plugin1::Engine1"),
@@ -231,9 +231,9 @@ TEST_F(StaticOrderingPolicyTest, ComplexMixedEngineList)
 
 // ========== Idempotency Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, SortingIsIdempotent)
+TEST_F(TestStaticOrderingPolicy, SortingIsIdempotent)
 {
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         engineNameToId("MIOpenDeterministic"),
         engineNameToId("Custom"),
         engineNameToId("MIOpen"),
@@ -250,10 +250,10 @@ TEST_F(StaticOrderingPolicyTest, SortingIsIdempotent)
 
 // ========== Negative Tests ==========
 
-TEST_F(StaticOrderingPolicyTest, UnknownEngineIdsHandledGracefully)
+TEST_F(TestStaticOrderingPolicy, UnknownEngineIdsHandledGracefully)
 {
     // Engines with unknown IDs should be treated as middle-priority
-    std::vector<int64_t> engines = {
+    const std::vector<int64_t> engines = {
         static_cast<int64_t>(0x1234567890ABCDEF), // Unknown ID
         engineNameToId("MIOpen"),
         static_cast<int64_t>(0xFEDCBA0987654321), // Another unknown ID

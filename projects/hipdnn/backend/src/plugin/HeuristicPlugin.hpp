@@ -37,6 +37,9 @@ public:
 
     // Module metadata (called before handle creation)
     std::string_view apiVersion() const override;
+    std::string_view name() const override; // Override to return policy name
+    std::string_view version() const override; // Override to return plugin version
+    hipdnnPluginType_t type() const override; // Override to return plugin type
     int64_t policyId() const;
     std::string_view policyName() const;
     std::string_view pluginVersion() const;

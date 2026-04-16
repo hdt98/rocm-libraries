@@ -163,6 +163,15 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicSetLogLevel(h
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
+HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnHeuristicGetLastErrorString(const char** error_str)
+{
+    if(error_str == nullptr)
+    {
+        return;
+    }
+    *error_str = "No error information available";
+}
+
 //=============================================================================
 // C ABI Implementation - Handle Lifecycle
 //=============================================================================

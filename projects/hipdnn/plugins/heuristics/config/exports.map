@@ -9,6 +9,7 @@
         # Logging
         hipdnnHeuristicSetLoggingCallback;
         hipdnnHeuristicSetLogLevel;
+        hipdnnHeuristicGetLastErrorString;
 
         # Handle lifecycle
         hipdnnHeuristicHandleCreate;

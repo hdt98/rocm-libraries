@@ -208,9 +208,31 @@ public:
             }
         }
 
+        // Track failed plugin loads for summary reporting
+        size_t failedCount = 0;
+
         for(const auto& filePath : filesToLoad)
         {
-            loadPluginFromFile(filePath);
+            if(!loadPluginFromFile(filePath))
+            {
+                failedCount++;
+                // Error already logged in loadPluginFromFile
+            }
+        }
+
+        // Emit summary if any plugins failed to load
+        if(failedCount > 0)
+        {
+            HIPDNN_BACKEND_LOG_WARN(
+                "⚠️  Plugin loading summary: {} plugin(s) failed to load out of {} attempted. "
+                "Check error messages above for details.",
+                failedCount,
+                filesToLoad.size());
+        }
+        else if(!filesToLoad.empty())
+        {
+            HIPDNN_BACKEND_LOG_INFO(
+                "✓ Successfully loaded all {} plugin(s)", filesToLoad.size());
         }
     }
 
@@ -253,13 +275,14 @@ private:
         }
     }
 
-    void loadPluginFromFile(const std::filesystem::path& filePath)
+    bool loadPluginFromFile(const std::filesystem::path& filePath)
     {
-
         HIPDNN_BACKEND_LOG_INFO("Attempting to load plugin from [{}]", filePath.string());
 
+        bool success = false;
         hipdnn_backend::tryCatch(
             [&]() {
+                success = true;
                 SharedLibrary lib(filePath);
                 const auto libraryPath = lib.libraryPath();
 
@@ -306,7 +329,9 @@ private:
 
                 actionAfterAdding(*_plugins.back());
             },
-            fmt::format("Error loading plugin from [{}]: ", filePath.string()));
+            fmt::format("❌ Error loading plugin from [{}]: ", filePath.string()));
+
+        return success;
     }
 
     std::vector<std::shared_ptr<Plugin>> _plugins;
