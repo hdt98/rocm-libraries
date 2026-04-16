@@ -73,6 +73,14 @@ int run_bench_test(Arguments&         arg,
     // enable timing check,otherwise no performance data collected
     arg.timing = 1;
 
+    // Multi-macrotile requires verification mode (timing = 0)
+    if(arg.multi_macrotile)
+    {
+        arg.timing = 0;
+        hipblaslt_cout << "Multi-MacroTile: Running in verification mode (timing disabled)"
+                       << std::endl;
+    }
+
     // One stream and one thread (0 indicates to use default behavior)
     arg.streams = 0;
     arg.threads = 0;
@@ -1026,14 +1034,6 @@ try
     }
 
     arg.norm_check_assert = false;
-
-    // If multi_macrotile is enabled, force timing OFF (only verification mode is supported)
-    if(arg.multi_macrotile)
-    {
-        std::cout << "DEBUG: multi_macrotile enabled, arg.timing before=" << arg.timing << std::endl;
-        arg.timing = 0;
-        std::cout << "DEBUG: multi_macrotile enabled, arg.timing after=" << arg.timing << std::endl;
-    }
 
     return run_bench_test(arg, filter, any_stride, props);
 }

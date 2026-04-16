@@ -106,13 +106,15 @@ inline size_t calculateOffsetA(int64_t m_offset,
 
     if(transA == HIPBLAS_OP_N)
     {
-        // A is M x K, offset is m_offset rows
-        return m_offset * lda * elem_size;
+        // A is M x K in column-major, element A[i,j] is at position i + j*lda
+        // Offset of m_offset rows means we start at element m_offset
+        return m_offset * elem_size;
     }
     else
     {
-        // A is K x M (transposed), offset is m_offset columns
-        return m_offset * elem_size;
+        // A^T means we're accessing K x M, stored as M x K with K-offset in columns
+        // k_offset would move in column direction, m_offset moves in row direction
+        return (m_offset + k_offset * lda) * elem_size;
     }
 }
 
@@ -127,13 +129,14 @@ inline size_t calculateOffsetB(int64_t n_offset,
 
     if(transB == HIPBLAS_OP_N)
     {
-        // B is K x N, offset is n_offset columns
-        return n_offset * elem_size;
+        // B is K x N in column-major, element B[i,j] is at position i + j*ldb
+        // Offset of n_offset columns means we move n_offset columns
+        return n_offset * ldb * elem_size;
     }
     else
     {
-        // B is N x K (transposed), offset is n_offset rows
-        return n_offset * ldb * elem_size;
+        // B^T means physical matrix is N x K, offset n_offset rows
+        return n_offset * elem_size;
     }
 }
 
@@ -297,7 +300,7 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
     int target_wgs = 256,
     int macrotile_m = 128,        // Estimated MacroTile size (if known)
     int macrotile_n = 128,
-    int num_CUs = 304,            // MI355X has 304 CUs
+    int num_CUs = 256,            // MI355X has 256 CUs
     size_t available_memory = 512ULL * 1024 * 1024,  // 512 MiB default
     size_t workspace_size = 128ULL * 1024 * 1024)
 {
