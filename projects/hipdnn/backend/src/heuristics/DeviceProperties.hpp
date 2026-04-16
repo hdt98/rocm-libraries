@@ -23,9 +23,9 @@ namespace hipdnn_backend::heuristics
  */
 struct DeviceProperties
 {
-    int deviceId            = -1; ///< Device ID from hipGetDevice
-    int multiProcessorCount = 0;  ///< Number of multiprocessors (compute units)
-    size_t totalGlobalMem   = 0;  ///< Total global memory in bytes
+    int deviceId = -1; ///< Device ID from hipGetDevice
+    int multiProcessorCount = 0; ///< Number of multiprocessors (compute units)
+    size_t totalGlobalMem = 0; ///< Total global memory in bytes
 
     // Future optional fields can be added here and to the FlatBuffer schema
     // Example: std::string architectureName;
@@ -93,7 +93,7 @@ inline hipdnnPluginConstData_t
     wrapSerializedDeviceProperties(const std::vector<uint8_t>& serializedBuffer)
 {
     hipdnnPluginConstData_t wrapper;
-    wrapper.ptr  = serializedBuffer.data();
+    wrapper.ptr = serializedBuffer.data();
     wrapper.size = serializedBuffer.size();
     return wrapper;
 }

@@ -67,8 +67,8 @@ extern "C" {
  * @param[in] message The log message content
  */
 typedef void (*hipdnnHeuristicLoggingCallback_t)(hipdnnSeverity_t severity,
-                                                  const char* component_prefix,
-                                                  const char* message);
+                                                 const char* component_prefix,
+                                                 const char* message);
 
 /**
  * @brief Opaque handle for a heuristic plugin session.
@@ -272,8 +272,8 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
  *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if buffer is malformed or incompatible.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
-                                             const hipdnnPluginConstData_t* device_props_serialized);
+    hipdnnHeuristicHandleSetDeviceProperties(
+        hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* device_props_serialized);
 
 /** @} */ // End of HeuristicPluginHandleLifecycle group
 

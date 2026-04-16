@@ -1,10 +1,10 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include "heuristics/DeviceProperties.hpp"
 #include "HipdnnException.hpp"
-#include <gtest/gtest.h>
+#include "heuristics/DeviceProperties.hpp"
 #include <array>
+#include <gtest/gtest.h>
 #include <limits>
 
 using namespace hipdnn_backend::heuristics;
@@ -15,9 +15,9 @@ protected:
     static DeviceProperties createTestProperties()
     {
         DeviceProperties props;
-        props.deviceId            = 0;
+        props.deviceId = 0;
         props.multiProcessorCount = 120;
-        props.totalGlobalMem      = 16ULL * 1024 * 1024 * 1024; // 16 GB
+        props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024; // 16 GB
         return props;
     }
 };
@@ -32,8 +32,8 @@ TEST_F(TestDeviceProperties, SerializeDeserializeRoundTrip)
     ASSERT_FALSE(serialized.empty());
 
     // Deserialize
-    const DeviceProperties deserialized =
-        deserializeDeviceProperties(serialized.data(), serialized.size());
+    const DeviceProperties deserialized
+        = deserializeDeviceProperties(serialized.data(), serialized.size());
 
     // Verify fields match
     EXPECT_EQ(deserialized.deviceId, original.deviceId);
@@ -46,7 +46,7 @@ TEST_F(TestDeviceProperties, SerializeDefaultValues)
 {
     const DeviceProperties props; // All zeros/defaults
 
-    auto serialized   = serializeDeviceProperties(props);
+    auto serialized = serializeDeviceProperties(props);
     auto deserialized = deserializeDeviceProperties(serialized.data(), serialized.size());
 
     EXPECT_EQ(deserialized.deviceId, -1); // Default from struct
@@ -58,11 +58,11 @@ TEST_F(TestDeviceProperties, SerializeDefaultValues)
 TEST_F(TestDeviceProperties, SerializeMaxValues)
 {
     DeviceProperties props;
-    props.deviceId            = std::numeric_limits<int>::max();
+    props.deviceId = std::numeric_limits<int>::max();
     props.multiProcessorCount = std::numeric_limits<int>::max();
-    props.totalGlobalMem      = std::numeric_limits<size_t>::max();
+    props.totalGlobalMem = std::numeric_limits<size_t>::max();
 
-    auto serialized   = serializeDeviceProperties(props);
+    auto serialized = serializeDeviceProperties(props);
     auto deserialized = deserializeDeviceProperties(serialized.data(), serialized.size());
 
     EXPECT_EQ(deserialized.deviceId, props.deviceId);
@@ -74,7 +74,7 @@ TEST_F(TestDeviceProperties, SerializeMaxValues)
 TEST_F(TestDeviceProperties, WrapSerializedDeviceProperties)
 {
     const DeviceProperties props = createTestProperties();
-    auto serialized        = serializeDeviceProperties(props);
+    auto serialized = serializeDeviceProperties(props);
 
     // Create wrapper
     const hipdnnPluginConstData_t wrapper = wrapSerializedDeviceProperties(serialized);
@@ -84,8 +84,8 @@ TEST_F(TestDeviceProperties, WrapSerializedDeviceProperties)
     EXPECT_EQ(wrapper.size, serialized.size());
 
     // Verify we can deserialize through wrapper
-    auto deserialized =
-        deserializeDeviceProperties(static_cast<const uint8_t*>(wrapper.ptr), wrapper.size);
+    auto deserialized
+        = deserializeDeviceProperties(static_cast<const uint8_t*>(wrapper.ptr), wrapper.size);
     EXPECT_EQ(deserialized.deviceId, props.deviceId);
 }
 
@@ -115,7 +115,7 @@ TEST_F(TestDeviceProperties, DeserializeInvalidData)
 TEST_F(TestDeviceProperties, DeserializeTruncatedBuffer)
 {
     const DeviceProperties props = createTestProperties();
-    auto serialized              = serializeDeviceProperties(props);
+    auto serialized = serializeDeviceProperties(props);
 
     // Try to deserialize with truncated size
     if(serialized.size() > 4)
@@ -132,7 +132,7 @@ TEST_F(TestDeviceProperties, MultipleRoundTrips)
 
     for(int i = 0; i < 5; ++i)
     {
-        auto serialized   = serializeDeviceProperties(props);
+        auto serialized = serializeDeviceProperties(props);
         auto deserialized = deserializeDeviceProperties(serialized.data(), serialized.size());
 
         EXPECT_EQ(deserialized.deviceId, props.deviceId);
@@ -148,14 +148,14 @@ TEST_F(TestDeviceProperties, MultipleRoundTrips)
 TEST_F(TestDeviceProperties, DifferentPropertiesProduceDifferentSerializations)
 {
     DeviceProperties props1;
-    props1.deviceId            = 0;
+    props1.deviceId = 0;
     props1.multiProcessorCount = 120;
-    props1.totalGlobalMem      = 16ULL * 1024 * 1024 * 1024;
+    props1.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
 
     DeviceProperties props2;
-    props2.deviceId            = 1; // Different device ID
+    props2.deviceId = 1; // Different device ID
     props2.multiProcessorCount = 120;
-    props2.totalGlobalMem      = 16ULL * 1024 * 1024 * 1024;
+    props2.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
 
     auto serialized1 = serializeDeviceProperties(props1);
     auto serialized2 = serializeDeviceProperties(props2);

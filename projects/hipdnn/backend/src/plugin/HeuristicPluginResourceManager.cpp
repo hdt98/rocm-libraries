@@ -80,7 +80,8 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         {
             // Set logging callback before creating handle
             // Use heuristicLoggingCallback which handles the 3-parameter signature
-            auto logStatus = plugin->setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
+            auto logStatus
+                = plugin->setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
             if(logStatus != HIPDNN_PLUGIN_STATUS_SUCCESS)
             {
                 HIPDNN_BACKEND_LOG_WARN(
@@ -99,14 +100,15 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
             _policyIdToHandle[plugin->policyId()] = handle;
 
             HIPDNN_BACKEND_LOG_INFO("Created heuristic plugin handle for policy ID {} ({})",
-                                   plugin->policyId(),
-                                   plugin->policyName());
+                                    plugin->policyId(),
+                                    plugin->policyName());
         }
         catch(const HipdnnException& e)
         {
-            HIPDNN_BACKEND_LOG_ERROR("Failed to create handle for heuristic plugin with policy ID {}: {}",
-                                    plugin->policyId(),
-                                    e.what());
+            HIPDNN_BACKEND_LOG_ERROR(
+                "Failed to create handle for heuristic plugin with policy ID {}: {}",
+                plugin->policyId(),
+                e.what());
             // Continue loading other plugins
         }
     }
@@ -137,10 +139,10 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
 
 HeuristicPluginResourceManager::HeuristicPluginResourceManager(
     HeuristicPluginResourceManager&& other) noexcept
-    : _pm(std::move(other._pm)),
-      _handleToPlugin(std::move(other._handleToPlugin)),
-      _policyIdToHandle(std::move(other._policyIdToHandle)),
-      _cachedPolicyInfos(std::move(other._cachedPolicyInfos))
+    : _pm(std::move(other._pm))
+    , _handleToPlugin(std::move(other._handleToPlugin))
+    , _policyIdToHandle(std::move(other._policyIdToHandle))
+    , _cachedPolicyInfos(std::move(other._cachedPolicyInfos))
 {
 }
 
@@ -158,7 +160,8 @@ HeuristicPluginResourceManager&
 }
 
 void HeuristicPluginResourceManager::setHeuristicPluginPaths(
-    const std::vector<std::filesystem::path>& pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode)
+    const std::vector<std::filesystem::path>& pluginPaths,
+    hipdnnPluginLoadingMode_ext_t loadingMode)
 {
     resetManagerIfNeeded();
 
@@ -193,11 +196,10 @@ void HeuristicPluginResourceManager::setPluginLogLevel(hipdnnSeverity_t level)
     for(const auto& plugin : plugins)
     {
         auto status = plugin->setLogLevel(level);
-        if(status != HIPDNN_PLUGIN_STATUS_SUCCESS
-           && status != HIPDNN_PLUGIN_STATUS_INVALID_VALUE)
+        if(status != HIPDNN_PLUGIN_STATUS_SUCCESS && status != HIPDNN_PLUGIN_STATUS_INVALID_VALUE)
         {
             HIPDNN_BACKEND_LOG_WARN("Failed to set log level on heuristic plugin with policy ID {}",
-                                   plugin->policyId());
+                                    plugin->policyId());
         }
     }
 }
@@ -219,8 +221,7 @@ hipdnnHeuristicHandle_t
     return it->second;
 }
 
-const HeuristicPlugin*
-    HeuristicPluginResourceManager::getPluginForPolicyId(int64_t policyId) const
+const HeuristicPlugin* HeuristicPluginResourceManager::getPluginForPolicyId(int64_t policyId) const
 {
     auto handle = getHeuristicHandleForPolicyId(policyId);
     if(handle == nullptr)
@@ -284,7 +285,8 @@ void HeuristicPluginResourceManager::getLoadedHeuristicPluginFiles(size_t* numPl
                                                                    char** pluginPaths,
                                                                    size_t* maxStringLen) const
 {
-    THROW_IF_FALSE(numPlugins != nullptr, HIPDNN_STATUS_BAD_PARAM_NULL_POINTER, "numPlugins is null");
+    THROW_IF_FALSE(
+        numPlugins != nullptr, HIPDNN_STATUS_BAD_PARAM_NULL_POINTER, "numPlugins is null");
 
     if(!_pm)
     {
@@ -314,7 +316,8 @@ void HeuristicPluginResourceManager::getLoadedHeuristicPluginFiles(size_t* numPl
     // TODO: Implement actual path retrieval when SharedLibrary exposes getPath()
     if(pluginPaths != nullptr)
     {
-        HIPDNN_BACKEND_LOG_WARN("getLoadedHeuristicPluginFiles: path retrieval not yet implemented");
+        HIPDNN_BACKEND_LOG_WARN(
+            "getLoadedHeuristicPluginFiles: path retrieval not yet implemented");
     }
 }
 

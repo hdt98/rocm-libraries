@@ -25,10 +25,10 @@ class HeuristicPluginManager;
  */
 struct HeuristicPolicyInfo
 {
-    std::string policyName;  ///< Canonical policy name (UTF-8)
-    int64_t policyId;        ///< Stable policy ID (engineNameToId hash)
+    std::string policyName; ///< Canonical policy name (UTF-8)
+    int64_t policyId; ///< Stable policy ID (engineNameToId hash)
     std::string pluginVersion; ///< Plugin implementation version
-    std::string apiVersion;    ///< Heuristic C ABI version
+    std::string apiVersion; ///< Heuristic C ABI version
 };
 
 /**
@@ -109,8 +109,8 @@ public:
      * @param devicePropsSerialized Pointer to hipdnnPluginConstData_t containing
      *                              FlatBuffer-serialized device properties
      */
-    virtual void setDevicePropertiesOnAllHandles(
-        const hipdnnPluginConstData_t* devicePropsSerialized) const;
+    virtual void
+        setDevicePropertiesOnAllHandles(const hipdnnPluginConstData_t* devicePropsSerialized) const;
 
     /**
      * @brief Get information about all loaded heuristic policies.

@@ -9,13 +9,13 @@
  * per-handle plugin lifecycle management and policy lookup.
  */
 
-#include "plugin/HeuristicPluginResourceManager.hpp"
-#include "plugin/HeuristicPluginManager.hpp"
-#include "descriptors/mocks/MockHeuristicPlugin.hpp"
 #include "HipdnnException.hpp"
+#include "descriptors/mocks/MockHeuristicPlugin.hpp"
+#include "plugin/HeuristicPluginManager.hpp"
+#include "plugin/HeuristicPluginResourceManager.hpp"
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <memory>
 
 using namespace hipdnn_backend;
@@ -29,9 +29,7 @@ protected:
         // Tests in this suite use mock plugins, not real shared libraries
     }
 
-    void TearDown() override
-    {
-    }
+    void TearDown() override {}
 };
 
 // ========== Construction and Initialization Tests ==========
@@ -53,7 +51,7 @@ TEST_F(TestHeuristicPluginResourceManager, ConstructorWithPluginManagerSucceeds)
 
 TEST_F(TestHeuristicPluginResourceManager, MoveConstructorTransfersOwnership)
 {
-    auto pm  = std::make_shared<HeuristicPluginManager>();
+    auto pm = std::make_shared<HeuristicPluginManager>();
     auto rm1 = std::make_shared<HeuristicPluginResourceManager>(pm);
 
     // Move construct
@@ -66,7 +64,7 @@ TEST_F(TestHeuristicPluginResourceManager, MoveConstructorTransfersOwnership)
 
 TEST_F(TestHeuristicPluginResourceManager, MoveAssignmentTransfersOwnership)
 {
-    auto pm  = std::make_shared<HeuristicPluginManager>();
+    auto pm = std::make_shared<HeuristicPluginManager>();
     auto rm1 = std::make_shared<HeuristicPluginResourceManager>(pm);
     auto rm2 = std::make_shared<HeuristicPluginResourceManager>(pm);
 
@@ -87,7 +85,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetHandleForNonexistentPolicyReturnsN
     auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
 
     const int64_t fakePolicyId = 0x1234567890ABCDEF;
-    auto handle                = rm->getHeuristicHandleForPolicyId(fakePolicyId);
+    auto handle = rm->getHeuristicHandleForPolicyId(fakePolicyId);
 
     EXPECT_EQ(handle, nullptr);
 }
@@ -98,7 +96,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetPluginForNonexistentPolicyReturnsN
     auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
 
     const int64_t fakePolicyId = 0x1234567890ABCDEF;
-    auto plugin                = rm->getPluginForPolicyId(fakePolicyId);
+    auto plugin = rm->getPluginForPolicyId(fakePolicyId);
 
     EXPECT_EQ(plugin, nullptr);
 }
@@ -136,7 +134,7 @@ TEST_F(TestHeuristicPluginResourceManager, SetDevicePropertiesOnEmptyManagerDoes
     auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
 
     hipdnnPluginConstData_t deviceProps;
-    deviceProps.ptr  = nullptr;
+    deviceProps.ptr = nullptr;
     deviceProps.size = 0;
 
     // Should not throw even when no plugins loaded
@@ -159,8 +157,8 @@ TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesWhenNoneLoaded)
     auto pm = std::make_shared<HeuristicPluginManager>();
     auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
 
-    size_t numPlugins    = 0;
-    size_t maxStringLen  = 0;
+    size_t numPlugins = 0;
+    size_t maxStringLen = 0;
 
     // Query counts
     rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, &maxStringLen);
@@ -197,8 +195,7 @@ TEST_F(TestHeuristicPluginResourceManager, ToStringIncludesPluginCount)
     const std::string str = rm->toString();
 
     // Should mention plugin count (even if 0)
-    EXPECT_TRUE(str.find("plugin") != std::string::npos ||
-                str.find("Plugin") != std::string::npos);
+    EXPECT_TRUE(str.find("plugin") != std::string::npos || str.find("Plugin") != std::string::npos);
 }
 
 // ========== Static Path Configuration Tests ==========
@@ -215,8 +212,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetHeuristicPluginPathsReturnsConfigu
 {
     const std::vector<std::filesystem::path> paths = {"/tmp/test_plugins", "/tmp/more_plugins"};
 
-    HeuristicPluginResourceManager::setHeuristicPluginPaths(
-        paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    HeuristicPluginResourceManager::setHeuristicPluginPaths(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto retrievedPaths = HeuristicPluginResourceManager::getHeuristicPluginPaths();
 
@@ -227,11 +223,11 @@ TEST_F(TestHeuristicPluginResourceManager, GetHeuristicPluginPathsReturnsConfigu
 TEST_F(TestHeuristicPluginResourceManager, SetPluginUnloadingModeSucceeds)
 {
     // Both modes should be accepted
-    EXPECT_NO_THROW(HeuristicPluginResourceManager::setPluginUnloadingMode(
-        HIPDNN_PLUGIN_UNLOAD_LAZY));
+    EXPECT_NO_THROW(
+        HeuristicPluginResourceManager::setPluginUnloadingMode(HIPDNN_PLUGIN_UNLOAD_LAZY));
 
-    EXPECT_NO_THROW(HeuristicPluginResourceManager::setPluginUnloadingMode(
-        HIPDNN_PLUGIN_UNLOAD_EAGER));
+    EXPECT_NO_THROW(
+        HeuristicPluginResourceManager::setPluginUnloadingMode(HIPDNN_PLUGIN_UNLOAD_EAGER));
 }
 
 TEST_F(TestHeuristicPluginResourceManager, SetPluginLogLevelSucceeds)

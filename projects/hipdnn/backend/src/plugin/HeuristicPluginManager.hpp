@@ -48,14 +48,15 @@ protected:
         // (RFC 0007: heuristic plugin API has independent versioning from backend)
         if(Version{plugin.apiVersion()}.major != HIPDNN_HEURISTIC_API_VERSION_MAJOR)
         {
-            throw HipdnnException(
-                HIPDNN_STATUS_PLUGIN_ERROR,
-                "❌ HEURISTIC PLUGIN ABI VALIDATION FAILED ❌\n"
-                "Plugin API major version (" + std::string(plugin.apiVersion())
-                    + ") does not match expected heuristic API major version ("
-                    + std::to_string(HIPDNN_HEURISTIC_API_VERSION_MAJOR) + ")\n"
-                    + "The plugin was compiled against an incompatible version of HeuristicsPluginApi.h\n"
-                    + "Expected API version: " HIPDNN_HEURISTIC_API_VERSION);
+            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                                  "❌ HEURISTIC PLUGIN ABI VALIDATION FAILED ❌\n"
+                                  "Plugin API major version ("
+                                      + std::string(plugin.apiVersion())
+                                      + ") does not match expected heuristic API major version ("
+                                      + std::to_string(HIPDNN_HEURISTIC_API_VERSION_MAJOR) + ")\n"
+                                      + "The plugin was compiled against an incompatible version "
+                                        "of HeuristicsPluginApi.h\n"
+                                      + "Expected API version: " HIPDNN_HEURISTIC_API_VERSION);
         }
 
         // Validate unique policy ID
@@ -64,7 +65,8 @@ protected:
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                                   "❌ HEURISTIC PLUGIN VALIDATION FAILED ❌\n"
-                                  "Policy ID " + std::to_string(policyId)
+                                  "Policy ID "
+                                      + std::to_string(policyId)
                                       + " already exists in the list of loaded heuristic plugins.\n"
                                       + "Each heuristic plugin must have a unique policy ID.");
         }
@@ -81,9 +83,9 @@ protected:
                 throw HipdnnException(
                     HIPDNN_STATUS_PLUGIN_ERROR,
                     "❌ HEURISTIC PLUGIN VALIDATION FAILED ❌\n"
-                    "Policy ID mismatch: GetPolicyId() returned " + std::to_string(policyId)
-                        + " but engineNameToId(\"" + policyName + "\") = "
-                        + std::to_string(expectedId)
+                    "Policy ID mismatch: GetPolicyId() returned "
+                        + std::to_string(policyId) + " but engineNameToId(\"" + policyName
+                        + "\") = " + std::to_string(expectedId)
                         + "\nPlugin must return consistent ID and name (RFC 0007 §11, §5.3.1).\n"
                         + "Either fix the policy ID to match the hash, or fix the policy name.");
             }

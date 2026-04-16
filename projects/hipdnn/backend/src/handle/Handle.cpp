@@ -28,7 +28,8 @@ std::shared_ptr<EnginePluginResourceManager> hipdnnHandle::getPluginResourceMana
     return _pluginResourceManager;
 }
 
-std::shared_ptr<HeuristicPluginResourceManager> hipdnnHandle::getHeuristicPluginResourceManager() const
+std::shared_ptr<HeuristicPluginResourceManager>
+    hipdnnHandle::getHeuristicPluginResourceManager() const
 {
     return _heuristicPluginResourceManager;
 }

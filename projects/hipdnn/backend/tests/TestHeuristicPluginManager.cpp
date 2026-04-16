@@ -11,12 +11,12 @@
  * - Policy ID ↔ policy name consistency validation
  */
 
-#include "plugin/HeuristicPluginManager.hpp"
-#include "plugin/HeuristicPlugin.hpp"
 #include "HipdnnException.hpp"
+#include "plugin/HeuristicPlugin.hpp"
+#include "plugin/HeuristicPluginManager.hpp"
 
-#include <gtest/gtest.h>
 #include <filesystem>
+#include <gtest/gtest.h>
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
@@ -29,9 +29,7 @@ protected:
         // Most tests use validation logic, not actual plugin loading
     }
 
-    void TearDown() override
-    {
-    }
+    void TearDown() override {}
 };
 
 // ========== Construction Tests ==========
@@ -57,7 +55,8 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsFromEmptyDirectorySucceeds)
     HeuristicPluginManager manager;
 
     // Create a temporary empty directory
-    const std::filesystem::path emptyDir = std::filesystem::temp_directory_path() / "hipdnn_test_empty";
+    const std::filesystem::path emptyDir
+        = std::filesystem::temp_directory_path() / "hipdnn_test_empty";
     std::filesystem::create_directories(emptyDir);
 
     // Should not throw when loading from empty directory
@@ -81,11 +80,7 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithMultiplePathsSucceeds)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths = {
-        "/tmp/path1",
-        "/tmp/path2",
-        "/tmp/path3"
-    };
+    const std::set<std::filesystem::path> paths = {"/tmp/path1", "/tmp/path2", "/tmp/path3"};
 
     // Should not throw
     EXPECT_NO_THROW(manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
