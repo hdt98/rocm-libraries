@@ -18,51 +18,62 @@ HeuristicPlugin::HeuristicPlugin(SharedLibrary&& lib)
 #endif
 }
 
-HeuristicPlugin::HeuristicPlugin()
-    : _lib()
-{
-}
+HeuristicPlugin::HeuristicPlugin() = default;
 
 void HeuristicPlugin::resolveSymbols()
 {
+    // NOLINTBEGIN(bugprone-macro-parentheses, cppcoreguidelines-macro-usage)
+    // Helper macro to provide clearer error messages when required symbols are missing
+#define GET_REQUIRED_SYMBOL(funcPtr, symbolName)                                           \
+    do                                                                                      \
+    {                                                                                       \
+        try                                                                                 \
+        {                                                                                   \
+            (funcPtr) = _lib.getSymbol<decltype(funcPtr)>(symbolName);                     \
+        }                                                                                   \
+        catch(const HipdnnException& e)                                                    \
+        {                                                                                   \
+            throw HipdnnException(                                                         \
+                HIPDNN_STATUS_PLUGIN_ERROR,                                                \
+                std::string("❌ HEURISTIC PLUGIN ABI INCOMPLETE ❌\n")                      \
+                    + "Plugin: " + _lib.libraryPath().string() + "\n"                      \
+                    + "Missing required symbol: " symbolName "\n"                          \
+                    + "This plugin does not implement the complete heuristic plugin C ABI.\n" \
+                    + "See plugin_sdk/include/hipdnn_plugin_sdk/HeuristicsPluginApi.h for the full API.\n" \
+                    + "Original error: " + e.what());                                      \
+        }                                                                                   \
+    } while(0)
+    // NOLINTEND(bugprone-macro-parentheses, cppcoreguidelines-macro-usage)
+
     // Required module metadata symbols
-    _funcGetApiVersion = _lib.getSymbol<decltype(_funcGetApiVersion)>("hipdnnHeuristicGetApiVersion");
-    _funcGetPolicyId   = _lib.getSymbol<decltype(_funcGetPolicyId)>("hipdnnHeuristicGetPolicyId");
-    _funcGetPluginVersion
-        = _lib.getSymbol<decltype(_funcGetPluginVersion)>("hipdnnHeuristicGetPluginVersion");
-    _funcSetLoggingCallback
-        = _lib.getSymbol<decltype(_funcSetLoggingCallback)>("hipdnnHeuristicSetLoggingCallback");
-    _funcGetLastErrorString
-        = _lib.getSymbol<decltype(_funcGetLastErrorString)>("hipdnnHeuristicGetLastErrorString");
+    GET_REQUIRED_SYMBOL(_funcGetApiVersion, "hipdnnHeuristicGetApiVersion");
+    GET_REQUIRED_SYMBOL(_funcGetPolicyId, "hipdnnHeuristicGetPolicyId");
+    GET_REQUIRED_SYMBOL(_funcGetPluginVersion, "hipdnnHeuristicGetPluginVersion");
+    GET_REQUIRED_SYMBOL(_funcSetLoggingCallback, "hipdnnHeuristicSetLoggingCallback");
+    GET_REQUIRED_SYMBOL(_funcGetLastErrorString, "hipdnnHeuristicGetLastErrorString");
 
     // Optional module metadata symbols
     tryAssignSymbol(_funcGetPolicyName, "hipdnnHeuristicGetPolicyName");
     tryAssignSymbol(_funcSetLogLevel, "hipdnnHeuristicSetLogLevel");
 
     // Required handle lifecycle symbols
-    _funcHandleCreate = _lib.getSymbol<decltype(_funcHandleCreate)>("hipdnnHeuristicHandleCreate");
-    _funcHandleDestroy
-        = _lib.getSymbol<decltype(_funcHandleDestroy)>("hipdnnHeuristicHandleDestroy");
-    _funcHandleSetDeviceProperties = _lib.getSymbol<decltype(_funcHandleSetDeviceProperties)>(
-        "hipdnnHeuristicHandleSetDeviceProperties");
+    GET_REQUIRED_SYMBOL(_funcHandleCreate, "hipdnnHeuristicHandleCreate");
+    GET_REQUIRED_SYMBOL(_funcHandleDestroy, "hipdnnHeuristicHandleDestroy");
+    GET_REQUIRED_SYMBOL(_funcHandleSetDeviceProperties, "hipdnnHeuristicHandleSetDeviceProperties");
 
     // Required policy descriptor lifecycle symbols
-    _funcPolicyDescriptorCreate = _lib.getSymbol<decltype(_funcPolicyDescriptorCreate)>(
-        "hipdnnHeuristicPolicyDescriptorCreate");
-    _funcPolicyDescriptorDestroy = _lib.getSymbol<decltype(_funcPolicyDescriptorDestroy)>(
-        "hipdnnHeuristicPolicyDescriptorDestroy");
+    GET_REQUIRED_SYMBOL(_funcPolicyDescriptorCreate, "hipdnnHeuristicPolicyDescriptorCreate");
+    GET_REQUIRED_SYMBOL(_funcPolicyDescriptorDestroy, "hipdnnHeuristicPolicyDescriptorDestroy");
 
     // Required policy input symbols
-    _funcPolicySetEngineIds
-        = _lib.getSymbol<decltype(_funcPolicySetEngineIds)>("hipdnnHeuristicPolicySetEngineIds");
-    _funcPolicySetSerializedGraph = _lib.getSymbol<decltype(_funcPolicySetSerializedGraph)>(
-        "hipdnnHeuristicPolicySetSerializedGraph");
+    GET_REQUIRED_SYMBOL(_funcPolicySetEngineIds, "hipdnnHeuristicPolicySetEngineIds");
+    GET_REQUIRED_SYMBOL(_funcPolicySetSerializedGraph, "hipdnnHeuristicPolicySetSerializedGraph");
 
     // Required selection symbols
-    _funcPolicyFinalize
-        = _lib.getSymbol<decltype(_funcPolicyFinalize)>("hipdnnHeuristicPolicyFinalize");
-    _funcPolicyGetSortedEngineIds = _lib.getSymbol<decltype(_funcPolicyGetSortedEngineIds)>(
-        "hipdnnHeuristicPolicyGetSortedEngineIds");
+    GET_REQUIRED_SYMBOL(_funcPolicyFinalize, "hipdnnHeuristicPolicyFinalize");
+    GET_REQUIRED_SYMBOL(_funcPolicyGetSortedEngineIds, "hipdnnHeuristicPolicyGetSortedEngineIds");
+
+#undef GET_REQUIRED_SYMBOL
 }
 
 std::string_view HeuristicPlugin::apiVersion() const
@@ -70,6 +81,24 @@ std::string_view HeuristicPlugin::apiVersion() const
     const char* version = nullptr;
     invokeHeuristicFunction("get API version", _funcGetApiVersion, &version);
     return version;
+}
+
+std::string_view HeuristicPlugin::name() const
+{
+    // For heuristic plugins, use the policy name as the plugin name
+    return policyName();
+}
+
+std::string_view HeuristicPlugin::version() const
+{
+    // For heuristic plugins, delegate to pluginVersion()
+    return pluginVersion();
+}
+
+hipdnnPluginType_t HeuristicPlugin::type() const
+{
+    // Heuristic plugins return UNSPECIFIED type
+    return HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
 }
 
 int64_t HeuristicPlugin::policyId() const
@@ -107,7 +136,7 @@ std::string_view HeuristicPlugin::policyName() const
                                   + ", Error: " + std::string(getLastErrorString()));
     }
 
-    return name ? name : "";
+    return (name != nullptr) ? name : "";
 }
 
 std::string_view HeuristicPlugin::pluginVersion() const
@@ -128,7 +157,7 @@ hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t /*call
 {
     // The heuristicLoggingCallback function in logging/Logging.cpp already
     // wraps the backend's 2-param callback to the plugin's 3-param interface
-    // by combining component_prefix and message before calling backendLoggingCallback
+    // by combining componentPrefix and message before calling backendLoggingCallback
     // We ignore the passed callback and use the global heuristicLoggingCallback
     return setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
 }
@@ -227,7 +256,7 @@ std::string_view HeuristicPlugin::getLastErrorString() const noexcept
 {
     const char* error = nullptr;
     _funcGetLastErrorString(&error);
-    return error ? error : "";
+    return (error != nullptr) ? error : "";
 }
 
 } // namespace hipdnn_backend::plugin

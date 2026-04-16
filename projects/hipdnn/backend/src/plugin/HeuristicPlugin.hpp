@@ -32,14 +32,17 @@ protected:
 
 public:
     // Virtual destructor for polymorphic class
-    virtual ~HeuristicPlugin() = default;
+    ~HeuristicPlugin() override = default;
 
 
     // Module metadata (called before handle creation)
-    virtual std::string_view apiVersion() const;
-    virtual int64_t policyId() const;
-    virtual std::string_view policyName() const;
-    virtual std::string_view pluginVersion() const;
+    std::string_view apiVersion() const override;
+    std::string_view name() const override; // Override to return policy name
+    std::string_view version() const override; // Override to return plugin version
+    hipdnnPluginType_t type() const override; // Override to return plugin type
+    int64_t policyId() const;
+    std::string_view policyName() const;
+    std::string_view pluginVersion() const;
 
     // Plugin type - heuristic plugins return UNSPECIFIED (they don't have their own type yet)
     static hipdnnPluginType_t getPluginType() { return HIPDNN_PLUGIN_TYPE_UNSPECIFIED; }

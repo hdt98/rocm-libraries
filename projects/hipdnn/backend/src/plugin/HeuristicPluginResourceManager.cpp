@@ -27,8 +27,8 @@ struct StaticHeuristicPluginState
 
 StaticHeuristicPluginState& getStaticState()
 {
-    static StaticHeuristicPluginState state;
-    return state;
+    static StaticHeuristicPluginState s_gState;
+    return s_gState;
 }
 
 std::shared_ptr<HeuristicPluginManager> getOrCreateManager()
@@ -64,9 +64,7 @@ void resetManagerIfNeeded()
 
 } // anonymous namespace
 
-HeuristicPluginResourceManager::HeuristicPluginResourceManager()
-{
-}
+HeuristicPluginResourceManager::HeuristicPluginResourceManager() = default;
 
 HeuristicPluginResourceManager::HeuristicPluginResourceManager(
     std::shared_ptr<HeuristicPluginManager> pm)
@@ -291,7 +289,7 @@ void HeuristicPluginResourceManager::getLoadedHeuristicPluginFiles(size_t* numPl
     if(!_pm)
     {
         *numPlugins = 0;
-        if(maxStringLen)
+        if(maxStringLen != nullptr)
         {
             *maxStringLen = 0;
         }
@@ -301,7 +299,7 @@ void HeuristicPluginResourceManager::getLoadedHeuristicPluginFiles(size_t* numPl
     const auto& plugins = _pm->getPlugins();
     *numPlugins = plugins.size();
 
-    if(maxStringLen)
+    if(maxStringLen != nullptr)
     {
         size_t maxLen = 0;
         for(const auto& plugin : plugins)
@@ -314,7 +312,7 @@ void HeuristicPluginResourceManager::getLoadedHeuristicPluginFiles(size_t* numPl
     }
 
     // TODO: Implement actual path retrieval when SharedLibrary exposes getPath()
-    if(pluginPaths)
+    if(pluginPaths != nullptr)
     {
         HIPDNN_BACKEND_LOG_WARN("getLoadedHeuristicPluginFiles: path retrieval not yet implemented");
     }

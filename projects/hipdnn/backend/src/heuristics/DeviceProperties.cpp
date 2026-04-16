@@ -43,7 +43,7 @@ DeviceProperties queryDeviceProperties()
     }
 
     out.multiProcessorCount = hipProps.multiProcessorCount;
-    out.totalGlobalMem      = static_cast<size_t>(hipProps.totalGlobalMem);
+    out.totalGlobalMem      = hipProps.totalGlobalMem;
 
     HIPDNN_BACKEND_LOG_DEBUG(
         "Queried device properties: deviceId={}, multiProcessorCount={}, totalGlobalMem={} bytes",
@@ -68,9 +68,9 @@ std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& props)
     builder.Finish(devicePropsOffset, "HDDP"); // File identifier for versioning
 
     // Copy to vector
-    uint8_t* buf = builder.GetBufferPointer();
-    size_t size  = builder.GetSize();
-    return std::vector<uint8_t>(buf, buf + size);
+    uint8_t* buf       = builder.GetBufferPointer();
+    const size_t size  = builder.GetSize();
+    return {buf, buf + size};
 }
 
 DeviceProperties deserializeDeviceProperties(const uint8_t* buffer, size_t size)

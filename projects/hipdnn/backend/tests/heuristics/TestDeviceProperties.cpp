@@ -4,6 +4,7 @@
 #include "heuristics/DeviceProperties.hpp"
 #include "HipdnnException.hpp"
 #include <gtest/gtest.h>
+#include <array>
 #include <limits>
 
 using namespace hipdnn_backend::heuristics;
@@ -11,7 +12,7 @@ using namespace hipdnn_backend::heuristics;
 class TestDeviceProperties : public ::testing::Test
 {
 protected:
-    DeviceProperties createTestProperties()
+    static DeviceProperties createTestProperties()
     {
         DeviceProperties props;
         props.deviceId            = 0;
@@ -24,14 +25,14 @@ protected:
 // Test basic round-trip serialization
 TEST_F(TestDeviceProperties, SerializeDeserializeRoundTrip)
 {
-    DeviceProperties original = createTestProperties();
+    const DeviceProperties original = createTestProperties();
 
     // Serialize
     auto serialized = serializeDeviceProperties(original);
     ASSERT_FALSE(serialized.empty());
 
     // Deserialize
-    DeviceProperties deserialized =
+    const DeviceProperties deserialized =
         deserializeDeviceProperties(serialized.data(), serialized.size());
 
     // Verify fields match
@@ -43,7 +44,7 @@ TEST_F(TestDeviceProperties, SerializeDeserializeRoundTrip)
 // Test default/zero values
 TEST_F(TestDeviceProperties, SerializeDefaultValues)
 {
-    DeviceProperties props; // All zeros/defaults
+    const DeviceProperties props; // All zeros/defaults
 
     auto serialized   = serializeDeviceProperties(props);
     auto deserialized = deserializeDeviceProperties(serialized.data(), serialized.size());
@@ -72,11 +73,11 @@ TEST_F(TestDeviceProperties, SerializeMaxValues)
 // Test wrapper function
 TEST_F(TestDeviceProperties, WrapSerializedDeviceProperties)
 {
-    DeviceProperties props = createTestProperties();
+    const DeviceProperties props = createTestProperties();
     auto serialized        = serializeDeviceProperties(props);
 
     // Create wrapper
-    hipdnnPluginConstData_t wrapper = wrapSerializedDeviceProperties(serialized);
+    const hipdnnPluginConstData_t wrapper = wrapSerializedDeviceProperties(serialized);
 
     // Verify wrapper points to serialized data
     EXPECT_EQ(wrapper.ptr, serialized.data());
@@ -97,8 +98,8 @@ TEST_F(TestDeviceProperties, DeserializeNullBuffer)
 // Test error handling - zero size
 TEST_F(TestDeviceProperties, DeserializeZeroSize)
 {
-    uint8_t dummy[10] = {};
-    EXPECT_THROW(deserializeDeviceProperties(dummy, 0), hipdnn_backend::HipdnnException);
+    const std::array<uint8_t, 10> dummy = {};
+    EXPECT_THROW(deserializeDeviceProperties(dummy.data(), 0), hipdnn_backend::HipdnnException);
 }
 
 // Test error handling - invalid FlatBuffer data
@@ -113,8 +114,8 @@ TEST_F(TestDeviceProperties, DeserializeInvalidData)
 // Test error handling - truncated buffer
 TEST_F(TestDeviceProperties, DeserializeTruncatedBuffer)
 {
-    DeviceProperties props = createTestProperties();
-    auto serialized        = serializeDeviceProperties(props);
+    const DeviceProperties props = createTestProperties();
+    auto serialized              = serializeDeviceProperties(props);
 
     // Try to deserialize with truncated size
     if(serialized.size() > 4)
@@ -166,7 +167,7 @@ TEST_F(TestDeviceProperties, DifferentPropertiesProduceDifferentSerializations)
 // Test serialization is deterministic
 TEST_F(TestDeviceProperties, SerializationIsDeterministic)
 {
-    DeviceProperties props = createTestProperties();
+    const DeviceProperties props = createTestProperties();
 
     auto serialized1 = serializeDeviceProperties(props);
     auto serialized2 = serializeDeviceProperties(props);
