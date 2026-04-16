@@ -788,8 +788,7 @@ struct tile_scatter_gather
                     reinterpret_cast<CK_TILE_LDS_ADDR lds_padded_element<LdsDataType>*>(
                         lds_base_ptr);
                 CK_TILE_LDS_ADDR LdsDataType* smem =
-                    &padded_base[(lds_coord.get_offset() + lds_ys_offset) /
-                                 Traits::PackedSize]
+                    &padded_base[(lds_coord.get_offset() + lds_ys_offset) / Traits::PackedSize]
                          .value;
 
                 const auto dram_ys_offset = [&]() {
