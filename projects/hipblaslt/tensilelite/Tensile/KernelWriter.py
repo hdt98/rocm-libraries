@@ -37,7 +37,7 @@ from rocisa.instruction import BufferLoadB128, BufferLoadB192, BufferLoadB32, Bu
   FlatLoadB64, FlatStoreB128, FlatStoreB32, FlatStoreB64, Instruction, MacroInstruction, \
   MXMFMAInstruction, MFMAInstruction, SBarrier, SBranch, SCBranchSCC0, SCBranchSCC1, SCBranchVCCNZ, SCmpEQU32, SCmpLeU32, \
   SMFMAInstruction, SNop, SSetPrior, SSetRegIMM32B32, SSubU32, SWaitCnt, SWaitAlu, \
-  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VReadfirstlaneB32, VNop
+  SLongBranchPositive, VFmaMixF32, VMadMixF32, VMovB32, VAndB32, VCmpEQU32, VCndMaskB32, VMovB64, VNop
 from rocisa.register import RegisterPool
 from rocisa.enum import RegisterType, DataTypeEnum
 
@@ -4058,13 +4058,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.isStreamKConstantsToVgprEnabled(kernel):
       return self.sgprPool.checkOut(1, name)
     return name
-
-  def vReadfirstlaneStreamKConstToSgpr(self, module, name, dst, waitBefore=False, waitAfter=False):
-    if waitBefore and self.states.archCaps["CrosslaneWait"]:
-      module.add(SNop(waitState=0, comment="1 wait state before v_readfirstlane_b32"))
-    module.add(VReadfirstlaneB32(dst=sgpr(dst), src=vgpr(self.states.skConstVgprs[name])))
-    if waitAfter and self.states.archCaps["CrosslaneWait"]:
-      module.add(SNop(waitState=0, comment="1 wait state after v_readfirstlane_b32"))
 
   def releaseStreamKConstSgpr(self, nameOrIdx):
     if isinstance(nameOrIdx, int):

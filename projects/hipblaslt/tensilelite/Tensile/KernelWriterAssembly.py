@@ -6419,7 +6419,7 @@ class KernelWriterAssembly(KernelWriter):
             # Check if tile finished
             sIpt = self.acquireStreamKConstSgpr(kernel, "ItersPerTile")
             if self.isStreamKConstantsToVgprEnabled(kernel):
-              self.vReadfirstlaneStreamKConstToSgpr(module, "ItersPerTile", sIpt)
+              module.add(VReadfirstlaneB32(dst=sgpr(sIpt), src=vgpr(self.states.skConstVgprs["ItersPerTile"])))
             module.add(SCmpLtU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr(sIpt), comment="Check if WG processes final iteration of tile"))
             self.releaseStreamKConstSgpr(sIpt)
             module.add(SCMovB32(dst=loopCounter, src=0, comment="This WG not completing tile"))
@@ -12259,7 +12259,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
         sSkt = self.acquireStreamKConstSgpr(kernel, "skTiles")
         if self.isStreamKConstantsToVgprEnabled(kernel):
-          self.vReadfirstlaneStreamKConstToSgpr(module, "skTiles", sSkt)
+          module.add(VReadfirstlaneB32(dst=sgpr(sSkt), src=vgpr(self.states.skConstVgprs["skTiles"])))
         module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
         self.releaseStreamKConstSgpr(sSkt)
         module.add(SCBranchSCC1(labelName=bpeDoneLabel.getLabelName(), comment="If split == 1, use reguler output BPE"))
@@ -13395,7 +13395,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(SCBranchSCC0(labelName=gsuLabel.getLabelName(), comment="Branch to stream-k store code"))
         sSkt = self.acquireStreamKConstSgpr(kernel, "skTiles")
         if self.isStreamKConstantsToVgprEnabled(kernel):
-          self.vReadfirstlaneStreamKConstToSgpr(module, "skTiles", sSkt)
+          module.add(VReadfirstlaneB32(dst=sgpr(sSkt), src=vgpr(self.states.skConstVgprs["skTiles"])))
         module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
         self.releaseStreamKConstSgpr(sSkt)
         # TODO May need long branch??
