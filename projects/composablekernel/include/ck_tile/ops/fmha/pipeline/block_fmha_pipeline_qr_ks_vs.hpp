@@ -4,6 +4,18 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+
+#ifndef CK_TILE_FMHA_FWD_SW_EXP2
+#define CK_TILE_FMHA_FWD_SW_EXP2 0
+#endif
+
+#if CK_TILE_FMHA_FWD_SW_EXP2
+#include "ck_tile/core/numeric/software_exp2.hpp"
+#define CK_TILE_EXP2(x) ck_tile::exp2_fma(x)
+#else
+#define CK_TILE_EXP2(x) exp2(x)
+#endif
+
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_dropout.hpp"
 #include "ck_tile/ops/fmha/block/cast_tile_mx.hpp"
@@ -767,17 +779,17 @@ struct BlockFmhaPipelineQRKSVS
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
+                        p_compute(i_j_idx) = CK_TILE_EXP2(s[i_j_idx] - validated_m);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
+                            p_compute(i_j_idx) = CK_TILE_EXP2(s[i_j_idx] - validated_m);
                         }
                         else
                         {
-                            p_compute(i_j_idx) = exp2(scale_s * s[i_j_idx] - row_max);
+                            p_compute(i_j_idx) = CK_TILE_EXP2(scale_s * s[i_j_idx] - row_max);
                         }
                     }
 #else
@@ -791,41 +803,76 @@ struct BlockFmhaPipelineQRKSVS
 
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
             // l{j}, Oacc{j}
+            // Conditional rescaling: skip o_acc rescale when correction factor
+            // exp2(acc_scale_log2) is negligible (< exp2(-8) ≈ 0.004, below BF16
+            // precision). Adapted from FlashAttention-4 (Tri Dao, 2025).
+            // Eliminates 70-90% of rescale operations in practice.
+            static constexpr SMPLComputeDataType kRescaleThreshold =
+                type_convert<SMPLComputeDataType>(8.0f);
+
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
 #if CK_TILE_FMHA_FWD_FAST_EXP2
-                const auto tmp = [&]() {
+                const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return m_old[i_idx] - get_validated_m(m[i_idx]);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-
-                            return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            return m_old[i_idx] - get_validated_m(m[i_idx]);
                         }
                         else
                         {
                             auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            return scale_s * m_old[i_idx] - row_max;
                         }
                     }
                 }();
+
+                const bool need_rescale =
+                    (acc_scale_log2 <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = CK_TILE_EXP2(acc_scale_log2);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
 #else
-                const auto tmp       = exp(m_old[i_idx] - get_validated_m(m[i_idx]));
+                const auto diff = m_old[i_idx] - get_validated_m(m[i_idx]);
+                const bool need_rescale =
+                    (diff <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = exp(diff);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
 #endif
                 l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
-                sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    // FIXME: this use different equation from FA v2 paper,
-                    // but produce correc result.
-                    // Is the equation wrong?
-                    o_acc(i_j_idx) *= tmp;
-                });
+                if(need_rescale)
+                {
+                    sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                        o_acc(i_j_idx) *= tmp;
+                    });
+                }
             });
 
             if constexpr(kHasDropout)

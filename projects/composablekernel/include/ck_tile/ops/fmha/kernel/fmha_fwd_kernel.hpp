@@ -1341,9 +1341,33 @@ struct FmhaFwdKernel
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            const index_t i_block = blockIdx.z;
+            index_t i_block = blockIdx.z;
             const index_t i_nhead = blockIdx.x;
             const index_t i_batch = blockIdx.y;
+
+            // XCD-interleave scheduling: remap block indices so that adjacent
+            // Q-tiles land on the same XCD (chiplet), improving L2 cache
+            // locality for KV reuse. Adapted from FA4 (Tri Dao, 2025).
+            // MI300X/MI350X have 8 XCDs; CUs are assigned round-robin across
+            // XCDs, so without remapping adjacent tiles scatter across chiplets.
+            // Only activate when grid is large enough for balanced distribution
+            // (at least kMinTilesPerXCD tiles per XCD); small grids regress
+            // due to load imbalance from uneven tile distribution.
+            constexpr index_t kNumXCDs = 8;
+            constexpr index_t kMinTilesPerXCD = 16;
+            {
+                const index_t grid_x = gridDim.z;
+                const index_t cus_per_xdim_per_xcd = grid_x / kNumXCDs;
+                if(cus_per_xdim_per_xcd >= kMinTilesPerXCD)
+                {
+                    const index_t cu_id  = i_block / kNumXCDs;
+                    const index_t xcd_id = i_block % kNumXCDs;
+                    if(cu_id < cus_per_xdim_per_xcd)
+                    {
+                        i_block = xcd_id * cus_per_xdim_per_xcd + cu_id;
+                    }
+                }
+            }
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
@@ -1355,9 +1379,10 @@ struct FmhaFwdKernel
 
             if constexpr(kHasMask)
             {
-                // assume that num_tile_n1 is always 1
-                return ck_tile::make_tuple(
-                    static_cast<index_t>(gridDim.z) - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
+                // LPT (Largest Processing Time) reversal: assign longer
+                // causal rows first so the last wave finishes sooner.
+                const index_t num_tile_m0 = gridDim.z / num_tile_n1;
+                return ck_tile::make_tuple(num_tile_m0 - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
             }
             else
             {
@@ -1370,9 +1395,26 @@ struct FmhaFwdKernel
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            const index_t i_block = blockIdx.y; // blockIdx.x
+            index_t i_block = blockIdx.y; // blockIdx.x
             const index_t i_nhead = blockIdx.x; // blockIdx.y
             const index_t i_batch = blockIdx.z;
+
+            // XCD-interleave scheduling (see padded path above for details).
+            constexpr index_t kNumXCDs = 8;
+            constexpr index_t kMinTilesPerXCD = 16;
+            {
+                const index_t grid_x = gridDim.y;
+                const index_t cus_per_xdim_per_xcd = grid_x / kNumXCDs;
+                if(cus_per_xdim_per_xcd >= kMinTilesPerXCD)
+                {
+                    const index_t cu_id  = i_block / kNumXCDs;
+                    const index_t xcd_id = i_block % kNumXCDs;
+                    if(cu_id < cus_per_xdim_per_xcd)
+                    {
+                        i_block = xcd_id * cus_per_xdim_per_xcd + cu_id;
+                    }
+                }
+            }
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
@@ -1384,9 +1426,9 @@ struct FmhaFwdKernel
 
             if constexpr(kHasMask)
             {
-                // assume that num_tile_n1 is always 1
-                return ck_tile::make_tuple(
-                    static_cast<index_t>(gridDim.y) - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
+                // LPT reversal for causal masking (see padded path above).
+                const index_t num_tile_m0 = gridDim.y / num_tile_n1;
+                return ck_tile::make_tuple(num_tile_m0 - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
             }
             else
             {
