@@ -231,7 +231,7 @@ TEST_F(HeuristicPluginIntegrationTest, PolicyIdMatchesNameHash)
         if(!info.policyName.empty())
         {
             // Policy ID should match engineNameToId(policyName)
-            int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(info.policyName);
+            const int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(info.policyName);
             EXPECT_EQ(info.policyId, expectedId)
                 << "Policy ID mismatch for " << info.policyName;
         }
@@ -252,7 +252,7 @@ TEST_F(HeuristicPluginIntegrationTest, AllPluginsHaveCompatibleApiVersion)
         EXPECT_FALSE(info.apiVersion.empty());
 
         // Parse version
-        hipdnn_data_sdk::utilities::Version apiVer{info.apiVersion};
+        const hipdnn_data_sdk::utilities::Version apiVer{info.apiVersion};
 
         // Major version should match backend
         EXPECT_EQ(apiVer.major, HIPDNN_BACKEND_VERSION_MAJOR)
@@ -278,7 +278,9 @@ TEST_F(HeuristicPluginIntegrationTest, EnumerationMatchesResourceManager)
     for(size_t i = 0; i < rmInfos.size(); ++i)
     {
         int64_t apiPolicyId = -1;
-        size_t nameLen = 0, pluginVerLen = 0, apiVerLen = 0;
+        size_t nameLen      = 0;
+        size_t pluginVerLen = 0;
+        size_t apiVerLen    = 0;
 
         ASSERT_EQ(hipdnnGetHeuristicPolicyInfo_ext(
                       _handle, i, &apiPolicyId, nullptr, &nameLen, nullptr, &pluginVerLen, nullptr, &apiVerLen),
@@ -321,7 +323,7 @@ TEST_F(HeuristicPluginIntegrationTest, MissingPolicyGracefullyHandled)
     auto heurRm = _handle->getHeuristicPluginResourceManager();
 
     // Query a non-existent policy ID
-    int64_t fakePolicyId = 0x1234567890ABCDEF;
+    const int64_t fakePolicyId = 0x1234567890ABCDEF;
     auto handle = heurRm->getHeuristicHandleForPolicyId(fakePolicyId);
     auto plugin = heurRm->getPluginForPolicyId(fakePolicyId);
 

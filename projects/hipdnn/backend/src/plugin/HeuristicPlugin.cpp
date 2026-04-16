@@ -18,10 +18,7 @@ HeuristicPlugin::HeuristicPlugin(SharedLibrary&& lib)
 #endif
 }
 
-HeuristicPlugin::HeuristicPlugin()
-    : _lib()
-{
-}
+HeuristicPlugin::HeuristicPlugin() = default;
 
 void HeuristicPlugin::resolveSymbols()
 {
@@ -107,7 +104,7 @@ std::string_view HeuristicPlugin::policyName() const
                                   + ", Error: " + std::string(getLastErrorString()));
     }
 
-    return name ? name : "";
+    return (name != nullptr) ? name : "";
 }
 
 std::string_view HeuristicPlugin::pluginVersion() const
@@ -128,7 +125,7 @@ hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t /*call
 {
     // The heuristicLoggingCallback function in logging/Logging.cpp already
     // wraps the backend's 2-param callback to the plugin's 3-param interface
-    // by combining component_prefix and message before calling backendLoggingCallback
+    // by combining componentPrefix and message before calling backendLoggingCallback
     // We ignore the passed callback and use the global heuristicLoggingCallback
     return setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
 }
@@ -227,7 +224,7 @@ std::string_view HeuristicPlugin::getLastErrorString() const noexcept
 {
     const char* error = nullptr;
     _funcGetLastErrorString(&error);
-    return error ? error : "";
+    return (error != nullptr) ? error : "";
 }
 
 } // namespace hipdnn_backend::plugin

@@ -12,7 +12,7 @@ namespace hipdnn_backend::plugin
 class MockHeuristicPluginResourceManager : public HeuristicPluginResourceManager
 {
 public:
-    MockHeuristicPluginResourceManager() : HeuristicPluginResourceManager() {}
+    MockHeuristicPluginResourceManager() = default;
 
     MOCK_METHOD(hipdnnHeuristicHandle_t,
                 getHeuristicHandleForPolicyId,

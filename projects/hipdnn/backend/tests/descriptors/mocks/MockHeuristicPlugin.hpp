@@ -20,13 +20,13 @@ namespace hipdnn_backend::plugin
 class MockHeuristicPlugin : public HeuristicPlugin
 {
 public:
-    MockHeuristicPlugin() : HeuristicPlugin() {}
+    MockHeuristicPlugin() = default;
 
     // Module metadata
     MOCK_METHOD(std::string_view, apiVersion, (), (const, override));
-    MOCK_METHOD(int64_t, policyId, (), (const, override));
-    MOCK_METHOD(std::string_view, policyName, (), (const, override));
-    MOCK_METHOD(std::string_view, pluginVersion, (), (const, override));
+    MOCK_METHOD(int64_t, policyId, (), (const));
+    MOCK_METHOD(std::string_view, policyName, (), (const));
+    MOCK_METHOD(std::string_view, pluginVersion, (), (const));
 
     // Handle lifecycle
     MOCK_METHOD(hipdnnHeuristicHandle_t, createHandle, (), (const, override));

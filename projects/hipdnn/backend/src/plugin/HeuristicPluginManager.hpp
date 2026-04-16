@@ -56,7 +56,7 @@ protected:
         }
 
         // Validate unique policy ID
-        int64_t policyId = plugin.policyId();
+        const int64_t policyId = plugin.policyId();
         if(_policyIds.find(policyId) != _policyIds.end())
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
@@ -69,8 +69,8 @@ protected:
         auto policyNameView = plugin.policyName();
         if(!policyNameView.empty())
         {
-            std::string policyName(policyNameView);
-            int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(policyName);
+            const std::string policyName(policyNameView);
+            const int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(policyName);
             if(expectedId != policyId)
             {
                 throw HipdnnException(

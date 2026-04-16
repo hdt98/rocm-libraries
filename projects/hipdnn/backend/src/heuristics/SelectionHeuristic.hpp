@@ -131,7 +131,7 @@ public:
 
 private:
     const plugin::HeuristicPlugin* _plugin;
-    hipdnnHeuristicPolicyDescriptor_t _descriptor;
+    hipdnnHeuristicPolicyDescriptor_t _descriptor = nullptr;
 };
 
 } // namespace hipdnn_backend::heuristics

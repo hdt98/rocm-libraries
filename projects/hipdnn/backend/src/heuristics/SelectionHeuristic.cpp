@@ -11,7 +11,7 @@ namespace hipdnn_backend::heuristics
 
 SelectionHeuristic::SelectionHeuristic(const plugin::HeuristicPlugin* plugin,
                                        hipdnnHeuristicHandle_t pluginHandle)
-    : _plugin(plugin), _descriptor(nullptr)
+    : _plugin(plugin)
 {
     THROW_IF_FALSE(_plugin != nullptr,
                    HIPDNN_STATUS_BAD_PARAM,
@@ -32,7 +32,7 @@ SelectionHeuristic::~SelectionHeuristic()
         {
             _plugin->destroyPolicyDescriptor(_descriptor);
         }
-        catch(const HipdnnException& e)
+        catch(const HipdnnException&) // NOLINT(bugprone-empty-catch)
         {
             // Log but don't throw from destructor
             // The plugin's logging callback should have already reported this
@@ -59,7 +59,7 @@ SelectionHeuristic& SelectionHeuristic::operator=(SelectionHeuristic&& other) no
             {
                 _plugin->destroyPolicyDescriptor(_descriptor);
             }
-            catch(...)
+            catch(...) // NOLINT(bugprone-empty-catch)
             {
                 // Ignore exceptions in move assignment cleanup
             }

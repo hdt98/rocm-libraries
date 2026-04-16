@@ -608,14 +608,14 @@ hipdnnStatus_t getGlobalLogLevel(hipdnnSeverity_t& level)
 }
 
 void heuristicLoggingCallback(hipdnnSeverity_t severity,
-                              const char* component_prefix,
+                              const char* componentPrefix,
                               const char* msg)
 {
     // RFC 0007 Section 12: Heuristic plugin logging callback
     // Combines component prefix and message, then forwards to backend logging
-    if(component_prefix != nullptr && msg != nullptr)
+    if(componentPrefix != nullptr && msg != nullptr)
     {
-        std::string combined = std::string(component_prefix) + msg;
+        const std::string combined = std::string(componentPrefix) + msg;
         backendLoggingCallback(severity, combined.c_str());
     }
     else if(msg != nullptr)

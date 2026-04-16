@@ -52,7 +52,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     else if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
     {
         // Parse comma-separated policy names
-        std::string envStr(envPolicyOrder);
+        const std::string envStr(envPolicyOrder);
         std::istringstream iss(envStr);
         std::string token;
         while(std::getline(iss, token, ','))
@@ -107,7 +107,7 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
     auto heurRm = handle->getHeuristicPluginResourceManager();
 
     // Create one SelectionHeuristic per policy slot
-    for(int64_t policyId : orderedPolicyIds)
+    for(const int64_t policyId : orderedPolicyIds)
     {
         auto pluginHandle = heurRm->getHeuristicHandleForPolicyId(policyId);
         if(pluginHandle == nullptr)
@@ -156,11 +156,11 @@ void EngineHeuristicDescriptor::finalize()
     // RFC 0007 Section 6 & 13.2: Query and serialize device properties
     auto devProps = heuristics::queryDeviceProperties();
     auto devicePropsSerialized = heuristics::serializeDeviceProperties(devProps);
-    hipdnnPluginConstData_t devicePropsWrapper =
+    const hipdnnPluginConstData_t devicePropsWrapper =
         heuristics::wrapSerializedDeviceProperties(devicePropsSerialized);
 
     // RFC 0007 Section 13.1: Get serialized graph from GraphDescriptor
-    hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
+    const hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
 
     // Resolve ordered policy IDs
     auto orderedPolicyIds = resolveHeuristicPolicyOrder();
@@ -173,7 +173,7 @@ void EngineHeuristicDescriptor::finalize()
     // .so file (e.g., a single plugin providing multiple ordering strategies like Fast/Balanced/Accurate).
     // Use a map to deduplicate and call setDeviceProperties only once per unique handle.
     std::unordered_map<hipdnnHeuristicHandle_t, const plugin::HeuristicPlugin*> distinctHandles;
-    for(int64_t policyId : orderedPolicyIds)
+    for(const int64_t policyId : orderedPolicyIds)
     {
         auto pluginHandle = heurRm->getHeuristicHandleForPolicyId(policyId);
         if(pluginHandle != nullptr)
@@ -187,7 +187,13 @@ void EngineHeuristicDescriptor::finalize()
     }
 
     // Call SetDeviceProperties on each distinct handle
-    for(const auto& [pluginHandle, plugin] : distinctHandles)
+    // Convert to vector and sort by handle pointer for deterministic iteration
+    std::vector<std::pair<hipdnnHeuristicHandle_t, const plugin::HeuristicPlugin*>> sortedHandles(
+        distinctHandles.begin(), distinctHandles.end());
+    std::sort(sortedHandles.begin(), sortedHandles.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    for(const auto& [pluginHandle, plugin] : sortedHandles)
     {
         plugin->setDeviceProperties(pluginHandle, &devicePropsWrapper);
     }
@@ -554,7 +560,7 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
     size_t offset = 0;
     while(offset < static_cast<size_t>(elementCount))
     {
-        std::string policyName(data + offset);
+        const std::string policyName(data + offset);
         if(policyName.empty())
         {
             break; // End of list
@@ -652,7 +658,10 @@ std::string EngineHeuristicDescriptor::toString() const
         str += ", policyOrder=[";
         for(size_t i = 0; i < _policyOrder.size(); ++i)
         {
-            if(i > 0) str += ", ";
+            if(i > 0)
+            {
+                str += ", ";
+            }
             str += "\"" + _policyOrder[i] + "\"";
         }
         str += "]";
