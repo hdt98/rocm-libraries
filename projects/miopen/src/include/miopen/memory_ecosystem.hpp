@@ -28,15 +28,14 @@ struct MemoryEcosystemInfo
     MemoryEcosystemInfo() {}
 #ifdef _WIN32
     MemoryEcosystemInfo(const DXGI_ADAPTER_DESC1& desc) :
-        description(desc.Description.start(), desc.Description.end()),
+        adapter_index(0),
         dedicated_vram(desc.DedicatedVideoMemory),
         shared_ram(desc.SharedSystemMemory),
         dedicated_ram(desc.DedicatedSystemMemory)
     {}
 #endif
-    MemoryEcosystemInfo(int adapter, const std::string &desc, size_t ded_vram, size_t shared, size_t ded_ram) :
+    MemoryEcosystemInfo(int adapter, size_t ded_vram, size_t shared, size_t ded_ram) :
         adapter_index(adapter),
-        description(desc),
         dedicated_vram(ded_vram),
         shared_ram(shared),
         dedicated_ram(ded_ram)
@@ -52,7 +51,6 @@ struct MemoryEcosystemInfo
     }
 
     int adapter_index{-1};
-    std::string description = "No info available";
     size_t dedicated_vram{0};
     size_t shared_ram{0};
     size_t dedicated_ram{0};
@@ -152,24 +150,6 @@ struct MemoryEcosystem
 #else
         const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
         return AbleToAllocate(info, vram_blocks, cpu_blocks);
-#endif
-    }
-
-    static bool CouldAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
-    {
-        auto sorted_blocks = vram_blocks;
-        std::sort(sorted_blocks.begin(), sorted_blocks.end(), std::greater<size_t>());
-
-        return AbleToAllocate(info, sorted_blocks, cpu_blocks);
-    }
-
-    static bool CouldAllocate(const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
-    {
-#ifndef _WIN32
-        return true;
-#else
-        const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
-        return CouldAllocate(info, vram_blocks, cpu_blocks);
 #endif
     }
 };

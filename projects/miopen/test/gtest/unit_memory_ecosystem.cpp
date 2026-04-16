@@ -33,43 +33,33 @@ struct GPU_MemoryEcosystem_None
 {
 MemoryEcosystemInfo tmp_info;
 
-static auto IsAbleToAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+static auto IsAbleToAllocate(const MemoryEcosystemTestCase& testcase)
 {
-    return MemoryEcosystem::AbleToAllocate(info, vram_blocks, cpu_blocks);
+    return MemoryEcosystem::AbleToAllocate(testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
 }
 
-static auto NotAbleToAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+static auto NotAbleToAllocate(const MemoryEcosystemTestCase& testcase)
 {
-    return !MemoryEcosystem::AbleToAllocate(info, vram_blocks, cpu_blocks);
-}
-
-static auto CouldAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
-{
-    return MemoryEcosystem::CouldAllocate(info, vram_blocks, cpu_blocks);
-}
-
-static auto CannotAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
-{
-    return !MemoryEcosystem::CouldAllocate(info, vram_blocks, cpu_blocks);
+    return !MemoryEcosystem::AbleToAllocate(testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
 }
 };
 
 inline std::vector<MemoryEcosystemTestCase> AllocateCases()
 {
     return {
-        {{0, "r0_d33", 8, 8, 16}, {3, 3}, {0}, true, true},
-        {{0, "r2_d33", 8, 8, 16}, {3, 3}, {2}, true, true},
-        {{0, "r0_n9", 8, 8, 16}, {9}, {0}, False(), False()},
-        {{0, "r0_d9", 12, 8, 12}, {9}, {0}, true, true},
-        {{0, "r3_d5_s5", 8, 8, 16}, {5, 5}, {3}, true, true},
-        {{0, "r4_d53_s2", 8, 8, 16}, {5, 3, 2}, {3, 1}, true, true},
-        {{0, "r4_d5_n5", 8, 8, 16}, {5, 5}, {3, 1}, False(), False()},
-        {{0, "r0_d41_s4_d1_s4", 8, 8, 16}, {4, 1, 4, 1, 4}, {0}, true, true},
-        {{0, "r3_d41_s4_d1_n4__d44_s41_n1", 8, 8, 16}, {4, 1, 4, 1, 4}, {3}, False(), False()},
-        {{0, "r3_d4141_n4", 12, 4, 16}, {4, 1, 4, 1, 4}, {3}, False(), False()},
-        {{0, "r3_d4141_s4", 12, 8, 12}, {4, 1, 4, 1, 4}, {3}, true, true},
-        {{0, "r0_d4_s5_d2_n4__d5_s4_s4_d2", 8, 8, 16}, {4, 5, 2, 4}, {0}, False(), true},
-        {{0, "r1_d4_s5_d2_n4__d5_s4_n4", 8, 8, 16}, {4, 5, 2, 4}, {1}, False(), False()},
+        {{0, "r0_d33", 8, 8, 16}, {3, 3}, {0}, true},
+        {{0, "r2_d33", 8, 8, 16}, {3, 3}, {2}, true},
+        {{0, "r0_n9", 8, 8, 16}, {9}, {0}, False())},
+        {{0, "r0_d9", 12, 8, 12}, {9}, {0}, true},
+        {{0, "r3_d5_s5", 8, 8, 16}, {5, 5}, {3}, true},
+        {{0, "r4_d53_s2", 8, 8, 16}, {5, 3, 2}, {3, 1}, true},
+        {{0, "r4_d5_n5", 8, 8, 16}, {5, 5}, {3, 1}, False()},
+        {{0, "r0_d41_s4_d1_s4", 8, 8, 16}, {4, 1, 4, 1, 4}, {0}, true},
+        {{0, "r3_d41_s4_d1_n4__d44_s41_n1", 8, 8, 16}, {4, 1, 4, 1, 4}, {3}, False()},
+        {{0, "r3_d4141_n4", 12, 4, 16}, {4, 1, 4, 1, 4}, {3}, False()},
+        {{0, "r3_d4141_s4", 12, 8, 12}, {4, 1, 4, 1, 4}, {3}, true},
+        {{0, "r0_d4_s5_d2_n4__d5_s4_s4_d2", 8, 8, 16}, {4, 5, 2, 4}, {0}, False()},
+        {{0, "r1_d4_s5_d2_n4__d5_s4_n4", 8, 8, 16}, {4, 5, 2, 4}, {1}, False()},
     };
 };
 
@@ -84,19 +74,11 @@ TEST_P(GPU_MemoryEcosystem_None, AbleToAllocate)
 
     if(info.able)
     {
-        EXPECT_PRED3(IsAbleToAllocate, info.info, info.vram_blocks, info.cpu_blocks);
+        EXPECT_PRED3(IsAbleToAllocate, info);
     }
     else
     {
-        EXPECT_PRED3(NotAbleToAllocate, info.info, info.vram_blocks, info.cpu_blocks);
-    }
-    if(info.could)
-    {
-        EXPECT_PRED3(CouldAllocate, info.info, info.vram_blocks, info.cpu_blocks);
-    }
-    else
-    {
-        EXPECT_PRED3(CannotAllocate, info.info, info.vram_blocks, info.cpu_blocks);
+        EXPECT_PRED3(NotAbleToAllocate, info);
     }
 }
 
