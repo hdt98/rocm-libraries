@@ -688,33 +688,66 @@ struct BlockFmhaPipelineQRKSVSWholeKPrefetch
 
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
             // l{j}, Oacc{j}
+            // Conditional rescaling (FA4): skip when correction is negligible.
+            static constexpr SMPLComputeDataType kRescaleThreshold =
+                type_convert<SMPLComputeDataType>(8.0f);
+
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
 #if CK_TILE_FMHA_FWD_FAST_EXP2
-                const auto tmp = [&]() {
+                const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return m_old[i_idx] - get_validated_m(m[i_idx]);
                     }
                     else
                     {
                         auto row_max = scale_s * get_validated_m(m[i_idx]);
-                        return exp2(scale_s * m_old[i_idx] - row_max);
+                        return scale_s * m_old[i_idx] - row_max;
                     }
                 }();
+
+                const bool need_rescale =
+                    (acc_scale_log2 <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = exp2(acc_scale_log2);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
 #else
-                    const auto tmp = exp(m_old[i_idx] - get_validated_m(m[i_idx]));
+                const auto diff = m_old[i_idx] - get_validated_m(m[i_idx]);
+                const bool need_rescale =
+                    (diff <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = exp(diff);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
 #endif
                 l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
-                sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    // FIXME: this use different equation from FA v2 paper,
-                    // but produce correc result.
-                    // Is the equation wrong?
-                    o_acc(i_j_idx) *= tmp;
-                });
+                if(need_rescale)
+                {
+                    sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                        o_acc(i_j_idx) *= tmp;
+                    });
+                }
             });
 
             if constexpr(kHasDropout)

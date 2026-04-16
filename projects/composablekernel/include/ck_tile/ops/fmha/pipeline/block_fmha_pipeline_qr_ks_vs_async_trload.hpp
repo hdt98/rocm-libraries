@@ -537,34 +537,55 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
             p_tile.get_thread_buffer() = cast_tile<PDataType>(p_compute).get_thread_buffer();
 
             // l{j}, Oacc{j}
+            // Conditional rescaling (FA4): skip when correction is negligible.
+            static constexpr SMPLComputeDataType kRescaleThreshold =
+                type_convert<SMPLComputeDataType>(8.0f);
+
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[I0], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
-                const auto tmp       = [&]() {
+                const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return m_old[i_idx] - get_validated_m(m[i_idx]);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            return m_old[i_idx] - get_validated_m(m[i_idx]);
                         }
                         else
                         {
                             auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            return scale_s * m_old[i_idx] - row_max;
                         }
                     }
                 }();
-                l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
-                sweep_tile_span(o_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
 
-                    o_acc(i_j_idx) *= tmp;
-                });
+                const bool need_rescale =
+                    (acc_scale_log2 <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = exp2(acc_scale_log2);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
+                l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
+                if(need_rescale)
+                {
+                    sweep_tile_span(o_spans[I1], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                        o_acc(i_j_idx) *= tmp;
+                    });
+                }
             });
 
             block_sync_lds_direct_load<k_vmem_insts>();
@@ -1062,34 +1083,55 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
             p_tile.get_thread_buffer() = cast_tile<PDataType>(p_compute).get_thread_buffer();
 
             // l{j}, Oacc{j}
+            // Conditional rescaling (FA4): skip when correction is negligible.
+            static constexpr SMPLComputeDataType kRescaleThreshold =
+                type_convert<SMPLComputeDataType>(8.0f);
+
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[I0], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
-                const auto tmp       = [&]() {
+                const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return m_old[i_idx] - get_validated_m(m[i_idx]);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            return m_old[i_idx] - get_validated_m(m[i_idx]);
                         }
                         else
                         {
                             auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            return scale_s * m_old[i_idx] - row_max;
                         }
                     }
                 }();
-                l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
-                sweep_tile_span(o_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
 
-                    o_acc(i_j_idx) *= tmp;
-                });
+                const bool need_rescale =
+                    (acc_scale_log2 <
+                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+
+                SMPLComputeDataType tmp;
+                if(need_rescale)
+                {
+                    tmp = exp2(acc_scale_log2);
+                }
+                else
+                {
+                    tmp = type_convert<SMPLComputeDataType>(1.0f);
+                    m(i_idx) = m_old[i_idx];
+                }
+                l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
+                if(need_rescale)
+                {
+                    sweep_tile_span(o_spans[I1], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                        o_acc(i_j_idx) *= tmp;
+                    });
+                }
             });
 
             block_sync_lds<v_lds_insts>();
