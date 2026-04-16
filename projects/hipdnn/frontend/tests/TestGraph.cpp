@@ -6327,6 +6327,10 @@ static std::vector<GraphTopologyParam> getGraphTopologyParams()
         {"Layernorm", [](Graph& g) { g = FrontendGraphFactory::createLayernormGraph(); }},
         {"Rmsnorm", [](Graph& g) { g = FrontendGraphFactory::createRmsnormGraph(); }},
         {"Reduction", [](Graph& g) { g = FrontendGraphFactory::createReductionGraph(); }},
+#ifdef HIPDNN_ENABLE_SDPA
+        {"SdpaForward", [](Graph& g) { g = FrontendGraphFactory::createSdpaForwardGraph(); }},
+        {"SdpaBackward", [](Graph& g) { g = FrontendGraphFactory::createSdpaBackwardGraph(); }},
+#endif
         // Multi-node topologies
         {"ConvFwdBiasActiv",
          [](Graph& g) { g = FrontendGraphFactory::createConvFwdBiasActivGraph(); }},
@@ -6334,13 +6338,6 @@ static std::vector<GraphTopologyParam> getGraphTopologyParams()
         {"PointwiseChain", createPointwiseChainGraph},
         {"Diamond", createDiamondGraph},
     };
-
-#ifdef HIPDNN_ENABLE_SDPA
-    params.push_back(
-        {"SdpaForward", [](Graph& g) { g = FrontendGraphFactory::createSdpaForwardGraph(); }});
-    params.push_back(
-        {"SdpaBackward", [](Graph& g) { g = FrontendGraphFactory::createSdpaBackwardGraph(); }});
-#endif
 
     return params;
 }
