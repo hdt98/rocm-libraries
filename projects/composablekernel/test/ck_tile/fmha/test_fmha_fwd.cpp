@@ -223,7 +223,8 @@ TEST_P(AllLong, DataTypeConfig)
     {
         if(hdim_q == 256 && hdim_v == 24 && mode == mode_enum::batch && p_drop > 0 &&
            ck_tile::is_gfx95_supported())
-            GTEST_SKIP() << "Skipped: fp16 dropout d256/d24 batch gfx950 — compiler VGPR aliasing bug (ROCm 7.1.x)";
+            GTEST_SKIP() << "Skipped: fp16 dropout d256/d24 batch gfx950 — compiler VGPR aliasing "
+                            "bug (ROCm 7.1.x)";
     }
 #endif
 
