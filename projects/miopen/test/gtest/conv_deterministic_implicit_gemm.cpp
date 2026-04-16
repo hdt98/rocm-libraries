@@ -63,10 +63,8 @@ struct DeterministicTestConfig
 
     friend std::ostream& operator<<(std::ostream& os, const DeterministicTestConfig& tc)
     {
-        os << "N:" << tc.N << " C:" << tc.C << " K:" << tc.K
-           << " H:" << tc.H << " W:" << tc.W
-           << " y:" << tc.y << " x:" << tc.x
-           << " pad:{" << tc.pad_h << "," << tc.pad_w << "}"
+        os << "N:" << tc.N << " C:" << tc.C << " K:" << tc.K << " H:" << tc.H << " W:" << tc.W
+           << " y:" << tc.y << " x:" << tc.x << " pad:{" << tc.pad_h << "," << tc.pad_w << "}"
            << " stride:{" << tc.stride_h << "," << tc.stride_w << "}"
            << " dilation:{" << tc.dilation_h << "," << tc.dilation_w << "}";
         return os;
@@ -129,8 +127,8 @@ std::vector<DeterministicTestConfig> GetConfigBwdV1R1()
 std::vector<DeterministicTestConfig> GetConfigBwdV4R1()
 {
     return {
-        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},   // PASS
-        {16, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},   // was SKIP
+        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}, // PASS
+        {16, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1}, // was SKIP
     };
 }
 
@@ -161,8 +159,7 @@ std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
 }
 
 template <typename T, Direction CONV_DIR, typename SolverType>
-class GPU_ConvDeterministicImplicitGemm
-    : public ::testing::TestWithParam<DeterministicTestConfig>
+class GPU_ConvDeterministicImplicitGemm : public ::testing::TestWithParam<DeterministicTestConfig>
 {
 protected:
     static constexpr int NUM_ITERATIONS = 3;
@@ -192,8 +189,8 @@ protected:
             {static_cast<int>(config.stride_h), static_cast<int>(config.stride_w)},
             {static_cast<int>(config.dilation_h), static_cast<int>(config.dilation_w)},
             {0, 0}, // adj
-            1,       // group_count
-            1.0};    // lowp_quant
+            1,      // group_count
+            1.0};   // lowp_quant
 
         // Enable deterministic mode
         conv_desc.attribute.Set(MIOPEN_CONVOLUTION_ATTRIB_DETERMINISTIC, 1);
@@ -402,11 +399,19 @@ protected:
     {
         prng::reset_seed();
         // Enable the solver which is disabled by default due to a workaround
+#ifdef _WIN32
+        _putenv_s("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1", "1");
+#else
         setenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1", "1", 1);
+#endif
     }
     void TearDown() override
     {
+#ifdef _WIN32
+        _putenv_s("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1", "");
+#else
         unsetenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1");
+#endif
     }
 };
 
@@ -442,8 +447,7 @@ using GPU_Deterministic_BwdV1R1_FP32 =
                                       Direction::BackwardData,
                                       miopen::solver::conv::ConvHipImplicitGemmBwdDataV1R1>;
 using GPU_Deterministic_BwdV4R1_FP32 =
-    GPU_ConvDeterministicBwdV4R1<float,
-                                 miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1>;
+    GPU_ConvDeterministicBwdV4R1<float, miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1>;
 
 // ============================================================================
 // Weight gradient (WrW) solvers
@@ -481,43 +485,46 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
                          testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_BwdV1R1_FP32,
-                         testing::Values(DeterministicTestConfig{32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1}));
+                         testing::Values(DeterministicTestConfig{
+                             32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1}));
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_BwdV4R1_FP32,
-                         testing::Values(DeterministicTestConfig{16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}));
+                         testing::Values(DeterministicTestConfig{
+                             16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}));
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_WrwV4R4_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4()));
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_WrwV4R4Xdlops_FP32,
-                         testing::Values(DeterministicTestConfig{1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}));
+                         testing::Values(DeterministicTestConfig{
+                             1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}));
 
 // ============================================================================
 // Extended tests (Full): runs only with MIOPEN_TEST_ALL=ON
 // Includes all boundary configs that were FAIL/SKIP before the IsApplicable() fix
 // ============================================================================
 
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_FwdV4R5Xdlops_FP32,
                          testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_FwdV4R5Xdlops_BFP16,
                          testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_FwdV4R4Xdlops_FP32,
                          testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_FwdV4R1_FP32,
                          testing::ValuesIn(GetConfigFwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_BwdV1R1_FP32,
                          testing::ValuesIn(GetConfigBwdV1R1()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_BwdV4R1_FP32,
                          testing::ValuesIn(GetConfigBwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_WrwV4R4_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4()));
-INSTANTIATE_TEST_SUITE_P(Full_Deterministic,
+INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_Deterministic_WrwV4R4Xdlops_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
