@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright 2025 AMD ROCm(TM) Software
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #include <rocRoller/KernelGraph/KernelGraph.hpp>
 #include <rocRoller/KernelGraph/Transforms/PrefetchScale.hpp>
@@ -69,7 +46,7 @@ namespace rocRoller
             for(auto const load : loads)
             {
                 auto unrollMap  = colouring.operationColour.at(load);
-                auto unrollKDim = graph.mapper.get<Unroll>(load, 2);
+                auto unrollKDim = graph.mapper.get<Unroll>(load, rocRoller::KLOOP_UNROLL);
                 if(unrollKVal && *unrollKVal != unrollMap.at(unrollKDim))
                 {
                     nextLoad = load;
@@ -404,7 +381,7 @@ namespace rocRoller
 
                 auto inLoopLoad = duplicateChain(graph, {topOp});
                 graph.control.addElement(Sequence(), {copyTag}, {inLoopLoad});
-                auto unrollDim = graph.mapper.get<Unroll>(loadTag, 2);
+                auto unrollDim = graph.mapper.get<Unroll>(loadTag, rocRoller::KLOOP_UNROLL);
                 inLoopLoads.push_back(std::make_pair(inLoopLoad, unrollDim));
 
                 UpdateExchangeMacroTiles(
@@ -482,11 +459,14 @@ namespace rocRoller
          * @param graph Kernel graph containing the loads
          * @param colouring Maps operations to unroll values
          * @param nonSwizzleLoads Non-WAVE_SWIZZLE loads used as position anchors
+         * @param kLoopLoadSet Loads that are inside the K loop (used to distinguish
+         *                     pre-loop loads from K loop body loads)
          * @return PrefetchPositions indexed by sub-iteration
          */
-        PrefetchPositions DeterminePrefetchPositions(KernelGraph const&      graph,
-                                                     UnrollColouring const&  colouring,
-                                                     std::vector<int> const& nonSwizzleLoads)
+        PrefetchPositions DeterminePrefetchPositions(KernelGraph const&             graph,
+                                                     UnrollColouring const&         colouring,
+                                                     std::vector<int> const&        nonSwizzleLoads,
+                                                     std::unordered_set<int> const& kLoopLoadSet)
         {
             std::vector<int>   prefetchPosition;
             std::vector<int>   exchangePosition;
@@ -497,14 +477,13 @@ namespace rocRoller
             for(auto const loadTag : nonSwizzleLoads)
             {
                 auto unrollMap  = colouring.operationColour.at(loadTag);
-                auto unrollKDim = graph.mapper.get<Unroll>(loadTag, 2);
+                auto unrollKDim = graph.mapper.get<Unroll>(loadTag, rocRoller::KLOOP_UNROLL);
                 auto subiter    = unrollMap.at(unrollKDim);
 
-                // Detect if we've entered the K loop
+                // Detect if we've entered the K loop (not just any ForLoopOp)
                 if(!isInsideLoop)
                 {
-                    auto maybeForLoop = findContainingOperation<ForLoopOp>(loadTag, graph);
-                    if(maybeForLoop)
+                    if(kLoopLoadSet.contains(loadTag))
                         isInsideLoop = true;
                 }
 
@@ -629,8 +608,10 @@ namespace rocRoller
             if(swizzleLoads.empty())
                 return;
 
+            std::unordered_set<int> kLoopLoadSet(loopLoads.begin(), loopLoads.end());
+
             auto [prefetchPosition, exchangePosition]
-                = DeterminePrefetchPositions(graph, colouring, nonSwizzleLoads);
+                = DeterminePrefetchPositions(graph, colouring, nonSwizzleLoads, kLoopLoadSet);
 
             for(auto const loadTag : swizzleLoads)
             {
@@ -640,14 +621,15 @@ namespace rocRoller
                     numInFlight = static_cast<int>(prefetchPosition.size());
 
                 auto unrollMap  = colouring.operationColour.at(loadTag);
-                auto unrollKDim = graph.mapper.get<Unroll>(loadTag, 2);
+                auto unrollKDim = graph.mapper.get<Unroll>(loadTag, rocRoller::KLOOP_UNROLL);
                 auto subiter    = unrollMap.at(unrollKDim);
 
                 auto topOp = getTopSetCoordinate(graph, loadTag);
                 replaceWith(graph, topOp, graph.control.addElement(NOP()), false);
                 nextIterPrefetch[subiter].push_back(topOp);
 
-                if(context->kernelOptions()->scaleSkipPermlane)
+                if(context->kernelOptions()->scaleSkipPermlane
+                   != rocRoller::ScaleSkipPermlaneMode::None)
                 {
                     auto [copyTag, destMacTileTag]
                         = CreateCopy(graph, context, loadTag, macTileTag, copyInfo);
@@ -828,9 +810,9 @@ namespace rocRoller
                             || macTile.layoutType == LayoutType::MATRIX_B,
                         ShowValue(macTile.layoutType));
 
-            auto unroll0 = graph.mapper.get<Unroll>(loadTag, 0);
-            auto unroll1 = graph.mapper.get<Unroll>(loadTag, 1);
-            auto unroll2 = graph.mapper.get<Unroll>(loadTag, 2);
+            auto unroll0 = graph.mapper.get<Unroll>(loadTag, rocRoller::XLOOP_UNROLL);
+            auto unroll1 = graph.mapper.get<Unroll>(loadTag, rocRoller::YLOOP_UNROLL);
+            auto unroll2 = graph.mapper.get<Unroll>(loadTag, rocRoller::KLOOP_UNROLL);
 
             unsigned int xyUnrollSize = 0, macKUnrollSize = 0;
             if(macTile.layoutType == LayoutType::MATRIX_A)

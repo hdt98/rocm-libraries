@@ -144,15 +144,11 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
     const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(K_split);
     const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
     const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
-    float ave_time{0};
 
-    const auto Run = [&](const auto has_hot_loop_,
-                         const auto tail_number_,
-                         const auto memory_operation_) {
-        constexpr bool has_hot_loop_v   = has_hot_loop_.value;
-        constexpr auto tail_number_v    = tail_number_.value;
-        constexpr auto scheduler        = FlatmmConfig::Scheduler;
-        constexpr auto memory_operation = memory_operation_.value;
+    const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
+        constexpr bool has_hot_loop_v = has_hot_loop_.value;
+        constexpr auto tail_number_v  = tail_number_.value;
+        constexpr auto scheduler      = FlatmmConfig::Scheduler;
 
         using CodegenPipelineProblem = ck_tile::FlatmmPipelineProblem<ADataType,
                                                                       BDataType,
@@ -167,29 +163,48 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                 ? 2
                                                 : 1; // determined by scale shuffle pattern
 
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
-                                             BDataType,
-                                             DsDatatype,
-                                             AccDataType,
-                                             CDataType,
-                                             DsLayout,
-                                             ELayout,
-                                             CDEElementWise,
-                                             TilePartitioner::MPerBlock,
-                                             TilePartitioner::NPerBlock,
-                                             FlatmmConfig::M_Warp,
-                                             FlatmmConfig::N_Warp,
-                                             FlatmmConfig::M_Warp_Tile,
-                                             FlatmmConfig::N_Warp_Tile,
-                                             FlatmmConfig::K_Warp_Tile,
-                                             CodegenPipelineProblem::TransposeC,
-                                             memory_operation,
-                                             FlatmmConfig::NumWaveGroups,
-                                             false,
-                                             1,
-                                             FlatmmConfig::TiledMMAPermuteN,
-                                             BlockedXDLN_PerWarp>>;
+        using GemmEpilogue = std::conditional_t<
+            FlatmmConfig::TiledMMAPermuteN,
+            ck_tile::PermuteNEpilogue<
+                ck_tile::PermuteNEpilogueProblem<ADataType,
+                                                 BDataType,
+                                                 DsDatatype,
+                                                 AccDataType,
+                                                 CDataType,
+                                                 DsLayout,
+                                                 ELayout,
+                                                 CDEElementWise,
+                                                 TilePartitioner::MPerBlock,
+                                                 TilePartitioner::NPerBlock,
+                                                 FlatmmConfig::M_Warp,
+                                                 FlatmmConfig::N_Warp,
+                                                 FlatmmConfig::M_Warp_Tile,
+                                                 FlatmmConfig::N_Warp_Tile,
+                                                 FlatmmConfig::K_Warp_Tile,
+                                                 CodegenPipelineProblem::TransposeC,
+                                                 false,
+                                                 1>>,
+            ck_tile::CShuffleEpilogue<
+                ck_tile::CShuffleEpilogueProblem<ADataType,
+                                                 BDataType,
+                                                 DsDatatype,
+                                                 AccDataType,
+                                                 CDataType,
+                                                 DsLayout,
+                                                 ELayout,
+                                                 CDEElementWise,
+                                                 TilePartitioner::MPerBlock,
+                                                 TilePartitioner::NPerBlock,
+                                                 FlatmmConfig::M_Warp,
+                                                 FlatmmConfig::N_Warp,
+                                                 FlatmmConfig::M_Warp_Tile,
+                                                 FlatmmConfig::N_Warp_Tile,
+                                                 FlatmmConfig::K_Warp_Tile,
+                                                 CodegenPipelineProblem::TransposeC,
+                                                 FlatmmConfig::NumWaveGroups,
+                                                 false,
+                                                 1,
+                                                 BlockedXDLN_PerWarp>>>;
 
         using CodegenFlatmmPipeline =
             ck_tile::MoeFlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
@@ -261,37 +276,20 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                        args.NumTokens * args.TopK * outputN * sizeof(CDataType),
                                        s.stream_id_));
             };
-            ave_time = ck_tile::launch_kernel_time_mask(
+            return ck_tile::launch_kernel_time_mask(
                 s,
                 run_flush_cache,
                 ck_tile::make_kernel<FlatmmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
         }
         else
         {
-            ave_time = ck_tile::launch_kernel(
+            return ck_tile::launch_kernel(
                 s,
                 ck_tile::make_kernel<FlatmmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
         }
-        return ave_time;
     };
 
-    const auto RunSplitk = [&](const auto has_hot_loop_, const auto tail_number_) {
-        if(args.k_batch == 1)
-        {
-            Run(has_hot_loop_,
-                tail_number_,
-                ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::set>{});
-        }
-        else
-        {
-            Run(has_hot_loop_,
-                tail_number_,
-                ck_tile::integral_constant<ck_tile::memory_operation_enum,
-                                           ck_tile::memory_operation_enum::atomic_add>{});
-        }
-    };
-    BaseGemmPipeline::TailHandler(RunSplitk, has_hot_loop, tail_num);
+    float ave_time = BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
     return ave_time;
 }
 

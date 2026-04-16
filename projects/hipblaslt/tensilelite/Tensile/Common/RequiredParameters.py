@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+# Copyright (C) 2025-2026 Advanced Micro Devices, Inc. All rights reserved.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -43,9 +43,14 @@ def getRequiredParametersMin() -> set:
         'ConvertAfterDS',
         'DirectToVgprA',
         'DirectToVgprB',
+        'DirectToVgprSparseMetadata',
         'DirectToLdsA',
         'DirectToLdsB',
+        'DirectToVgprMXSA',
+        'DirectToVgprMXSB',
         'ExpandPointerSwap',
+        'ExtraLatencyForLR',
+        'ExtraMiLatencyLeft',
         'ForceDisableShadowInit',
         'GlobalReadPerMfma',
         'GlobalReadVectorWidthA',
@@ -80,6 +85,7 @@ def getRequiredParametersMin() -> set:
         'PrefetchLocalRead',
         'PreloadKernArgs',
         'ScheduleIterAlg',
+        'ScheduleGROverBarrier',
         'SourceSwap',
         'SpaceFillingAlgo',
         'StorePriorityOpt',
@@ -89,7 +95,11 @@ def getRequiredParametersMin() -> set:
         'StreamK',
         'StreamKXCCMapping',
         'StreamKFixupTreeReduction',
+        'SwapGlobalReadOrder',
+        'TailloopInNll',
         'TransposeLDS',
+        'TransposeLDSMetadata',
+        'TDMInst',
         'UnrollLoopSwapGlobalReadOrder',
         'Use64bShadowLimit',
         'UseInstOffsetForGRO',
@@ -101,4 +111,7 @@ def getRequiredParametersMin() -> set:
         'WaveSeparateGlobalReadB',
         'WavefrontSize',
         'WorkGroup',
+        'DtlPlusLdsBuf',
+        'MinGRIncPerMfma',
+        'UsePLRPack'
     })

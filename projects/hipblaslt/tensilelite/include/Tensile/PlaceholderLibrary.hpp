@@ -31,6 +31,7 @@
 #include <Tensile/SolutionLibrary.hpp>
 #include <Tensile/Tensile.hpp>
 
+#include <atomic>
 #include <algorithm>
 #include <map>
 
@@ -68,6 +69,7 @@ namespace TensileLite
         gfx1153,
         gfx1200,
         gfx1201,
+        gfx1250,
         All
     };
 
@@ -132,6 +134,8 @@ namespace TensileLite
             return "TensileLibrary_*_gfx1200";
         case LazyLoadingInit::gfx1201:
             return "TensileLibrary_*_gfx1201";
+        case LazyLoadingInit::gfx1250:
+            return "TensileLibrary_*_gfx1250";
         case LazyLoadingInit::None:
             return "";
         }
@@ -149,6 +153,7 @@ namespace TensileLite
         std::string                                                     filePrefix;
         std::string                                                     suffix;
         std::string                                                     libraryDirectory;
+        mutable std::atomic<bool>                                       lastFindTopRetAll = false;
 
         mutable std::map<std::string, std::shared_ptr<SolutionLibrary<MyProblem, MySolution>>>*
             indexLoadedLibraries;
@@ -303,7 +308,15 @@ namespace TensileLite
             {
                 solution->codeObjectFilename = getCodeObjectFileName();
             }
+
+            // can't reach the requested number, means findTop already done its best
+            lastFindTopRetAll = (solutions.size() < numSolutions);
             return solutions;
+        }
+
+        virtual bool lastFindTopAlreadyRetAll() const override
+        {
+            return lastFindTopRetAll;
         }
 
         virtual SolutionVector<MySolution>
@@ -338,6 +351,12 @@ namespace TensileLite
         virtual std::string description() const override
         {
             return this->type();
+        }
+
+        // Get the library filename for debug output
+        virtual std::string getLibraryFileName() const override
+        {
+            return filePrefix + suffix;
         }
     };
 

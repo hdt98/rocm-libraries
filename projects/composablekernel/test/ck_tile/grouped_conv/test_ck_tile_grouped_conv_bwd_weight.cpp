@@ -42,8 +42,7 @@ template <typename PrecType,
           typename InLayout,
           typename WeiLayout,
           typename OutLayout,
-          memory_operation_enum MemOp = memory_operation_enum::set,
-          index_t NDimSpatial         = 2>
+          index_t NDimSpatial = 2>
 struct BuildKernel
 {
     using GemmShape = TileGemmShape<
@@ -123,7 +122,6 @@ struct BuildKernel
                                                     ConvConfig::N_Warp_Tile,
                                                     ConvConfig::K_Warp_Tile,
                                                     ConvTraits::FixedGemmParams::TransposeC,
-                                                    MemOp,
                                                     ConvConfig::NumWaveGroups,
                                                     ConvTraits::FixedGemmParams::FixedVectorSize,
                                                     ConvTraits::VectorSizeC>;
@@ -212,26 +210,6 @@ TEST_F(GroupedConvBwdWeightIsSupportedArgumentTest, InvalidKBatchLessThanOne)
     EXPECT_FALSE(Kernel::IsSupportedArgument(kargs));
 }
 
-TEST_F(GroupedConvBwdWeightIsSupportedArgumentTest, AtomicAddRequiresKBatchGreaterThanOne)
-{
-    using Kernel = typename BuildKernel<half_t,
-                                        TestConvConfig,
-                                        tensor_layout::convolution::NHWGC,
-                                        tensor_layout::convolution::GKYXC,
-                                        tensor_layout::convolution::NHWGK,
-                                        memory_operation_enum::atomic_add>::type;
-
-    // k_batch = 1 should fail with atomic_add
-    auto host_args_kbatch_1 = create_2d_host_args(1);
-    auto kargs_1 = typename Kernel::GroupedConvBwdWeightKernelArgsSpecialized(host_args_kbatch_1);
-    EXPECT_FALSE(Kernel::IsSupportedArgument(kargs_1));
-
-    // k_batch = 2 should pass
-    auto host_args_kbatch_2 = create_2d_host_args(2);
-    auto kargs_2 = typename Kernel::GroupedConvBwdWeightKernelArgsSpecialized(host_args_kbatch_2);
-    EXPECT_TRUE(Kernel::IsSupportedArgument(kargs_2));
-}
-
 TEST_F(GroupedConvBwdWeightIsSupportedArgumentTest, K0KBatchLimitation)
 {
     using Kernel = typename BuildKernel<half_t,
@@ -241,12 +219,12 @@ TEST_F(GroupedConvBwdWeightIsSupportedArgumentTest, K0KBatchLimitation)
                                         tensor_layout::convolution::NHWGK>::type;
 
     // k_batch = 128 should pass
-    auto host_args_kbatch_6 = create_2d_host_args(6);
+    auto host_args_kbatch_6 = create_2d_host_args(7);
     auto kargs_6 = typename Kernel::GroupedConvBwdWeightKernelArgsSpecialized(host_args_kbatch_6);
     EXPECT_TRUE(Kernel::IsSupportedArgument(kargs_6));
 
     // k_batch = 129 should fail for half_t output
-    auto host_args_kbatch_7 = create_2d_host_args(7);
+    auto host_args_kbatch_7 = create_2d_host_args(8);
     auto kargs_7 = typename Kernel::GroupedConvBwdWeightKernelArgsSpecialized(host_args_kbatch_7);
     EXPECT_FALSE(Kernel::IsSupportedArgument(kargs_7));
 }

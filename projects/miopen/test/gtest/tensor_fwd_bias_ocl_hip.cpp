@@ -38,6 +38,8 @@
 
 #define MAX_TENSOR_ELEM 17
 
+namespace {
+
 struct TensorsConfig
 {
     std::vector<std::size_t> aclens;
@@ -51,42 +53,21 @@ std::vector<TensorsConfig> TensorsConfigs()
 {
     std::vector<TensorsConfig> configs;
     auto insertTestCase = [&configs](size_t N, size_t C, size_t H, size_t W) {
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, C, H, W}, {C * H * W, H * W, W, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, C, H, 1}, {C * H * 1, H * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, C, 1, W}, {C * 1 * W, 1 * W, W, 1}});
+        // OpTensorFwdBias maps gid directly to the channel index (o_c = gid when incr_wg=0),
+        // so it only supports B tensors that vary in the C dimension (H=1, W=1 in B).
+        // B shapes with non-1 H or W cause num_wg >> b_c, producing out-of-bounds GPU
+        // memory accesses that hang under ASan guard pages. Those shapes are covered by
+        // tensor_fwd_bias_generic_ocl_hip.cpp which uses OpTensorFwdBiasGeneric.
         configs.push_back(
             {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, C, 1, 1}, {C * 1 * 1, 1 * 1, 1, 1}});
         configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, 1, H, W}, {1 * H * W, H * W, W, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, 1, H, 1}, {1 * H * 1, H * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, 1, 1, W}, {1 * 1 * W, 1 * W, W, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {N, 1, 1, 1}, {1 * 1 * 1, 1 * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, C, H, W}, {C * H * W, H * W, W, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, C, H, 1}, {C * H * 1, H * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, C, 1, W}, {C * 1 * W, 1 * W, W, 1}});
-        configs.push_back(
             {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, C, 1, 1}, {C * 1 * 1, 1 * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, 1, H, W}, {1 * H * W, H * W, W, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, 1, H, 1}, {1 * H * 1, H * 1, 1, 1}});
-        configs.push_back(
-            {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, 1, 1, W}, {1 * 1 * W, 1 * W, W, 1}});
         configs.push_back(
             {{N, C, H, W}, {C * H * W, H * W, W, 1}, {1, 1, 1, 1}, {1 * 1 * 1, 1 * 1, 1, 1}});
     };
 
 #if PERF_ENABLE
-    size_t maxTotalSize = getCacheSizeLimit(get_handle().GetDeviceName()) / sizeof(T);
+    size_t maxTotalSize = getCacheSizeLimit<T>(get_handle().GetDeviceName());
 
     // Generate all NCHW tensors that are limited by L3 cache size
     // or 2xL2 cache size when L3 is not available
@@ -160,6 +141,8 @@ std::vector<TensorsConfig> TensorsConfigs()
     return configs;
 #endif
 }
+
+} // namespace
 
 template <typename T>
 struct OpTensorFwdBiasTest
@@ -348,7 +331,8 @@ protected:
     void verify()
     {
         auto error = miopen::rms_range(tensC_ocl, tensC_hip);
-        EXPECT_TRUE(error == 0) << "GPU outputs do not match each other. Error: " << error;
+        EXPECT_TRUE(miopen::float_equal_sentinel(error, 0))
+            << "OCL and HIP GPU outputs are expected to be identical. Error: " << error;
     }
 
     void TearDown() override
