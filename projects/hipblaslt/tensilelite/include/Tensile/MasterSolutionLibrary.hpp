@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <filesystem>
 #include <map>
@@ -34,6 +35,7 @@
 #include <Tensile/Debug.hpp>
 #include <Tensile/SolutionLibrary.hpp>
 #include <Tensile/Tensile.hpp>
+#include <Tensile/TensorOps.hpp>
 
 namespace fs = std::filesystem;
 
@@ -102,6 +104,7 @@ namespace TensileLite
         mutable SolutionMap<MySolution>                         solutions;
         std::string                                             version;
         mutable std::mutex                                      solutionsGuard;
+        mutable std::atomic<bool>                               lastFindTopRetAll = false;
 
         MasterSolutionLibrary() = default;
 
@@ -178,6 +181,7 @@ namespace TensileLite
                                                                Hardware const&  hardware,
                                                                const int index) const override
         {
+            std::lock_guard<std::mutex> lock(solutionsGuard);
             if(solutions.find(index) == solutions.end())
             {
                 return std::shared_ptr<MySolution>();
@@ -195,6 +199,7 @@ namespace TensileLite
                                                                const int       index) const override
         {
             loadLibrary(index);
+            std::lock_guard<std::mutex> lock(solutionsGuard);
             if(solutions.find(index) == solutions.end())
             {
                 return std::shared_ptr<MySolution>();
@@ -211,7 +216,8 @@ namespace TensileLite
                                                       solution->problemType.dType,
                                                       solution->problemType.computeType,
                                                       solution->problemType.computeType,
-                                                      solution->problemType.computeInputType,
+                                                      solution->problemType.computeInputTypeA,
+                                                      solution->problemType.computeInputTypeB,
                                                       solution->problemType.computeType,
                                                       1.0,
                                                       1.0,
@@ -319,13 +325,22 @@ namespace TensileLite
                 auto   end    = std::chrono::steady_clock::now();
                 double time   = std::chrono::duration<double, std::micro>(end - start).count();
                 std::cout << "Solution selection time: " << time << " us" << std::endl;
+                lastFindTopRetAll = library->lastFindTopAlreadyRetAll();
 
                 return result;
             }
             else
             {
-                return library->findTopSolutions(problem, hardware, numSolutions);
+                const auto& result = library->findTopSolutions(problem, hardware, numSolutions);
+                lastFindTopRetAll = library->lastFindTopAlreadyRetAll();
+
+                return result;
             }
+        }
+
+        virtual bool lastFindTopAlreadyRetAll() const override
+        {
+            return lastFindTopRetAll;
         }
 
         virtual SolutionVector<MySolution>

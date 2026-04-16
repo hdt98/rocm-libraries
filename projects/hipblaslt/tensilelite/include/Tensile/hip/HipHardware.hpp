@@ -28,7 +28,7 @@
 
 #include <Tensile/AMDGPU.hpp>
 #include <Tensile/Tensile.hpp>
-#include <origami/utils.hpp>
+#include <origami/hardware.hpp>
 
 #include <hip/hip_runtime.h>
 
@@ -39,7 +39,7 @@ namespace TensileLite
         struct HipAMDGPU : public AMDGPU
         {
             HipAMDGPU() = default;
-            HipAMDGPU(hipDeviceProp_t const& prop);
+            HipAMDGPU(hipDeviceProp_t const& prop, std::optional<int> pciChipId = std::nullopt);
 
             hipDeviceProp_t properties;
 

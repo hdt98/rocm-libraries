@@ -1,4 +1,6 @@
-from datetime import datetime
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+
 import pathlib
 from pathlib import Path
 import subprocess
@@ -10,8 +12,8 @@ OPS = "ops"
 OPS_COMMON = "common"  # common header will be duplicated into ops/* other module
 
 IGNORED_DIRS = ["utility", "ref"]
-HEADER_COMMON = f"""// SPDX-License-Identifier: MIT
-// Copyright (c) 2018-{datetime.now().year}, Advanced Micro Devices, Inc. All rights reserved.\n
+HEADER_COMMON = """// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 """
 
 
@@ -85,18 +87,19 @@ class submodule_t:
 
 submodule = submodule_t()
 # formatting
+format_procs = []
 for x in all_files:
-    subprocess.Popen(
-        f"python -m dos2unix {str(x)} {str(x)}",
-        shell=True,
-        stdout=open(os.devnull, "wb"),
+    dos2unix = f"python3 -m dos2unix {str(x)} {str(x)}"
+    clang_format = f"clang-format -style=file -i {str(x)}"
+    # One process to avoid race conditions.
+    cmd = f"{dos2unix} && {clang_format}"
+    format_procs.append(
+        subprocess.Popen(cmd, shell=True, stdout=open(os.devnull, "wb"))
     )
-    cmd = f"clang-format -style=file -i {str(x)}"
-    # for xp in x.parents:
-    # print(get_file_base(x))
-    subprocess.Popen(cmd, shell=True)
     submodule.push(x)
 
-submodule.gen()
+# Wait for formatting to complete before generating headers.
+for p in format_procs:
+    p.wait()
 
-# print(all_files)
+submodule.gen()

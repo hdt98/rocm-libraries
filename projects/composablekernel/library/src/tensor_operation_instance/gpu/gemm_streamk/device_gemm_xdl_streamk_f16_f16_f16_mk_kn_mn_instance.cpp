@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2022, Advanced Micro Devices, Inc. All rights reserved.
 
 #include <cstdlib>
 
@@ -26,9 +26,6 @@ using S = ck::Sequence<Is...>;
 
 using PassThrough = ck::tensor_operation::element_wise::PassThrough;
 
-// static constexpr auto GemmDefault = ck::tensor_operation::device::GemmSpecialization::Default;
-// static constexpr auto GemmMNPadding =
-// ck::tensor_operation::device::GemmSpecialization::MNPadding;
 using device_gemm_xdl_streamk_f16_f16_f16_mk_kn_mn_generic_instances = std::tuple<
     // clang-format off
         //##################|AData| BData| CData| AccData| ALayout| BLayout| CLayout|           A|           B|           C| Block|  MPer|  NPer| K0Per| K1| MPer| NPer| MXdl| NXdl|  ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockTransfer| ABlockLds|  BBlockTransfer| BBlockTransfer| BBlockTransfer| BlockTransfer| BBlockTransfer| BBlockTransfer| BBlockLds|    CShuffle|    CShuffle|     CBlockTransferClusterLengths|  CBlockTransfer|

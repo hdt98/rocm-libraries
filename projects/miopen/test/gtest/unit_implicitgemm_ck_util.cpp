@@ -26,7 +26,7 @@
 
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/conv/solvers.hpp>
-#include <miopen/solver/implicitgemm_ck_util.hpp>
+#include "../../src/ck_impl/implicitgemm_ck_util.hpp"
 #include <gtest/gtest.h>
 #include <iostream>
 #include <memory>
@@ -145,7 +145,14 @@ struct CPU_UnitTestImplicitGemmCKUtil_NONE : CKArgParsingTest<StubbedCKArgs, Stu
 {
 };
 
-TEST_P(CPU_UnitTestImplicitGemmCKUtil_NONE, TestParsing) { this->TestParsing(); };
+TEST_P(CPU_UnitTestImplicitGemmCKUtil_NONE, TestParsing)
+{
+#if MIOPEN_USE_COMPOSABLEKERNEL
+    this->TestParsing();
+#else
+    GTEST_SKIP();
+#endif
+};
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          CPU_UnitTestImplicitGemmCKUtil_NONE,

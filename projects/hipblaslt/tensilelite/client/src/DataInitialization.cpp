@@ -132,6 +132,8 @@ namespace TensileLite
             case rocisa::DataType::BFloat8:
             case rocisa::DataType::Float8BFloat8:
             case rocisa::DataType::BFloat8Float8:
+            case rocisa::DataType::E8:
+            case rocisa::DataType::E5M3:
                 return 8;
             default:
                 throw std::runtime_error("unsupported datatype");
@@ -371,6 +373,8 @@ namespace TensileLite
             case rocisa::DataType::BFloat8:
             case rocisa::DataType::Float8BFloat8:
             case rocisa::DataType::BFloat8Float8:
+            case rocisa::DataType::E8:
+            case rocisa::DataType::E5M3:
                 MiK  = 32;
                 MiKv = 8;
                 break;
@@ -406,56 +410,75 @@ namespace TensileLite
             size_t      loop_count   = count / pruneDimSize;
             if(pruneDimSize % 4 != 0)
                 throw std::runtime_error("prune dimension size must be multiple of 4.");
-            auto getPruneIndex = [](PruneSparseMode pruneMode, size_t* index1, size_t* index2) {
-                if(pruneMode == PruneSparseMode::PruneRandom)
-                    pruneMode = static_cast<PruneSparseMode>(
-                        rand() % (static_cast<int>(PruneSparseMode::MaxPruneMode) - 1) + 1);
-                switch(pruneMode)
-                {
-                case PruneSparseMode::PruneXX00:
-                    *index1 = 2;
-                    *index2 = 3;
-                    break;
-                case PruneSparseMode::PruneX0X0:
-                    *index1 = 1;
-                    *index2 = 3;
-                    break;
-                case PruneSparseMode::Prune0XX0:
-                    *index1 = 0;
-                    *index2 = 3;
-                    break;
-                case PruneSparseMode::PruneX00X:
-                    *index1 = 1;
-                    *index2 = 2;
-                    break;
-                case PruneSparseMode::Prune0X0X:
-                    *index1 = 0;
-                    *index2 = 2;
-                    break;
-                case PruneSparseMode::Prune00XX:
-                    *index1 = 0;
-                    *index2 = 1;
-                    break;
-                default:
-                    throw std::runtime_error("prune mode is not allowed.");
-                    break;
-                }
-            };
-#pragma omp parallel for
-            for(size_t loop = 0; loop < loop_count; loop++)
+            switch(mode)
             {
-                std::vector<size_t> coord(tensor.dimensions(), 0);
-                CoordNumberedExclude(
-                    loop, coord.begin(), coord.end(), sizes.begin(), sizes.end(), pruneDim);
-                for(size_t pruneDimIdx = 0; pruneDimIdx < pruneDimSize;
-                    pruneDimIdx += 4) //traverse along pruneDim
+            case PruneSparseMode::PruneXX00:
+            case PruneSparseMode::PruneX0X0:
+            case PruneSparseMode::Prune0XX0:
+            case PruneSparseMode::PruneX00X:
+            case PruneSparseMode::Prune0X0X:
+            case PruneSparseMode::Prune00XX:
+            case PruneSparseMode::PruneRandom:
+                break;
+            default:
+                throw std::runtime_error("prune mode is not allowed.");
+                break;
+            }
+
+            constexpr std::array<uint8_t, static_cast<uint32_t>(PruneSparseMode::MaxPruneMode)>
+                pruneMask = [] {
+                    std::array<uint8_t, static_cast<uint32_t>(PruneSparseMode::MaxPruneMode)> m{};
+                    m[static_cast<uint32_t>(PruneSparseMode::PruneXX00)] = 0x3;
+                    m[static_cast<uint32_t>(PruneSparseMode::PruneX0X0)] = 0x5;
+                    m[static_cast<uint32_t>(PruneSparseMode::Prune0XX0)] = 0x6;
+                    m[static_cast<uint32_t>(PruneSparseMode::PruneX00X)] = 0x9;
+                    m[static_cast<uint32_t>(PruneSparseMode::Prune0X0X)] = 0xA;
+                    m[static_cast<uint32_t>(PruneSparseMode::Prune00XX)] = 0xC;
+                    return m;
+                }();
+
+#pragma omp parallel
+            {
+                std::random_device                      rd;
+                std::mt19937                            rng(rd());
+                std::uniform_int_distribution<uint32_t> dist(
+                    1, static_cast<uint32_t>(PruneSparseMode::MaxPruneMode) - 1);
+
+#pragma omp for schedule(static)
+                for(size_t loop = 0; loop < loop_count; loop++)
                 {
-                    size_t pruneIdx1, pruneIdx2;
-                    getPruneIndex(mode, &pruneIdx1, &pruneIdx2);
-                    coord[pruneDim]            = pruneDimIdx + pruneIdx1;
-                    array[tensor.index(coord)] = static_cast<T>(0);
-                    coord[pruneDim]            = pruneDimIdx + pruneIdx2;
-                    array[tensor.index(coord)] = static_cast<T>(0);
+                    std::vector<size_t> coord(tensor.dimensions(), 0);
+                    CoordNumberedExclude(
+                        loop, coord.begin(), coord.end(), sizes.begin(), sizes.end(), pruneDim);
+                    for(size_t pruneDimIdx = 0; pruneDimIdx < pruneDimSize;
+                        pruneDimIdx += 4) //traverse along pruneDim
+                    {
+                        uint32_t umode = static_cast<uint32_t>(mode);
+                        if(umode == static_cast<uint32_t>(PruneSparseMode::PruneRandom))
+                            umode = dist(rng);
+
+                        uint32_t mask_ = pruneMask[umode];
+
+                        coord[pruneDim] = pruneDimIdx;
+                        uint32_t bit    = (mask_) & 0x1u;
+                        if(!bit)
+                            array[tensor.index(coord)] = T{};
+
+                        coord[pruneDim] = pruneDimIdx + 1;
+                        bit             = (mask_ >> 1) & 0x1u;
+                        if(!bit)
+                            array[tensor.index(coord)] = T{};
+
+                        coord[pruneDim] = pruneDimIdx + 2;
+                        bit             = (mask_ >> 2) & 0x1u;
+                        if(!bit)
+                            array[tensor.index(coord)] = T{};
+
+                        coord[pruneDim] = pruneDimIdx + 3;
+                        bit             = (mask_ >> 3) & 0x1u;
+                        if(!bit)
+                            array[tensor.index(coord)] = T{};
+                    }
                 }
             }
         }
@@ -467,7 +490,8 @@ namespace TensileLite
                                  TensorDescriptor const& tensor,
                                  TensorDescriptor const& tensorC,
                                  TensorDescriptor const& tensorMeta,
-                                 size_t                  dim)
+                                 size_t                  dim,
+                                 bool                    metadataLayout)
         {
             auto const& sizes      = tensor.sizes();
             auto const& sizesC     = tensorC.sizes();
@@ -479,93 +503,96 @@ namespace TensileLite
             if(dimSize % 4 != 0)
                 throw std::runtime_error("compressed dimension size must be multiple of 4.");
 
-            std::memset((void*)dstCompressed,
-                        0,
-                        TypeInfo<T>::ElementSize * tensorC.totalAllocatedElements());
-            std::memset((void*)dstMeta, 0, tensorMeta.totalLogicalElements());
+            std::memset((void*)dstCompressed, 0, tensorC.totalAllocatedBytes());
+            std::memset((void*)dstMeta, 0, tensorMeta.totalAllocatedBytes());
 
-#pragma omp parallel for
-            for(size_t loop = 0; loop < loop_count; loop++)
+#pragma omp parallel
             {
-                std::vector<size_t> coord(tensor.dimensions());
-                std::vector<size_t> coordC(tensorC.dimensions());
-                std::vector<size_t> coordMeta(tensorMeta.dimensions());
-                CoordNumberedExclude(
-                    loop, coord.begin(), coord.end(), sizes.begin(), sizes.end(), dim);
-                CoordNumberedExclude(
-                    loop, coordC.begin(), coordC.end(), sizesC.begin(), sizesC.end(), dim);
-                //metadata is always a tranpose matrix, so the dimension will always at 0.
-                CoordNumberedExclude(loop,
-                                     coordMeta.begin(),
-                                     coordMeta.end(),
-                                     sizesMeta.begin(),
-                                     sizesMeta.end(),
-                                     0);
-
-                coordMeta[0] = 0;
-
-                for(size_t compressDimIdx = 0; compressDimIdx < dimSize;
-                    compressDimIdx += 4) //traverse along compressdim
+#pragma omp for schedule(static)
+                for(size_t loop = 0; loop < loop_count; loop++)
                 {
-                    size_t metaData    = 0;
-                    size_t metaIdx     = 0;
-                    size_t dstDimCoord = compressDimIdx / 4 * 2;
-
-                    for(size_t i = 0; i < 4; i++)
+                    std::vector<size_t> coord(tensor.dimensions());
+                    std::vector<size_t> coordC(tensorC.dimensions());
+                    std::vector<size_t> coordMeta(tensorMeta.dimensions());
+                    std::vector<size_t> _sizesMeta(tensorMeta.dimensions());
+                    CoordNumberedExclude(
+                        loop, coord.begin(), coord.end(), sizes.begin(), sizes.end(), dim);
+                    CoordNumberedExclude(
+                        loop, coordC.begin(), coordC.end(), sizesC.begin(), sizesC.end(), dim);
+                    //metadata is always a tranpose matrix until we use metadataLayout now.
+                    for(int i = 0; i < tensorMeta.dimensions(); i++)
                     {
-                        //src coord
-                        coord[dim] = compressDimIdx + i;
-                        T srcData  = src[tensor.index(coord)];
-                        if(srcData != static_cast<T>(0))
-                        {
-                            if(metaIdx > 2)
-                                throw std::runtime_error("Sparse matrix must contain 2 zero "
-                                                         "elements of each 4 elements.");
-
-                            //dst coord
-                            coordC[dim]                          = dstDimCoord + metaIdx;
-                            dstCompressed[tensorC.index(coordC)] = srcData;
-                            metaData |= i << (2 * metaIdx);
-                            metaIdx++;
-                        }
-
-                        if(i == 3 && metaIdx < 2)
-                        {
-                            if(metaIdx == 0) //all zeros
-                            {
-                                coordC[dim]                          = dstDimCoord;
-                                dstCompressed[tensorC.index(coordC)] = static_cast<T>(0);
-                                metaData                             = 0;
-                                metaIdx++;
-                            }
-                            if(metaIdx == 1) //3 zeros at least
-                            {
-                                if(metaData != 3) //last element is zero
-                                {
-                                    coordC[dim]                          = dstDimCoord + metaIdx;
-                                    dstCompressed[tensorC.index(coordC)] = static_cast<T>(0);
-                                    metaData |= i << (2 * metaIdx);
-                                }
-                                else //last element is not zero
-                                {
-                                    coordC[dim]                          = dstDimCoord;
-                                    dstCompressed[tensorC.index(coordC)] = static_cast<T>(0);
-                                    coordC[dim]                          = dstDimCoord + metaIdx;
-                                    dstCompressed[tensorC.index(coordC)] = srcData;
-                                    metaData = (metaData << (2 * metaIdx));
-                                }
-                                metaIdx++;
-                            }
-                        }
+                        _sizesMeta[i] = sizesMeta[i];
                     }
-                    //meta Data coord
-                    size_t shift4bit = (compressDimIdx / 4 % 2) * 4;
-                    coordMeta[0]     = compressDimIdx / 8;
-                    //calculate flatten index of dstMeta
-                    size_t flattenIdx = CoordFlattenIndex(
-                        coordMeta.begin(), coordMeta.end(), sizesMeta.begin(), sizesMeta.end());
-                    // store metaData to dstMeta
-                    dstMeta[flattenIdx] |= metaData << shift4bit;
+
+                    CoordNumberedExclude(loop,
+                                         coordMeta.begin(),
+                                         coordMeta.end(),
+                                         _sizesMeta.begin(),
+                                         _sizesMeta.end(),
+                                         metadataLayout);
+                    coordMeta[metadataLayout] = 0;
+
+                    for(size_t compressDimIdx = 0; compressDimIdx < dimSize;
+                        compressDimIdx += 4) //traverse along compressdim
+                    {
+                        uint32_t metaData = 0;
+                        uint32_t metaIdx[2];
+
+                        size_t dstDimCoord = compressDimIdx / 4 * 2;
+
+                        coord[dim]  = compressDimIdx;
+                        coordC[dim] = dstDimCoord;
+
+                        T srcData[4];
+                        srcData[0] = src[tensor.index(coord)];
+                        coord[dim] = compressDimIdx + 1;
+                        srcData[1] = src[tensor.index(coord)];
+                        coord[dim] = compressDimIdx + 2;
+                        srcData[2] = src[tensor.index(coord)];
+                        coord[dim] = compressDimIdx + 3;
+                        srcData[3] = src[tensor.index(coord)];
+
+                        int nnz = (srcData[0] != T{}) + (srcData[1] != T{}) + (srcData[2] != T{})
+                                  + (srcData[3] != T{});
+                        if(nnz > 2)
+                            throw std::runtime_error("Sparse matrix must contain 2 zero "
+                                                     "elements of each 4 elements.");
+                        //init metadata = 10
+                        metaIdx[0] = 0;
+                        metaIdx[1] = 1;
+
+                        if(srcData[2] != T{})
+                        {
+                            if(srcData[1] != T{})
+                            {
+                                metaIdx[0] = 1;
+                            }
+                            metaIdx[1] = 2; //metadata = 20 or 21
+                        }
+                        if(srcData[3] != T{})
+                        {
+
+                            if(srcData[metaIdx[1]] != T{})
+                            {
+                                metaIdx[0] = metaIdx[1];
+                            }
+                            metaIdx[1] = 3; //metadata = 32 or 31 or 30
+                        }
+
+                        dstCompressed[tensorC.index(coordC)] = srcData[metaIdx[0]];
+                        coordC[dim]                          = dstDimCoord + 1;
+                        dstCompressed[tensorC.index(coordC)] = srcData[metaIdx[1]];
+                        metaData                             = metaIdx[0] | (metaIdx[1] << 2);
+                        //meta Data coord
+                        size_t shift4bit = (compressDimIdx / 4 % 2) * 4;
+                        coordMeta[metadataLayout]     = compressDimIdx / 8;
+                        //calculate flatten index of dstMeta
+                        size_t flattenIdx = CoordFlattenIndex(
+                            coordMeta.begin(), coordMeta.end(), _sizesMeta.begin(), _sizesMeta.end());
+                        // store metaData to dstMeta
+                        dstMeta[flattenIdx] |= metaData << shift4bit;
+                    }
                 }
             }
         }
@@ -577,7 +604,8 @@ namespace TensileLite
                                          TensorDescriptor const& tensor,
                                          TensorDescriptor const& tensorC,
                                          TensorDescriptor const& tensorMeta,
-                                         size_t                  dim)
+                                         size_t                  dim,
+                                         bool                    metadataLayout)
         {
             throw std::runtime_error("SparseMatrix doesn't support Int8x4.");
         }
@@ -590,11 +618,12 @@ namespace TensileLite
                                         TensorDescriptor const& tensor,
                                         TensorDescriptor const& tensorC,
                                         TensorDescriptor const& tensorMeta,
-                                        size_t                  dim)
+                                        size_t                  dim,
+                                        bool                    metadataLayout)
         {
             pruneSparseArray(mode, dstPruned, tensor, dim);
             compressSparseArray(
-                dstCompressed, dstMeta, dstPruned, tensor, tensorC, tensorMeta, dim);
+                dstCompressed, dstMeta, dstPruned, tensor, tensorC, tensorMeta, dim, metadataLayout);
         }
 
         void initCPUSparseInput(PruneSparseMode         mode,
@@ -604,7 +633,8 @@ namespace TensileLite
                                 TensorDescriptor const& tensor,
                                 TensorDescriptor const& tensorC,
                                 TensorDescriptor const& tensorMeta,
-                                size_t                  dim)
+                                size_t                  dim,
+                                bool                    metadataLayout)
         {
 
             //alloc compressed sparse buffer
@@ -618,7 +648,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat16:
                 initCPUSparseInputTemplate(mode,
@@ -628,7 +659,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Int8:
                 initCPUSparseInputTemplate(mode,
@@ -638,7 +670,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Float8:
                 initCPUSparseInputTemplate(mode,
@@ -648,7 +681,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat8:
                 initCPUSparseInputTemplate(mode,
@@ -658,7 +692,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Float8_fnuz:
                 initCPUSparseInputTemplate(mode,
@@ -668,7 +703,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat8_fnuz:
                 initCPUSparseInputTemplate(mode,
@@ -678,7 +714,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             default:
                 throw std::runtime_error("SparseMatrix doesn't support");
@@ -727,11 +764,12 @@ namespace TensileLite
             HIP_CHECK_EXC(
                 hipMemcpy(dst,
                           src,
-                          DataTypeInfo::Get(descriptor.dataType()).elementSize * totalElements,
+                          multiplyElementSize(totalElements,
+                                              DataTypeInfo::Get(descriptor.dataType()).elementSize),
                           kind));
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
-            dPadding *= descriptor.elementBytes();
-            void* dstOffset = (void*)((uint8_t*)dst + dPadding / 2);
+            dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
+            void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
             TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind);
             return dstOffset;
         }
@@ -749,9 +787,13 @@ namespace TensileLite
             const size_t    numElementsToCopy
                 = (customPadding == -1) ? descriptor.totalAllocatedElements()
                                         : (descriptor.totalAllocatedElements() + customPadding);
-            uint8_t* dstOffset = (uint8_t*)dst + (dPadding * descriptor.elementBytes());
+            uint8_t* dstOffset
+                = (uint8_t*)dst + multiplyElementSize(dPadding, descriptor.elementBytes());
             HIP_CHECK_EXC(
-                hipMemcpy(dstOffset, src, descriptor.elementBytes() * numElementsToCopy, kind));
+                hipMemcpy(dstOffset,
+                          src,
+                          multiplyElementSize(numElementsToCopy, descriptor.elementBytes()),
+                          kind));
             return dstOffset;
         }
 
@@ -761,7 +803,8 @@ namespace TensileLite
                                size_t                  totalElements,
                                hipMemcpyKind           kind)
         {
-            HIP_CHECK_EXC(hipMemcpy(dst, src, descriptor.elementBytes() * totalElements, kind));
+            HIP_CHECK_EXC(hipMemcpy(
+                dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));
             return dst;
         }
 
@@ -945,8 +988,8 @@ namespace TensileLite
                             calculateKforSwizzling(dataType, MiK, MiKv, PackK);
                             numAllocatedElements = getSwizzledTensorNumAllocatedElements(
                                 problem.tensors()[i], MiM_N, MiK, PackK);
-                            numAllocatedBytes
-                                = numAllocatedElements * rocisa::GetElementSize(dataType);
+                            numAllocatedBytes = multiplyElementSize(
+                                numAllocatedElements, rocisa::GetElementSize(dataType));
                         }
 
                         pristine.maxElements = std::max(pristine.maxElements, numAllocatedElements);
@@ -1172,7 +1215,6 @@ namespace TensileLite
                         continue;
                     }
 
-                    size_t dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
                     if(m_curBoundsCheck == BoundsCheckMode::NaN)
                     {
                         p->second.maxElements += 1024;
@@ -1180,7 +1222,8 @@ namespace TensileLite
                     else if(m_curBoundsCheck == BoundsCheckMode::GuardPageFront
                             || m_curBoundsCheck == BoundsCheckMode::GuardPageBack)
                     {
-                        size_t roundUpSize = pageSize / dataTypeSize;
+                        float        dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
+                        unsigned int roundUpSize  = divideElementSize(pageSize, dataTypeSize);
                         p->second.maxElements
                             = RoundUpToMultiple<size_t>(p->second.maxElements, roundUpSize);
                         // No bias page guard
@@ -1260,10 +1303,11 @@ namespace TensileLite
                     {
 
                         initArray(p.first, it.init, pUnit.cpuInput.valid.get(), pUnit.maxElements);
-                        HIP_CHECK_EXC(hipMemcpy(pUnit.gpuInput.valid.get(),
-                                                pUnit.cpuInput.valid.get(),
-                                                dataTypeSize * pUnit.maxElements,
-                                                hipMemcpyHostToDevice));
+                        HIP_CHECK_EXC(
+                            hipMemcpy(pUnit.gpuInput.valid.get(),
+                                      pUnit.cpuInput.valid.get(),
+                                      multiplyElementSize(pUnit.maxElements, dataTypeSize),
+                                      hipMemcpyHostToDevice));
                     }
                     // Init and copy bad from cpu to gpu
                     if(pUnit.gpuInput.bad && pUnit.cpuInput.bad)
@@ -1272,10 +1316,11 @@ namespace TensileLite
                                   InitMode::BadOutput,
                                   pUnit.cpuInput.bad.get(),
                                   pUnit.maxElements);
-                        HIP_CHECK_EXC(hipMemcpy(pUnit.gpuInput.bad.get(),
-                                                pUnit.cpuInput.bad.get(),
-                                                dataTypeSize * pUnit.maxElements,
-                                                hipMemcpyHostToDevice));
+                        HIP_CHECK_EXC(
+                            hipMemcpy(pUnit.gpuInput.bad.get(),
+                                      pUnit.cpuInput.bad.get(),
+                                      multiplyElementSize(pUnit.maxElements, dataTypeSize),
+                                      hipMemcpyHostToDevice));
                     }
                 }
             }
@@ -1288,7 +1333,8 @@ namespace TensileLite
                 for(auto& p : it.pristine)
                 {
                     auto&  pUnit = p.second;
-                    size_t size  = DataTypeInfo::Get(p.first).elementSize * pUnit.maxElements;
+                    size_t size  = multiplyElementSize(pUnit.maxElements,
+                                                      DataTypeInfo::Get(p.first).elementSize);
                     if(size <= 0)
                     {
                         throw std::runtime_error("Size not exists.");
@@ -1360,12 +1406,12 @@ namespace TensileLite
                 for(auto& p : it.pristine)
                 {
                     auto&  pUnit = p.second;
-                    size_t size  = DataTypeInfo::Get(p.first).elementSize * pUnit.maxElements;
+                    size_t size  = multiplyElementSize(pUnit.maxElements,
+                                                      DataTypeInfo::Get(p.first).elementSize);
 
                     std::stringstream ss;
-                    ss << "[" << tensorIdx << "]"
-                       << "Failed to allocate gpu input " << it.name << " type("
-                       << DataTypeInfo::Get(p.first).abbrev
+                    ss << "[" << tensorIdx << "]" << "Failed to allocate gpu input " << it.name
+                       << " type(" << DataTypeInfo::Get(p.first).abbrev
                        << "), element size: " << DataTypeInfo::Get(p.first).elementSize
                        << ", element length: " << pUnit.maxElements;
 
@@ -1504,7 +1550,8 @@ namespace TensileLite
                                       problem.tensors()[i], MiM_N, MiK, PackK);
                     }
                 }
-                padding *= DataTypeInfo::Get(problem.tensors()[i].dataType()).elementSize;
+                padding = multiplyElementSize(
+                    padding, DataTypeInfo::Get(problem.tensors()[i].dataType()).elementSize);
                 uint8_t* offset = (uint8_t*)pUnit.gpuInput.current.get();
                 initGPUBatchedInput((void*)(offset + padding),
                                     pUnit.gpuInput.batch.get(),
@@ -1528,10 +1575,11 @@ namespace TensileLite
                                   - problem.tensors()[ContractionProblemGemm::TENSOR::BIAS]
                                         .totalAllocatedElements();
                     }
-                    padding
-                        *= DataTypeInfo::Get(
-                               problem.tensors()[ContractionProblemGemm::TENSOR::BIAS].dataType())
-                               .elementSize;
+                    padding = multiplyElementSize(
+                        padding,
+                        DataTypeInfo::Get(
+                            problem.tensors()[ContractionProblemGemm::TENSOR::BIAS].dataType())
+                            .elementSize);
                     uint8_t* offset = (uint8_t*)pUnitBias.gpuInput.current.get();
                     initGPUBatchedInput((void*)(offset + padding),
                                         pUnitBias.gpuInput.batch.get(),
@@ -1650,11 +1698,12 @@ namespace TensileLite
                                         t,
                                         tC,
                                         tM,
-                                        tDim);
+                                        tDim,
+                                        problem.gemms[j].metadataLayout());
                                 }
                             }
-                            gemmInitOffset
-                                += p.second.groupedGemmOffsets[j] * tensors[i].elementBytes();
+                            gemmInitOffset += multiplyElementSize(p.second.groupedGemmOffsets[j],
+                                                                  tensors[i].elementBytes());
                         }
                     }
                 }
@@ -1719,7 +1768,8 @@ namespace TensileLite
                                                    t,
                                                    tC,
                                                    tM,
-                                                   tDim);
+                                                   tDim,
+                                                   problem.metadataLayout());
                             }
                         }
                     }
@@ -1777,6 +1827,11 @@ namespace TensileLite
                     case rocisa::DataType::BFloat8_fnuz:
                         prop.value = getValue<BFloat8_fnuz>(prop.init, prop.freeValue);
                         break;
+                    case rocisa::DataType::Float6:
+                    case rocisa::DataType::BFloat6:
+                    case rocisa::DataType::Float4:
+                    case rocisa::DataType::E8:
+                    case rocisa::DataType::E5M3:
                     case rocisa::DataType::Int64:
                     case rocisa::DataType::XFloat32:
                     case rocisa::DataType::Count:
@@ -2144,6 +2199,8 @@ namespace TensileLite
             inputs->scaleC        = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALEC];
             inputs->scaleD        = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALED];
             inputs->scaleAlphaVec = (void*)ptrs[ContractionProblemGemm::TENSOR::SCALEALPHAVEC];
+            inputs->mxsa          = (void*)ptrs[ContractionProblemGemm::TENSOR::MXSA];
+            inputs->mxsb          = (void*)ptrs[ContractionProblemGemm::TENSOR::MXSB];
             inputs->metadata      = (unsigned char*)ptrs[ContractionProblemGemm::TENSOR::METADATA];
             inputs->Synchronizer  = (void*)ptrs[ContractionProblemGemm::TENSOR::Synchronizer];
             inputs->amaxD         = (void*)ptrs[ContractionProblemGemm::TENSOR::AMAXD];
@@ -2204,67 +2261,63 @@ namespace TensileLite
                 setContractionInputs(u8Ptr, batchPtrs, ws, cdata, maxElements, isGPU, &unit);
                 inputs->grouped.push_back(unit);
 
-                u8Ptr[ContractionProblemGemm::TENSOR::A]
-                    += offsets[ContractionProblemGemm::TENSOR::A][idx] * problem.a().elementBytes();
-                u8Ptr[ContractionProblemGemm::TENSOR::B]
-                    += offsets[ContractionProblemGemm::TENSOR::B][idx] * problem.b().elementBytes();
-                u8Ptr[ContractionProblemGemm::TENSOR::C]
-                    += offsets[ContractionProblemGemm::TENSOR::C][idx] * problem.c().elementBytes();
-                u8Ptr[ContractionProblemGemm::TENSOR::D]
-                    += offsets[ContractionProblemGemm::TENSOR::D][idx] * problem.d().elementBytes();
+                u8Ptr[ContractionProblemGemm::TENSOR::A] += multiplyElementSize(
+                    offsets[ContractionProblemGemm::TENSOR::A][idx], problem.a().elementBytes());
+                u8Ptr[ContractionProblemGemm::TENSOR::B] += multiplyElementSize(
+                    offsets[ContractionProblemGemm::TENSOR::B][idx], problem.b().elementBytes());
+                u8Ptr[ContractionProblemGemm::TENSOR::C] += multiplyElementSize(
+                    offsets[ContractionProblemGemm::TENSOR::C][idx], problem.c().elementBytes());
+                u8Ptr[ContractionProblemGemm::TENSOR::D] += multiplyElementSize(
+                    offsets[ContractionProblemGemm::TENSOR::D][idx], problem.d().elementBytes());
                 if(u8Ptr[ContractionProblemGemm::TENSOR::E] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::E]
-                        += offsets[ContractionProblemGemm::TENSOR::E][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::E].elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::E] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::E][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::E].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::BIAS] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::BIAS]
-                        += offsets[ContractionProblemGemm::TENSOR::BIAS][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::BIAS].elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::BIAS] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::BIAS][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::BIAS].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEA] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEA]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEA][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEA]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEA] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::SCALEA][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::SCALEA].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEB] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEB]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEB][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEB]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEB] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::SCALEB][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::SCALEB].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEC] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEC]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEC][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEC]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEC] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::SCALEC][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::SCALEC].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALED] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::SCALED]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALED][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALED]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::SCALED] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::SCALED][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::SCALED].elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
-                        += offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::SCALEALPHAVEC] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::SCALEALPHAVEC][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::SCALEALPHAVEC]
+                            .elementBytes());
                 }
                 if(u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer] != nullptr)
                 {
-                    u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer]
-                        += offsets[ContractionProblemGemm::TENSOR::Synchronizer][idx]
-                           * problem.tensors()[ContractionProblemGemm::TENSOR::Synchronizer]
-                                 .elementBytes();
+                    u8Ptr[ContractionProblemGemm::TENSOR::Synchronizer] += multiplyElementSize(
+                        offsets[ContractionProblemGemm::TENSOR::Synchronizer][idx],
+                        problem.tensors()[ContractionProblemGemm::TENSOR::Synchronizer]
+                            .elementBytes());
                 }
             }
         }
