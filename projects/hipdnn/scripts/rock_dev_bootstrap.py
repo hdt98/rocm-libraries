@@ -549,7 +549,7 @@ def parse_args(argv: list[str] = None) -> argparse.Namespace:
     )
     global_opts.add_argument(
         "--build-dir", type=Path, default=None,
-        help="Build directory (default: <workspace>/build/therock-<gpu-short>)",
+        help="Build directory (default: <cwd>/build/therock-<gpu-short>)",
     )
     global_opts.add_argument(
         "--therock-dir", type=Path, default=None,
@@ -634,11 +634,10 @@ Per-component ninja targets (for manual use):
         sys.exit(0)
 
     # Derive build dir from GPU if not set.
-    # Default: <workspace>/build/therock-<gpu> when the script lives at
-    # <workspace>/repos/rocm-libraries/projects/hipdnn/scripts/.
+    # Default: <cwd>/build/therock-<gpu> — builds land relative to where
+    # the script is invoked.  Use --build-dir to override.
     if args.build_dir is None:
-        workspace_root = Path(__file__).resolve().parents[5]
-        args.build_dir = workspace_root / "build" / f"therock-{gpu_short(args.gpu)}"
+        args.build_dir = Path.cwd() / "build" / f"therock-{gpu_short(args.gpu)}"
 
     # Validate components
     components = getattr(args, "components", None)
