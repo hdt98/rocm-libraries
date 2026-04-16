@@ -838,8 +838,8 @@ class LocalReadMFMA(LocalRead):
                         localReadCode = Module("LocalRead%s Valu%u"%(tc,valuiIdx))
                         self._emitLdsRead(writer, kernel, tP, LocalReadX, dst=destVgpr, src=srcAddr, ds=ds, module=localReadCode, comment="LDS Transpose")
                         if perpStride == 1:
-                            inputPerThread = kernel[f"LocalReadVectorWidth{tc if('MXS' not in tc) else 'MXS'}"] if not writer.states.inTailLoop else MIInputPerThUnroll
-                            offset_val += (UnrollStride*inputPerThread) // (blocksPerTGroupSMFMA if writer.states.inTailLoop else 1)
+                            # each block is 4 bytes
+                            offset_val += (UnrollStride * blockWidth * 4)
                         else:
                             permBlock = kernel["MatrixInstK"]
                             perpStrideInv = permBlock // perpStride

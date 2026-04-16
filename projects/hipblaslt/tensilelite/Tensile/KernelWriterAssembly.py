@@ -11925,7 +11925,7 @@ class KernelWriterAssembly(KernelWriter):
             elif tc in ("MXSA", "MXSB"):
               offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (matrixInstK)
             elif tc == "Metadata":
-              lrvw = kernel["LocalReadVectorWidth%s"%tc] // 8
+              lrvw = kernel["LocalReadVectorWidth%s"%tc] // 4
               if lrvw < kernel["MIInputPerThreadMetadata"]:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadMetadata"]) // 4
                 if kernel["WavefrontSize"] == 32:
@@ -11937,7 +11937,7 @@ class KernelWriterAssembly(KernelWriter):
                 offsetInc //= 8
             elif tc == "B":
               sparseB = kernel["ProblemType"]["Sparse"] == 2
-              lrvw = kernel["LocalReadVectorWidth%s"%tc] // (2 if sparseB else 1)
+              lrvw = kernel["LocalReadVectorWidth%s"%tc]
               wlr = lrvw//kernel["MIInputPerThreadB"]
               wlr = max(wlr, 1)
               if kernel["ProblemType"]["Sparse"] and lrvw < kernel["MIInputPerThreadB"]:
