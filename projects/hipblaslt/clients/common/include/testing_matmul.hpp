@@ -40,6 +40,7 @@
 #include "hipblaslt_vector.hpp"
 #include "mxDataGen.hpp"
 #include "multi_macrotile.hpp"
+#include "multi_macrotile_fused_host.hpp"
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -4039,10 +4040,18 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
 
-                        // Timed iterations
+                        // Timed iterations - with optional fused dispatch
                         auto start_time = std::chrono::high_resolution_clock::now();
-                        for(int iter = 0; iter < timing_iters; iter++)
+
+                        // If fused_kernel is enabled, try fused dispatch first
+                        bool used_fused_dispatch = false;
+                        if(arg.fused_kernel)
                         {
+                            hipblaslt_cout << "\n*** Attempting fused kernel dispatch ***\n" << std::endl;
+
+                            // Collect algorithms for all sub-problems
+                            std::vector<hipblasLtMatmulAlgo_t> algorithms;
+
                             for(size_t sp = 0; sp < subProblems.size(); sp++)
                             {
                                 const auto& sub = subProblems[sp];
@@ -4063,31 +4072,24 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 int ret_tmp = 0;
                                 hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
 
-                                // Store kernel info on first iteration
-                                if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
-                                {
-                                    try {
-                                        subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
-                                        subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
-                                        // Extract solution index from algo.data (first 4 bytes are int*)
-                                        int* solutionIndex = (int*)heur_tmp.algo.data;
-                                        subproblem_solution_indices[sp] = *solutionIndex;
-                                    } catch (...) {
-                                        subproblem_solution_names[sp] = "ERROR: Failed to get solution info";
-                                        subproblem_kernel_names[sp] = "ERROR";
-                                        subproblem_solution_indices[sp] = -1;
-                                    }
-                                }
-
                                 if(ret_tmp > 0)
                                 {
-                                    void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                                    void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                                    void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                                    void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+                                    algorithms.push_back(heur_tmp.algo);
 
-                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                                   &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                                    // Store kernel info
+                                    if(arg.print_kernel_info)
+                                    {
+                                        try {
+                                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                                            int* solutionIndex = (int*)heur_tmp.algo.data;
+                                            subproblem_solution_indices[sp] = *solutionIndex;
+                                        } catch (...) {
+                                            subproblem_solution_names[sp] = "ERROR";
+                                            subproblem_kernel_names[sp] = "ERROR";
+                                            subproblem_solution_indices[sp] = -1;
+                                        }
+                                    }
                                 }
 
                                 hipblasLtMatrixLayoutDestroy(matA_tmp);
@@ -4095,7 +4097,108 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 hipblasLtMatrixLayoutDestroy(matC_tmp);
                                 hipblasLtMatrixLayoutDestroy(matD_tmp);
                             }
+
+                            // Try fused dispatch for timing iterations
+                            if(algorithms.size() == subProblems.size())
+                            {
+                                int device_id = 0;
+                                hipGetDevice(&device_id);
+
+                                // Execute fused dispatch for all timing iterations
+                                start_time = std::chrono::high_resolution_clock::now();
+                                for(int iter = 0; iter < timing_iters; iter++)
+                                {
+                                    // Convert alpha/beta to float for fused dispatch
+                                    float alpha_f = 1.0f;
+                                    float beta_f = 0.0f;
+                                    if(alpha_in[0]) alpha_f = *reinterpret_cast<const float*>(alpha_in[0]);
+                                    if(h_beta.size() > 0) beta_f = *reinterpret_cast<const float*>(&h_beta[0]);
+
+                                    hipError_t err = executeFusedMultiMacrotileBatchLaunch(
+                                        subProblems, algorithms, handle,
+                                        dA[0].buf(), dB[0].buf(), dC[0].buf(), (*dDp)[0].buf(),
+                                        alpha_f, beta_f,
+                                        lda[0], ldb[0], ldc[0], ldd[0],
+                                        transA, transB,
+                                        arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                                        *dWorkspace, workspace_size, stream, device_id);
+
+                                    if(err != hipSuccess && iter == 0)
+                                    {
+                                        hipblaslt_cout << "Fused dispatch failed, falling back to sequential" << std::endl;
+                                        break;
+                                    }
+
+                                    if(err == hipSuccess && iter == 0)
+                                        used_fused_dispatch = true;
+                                }
+                            }
+                            else
+                            {
+                                hipblaslt_cout << "Not all sub-problems have algorithms, falling back to sequential" << std::endl;
+                            }
                         }
+
+                        // Fall back to sequential if fused dispatch not used or failed
+                        if(!used_fused_dispatch)
+                        {
+                            start_time = std::chrono::high_resolution_clock::now();
+                            for(int iter = 0; iter < timing_iters; iter++)
+                            {
+                                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                                {
+                                    const auto& sub = subProblems[sp];
+
+                                    // Create temp matrix layouts
+                                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
+                                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
+                                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                                    // Query heuristic
+                                    hipblasLtMatmulHeuristicResult_t heur_tmp;
+                                    int ret_tmp = 0;
+                                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
+
+                                    // Store kernel info on first iteration
+                                    if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info && !used_fused_dispatch)
+                                    {
+                                        try {
+                                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                                            int* solutionIndex = (int*)heur_tmp.algo.data;
+                                            subproblem_solution_indices[sp] = *solutionIndex;
+                                        } catch (...) {
+                                            subproblem_solution_names[sp] = "ERROR";
+                                            subproblem_kernel_names[sp] = "ERROR";
+                                            subproblem_solution_indices[sp] = -1;
+                                        }
+                                    }
+
+                                    if(ret_tmp > 0)
+                                    {
+                                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
+                                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                                    }
+
+                                    hipblasLtMatrixLayoutDestroy(matA_tmp);
+                                    hipblasLtMatrixLayoutDestroy(matB_tmp);
+                                    hipblasLtMatrixLayoutDestroy(matC_tmp);
+                                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                                }
+                            }
+                        }
+
                         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                         auto end_time = std::chrono::high_resolution_clock::now();
 

@@ -641,6 +641,10 @@ try
         value<int32_t>(&arg.target_wgs_per_split)->default_value(256),
         "Target workgroups per split for alignment optimization")
 
+        ("fused_kernel",
+        value<bool>(&arg.fused_kernel)->default_value(false),
+        "Use fused kernel dispatch to eliminate sequential launch overhead (experimental)")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");

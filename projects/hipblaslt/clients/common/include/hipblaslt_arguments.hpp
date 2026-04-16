@@ -190,6 +190,7 @@ struct Arguments
     int32_t split_strategy;      // 0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d
     int32_t num_splits;           // Manual override for number of splits (0=auto)
     int32_t target_wgs_per_split; // Target workgroups per split for optimization
+    bool fused_kernel;            // Use fused kernel dispatch instead of sequential launches
 
     /*************************************************************************
      *                     End Of Arguments                                  *
