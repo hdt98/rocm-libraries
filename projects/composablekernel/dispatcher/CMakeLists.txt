@@ -10,6 +10,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# When integrated as a subdirectory of the parent CK project, the parent enables
+# -Werror -Weverything (BUILD_DEV=ON). Dispatcher source intentionally uses patterns
+# (assert-only-used vars in Release, std::scoped_lock CTAD, old-style casts, etc.)
+# that those flags would treat as errors. Relax to warnings for the dispatcher
+# subtree only — root CK keeps its strict checks.
+add_compile_options(-Wno-error)
+
 # Find HIP for headers (needed for validation kernels)
 find_package(hip QUIET)
 if(NOT hip_FOUND)

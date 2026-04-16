@@ -552,6 +552,72 @@ def build_and_run_fmha(String arch){
     return cmd
 }
 
+def dispatcher_common_cmake_args(){
+    // Returned as a string fragment; callers must append `..` (project root).
+    // Dispatcher tests are only validated on gfx950 — GPU target is hardcoded.
+    // BUILD_TESTING=OFF disables the root test/ subdir (FMHA/Pooling/etc.) so
+    // only the dispatcher subtree is built.
+    return """ -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
+               -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
+               -D CMAKE_HIP_COMPILER="${params.BUILD_COMPILER}" \
+               -D CMAKE_BUILD_TYPE=Release \
+               -D GPU_TARGETS=gfx950 \
+               -D BUILD_CK_DISPATCHER=ON \
+               -D BUILD_CK_DEVICE_INSTANCES=OFF \
+               -D BUILD_CK_TILE_ENGINE=OFF \
+               -D BUILD_CK_EXAMPLES=OFF \
+               -D BUILD_CK_TUTORIALS=OFF \
+               -D BUILD_CK_PROFILER=OFF \
+               -D BUILD_TESTING=OFF """
+}
+
+def build_and_run_dispatcher_cpu(){
+    // ctest is run from build/dispatcher (not the root build/), bypassing root's
+    // BUILD_TESTING gate. Dispatcher tests register individual labels — multiple
+    // -L flags AND-intersect; -LE excludes by label regex.
+    return """ cmake ${dispatcher_common_cmake_args()} \
+                -D BUILD_DISPATCHER_TESTS=ON \
+                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF .. && \
+               ninja -j${nthreads()} && \
+               cd dispatcher && \
+               ctest --output-on-failure -L dispatcher -L cpp && \
+               ctest --output-on-failure -L dispatcher -L python -LE 'stress|integration' """
+}
+
+def build_and_run_dispatcher_gpu(){
+    // Hardcoded to gfx950 — dispatcher GPU kernel tests are only validated on gfx950.
+    // Currently only runs python integration tests; cpp;gpu tests are skipped
+    // pending fix to dispatcher's tests/CMakeLists.txt SINGLE_KERNEL_HEADER path.
+    // BUILD_DISPATCHER_REAL_KERNEL_TESTS stays OFF since cpp;gpu tests are skipped.
+    // -LE stress excludes dispatcher_stress_test (labels dispatcher;python;stress;
+    // integration) which is gated separately via RUN_DISPATCHER_STRESS_TESTS.
+    return """ cmake ${dispatcher_common_cmake_args()} \
+                -D BUILD_DISPATCHER_TESTS=ON \
+                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF \
+                -D BUILD_DISPATCHER_EXAMPLES=ON .. && \
+               ninja -j${nthreads()} && \
+               cd dispatcher && \
+               ctest --output-on-failure -L dispatcher -L python -L integration -LE stress """
+}
+
+def build_and_run_dispatcher_stress(){
+    // Stress tests are excluded from PR runs (CPU/GPU stages) and only run when
+    // explicitly enabled (default: nightly via RUN_DISPATCHER_STRESS_TESTS=true).
+    // Runs on nogpu — all stress tests are pure Python autocorrect/random-config
+    // exercises that do not need a GPU.
+    return """ cmake ${dispatcher_common_cmake_args()} \
+                -D BUILD_DISPATCHER_TESTS=ON \
+                -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF .. && \
+               ninja -j${nthreads()} && \
+               cd dispatcher && \
+               ctest --output-on-failure -L dispatcher -L stress """
+}
+
+def run_dispatcher_heuristics(){
+    return """ cd ../dispatcher && pip install -r requirements-ml.txt && \
+               python3 -m pytest heuristics/tests/ -v --tb=short """
+}
+
 def cmake_build(Map conf=[:]){
 
     def config_targets = conf.get("config_targets","check")
@@ -1189,7 +1255,7 @@ def getFaTestsCmds() {
 
 //launch develop branch daily jobs
 CRON_SETTINGS = BRANCH_NAME == "develop" ? '''0 23 * * * % RUN_FULL_QA=true;RUN_CK_TILE_FMHA_TESTS=true;RUN_PERFORMANCE_TESTS=true;FORCE_CI=true
-                                              0 22 * * * % RUN_FULL_QA=true;DISABLE_DL_KERNELS=true;RUN_TILE_ENGINE_BASIC_TESTS=true;RUN_TILE_ENGINE_GEMM_TESTS=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
+                                              0 22 * * * % RUN_FULL_QA=true;DISABLE_DL_KERNELS=true;RUN_TILE_ENGINE_BASIC_TESTS=true;RUN_TILE_ENGINE_GEMM_TESTS=true;RUN_DISPATCHER_GPU_TESTS=true;RUN_DISPATCHER_HEURISTICS_TESTS=true;RUN_DISPATCHER_STRESS_TESTS=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
                                               0 21 * * * % RUN_GROUPED_CONV_LARGE_CASES_TESTS=true;hipTensor_test=true;BUILD_GFX101=false;BUILD_GFX908=false;BUILD_GFX942=true;BUILD_GFX950=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true;BUILD_PACKAGES=true
                                               0 19 * * * % BUILD_DOCKER=true;COMPILER_VERSION=develop;BUILD_COMPILER=/llvm-project/build/bin/clang++;USE_SCCACHE=false;NINJA_BUILD_TRACE=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
                                               0 17 * * * % BUILD_DOCKER=true;COMPILER_VERSION=therock;USE_SCCACHE=false;NINJA_BUILD_TRACE=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
@@ -1392,6 +1458,22 @@ pipeline {
             name: 'ck_fa_branch',
             defaultValue: CURRENT_BRANCH_NAME,
             description: 'Specify which branch of CK to test with flash-attention (default: current branch)')
+        booleanParam(
+            name: "RUN_DISPATCHER_CPU_TESTS",
+            defaultValue: true,
+            description: "Run dispatcher CPU-only unit + integration tests on a nogpu node (default: ON)")
+        booleanParam(
+            name: "RUN_DISPATCHER_GPU_TESTS",
+            defaultValue: false,
+            description: "Run dispatcher GPU kernel + integration tests on gfx950 (default: OFF)")
+        booleanParam(
+            name: "RUN_DISPATCHER_HEURISTICS_TESTS",
+            defaultValue: false,
+            description: "Run dispatcher ML heuristics pytest suite (requires lightgbm, pandas, sklearn) (default: OFF)")
+        booleanParam(
+            name: "RUN_DISPATCHER_STRESS_TESTS",
+            defaultValue: false,
+            description: "Run dispatcher stress tests (autocorrect/random-config exercises) — nightly only (default: OFF)")
         booleanParam(
             name: "FORCE_CI",
             defaultValue: false,
@@ -1856,6 +1938,81 @@ pipeline {
                                             -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" .. && \
                                            ninja -j${nthreads()} benchmark_gemm_universal_all && \
                                            python3 ../tile_engine/ops/gemm/gemm_universal/gemm_universal_benchmark.py . --problem-sizes "1024,1024,1024" --warmup 5 --repeat 5 --verbose --json results.json """
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+            }
+        }
+
+        stage("Run DISPATCHER Tests")
+        {
+            when {
+                beforeAgent true
+                expression { env.SHOULD_RUN_CI.toBoolean() }
+            }
+            parallel
+            {
+                stage("Run DISPATCHER CPU Tests on nogpu")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.RUN_DISPATCHER_CPU_TESTS.toBoolean() }
+                    }
+                    agent{ label rocmnode("nogpu") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_and_run_dispatcher_cpu()
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run DISPATCHER GPU Tests on gfx950")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.RUN_DISPATCHER_GPU_TESTS.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx950") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_and_run_dispatcher_gpu()
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run DISPATCHER ML Heuristics Tests on nogpu")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() }
+                    }
+                    agent{ label rocmnode("nogpu") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = run_dispatcher_heuristics()
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
+                stage("Run DISPATCHER Stress Tests on nogpu")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.RUN_DISPATCHER_STRESS_TESTS.toBoolean() }
+                    }
+                    agent{ label rocmnode("nogpu") }
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = build_and_run_dispatcher_stress()
                     }
                     steps{
                         buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)

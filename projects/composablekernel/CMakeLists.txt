@@ -680,6 +680,7 @@ option(BUILD_CK_PROFILER "Build the CK profiler in profiler/" ON)
 option(BUILD_CK_TILE_ENGINE_TESTS "Build tile engine tests" ON)
 option(BUILD_CK_TILE_FMHA_TESTS "Build FMHA tests" ON)
 option(BUILD_CK_TILE_CSHUFFLE_LDS_BENCHMARKS "Build CShuffleLds microbenchmarks (requires BUILD_CK_EXAMPLES=ON)" OFF)
+option(BUILD_CK_DISPATCHER "Build the dispatcher subdirectory" OFF)
 
 if(BUILD_CK_DEVICE_INSTANCES)
     # Optimization: Search only in library/src where all instance files actually live
@@ -771,6 +772,23 @@ if(BUILD_CK_PROFILER)
         )
         add_subdirectory(profiler)
     endif()
+endif()
+
+# Dispatcher is independent of MIOPEN_REQ_LIBS_ONLY / HIPTENSOR_REQ_LIBS_ONLY
+# and the GPU_ARCHS/USER_GPU_TARGETS guard above; it has its own self-contained
+# CMakeLists.txt and only requires HIP headers (which it locates itself).
+if(BUILD_CK_DISPATCHER)
+    add_subdirectory(dispatcher)
+    # Independent test runner — invokes ctest against dispatcher's own
+    # CTestTestfile.cmake (created by dispatcher's enable_testing()), so it
+    # works regardless of root BUILD_TESTING and does not interact with the
+    # main CK test/ subdirectory. Use: `ninja ck_dispatcher_test`.
+    add_custom_target(ck_dispatcher_test
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/dispatcher
+        USES_TERMINAL VERBATIM
+        COMMENT "Running dispatcher CTest suite"
+    )
 endif()
 
 if(CK_USE_CODEGEN AND (SUPPORTED_GPU_TARGETS MATCHES "gfx9" OR GPU_ARCHS))
