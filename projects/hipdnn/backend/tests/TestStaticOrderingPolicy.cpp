@@ -55,23 +55,23 @@ TEST_F(TestStaticOrderingPolicy, MIOpenEngineHasHighestPriority)
 {
     // Verify that MIOpen engine is prioritized first
     const std::vector<int64_t> engines = {
-        engineNameToId("MIOpenDeterministic"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("SomeOtherEngine"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
     };
 
     std::vector<int64_t> sorted = engines;
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
 
     // MIOpen should be first
-    EXPECT_EQ(sorted[0], engineNameToId("MIOpen"));
+    EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
 }
 
 TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicHasLowestPriority)
 {
     const std::vector<int64_t> engines = {
-        engineNameToId("MIOpenDeterministic"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
+        engineNameToId("MIOPEN_ENGINE"),
         engineNameToId("SomeOtherEngine"),
     };
 
@@ -79,15 +79,15 @@ TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicHasLowestPriority)
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
 
     // MIOpenDeterministic should be last
-    EXPECT_EQ(sorted.back(), engineNameToId("MIOpenDeterministic"));
+    EXPECT_EQ(sorted.back(), engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"));
 }
 
 TEST_F(TestStaticOrderingPolicy, OtherEnginesAreMiddlePriority)
 {
     const std::vector<int64_t> engines = {
-        engineNameToId("MIOpenDeterministic"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("CustomEngine1"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
         engineNameToId("CustomEngine2"),
     };
 
@@ -95,8 +95,8 @@ TEST_F(TestStaticOrderingPolicy, OtherEnginesAreMiddlePriority)
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
 
     // Order should be: MIOpen, CustomEngine1, CustomEngine2, MIOpenDeterministic
-    EXPECT_EQ(sorted[0], engineNameToId("MIOpen"));
-    EXPECT_EQ(sorted[3], engineNameToId("MIOpenDeterministic"));
+    EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
+    EXPECT_EQ(sorted[3], engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"));
 
     // Custom engines in middle (order preserved)
     EXPECT_EQ(sorted[1], engineNameToId("CustomEngine1"));
@@ -131,7 +131,7 @@ TEST_F(TestStaticOrderingPolicy, EmptyListRemainsEmpty)
 
 TEST_F(TestStaticOrderingPolicy, SingleEngineUnchanged)
 {
-    const std::vector<int64_t> engines = {engineNameToId("MIOpen")};
+    const std::vector<int64_t> engines = {engineNameToId("MIOPEN_ENGINE")};
 
     std::vector<int64_t> sorted = engines;
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
@@ -145,9 +145,9 @@ TEST_F(TestStaticOrderingPolicy, BackendAndDataSdkSortingMatch)
 {
     // Verify that backend utilities::sortEngineIds delegates to data_sdk
     const std::vector<int64_t> engines = {
-        engineNameToId("MIOpenDeterministic"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("CustomEngine"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
     };
 
     std::vector<int64_t> backendSorted = engines;
@@ -190,13 +190,13 @@ TEST_F(TestStaticOrderingPolicy, PolicyNeverDeclines)
 
 TEST_F(TestStaticOrderingPolicy, MIOpenEngineIdIsRecognized)
 {
-    const int64_t miopenId = engineNameToId("MIOpen");
+    const int64_t miopenId = engineNameToId("MIOPEN_ENGINE");
     EXPECT_EQ(miopenId, MIOPEN_ENGINE_ID);
 }
 
 TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicIdIsRecognized)
 {
-    const int64_t miopenDetId = engineNameToId("MIOpenDeterministic");
+    const int64_t miopenDetId = engineNameToId("MIOPEN_ENGINE_DETERMINISTIC");
     EXPECT_EQ(miopenDetId, MIOPEN_ENGINE_DETERMINISTIC_ID);
 }
 
@@ -206,9 +206,9 @@ TEST_F(TestStaticOrderingPolicy, ComplexMixedEngineList)
 {
     const std::vector<int64_t> engines = {
         engineNameToId("Plugin1::Engine3"),
-        engineNameToId("MIOpenDeterministic"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("Plugin1::Engine1"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
         engineNameToId("Plugin2::Engine1"),
         engineNameToId("Plugin1::Engine2"),
     };
@@ -217,10 +217,10 @@ TEST_F(TestStaticOrderingPolicy, ComplexMixedEngineList)
     hipdnn_data_sdk::utilities::sortEngineIds(sorted);
 
     // First should be MIOpen
-    EXPECT_EQ(sorted[0], engineNameToId("MIOpen"));
+    EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
 
     // Last should be MIOpenDeterministic
-    EXPECT_EQ(sorted.back(), engineNameToId("MIOpenDeterministic"));
+    EXPECT_EQ(sorted.back(), engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"));
 
     // Middle engines should preserve relative order
     EXPECT_EQ(sorted[1], engineNameToId("Plugin1::Engine3"));
@@ -234,9 +234,9 @@ TEST_F(TestStaticOrderingPolicy, ComplexMixedEngineList)
 TEST_F(TestStaticOrderingPolicy, SortingIsIdempotent)
 {
     const std::vector<int64_t> engines = {
-        engineNameToId("MIOpenDeterministic"),
+        engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("Custom"),
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
     };
 
     std::vector<int64_t> sorted1 = engines;
@@ -255,7 +255,7 @@ TEST_F(TestStaticOrderingPolicy, UnknownEngineIdsHandledGracefully)
     // Engines with unknown IDs should be treated as middle-priority
     const std::vector<int64_t> engines = {
         static_cast<int64_t>(0x1234567890ABCDEF), // Unknown ID
-        engineNameToId("MIOpen"),
+        engineNameToId("MIOPEN_ENGINE"),
         static_cast<int64_t>(0xFEDCBA0987654321), // Another unknown ID
     };
 
@@ -265,5 +265,5 @@ TEST_F(TestStaticOrderingPolicy, UnknownEngineIdsHandledGracefully)
     EXPECT_NO_THROW(hipdnn_data_sdk::utilities::sortEngineIds(sorted));
 
     // MIOpen should still be first
-    EXPECT_EQ(sorted[0], engineNameToId("MIOpen"));
+    EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
 }
