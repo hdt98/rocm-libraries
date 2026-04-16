@@ -218,6 +218,14 @@ TEST_P(AllLong, DataTypeConfig)
     hdim_q = hdim_q_ == -1 ? hdim_q : hdim_q_;
     hdim_v = hdim_v_ == -1 ? hdim_v : hdim_v_;
 
+#if CK_TILE_WORKAROUND_ROCM_7_1_FP16_DROPOUT_MISCOMPILE
+    if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp16>)
+    {
+        if(hdim_q == 256 && hdim_v == 24 && mode == mode_enum::batch && p_drop > 0)
+            GTEST_SKIP() << "Skipped: fp16 dropout d256/d24 batch — compiler VGPR aliasing bug (ROCm 7.1.x)";
+    }
+#endif
+
     auto result = fmha_fwd_run<DataTypeConfig>(mode,
                                                batch,
                                                nhead,
