@@ -192,6 +192,7 @@ struct Arguments
     int32_t target_wgs_per_split; // Target workgroups per split for optimization
     bool fused_kernel;            // Use fused kernel dispatch instead of sequential launches
     bool l2_cache_hints;          // Enable L2 cache persistence hints for shared matrices
+    bool stream_parallel;         // Use stream-parallel execution for concurrent sub-problem execution
 
     /*************************************************************************
      *                     End Of Arguments                                  *

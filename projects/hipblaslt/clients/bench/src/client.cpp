@@ -649,6 +649,10 @@ try
         value<bool>(&arg.l2_cache_hints)->default_value(true),
         "Enable L2 cache persistence hints for shared matrices in multi-MacroTile (reduces redundant memory reads)")
 
+        ("stream_parallel",
+        value<bool>(&arg.stream_parallel)->default_value(false),
+        "Use stream-parallel execution for concurrent sub-problem execution (high performance gain)")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");
