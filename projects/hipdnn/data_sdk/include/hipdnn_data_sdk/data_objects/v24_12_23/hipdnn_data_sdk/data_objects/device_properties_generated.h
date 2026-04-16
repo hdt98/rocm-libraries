@@ -19,6 +19,8 @@ namespace data_objects {
 struct DeviceProperties;
 struct DevicePropertiesBuilder;
 
+inline const ::flatbuffers::TypeTable *DevicePropertiesTypeTable();
+
 /// @brief Device properties for heuristic plugin selection.
 ///
 /// This table carries device facts needed for engine selection heuristics.
@@ -32,8 +34,8 @@ struct DevicePropertiesBuilder;
 struct DeviceProperties FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef DevicePropertiesBuilder Builder;
   struct Traits;
-  static FLATBUFFERS_CONSTEXPR_CPP11 const char *GetFullyQualifiedName() {
-    return "hipdnn_data_sdk.data_objects.DeviceProperties";
+  static const ::flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return DevicePropertiesTypeTable();
   }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_DEVICE_ID = 4,
@@ -101,6 +103,23 @@ struct DeviceProperties::Traits {
   using type = DeviceProperties;
   static auto constexpr Create = CreateDeviceProperties;
 };
+
+inline const ::flatbuffers::TypeTable *DevicePropertiesTypeTable() {
+  static const ::flatbuffers::TypeCode type_codes[] = {
+    { ::flatbuffers::ET_INT, 0, -1 },
+    { ::flatbuffers::ET_INT, 0, -1 },
+    { ::flatbuffers::ET_ULONG, 0, -1 }
+  };
+  static const char * const names[] = {
+    "device_id",
+    "multi_processor_count",
+    "total_global_mem"
+  };
+  static const ::flatbuffers::TypeTable tt = {
+    ::flatbuffers::ST_TABLE, 3, type_codes, nullptr, nullptr, nullptr, names
+  };
+  return &tt;
+}
 
 inline const hipdnn_data_sdk::data_objects::DeviceProperties *GetDeviceProperties(const void *buf) {
   return ::flatbuffers::GetRoot<hipdnn_data_sdk::data_objects::DeviceProperties>(buf);
