@@ -73,7 +73,7 @@ if not test_component_job_name:
     sys.exit(1)
 
 TEST_COMPONENT = COMPONENT_DIR_MAPPING.get(
-    test_component_job_name, test_component_job_name
+    test_component_job_name
 )
 
 # GTest sharding
