@@ -421,6 +421,50 @@ void heuristics_database_t::initialize_defaults() {
       add_entry(key, params);
     }
   }
+
+  // ========================================================================
+  // HEURISTIC 3: gfx1151 HHS TN global overrides (from 199-iteration optimization)
+  // ========================================================================
+  {
+    auto key = make_arch_dtype_key(hardware_t::architecture_t::gfx1151, data_type_t::Half);
+
+    heuristic_params_t params;
+    params.weight_compute            = 1.2;
+    params.weight_memory             = 0.48;
+    params.weight_prologue           = 0.4;
+    params.weight_epilogue           = 2.1;
+    params.weight_loop_overhead      = 325.0;
+    params.occupancy_decay_base      = 0.97;
+    params.weight_tile_total         = 0.9;
+    params.weight_mem_l2             = 3.0;
+    params.main_memory_load_latency  = 47.0;
+    params.epilogue_k_padding_penalty = 950.0;
+    params.weight_wg_setup           = 9.0;
+
+    add_entry(key, params);
+  }
+
+  // ========================================================================
+  // HEURISTIC 4: gfx1151 BF16 TN global overrides (same arch, same 16-bit width)
+  // ========================================================================
+  {
+    auto key = make_arch_dtype_key(hardware_t::architecture_t::gfx1151, data_type_t::BFloat16);
+
+    heuristic_params_t params;
+    params.weight_compute            = 1.2;
+    params.weight_memory             = 0.48;
+    params.weight_prologue           = 0.4;
+    params.weight_epilogue           = 2.1;
+    params.weight_loop_overhead      = 325.0;
+    params.occupancy_decay_base      = 0.97;
+    params.weight_tile_total         = 0.9;
+    params.weight_mem_l2             = 3.0;
+    params.main_memory_load_latency  = 47.0;
+    params.epilogue_k_padding_penalty = 950.0;
+    params.weight_wg_setup           = 9.0;
+
+    add_entry(key, params);
+  }
 }
 
 // ============================================================================
