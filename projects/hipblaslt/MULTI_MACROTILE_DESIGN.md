@@ -294,127 +294,828 @@ double gflops = (flops / avg_time_us) / 1000.0;
 
 ## Splitting Algorithms
 
-### Strategy 0: Auto
+Multi-MacroTile supports 6 different splitting strategies (0-5), each optimized for different scenarios. The strategy determines how the GEMM problem is divided into sub-problems.
 
-Automatically chooses the best strategy based on problem characteristics:
+### Strategy 0: Auto (Automatic Selection)
+
+**Purpose**: Automatically selects the best strategy based on problem characteristics and hardware.
+
+**Decision Logic**:
 
 ```cpp
-// Decision tree
-if (memory_required > available_memory)
-    use Memory strategy
-else if (workgroup_distribution_poor)
-    use Workgroup strategy
-else if (M > 2*N)
-    use M-only strategy
-else if (N > 2*M)
-    use N-only strategy
-else
-    use Workgroup strategy (default)
-```
-
-### Strategy 1: Workgroup-Based
-
-Optimizes workgroup distribution across CUs.
-
-**Algorithm:**
-```cpp
-total_wgs = ceil(M/MT_m) × ceil(N/MT_n)
-wgs_per_CU = total_wgs / num_CUs
-
-// Score different split counts
-for (num_splits in [2, 3, 4, ...]) {
-    wgs_per_split = total_wgs / num_splits
-    split_wgs_per_CU = wgs_per_split / num_CUs
+SplitStrategy selectAutoStrategy(int64_t M, int64_t N, int64_t K,
+                                 size_t available_memory,
+                                 int num_CUs) {
+    // Calculate total memory requirement
+    size_t total_memory = calculateTotalMemory(M, N, K, data_types);
     
-    // Perfect alignment gets score 2.0
-    if (split_wgs_per_CU is integer)
-        score = 2.0
-    else
-        score = 1.0 - (remainder / target_wgs)
-    
-    if (score > best_score)
-        best_num_splits = num_splits
-}
-```
-
-**Example:**
-- Problem: 10240×10240, MT=256×208
-- WGs: ceil(10240/256) × ceil(10240/208) = 40 × 50 = 2000
-- 2000 WGs / 256 CUs = 7.8 WGs/CU (poor)
-- Split into 2: 1000 WGs per split
-- 1000 / 256 = 3.9 WGs/CU (better alignment)
-
-### Strategy 2: Memory-Based
-
-Splits based on memory constraints.
-
-**Algorithm:**
-```cpp
-total_memory = sizeof(A) + sizeof(B) + sizeof(C) + sizeof(D) + workspace
-
-if (total_memory > available_memory) {
-    min_splits = ceil(total_memory / available_memory)
-    // Split along largest dimension
-    if (M >= N)
-        split M into min_splits
-    else
-        split N into min_splits
-}
-```
-
-### Strategy 3: M-only
-
-Splits only along M dimension into equal parts.
-
-```cpp
-M_per_split = M / num_splits
-
-for (i = 0; i < num_splits; i++) {
-    sub.m_size = M_per_split
-    sub.n_size = N
-    sub.k_size = K
-    sub.m_offset = i * M_per_split
-    sub.n_offset = 0
-}
-```
-
-### Strategy 4: N-only
-
-Splits only along N dimension into equal parts.
-
-```cpp
-N_per_split = N / num_splits
-
-for (i = 0; i < num_splits; i++) {
-    sub.m_size = M
-    sub.n_size = N_per_split
-    sub.k_size = K
-    sub.m_offset = 0
-    sub.n_offset = i * N_per_split
-}
-```
-
-### Strategy 5: 2D
-
-Splits along both M and N dimensions, creating a grid.
-
-```cpp
-splits_M = ceil(sqrt(num_splits))
-splits_N = num_splits / splits_M
-
-M_per_split = M / splits_M
-N_per_split = N / splits_N
-
-for (i = 0; i < splits_M; i++) {
-    for (j = 0; j < splits_N; j++) {
-        sub.m_size = M_per_split
-        sub.n_size = N_per_split
-        sub.k_size = K
-        sub.m_offset = i * M_per_split
-        sub.n_offset = j * N_per_split
+    // Priority 1: Memory constraints
+    if (total_memory > available_memory * 0.8) {
+        return MEMORY_BASED;  // Must fit in memory
     }
+    
+    // Priority 2: Workgroup distribution issues
+    int total_wgs = estimateWorkgroups(M, N, MacroTile);
+    double wgs_per_CU = (double)total_wgs / num_CUs;
+    double waste = wgs_per_CU - floor(wgs_per_CU);
+    
+    if (waste > 0.3) {  // More than 30% waste
+        return WORKGROUP_BASED;  // Optimize WG distribution
+    }
+    
+    // Priority 3: Aspect ratio heuristics
+    if (M > 2 * N) {
+        return M_ONLY;  // Tall matrix - split rows
+    }
+    
+    if (N > 2 * M) {
+        return N_ONLY;  // Wide matrix - split columns
+    }
+    
+    // Default: Try workgroup optimization
+    return WORKGROUP_BASED;
 }
 ```
+
+**When to use**:
+- Initial exploration of unknown problem sizes
+- Production environments where problem dimensions vary
+- When you want the heuristic to handle strategy selection
+
+**Limitations**:
+- May not always pick the optimal strategy
+- Decision tree is based on heuristics, not guaranteed optimal
+- No cross-validation against actual performance
+
+---
+
+### Strategy 1: Workgroup-Based Splitting
+
+**Purpose**: Optimize the distribution of workgroups across compute units to maximize GPU utilization.
+
+**Core Problem**:
+
+GPUs have a fixed number of compute units (e.g., 256 CUs on MI355X). When the total number of workgroups doesn't divide evenly by the number of CUs, some CUs will be idle while others finish their last workgroup, wasting compute resources.
+
+**Algorithm**:
+
+```cpp
+vector<GemmSubProblem> findOptimalSplitsForWorkgroups(
+    int64_t M, int64_t N, int64_t K,
+    int num_CUs, int macrotile_m, int macrotile_n,
+    int requested_splits) {
+    
+    // Calculate baseline workgroup count
+    int wgs_m = (M + macrotile_m - 1) / macrotile_m;
+    int wgs_n = (N + macrotile_n - 1) / macrotile_n;
+    int total_wgs = wgs_m * wgs_n;
+    
+    // Target: want workgroups per CU to be integer
+    int target_wgs_per_split = num_CUs;
+    
+    double best_score = -1.0;
+    int best_splits = 2;
+    SplitDimension best_dimension = SPLIT_M;
+    
+    // Try different split counts (2 to requested_splits)
+    for (int num_splits = 2; num_splits <= requested_splits; num_splits++) {
+        
+        // Try M-dimension splits
+        {
+            int wgs_per_split = total_wgs / num_splits;
+            double wgs_per_CU = (double)wgs_per_split / num_CUs;
+            
+            // Score based on how close to integer WGs/CU
+            double score;
+            double remainder = wgs_per_CU - floor(wgs_per_CU);
+            
+            if (remainder < 0.01) {
+                // Perfect alignment!
+                score = 2.0;
+            } else {
+                // Penalize based on waste
+                score = 1.0 - (remainder * num_splits);
+            }
+            
+            if (score > best_score) {
+                best_score = score;
+                best_splits = num_splits;
+                best_dimension = SPLIT_M;
+            }
+        }
+        
+        // Try N-dimension splits (similar logic)
+        // ...
+    }
+    
+    // Create sub-problems using best configuration
+    return createSubProblems(M, N, K, best_splits, best_dimension);
+}
+```
+
+**Scoring System**:
+
+- **Score 2.0**: Perfect WG alignment (WGs/CU is integer)
+- **Score 1.0 - 1.99**: Good alignment (small remainder)
+- **Score 0.0 - 0.99**: Poor alignment (large remainder)
+
+**Example 1: Perfect Alignment**
+
+```
+Problem: 10240×10240, MacroTile: 256×256
+WGs: ⌈10240/256⌉ × ⌈10240/256⌉ = 40 × 40 = 1600 WGs
+CUs: 256
+
+Without splitting:
+  1600 WGs / 256 CUs = 6.25 WGs/CU
+  Each CU gets 6-7 WGs → uneven, some idle time
+
+With 2 M-splits:
+  1600 / 2 = 800 WGs per split
+  800 / 256 = 3.125 WGs/CU → still not perfect
+
+With 4 M-splits:
+  1600 / 4 = 400 WGs per split
+  400 / 256 = 1.5625 WGs/CU → better
+
+With 8 M-splits:
+  1600 / 8 = 200 WGs per split
+  200 / 256 = 0.78 WGs/CU → TOO SMALL! Some CUs get 0 WGs
+```
+
+**Example 2: Finding Optimal Splits**
+
+```
+Problem: 9216×9216, MacroTile: 256×208
+WGs: ⌈9216/256⌉ × ⌈9216/208⌉ = 36 × 45 = 1620 WGs
+CUs: 256
+
+Test 2 splits:
+  1620 / 2 = 810 WGs per split
+  810 / 256 = 3.164 WGs/CU
+  Score = 1.0 - (0.164 × 2) = 0.67
+
+Test 3 splits:
+  1620 / 3 = 540 WGs per split
+  540 / 256 = 2.109 WGs/CU
+  Score = 1.0 - (0.109 × 3) = 0.67
+
+Test 4 splits:
+  1620 / 4 = 405 WGs per split
+  405 / 256 = 1.582 WGs/CU
+  Score = 1.0 - (0.582 × 4) = -1.33 (negative!)
+
+Test 5 splits:
+  1620 / 5 = 324 WGs per split
+  324 / 256 = 1.266 WGs/CU
+  Score = 1.0 - (0.266 × 5) = -0.33 (negative!)
+
+Best: 2 or 3 splits (similar scores)
+```
+
+**When to use**:
+- Square or near-square matrices
+- Known poor WG distribution with single kernel
+- Problem sizes that don't align well with MacroTile
+
+**Limitations**:
+- Assumes all sub-problems use same MacroTile (may not be true)
+- Doesn't account for memory bandwidth constraints
+- May recommend too many splits for small problems
+
+---
+
+### Strategy 2: Memory-Based Splitting
+
+**Purpose**: Handle very large problems that exceed memory constraints by splitting them into smaller pieces that fit in available memory.
+
+**Core Problem**:
+
+Very large GEMMs can exceed:
+- GPU memory capacity (HBM)
+- Workspace memory limits
+- Per-kernel memory allocation limits
+- Cache capacity (causing thrashing)
+
+**Algorithm**:
+
+```cpp
+vector<GemmSubProblem> findOptimalSplitsForMemory(
+    int64_t M, int64_t N, int64_t K,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    size_t available_memory,
+    int requested_splits) {
+    
+    // Calculate memory requirements
+    size_t elem_size_a = getDataTypeSize(a_type);
+    size_t elem_size_b = getDataTypeSize(b_type);
+    size_t elem_size_c = getDataTypeSize(c_type);
+    size_t elem_size_d = getDataTypeSize(d_type);
+    
+    // Matrix A: M×K elements
+    size_t mem_A = M * K * elem_size_a;
+    
+    // Matrix B: K×N elements
+    size_t mem_B = K * N * elem_size_b;
+    
+    // Matrix C: M×N elements
+    size_t mem_C = M * N * elem_size_c;
+    
+    // Matrix D: M×N elements
+    size_t mem_D = M * N * elem_size_d;
+    
+    // Workspace (estimated)
+    size_t workspace = estimateWorkspace(M, N, K);
+    
+    size_t total_memory = mem_A + mem_B + mem_C + mem_D + workspace;
+    
+    // Check if split needed
+    if (total_memory <= available_memory) {
+        // No split needed
+        return createSingleProblem(M, N, K);
+    }
+    
+    // Calculate minimum splits needed
+    int min_splits = (int)ceil((double)total_memory / available_memory);
+    int num_splits = max(min_splits, requested_splits);
+    
+    // Choose which dimension to split based on size
+    // Splitting M reduces: mem_A, mem_C, mem_D
+    // Splitting N reduces: mem_B, mem_C, mem_D
+    // Splitting K reduces: mem_A, mem_B (but requires reduction!)
+    
+    size_t mem_reduced_by_M = mem_A + mem_C + mem_D;
+    size_t mem_reduced_by_N = mem_B + mem_C + mem_D;
+    
+    SplitDimension split_dim;
+    if (mem_reduced_by_M > mem_reduced_by_N) {
+        split_dim = SPLIT_M;  // Splitting M saves more memory
+    } else {
+        split_dim = SPLIT_N;  // Splitting N saves more memory
+    }
+    
+    return createSubProblems(M, N, K, num_splits, split_dim);
+}
+```
+
+**Memory Reduction Analysis**:
+
+For GEMM: `D[M×N] = A[M×K] × B[K×N] + C[M×N]`
+
+**Splitting M into P parts**:
+- Each sub-problem: `(M/P) × N × K`
+- Memory per iteration:
+  - A: `(M/P) × K` elements (reduced by P)
+  - B: `K × N` elements (unchanged)
+  - C: `(M/P) × N` elements (reduced by P)
+  - D: `(M/P) × N` elements (reduced by P)
+- Total reduction: `~(M×K + M×N + M×N) × (P-1)/P`
+
+**Splitting N into P parts**:
+- Each sub-problem: `M × (N/P) × K`
+- Memory per iteration:
+  - A: `M × K` elements (unchanged)
+  - B: `K × (N/P)` elements (reduced by P)
+  - C: `M × (N/P)` elements (reduced by P)
+  - D: `M × (N/P)` elements (reduced by P)
+- Total reduction: `~(K×N + M×N + M×N) × (P-1)/P`
+
+**Example**:
+
+```
+Problem: 16384×16384×4096, FP16 (2 bytes/element)
+Available memory: 8 GB
+
+Memory calculation:
+  A: 16384 × 4096 × 2 = 134 MB
+  B: 4096 × 16384 × 2 = 134 MB
+  C: 16384 × 16384 × 2 = 537 MB
+  D: 16384 × 16384 × 2 = 537 MB
+  Workspace (est): ~1 GB
+  Total: ~2.3 GB (fits in 8 GB)
+
+No split needed!
+
+Now try: 32768×32768×8192, FP16
+  A: 32768 × 8192 × 2 = 537 MB
+  B: 8192 × 32768 × 2 = 537 MB
+  C: 32768 × 32768 × 2 = 2.1 GB
+  D: 32768 × 32768 × 2 = 2.1 GB
+  Workspace (est): ~2 GB
+  Total: ~7.3 GB (fits in 8 GB, but tight!)
+
+Split M into 2:
+  Per iteration:
+    A: 16384 × 8192 × 2 = 268 MB
+    B: 8192 × 32768 × 2 = 537 MB (shared)
+    C: 16384 × 32768 × 2 = 1.05 GB
+    D: 16384 × 32768 × 2 = 1.05 GB
+    Workspace: ~1 GB
+  Total per iteration: ~3.9 GB (much safer!)
+```
+
+**When to use**:
+- Very large problems (> 16K dimensions)
+- Limited GPU memory
+- Avoiding out-of-memory errors
+- Reducing cache pressure
+
+**Limitations**:
+- Sequential execution means total time increases
+- Memory savings only realized if matrices don't all fit simultaneously
+- Splitting K dimension requires reduction (not implemented)
+
+---
+
+### Strategy 3: M-only (Row Splitting)
+
+**Purpose**: Split the problem along the M (row) dimension only, creating horizontal stripes of the output matrix.
+
+**Visual Representation**:
+
+```
+Original Problem: D[M×N] = A[M×K] × B[K×N]
+
+┌─────────────────┐       ┌─────────┐     ┌─────────────────┐
+│                 │       │         │     │                 │
+│        A        │   ×   │    B    │  =  │        D        │
+│     [M×K]       │       │  [K×N]  │     │     [M×N]       │
+│                 │       │         │     │                 │
+└─────────────────┘       └─────────┘     └─────────────────┘
+
+Split M into 2:
+
+Sub-problem 0:
+┌─────────────────┐       ┌─────────┐     ┌─────────────────┐
+│   A0 [M/2 × K]  │   ×   │    B    │  =  │  D0 [M/2 × N]   │
+└─────────────────┘       │  [K×N]  │     └─────────────────┘
+                          │         │
+Sub-problem 1:            │         │     
+┌─────────────────┐       │         │     ┌─────────────────┐
+│   A1 [M/2 × K]  │   ×   │         │  =  │  D1 [M/2 × N]   │
+└─────────────────┘       └─────────┘     └─────────────────┘
+```
+
+**Algorithm**:
+
+```cpp
+vector<GemmSubProblem> splitM(int64_t M, int64_t N, int64_t K,
+                              int num_splits,
+                              hipDataType a_type, hipDataType b_type,
+                              hipDataType c_type, hipDataType d_type,
+                              int64_t lda, int64_t ldb,
+                              int64_t ldc, int64_t ldd,
+                              hipblasOperation_t transA,
+                              hipblasOperation_t transB) {
+    
+    vector<GemmSubProblem> subProblems;
+    int64_t M_per_split = M / num_splits;
+    int64_t M_remainder = M % num_splits;
+    
+    int64_t current_m_offset = 0;
+    
+    for (int i = 0; i < num_splits; i++) {
+        GemmSubProblem sub;
+        
+        // Handle remainder by giving extra row to first splits
+        sub.m_size = M_per_split + (i < M_remainder ? 1 : 0);
+        sub.n_size = N;
+        sub.k_size = K;
+        
+        sub.m_offset = current_m_offset;
+        sub.n_offset = 0;
+        
+        // Calculate byte offsets
+        sub.offset_A_bytes = calculateOffsetA(
+            sub.m_offset, 0, lda, transA, a_type);
+        sub.offset_B_bytes = 0;  // B is shared across all splits
+        sub.offset_C_bytes = calculateOffsetCD(
+            sub.m_offset, 0, ldc, c_type);
+        sub.offset_D_bytes = calculateOffsetCD(
+            sub.m_offset, 0, ldd, d_type);
+        
+        current_m_offset += sub.m_size;
+        subProblems.push_back(sub);
+    }
+    
+    return subProblems;
+}
+```
+
+**Offset Calculation Details**:
+
+For **non-transposed A** (M×K, column-major):
+- Element A[i,j] is at position: `i + j*lda`
+- Offset for row i: `i * elem_size`
+- Sub-problem starting at row `m_offset`: `offset_A_bytes = m_offset * elem_size`
+
+For **transposed A** (physical K×M):
+- Element A^T[i,j] accesses A[j,i]
+- Offset for M-split: `(m_offset + k_offset * lda) * elem_size`
+
+**Matrix B is shared** - all sub-problems use the same B matrix:
+- `offset_B_bytes = 0` for all sub-problems
+
+**Example with Concrete Numbers**:
+
+```
+Problem: 10240×10240×2048, FP16, transA=N, transB=N
+lda = 10240, ldb = 2048, ldc = 10240, ldd = 10240
+Split M into 2
+
+Sub-problem 0:
+  m_size = 5120, n_size = 10240, k_size = 2048
+  m_offset = 0, n_offset = 0
+  
+  offset_A_bytes = 0 * 2 = 0
+  offset_B_bytes = 0
+  offset_C_bytes = (0 + 0*10240) * 2 = 0
+  offset_D_bytes = (0 + 0*10240) * 2 = 0
+  
+  Pointers:
+    A_ptr = A + 0
+    B_ptr = B + 0
+    C_ptr = C + 0
+    D_ptr = D + 0
+
+Sub-problem 1:
+  m_size = 5120, n_size = 10240, k_size = 2048
+  m_offset = 5120, n_offset = 0
+  
+  offset_A_bytes = 5120 * 2 = 10240 bytes
+  offset_B_bytes = 0
+  offset_C_bytes = (5120 + 0*10240) * 2 = 10240 bytes
+  offset_D_bytes = (5120 + 0*10240) * 2 = 10240 bytes
+  
+  Pointers:
+    A_ptr = A + 10240 bytes
+    B_ptr = B + 0
+    C_ptr = C + 10240 bytes
+    D_ptr = D + 10240 bytes
+```
+
+**When to use**:
+- Tall matrices (M >> N)
+- When M dimension has poor MacroTile alignment
+- Default choice for square matrices
+- Recommended: 2 splits
+
+**Advantages**:
+- Simple and predictable
+- Good for tall matrices
+- Matrix B is fully shared (no redundant loads)
+- Easy to reason about correctness
+
+**Limitations**:
+- Doesn't help for wide matrices (M << N)
+- All sub-problems access full B matrix (bandwidth)
+- May not maximize algorithmic diversity
+
+---
+
+### Strategy 4: N-only (Column Splitting)
+
+**Purpose**: Split the problem along the N (column) dimension only, creating vertical stripes of the output matrix.
+
+**Visual Representation**:
+
+```
+Original Problem: D[M×N] = A[M×K] × B[K×N]
+
+┌──────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│          │     │                     │     │                     │
+│    A     │  ×  │          B          │  =  │          D          │
+│  [M×K]   │     │       [K×N]         │     │       [M×N]         │
+│          │     │                     │     │                     │
+└──────────┘     └─────────────────────┘     └─────────────────────┘
+
+Split N into 2:
+
+                 ┌──────────┬──────────┐
+                 │    B0    │    B1    │
+Sub-problem 0:   │ [K×N/2]  │          │     ┌──────────┐
+┌──────────┐     │          │          │     │    D0    │
+│    A     │  ×  │          │          │  =  │ [M×N/2]  │
+│  [M×K]   │     │          │          │     │          │
+└──────────┘     └──────────┴──────────┘     └──────────┘
+                                              
+Sub-problem 1:   ┌──────────┬──────────┐     
+                 │          │    B1    │     ┌──────────┐
+                 │          │ [K×N/2]  │     │    D1    │
+                 │          │          │  =  │ [M×N/2]  │
+                 │          │          │     │          │
+                 └──────────┴──────────┘     └──────────┘
+```
+
+**Algorithm**:
+
+```cpp
+vector<GemmSubProblem> splitN(int64_t M, int64_t N, int64_t K,
+                              int num_splits,
+                              hipDataType a_type, hipDataType b_type,
+                              hipDataType c_type, hipDataType d_type,
+                              int64_t lda, int64_t ldb,
+                              int64_t ldc, int64_t ldd,
+                              hipblasOperation_t transA,
+                              hipblasOperation_t transB) {
+    
+    vector<GemmSubProblem> subProblems;
+    int64_t N_per_split = N / num_splits;
+    int64_t N_remainder = N % num_splits;
+    
+    int64_t current_n_offset = 0;
+    
+    for (int i = 0; i < num_splits; i++) {
+        GemmSubProblem sub;
+        
+        // Handle remainder
+        sub.m_size = M;
+        sub.n_size = N_per_split + (i < N_remainder ? 1 : 0);
+        sub.k_size = K;
+        
+        sub.m_offset = 0;
+        sub.n_offset = current_n_offset;
+        
+        // Calculate byte offsets
+        sub.offset_A_bytes = 0;  // A is shared across all splits
+        sub.offset_B_bytes = calculateOffsetB(
+            sub.n_offset, 0, ldb, transB, b_type);
+        sub.offset_C_bytes = calculateOffsetCD(
+            0, sub.n_offset, ldc, c_type);
+        sub.offset_D_bytes = calculateOffsetCD(
+            0, sub.n_offset, ldd, d_type);
+        
+        current_n_offset += sub.n_size;
+        subProblems.push_back(sub);
+    }
+    
+    return subProblems;
+}
+```
+
+**Offset Calculation Details**:
+
+**Matrix A is shared** - all sub-problems use the same A matrix:
+- `offset_A_bytes = 0` for all sub-problems
+
+For **non-transposed B** (K×N, column-major):
+- Element B[i,j] is at position: `i + j*ldb`
+- Offset for column j: `j * ldb * elem_size`
+- Sub-problem starting at column `n_offset`: `offset_B_bytes = n_offset * ldb * elem_size`
+
+For **transposed B** (physical N×K):
+- Element B^T[i,j] accesses B[j,i]
+- Offset for N-split: `n_offset * elem_size`
+
+**Example with Concrete Numbers**:
+
+```
+Problem: 10240×10240×2048, FP16, transA=N, transB=N
+lda = 10240, ldb = 2048, ldc = 10240, ldd = 10240
+Split N into 2
+
+Sub-problem 0:
+  m_size = 10240, n_size = 5120, k_size = 2048
+  m_offset = 0, n_offset = 0
+  
+  offset_A_bytes = 0
+  offset_B_bytes = 0 * 2048 * 2 = 0
+  offset_C_bytes = (0 + 0*10240) * 2 = 0
+  offset_D_bytes = (0 + 0*10240) * 2 = 0
+
+Sub-problem 1:
+  m_size = 10240, n_size = 5120, k_size = 2048
+  m_offset = 0, n_offset = 5120
+  
+  offset_A_bytes = 0
+  offset_B_bytes = 5120 * 2048 * 2 = 20,971,520 bytes
+  offset_C_bytes = (0 + 5120*10240) * 2 = 104,857,600 bytes
+  offset_D_bytes = (0 + 5120*10240) * 2 = 104,857,600 bytes
+```
+
+**When to use**:
+- Wide matrices (N >> M)
+- When N dimension has poor MacroTile alignment
+- Alternative to M-splitting for square matrices
+- Recommended: 2 splits
+
+**Advantages**:
+- Simple and predictable
+- Good for wide matrices
+- Matrix A is fully shared (no redundant loads)
+- Symmetric to M-splitting
+
+**Limitations**:
+- Doesn't help for tall matrices (N << M)
+- All sub-problems access full A matrix (bandwidth)
+- May create larger offsets in C/D (cache implications)
+
+---
+
+### Strategy 5: 2D (Grid Splitting)
+
+**Purpose**: Split along both M and N dimensions simultaneously, creating a grid of tiles in the output matrix.
+
+**Visual Representation**:
+
+```
+Original Problem: D[M×N] = A[M×K] × B[K×N]
+
+Split into 4 (2×2 grid):
+
+        ┌────────────────┬────────────────┐
+        │   D[0,0]       │   D[0,1]       │
+        │  [M/2 × N/2]   │  [M/2 × N/2]   │
+        ├────────────────┼────────────────┤
+        │   D[1,0]       │   D[1,1]       │
+        │  [M/2 × N/2]   │  [M/2 × N/2]   │
+        └────────────────┴────────────────┘
+
+Sub-problem [0,0]: A[0:M/2, :] × B[:, 0:N/2] = D[0:M/2, 0:N/2]
+Sub-problem [0,1]: A[0:M/2, :] × B[:, N/2:N] = D[0:M/2, N/2:N]
+Sub-problem [1,0]: A[M/2:M, :] × B[:, 0:N/2] = D[M/2:M, 0:N/2]
+Sub-problem [1,1]: A[M/2:M, :] × B[:, N/2:N] = D[M/2:M, N/2:N]
+```
+
+**Algorithm**:
+
+```cpp
+vector<GemmSubProblem> split2D(int64_t M, int64_t N, int64_t K,
+                               int num_splits,
+                               hipDataType a_type, hipDataType b_type,
+                               hipDataType c_type, hipDataType d_type,
+                               int64_t lda, int64_t ldb,
+                               int64_t ldc, int64_t ldd,
+                               hipblasOperation_t transA,
+                               hipblasOperation_t transB) {
+    
+    // Factorize num_splits into M_splits × N_splits
+    // Try to make it as square as possible
+    int splits_M = (int)ceil(sqrt((double)num_splits));
+    int splits_N = (num_splits + splits_M - 1) / splits_M;
+    
+    // Adjust if product exceeds num_splits
+    while (splits_M * splits_N > num_splits && splits_M > 1) {
+        splits_M--;
+        splits_N = (num_splits + splits_M - 1) / splits_M;
+    }
+    
+    int64_t M_per_split = M / splits_M;
+    int64_t N_per_split = N / splits_N;
+    
+    vector<GemmSubProblem> subProblems;
+    
+    // Create grid of sub-problems
+    for (int i = 0; i < splits_M; i++) {
+        int64_t m_offset = i * M_per_split;
+        int64_t m_size = (i == splits_M - 1) ? (M - m_offset) : M_per_split;
+        
+        for (int j = 0; j < splits_N; j++) {
+            int64_t n_offset = j * N_per_split;
+            int64_t n_size = (j == splits_N - 1) ? (N - n_offset) : N_per_split;
+            
+            GemmSubProblem sub;
+            sub.m_size = m_size;
+            sub.n_size = n_size;
+            sub.k_size = K;
+            sub.m_offset = m_offset;
+            sub.n_offset = n_offset;
+            
+            // Calculate offsets
+            sub.offset_A_bytes = calculateOffsetA(
+                m_offset, 0, lda, transA, a_type);
+            sub.offset_B_bytes = calculateOffsetB(
+                n_offset, 0, ldb, transB, b_type);
+            sub.offset_C_bytes = calculateOffsetCD(
+                m_offset, n_offset, ldc, c_type);
+            sub.offset_D_bytes = calculateOffsetCD(
+                m_offset, n_offset, ldd, d_type);
+            
+            subProblems.push_back(sub);
+        }
+    }
+    
+    return subProblems;
+}
+```
+
+**Grid Layout Examples**:
+
+```
+num_splits = 4:
+  2×2 grid: ┌──┬──┐
+            │0 │1 │
+            ├──┼──┤
+            │2 │3 │
+            └──┴──┘
+
+num_splits = 6:
+  2×3 grid: ┌──┬──┬──┐
+            │0 │1 │2 │
+            ├──┼──┼──┤
+            │3 │4 │5 │
+            └──┴──┴──┘
+
+num_splits = 9:
+  3×3 grid: ┌──┬──┬──┐
+            │0 │1 │2 │
+            ├──┼──┼──┤
+            │3 │4 │5 │
+            ├──┼──┼──┤
+            │6 │7 │8 │
+            └──┴──┴──┘
+```
+
+**Offset Calculation Example**:
+
+```
+Problem: 10240×10240×2048, FP16
+Split into 4 (2×2 grid)
+
+Grid layout:
+  M splits: 2 (each 5120)
+  N splits: 2 (each 5120)
+
+Sub-problem [0,0] (top-left):
+  m_offset = 0, n_offset = 0
+  m_size = 5120, n_size = 5120
+  offset_A = 0
+  offset_B = 0
+  offset_C = (0 + 0*10240) * 2 = 0
+  offset_D = (0 + 0*10240) * 2 = 0
+
+Sub-problem [0,1] (top-right):
+  m_offset = 0, n_offset = 5120
+  m_size = 5120, n_size = 5120
+  offset_A = 0
+  offset_B = 5120 * 2048 * 2 = 20,971,520 bytes
+  offset_C = (0 + 5120*10240) * 2 = 104,857,600 bytes
+  offset_D = (0 + 5120*10240) * 2 = 104,857,600 bytes
+
+Sub-problem [1,0] (bottom-left):
+  m_offset = 5120, n_offset = 0
+  m_size = 5120, n_size = 5120
+  offset_A = 5120 * 2 = 10,240 bytes
+  offset_B = 0
+  offset_C = (5120 + 0*10240) * 2 = 10,240 bytes
+  offset_D = (5120 + 0*10240) * 2 = 10,240 bytes
+
+Sub-problem [1,1] (bottom-right):
+  m_offset = 5120, n_offset = 5120
+  m_size = 5120, n_size = 5120
+  offset_A = 5120 * 2 = 10,240 bytes
+  offset_B = 5120 * 2048 * 2 = 20,971,520 bytes
+  offset_C = (5120 + 5120*10240) * 2 = 104,867,840 bytes
+  offset_D = (5120 + 5120*10240) * 2 = 104,867,840 bytes
+```
+
+**When to use**:
+- Very large square matrices
+- When both M and N have poor alignment
+- When you want maximum sub-problem diversity
+- Experimental exploration
+- Recommended: 4 or 9 splits (perfect squares)
+
+**Advantages**:
+- Maximum flexibility in sub-problem sizes
+- Can create more diverse MacroTile selections
+- Better cache locality (smaller sub-problems)
+- Interesting for stream-parallel future work
+
+**Limitations**:
+- More kernel launches (more overhead)
+- Neither A nor B is fully shared
+- Complexity in offset calculation
+- Empirically performs worse than 1D splits
+- Hard to predict which sub-problems benefit
+
+**Performance Reality**:
+
+In practice, 2D splitting performs **worse** than 1D splitting because:
+1. **More kernel launches**: 4 kernels instead of 2 → 2× overhead
+2. **No data sharing**: Each sub-problem accesses different parts of A AND B
+3. **Cache pressure**: More matrix data movement
+4. **Diminishing returns**: Workgroup benefits don't scale with more splits
+
+**Recommendation**: Avoid 2D splitting unless exploring very specific scenarios.
+
+---
+
+## Summary of Splitting Strategies
+
+| Strategy | Use Case | Splits | Complexity | Recommended |
+|----------|----------|--------|------------|-------------|
+| **0: Auto** | Unknown problems | Varies | Medium | ✅ Yes - for exploration |
+| **1: Workgroup** | Poor WG distribution | 2-8 | High | ⚠️ Maybe - if auto doesn't work |
+| **2: Memory** | Memory constraints | 2+ | Medium | ✅ Yes - for huge problems |
+| **3: M-only** | Tall or square matrices | 2 | Low | ✅✅ **BEST** - use this |
+| **4: N-only** | Wide matrices | 2 | Low | ✅ Yes - for wide matrices |
+| **5: 2D** | Research/exploration | 4+ | Very High | ❌ No - performs poorly |
+
+**Practical Recommendation**: 
+
+For best results, use **Strategy 3 (M-only) with 2 splits** for square matrices in the 9K-11K range. This has empirically shown the best performance improvements (+9% to +14%).
 
 ---
 
