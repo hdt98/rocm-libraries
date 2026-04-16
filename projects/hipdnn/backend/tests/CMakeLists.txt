@@ -94,6 +94,9 @@ add_executable(
     TestBackendLogger.cpp
     TestGraphLogger.cpp
     heuristics/TestDeviceProperties.cpp
+    TestHeuristicPlugin.cpp
+    TestHeuristicPluginManager.cpp
+    TestHeuristicPluginResourceManager.cpp
     TestUserLoggingApis.cpp
     TestPlatformUtils.cpp
     TestPlugin.cpp
