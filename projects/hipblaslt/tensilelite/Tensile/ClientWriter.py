@@ -538,7 +538,9 @@ def dataInitParams(problemType):
             ('init-scaleD',        DataInitName(initScaleD).name),
             ('init-scaleAlphaVec', DataInitName(initScaleAlphaVec).name),
             ('init-mx-a',      DataInitName(initMXScaleA).name),
-            ('init-mx-b',      DataInitName(initMXScaleB).name)]
+            ('init-mx-b',      DataInitName(initMXScaleB).name),
+            ('init-mxScaleA',      DataInitName(initMXScaleA).name),
+            ('init-mxScaleB',      DataInitName(initMXScaleB).name)]
 
 def boundsCheckName(mode):
     if mode == 0: return 'Disable'
@@ -602,9 +604,11 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param('swizzle-tensor-b', problemType.swizzleTensorB)
         if problemType.mxBlockA:
             param('mx-a-block', problemType.mxBlockA)
+            param('mx-block-a', problemType.mxBlockA)
             param('mx-a-type', problemType.mxTypeA.toName())
         if problemType.mxBlockB:
             param('mx-b-block', problemType.mxBlockB)
+            param('mx-block-b', problemType.mxBlockB)
             param('mx-b-type', problemType.mxTypeB.toName())
         if biasTypeArgs:
           for btype in biasTypeArgs.biasTypes:
