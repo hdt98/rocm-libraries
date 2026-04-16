@@ -191,6 +191,7 @@ struct Arguments
     int32_t num_splits;           // Manual override for number of splits (0=auto)
     int32_t target_wgs_per_split; // Target workgroups per split for optimization
     bool fused_kernel;            // Use fused kernel dispatch instead of sequential launches
+    bool l2_cache_hints;          // Enable L2 cache persistence hints for shared matrices
 
     /*************************************************************************
      *                     End Of Arguments                                  *

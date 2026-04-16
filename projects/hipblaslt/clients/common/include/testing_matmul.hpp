@@ -4043,6 +4043,82 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
 
+                        // ===================================================================
+                        // L2 Cache Persistence Hints for Shared Matrices
+                        // ===================================================================
+                        // Enable L2 cache persistence for matrices that are shared across
+                        // multiple sub-problems to reduce redundant memory reads.
+                        //
+                        // Strategy-specific shared matrices:
+                        //   - M-only split (strategy 3): Matrix B is shared
+                        //   - N-only split (strategy 4): Matrix A is shared
+                        //   - 2D split (strategy 5): No fully shared matrices
+                        // ===================================================================
+
+                        if(arg.l2_cache_hints && arg.multi_macrotile && subProblems.size() > 1)
+                        {
+                            hipblaslt_cout << "\n=== L2 Cache Persistence Hints ===" << std::endl;
+
+                            // Determine which matrix is shared based on split strategy
+                            void* shared_matrix_ptr = nullptr;
+                            size_t shared_matrix_bytes = 0;
+                            const char* matrix_name = nullptr;
+
+                            if(arg.split_strategy == 3)  // M-only split
+                            {
+                                // Matrix B is shared across all sub-problems
+                                shared_matrix_ptr = dB[0].buf();
+                                shared_matrix_bytes = N[0] * K[0] * getDataTypeSize(arg.b_type);
+                                matrix_name = "Matrix B";
+                            }
+                            else if(arg.split_strategy == 4)  // N-only split
+                            {
+                                // Matrix A is shared across all sub-problems
+                                shared_matrix_ptr = dA[0].buf();
+                                shared_matrix_bytes = M[0] * K[0] * getDataTypeSize(arg.a_type);
+                                matrix_name = "Matrix A";
+                            }
+
+                            if(shared_matrix_ptr != nullptr)
+                            {
+                                // Configure L2 cache persistence window
+                                hipStreamAttrValue stream_attr = {};
+                                stream_attr.accessPolicyWindow.base_ptr = shared_matrix_ptr;
+                                stream_attr.accessPolicyWindow.num_bytes = shared_matrix_bytes;
+                                stream_attr.accessPolicyWindow.hitRatio = 1.0f;  // 100% of accesses should persist
+                                stream_attr.accessPolicyWindow.hitProp = hipAccessPropertyPersisting;
+                                stream_attr.accessPolicyWindow.missProp = hipAccessPropertyPersisting;
+
+                                hipError_t cache_err = hipStreamSetAttribute(
+                                    stream,
+                                    hipStreamAttributeAccessPolicyWindow,
+                                    &stream_attr);
+
+                                if(cache_err == hipSuccess)
+                                {
+                                    double size_mb = shared_matrix_bytes / (1024.0 * 1024.0);
+                                    hipblaslt_cout << "  Enabled L2 persistence for " << matrix_name << std::endl;
+                                    hipblaslt_cout << "  Size: " << size_mb << " MB" << std::endl;
+                                    hipblaslt_cout << "  Expected benefit: Reduced redundant memory reads across "
+                                                   << subProblems.size() << " sub-problems" << std::endl;
+                                }
+                                else
+                                {
+                                    hipblaslt_cout << "  WARNING: Failed to set L2 cache hints (error "
+                                                   << cache_err << ")" << std::endl;
+                                    hipblaslt_cout << "  Continuing without cache hints..." << std::endl;
+                                }
+                            }
+                            else
+                            {
+                                hipblaslt_cout << "  No shared matrices for split strategy "
+                                               << arg.split_strategy << std::endl;
+                                hipblaslt_cout << "  (L2 hints most effective for M-only or N-only splits)" << std::endl;
+                            }
+
+                            hipblaslt_cout << "===================================\n" << std::endl;
+                        }
+
                         // Timed iterations - with optional fused dispatch
                         auto start_time = std::chrono::high_resolution_clock::now();
 

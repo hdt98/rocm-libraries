@@ -645,6 +645,10 @@ try
         value<bool>(&arg.fused_kernel)->default_value(false),
         "Use fused kernel dispatch to eliminate sequential launch overhead (experimental)")
 
+        ("l2_cache_hints",
+        value<bool>(&arg.l2_cache_hints)->default_value(true),
+        "Enable L2 cache persistence hints for shared matrices in multi-MacroTile (reduces redundant memory reads)")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");
