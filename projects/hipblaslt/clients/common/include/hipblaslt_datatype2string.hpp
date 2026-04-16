@@ -47,7 +47,8 @@ enum class hipblaslt_initialization
     neg_zero   = 891,
     neg_inf    = 892,
     nan        = 893,
-    // norm_dist with one element overwritten by inf, -inf, or nan (deterministic from seed)
+    // norm_dist with one element overwritten by +inf, -inf, or quiet NaN; index and special kind are
+    // deterministic from the fixed seed (NaN uses canonical quiet_NaN, not RNG).
     norm_dist_one_special = 894,
 };
 

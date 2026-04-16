@@ -633,7 +633,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
                                        : int(s >> 16) % 3;
                 float special_val = (special_type == 0) ? std::numeric_limits<float>::infinity()
                                    : (special_type == 1) ? -std::numeric_limits<float>::infinity()
-                                                         : static_cast<float>(hipblaslt_nan_rng());
+                                                         : std::numeric_limits<float>::quiet_NaN();
                 T special_T = T(special_val);
                 fill_batch(A, M, N, lda, stride, batch_count,
                            [base_seed = kNormDistOneSpecialSeed, special_idx, special_T] __device__ (
@@ -747,7 +747,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
             }
             else
             {
-                hipblaslt_cerr << "hipblaslt_init_device: neg_zero only supported for "
+                hipblaslt_cerr << "hipblaslt_init_device: neg_zero initialization only supported for "
                                   "floating-point types"
                                << std::endl;
             }
@@ -762,7 +762,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
             }
             else
             {
-                hipblaslt_cerr << "hipblaslt_init_device: neg_inf only supported for "
+                hipblaslt_cerr << "hipblaslt_init_device: neg_inf initialization only supported for "
                                   "floating-point types"
                                << std::endl;
             }

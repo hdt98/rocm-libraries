@@ -79,7 +79,7 @@ Tests:
   beta: 0.0
   initialization: [ zero, neg_zero, inf, neg_inf, nan ]
 
-# Norm_dist with one inf/-inf/nan in A; B and C are norm_dist. Deterministic, FP only.
+# Norm_dist with one inf/-inf/nan in A; B and C are norm_dist. Index and special kind are deterministic; NaN is quiet NaN. FP only.
 # Run with norm_dist_one_special_type 0, 1, 2 to guarantee inf, neg_inf, and nan are each tested (e.g. for inf-handling bugs).
 - name: matmul_norm_dist_one_special_in_A
   category: pre_checkin
@@ -98,7 +98,7 @@ Tests:
   norm_check: 1
   norm_check_assert: 0
 
-# Norm_dist with one inf/-inf/nan in B; A and C are norm_dist. Deterministic, FP only.
+# Norm_dist with one inf/-inf/nan in B; A and C are norm_dist. Index and special kind are deterministic; NaN is quiet NaN. FP only.
 # Run with norm_dist_one_special_type 0, 1, 2 to guarantee inf, neg_inf, and nan are each tested.
 - name: matmul_norm_dist_one_special_in_B
   category: pre_checkin

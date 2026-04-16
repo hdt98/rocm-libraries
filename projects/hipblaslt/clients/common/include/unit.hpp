@@ -554,7 +554,7 @@ inline int64_t unit_check_diff(
     return error;
 }
 
-/*! \brief Check that CPU and GPU agree on Inf/NaN: where CPU is Inf, GPU must be Inf;
+/*! \brief Check that CPU and GPU agree on Inf/NaN: where CPU is Inf, GPU must be Inf with the same sign;
  *  where CPU is NaN, GPU must be NaN. Fails with a clear message (e.g. "CPU is Inf but GPU is NaN").
  *  Only for FP types that can have Inf/NaN; no-op for others. Run before unit_check so Inf->NaN bugs are reported clearly. */
 #ifdef GOOGLE_TEST
@@ -578,7 +578,7 @@ inline void check_special_value_consistency_impl(int64_t M,
                 double gd = double(g);
                 if(std::isinf(cd))
                 {
-                    ASSERT_TRUE(std::isinf(gd))
+                    ASSERT_TRUE(std::isinf(gd) && (std::signbit(cd) == std::signbit(gd)))
                         << "Special value mismatch: CPU is Inf but GPU is " << gd << " at (i=" << i
                         << ", j=" << j << ", batch=" << k << ")";
                 }
