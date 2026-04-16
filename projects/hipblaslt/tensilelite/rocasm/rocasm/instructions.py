@@ -35,9 +35,15 @@ Usage:
 from __future__ import annotations
 
 from rocisa.enum import InstType
-from rocisa.instruction import MFMAInstruction, DSLoadB128 as _DSLoadB128, BufferLoadB128 as _BufferLoadB128
+from rocisa.instruction import (
+    MFMAInstruction,
+    DSLoadB128 as _DSLoadB128,
+    DSStoreB128 as _DSStoreB128,
+    DSStoreB32 as _DSStoreB32,
+    BufferLoadB128 as _BufferLoadB128,
+)
 
-from rocasm.ops import PendingOp
+from rocasm.ops import Op, PendingOp
 from rocasm.regs import RegisterSlice
 
 
@@ -75,13 +81,59 @@ def vmfma_f32_16x16x32_bf16(src_b: RegisterSlice, src_a: RegisterSlice,
             variant=[16, 16, 32, 1],
             mfma1k=False,
             acc=dst.container(),
-            a=srcs[1].container(),
-            b=srcs[0].container(),
+            a=srcs[0].container(),
+            b=srcs[1].container(),
             acc2=srcs[2].container(),
         )
 
     return PendingOp(
         inst_name="v_mfma_f32_16x16x32_bf16",
+        srcs=[src_b, src_a, acc2],
+        build_fn=_build,
+        block=block,
+    )
+
+
+def vmfma_f32_16x16x16bf16_1k(src_b: RegisterSlice, src_a: RegisterSlice,
+                               acc2: RegisterSlice) -> PendingOp:
+    """v_mfma_f32_16x16x16bf16_1k: BF16 matrix fused multiply-add (gfx942/CDNA3).
+
+    dst = A * B + acc2
+
+    Produces 4 F32 accumulator registers from 2 BF16 A-source and 2 BF16 B-source
+    registers, added to the acc2 accumulator input.
+
+    Args:
+        src_b: B matrix tile (2 VGPRs, BF16)
+        src_a: A matrix tile (2 VGPRs, BF16)
+        acc2: Accumulator input to add to (4 AccVGPRs, F32)
+
+    Returns:
+        PendingOp to be resolved by assignment to Acc[dst_start:dst_end]
+    """
+    block = src_b.array.block
+    if block is None:
+        block = src_a.array.block
+    if block is None:
+        block = acc2.array.block
+    if block is None:
+        raise RuntimeError(
+            "vmfma_f32_16x16x16bf16_1k: source registers are not attached to a Block")
+
+    def _build(dst: RegisterSlice, srcs: list[RegisterSlice]) -> MFMAInstruction:
+        return MFMAInstruction(
+            instType=InstType.INST_BF16,
+            accType=InstType.INST_F32,
+            variant=[16, 16, 16, 1],
+            mfma1k=True,
+            acc=dst.container(),
+            a=srcs[0].container(),
+            b=srcs[1].container(),
+            acc2=srcs[2].container(),
+        )
+
+    return PendingOp(
+        inst_name="v_mfma_f32_16x16x16bf16_1k",
         srcs=[src_b, src_a, acc2],
         build_fn=_build,
         block=block,
@@ -157,3 +209,71 @@ def buffer_load_dwordx4(vaddr: RegisterSlice, saddr: RegisterSlice,
         build_fn=_build,
         block=block,
     )
+
+
+def ds_write_b128(addr: RegisterSlice, src: RegisterSlice,
+                  ds=None, comment: str = ""):
+    """ds_write_b128 / ds_store_b128: Store 128 bits (4 dwords) to LDS.
+
+    Side-effect instruction — no destination register, appends directly to the block.
+
+    Args:
+        addr: Address VGPR (1 VGPR)
+        src: Data VGPRs to store (4 VGPRs)
+        ds: Optional DSModifiers (offset, etc.)
+        comment: Optional comment string
+    """
+    block = addr.array.block
+    if block is None:
+        block = src.array.block
+    if block is None:
+        raise RuntimeError(
+            "ds_write_b128: source registers are not attached to a Block")
+
+    rocisa_inst = _DSStoreB128(
+        dstAddr=addr.container(),
+        src=src.container(),
+        ds=ds,
+        comment=comment,
+    )
+    op = Op(
+        inst="ds_write_b128",
+        dst=None,
+        srcs=[addr, src],
+        rocisa_inst=rocisa_inst,
+    )
+    block._append_op(op)
+
+
+def ds_write_b32(addr: RegisterSlice, src: RegisterSlice,
+                 ds=None, comment: str = ""):
+    """ds_write_b32 / ds_store_b32: Store 32 bits (1 dword) to LDS.
+
+    Side-effect instruction — no destination register, appends directly to the block.
+
+    Args:
+        addr: Address VGPR (1 VGPR)
+        src: Data VGPR to store (1 VGPR)
+        ds: Optional DSModifiers (offset, etc.)
+        comment: Optional comment string
+    """
+    block = addr.array.block
+    if block is None:
+        block = src.array.block
+    if block is None:
+        raise RuntimeError(
+            "ds_write_b32: source registers are not attached to a Block")
+
+    rocisa_inst = _DSStoreB32(
+        dstAddr=addr.container(),
+        src=src.container(),
+        ds=ds,
+        comment=comment,
+    )
+    op = Op(
+        inst="ds_write_b32",
+        dst=None,
+        srcs=[addr, src],
+        rocisa_inst=rocisa_inst,
+    )
+    block._append_op(op)

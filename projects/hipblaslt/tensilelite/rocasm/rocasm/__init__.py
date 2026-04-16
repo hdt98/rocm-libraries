@@ -29,4 +29,4 @@ __version__ = "0.1.0"
 from rocasm.regs import VgprArray, AccArray, SgprArray
 from rocasm.ops import Op
 from rocasm.block import Block
-from rocasm.instructions import vmfma_f32_16x16x32_bf16
+from rocasm.instructions import vmfma_f32_16x16x32_bf16, vmfma_f32_16x16x16bf16_1k

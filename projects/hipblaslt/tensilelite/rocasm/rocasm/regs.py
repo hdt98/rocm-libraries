@@ -113,7 +113,7 @@ class RegisterSlice:
 class _RegArray:
     """Base class for typed register arrays."""
 
-    def __init__(self, name: str, base: int, count: int, block: Block | None = None):
+    def __init__(self, name: str = "", *, base: int, count: int, block: Block | None = None):
         self.name = name
         self.base = base
         self.count = count

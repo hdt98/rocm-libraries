@@ -40,7 +40,7 @@ class CMakeBuild(build_ext):
             ]
             subprocess.check_call(make_args)
             ext_suffix = ".so" if sys.platform != "win32" else ".pyd"
-            build_module = glob.glob(os.path.join(self.build_temp, 'tensilelite', 'rocisa', "lib", f"rocisa*{ext_suffix}"))[0]
+            build_module = glob.glob(os.path.join(self.build_temp, 'tensilelite', 'rocisa', f"_rocisa*{ext_suffix}"))[0]
             target_module = os.path.join(self.build_lib, os.path.basename(build_module))
             shutil.copy2(build_module, target_module)
         except subprocess.CalledProcessError as e:
@@ -50,7 +50,6 @@ class CMakeBuild(build_ext):
 setup(
     name='rocisa',
     version="0.1.0",
-    packages=["rocisa"],
     ext_modules=[Extension("rocisa", sources=[])],
     install_requires=["nanobind"],
     cmdclass={"build_ext": CMakeBuild},

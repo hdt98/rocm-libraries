@@ -335,7 +335,7 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
     num_sgprs = reg_counts.get("sgpr", 88)
 
     # Translate assembly to rocasm Python code (flat path — always needed)
-    rocasm_code, named_regs = asm_to_rocasm(main_loop_text, symbols)
+    rocasm_code, named_regs, inst_funcs = asm_to_rocasm(main_loop_text, symbols)
 
     # Try the tiled path: analyze the flat code and generate loop-based output
     tile_info = None
@@ -373,10 +373,25 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
         if "S[" in rocasm_code:
             block_kwargs.append(f"        S=SgprArray(base=0, count={num_sgprs}),\n")
 
+        # Check if generated code uses DSModifiers, MUBUFModifiers, or sgpr
+        needs_ds_modifiers = "DSModifiers" in rocasm_code
+        needs_mubuf_modifiers = "MUBUFModifiers" in rocasm_code
+        needs_sgpr = "sgpr(" in rocasm_code
+
         with open(mainloopPath, "w", encoding="utf-8") as f:
             f.write("from rocasm.block import Block\n")
             f.write("from rocasm.regs import VgprArray, AccArray, SgprArray\n")
-            f.write("from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4\n")
+            if inst_funcs:
+                f.write(f"from rocasm.instructions import {', '.join(sorted(inst_funcs))}\n")
+            container_imports = []
+            if needs_ds_modifiers:
+                container_imports.append("DSModifiers")
+            if needs_mubuf_modifiers:
+                container_imports.append("MUBUFModifiers")
+            if needs_sgpr:
+                container_imports.append("sgpr")
+            if container_imports:
+                f.write(f"from rocisa.container import {', '.join(container_imports)}\n")
             f.write("\n\n")
             f.write("def rocasm_main_loop():\n")
             f.write('    """ROCasm translation of the main loop.\n')
@@ -451,6 +466,11 @@ def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
             mainloopPath = Path(asmPath) / f"{result.name}_mainloop.py"
             src = _generateROCasmMainloop(src, mainloopPath)
         if result.useROCasmMainLoop is not None:
+            # Ensure rocisa is configured for this kernel's ISA so that
+            # emitted instruction mnemonics match the target architecture.
+            ti = rocisa.rocIsa.getInstance()
+            ti.init(isa, "amdclang++")
+            ti.setKernel(isa, wfsize)
             src = _useROCasmMainloop(src, result.useROCasmMainLoop)
         f.write(src)
 

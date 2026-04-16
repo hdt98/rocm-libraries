@@ -174,7 +174,7 @@ def _parse_scalar_operand(operand: str, symbols: dict[str, int]) -> str:
     # Try as integer literal
     try:
         val = int(operand, 0)
-        return f"hex({val})" if operand.startswith("0x") else str(val)
+        return hex(val) if operand.startswith("0x") else str(val)
     except ValueError:
         pass
 
@@ -257,7 +257,7 @@ def _strip_comment(line: str) -> str:
     return line[:idx].rstrip() if idx != -1 else line.rstrip()
 
 
-def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple[str, dict]:
+def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple[str, dict, set]:
     """Convert assembly text to rocasm Python source code.
 
     Args:
@@ -266,9 +266,10 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
                  If None, any .set directives in asm_text are parsed.
 
     Returns:
-        A tuple ``(code, named_regs)`` where *code* is the Python source string
-        and *named_regs* maps alias names to ``(reg_type, phys_base, count)``.
-        For example: ``{"ValuA_X0_I0": ("v", 16, 24), "SrdA": ("s", 64, 4)}``.
+        A tuple ``(code, named_regs, inst_funcs)`` where *code* is the Python
+        source string, *named_regs* maps alias names to
+        ``(reg_type, phys_base, count)``, and *inst_funcs* is the set of
+        instruction function names used (e.g. ``{"vmfma_f32_16x16x16bf16_1k", ...}``).
     """
     if symbols is None:
         symbols = parse_set_directives(asm_text)
@@ -331,7 +332,7 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
         parts.append("")  # blank separator line
     parts.append("\n".join(body_lines))
 
-    return "\n".join(parts), used_named_regs
+    return "\n".join(parts), used_named_regs, used_inst_funcs
 
 
 def _convert_instruction(inst_line: str, symbols: dict[str, int],
@@ -372,6 +373,20 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int],
         return (f"{_reg(*dst)} = vmfma_f32_16x16x32_bf16("
                 f"{_reg(*src_b)}, {_reg(*src_a)}, {_reg(*acc2)})")
 
+    if mnemonic == "v_mfma_f32_16x16x16bf16_1k":
+        operands = _split_operands(operand_str)
+        if len(operands) != 4:
+            return None
+        dst = _parse_reg_operand(operands[0], symbols)
+        src_b = _parse_reg_operand(operands[1], symbols)
+        src_a = _parse_reg_operand(operands[2], symbols)
+        acc2 = _parse_reg_operand(operands[3], symbols)
+        if not all([dst, src_b, src_a, acc2]):
+            return None
+        used_inst_funcs.add("vmfma_f32_16x16x16bf16_1k")
+        return (f"{_reg(*dst)} = vmfma_f32_16x16x16bf16_1k("
+                f"{_reg(*src_b)}, {_reg(*src_a)}, {_reg(*acc2)})")
+
     # --- ds_read_b128 / ds_load_b128 ---
     if mnemonic in ("ds_read_b128", "ds_load_b128"):
         offset = None
@@ -395,6 +410,54 @@ def _convert_instruction(inst_line: str, symbols: dict[str, int],
         used_inst_funcs.add("ds_read_b128")
         return (f"{_reg(*dst)} = ds_read_b128("
                 f"{_reg(*src)}{ds_arg})")
+
+    # --- ds_write_b128 / ds_store_b128 ---
+    if mnemonic in ("ds_write_b128", "ds_store_b128"):
+        offset = None
+        clean = operand_str
+        m = re.search(r'\boffset:(\S+)', operand_str)
+        if m:
+            offset = int(m.group(1), 0)
+            clean = operand_str[:m.start()].rstrip().rstrip(',')
+
+        operands = _split_operands(clean)
+        if len(operands) < 2:
+            return None
+        addr = _parse_reg_operand(operands[0], symbols)
+        src = _parse_reg_operand(operands[1], symbols)
+        if not addr or not src:
+            return None
+
+        ds_arg = ""
+        if offset is not None and offset != 0:
+            ds_arg = f", ds=DSModifiers(offset={offset})"
+        used_inst_funcs.add("ds_write_b128")
+        return (f"ds_write_b128("
+                f"{_reg(*addr)}, {_reg(*src)}{ds_arg})")
+
+    # --- ds_write_b32 / ds_store_b32 ---
+    if mnemonic in ("ds_write_b32", "ds_store_b32"):
+        offset = None
+        clean = operand_str
+        m = re.search(r'\boffset:(\S+)', operand_str)
+        if m:
+            offset = int(m.group(1), 0)
+            clean = operand_str[:m.start()].rstrip().rstrip(',')
+
+        operands = _split_operands(clean)
+        if len(operands) < 2:
+            return None
+        addr = _parse_reg_operand(operands[0], symbols)
+        src = _parse_reg_operand(operands[1], symbols)
+        if not addr or not src:
+            return None
+
+        ds_arg = ""
+        if offset is not None and offset != 0:
+            ds_arg = f", ds=DSModifiers(offset={offset})"
+        used_inst_funcs.add("ds_write_b32")
+        return (f"ds_write_b32("
+                f"{_reg(*addr)}, {_reg(*src)}{ds_arg})")
 
     # --- buffer_load_dwordx4 / buffer_load_b128 ---
     if mnemonic in ("buffer_load_dwordx4", "buffer_load_b128"):

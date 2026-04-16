@@ -215,7 +215,11 @@ class TestBlock:
 
 # ---------- vmfma instruction ----------
 
-from rocasm.instructions import vmfma_f32_16x16x32_bf16, ds_read_b128, buffer_load_dwordx4
+from rocasm.instructions import (
+    vmfma_f32_16x16x32_bf16, vmfma_f32_16x16x16bf16_1k,
+    ds_read_b128, buffer_load_dwordx4,
+    ds_write_b128, ds_write_b32,
+)
 from rocasm.ops import Op
 
 
@@ -282,6 +286,65 @@ class TestVmfma:
         block = Block(Acc=AccArray("Acc", base=0, count=16))
         with pytest.raises(TypeError, match="Cannot assign"):
             block.Acc[0:4] = 42
+
+
+# ---------- vmfma_f32_16x16x16bf16_1k instruction (gfx942) ----------
+
+
+class TestVmfma16x16x16bf16_1k:
+
+    def _make_block(self):
+        return Block(
+            Acc=AccArray("Acc", base=0, count=64),
+            A=VgprArray("A", base=18, count=24),
+            B=VgprArray("B", base=66, count=32),
+        )
+
+    def test_single_mfma_1k(self):
+        block = self._make_block()
+        block.Acc[0:4] = vmfma_f32_16x16x16bf16_1k(block.B[0:2], block.A[0:2], block.Acc[0:4])
+
+        assert len(block) == 1
+        op = block.ops[0]
+        assert isinstance(op, Op)
+        assert op.inst == "v_mfma_f32_16x16x16bf16_1k"
+        assert op.dst.phys_base == 0
+        assert op.dst.count == 4
+
+    def test_mfma_1k_emits_assembly(self):
+        block = self._make_block()
+        block.Acc[0:4] = vmfma_f32_16x16x16bf16_1k(block.B[0:2], block.A[0:2], block.Acc[0:4])
+
+        asm = block.emit()
+        # rocisa may emit v_mfma_ or v_wmma_ depending on asmCaps
+        assert "16x16x16" in asm
+        assert "acc[0:3]" in asm
+
+    def test_mfma_1k_sources_tracked(self):
+        block = self._make_block()
+        block.Acc[4:8] = vmfma_f32_16x16x16bf16_1k(block.B[0:2], block.A[4:6], block.Acc[4:8])
+
+        op = block.ops[0]
+        assert len(op.srcs) == 3
+        assert op.srcs[0].phys_base == 66   # B[0:2] -> v[66:67]
+        assert op.srcs[0].count == 2
+        assert op.srcs[1].phys_base == 22   # A[4:6] -> v[22:23]
+        assert op.srcs[1].count == 2
+        assert op.srcs[2].phys_base == 4    # Acc[4:8] -> acc[4:7]
+
+    def test_mfma_1k_multiple(self):
+        block = self._make_block()
+        block.Acc[0:4] = vmfma_f32_16x16x16bf16_1k(block.B[0:2], block.A[0:2], block.Acc[0:4])
+        block.Acc[4:8] = vmfma_f32_16x16x16bf16_1k(block.B[0:2], block.A[4:6], block.Acc[4:8])
+
+        assert len(block) == 2
+
+    def test_mfma_1k_unattached_raises(self):
+        A = VgprArray("A", base=18, count=24)
+        B = VgprArray("B", base=66, count=32)
+        Acc = AccArray("Acc", base=0, count=16)
+        with pytest.raises(RuntimeError, match="not attached to a Block"):
+            vmfma_f32_16x16x16bf16_1k(B[0:2], A[0:2], Acc[0:4])
 
 
 # ---------- Block.emit round-trip ----------
@@ -750,3 +813,85 @@ class TestBufferLoadDwordx4:
         saddr = SgprArray("S", base=0, count=4)
         with pytest.raises(RuntimeError, match="not attached"):
             buffer_load_dwordx4(vaddr[0:1], saddr[0:4], 0)
+
+
+# ---------- ds_write_b128 instruction ----------
+
+
+class TestDsWriteB128:
+
+    def _make_block(self):
+        return Block(
+            G2LA=VgprArray("G2LA", base=130, count=24),
+            LocalWriteAddr=VgprArray("LocalWriteAddr", base=186, count=1),
+        )
+
+    def test_basic_ds_write_b128(self):
+        block = self._make_block()
+        ds_write_b128(block.LocalWriteAddr[0:1], block.G2LA[0:4])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "ds_write_b128"
+        assert op.dst is None
+        assert len(op.srcs) == 2
+
+    def test_ds_write_b128_emits_assembly(self):
+        block = self._make_block()
+        ds_write_b128(block.LocalWriteAddr[0:1], block.G2LA[0:4])
+        asm = block.emit()
+        assert "ds_store_b128" in asm or "ds_write_b128" in asm
+
+    def test_ds_write_b128_with_offset(self):
+        from rocisa.container import DSModifiers
+        block = self._make_block()
+        ds_write_b128(block.LocalWriteAddr[0:1], block.G2LA[4:8],
+                      ds=DSModifiers(offset=4608))
+        assert len(block) == 1
+        asm = block.emit()
+        assert "4608" in asm or "offset" in asm.lower()
+
+    def test_ds_write_b128_unattached_raises(self):
+        addr = VgprArray("Addr", base=0, count=1)
+        data = VgprArray("Data", base=4, count=4)
+        with pytest.raises(RuntimeError, match="not attached"):
+            ds_write_b128(addr[0:1], data[0:4])
+
+
+# ---------- ds_write_b32 instruction ----------
+
+
+class TestDsWriteB32:
+
+    def _make_block(self):
+        return Block(
+            G2LB=VgprArray("G2LB", base=154, count=32),
+            LocalWriteAddr=VgprArray("LocalWriteAddr", base=186, count=1),
+        )
+
+    def test_basic_ds_write_b32(self):
+        block = self._make_block()
+        ds_write_b32(block.LocalWriteAddr[0:1], block.G2LB[24:25])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "ds_write_b32"
+        assert op.dst is None
+
+    def test_ds_write_b32_emits_assembly(self):
+        block = self._make_block()
+        ds_write_b32(block.LocalWriteAddr[0:1], block.G2LB[0:1])
+        asm = block.emit()
+        assert "ds_store_b32" in asm or "ds_write_b32" in asm
+
+    def test_ds_write_b32_with_offset(self):
+        from rocisa.container import DSModifiers
+        block = self._make_block()
+        ds_write_b32(block.LocalWriteAddr[0:1], block.G2LB[24:25],
+                     ds=DSModifiers(offset=25344))
+        asm = block.emit()
+        assert "25344" in asm or "offset" in asm.lower()
+
+    def test_ds_write_b32_unattached_raises(self):
+        addr = VgprArray("Addr", base=0, count=1)
+        data = VgprArray("Data", base=4, count=1)
+        with pytest.raises(RuntimeError, match="not attached"):
+            ds_write_b32(addr[0:1], data[0:1])

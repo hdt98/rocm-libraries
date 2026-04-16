@@ -36,6 +36,7 @@ from copy import copy
 from functools import partial
 from typing import Any
 
+from rocisa.code import Label
 from rocisa.instruction import (
     SWaitCnt, SBarrier, SNop,
     SMovB32, SAddU32, SAddCU32, SSubU32, SSubBU32,
@@ -103,6 +104,8 @@ class Block:
         regs = object.__getattribute__(self, "_regs")
         if name in regs:
             return regs[name]
+        if name == "label":
+            return self._label
         if name in _SIDE_EFFECT_INSTRUCTIONS:
             return partial(self._side_effect, name)
         raise AttributeError(
@@ -115,6 +118,22 @@ class Block:
 
     def _append_op(self, op: Op):
         """Append an Op. Called by PendingOp.resolve()."""
+        self._ops.append(op)
+
+    def _label(self, name: str):
+        """Emit an assembly label.
+
+        If name starts with 'label_', the prefix is stripped since rocisa's
+        Label class adds it back automatically.
+        """
+        label_name = name[6:] if name.startswith("label_") else name
+        rocisa_label = Label(label_name, "")
+        op = Op(
+            inst="label",
+            dst=None,
+            srcs=[],
+            rocisa_inst=rocisa_label,
+        )
         self._ops.append(op)
 
     def _side_effect(self, inst_name: str, *args, **kwargs):
