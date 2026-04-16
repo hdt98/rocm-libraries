@@ -6336,8 +6336,7 @@ static std::vector<GraphTopologyParam> getGraphTopologyParams()
          [](Graph& g) { g = FrontendGraphFactory::createConvFwdBiasActivGraph(); }},
         {"ConvReluFusion", createConvReluFusionGraph},
         {"PointwiseChain", createPointwiseChainGraph},
-        {"Diamond", createDiamondGraph},
-    };
+        {"Diamond", createDiamondGraph}};
 
     return params;
 }
