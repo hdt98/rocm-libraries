@@ -34,7 +34,7 @@ BenchmarkProblems:
       TransposeB: False
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
       MXBlockA: 32
@@ -105,7 +105,7 @@ BenchmarkProblems:
       TransposeB: True
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
       MXBlockA: 32
@@ -176,7 +176,7 @@ BenchmarkProblems:
       TransposeB: False
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
       MXBlockA: 32
@@ -249,7 +249,7 @@ BenchmarkProblems:
       TransposeB: True
       UseBeta: True
       Batched: True
-      Activation: False
+      Activation: True
       SupportUserArgs: True
       UseBias: 0
       MXBlockA: 32
