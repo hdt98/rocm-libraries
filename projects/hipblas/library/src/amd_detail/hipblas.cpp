@@ -331,7 +331,8 @@ try
     if(!version)
         return HIPBLAS_STATUS_INVALID_VALUE;
 
-    *version = hipblasVersionMajor * 1000 + hipblasVersionMinor * 100 + hipblasVersionPatch;
+    *version = (hipblasVersionMajor * hipblasVersionK + hipblasVersionMinor) * hipblasVersionK
+               + hipblasVersionPatch;
     return HIPBLAS_STATUS_SUCCESS;
 }
 catch(...)

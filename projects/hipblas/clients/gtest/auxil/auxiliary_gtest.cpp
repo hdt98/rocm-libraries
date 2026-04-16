@@ -45,9 +45,14 @@ namespace
         int version = 0;
         EXPECT_EQ(HIPBLAS_STATUS_SUCCESS, hipblasGetVersion(handle, &version));
 
-        // Verify version format: major * 1000 + minor * 100 + patch
+        // Verify version format
+
+        assert( hipblasVersionMinor < hipblasVersionK );
+        assert( hipblasVersionPatch < hipblasVersionK );
+
         int expected_version
-            = hipblasVersionMajor * 1000 + hipblasVersionMinor * 100 + hipblasVersionPatch;
+            = (hipblasVersionMajor * hipblasVersionK + hipblasVersionMinor) * hipblasVersionK
+              + hipblasVersionPatch;
         EXPECT_EQ(expected_version, version);
 
         EXPECT_EQ(HIPBLAS_STATUS_SUCCESS, hipblasDestroy(handle));
@@ -61,7 +66,8 @@ namespace
 
         // Verify version format
         int expected_version
-            = hipblasVersionMajor * 1000 + hipblasVersionMinor * 100 + hipblasVersionPatch;
+            = (hipblasVersionMajor * hipblasVersionK + hipblasVersionMinor) * hipblasVersionK
+              + hipblasVersionPatch;
         EXPECT_EQ(expected_version, version);
     }
 
@@ -127,7 +133,7 @@ namespace
         EXPECT_EQ(HIPBLAS_STATUS_SUCCESS, hipblasGetProperty(HIPBLAS_PATCH_LEVEL, &patch));
 
         // Verify that reconstructed version matches
-        int reconstructed_version = major * 1000 + minor * 100 + patch;
+        int reconstructed_version = (major * hipblasVersionK + minor) * hipblasVersionK + patch;
         EXPECT_EQ(version, reconstructed_version);
     }
 
