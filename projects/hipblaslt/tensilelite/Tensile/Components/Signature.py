@@ -64,7 +64,11 @@ class UserArgumentsInfo:
 
 def getSrcValueType(kernel, isTypeA):
     # special cases for F8 datatypes
+<<<<<<< HEAD
     tc = 'A' if isTypeA else 'B'
+=======
+    tc='A' if isTypeA else 'B'
+>>>>>>> origin/develop
     if kernel["ProblemType"]["MacDataType%s"%tc].isAnyFloat8():
         srcValueType = "FP8"
     elif kernel["ProblemType"]["MacDataType%s"%tc].isAnyBFloat8():
@@ -75,6 +79,10 @@ def getSrcValueType(kernel, isTypeA):
     srcValueType = srcValueType.lower()
     return srcValueType
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/develop
 # Creates kernel header, compatible with code object version 4 and up. V2 and V3 no longer supported.
 class SignatureDefault(Signature):
 
@@ -86,7 +94,13 @@ class SignatureDefault(Signature):
         # kern arg size
         kernArgReg = 0
         kernArgReg += 3*writer.states.rpga
+<<<<<<< HEAD
         kernArgReg += max(1,int(writer.states.bpeA/4)) # alpha
+=======
+        # TODO: Check correctness of the following
+        kernArgReg += max(1,int(writer.states.bpeA/4)) # alpha
+        # TODO: alpha and beta should be computeType
+>>>>>>> origin/develop
         if kernel["ProblemType"]["UseBeta"]:
             kernArgReg += max(1,int(writer.states.bpeCexternal/4)) # beta
         kernArgReg += kernel["ProblemType"]["NumIndicesC"] # strides
@@ -141,12 +155,21 @@ class SignatureDefault(Signature):
 
         if writer.debugConfig.debugKernel:
             signature.addArg("AddressDbg", SVK.SIG_GLOBALBUFFER, "struct", "generic")
+<<<<<<< HEAD
         signature.addArg(    "D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
         signature.addArg(    "A", SVK.SIG_GLOBALBUFFER, srcValueTypeA, "generic")
         if kernel["ProblemType"]["MXBlockA"]:
             signature.addArg("MXSA", SVK.SIG_GLOBALBUFFER, "void", "generic")
         signature.addArg(    "B", SVK.SIG_GLOBALBUFFER, srcValueTypeB, "generic")
+=======
+        signature.addArg("D", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+        signature.addArg("C", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+        signature.addArg("A", SVK.SIG_GLOBALBUFFER, srcValueTypeA, "generic")
+        if kernel["ProblemType"]["MXBlockA"]:
+            signature.addArg("MXSA", SVK.SIG_GLOBALBUFFER, "void", "generic")
+        signature.addArg("B", SVK.SIG_GLOBALBUFFER, srcValueTypeB, "generic")
+>>>>>>> origin/develop
         if kernel["ProblemType"]["MXBlockB"]:
             signature.addArg("MXSB", SVK.SIG_GLOBALBUFFER, "void", "generic")
         userArgumentsInfo.gemmArgumentSize += (8 + 8 + 8 + 8)  # A, B, C, D buffer
@@ -154,7 +177,10 @@ class SignatureDefault(Signature):
             userArgumentsInfo.gemmArgumentSize += 8
         if kernel["ProblemType"]["MXBlockB"]:
             userArgumentsInfo.gemmArgumentSize += 8
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/develop
         if kernel["ProblemType"]["Sparse"]:
             signature.addArg("MetaData", SVK.SIG_GLOBALBUFFER, "void" , "generic")
 

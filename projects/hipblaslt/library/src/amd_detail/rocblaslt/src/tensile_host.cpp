@@ -394,10 +394,13 @@ namespace
             return rocisa::DataType::BFloat6;
         case HIP_R_4F_E2M1_EXT:
             return rocisa::DataType::Float4;
+<<<<<<< HEAD
         case HIP_C_32F:
             return rocisa::DataType::ComplexFloat;
         case HIP_C_64F:
             return rocisa::DataType::ComplexDouble;
+=======
+>>>>>>> origin/develop
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -434,10 +437,13 @@ namespace
             return static_cast<hipDataType>(HIP_R_6F_E3M2_EXT);
         case rocisa::DataType::Float4:
             return static_cast<hipDataType>(HIP_R_4F_E2M1_EXT);
+<<<<<<< HEAD
         case rocisa::DataType::ComplexFloat:
             return HIP_C_32F;
         case rocisa::DataType::ComplexDouble:
             return HIP_C_64F;
+=======
+>>>>>>> origin/develop
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -477,6 +483,8 @@ namespace
         roc2TensileComputeInputTypeA(const rocisa::DataType&       typeA,
                                      const rocisa::DataType&       typeB,
                                      const rocblaslt_compute_type& typeCompute)
+<<<<<<< HEAD
+=======
     {
         switch(typeCompute)
         {
@@ -497,6 +505,51 @@ namespace
         case rocblaslt_compute_f32_fast_bf8:
             return rocisa::DataType::BFloat8;
         case rocblaslt_compute_f32_fast_f8bf8:
+            return rocisa::DataType::Float8;
+        case rocblaslt_compute_f32_fast_bf8f8:
+            return rocisa::DataType::BFloat8;
+        default:;
+        }
+
+        if(typeA == rocisa::DataType::Float8 || typeA == rocisa::DataType::BFloat8 || typeA == rocisa::DataType::Float8_fnuz || typeA == rocisa::DataType::BFloat8_fnuz || typeA == rocisa::DataType::Float6 || typeA == rocisa::DataType::BFloat6 || typeA == rocisa::DataType::Float4) return typeA;
+        return TensileLite::DataTypeInfo::Get(typeA).elementSize
+                       <= TensileLite::DataTypeInfo::Get(typeB).elementSize
+                   ? typeA
+                   : typeB;
+    }
+
+    inline const rocisa::DataType
+        roc2TensileComputeInputTypeB(const rocisa::DataType&  typeA,
+                                    const rocisa::DataType&  typeB,
+                                    const rocblaslt_compute_type& typeCompute)
+>>>>>>> origin/develop
+    {
+        switch(typeCompute)
+        {
+        case rocblaslt_compute_f32_fast_f16:
+            return rocisa::DataType::Half;
+        case rocblaslt_compute_f32_fast_bf16:
+            return rocisa::DataType::BFloat16;
+        case rocblaslt_compute_f32_fast_f8_fnuz:
+            return rocisa::DataType::Float8_fnuz;
+        case rocblaslt_compute_f32_fast_bf8_fnuz:
+            return rocisa::DataType::BFloat8_fnuz;
+        case rocblaslt_compute_f32_fast_f8bf8_fnuz:
+<<<<<<< HEAD
+            return rocisa::DataType::Float8_fnuz;
+        case rocblaslt_compute_f32_fast_bf8f8_fnuz:
+            return rocisa::DataType::BFloat8_fnuz;
+=======
+            return rocisa::DataType::BFloat8_fnuz;
+        case rocblaslt_compute_f32_fast_bf8f8_fnuz:
+            return rocisa::DataType::Float8_fnuz;
+>>>>>>> origin/develop
+        case rocblaslt_compute_f32_fast_f8:
+            return rocisa::DataType::Float8;
+        case rocblaslt_compute_f32_fast_bf8:
+            return rocisa::DataType::BFloat8;
+        case rocblaslt_compute_f32_fast_f8bf8:
+<<<<<<< HEAD
             return rocisa::DataType::Float8;
         case rocblaslt_compute_f32_fast_bf8f8:
             return rocisa::DataType::BFloat8;
@@ -575,6 +628,15 @@ namespace
             return rocisa::DataType::Float8;
         }
 
+=======
+            return rocisa::DataType::BFloat8;
+        case rocblaslt_compute_f32_fast_bf8f8:
+            return rocisa::DataType::Float8;
+        default:;
+        }
+
+        if(typeB == rocisa::DataType::Float8 || typeB == rocisa::DataType::BFloat8 || typeB == rocisa::DataType::Float8_fnuz || typeB == rocisa::DataType::BFloat8_fnuz ||typeB == rocisa::DataType::Float6 || typeB == rocisa::DataType::BFloat6 || typeB == rocisa::DataType::Float4) return typeB;
+>>>>>>> origin/develop
         return TensileLite::DataTypeInfo::Get(typeA).elementSize
                        <= TensileLite::DataTypeInfo::Get(typeB).elementSize
                    ? typeA
@@ -633,8 +695,13 @@ namespace
             typeBTensile,
             hip2TensileType(typeC),
             hip2TensileType(typeD),
+<<<<<<< HEAD
             alphaBetaType,
             alphaBetaType,
+=======
+            roc2TensileType(typeCompute),
+            roc2TensileType(typeCompute),
+>>>>>>> origin/develop
             roc2TensileComputeInputTypeA(typeATensile, typeBTensile, typeCompute),
             roc2TensileComputeInputTypeB(typeATensile, typeBTensile, typeCompute),
             roc2TensileType(typeCompute),
@@ -674,8 +741,14 @@ namespace
             return "xf32_r";
         }
         else if(typeComputeInputA == rocisa::DataType::BFloat16
+<<<<<<< HEAD
                 && typeComputeInputB == rocisa::DataType::BFloat16 && typeA == rocisa::DataType::Half
                 && typeB == rocisa::DataType::Half)
+=======
+                && typeComputeInputB == rocisa::DataType::BFloat16
+                && (typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Half
+                    || typeA == rocisa::DataType::Float && typeB == rocisa::DataType::Float))
+>>>>>>> origin/develop
         {
             return "f32_bf16_r";
         }
@@ -718,8 +791,14 @@ namespace
             return "c_xf32_r";
         }
         else if(typeComputeInputA == rocisa::DataType::BFloat16
+<<<<<<< HEAD
                 && typeComputeInputB == rocisa::DataType::BFloat16 && typeA == rocisa::DataType::Half
                 && typeB == rocisa::DataType::Half)
+=======
+                && typeComputeInputB == rocisa::DataType::BFloat16
+                && (typeA == rocisa::DataType::Half && typeB == rocisa::DataType::Half
+                    || typeA == rocisa::DataType::Float && typeB == rocisa::DataType::Float))
+>>>>>>> origin/develop
         {
             return "c_f32_fast_bf16_r";
         }
@@ -1673,6 +1752,7 @@ namespace
             roc2TensileComputeInputTypeA(a_type, b_type, prob.compute_type));
         tensileProblem.setComputeInputTypeB(
             roc2TensileComputeInputTypeB(a_type, b_type, prob.compute_type));
+<<<<<<< HEAD
 
         bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat
                                || a_type == rocisa::DataType::ComplexDouble);
@@ -1681,6 +1761,10 @@ namespace
 
         tensileProblem.setAlphaType(alphaBetaType);
         tensileProblem.setBetaType(alphaBetaType);
+=======
+        tensileProblem.setAlphaType(compute_type);
+        tensileProblem.setBetaType(compute_type);
+>>>>>>> origin/develop
 
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
@@ -1728,6 +1812,7 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
+<<<<<<< HEAD
 	// NOTE: for MX data types, Tensile sets useScaleAB field in yaml to be empty.
 	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
 		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
@@ -1748,6 +1833,70 @@ namespace
 			? "Vector"
 			: "Scalar");
 	}
+=======
+        switch(prob.scaleAType)
+        {
+        case RocblasltContractionProblem::ScalingFormat::None:
+        case RocblasltContractionProblem::ScalingFormat::Scalar:
+        case RocblasltContractionProblem::ScalingFormat::Vector:
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+            tensileProblem.setMXScaleA(rocisa::DataType::E8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
+            tensileProblem.setMXScaleA(rocisa::DataType::E8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::Float8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::Float8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::E5M3, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::E5M3, 16);
+            break;
+        }
+
+        switch(prob.scaleBType)
+        {
+        case RocblasltContractionProblem::ScalingFormat::None:
+        case RocblasltContractionProblem::ScalingFormat::Scalar:
+        case RocblasltContractionProblem::ScalingFormat::Vector:
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+            tensileProblem.setMXScaleB(rocisa::DataType::E8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
+            tensileProblem.setMXScaleB(rocisa::DataType::E8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::Float8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::Float8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::E5M3, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::E5M3, 16);
+            break;
+        }
+
+        if (prob.scaleA == nullptr && prob.scaleB == nullptr)
+            tensileProblem.setUseScaleAB("");
+        else if (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector
+                 || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Vector)
+            tensileProblem.setUseScaleAB("Vector");
+        else if (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Scalar
+                 || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Scalar)
+            tensileProblem.setUseScaleAB("Scalar");
+        else
+            tensileProblem.setUseScaleAB("");
+>>>>>>> origin/develop
 
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
@@ -1876,6 +2025,7 @@ namespace
             roc2TensileComputeInputTypeA(a_type, b_type, prob.compute_type));
         tensileProblem.setComputeInputTypeB(
             roc2TensileComputeInputTypeB(a_type, b_type, prob.compute_type));
+<<<<<<< HEAD
 
         bool isComplexInput = (a_type == rocisa::DataType::ComplexFloat
                                || a_type == rocisa::DataType::ComplexDouble);
@@ -1884,6 +2034,10 @@ namespace
 
         tensileProblem.setAlphaType(alphaBetaType);
         tensileProblem.setBetaType(alphaBetaType);
+=======
+        tensileProblem.setAlphaType(compute_type);
+        tensileProblem.setBetaType(compute_type);
+>>>>>>> origin/develop
 
         // HPA is active iff sizeof(compute type) > sizeof(input type)
         tensileProblem.setHighPrecisionAccumulate(
@@ -1924,6 +2078,7 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
+<<<<<<< HEAD
         // NOTE: for MX data types, Tensile sets useScaleAB field in yaml to be empty.
 	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
 		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
@@ -1944,6 +2099,70 @@ namespace
 			? "Vector"
 			: "Scalar");
 	}
+=======
+        switch(prob.scaleAType)
+        {
+        case RocblasltContractionProblem::ScalingFormat::None:
+        case RocblasltContractionProblem::ScalingFormat::Scalar:
+        case RocblasltContractionProblem::ScalingFormat::Vector:
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+            tensileProblem.setMXScaleA(rocisa::DataType::E8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
+            tensileProblem.setMXScaleA(rocisa::DataType::E8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::Float8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::Float8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::E5M3, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
+            tensileProblem.setMXScaleA(rocisa::DataType::E5M3, 16);
+            break;
+        }
+
+        switch(prob.scaleBType)
+        {
+        case RocblasltContractionProblem::ScalingFormat::None:
+        case RocblasltContractionProblem::ScalingFormat::Scalar:
+        case RocblasltContractionProblem::ScalingFormat::Vector:
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+            tensileProblem.setMXScaleB(rocisa::DataType::E8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
+            tensileProblem.setMXScaleB(rocisa::DataType::E8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::Float8, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::Float8, 16);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::E5M3, 32);
+            break;
+        case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
+            tensileProblem.setMXScaleB(rocisa::DataType::E5M3, 16);
+            break;
+        }
+
+        if (prob.scaleA == nullptr && prob.scaleB == nullptr)
+            tensileProblem.setUseScaleAB("");
+        else if (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector
+                 || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Vector)
+            tensileProblem.setUseScaleAB("Vector");
+        else if (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Scalar
+                 || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Scalar)
+            tensileProblem.setUseScaleAB("Scalar");
+        else
+            tensileProblem.setUseScaleAB("");
+>>>>>>> origin/develop
 
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
@@ -2029,6 +2248,7 @@ namespace
         else
             inputs.bias = nullptr;
 
+<<<<<<< HEAD
 	if(prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
            prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
 	{
@@ -2050,6 +2270,39 @@ namespace
 	    inputs.mxsa        = nullptr;
 	    inputs.mxsb        = nullptr;
 	}
+=======
+        if(prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0
+            || prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3
+            || prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0
+            || prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3
+            || prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3
+            || prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3)
+        {
+            inputs.scaleA = nullptr;
+            inputs.mxsa   = reinterpret_cast<const void*>(prob.scaleA);
+        }
+        else
+        {
+            inputs.scaleA = reinterpret_cast<const void*>(prob.scaleA);
+            inputs.mxsa   = nullptr;
+        }
+
+        if(prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0
+            || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3
+            || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0
+            || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3
+            || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3
+            || prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3)
+        {
+            inputs.scaleB = nullptr;
+            inputs.mxsb   = reinterpret_cast<const void*>(prob.scaleB);
+        }
+        else
+        {
+            inputs.scaleB = reinterpret_cast<const void*>(prob.scaleB);
+            inputs.mxsb   = nullptr;
+        }
+>>>>>>> origin/develop
 
         inputs.scaleC        = reinterpret_cast<const void*>(prob.scaleC);
         inputs.scaleD        = reinterpret_cast<const void*>(prob.scaleD);
@@ -2073,6 +2326,7 @@ namespace
         // push 2 activation arguments
         std::visit(
             [&inputs, &prob](auto val) {
+<<<<<<< HEAD
                 using ValType = decltype(val);
                 if constexpr (std::is_constructible_v<ValType, float>)
                 {
@@ -2084,6 +2338,10 @@ namespace
                     inputs.activationArgs.push_back(prob.act0);
                     inputs.activationArgs.push_back(prob.act1);
                 }
+=======
+                inputs.activationArgs.push_back(static_cast<decltype(val)>(prob.act0));
+                inputs.activationArgs.push_back(static_cast<decltype(val)>(prob.act1));
+>>>>>>> origin/develop
                 if(prob.k)
                     inputs.alpha = *(ValType*)(prob.alpha);
                 else
@@ -2195,6 +2453,10 @@ namespace
         {
             return TensileLite::LazyLoadingInit::gfx1201;
         }
+        else if(deviceString.find("gfx1250") != std::string::npos)
+        {
+            return TensileLite::LazyLoadingInit::gfx1250;
+        }
         return TensileLite::LazyLoadingInit::None;
     }
 
@@ -2209,8 +2471,10 @@ namespace
 #if ROCBLASLT_TENSILE_LAZY_LOAD
         std::unordered_set<TensileLite::LazyLoadingInit>                  m_deviceSet;
         std::unordered_map<std::string, std::shared_ptr<hipDeviceProp_t>> m_devicePropMap;
+        std::unordered_map<std::string, std::shared_ptr<TensileLite::Hardware>> m_hardwareMap;
 #else
-        std::shared_ptr<hipDeviceProp_t> m_deviceProp;
+        std::shared_ptr<hipDeviceProp_t>       m_deviceProp;
+        std::shared_ptr<TensileLite::Hardware> m_hardware;
 #endif
         std::string m_tensileLibPath;
 
@@ -2267,10 +2531,18 @@ namespace
         {
             return m_devicePropMap.at(deviceName);
         }
+        auto get_hardware(const std::string& deviceName) const
+        {
+            return m_hardwareMap.at(deviceName);
+        }
 #else
         auto& get_device_property() const
         {
             return m_deviceProp;
+        }
+        auto get_hardware() const
+        {
+            return m_hardware;
         }
 #endif
         auto& get_adapters() const
@@ -2323,9 +2595,14 @@ namespace
                        /*relpath=*/std::nullopt, default_lib_path))
                     path = std::move(*maybe_path);
                 // Optionally, look for a `processor` sub-directory under the library path.
+                // Only use the subdir if a Tensile mapping file is actually present there;
+                // otherwise the directory may have been created by ExtOp/Transform installs
+                // without a corresponding Tensile library (multi-arch non-TheRock builds).
                 {
-                    auto processor_path = path / processor;
-                    if(std::filesystem::exists(processor_path))
+                    auto processor_path  = path / processor;
+                    auto mapping_msgpack = processor_path / ("TensileLibrary_lazy_" + processor + ".dat");
+                    auto mapping_yaml    = processor_path / ("TensileLibrary_lazy_" + processor + ".yaml");
+                    if(std::filesystem::exists(mapping_msgpack) || std::filesystem::exists(mapping_yaml))
                         path = std::move(processor_path);
                 }
 
@@ -2422,6 +2699,7 @@ namespace
                         std::string deviceString
                             = deviceFullString.substr(0, deviceFullString.find(":"));
                         m_devicePropMap[deviceString] = std::make_shared<hipDeviceProp_t>(prop);
+                        m_hardwareMap[deviceString] = TensileLite::hip::GetDevice(devId);
                     }
                 }
 
@@ -2433,6 +2711,7 @@ namespace
                 hipDeviceProp_t prop;
                 HIP_CHECK_EXC(hipGetDeviceProperties(&prop, deviceId));
                 m_deviceProp = std::make_shared<hipDeviceProp_t>(prop);
+                m_hardware = TensileLite::hip::GetDevice(deviceId);
 
                 // Load library
                 auto lib = TensileLite::LoadLibraryFile<TensileLite::ContractionProblemGemm>(
@@ -2472,8 +2751,9 @@ namespace
         std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>*
             library
         = nullptr,
-        std::shared_ptr<hipDeviceProp_t>* deviceProp = nullptr,
-        int                               device     = -1)
+        std::shared_ptr<hipDeviceProp_t>*       deviceProp = nullptr,
+        std::shared_ptr<TensileLite::Hardware>* hardware   = nullptr,
+        int                                     device     = -1)
     try
     {
         // TensileHost is initialized on the first call
@@ -2509,11 +2789,16 @@ namespace
         // If an adapter is found, it is assumed that the library is initialized
         if(library)
             *library = host.get_library();
-        if(deviceProp)
 #if ROCBLASLT_TENSILE_LAZY_LOAD
+        if(deviceProp)
             *deviceProp = host.get_device_property(rocblaslt_internal_get_arch_name());
+        if(hardware)
+            *hardware = host.get_hardware(rocblaslt_internal_get_arch_name());
 #else
+        if(deviceProp)
             *deviceProp = host.get_device_property();
+        if(hardware)
+            *hardware = host.get_hardware();
 #endif
 
         return adapter;
@@ -2595,6 +2880,10 @@ TensileLite::ProblemOverride TensileDataGemm2ProblemOverride(std::shared_ptr<voi
 {
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
     rocisa::DataType                 computeType      = rocisa::DataType::None;
+<<<<<<< HEAD
+=======
+    // TODO: Check correctness of computeInputTypeA()
+>>>>>>> origin/develop
     rocisa::DataType                 computeInputType = data->problem.computeInputTypeA();
 
     if(data->problem.f32XdlMathOp() == rocisa::DataType::XFloat32)
@@ -2723,14 +3012,12 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
             return rocblaslt_status_invalid_pointer;
         }
-
-        hardware = TensileLite::hip::GetDevice(*deviceProp);
 
         std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
         rocblaslt_matmul_heuristic_result heuristicResult;
@@ -3105,14 +3392,12 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
             return rocblaslt_status_invalid_pointer;
         }
-
-        hardware = TensileLite::hip::GetDevice(*deviceProp);
 
         int* solutionIndex = (int*)algo.data;
         if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
@@ -3299,7 +3584,7 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
@@ -3437,7 +3722,7 @@ rocblaslt_status getDeviceUserArgumentsValuesFromContractionProblem(rocblaslt_ha
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
@@ -3501,7 +3786,7 @@ rocblaslt_status runKernelFromNewDeviceUserArguments(rocblaslt_handle       hand
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
@@ -3624,7 +3909,7 @@ rocblaslt_status runKernelFromDeviceUserArguments(rocblaslt_handle             h
         std::shared_ptr<hipDeviceProp_t>       deviceProp;
         std::shared_ptr<TensileLite::Hardware> hardware;
 
-        auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+        auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
         if(!library)
         {
@@ -3725,14 +4010,12 @@ std::vector<std::shared_ptr<TensileLite::ContractionSolution>>
     std::shared_ptr<hipDeviceProp_t>       deviceProp;
     std::shared_ptr<TensileLite::Hardware> hardware;
 
-    static_cast<void>(get_library_and_adapter(&library, &deviceProp, handle->device));
+    static_cast<void>(get_library_and_adapter(&library, &deviceProp, &hardware, handle->device));
 
     if(!library)
     {
         return {};
     }
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
     updateTensileProblem(prob, data->problem);
@@ -3777,14 +4060,12 @@ rocblaslt_status getBestSolutions(RocblasltContractionProblem const& prob,
     std::shared_ptr<TensileLite::Hardware> hardware;
 
     // auto &adapter =
-    static_cast<void>(get_library_and_adapter(&library, &deviceProp, handle->device));
+    static_cast<void>(get_library_and_adapter(&library, &deviceProp, &hardware, handle->device));
 
     if(!library)
     {
         return rocblaslt_status_invalid_pointer;
     }
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     std::shared_ptr<TensileDataGemm> data = std::static_pointer_cast<TensileDataGemm>(gemmData);
     updateTensileProblem(prob, data->problem);
@@ -3842,7 +4123,7 @@ rocblaslt_status getAllSolutions(MyProblem&                                     
     std::shared_ptr<TensileLite::Hardware> hardware;
 
     // auto &adapter =
-    static_cast<void>(get_library_and_adapter(&library, &deviceProp, handle->device));
+    static_cast<void>(get_library_and_adapter(&library, &deviceProp, &hardware, handle->device));
 
     if(!library)
     {
@@ -3851,8 +4132,6 @@ rocblaslt_status getAllSolutions(MyProblem&                                     
 
     std::string deviceFullString(deviceProp->gcnArchName);
     std::string deviceString = deviceFullString.substr(0, deviceFullString.find(":"));
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     std::set<std::shared_ptr<TensileLite::ContractionSolution>> solutions;
     std::shared_ptr<void>                                       tensile_prob;
@@ -3994,14 +4273,12 @@ rocblaslt_status
     std::shared_ptr<hipDeviceProp_t>       deviceProp;
     std::shared_ptr<TensileLite::Hardware> hardware;
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+    auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
     if(!library)
     {
         return rocblaslt_status_invalid_pointer;
     }
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     bool isOutOfBound = false;
     int  i            = 0;
@@ -4052,14 +4329,13 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
     std::shared_ptr<hipDeviceProp_t>       deviceProp;
     std::shared_ptr<TensileLite::Hardware> hardware;
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+    auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
     if(!library)
     {
         return rocblaslt_status_invalid_pointer;
     }
 
-    hardware              = TensileLite::hip::GetDevice(*deviceProp);
     *workspaceSizeInBytes = 0;
 
     int* solutionIndex = (int*)algo->data;
@@ -4361,14 +4637,12 @@ rocblaslt_status getBestSolutions(rocblaslt_handle       handle,
     std::shared_ptr<TensileLite::Hardware> hardware;
 
     // auto &adapter =
-    static_cast<void>(get_library_and_adapter(&library, &deviceProp, handle->device));
+    static_cast<void>(get_library_and_adapter(&library, &deviceProp, &hardware, handle->device));
 
     if(!library)
     {
         return rocblaslt_status_invalid_pointer;
     }
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
     {
@@ -4455,7 +4729,7 @@ std::string getKernelNameFromData(rocblaslt_handle             handle,
                                      library;
     std::shared_ptr<hipDeviceProp_t> deviceProp;
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+    auto adapter = get_library_and_adapter(&library, &deviceProp, nullptr, handle->device);
 
     if(!library)
     {
@@ -4497,10 +4771,11 @@ std::string getSolutionNameFromData(rocblaslt_handle             handle,
                                     std::shared_ptr<void>        gemmData)
 {
     std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>
-                                     library;
-    std::shared_ptr<hipDeviceProp_t> deviceProp;
+                                           library;
+    std::shared_ptr<hipDeviceProp_t>       deviceProp;
+    std::shared_ptr<TensileLite::Hardware> hardware;
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+    auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
     if(!library)
     {
@@ -4510,10 +4785,6 @@ std::string getSolutionNameFromData(rocblaslt_handle             handle,
     int gsu           = 0;
     int wgm           = 0;
     int solutionIndex = -1;
-
-    std::shared_ptr<TensileLite::Hardware> hardware;
-
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
 
     if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GEMM)
     {
@@ -4553,41 +4824,55 @@ std::string getSolutionNameFromData(rocblaslt_handle             handle,
 
 std::string getKernelNameFromAlgoIndex(rocblaslt_handle handle, const rocblaslt_matmul_algo& algo)
 {
-    std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>
-                                     library;
-    std::shared_ptr<hipDeviceProp_t> deviceProp;
+    int* solutionIndex = (int*)algo.data;
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+#ifdef HIPBLASLT_USE_ROCROLLER
+    if(*solutionIndex < 0)
+    {
+        return rocRollerShortKernelNameFromEncodedSolutionIndex(*solutionIndex);
+    }
+#endif
+
+    std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>
+                                           library;
+    std::shared_ptr<hipDeviceProp_t>       deviceProp;
     std::shared_ptr<TensileLite::Hardware> hardware;
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
+
+    auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
     if(!library)
     {
         return std::string();
     }
 
-    int* solutionIndex = (int*)algo.data;
-    auto solution      = library->getSolutionByIndex(*hardware, *solutionIndex);
+    auto solution = library->getSolutionByIndex(*hardware, *solutionIndex);
     return solution->kernelName;
 }
 
 std::string getSolutionNameFromAlgoIndex(rocblaslt_handle handle, const rocblaslt_matmul_algo& algo)
 {
-    std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>
-                                     library;
-    std::shared_ptr<hipDeviceProp_t> deviceProp;
+    int* solutionIndex = (int*)algo.data;
+ 
+#ifdef HIPBLASLT_USE_ROCROLLER
+    if(*solutionIndex < 0)
+    {
+        return rocRollerShortKernelNameFromEncodedSolutionIndex(*solutionIndex);
+    }
+#endif
 
-    auto adapter = get_library_and_adapter(&library, &deviceProp, handle->device);
+    std::shared_ptr<TensileLite::MasterSolutionLibrary<TensileLite::ContractionProblemGemm>>
+                                           library;
+    std::shared_ptr<hipDeviceProp_t>       deviceProp;
     std::shared_ptr<TensileLite::Hardware> hardware;
-    hardware = TensileLite::hip::GetDevice(*deviceProp);
+
+    auto adapter = get_library_and_adapter(&library, &deviceProp, &hardware, handle->device);
 
     if(!library)
     {
         return std::string();
     }
 
-    int* solutionIndex = (int*)algo.data;
-    auto solution      = library->getSolutionByIndex(*hardware, *solutionIndex);
+    auto solution = library->getSolutionByIndex(*hardware, *solutionIndex);
     return solution->solutionName;
 }
 

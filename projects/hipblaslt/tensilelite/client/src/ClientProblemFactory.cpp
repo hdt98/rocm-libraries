@@ -53,10 +53,16 @@ namespace TensileLite
             , m_f32XdlMathOp(rocisa::DataType::Float)
             , m_activationComputeType(rocisa::DataType::Float)
             , m_useUserArgs(false)
+            , m_mxBlockA(args["mx-a-block"].as<int>())
+            , m_mxBlockB(args["mx-b-block"].as<int>())
             , m_swizzleTensorA(false)
             , m_swizzleTensorB(false)
+<<<<<<< HEAD
             , m_mxBlockA(args["mx-block-a"].as<int>())
             , m_mxBlockB(args["mx-block-b"].as<int>())
+=======
+            , m_metadataLayout(args["metadata-layout"].as<int>())
+>>>>>>> origin/develop
             , m_aOps(args["a-ops"].as<TensorOps>())
             , m_bOps(args["b-ops"].as<TensorOps>())
             , m_cOps(args["c-ops"].as<TensorOps>())
@@ -349,7 +355,7 @@ namespace TensileLite
                             rv.back().setKernelLanguage(m_kernelLanguage);
                             rv.back().setPerformanceMetric(m_performanceMetric);
                             rv.back().setDeterministicMode(m_deterministicMode);
-                            rv.back().setSparse(m_sparse);
+                            rv.back().setSparse(m_sparse, m_metadataLayout);
                             rv.back().setActivationType(m_activationType);
                             rv.back().setWorkspaceSize(m_maxWorkspaceSize);
                             rv.back().setSwizzleTensorA(m_swizzleTensorA);
@@ -444,11 +450,19 @@ namespace TensileLite
                             rv.back().setUseDeviceUserArguments(m_useUserArgs);
                             if(m_mxBlockA)
                             {
+<<<<<<< HEAD
                                 rv.back().setMXScaleA(m_mxBlockA);
                             }
                             if(m_mxBlockB)
                             {
                                 rv.back().setMXScaleB(m_mxBlockB);
+=======
+                                rv.back().setMXScaleA(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA], m_mxBlockA);
+                            }
+                            if(m_mxBlockB)
+                            {
+                                rv.back().setMXScaleB(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB], m_mxBlockB);
+>>>>>>> origin/develop
                             }
                         }
                     }

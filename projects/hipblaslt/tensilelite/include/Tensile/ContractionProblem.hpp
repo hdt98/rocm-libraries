@@ -929,15 +929,21 @@ namespace TensileLite
             return m_highPrecisionAccumulate;
         }
 
-        void setSparse(int value)
+        void setSparse(int value, int layout)
         {
             m_sparse = value;
+            m_metadataLayout = layout;
             normalizeSparse();
         }
 
         int sparse() const
         {
             return m_sparse;
+        }
+
+        int metadataLayout() const
+        {
+            return m_metadataLayout;
         }
 
         void setKernelLanguage(KernelLanguage value)
@@ -1040,6 +1046,30 @@ namespace TensileLite
         size_t maxProblemSize() const
         {
             return m_maxProblemSize;
+        }
+
+        void setMXScaleA(rocisa::DataType mxType, int mxBlock, std::vector<size_t> saStride = {});
+
+        size_t mxBlockA() const
+        {
+            return m_mxBlockA;
+        }
+
+        rocisa::DataType mxTypeA() const
+        {
+            return m_mxTypeA;
+        }
+
+        void setMXScaleB(rocisa::DataType mxType, int mxBlock, std::vector<size_t> sbStride = {});
+
+        size_t mxBlockB() const
+        {
+            return m_mxBlockB;
+        }
+
+        rocisa::DataType mxTypeB() const
+        {
+            return m_mxTypeB;
         }
 
         bool swizzleTensorA() const
@@ -1158,6 +1188,14 @@ namespace TensileLite
         TensorOps const& dOps() const
         {
             return m_dOps;
+        }
+        TensorDescriptor const& mxsa() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSA];
+        }
+        TensorDescriptor const& mxsb() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSB];
         }
         FreeIndices const& freeIndicesA() const
         {
@@ -1329,8 +1367,16 @@ namespace TensileLite
         ActivationType   m_activationType          = ActivationType::None;
         bool             m_activationNoGuard       = false;
         int              m_sparse                  = 0;
+<<<<<<< HEAD
         int              m_mxBlockA                = 0;
         int              m_mxBlockB                = 0;
+=======
+        int              m_metadataLayout          = 0;
+        int              m_mxBlockA                = 0;
+        int              m_mxBlockB                = 0;
+        rocisa::DataType m_mxTypeA                 = rocisa::DataType::None;
+        rocisa::DataType m_mxTypeB                 = rocisa::DataType::None;
+>>>>>>> origin/develop
 
         KernelLanguage    m_kernelLanguage    = KernelLanguage::Any;
         PerformanceMetric m_performanceMetric = PerformanceMetric::DeviceEfficiency;

@@ -57,7 +57,12 @@ namespace rocisa
         Float6,
         BFloat6,
         Float4,
+<<<<<<< HEAD
         MXScale,
+=======
+        E8,
+        E5M3,
+>>>>>>> origin/develop
         Count,
         None = Count
     };
@@ -163,8 +168,15 @@ namespace rocisa
             return "BFloat6";
         case DataType::Float4:
             return "Float4";
+<<<<<<< HEAD
         case DataType::MXScale:
             return "MXScale";
+=======
+        case DataType::E8:
+            return "E8";
+        case DataType::E5M3:
+            return "E5M3";
+>>>>>>> origin/develop
         default:
             return "Invalid";
         }
@@ -223,6 +235,7 @@ namespace rocisa
         INST_F6         = 42,
         INST_BF6        = 43,
         INST_F4         = 44,
+<<<<<<< HEAD
         INST_F8_F6      = 45,
         INST_F6_F8      = 46,
         INST_F8_F4      = 47,
@@ -234,6 +247,31 @@ namespace rocisa
         INST_B6_F4      = 53,
         INST_F4_B6      = 55,
         INST_NOTYPE     = 56
+=======
+        INST_F8_F4      = 45,
+        INST_F4_F8      = 46,
+        INST_F6_F4      = 47,
+        INST_F4_F6      = 48,
+        INST_F8_F6      = 49,
+        INST_F6_F8      = 50,
+        INST_F8_B6      = 51,
+        INST_B6_F8      = 52,
+        INST_B8_F4      = 53,
+        INST_F4_B8      = 54,
+        INST_B6_F4      = 55,
+        INST_F4_B6      = 56,
+        INST_B8_F6      = 57,
+        INST_F6_B8      = 58,
+        INST_B8_B6      = 59,
+        INST_B6_B8      = 60,
+        INST_F6_B6      = 61,
+        INST_B6_F6      = 62,
+        INST_B96        = 63,
+        INST_E8         = 64,
+        INST_E5M3       = 65,
+        INST_TDM        = 66,
+        INST_NOTYPE     = 67
+>>>>>>> origin/develop
     };
 
     enum class SelectBit : int
@@ -265,6 +303,13 @@ namespace rocisa
         SCOPE_SYS  = 4,
     };
 
+    enum class HighBitSel : int
+    {
+        NONE = -1,
+        LOW  =  0,
+        HIGH =  1
+    };
+
     enum class CvtType : int
     {
         CVT_F16_to_F32          = 1,
@@ -293,12 +338,22 @@ namespace rocisa
         CVT_PK_F32_to_BF16      = 24,
         CVT_U32_to_F64          = 25,
         CVT_F64_to_U32          = 26,
+        CVT_FP8_to_F16          = 27,
+        CVT_PK_FP8_to_F16       = 28,
+        CVT_PK_F32_to_F16       = 29
     };
 
     enum class RoundType : int
     {
         ROUND_UP              = 0,
         ROUND_TO_NEAREST_EVEN = 1
+    };
+
+    enum class ArgType : int
+    {
+        DST  = 0,
+        DST1 = 1,
+        SRC0 = 2
     };
 
     inline std::string toString(SelectBit bit)

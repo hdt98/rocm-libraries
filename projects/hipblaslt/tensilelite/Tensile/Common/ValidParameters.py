@@ -83,7 +83,10 @@ def makeValidWorkGroups():
     return validWorkGroups
 
 def makeValidWMMA():
-    return [[16, 16, 16, 1]]
+    return [[16, 16, 4, 1], [16, 16, 8, 1], [16, 16, 16, 1], [16, 16, 32, 1], [16, 16, 64, 1], [16, 16, 128, 1], [32, 16, 128, 1]]
+
+def makeValidSWMMAC():
+    return [[16, 16, 32, 1], [16, 16, 64, 1], [16, 16, 128, 1]]
 
 @lru_cache
 def makeValidMFMA():
@@ -171,7 +174,11 @@ def makeValidSMFMA():
     validSMFMA["F8NB8N"] = validSMFMA["F8NF8N"]
     validSMFMA["B8NF8N"] = validSMFMA["F8NF8N"]
     validSMFMA["_format9"] = []
+<<<<<<< HEAD
     for SMFMA in [validSMFMA["HH"], validSMFMA["BB"], validSMFMA["4xi84xi8"], validSMFMA["F8NF8N"]]:
+=======
+    for SMFMA in [validSMFMA["H"], validSMFMA["B"], validSMFMA["4xi8"], validSMFMA["F8N"], makeValidSWMMAC()]:
+>>>>>>> origin/develop
         for MI in SMFMA:
             for bm in range(int(math.log(MI[3], 2)) + 1):
                 for tt0 in range(1, validTT + 1):
@@ -187,6 +194,7 @@ def makeValidSMFMA():
 def makeValidMatrixInstructions():
     mfma = makeValidMFMA()
     smfma = makeValidSMFMA()
+    wmma = makeValidWMMA()
     validMatrixInstructions = (
         [[], [-1]]
         + mfma["HH"]
@@ -194,10 +202,18 @@ def makeValidMatrixInstructions():
         + mfma["BB"]
         + mfma["DD"]
         + mfma["B1k"]
+<<<<<<< HEAD
         + mfma["XX"]
         + smfma["HH"]
         + smfma["BB"]
         + smfma["4xi84xi8"]
+=======
+        + mfma["X"]
+        + smfma["H"]
+        + smfma["B"]
+        + smfma["4xi8"]
+        + wmma
+>>>>>>> origin/develop
     )
     return validMatrixInstructions + mfma["_format9"] + smfma["_format9"]
 
@@ -358,6 +374,8 @@ validParameters = { # we need to make sure this matches develop
     # Assembly only
     "DirectToVgprA": [False, True],
     "DirectToVgprB": [False, True],
+    "DirectToVgprMXSA": [False, True],
+    "DirectToVgprMXSB": [False, True],
     "DirectToVgprSparseMetadata": [False, True],
     # B address interleave (restricted): non-contiguous tile columns for TN/NN-like B (TLUB == False),
     # with runtime G chosen as the largest power-of-two factor of (N/MT1), capped by LVCB.
@@ -469,7 +487,7 @@ validParameters = { # we need to make sure this matches develop
     #   (since C matrix is always coalesced in Free0 index direction and this assertion guarantees the index element multiple)
     #
     # 1 indicates no assertion (since all sizes are multiples of 1)
-    "AssertFree0ElementMultiple": [1, 2, 4, 8, 16],
+    "AssertFree0ElementMultiple": [1, 2, 4, 8, 16, 32],
     # Kernel generator will assume that the FreeIndex[1] size is some multiple of the element size
     # and uses this to optimize the kernel.
     # FreeIndex[1] is usually letter "J"
@@ -477,7 +495,7 @@ validParameters = { # we need to make sure this matches develop
     # Optimizations enabled by AssertFree1ElementMultiple>1:
     #  - See above AssertFree0ElementMultiple "Load optimizations"
     # 1 indicates no assertion (since all sizes are multiples of 1)
-    "AssertFree1ElementMultiple": [1, 2, 4, 8, 16],
+    "AssertFree1ElementMultiple": [1, 2, 4, 8, 16, 32],
     # Address-interleave restriction:
     # If >0, require tiles1=(Free1Size / MT1) to have lowbit(tiles1)>1 (i.e. G>1).
     # This matches the kernel's initBInterleaveG logic:
@@ -627,7 +645,7 @@ validParameters = { # we need to make sure this matches develop
     "MaxOccupancy": list(
         range(1, 40 + 1)
     ),  # wg / CU; if cache thrashing is hurting performance, this allocates extra lds to artificially limit occupancy
-    "MaxLDS": [-1, 65536, 163840],
+    "MaxLDS": [-1, 65536, 163840, 327680],
     "WorkGroup": makeValidWorkGroups(),  # ( wg0 x wg1 x LocalSplitU ) dimensions of the workgroup which will operate on a tile and share lds
     # ThreadTile: ( tt0 x tt1 ) dimensions of the C tile that each thread works on,
     # TT=4 and VW=4 means a thread will work on a tight 4x4 tile of C, where VW=1 means the tile will work on 16 spread out values
@@ -961,7 +979,13 @@ validParameters = { # we need to make sure this matches develop
     #  0: Do prefetch for local read only
     #  1: Do prefetch for pack code
     # CMS (UseCustomMainLoopSchedule) case, this is internally set and setting it from yaml will not change CMS config
-    "UsePLRPack": [0,1]
+    "UsePLRPack": [0,1],
+    # Enable tensor data mover for VM -> LDS
+    # 0: Disable
+    # 1: Use TDM for A
+    # 2: Use TDM for B
+    # 3: Use TDM for both A and B
+    "TDMInst": [0, 1, 2, 3]
 }
 
 newMIValidParameters = {

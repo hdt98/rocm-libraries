@@ -312,7 +312,10 @@ namespace
                                                        boundIndex,
                                                        static_cast<double>(*prob.beta),
                                                        prob.workspaceSize);
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/develop
         tensileProblem.setComputeInputTypeA(Tensile_Ti);
         tensileProblem.setComputeInputTypeB(Tensile_Ti);
         tensileProblem.setAlphaType(Tensile_Tc);
@@ -344,7 +347,8 @@ namespace
         // Add problem predicates for CEqualsD
         tensileProblem.setCEqualsD(prob.C == prob.D);
 
-        tensileProblem.setSparse(prob.sparseA ? 1 : 2);
+        // Workaround: metadata layout
+        tensileProblem.setSparse(prob.sparseA ? 1 : 2, 0);
 
         // set Actvation
         tensileProblem.setActivationType(TensileLite::ActivationType::All);

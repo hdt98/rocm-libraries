@@ -213,6 +213,10 @@ namespace TensileLite
                 ("compute-input-type-A",     po::value<rocisa::DataType>()->default_value(rocisa::DataType::None), "compute input data type A")
                 ("compute-input-type-B",     po::value<rocisa::DataType>()->default_value(rocisa::DataType::None), "compute input data type B")
                 ("f32-xdl-math-op",          po::value<rocisa::DataType>()->default_value(rocisa::DataType::None), "Use xf32 compute for float input and output matrices.")
+                ("mx-a-block",               po::value<int>()->default_value(0), "block of mx datatype input matrix A")
+                ("mx-b-block",               po::value<int>()->default_value(0), "block of mx datatype input matrix B")
+                ("mx-a-type",                po::value<rocisa::DataType>()->default_value(rocisa::DataType::E8), "type of mx datatype input matrix A")
+                ("mx-b-type",                po::value<rocisa::DataType>()->default_value(rocisa::DataType::E8), "type of mx datatype input matrix B")
                 ("swizzle-tensor-a",         po::value<bool>()->default_value(false), "Swizzle input tensor A.")
                 ("swizzle-tensor-b",         po::value<bool>()->default_value(false), "Swizzle input tensor B.")
                 ("mx-block-a",               po::value<int>()->default_value(0), "block of mx datatype input matrix A")
@@ -241,8 +245,13 @@ namespace TensileLite
                 ("init-scaleC",              po::value<InitMode>()->default_value(InitMode::Two), "Initialization for scaleC")
                 ("init-scaleD",              po::value<InitMode>()->default_value(InitMode::Two), "Initialization for scaleD")
                 ("init-scaleAlphaVec",       po::value<InitMode>()->default_value(InitMode::One), "Initialization for scaleAlphaVec")
+<<<<<<< HEAD
                 ("init-mxScaleA",            po::value<InitMode>()->default_value(InitMode::One), "Initialization for MX Scale for A")
                 ("init-mxScaleB",            po::value<InitMode>()->default_value(InitMode::One), "Initialization for MX Scale for B")
+=======
+                ("init-mx-a",                po::value<InitMode>()->default_value(InitMode::One), "Initialization for MX Scale for A")
+                ("init-mx-b",                po::value<InitMode>()->default_value(InitMode::One), "Initialization for MX Scale for B")
+>>>>>>> origin/develop
                 ("pristine-on-gpu",          po::value<bool>()->default_value(true), "Keep a pristine copy of inputs on GPU for performance")
                 ("c-equal-d",                po::value<bool>()->default_value(false), "C equals D")
                 ("offset-a",                 po::value<size_t>()->default_value(0), "buffer a start offset")
@@ -380,6 +389,7 @@ namespace TensileLite
                 ("output-amaxD",              po::value<bool>()->default_value(false), "Output AmaxD.")
                 ("timing-instrumentation",    po::value<bool>()->default_value(false)->implicit_value(true), "Enable detailed timing instrumentation output to stderr.")
                 ("rocprof-counter",           vector_default_empty<std::string>(), "Rocprof counters.")
+                ("metadata-layout",           po::value<int32_t>()->default_value(0), "Sparse Metadata Layout")
                 ;
             // clang-format on
 

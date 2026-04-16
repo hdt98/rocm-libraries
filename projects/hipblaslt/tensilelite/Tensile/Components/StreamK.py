@@ -196,7 +196,11 @@ class StreamK(Component):
 
         tileStart = sTmp + 2
         # StreamK partial tile - offset to tile start index
+<<<<<<< HEAD
         module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=_DepthU, comment="StreamK tile start offset"))
+=======
+        module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=kernel["DepthU"], comment="StreamK tile start offset"))
+>>>>>>> origin/develop
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(sTmp), sgpr(sTmp+1), sgpr(sTmp), strideL, comment="StreamK tile start offset"))
         # Overflow check removed
@@ -276,7 +280,11 @@ class StreamK(Component):
 
         # StreamK partial tile - offset to tile start index
         tmpOffset = writer.sgprPool.checkOut(2, "skStartOffset")
+<<<<<<< HEAD
         module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(_DepthU * tP["bpe"]), comment="StreamK tile start offset"))
+=======
+        module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(kernel["DepthU"] * tP["bpe"]), comment="StreamK tile start offset"))
+>>>>>>> origin/develop
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(tmpOffset), sgpr(tmpOffset+1), sgpr(tmpOffset), strideL, "StreamK tile start offset"))
         # Overflow check removed
@@ -1309,7 +1317,8 @@ class StreamK(Component):
                     module.add(self.fixupBatch(writer, kernel, ss, batchIdx, edge, gwvw, \
                             elementsThisBatch, writer.vgprs.addrD, writer.vgprs.addrC, \
                             tmpVgpr, cvtVgprStruct, \
-                            elementSgprs, tmpSgpr, codeAccVgprRead, codeAccVgprWrite))
+                            elementSgprs, tmpSgpr, codeAccVgprRead, codeAccVgprWrite,
+                            elementStartIdx))
                 # delay PreLoopVmcntCase code after globalWrite
                 # if self.canOptimizePreLoopLWVmcnt:
                 #     kStr += PreLoopVmcntCaseStr
@@ -1323,7 +1332,8 @@ class StreamK(Component):
 
     def fixupBatch(self, writer, kernel, ss, batchIdx, edge, gwvw, \
             batchElements, addrD, addrC, \
-            tmpVgpr, cvtVgprStruct, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeAccVgprWrite):
+            tmpVgpr, cvtVgprStruct, batchElementSgprs, tmpSgpr, codeAccVgprRead, codeAccVgprWrite,
+            elementStartIdx=0):
         module = Module("StreamK Common fixupBatch")
 
         module.addComment0("optSingleColVgpr=%u optSharedColVgpr=%u optSGPRUsage=%s optSrdIncForRow=%u" % \
@@ -1349,7 +1359,7 @@ class StreamK(Component):
         # allow expanding vgpr pool for OptNLL
         # preventOverflow = True #(not isOptNLL)
         # ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, preventOverflow=preventOverflow, isWorkspace=True)
-        ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, isOptNLL=False, factorDim=0, isWorkspace=True)
+        ss.setupStoreElementsForBatch(kernel, gwvw, batchElements, batchElementSgprs, False, 0, True, elementStartIdx)
 
         loadsIssued = 0
         storesIssued = 0

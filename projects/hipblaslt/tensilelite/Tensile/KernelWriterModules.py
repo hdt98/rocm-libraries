@@ -22,31 +22,32 @@
 
 from rocisa.code import Label, Module
 from rocisa.container import vgpr, sgpr, accvgpr, Holder
-from rocisa.instruction import SBarrier, SBranch, SMovB32, SMovB64, SWaitCnt, \
+from rocisa.instruction import SBarrier, SBranch, SMovB32, SMovB64, SWaitCnt, SWaitTensorcnt,\
   VAccvgprReadB32, VAccvgprWriteB32, VFmaF32, VFmaF64, VLShiftLeftB64, VMovB32, \
   VMulF32, VMulF64, VMulLOU32, VMulPKF16
 from rocisa.functions import BranchIfNotZero
 
 from Tensile.Common.DataType import DataType
 
-def allocPostLoopSrdSuppressRaw(ch: str, chAddress: str, labelStr: str, sgprLength) -> Module:
-    module = Module("allocPostLoopSrdSuppress")
-    label  = Label("%sAddrValid"%labelStr, "")
-    label2 = Label("%sAddrValid_End"%labelStr, "")
-    # Buffer-load uses one base read pointer stored in the SRD - set it here:
-    module.add(SMovB64(dst=sgpr("Srd%s+0"%ch, 2), src=sgpr("Address%s+0"%chAddress, 2), comment="init SRD base address" ))
-    module.add(SMovB32(dst=sgpr("Srd%s+3"%ch), src="Srd127_96", comment="Set bits 127_96 in post-loop SRD"))
-    module.add(BranchIfNotZero("Address%s"%chAddress, DataType('int64').toEnum(), label))
-    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=0))
-    module.add(SBranch(label2.getLabelName()))
-    module.add(label)
-    module.add(SMovB32(dst=sgpr("Srd%s+2"%ch), src=sgprLength))
-    module.add(label2)
-    module.addSpaceLine()
-    return module
-
-def allocPostLoopSrdSuppress(ch: str, labelStr: str, sgprLength) -> Module:
-    return allocPostLoopSrdSuppressRaw(ch, ch, labelStr, sgprLength)
+def tdmWait(states, kernel, tPA, tPB, tensorcnt: int, comment: str) -> Module:
+  #TODO: refactor this
+  skipGR = tensorcnt > -1
+  vmcnt = 0 if skipGR else -1
+  mod = Module()
+  if skipGR:
+    #TODO: remove
+    # numMXSA = kernel["NumLoadsPerpendicularMXSA"] * kernel["NumLoadsCoalescedMXSA"] if kernel["ProblemType"]["MXBlockA"] else 0
+    # numMXSB = kernel["NumLoadsPerpendicularMXSB"] * kernel["NumLoadsCoalescedMXSB"] if kernel["ProblemType"]["MXBlockB"] else 0
+    # numM = 0
+    # if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+    #   numM = kernel["NumLoadsPerpendicularMetadata"] * kernel["NumLoadsCoalescedMetadata"]
+    # numGR = 0
+    # if tensorcnt > -1:
+    #   numGR += tensorcnt * (numMXSA + numMXSB + numM)
+    # vmcnt += numGR
+    mod.add(SWaitCnt(vlcnt=vmcnt))
+  mod.add(SWaitTensorcnt(tensorcnt=tensorcnt, comment=comment))
+  return mod
 
 ##############################################################################
 # WaitCnt
@@ -263,11 +264,11 @@ def mapAcctoArchRegs(kernel, maxAgpr=256, write=False):
 ##############################################################################
 def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
   acc2arch, _ = accToArchMapper(kernel)
-
   itemList = [None] * len(acc2arch)
   for i in range(len(acc2arch)):
     destIdx = acc2arch[i]
     srcIdx  = i * kernel["MIRegPerOut"]
+    # TODO: Add conversion support for different compute data types
     if kernel["ProblemType"]["ComputeDataType"].isDouble():
       itemList[destIdx] = VMulF64(dst=vgpr(Holder(name="ValuC"),2),
                                                     src0=sgpr("Alpha",2), src1=vgpr("ValuC+%u"%srcIdx,2),
@@ -278,7 +279,7 @@ def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
                                                     src0=sgpr("Alpha"), src1=vgpr("ValuC+%u"%srcIdx),
                                                     comment="Multiply MI out reg with alpha")
     elif (kernel["ProblemType"]["ComputeDataType"].isHalf() and not kernel["ProblemType"]["HighPrecisionAccumulate"]):
-        itemList[destIdx] = VMulPKF16(dst=vgpr(Holder(name="ValuC")),
+      itemList[destIdx] = VMulPKF16(dst=vgpr(Holder(name="ValuC")),
                                                        src0=sgpr("Alpha"),
                                                        src1=vgpr("ValuC+%u"%srcIdx), comment="Multiply MI out reg with alpha")
     elif kernel["ProblemType"]["ComputeDataType"].isInt32():
@@ -326,7 +327,6 @@ def mulMIoutAlphaToArch(kernel, startVgprAlphaTmp):
   ##############################################################################
 def moveMIoutToArch(kernel, startVgprAlphaTmp):
   acc2arch, _ = accToArchMapper(kernel)
-
   itemList = [None] * len(acc2arch)
   for i in range(len(acc2arch)):
     destIdx = acc2arch[i]

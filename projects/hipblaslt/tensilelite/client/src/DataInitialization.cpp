@@ -132,6 +132,8 @@ namespace TensileLite
             case rocisa::DataType::BFloat8:
             case rocisa::DataType::Float8BFloat8:
             case rocisa::DataType::BFloat8Float8:
+            case rocisa::DataType::E8:
+            case rocisa::DataType::E5M3:
                 return 8;
             default:
                 throw std::runtime_error("unsupported datatype");
@@ -371,6 +373,8 @@ namespace TensileLite
             case rocisa::DataType::BFloat8:
             case rocisa::DataType::Float8BFloat8:
             case rocisa::DataType::BFloat8Float8:
+            case rocisa::DataType::E8:
+            case rocisa::DataType::E5M3:
                 MiK  = 32;
                 MiKv = 8;
                 break;
@@ -486,7 +490,8 @@ namespace TensileLite
                                  TensorDescriptor const& tensor,
                                  TensorDescriptor const& tensorC,
                                  TensorDescriptor const& tensorMeta,
-                                 size_t                  dim)
+                                 size_t                  dim,
+                                 bool                    metadataLayout)
         {
             auto const& sizes      = tensor.sizes();
             auto const& sizesC     = tensorC.sizes();
@@ -509,19 +514,24 @@ namespace TensileLite
                     std::vector<size_t> coord(tensor.dimensions());
                     std::vector<size_t> coordC(tensorC.dimensions());
                     std::vector<size_t> coordMeta(tensorMeta.dimensions());
+                    std::vector<size_t> _sizesMeta(tensorMeta.dimensions());
                     CoordNumberedExclude(
                         loop, coord.begin(), coord.end(), sizes.begin(), sizes.end(), dim);
                     CoordNumberedExclude(
                         loop, coordC.begin(), coordC.end(), sizesC.begin(), sizesC.end(), dim);
-                    //metadata is always a tranpose matrix, so the dimension will always at 0.
+                    //metadata is always a tranpose matrix until we use metadataLayout now.
+                    for(int i = 0; i < tensorMeta.dimensions(); i++)
+                    {
+                        _sizesMeta[i] = sizesMeta[i];
+                    }
+
                     CoordNumberedExclude(loop,
                                          coordMeta.begin(),
                                          coordMeta.end(),
-                                         sizesMeta.begin(),
-                                         sizesMeta.end(),
-                                         0);
-
-                    coordMeta[0] = 0;
+                                         _sizesMeta.begin(),
+                                         _sizesMeta.end(),
+                                         metadataLayout);
+                    coordMeta[metadataLayout] = 0;
 
                     for(size_t compressDimIdx = 0; compressDimIdx < dimSize;
                         compressDimIdx += 4) //traverse along compressdim
@@ -576,10 +586,10 @@ namespace TensileLite
                         metaData                             = metaIdx[0] | (metaIdx[1] << 2);
                         //meta Data coord
                         size_t shift4bit = (compressDimIdx / 4 % 2) * 4;
-                        coordMeta[0]     = compressDimIdx / 8;
+                        coordMeta[metadataLayout]     = compressDimIdx / 8;
                         //calculate flatten index of dstMeta
                         size_t flattenIdx = CoordFlattenIndex(
-                            coordMeta.begin(), coordMeta.end(), sizesMeta.begin(), sizesMeta.end());
+                            coordMeta.begin(), coordMeta.end(), _sizesMeta.begin(), _sizesMeta.end());
                         // store metaData to dstMeta
                         dstMeta[flattenIdx] |= metaData << shift4bit;
                     }
@@ -594,7 +604,8 @@ namespace TensileLite
                                          TensorDescriptor const& tensor,
                                          TensorDescriptor const& tensorC,
                                          TensorDescriptor const& tensorMeta,
-                                         size_t                  dim)
+                                         size_t                  dim,
+                                         bool                    metadataLayout)
         {
             throw std::runtime_error("SparseMatrix doesn't support Int8x4.");
         }
@@ -607,11 +618,12 @@ namespace TensileLite
                                         TensorDescriptor const& tensor,
                                         TensorDescriptor const& tensorC,
                                         TensorDescriptor const& tensorMeta,
-                                        size_t                  dim)
+                                        size_t                  dim,
+                                        bool                    metadataLayout)
         {
             pruneSparseArray(mode, dstPruned, tensor, dim);
             compressSparseArray(
-                dstCompressed, dstMeta, dstPruned, tensor, tensorC, tensorMeta, dim);
+                dstCompressed, dstMeta, dstPruned, tensor, tensorC, tensorMeta, dim, metadataLayout);
         }
 
         void initCPUSparseInput(PruneSparseMode         mode,
@@ -621,7 +633,8 @@ namespace TensileLite
                                 TensorDescriptor const& tensor,
                                 TensorDescriptor const& tensorC,
                                 TensorDescriptor const& tensorMeta,
-                                size_t                  dim)
+                                size_t                  dim,
+                                bool                    metadataLayout)
         {
 
             //alloc compressed sparse buffer
@@ -635,7 +648,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat16:
                 initCPUSparseInputTemplate(mode,
@@ -645,7 +659,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Int8:
                 initCPUSparseInputTemplate(mode,
@@ -655,7 +670,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Float8:
                 initCPUSparseInputTemplate(mode,
@@ -665,7 +681,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat8:
                 initCPUSparseInputTemplate(mode,
@@ -675,7 +692,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::Float8_fnuz:
                 initCPUSparseInputTemplate(mode,
@@ -685,7 +703,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             case rocisa::DataType::BFloat8_fnuz:
                 initCPUSparseInputTemplate(mode,
@@ -695,7 +714,8 @@ namespace TensileLite
                                            tensor,
                                            tensorC,
                                            tensorMeta,
-                                           dim);
+                                           dim,
+                                           metadataLayout);
                 break;
             default:
                 throw std::runtime_error("SparseMatrix doesn't support");
@@ -745,10 +765,18 @@ namespace TensileLite
             HIP_CHECK_EXC(
                 hipMemcpy(dst,
                           src,
+<<<<<<< HEAD
                           totalElements * info.elementSize / info.packing,
                           kind));
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
             dPadding           *= descriptor.elementBytes();
+=======
+                          multiplyElementSize(totalElements,
+                                              DataTypeInfo::Get(descriptor.dataType()).elementSize),
+                          kind));
+            ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
+            dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
+>>>>>>> origin/develop
             void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
             TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind);
             return dstOffset;
@@ -767,7 +795,12 @@ namespace TensileLite
             const size_t    numElementsToCopy
                 = (customPadding == -1) ? descriptor.totalAllocatedElements()
                                         : (descriptor.totalAllocatedElements() + customPadding);
+<<<<<<< HEAD
             uint8_t* dstOffset = (uint8_t*)dst + dPadding * descriptor.elementBytes();
+=======
+            uint8_t* dstOffset
+                = (uint8_t*)dst + multiplyElementSize(dPadding, descriptor.elementBytes());
+>>>>>>> origin/develop
             HIP_CHECK_EXC(
                 hipMemcpy(dstOffset,
                           src,
@@ -1202,8 +1235,13 @@ namespace TensileLite
                     else if(m_curBoundsCheck == BoundsCheckMode::GuardPageFront
                             || m_curBoundsCheck == BoundsCheckMode::GuardPageBack)
                     {
+<<<<<<< HEAD
                         float  dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
                         size_t roundUpSize  = divideElementSize(pageSize, dataTypeSize);
+=======
+                        float        dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
+                        unsigned int roundUpSize  = divideElementSize(pageSize, dataTypeSize);
+>>>>>>> origin/develop
                         p->second.maxElements
                             = RoundUpToMultiple<size_t>(p->second.maxElements, roundUpSize);
                         // No bias page guard
@@ -1685,7 +1723,8 @@ namespace TensileLite
                                         t,
                                         tC,
                                         tM,
-                                        tDim);
+                                        tDim,
+                                        problem.gemms[j].metadataLayout());
                                 }
                             }
                             gemmInitOffset += multiplyElementSize(p.second.groupedGemmOffsets[j],
@@ -1764,7 +1803,8 @@ namespace TensileLite
                                                    t,
                                                    tC,
                                                    tM,
-                                                   tDim);
+                                                   tDim,
+                                                   problem.metadataLayout());
                             }
                         }
                     }
@@ -1925,6 +1965,7 @@ namespace TensileLite
                     case rocisa::DataType::BFloat8_fnuz:
                         prop.value = getValue<BFloat8_fnuz>(prop.init, prop.freeValue);
                         break;
+<<<<<<< HEAD
                     case rocisa::DataType::MXScale:
                         prop.value = getValue<MXScale>(prop.init, prop.freeValue);
                         break;
@@ -1945,6 +1986,13 @@ namespace TensileLite
                         break;
 #endif // #ifdef TENSILE_USE_FP4
 #endif // !_WIN32
+=======
+                    case rocisa::DataType::Float6:
+                    case rocisa::DataType::BFloat6:
+                    case rocisa::DataType::Float4:
+                    case rocisa::DataType::E8:
+                    case rocisa::DataType::E5M3:
+>>>>>>> origin/develop
                     case rocisa::DataType::Int64:
                     case rocisa::DataType::XFloat32:
                     case rocisa::DataType::Count:

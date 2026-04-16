@@ -145,7 +145,15 @@ namespace TensileLite
                                         lhs.swizzleTensorA(),
                                         rhs.swizzleTensorA(),
                                         lhs.swizzleTensorB(),
-                                        rhs.swizzleTensorB());
+                                        rhs.swizzleTensorB(),
+                                        lhs.mxBlockA(),
+                                        rhs.mxBlockA(),
+                                        lhs.mxBlockB(),
+                                        rhs.mxBlockB(),
+                                        lhs.mxTypeA(),
+                                        rhs.mxTypeA(),
+                                        lhs.mxTypeB(),
+                                        rhs.mxTypeB());
         }
     };
 } // namespace TensileLite
@@ -185,7 +193,11 @@ namespace std
                                              problem.outputAmaxD(),
                                              problem.f32XdlMathOp(),
                                              problem.swizzleTensorA(),
-                                             problem.swizzleTensorB());
+                                             problem.swizzleTensorB(),
+                                             problem.mxBlockA(),
+                                             problem.mxBlockB(),
+                                             problem.mxTypeA(),
+                                             problem.mxTypeB());
         }
     };
 
@@ -227,7 +239,11 @@ namespace std
                                                   problem.outputAmaxD(),
                                                   problem.f32XdlMathOp(),
                                                   problem.swizzleTensorA(),
-                                                  problem.swizzleTensorB());
+                                                  problem.swizzleTensorB(),
+                                                  problem.mxBlockA(),
+                                                  problem.mxBlockB(),
+                                                  problem.mxTypeA(),
+                                                  problem.mxTypeB());
             }
             return hash;
         }

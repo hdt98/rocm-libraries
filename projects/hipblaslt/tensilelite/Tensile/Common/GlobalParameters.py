@@ -181,6 +181,8 @@ globalParameters["DataInitTypeScaleAlphaVec"] = 3
 globalParameters["DataInitTypeMXSA"] = 1
 globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["DataInitValueActivationArgs"] = [2.0, 2.0]
+globalParameters["DataInitTypeMXSA"] = 1
+globalParameters["DataInitTypeMXSB"] = 1
 globalParameters["CEqualD"] = (
     False  # Set to true if testing for the case where the pointer to C is the same as D.
 )
@@ -386,6 +388,8 @@ defaultBenchmarkCommonParameters = [
     {"BufferStore": [True]},
     {"DirectToVgprA": [False]},
     {"DirectToVgprB": [False]},
+    {"DirectToVgprMXSA": [False]},
+    {"DirectToVgprMXSB": [False]},
     {"DirectToVgprSparseMetadata": [False]},
     # Restricted address remap features (default off unless explicitly enabled in the solution config):
     {"BAddrInterleave": [False]},
@@ -471,7 +475,8 @@ defaultBenchmarkCommonParameters = [
     {"ScheduleGROverBarrier": [-1]},
     {"DtlPlusLdsBuf": [-1]},
     {"MinGRIncPerMfma": [-1]},
-    {"UsePLRPack": [0]}
+    {"UsePLRPack": [0]},
+    {"TDMInst": [0]},
 ]
 
 # dictionary of defaults comprised of default option for each parameter
