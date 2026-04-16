@@ -76,6 +76,15 @@ struct CoordinateTransform
     static_array<MagicDivConstants, MAX_DIMS_PER_TRANSFORM> magic_divs{};
     bool skip_bounds_check = false;
 
+    /// True if the transform is a bijection (1-1) over its valid input domain.
+    /// Set automatically by factory functions based on mathematical conditions:
+    ///   - Merge/Unmerge: always bijective (mixed-radix uniqueness)
+    ///   - Embed: bijective iff stride[k] >= stride[k+1] * length[k+1] for all k
+    ///   - PassThrough: always bijective (identity)
+    ///   - Pad: bijective within valid range
+    /// A TransformGraph is reversible iff ALL its transforms are bijective.
+    bool is_bijective = false;
+
     // Pure data — no member functions for dispatch.
     // Behavior is in TransformImpl<Type> specializations.
 

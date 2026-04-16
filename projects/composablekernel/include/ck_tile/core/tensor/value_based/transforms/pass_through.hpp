@@ -11,10 +11,31 @@
 
 namespace ck_tile {
 
-/** @brief Identity mapping: output[0] = input[0].
+/** @brief Identity mapping: passes a single dimension through unchanged.
  *
- *  The simplest transform — passes a single dimension through unchanged.
- *  Always valid (no bounds checking needed).
+ *  Definition:  1 dim --> 1 dim (same value, same length)
+ *  Traversal:   1 dim --> 1 dim (identity in both directions)
+ *
+ *  ndim_input = 1, ndim_output = 1
+ *  lengths[0] = dimension length
+ *
+ *  PassThrough is its own inverse --- the same operation in both
+ *  the definition and traversal directions.
+ *
+ *  Example: PassThrough(M=128)
+ *
+ *    User dim (M)              Base dim (M)
+ *        |                         ^
+ *        v    definition (up)      |
+ *       idx ===================> idx        (same value)
+ *        |    traversal (down)     ^
+ *        '========================'
+ *
+ *    mapIndices(5) = 5
+ *
+ *  Used when a dimension needs to pass through a transform layer
+ *  without modification --- e.g., the M dimension in a GEMM LDS
+ *  descriptor where only K is being reshaped.
  */
 template <>
 struct TransformImpl<TransformType::PASS_THROUGH>

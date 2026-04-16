@@ -11,23 +11,56 @@
 
 namespace ck_tile {
 
-/** @brief Split 1 memory dim into N user-facing component dims.
+/** @brief Split 1 base dim into N user-facing component dims.
  *
- *  During graph traversal (user -> memory), the unmerge receives N input
- *  values (the components from the user) and COMPOSES them into 1 output
- *  value (the flat index toward memory) using multiply-accumulate.
+ *  Definition:  1 base dim --> N user dims   (split / expand / unflatten)
+ *  Traversal:   N inputs --> 1 output        (COMPOSE via multiply-accumulate)
  *
- *  This matches v1's unmerge::calculate_lower_index which takes N upper
- *  values and produces 1 lower value.
+ *  ndim_input  = N   (receives N component values from above)
+ *  ndim_output = 1   (sends 1 flat value below)
+ *  lengths[0..N-1]      = component sizes
+ *  coefficients[0..N-1] = strides (prefix products of subsequent lengths)
  *
- *  - ndim_input = N (user side: the N component values)
- *  - ndim_output = 1 (memory side: the single flat value)
- *  - lengths[0..N-1] = component sizes
- *  - coefficients[0..N-1] = strides (prefix products of subsequent lengths)
+ *  Unmerge is the INVERSE of Merge:
+ *    - Merge definition: N --> 1 (flatten). Merge traversal: 1 --> N (decompose).
+ *    - Unmerge definition: 1 --> N (split). Unmerge traversal: N --> 1 (compose).
+ *    - Unmerge's traversal (compose) does the SAME MATH as Merge's definition.
+ *    - Merge's traversal (decompose) does the SAME MATH as Unmerge's definition.
  *
- *  Example: component_lengths = {4, 8}
- *    strides (coefficients) = {8, 1}
- *    input = {2, 3} -> output = 2*8 + 3*1 = 19
+ *  Example: Unmerge with component_lengths = {4, 8}
+ *
+ *    Definition direction (bottom-up):
+ *
+ *      Base dim:        flat index          User dims:    dim 0     dim 1
+ *                          (32)                         (rows=4)  (cols=8)
+ *                           |                              ^         ^
+ *                           |                              |         |
+ *                     .-----'-----.                  .-----'----.----'
+ *                     | 19 / 8 = 2|   division       |          |
+ *                     | 19 % 8 = 3|   (split)        |          |
+ *                     '----.------'                   |          |
+ *                          '==========================.==========.
+ *
+ *    Traversal direction (top-down) --- what mapIndices computes:
+ *
+ *      User provides:     row = 2       col = 3
+ *                           |             |
+ *                           v             v
+ *                     .-----'-----'-------.
+ *                     | 2 * 8  +  3 * 1   |   multiply-accumulate
+ *                     | = 16   +  3       |   strides = {8, 1}
+ *                     | = 19              |
+ *                     '---------.--------.'
+ *                               |
+ *                               v
+ *      To base:            flat = 19
+ *
+ *      mapIndices({2, 3}) = 19
+ *
+ *  Note: Unmerge's traversal is a simple multiply-accumulate (no magic
+ *  division needed), because composing components into a flat index
+ *  is cheap. Magic division is only needed in Merge's traversal, where
+ *  a flat index must be decomposed back into components.
  */
 template <>
 struct TransformImpl<TransformType::UNMERGE>

@@ -12,8 +12,9 @@
  *  2. Strided 3D (Embed)
  *  3. GEMM LDS chain (Embed + PassThrough + Merge)
  *  4. Padded chain (Embed + Pad + PassThrough)
- *  5. Roundtrip (Unmerge → Merge)
+ *  5. Roundtrip (Unmerge -> Merge)
  *  6. Structural properties and canonicalization
+ *  7. Graph reversal (memory offset -> user coordinates)
  */
 
 #include "ck_tile/core/tensor/value_based/value_based.hpp"
@@ -226,6 +227,57 @@ static_assert(do_magic_div(0, compute_magic_div(8)) == 0, "0 / 8 = 0");
 static_assert(do_magic_div(7, compute_magic_div(8)) == 0, "7 / 8 = 0");
 static_assert(do_magic_div(100, compute_magic_div(13)) == 7, "100 / 13 = 7");
 static_assert(do_magic_div(127, compute_magic_div(1)) == 127, "127 / 1 = 127");
+
+// ============================================================================
+// Test 7: Graph reversal (memory offset -> user coordinates)
+// ============================================================================
+
+// Reverse the GEMM LDS graph: offset -> (M, K)
+constexpr auto gemm_lds_rev = reverse_graph<gemm_lds>();
+static_assert(gemm_lds_rev.ndim_input == 1, "Reversed graph takes 1 input (offset)");
+static_assert(gemm_lds_rev.ndim_output == 2, "Reversed graph produces 2 outputs (M, K)");
+
+// Helper: apply reversed graph to recover user coordinates from an offset
+template <TransformGraph G>
+constexpr static_array<index_t, G.ndim_output> reverse_offset(index_t offset)
+{
+    static_array<index_t, 1> in{offset};
+    static_array<index_t, G.ndim_output> out{};
+    map<G>(out.elems, in.elems);
+    return out;
+}
+
+// Verify roundtrip: (M, K) -> offset -> (M, K)
+// offset(5, 19) = 2*1032 + 5*8 + 3*1 = 2107
+static_assert(calculate_offset<gemm_lds>(static_array<index_t, 2>{5, 19}) == 2107);
+static_assert(reverse_offset<gemm_lds_rev>(2107)[0] == 5, "M recovered");
+static_assert(reverse_offset<gemm_lds_rev>(2107)[1] == 19, "K recovered");
+
+// More roundtrip tests
+static_assert(reverse_offset<gemm_lds_rev>(0)[0] == 0);
+static_assert(reverse_offset<gemm_lds_rev>(0)[1] == 0);
+
+constexpr index_t off_127_63 = calculate_offset<gemm_lds>(static_array<index_t, 2>{127, 63});
+static_assert(reverse_offset<gemm_lds_rev>(off_127_63)[0] == 127, "M=127 recovered");
+static_assert(reverse_offset<gemm_lds_rev>(off_127_63)[1] == 63, "K=63 recovered");
+
+constexpr index_t off_64_32 = calculate_offset<gemm_lds>(static_array<index_t, 2>{64, 32});
+static_assert(reverse_offset<gemm_lds_rev>(off_64_32)[0] == 64, "M=64 recovered");
+static_assert(reverse_offset<gemm_lds_rev>(off_64_32)[1] == 32, "K=32 recovered");
+
+// Reverse a packed graph
+constexpr auto packed_rev = reverse_graph<packed_2d>();
+static_assert(packed_rev.ndim_input == 1);
+static_assert(packed_rev.ndim_output == 2);
+static_assert(reverse_offset<packed_rev>(21)[0] == 2, "row=2 from offset 21");
+static_assert(reverse_offset<packed_rev>(21)[1] == 5, "col=5 from offset 21");
+static_assert(reverse_offset<packed_rev>(31)[0] == 3, "row=3 from offset 31");
+static_assert(reverse_offset<packed_rev>(31)[1] == 7, "col=7 from offset 31");
+
+// Bijectivity checks
+static_assert(is_graph_bijective<gemm_lds>(), "GEMM LDS graph is bijective");
+static_assert(is_graph_bijective<packed_2d>(), "Packed 2D graph is bijective");
+static_assert(is_graph_bijective<strided_3d>(), "Strided 3D graph is bijective");
 
 } // anonymous namespace
 

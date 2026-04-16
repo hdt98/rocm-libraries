@@ -4,24 +4,219 @@
 /** @file transform_graph.hpp
  *  @brief Value-based coordinate transform graph and NTTP-based free functions.
  *
- *  A TransformGraph is a DAG of CoordinateTransform nodes that maps an
- *  N-dimensional input coordinate to an M-dimensional output coordinate.
+ *  A TransformGraph maps user-facing coordinates to a memory offset through a
+ *  stack of coordinate transforms. It is used as a C++20 structural NTTP
+ *  (template<TransformGraph G>) to guarantee compile-time constant folding of
+ *  all transform parameters, routing, and magic division constants.
  *
- *  The graph is used as an NTTP: template<TransformGraph G> to guarantee
- *  compile-time constant folding of all transform parameters and routing.
- *
- *  The graph owns:
- *  - Transform nodes (WHAT mappings exist)
- *  - Internal routing (which working-array slots each transform reads/writes)
- *  - Input/output endpoint slots
- *  - Metadata (element_space_size, vectorization hints)
- *
- *  The graph knows NOTHING about individual transform algorithms —
+ *  The graph knows NOTHING about individual transform algorithms ---
  *  it delegates to TransformImpl<Type> via static dispatch.
  *
- *  Internal routing uses a working array of index slots. Transforms fan in/out
- *  through this array. The user never sees slot assignments; they are computed
- *  automatically by factory functions (make_strided_graph, apply_transforms).
+ *
+ *  TRANSFORM STACK --- CONSTRUCTION AND TRAVERSAL
+ *  ===============================================
+ *
+ *  The transforms array is a LIFO stack:
+ *
+ *    - CONSTRUCTION pushes transforms bottom-up (base first, user-facing last).
+ *    - TRAVERSAL pops transforms top-down (user-facing first, base last).
+ *
+ *  There is only one traversal direction: user coordinates in, memory offset
+ *  out. The graph is never traversed in the other direction.
+ *
+ *
+ *  WORKED EXAMPLE: GEMM LDS Descriptor (M=128, K=64)
+ *  ===================================================
+ *
+ *  Goal: Map user coordinates (M=5, K=19) to a memory offset.
+ *
+ *  The physical LDS tensor is 3D: (K/8, M, 8) with strides ((M+1)*8, 8, 1).
+ *  The user sees 2D: (M, K), where K merges the K/8 and K_mod8 dimensions.
+ *
+ *
+ *  STEP 1: CONSTRUCTION --- make_strided_graph
+ *  --------------------------------------------
+ *
+ *    constexpr auto g0 = make_strided_graph(
+ *        {K/8=8, M=128, K_mod8=8},        // lengths
+ *        {1032,  8,     1});              // strides = ((M+1)*8, 8, 1)
+ *
+ *  This pushes one Embed transform and assigns 4 slots:
+ *
+ *    slots:  [0]       [1]       [2]       [3]
+ *            offset    K/8       M         K_mod8
+ *
+ *    Stack:
+ *      [0] Embed   reads {1,2,3}   writes {0}   strides=(1032,8,1)
+ *
+ *    Endpoints:
+ *      input_slots  = {1, 2, 3}    (dim 0=K/8, dim 1=M, dim 2=K_mod8)
+ *      output_slots = {0}          (memory offset)
+ *      ndim_input   = 3
+ *
+ *  At this point the user would need to provide 3 coordinates (K/8, M, K_mod8).
+ *  We want to reduce this to 2 coordinates (M, K) by merging K/8 and K_mod8.
+ *
+ *
+ *  STEP 2: CONSTRUCTION --- apply_transforms
+ *  ------------------------------------------
+ *
+ *  Recall the initial graph g0 has these input dimensions:
+ *
+ *    g0 input dims:   index 0 = K/8      (slot[1])
+ *                     index 1 = M        (slot[2])
+ *                     index 2 = K_mod8   (slot[3])
+ *                            ^
+ *                            these are the indices that input_dims refers to
+ *
+ *    constexpr auto g = apply_transforms(
+ *        g0,                                          // old graph
+ *        static_array<CoordinateTransform, 2>{        // 2 new transforms
+ *            make_pass_through(128),                  //   [0] PassThrough
+ *            make_merge(static_array<index_t, 2>{8, 8})}, // [1] Merge
+ *        static_array<DimIds, 2>{                     // input_dims:
+ *            dims(1),                                 //   PT replaces old index 1
+ *            dims(0, 2)},                             //   Merge replaces old 0 & 2
+ *        static_array<DimIds, 2>{                     // output_dims:
+ *            dims(0),                                 //   PT becomes new dim 0
+ *            dims(1)});                               //   Merge becomes new dim 1
+ *
+ *  input_dims and output_dims are arrays of DIMENSION INDICES:
+ *
+ *    input_dims[i] = indices into the OLD graph's input dim array.
+ *                    Tells which old dims this transform REPLACES.
+ *                    The transform's outputs get wired to those old slots.
+ *
+ *      input_dims[0] = dims(1)   --> PassThrough replaces old index 1 (M).
+ *                                    Old index 1 lives at slot[2].
+ *                                    So PassThrough writes to slot[2].
+ *
+ *      input_dims[1] = dims(0,2) --> Merge replaces old indices 0 and 2
+ *                                    (K/8 and K_mod8).
+ *                                    Old index 0 = slot[1], index 2 = slot[3].
+ *                                    So Merge writes to slot[1] and slot[3].
+ *
+ *    output_dims[i] = indices into the NEW graph's input dim array.
+ *                     Tells which new user-facing dim this transform CREATES.
+ *                     A fresh slot is allocated; the user's coordinate enters there.
+ *
+ *      output_dims[0] = dims(0) --> PassThrough creates new dim index 0.
+ *                                   Allocate fresh slot[4].
+ *                                   The user's 1st coordinate (M) enters slot[4].
+ *                                   PassThrough reads from slot[4].
+ *
+ *      output_dims[1] = dims(1) --> Merge creates new dim index 1.
+ *                                   Allocate fresh slot[5].
+ *                                   The user's 2nd coordinate (K) enters slot[5].
+ *                                   Merge reads from slot[5].
+ *
+ *  After processing PassThrough:
+ *
+ *    slots:  [0]       [1]       [2]       [3]       [4]
+ *            offset    K/8       M         K_mod8    M_user
+ *                                ^                   ^
+ *                                |  PassThrough      |
+ *                                +--- writes here    +--- reads here
+ *
+ *  After processing Merge:
+ *
+ *    slots:  [0]       [1]       [2]       [3]       [4]       [5]
+ *            offset    K_div8    M         K_mod8    M_user    K_user
+ *                      ^                   ^                   ^
+ *                      |       Merge       |                   |
+ *                      +--- writes here    +--- writes here    +--- reads here
+ *
+ *
+ *  RESULTING WIRING DIAGRAM
+ *  -------------------------
+ *
+ *  The complete slot wiring after construction. During traversal, data
+ *  flows top-down through these connections:
+ *
+ *    User provides:   dim 0 = M                dim 1 = K
+ *                         |                        |
+ *                         v                        v
+ *    input_slots:      slot[4]                  slot[5]
+ *                         |                        |
+ *                   .-----'                  .-----'
+ *                   |                        |
+ *                   |  [1] PassThrough       |  [2] Merge
+ *                   |   reads:  {4}          |   reads:  {5}
+ *                   |   writes: {2}          |   writes: {1, 3}
+ *                   |                        |
+ *                   '-----.            .-----'------.
+ *                         |            |            |
+ *                         v            v            v
+ *    base slots:       slot[2]      slot[1]      slot[3]
+ *                        (M)        (K_div8)     (K_mod8)
+ *                         |            |            |
+ *                   .-----'------------'------------'
+ *                   |
+ *                   |  [0] Embed
+ *                   |   reads:  {1, 2, 3}
+ *                   |   writes: {0}
+ *                   |
+ *                   '-----.
+ *                         |
+ *                         v
+ *    output_slots:     slot[0]
+ *                    memory offset
+ *
+ *
+ *  STEP 3: TRAVERSAL --- calculate_offset<g>({M=5, K=19})
+ *  --------------------------------------------------------
+ *
+ *  Data flows top-down through the wiring built above:
+ *
+ *    Pop [2] Merge:        read slot[5] = 19
+ *                          19 / 8 = 2 remainder 3
+ *                          write slot[1] = 2, slot[3] = 3
+ *
+ *    Pop [1] PassThrough:  read slot[4] = 5
+ *                          write slot[2] = 5
+ *
+ *    Pop [0] Embed:        read slot[1]=2, slot[2]=5, slot[3]=3
+ *                          2*1032 + 5*8 + 3*1 = 2107
+ *                          write slot[0] = 2107
+ *
+ *  Slot state after each step:
+ *
+ *                        [0]     [1]     [2]     [3]     [4]     [5]
+ *                       offset  K_div8    M     K_mod8  M_user  K_user
+ *                       ------  ------  ------  ------  ------  ------
+ *    After user input:    _       _       _       _       5      19
+ *    After pop Merge:     _       2       _       3       5      19
+ *    After pop PassThru:  _       2       5       3       5      19
+ *    After pop Embed:    2107     2       5       3       5      19
+ *                         ^
+ *                         output = 2107
+ *
+ *
+ *  ndim_input AND ndim_output
+ *  ==========================
+ *
+ *  These fields describe the traversal direction (top-down) for each transform:
+ *
+ *    ndim_input  = dimensions received from above (from the user, or from
+ *                  the transform above in the stack)
+ *    ndim_output = dimensions sent below (toward memory, feeding the
+ *                  transform below in the stack)
+ *
+ *   .-------------------.---------------------------------------------------.
+ *   | Transform         | ndim_input (from above)  | ndim_output (to below) |
+ *   |-------------------|--------------------------|------------------------|
+ *   | Merge (N->1)      | 1 (one merged value)     | N (N components)       |
+ *   | Unmerge (1->N)    | N (N component values)   | 1 (one flat value)     |
+ *   | PassThrough       | 1                        | 1                      |
+ *   | Embed             | N (N dim indices)        | 1 (memory offset)      |
+ *   | Pad               | 1                        | 1                      |
+ *   '-------------------'--------------------------'------------------------'
+ *
+ *  Note: Merge is defined as "combine N dims into 1", but during traversal
+ *  it must UNDO itself --- decomposing 1 merged value back into N components.
+ *  So ndim_input=1 and ndim_output=N, which is the inverse of the definition.
+ *  This is true for every transform: traversal applies the inverse because
+ *  it walks the stack top-down while the stack was built bottom-up.
  */
 
 #pragma once
@@ -65,7 +260,10 @@ inline constexpr index_t MAX_IO_DIMS    = 6;  ///< Max input or output dimension
  */
 struct TransformGraph
 {
-    // --- Nodes (transforms) ---
+    // --- Transform stack (LIFO) ---
+    // Transforms are pushed during construction (base first, user-facing last)
+    // and popped during traversal (user-facing first, base last).
+    // Index 0 = base (e.g., Embed), index num_transforms-1 = top (e.g., Merge).
     static_array<CoordinateTransform, MAX_TRANSFORMS> transforms{};
     index_t num_transforms = 0;
 
@@ -101,13 +299,13 @@ static_assert(sizeof(TransformGraph) < 2048,
 /** @brief Apply a single transform (called via fold expression, not directly by user).
  *
  *  @tparam G  The transform graph (NTTP)
- *  @tparam I  Fold index (0 = last transform applied, num_transforms-1 = first)
+ *  @tparam I  Fold index (0 = top of stack, num_transforms-1 = base)
  *  @param slots  Working array of index values
  */
 template <TransformGraph G, index_t I>
 CK_TILE_HOST_DEVICE constexpr void apply_single_transform(static_array<index_t, G.num_slots>& slots)
 {
-    constexpr index_t t      = G.num_transforms - 1 - I; // reverse order
+    constexpr index_t t      = G.num_transforms - 1 - I; // pop order (top of stack first)
     constexpr auto transform = G.transforms[t];
 
     // Gather inputs from working array
@@ -129,7 +327,7 @@ CK_TILE_HOST_DEVICE constexpr void apply_single_transform(static_array<index_t, 
     }
 }
 
-/** @brief Apply all transforms via fold expression (internal dispatch).
+/** @brief Pop all transforms from top to base via fold expression (internal dispatch).
  *
  *  @tparam G   The transform graph (NTTP)
  *  @tparam Is  Index sequence 0..num_transforms-1
@@ -144,9 +342,9 @@ CK_TILE_HOST_DEVICE constexpr void apply_all_transforms(static_array<index_t, G.
 
 /** @brief Map an input coordinate to an output coordinate.
  *
- *  Core operation of the transform graph. Traverses all transforms from
- *  input side to output side using a fold expression for guaranteed
- *  compile-time dispatch.
+ *  Core operation of the transform graph. Pops transforms from the top of
+ *  the stack (user-facing) to the base (memory-facing) using a fold
+ *  expression for guaranteed compile-time dispatch.
  *
  *  @tparam G       The transform graph (NTTP — all values are compile-time constants)
  *  @param[out] output  Output coordinate buffer (size >= G.ndim_output)
@@ -163,8 +361,8 @@ CK_TILE_HOST_DEVICE constexpr void map(index_t* output, const index_t* input)
         slots[G.input_slots[i]] = input[i];
     }
 
-    // Apply each transform in reverse using fold expression.
-    // Guarantees compile-time dispatch — no runtime loop unrolling needed.
+    // Pop transforms from top of stack to base (user-facing → memory).
+    // Fold expression guarantees compile-time dispatch.
     apply_all_transforms<G>(slots, make_index_sequence<G.num_transforms>{});
 
     // Extract output coordinate from assigned slots

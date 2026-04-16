@@ -11,24 +11,58 @@
 
 namespace ck_tile {
 
-/** @brief Merge N component dims into 1 user-facing dim.
+/** @brief Combine N component dims into 1 user-facing dim.
  *
- *  During graph traversal (user -> memory), the merge receives 1 input
- *  value (the merged/flattened index from the user) and DECOMPOSES it
- *  into N output values (the components toward memory) using pre-computed
- *  magic division constants.
+ *  Definition:  N base dims --> 1 user dim   (flatten / combine)
+ *  Traversal:   1 input --> N outputs        (DECOMPOSE via magic division)
  *
- *  This matches v1's merge_v2_magic_division::calculate_lower_index which
- *  takes 1 upper value and produces N lower values.
+ *  ndim_input  = 1   (receives 1 merged value from above)
+ *  ndim_output = N   (sends N component values below)
+ *  lengths[0..N-1]      = component sizes
+ *  coefficients[0..N-2] = divisors (product of subsequent lengths)
+ *  magic_divs[0..N-2]   = pre-computed magic division constants
  *
- *  - ndim_input = 1 (user side: the single merged value)
- *  - ndim_output = N (memory side: the N components)
- *  - lengths[0..N-1] = component sizes
- *  - coefficients[0..N-2] = divisors (product of subsequent lengths)
- *  - magic_divs[0..N-2] = pre-computed magic division constants
+ *  Merge is a CONSTRAINED, INVERTIBLE Embed:
+ *    - Like Embed, the definition is a linear combination: flat = sum(c[i]*s[i])
+ *    - Unlike Embed, the strides are exactly the prefix products of the
+ *      component lengths. This constraint makes it invertible via division.
+ *    - During traversal, mapIndices computes the INVERSE (decomposition),
+ *      which is why it needs magic division.
  *
- *  Example: component_lengths = {4, 8}
- *    input = 19 -> output = {2, 3} (19 / 8 = 2 remainder 3)
+ *  Example: Merge with component_lengths = {8, 8}
+ *
+ *    Definition direction (bottom-up):
+ *
+ *      Base dims:      dim 0        dim 1          Merged dim:
+ *                     (K_div8)     (K_mod8)            (K)
+ *                        |            |                 ^
+ *                        |            |                 |
+ *                        '-------.----'           .-----'
+ *                                |                |
+ *                          K = i0 * 8 + i1        |  strides = {8, 1}
+ *                                |                |  from prefix products
+ *                                '================.  of lengths {8, 8}
+ *
+ *    Traversal direction (top-down) --- what mapIndices computes:
+ *
+ *      User provides:      K = 19
+ *                            |
+ *                            v
+ *                     .------'------.
+ *                     | 19 / 8 = 2  |   magic division
+ *                     | 19 % 8 = 3  |   (remainder)
+ *                     '----.----.---'
+ *                          |    |
+ *                          v    v
+ *      To base:         K_div8=2  K_mod8=3
+ *
+ *      mapIndices(19) = {2, 3}
+ *
+ *  Contrast with Embed: Embed also computes a linear combination, but
+ *  it sits at the base and only runs forward (N-->1) during traversal.
+ *  Merge sits above the base and must run inverse (1-->N) during
+ *  traversal, which is why it needs magic division constants.
+ *  Merge is essentially an Embed that also carries its own inverse.
  */
 template <>
 struct TransformImpl<TransformType::MERGE>

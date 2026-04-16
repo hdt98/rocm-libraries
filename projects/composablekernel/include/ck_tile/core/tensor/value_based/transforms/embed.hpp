@@ -11,15 +11,49 @@
 
 namespace ck_tile {
 
-/** @brief Linear combination: output[0] = sum(input[i] * coefficient[i]).
+/** @brief Linear combination with strides. Computes a 1D memory offset
+ *  from N-dimensional indices.
  *
- *  Maps N input dimensions to 1 output dimension via a weighted sum.
- *  Typically used to compute a linear memory offset from multi-dimensional
- *  indices with strides.
+ *  Definition:  N dims --> 1 dim   (weighted sum with strides)
+ *  Traversal:   N dims --> 1 dim   (same --- Embed is always at the base)
  *
- *  - lengths[0..N-1] = input dimension sizes
- *  - coefficients[0..N-1] = strides (weights for the linear combination)
- *  - ndim_input = N, ndim_output = 1
+ *  ndim_input = N, ndim_output = 1
+ *  lengths[0..N-1]      = size of each input dimension
+ *  coefficients[0..N-1] = stride of each input dimension
+ *
+ *  Embed always sits at the BASE of the transform stack. It defines
+ *  the physical memory layout. During traversal it runs FORWARD
+ *  (N dims --> 1 offset). The memory offset is the end of the line,
+ *  so no transform ever needs to undo an Embed.
+ *
+ *  Compare with Merge: Merge also does a linear combination in its
+ *  definition direction, but during traversal it must run in REVERSE
+ *  (1 --> N, decomposing via magic division). Merge is essentially
+ *  an Embed that also carries its own inverse. Embed does not need
+ *  an inverse because it only ever runs forward.
+ *
+ *  Example: Embed with lengths={8, 128, 8}, strides={1032, 8, 1}
+ *
+ *    Base dims:     dim 0       dim 1      dim 2
+ *                  (K_div8)      (M)      (K_mod8)
+ *                    |           |           |
+ *                    v           v           v
+ *                .---'----------'-----------.
+ *                |                           |
+ *                | offset = 2*1032 + 5*8 + 3 |
+ *                |        = 2064 + 40 + 3    |
+ *                |        = 2107             |
+ *                |                           |
+ *                '-----------.---------------'
+ *                            |
+ *                            v
+ *                    Memory offset (1D)
+ *
+ *    mapIndices({2, 5, 3}) = 2107
+ *
+ *    The stride 1032 = (128+1)*8 includes 1 element of padding per
+ *    row for LDS bank conflict avoidance. These are arbitrary strides
+ *    that do not need to be prefix products of the lengths.
  */
 template <>
 struct TransformImpl<TransformType::EMBED>

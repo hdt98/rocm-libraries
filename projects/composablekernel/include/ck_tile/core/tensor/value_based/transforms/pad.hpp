@@ -11,19 +11,53 @@
 
 namespace ck_tile {
 
-/** @brief Shifted mapping with optional bounds checking.
+/** @brief Padding transform: expands a dimension with boundary elements.
  *
- *  Maps output = input - left_pad. The padded dimension has length
- *  = original_length + left_pad + right_pad.
+ *  Definition:  1 dim (unpadded) --> 1 dim (padded, larger)
+ *  Traversal:   1 input --> 1 output   (subtract left_pad to map into
+ *                                       the unpadded coordinate space)
  *
- *  Covers left-only (right_pad=0), right-only (left_pad=0), and
- *  both-sides padding in a single transform type.
+ *  ndim_input  = 1, ndim_output = 1
+ *  lengths[0]      = unpadded dimension length
+ *  coefficients[0] = left_pad amount
+ *  coefficients[1] = right_pad amount
+ *  skip_bounds_check = true to skip validation (e.g., halo regions)
  *
- *  - lengths[0] = unpadded dimension length
- *  - coefficients[0] = left_pad amount
- *  - coefficients[1] = right_pad amount
- *  - skip_bounds_check = true to skip validation (e.g., halo regions)
- *  - ndim_input = 1, ndim_output = 1
+ *  Example: Pad with unpadded_length=10, left_pad=2, right_pad=4
+ *
+ *    Definition direction (bottom-up):
+ *
+ *      Base dim (10 elements):      [0  1  2  3  4  5  6  7  8  9]
+ *                                      |
+ *                                      v
+ *      User dim (16 elements):  [P  P  0  1  2  3  4  5  6  7  8  9  P  P  P  P]
+ *                                ^  ^                                  ^  ^  ^  ^
+ *                               left_pad = 2                          right_pad = 4
+ *
+ *      The user sees 16 elements. Indices [0,1] and [12,13,14,15]
+ *      are padding. Indices [2..11] map to base elements [0..9].
+ *
+ *    Traversal direction (top-down) --- what mapIndices computes:
+ *
+ *      User provides:      padded_idx = 5
+ *                               |
+ *                               v
+ *                        .------'------.
+ *                        | 5 - 2 = 3   |   subtract left_pad
+ *                        '-------.-----'
+ *                                |
+ *                                v
+ *      To base:           unpadded_idx = 3
+ *
+ *      mapIndices(5) = 3
+ *
+ *      Boundary check: input must be in [left_pad, left_pad + length).
+ *        isValidInput(1) = false  (in left padding zone)
+ *        isValidInput(5) = true   (maps to base index 3)
+ *        isValidInput(13) = false (in right padding zone)
+ *
+ *  skip_bounds_check: Set to true for halo regions where out-of-bounds
+ *  access is intentional (the caller handles boundary conditions).
  */
 template <>
 struct TransformImpl<TransformType::PAD>

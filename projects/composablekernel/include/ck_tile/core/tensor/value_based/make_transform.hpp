@@ -55,10 +55,11 @@ constexpr DimIds dims(Ts... is)
 constexpr CoordinateTransform make_pass_through(index_t dim_length)
 {
     CoordinateTransform t{};
-    t.type        = TransformType::PASS_THROUGH;
-    t.ndim_input  = 1;
-    t.ndim_output = 1;
-    t.lengths[0]  = dim_length;
+    t.type         = TransformType::PASS_THROUGH;
+    t.ndim_input   = 1;
+    t.ndim_output  = 1;
+    t.lengths[0]   = dim_length;
+    t.is_bijective = true; // identity is always bijective
     return t;
 }
 
@@ -96,20 +97,24 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
         t.lengths[i] = component_lengths[i];
     }
 
+    // Compute prefix-product strides (same values as Unmerge).
+    // stride[i] = product of lengths[i+1..N-1].
+    // E.g., lengths = {4, 8}: strides = {8, 1}.
+    // These serve as divisors for forward decomposition (mapIndices)
+    // and as strides for reverse composition (when reversed to Unmerge).
+    t.coefficients[N - 1] = 1;
+    for(index_t i = N - 2; i >= 0; --i)
+    {
+        t.coefficients[i] = t.coefficients[i + 1] * component_lengths[i + 1];
+    }
+
     // Pre-compute magic division constants for decomposition at runtime.
-    // Divisor for dimension i = product of lengths[i+1..N-1]
-    // E.g., lengths = {4, 8}: divisor[0] = 8, magic_divs[0] = magic_div(8)
-    // The last dimension uses modulo (remainder), no magic div needed.
     for(index_t i = 0; i < N - 1; ++i)
     {
-        index_t divisor = 1;
-        for(index_t j = i + 1; j < N; ++j)
-        {
-            divisor *= component_lengths[j];
-        }
-        t.coefficients[i] = divisor; // store divisor for remainder computation
-        t.magic_divs[i]   = compute_magic_div(static_cast<uint32_t>(divisor));
+        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(t.coefficients[i]));
     }
+
+    t.is_bijective = true; // mixed-radix representation is always a bijection
 
     return t;
 }
@@ -157,6 +162,15 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
         t.coefficients[i] = t.coefficients[i + 1] * component_lengths[i + 1];
     }
 
+    // Pre-compute magic division for reversal (decomposition direction).
+    // Divisors are the same prefix products stored in coefficients.
+    for(index_t i = 0; i < N - 1; ++i)
+    {
+        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(t.coefficients[i]));
+    }
+
+    t.is_bijective = true; // mixed-radix representation is always a bijection
+
     return t;
 }
 
@@ -187,6 +201,19 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
         t.coefficients[i] = strides[i];
     }
 
+    // Check bijectivity: stride[k] >= stride[k+1] * length[k+1] for all k.
+    // This ensures no two valid index tuples map to the same offset.
+    // Also pre-compute magic division constants for reversal.
+    t.is_bijective = true;
+    for(index_t i = 0; i < N - 1; ++i)
+    {
+        if(strides[i] < strides[i + 1] * dim_lengths[i + 1])
+        {
+            t.is_bijective = false;
+        }
+        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(strides[i]));
+    }
+
     return t;
 }
 
@@ -211,6 +238,7 @@ make_pad(index_t dim_length, index_t left_pad, index_t right_pad, bool skip_chec
     t.coefficients[0]   = left_pad;
     t.coefficients[1]   = right_pad;
     t.skip_bounds_check = skip_check;
+    t.is_bijective      = true; // bijective within valid range [left_pad, left_pad+length)
     return t;
 }
 
@@ -232,11 +260,12 @@ constexpr CoordinateTransform make_right_pad(index_t dim_length, index_t pad_amo
 constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 {
     CoordinateTransform t{};
-    t.type        = TransformType::XOR;
-    t.ndim_input  = 2;
-    t.ndim_output = 2;
-    t.lengths[0]  = length_0;
-    t.lengths[1]  = length_1;
+    t.type         = TransformType::XOR;
+    t.ndim_input   = 2;
+    t.ndim_output  = 2;
+    t.lengths[0]   = length_0;
+    t.lengths[1]   = length_1;
+    t.is_bijective = true; // XOR is its own inverse
     return t;
 }
 
