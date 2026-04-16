@@ -152,6 +152,16 @@ struct MemoryEcosystem
         return AbleToAllocate(info, vram_blocks, cpu_blocks);
 #endif
     }
+
+    static bool SkipTestIfUnableToAllocate(gpu_bufs, cpu_bufs, std::optional<bool>& skip_flag)
+    {
+        if(!AbleToAllocate(gpu_bufs, cpu_bufs))
+        {
+            if(skip_flag.has_value())
+                skip_flag = true;
+            GTEST_SKIP() << "Unable to allocate enough Dedicated + Shared VRAM"; 
+        }
+    }
 };
 
 #endif

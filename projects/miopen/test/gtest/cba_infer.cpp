@@ -282,7 +282,7 @@ INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer_BFP16,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
-                          testing::Values(miopenTensorNHWC/*, miopenTensorNCHW*/)));    // TRJS
+                          testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_ConvGrpBiasActivInfer3D_BFP16,

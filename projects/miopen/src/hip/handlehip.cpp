@@ -77,23 +77,23 @@ std::size_t GetAvailableMemory()
 void* default_allocator(void*, size_t sz)
 {
     const auto available = GetAvailableMemory();
-    MIOPEN_LOG_E("GetAvailableMemory " << available);  // TRJS I2
-    if(sz > available)  // TRJS I
-        MIOPEN_LOG_E("GetAvailableMemory reports unsufficient memory to allocate " << sz);
+    MIOPEN_LOG_I2("GetAvailableMemory " << available);
+    if(sz > available)
+        MIOPEN_LOG_I("GetAvailableMemory reports unsufficient memory to allocate " << sz);
     void* ptr;
     const auto status = hipMalloc(&ptr, sz);
     if(status == hipSuccess)
     {
-        MIOPEN_LOG_E("hipMalloc " << sz << " at " << ptr << " Ok");  // TRJS I2
+        MIOPEN_LOG_I2("hipMalloc " << sz << " at " << ptr << " Ok");
         return ptr;
     }
     const auto status_host = hipHostMalloc(&ptr, sz);
     if(status_host == hipSuccess)
     {
-        MIOPEN_LOG_E("hipHostMalloc " << sz << " at " << ptr << " Ok");  // TRJS I2
+        MIOPEN_LOG_I2("hipHostMalloc " << sz << " at " << ptr << " Ok");
         return ptr;
     }
-    MIOPEN_LOG_E("hipMalloc " << sz << " status: " << status);  // TRJS W
+    MIOPEN_LOG_W("hipMalloc " << sz << " status: " << status);
     MIOPEN_THROW_HIP_STATUS(status_host, "hipHostMalloc " + std::to_string(sz));
 }
 

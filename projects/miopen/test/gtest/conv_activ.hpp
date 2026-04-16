@@ -55,7 +55,7 @@ protected:
             this->GetParam();
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
-        if(cfsb::test_skipped) { MIOPEN_LOG_E("Skipped from base!"); return; } // TRJS
+        if(cfsb::test_skipped) { return; }
 
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         std::fill(
