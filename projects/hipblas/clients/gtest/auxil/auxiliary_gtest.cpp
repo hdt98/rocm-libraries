@@ -47,8 +47,8 @@ namespace
 
         // Verify version format
 
-        assert( hipblasVersionMinor < hipblasVersionK );
-        assert( hipblasVersionPatch < hipblasVersionK );
+        assert(hipblasVersionMinor < hipblasVersionK);
+        assert(hipblasVersionPatch < hipblasVersionK);
 
         int expected_version
             = (hipblasVersionMajor * hipblasVersionK + hipblasVersionMinor) * hipblasVersionK
