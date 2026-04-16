@@ -393,6 +393,9 @@ protected:
             cpu_bufs.push_back(output.GetDataByteSize());
         }
 
+        MemoryEcosystem::SkipTestIfUnableToAllocate(gpu_bufs, cpu_bufs, test_skipped);
+        if(test_skipped) { return; }
+
         if(!MemoryEcosystem::AbleToAllocate(gpu_bufs, cpu_bufs))
         {
             test_skipped = true;
