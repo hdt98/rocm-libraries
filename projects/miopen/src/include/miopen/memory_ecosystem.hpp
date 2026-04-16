@@ -5,6 +5,7 @@
 
 #ifdef _WIN32
 #include <dxgi1_4.h>
+#include <wchar.h>
 #endif
 #include <algorithm>
 #include <functional>
@@ -74,14 +75,14 @@ struct MemoryEcosystem
         if (!SUCCEEDED(hr))
         {
             MIOPEN_LOG_E("Unable to create DXGI factory. Error Code: " << hr);
-            return 0;
+            return MemoryEcosystemInfo{};
         }
 
         IDXGIAdapter1* pAdapter;
         if(pFactory->EnumAdapters1(adapter_index, &pAdapter) == DXGI_ERROR_NOT_FOUND)
         {
             MIOPEN_LOG_E("Unable to access DXGI for adapter index " << adapter_index);
-            return 0;
+            return MemoryEcosystemInfo{};
         }
 
         DXGI_ADAPTER_DESC1 desc;
@@ -90,7 +91,7 @@ struct MemoryEcosystem
         {
             MIOPEN_LOG_E("Unable to retrieve details for adapter index " << adapter_index);
             pFactory->Release();
-            return 0;
+            return MemoryEcosystemInfo{};
         }
 
         pAdapter->Release();
@@ -150,7 +151,7 @@ struct MemoryEcosystem
         return true;
 #else
         const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
-        return AbleToAllocate(info, vram_blocks, reserved);
+        return AbleToAllocate(info, vram_blocks, cpu_blocks);
 #endif
     }
 
@@ -168,7 +169,7 @@ struct MemoryEcosystem
         return true;
 #else
         const auto info = MemoryEcosystem::GetMemoryEcosystemInfo(0);
-        return AbleToAllocate(info, sorted_blocks, cpu_blocks);
+        return CouldAllocate(info, vram_blocks, cpu_blocks);
 #endif
     }
 };
