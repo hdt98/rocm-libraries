@@ -40,7 +40,10 @@
 #include "hipblaslt_vector.hpp"
 #include "mxDataGen.hpp"
 #include "multi_macrotile.hpp"
+// Fused host header only needed for host code, not device
+#if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
 #include "multi_macrotile_fused_host.hpp"
+#endif
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -4099,10 +4102,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             }
 
                             // Try fused dispatch for timing iterations
+                            // Only available in host compilation (not device code)
+#if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
                             if(algorithms.size() == subProblems.size())
                             {
                                 int device_id = 0;
-                                hipGetDevice(&device_id);
+                                (void)hipGetDevice(&device_id);
 
                                 // Execute fused dispatch for all timing iterations
                                 start_time = std::chrono::high_resolution_clock::now();
@@ -4137,6 +4142,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                             {
                                 hipblaslt_cout << "Not all sub-problems have algorithms, falling back to sequential" << std::endl;
                             }
+#endif // !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
                         }
 
                         // Fall back to sequential if fused dispatch not used or failed

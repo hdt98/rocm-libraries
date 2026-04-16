@@ -11,6 +11,9 @@
 
 #pragma once
 
+// This file contains host-only code and should not be compiled for device
+#if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
+
 #include "multi_macrotile_fused.hpp"
 #include "multi_macrotile_kernel_extraction.hpp"
 #include <hipblaslt/hipblaslt.h>
@@ -313,5 +316,7 @@ inline bool tryFusedMultiMacrotileDispatch(
 
     return true;
 }
+
+#endif // !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
 
 #endif // MULTI_MACROTILE_FUSED_HOST_HPP

@@ -11,6 +11,9 @@
 
 #pragma once
 
+// This file contains host-only code and should not be compiled for device
+#if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
+
 #include "multi_macrotile_fused.hpp"
 #include "multi_macrotile_fused_kernel.hpp"
 #include <hipblaslt/hipblaslt.h>
@@ -401,5 +404,7 @@ inline KernelDispatchTable createKernelDispatchTable(
 
     return table;
 }
+
+#endif // !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
 
 #endif // MULTI_MACROTILE_KERNEL_EXTRACTION_HPP
