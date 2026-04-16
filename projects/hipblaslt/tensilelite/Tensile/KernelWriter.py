@@ -4054,12 +4054,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
   def isStreamKConstantsToVgprEnabled(self, kernel):
     return kernel["ISA"] == IsaVersion(12,5,0)
 
-  def allocStreamKConstSgpr(self, kernel, module, name):
+  def acquireStreamKConstSgpr(self, kernel, name):
     if self.isStreamKConstantsToVgprEnabled(kernel):
-      sTmp = self.sgprPool.checkOut(1, name)
-      module.add(VReadfirstlaneB32(dst=sgpr(sTmp), src=vgpr(self.states.skConstVgprs[name])))
-      return sTmp
+      return self.sgprPool.checkOut(1, name)
     return name
+
+  def vReadfirstlaneStreamKConstToSgpr(self, module, name, dst, waitBefore=False, waitAfter=False):
+    if waitBefore and self.states.archCaps["CrosslaneWait"]:
+      module.add(SNop(waitState=0, comment="1 wait state before v_readfirstlane_b32"))
+    module.add(VReadfirstlaneB32(dst=sgpr(dst), src=vgpr(self.states.skConstVgprs[name])))
+    if waitAfter and self.states.archCaps["CrosslaneWait"]:
+      module.add(SNop(waitState=0, comment="1 wait state after v_readfirstlane_b32"))
 
   def releaseStreamKConstSgpr(self, nameOrIdx):
     if isinstance(nameOrIdx, int):

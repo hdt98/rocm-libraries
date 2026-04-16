@@ -6417,7 +6417,9 @@ class KernelWriterAssembly(KernelWriter):
             # StreamK + TailLoopINNLL case
             # skip TailLoopINNLL if StreamK WG not processing final iteration
             # Check if tile finished
-            sIpt = self.allocStreamKConstSgpr(kernel, module, "ItersPerTile")
+            sIpt = self.acquireStreamKConstSgpr(kernel, "ItersPerTile")
+            if self.isStreamKConstantsToVgprEnabled(kernel):
+              self.vReadfirstlaneStreamKConstToSgpr(module, "ItersPerTile", sIpt)
             module.add(SCmpLtU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr(sIpt), comment="Check if WG processes final iteration of tile"))
             self.releaseStreamKConstSgpr(sIpt)
             module.add(SCMovB32(dst=loopCounter, src=0, comment="This WG not completing tile"))
@@ -12255,7 +12257,9 @@ class KernelWriterAssembly(KernelWriter):
 
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=bpeDoneLabel.getLabelName(), comment="If synchronizer, use regular output BPE"))
-        sSkt = self.allocStreamKConstSgpr(kernel, module, "skTiles")
+        sSkt = self.acquireStreamKConstSgpr(kernel, "skTiles")
+        if self.isStreamKConstantsToVgprEnabled(kernel):
+          self.vReadfirstlaneStreamKConstToSgpr(module, "skTiles", sSkt)
         module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
         self.releaseStreamKConstSgpr(sSkt)
         module.add(SCBranchSCC1(labelName=bpeDoneLabel.getLabelName(), comment="If split == 1, use reguler output BPE"))
@@ -13389,7 +13393,9 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["StreamK"]:
         module.add(SCmpEQU64(src0=sgpr("AddressFlags", 2), src1=hex(0), comment="Check for synchronizer"))
         module.add(SCBranchSCC0(labelName=gsuLabel.getLabelName(), comment="Branch to stream-k store code"))
-        sSkt = self.allocStreamKConstSgpr(kernel, module, "skTiles")
+        sSkt = self.acquireStreamKConstSgpr(kernel, "skTiles")
+        if self.isStreamKConstantsToVgprEnabled(kernel):
+          self.vReadfirstlaneStreamKConstToSgpr(module, "skTiles", sSkt)
         module.add(SCmpEQU32(src0=sgpr(sSkt), src1=1, comment="split == 1 ?"))
         self.releaseStreamKConstSgpr(sSkt)
         # TODO May need long branch??
