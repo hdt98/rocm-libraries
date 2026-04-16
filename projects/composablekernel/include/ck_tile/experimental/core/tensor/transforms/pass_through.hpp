@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "ck_tile/core/tensor/value_based/transform_impl.hpp"
+#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
 
 namespace ck_tile {
 

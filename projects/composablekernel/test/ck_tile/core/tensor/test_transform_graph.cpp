@@ -17,7 +17,13 @@
  *  7. Graph reversal (memory offset -> user coordinates)
  */
 
-#include "ck_tile/core/tensor/value_based/value_based.hpp"
+// IWYU: include only what this test directly uses
+#include "ck_tile/experimental/core/tensor/make_graph.hpp" // make_strided_graph, make_packed_graph,
+                                                           // apply_transforms, reverse_graph,
+                                                           // is_graph_bijective
+#include "ck_tile/experimental/core/tensor/make_transform.hpp" // make_pass_through, make_merge,
+                                                               // make_unmerge, make_right_pad, dims
+#include "ck_tile/experimental/core/tensor/magic_division.hpp" // compute_magic_div, do_magic_div
 
 namespace {
 

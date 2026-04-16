@@ -225,8 +225,8 @@
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/container/sequence.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/core/tensor/value_based/coordinate_transform.hpp"
-#include "ck_tile/core/tensor/value_based/transform_impl.hpp"
+#include "ck_tile/experimental/core/tensor/coordinate_transform.hpp"
+#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
 
 namespace ck_tile {
 

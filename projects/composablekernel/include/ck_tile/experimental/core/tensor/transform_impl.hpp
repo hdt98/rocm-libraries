@@ -27,7 +27,7 @@
 
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/core/tensor/value_based/coordinate_transform.hpp"
+#include "ck_tile/experimental/core/tensor/coordinate_transform.hpp"
 
 namespace ck_tile {
 
@@ -53,8 +53,8 @@ struct TransformImpl
 
 // Include all specializations.
 // To add a new transform, add a #include here and create the corresponding file.
-#include "ck_tile/core/tensor/value_based/transforms/pass_through.hpp"
-#include "ck_tile/core/tensor/value_based/transforms/embed.hpp"
-#include "ck_tile/core/tensor/value_based/transforms/merge.hpp"
-#include "ck_tile/core/tensor/value_based/transforms/unmerge.hpp"
-#include "ck_tile/core/tensor/value_based/transforms/pad.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/pass_through.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/embed.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/merge.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/unmerge.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/pad.hpp"

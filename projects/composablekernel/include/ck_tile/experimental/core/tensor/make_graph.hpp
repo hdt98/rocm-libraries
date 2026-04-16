@@ -16,8 +16,8 @@
 
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/core/tensor/value_based/transform_graph.hpp"
-#include "ck_tile/core/tensor/value_based/make_transform.hpp"
+#include "ck_tile/experimental/core/tensor/transform_graph.hpp"
+#include "ck_tile/experimental/core/tensor/make_transform.hpp"
 
 namespace ck_tile {
 

@@ -23,8 +23,8 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/core/tensor/value_based/transform_type.hpp"
-#include "ck_tile/core/tensor/value_based/magic_division.hpp"
+#include "ck_tile/experimental/core/tensor/transform_type.hpp"
+#include "ck_tile/experimental/core/tensor/magic_division.hpp"
 
 namespace ck_tile {
 
