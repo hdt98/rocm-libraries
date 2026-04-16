@@ -348,10 +348,10 @@ TEST_P(CPU_CandidateSelection_NONE, ExpandKernelParamsWithSplitKFunctionality_Te
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          CPU_CandidateSelection_NONE,
-                         testing::Values(CandidateSelectionParams{}),
-                         [](const testing::TestParamInfo<CandidateSelectionParams>& info_) {
+                         ::testing::Values(CandidateSelectionParams{}),
+                         [](const ::testing::TestParamInfo<CandidateSelectionParams>& info) {
                              std::ostringstream os;
-                             PrintTo(info_.param, &os);
+                             PrintTo(info.param, &os);
                              return os.str();
                          });
 

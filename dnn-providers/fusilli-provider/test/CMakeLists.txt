@@ -37,7 +37,6 @@ add_fusilli_plugin_test(
     GTest::gtest_main
     hipdnn_plugin_sdk
     hipdnn_data_sdk
-    hipdnn_frontend
 )
 
 # Integration tests

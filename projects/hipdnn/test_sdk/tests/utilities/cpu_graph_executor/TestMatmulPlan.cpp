@@ -86,10 +86,9 @@ TEST(TestMatmulPlanBuilder, IsApplicable)
     auto graphTuple = buildMatmulGraph(tensorBundle, DataType::FLOAT, DataType::FLOAT);
 
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
 
     // Correct case
     const MatmulPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
@@ -124,11 +123,10 @@ TEST(TestMatmulPlanBuilder, IsApplicable)
                                                         1,
                                                         TensorLayout::NCHW);
 
-    auto [serializedGraphPointwise, serErrPointwise]
-        = std::get<0>(graphPointwiseTuple)->to_binary();
-    ASSERT_TRUE(serErrPointwise.is_good()) << serErrPointwise.get_message();
-    const GraphWrapper graphWrapPointwise(serializedGraphPointwise.data(),
-                                          serializedGraphPointwise.size());
+    auto flatbufferGraphPointwise
+        = std::get<0>(graphPointwiseTuple)->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapPointwise(flatbufferGraphPointwise.data(),
+                                          flatbufferGraphPointwise.size());
     EXPECT_FALSE(floatPlanBuilder.isApplicable(graphWrapPointwise.getNode(0),
                                                graphWrapPointwise.getTensorMap()));
 }
@@ -150,10 +148,9 @@ TEST(TestMatmulPlanBuilder, BuildNodePlan)
         auto graphTuple = buildMatmulGraph(tensorBundle, DataType::FLOAT, DataType::FLOAT);
 
         auto& graph = std::get<0>(graphTuple);
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-        const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+        const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
         EXPECT_NO_THROW(patient.buildNodePlan(graphWrap, graphWrap.getNode(0)));
     }
 
@@ -170,9 +167,8 @@ TEST(TestMatmulPlanBuilder, BuildNodePlan)
                                                    TensorLayout::NCHW);
 
         auto& graph = std::get<0>(graphTuple);
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-        const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+        const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
         EXPECT_THROW(patient.buildNodePlan(graphWrap, graphWrap.getNode(0)), std::runtime_error);
     }
 }
@@ -188,10 +184,9 @@ TEST(TestMatmulPlanBuilder, PlanConstruction)
     auto graphTuple = buildMatmulGraph(tensorBundle, DataType::FLOAT, DataType::FLOAT);
 
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrap(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrap(flatbufferGraph.data(), flatbufferGraph.size());
 
     const MatmulPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;

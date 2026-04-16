@@ -7,7 +7,6 @@
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
-#include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 
 namespace hipdnn_sdk_test_utils
 {
@@ -21,23 +20,16 @@ static std::tuple<std::shared_ptr<hipdnn_frontend::graph::Graph>,
 {
     auto graph = std::make_shared<hipdnn_frontend::graph::Graph>();
     graph->set_name("MatmulTest");
-    graph->set_io_data_type(hipdnn_test_sdk::utilities::sdkToFrontendDataType(inputDataType))
-        .set_compute_data_type(hipdnn_test_sdk::utilities::sdkToFrontendDataType(computeDataType))
-        .set_intermediate_data_type(
-            hipdnn_test_sdk::utilities::sdkToFrontendDataType(computeDataType));
+    graph->set_compute_data_type(hipdnn_frontend::fromSdkType(computeDataType));
 
     int64_t uid = 1;
     auto aAttr = hipdnn_frontend::graph::makeTensorAttributes(
-        "A",
-        hipdnn_test_sdk::utilities::sdkToFrontendDataType(inputDataType),
-        tensorBundle.aTensor);
+        "A", hipdnn_frontend::fromSdkType(inputDataType), tensorBundle.aTensor);
     aAttr.set_uid(uid++);
     auto aTensorAttr = std::make_shared<hipdnn_frontend::graph::TensorAttributes>(std::move(aAttr));
 
     auto bAttr = hipdnn_frontend::graph::makeTensorAttributes(
-        "B",
-        hipdnn_test_sdk::utilities::sdkToFrontendDataType(inputDataType),
-        tensorBundle.bTensor);
+        "B", hipdnn_frontend::fromSdkType(inputDataType), tensorBundle.bTensor);
     bAttr.set_uid(uid++);
     auto bTensorAttr = std::make_shared<hipdnn_frontend::graph::TensorAttributes>(std::move(bAttr));
 
@@ -52,7 +44,7 @@ static std::tuple<std::shared_ptr<hipdnn_frontend::graph::Graph>,
         cTensorAttr->set_uid(uid++);
     }
 
-    cTensorAttr->set_data_type(hipdnn_test_sdk::utilities::sdkToFrontendDataType(inputDataType));
+    cTensorAttr->set_data_type(hipdnn_frontend::fromSdkType(inputDataType));
 
     auto variantPack = tensorBundle.createVariantPack(*aTensorAttr, *bTensorAttr, *cTensorAttr);
 

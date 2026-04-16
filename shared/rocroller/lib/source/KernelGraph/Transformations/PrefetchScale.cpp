@@ -459,14 +459,11 @@ namespace rocRoller
          * @param graph Kernel graph containing the loads
          * @param colouring Maps operations to unroll values
          * @param nonSwizzleLoads Non-WAVE_SWIZZLE loads used as position anchors
-         * @param kLoopLoadSet Loads that are inside the K loop (used to distinguish
-         *                     pre-loop loads from K loop body loads)
          * @return PrefetchPositions indexed by sub-iteration
          */
-        PrefetchPositions DeterminePrefetchPositions(KernelGraph const&             graph,
-                                                     UnrollColouring const&         colouring,
-                                                     std::vector<int> const&        nonSwizzleLoads,
-                                                     std::unordered_set<int> const& kLoopLoadSet)
+        PrefetchPositions DeterminePrefetchPositions(KernelGraph const&      graph,
+                                                     UnrollColouring const&  colouring,
+                                                     std::vector<int> const& nonSwizzleLoads)
         {
             std::vector<int>   prefetchPosition;
             std::vector<int>   exchangePosition;
@@ -480,10 +477,11 @@ namespace rocRoller
                 auto unrollKDim = graph.mapper.get<Unroll>(loadTag, rocRoller::KLOOP_UNROLL);
                 auto subiter    = unrollMap.at(unrollKDim);
 
-                // Detect if we've entered the K loop (not just any ForLoopOp)
+                // Detect if we've entered the K loop
                 if(!isInsideLoop)
                 {
-                    if(kLoopLoadSet.contains(loadTag))
+                    auto maybeForLoop = findContainingOperation<ForLoopOp>(loadTag, graph);
+                    if(maybeForLoop)
                         isInsideLoop = true;
                 }
 
@@ -608,10 +606,8 @@ namespace rocRoller
             if(swizzleLoads.empty())
                 return;
 
-            std::unordered_set<int> kLoopLoadSet(loopLoads.begin(), loopLoads.end());
-
             auto [prefetchPosition, exchangePosition]
-                = DeterminePrefetchPositions(graph, colouring, nonSwizzleLoads, kLoopLoadSet);
+                = DeterminePrefetchPositions(graph, colouring, nonSwizzleLoads);
 
             for(auto const loadTag : swizzleLoads)
             {

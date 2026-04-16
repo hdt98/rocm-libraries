@@ -155,7 +155,7 @@ namespace TensileLite
                 return "And";
             }
 
-            virtual bool operator()(Object const& obj) const override
+            virtual bool operator()(Object const& obj) const
             {
                 return std::all_of(
                     value.begin(), value.end(), [&obj](const auto& pred) {
@@ -163,7 +163,7 @@ namespace TensileLite
                     });
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const
             {
                 bool rv = (*this)(obj);
                 std::ostringstream details;
@@ -205,7 +205,7 @@ namespace TensileLite
                 return "Or";
             }
 
-            virtual bool operator()(Object const& obj) const override
+            virtual bool operator()(Object const& obj) const
             {
                 return std::any_of(
                     value.begin(), value.end(), [&obj](const auto& pred) {
@@ -213,7 +213,7 @@ namespace TensileLite
                     });
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const
             {
                 bool rv = (*this)(obj);
                 std::ostringstream details;
@@ -250,12 +250,12 @@ namespace TensileLite
                 return "Not";
             }
 
-            virtual bool operator()(Object const& obj) const override
+            virtual bool operator()(Object const& obj) const
             {
                 return !(*value)(obj);
             }
 
-            virtual bool debugEval(Object const& obj, std::ostream& stream) const override
+            virtual bool debugEval(Object const& obj, std::ostream& stream) const
             {
                 bool rv = (*this)(obj);
                 PredicateDebugger::printRow(stream, rv, "Not", "negates following predicate");

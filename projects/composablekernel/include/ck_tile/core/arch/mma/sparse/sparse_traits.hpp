@@ -43,15 +43,18 @@ struct BuiltinParams
 template <SparseCompressionIndex Idx>
 static constexpr BuiltinParams getBuiltinParams()
 {
-    // TODO c++20: designated initializers
+    BuiltinParams params;
     if constexpr(Idx == SparseCompressionIndex::FIRST)
     {
-        return BuiltinParams{1, 0};
+        params.UseFirstIndex       = 1;
+        params.ByteIndexToOverride = 0;
     }
     else
     {
-        return BuiltinParams{0, static_cast<int>(Idx)};
+        params.UseFirstIndex       = 0;
+        params.ByteIndexToOverride = static_cast<int>(Idx);
     }
+    return params;
 }
 
 } // namespace sparse::detail

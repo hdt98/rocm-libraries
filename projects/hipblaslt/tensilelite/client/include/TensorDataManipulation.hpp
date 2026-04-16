@@ -175,10 +175,10 @@ namespace Tensor
                 return Tensor(shape, sizeof(T));
             }
 
-            Tensor(const Shape shape, float elementSize)
+            Tensor(const Shape shape, size_t elementSize)
                 : desc(shape)
                 , elementSize(elementSize)
-                , data(new char[TensileLite::multiplyElementSize(desc.flattenSize(), elementSize)])
+                , data(new char[elementSize * desc.flattenSize()])
             {
             }
 
@@ -234,14 +234,14 @@ namespace Tensor
                 return desc;
             }
 
-            float getElementSize() const
+            size_t getElementSize() const
             {
                 return elementSize;
             }
 
             size_t getNumBytes() const
             {
-                return TensileLite::multiplyElementSize(getDesc().flattenSize(), getElementSize());
+                return getDesc().flattenSize() * getElementSize();
             }
 
             void reshape(const Shape& shape)
@@ -255,7 +255,7 @@ namespace Tensor
             }
 
         private:
-            float                   elementSize{};
+            size_t                  elementSize{};
             TensorDesc              desc;
             std::unique_ptr<char[]> data;
         };
@@ -317,9 +317,9 @@ namespace Tensor
         Tensor permute(const Tensor& tensor, const Permutation& perm)
         {
             assert(tensor.getDesc().numDims() == perm.size());
-            assert(sizeof(T) == size_t(tensor.getElementSize()));
+            assert(sizeof(T) == tensor.getElementSize());
             Shape  newShape = permute(tensor.getDesc().getShape(), perm);
-            Tensor permuted(newShape, size_t(tensor.getElementSize()));
+            Tensor permuted(newShape, tensor.getElementSize());
             permute<T>(permuted, tensor, perm);
             return permuted;
         }
@@ -367,8 +367,8 @@ namespace Tensor
         Tensor permute(const Tensor& tensor, const Permutation& perm)
         {
             Shape  newShape = permute(tensor.getDesc().getShape(), perm);
-            Tensor permuted(newShape, size_t(tensor.getElementSize()));
-            switch(size_t(tensor.getElementSize()))
+            Tensor permuted(newShape, tensor.getElementSize());
+            switch(tensor.getElementSize())
             {
             case 1:
                 permute<uint8_t>(permuted, tensor, perm);

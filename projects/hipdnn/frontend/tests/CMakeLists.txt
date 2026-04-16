@@ -44,6 +44,8 @@ add_executable(
     TestFrontendLogging.cpp
     TestGraph.cpp
     TestGraphAttributes.cpp
+    TestGraphGenerated.cpp
+    TestGraphSerialization.cpp
     TestHandle.cpp
     TestIncompatibleBackendWrapper.cpp
     TestINode.cpp
@@ -57,8 +59,8 @@ add_executable(
     TestOperationUnpacker.cpp
     TestSdpaAttributes.cpp
     TestSdpaBackwardAttributes.cpp
-    TestSdpaBwdNode.cpp
-    TestSdpaFwdNode.cpp
+    TestSdpaBpropNode.cpp
+    TestSdpaFpropNode.cpp
     TestPointwiseAttributes.cpp
     TestPointwiseNode.cpp
     TestReductionAttributes.cpp

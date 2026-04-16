@@ -272,31 +272,11 @@ namespace TensileLite
             template <typename T>
             void enumCase(T& member, const char* key, T value)
             {
-                bool match = false;
-                if(object.type == msgpack::type::object_type::STR)
-                {
-                    std::string result;
-                    object.convert(result);
+                assert(object.type == msgpack::type::object_type::STR);
+                std::string result;
+                object.convert(result);
 
-                    if(result == key)
-                        match = true;
-                }
-                else if(object.type == msgpack::type::POSITIVE_INTEGER ||
-                        object.type == msgpack::type::NEGATIVE_INTEGER)
-                {
-                    int64_t intValue;
-                    object.convert(intValue);
-
-                    if(static_cast<int64_t>(value) == intValue)
-                        match = true;
-                }
-                else
-                {
-                    addError(concatenate("Unexpected msgpack type for enum: ", (int)object.type,
-                                       " (expected STRING or INTEGER)"));
-                }
-                    
-                if(match)
+                if(result == key)
                 {
                     enumFound++;
                     member = value;

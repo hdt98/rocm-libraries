@@ -8,6 +8,7 @@ Example 06: JSON Export
 
 Exports registry configuration to JSON.
 
+Complexity: ★★☆☆☆
 
 Usage:
     python3 06_json_export.py
@@ -27,7 +28,6 @@ from ctypes_utils import (
     setup_gemm_dispatcher,
     cleanup_gemm,
     reset_for_example,
-    detect_gpu_arch,
 )
 
 
@@ -54,9 +54,7 @@ Examples:
         help="Data type (default: fp16)",
     )
     parser.add_argument(
-        "--arch",
-        default=detect_gpu_arch(),
-        help="Target architecture (auto-detected from rocminfo)",
+        "--arch", default="gfx942", help="Target architecture (default: gfx942)"
     )
     args = parser.parse_args()
 

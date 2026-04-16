@@ -3,7 +3,6 @@
 
 #include <rocRoller/KernelOptions.hpp>
 #include <rocRoller/KernelOptions_detail.hpp>
-#include <rocRoller/Parameters/Solution/LDSBankSwizzleMode.hpp>
 #include <rocRoller/Parameters/Solution/ScaleSkipPermlaneMode.hpp>
 
 #include <rocRoller/AssertOpKinds.hpp>
@@ -130,7 +129,7 @@ namespace rocRoller
 
     std::string toString(KernelOptionValues const& values)
     {
-        static_assert(sizeof(KernelOptionValues) == 88,
+        static_assert(sizeof(KernelOptionValues) == 84,
                       "Edit the toString() function when adding a kernel option!");
 
         std::string rv = "Kernel Options:\n";
@@ -167,7 +166,6 @@ namespace rocRoller
         ShowString(scaleSkipPermlane);
         ShowString(assertOpKind);
         ShowOption(removeSetCoordinate);
-        ShowString(ldsSwizzleMode);
 
 #undef Show
 #undef ShowOption

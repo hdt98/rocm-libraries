@@ -18,6 +18,7 @@ This tests:
 - Multiple data types (fp16, bf16)
 - Different schedulers (intrawave, interwave)
 
+Complexity: ★★★★☆
 
 Usage:
     python3 07_stress_test.py
@@ -42,7 +43,6 @@ from ctypes_utils import (
     cleanup_gemm,
     reset_for_example,
     Validator,
-    detect_gpu_arch,
 )
 
 
@@ -413,8 +413,8 @@ Examples:
     )
     parser.add_argument(
         "--arch",
-        default=detect_gpu_arch(),
-        help="Target architecture (auto-detected from rocminfo, override with --arch gfxNNN)",
+        default="gfx942",
+        help="Target architecture (default: gfx942)",
     )
     args = parser.parse_args()
 

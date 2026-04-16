@@ -191,8 +191,6 @@ inline hipError_t segmented_scan_impl(void*               temporary_storage,
 /// In this example a device-level segmented inclusive min-scan operation is performed on
 /// an array of integer values (<tt>short</tt>s are scanned into <tt>int</tt>s) using custom operator.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_segmented_scan.cpp).
-///
 /// \code{.cpp}
 /// #include <rocprim/rocprim.hpp>
 ///
@@ -221,7 +219,7 @@ inline hipError_t segmented_scan_impl(void*               temporary_storage,
 /// hipMalloc(&temporary_storage_ptr, temporary_storage_size_bytes);
 ///
 /// // perform scan
-/// rocprim::segmented_inclusive_scan(
+/// rocprim::inclusive_scan(
 ///     temporary_storage_ptr, temporary_storage_size_bytes,
 ///     input, output, segments, offsets, offsets + 1, min_op
 /// );

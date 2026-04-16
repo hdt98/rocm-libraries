@@ -32,10 +32,9 @@ TEST(TestSdpaFwdPlan, ExecutePlan)
 
     auto graphTuple = buildSdpaFwdGraph(planTensorBundle, DataType::FLOAT);
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
     const auto* nodeAttributes = graphWrapper.getNode(0).attributes_as_SdpaAttributes();
     const auto& tensorMap = graphWrapper.getTensorMap();
 
@@ -79,10 +78,9 @@ TEST(TestSdpaFwdPlan, ExecutePlanWithCausalMask)
 
     auto graphTuple = buildSdpaFwdGraph(planTensorBundle, DataType::FLOAT, /*causalMask=*/true);
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
     const auto* nodeAttributes = graphWrapper.getNode(0).attributes_as_SdpaAttributes();
     const auto& tensorMap = graphWrapper.getTensorMap();
 
@@ -127,10 +125,9 @@ TEST(TestSdpaFwdPlanBuilder, PlanConstruction)
 
     auto graphTuple = buildSdpaFwdGraph(tensorBundle, DataType::FLOAT);
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     const SdpaFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;
@@ -151,10 +148,9 @@ TEST(TestSdpaFwdPlanBuilder, IsApplicable)
 
     auto graphTuple = buildSdpaFwdGraph(tensorBundle, DataType::FLOAT);
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     // Correct data types: applicable
     const SdpaFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>

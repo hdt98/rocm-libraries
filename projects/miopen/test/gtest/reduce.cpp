@@ -154,6 +154,7 @@ struct verify_reduce_with_indices
     tensor<float> gpu() const
     {
         using reduce::convert_type;
+
         std::tuple<tensor<T>, tensor<int>> results;
 
         results = gpuImpl();
@@ -271,8 +272,10 @@ struct verify_reduce_with_indices
     {
         using reduce::convert_type;
 
-        const auto indexes_1 = get_all_indexes(invariantLengths);
-        const auto indexes_2 = get_all_indexes(toReduceLengths);
+        std::vector<std::vector<std::size_t>> indexes_1, indexes_2;
+
+        get_all_indexes(invariantLengths, 0, indexes_1);
+        get_all_indexes(toReduceLengths, 0, indexes_2);
 
         // go through indexes of the invariant dimensions
         for(const auto& index_1 : indexes_1)
@@ -344,7 +347,9 @@ struct verify_reduce_with_indices
     {
         using reduce::convert_type;
 
-        const auto indexes_1 = get_all_indexes(inLengths);
+        std::vector<std::vector<std::size_t>> indexes_1;
+
+        get_all_indexes(inLengths, 0, indexes_1);
 
         compType accuVal = reduce::ReduceOpZeroVal<compType>(reduceOp);
         int accuIndex    = 0;
@@ -576,8 +581,10 @@ struct verify_reduce_no_indices
     {
         using reduce::convert_type;
 
-        const auto indexes_1 = get_all_indexes(invariantLengths);
-        const auto indexes_2 = get_all_indexes(toReduceLengths);
+        std::vector<std::vector<std::size_t>> indexes_1, indexes_2;
+
+        get_all_indexes(invariantLengths, 0, indexes_1);
+        get_all_indexes(toReduceLengths, 0, indexes_2);
 
         // go through indexes of the invariant dimensions
         for(const auto& index_1 : indexes_1)
@@ -645,7 +652,9 @@ struct verify_reduce_no_indices
     {
         using reduce::convert_type;
 
-        const auto indexes_1 = get_all_indexes(inLengths);
+        std::vector<std::vector<std::size_t>> indexes_1;
+
+        get_all_indexes(inLengths, 0, indexes_1);
 
         compType accuVal = reduce::ReduceOpZeroVal<compType>(reduceOp);
 
@@ -1171,7 +1180,7 @@ class ReduceCustomCommon : public ReduceCommon<T>
 {
     void SetUp() override
     {
-        using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X, Gpu::gfx115X>;
+        using e_mask = enabled<Gpu::gfx94X, Gpu::gfx103X, Gpu::gfx110X>;
         using d_mask = disabled<Gpu::Default>;
         if(!::IsTestSupportedForDevMask<d_mask, e_mask>())
         {

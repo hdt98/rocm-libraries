@@ -86,11 +86,9 @@ struct MmaDefaultTransformsGfx12
 template <typename MmaOp, typename CompilerTarget>
 // TODO: c++20 template <MmaOpI MmaOp, amdgcn_target_arch_id GfxTargetId>
 // TODO: c++20 requires
-struct MmaTransformsDefaultSelector<
-    MmaOp,
-    CompilerTarget,
-    enable_if_all<enable_if_target_family_gfx11_t<CompilerTarget>,
-                  std::enable_if_t<MmaOp::OpFamily == MmaOpFamily::DENSE>>>
+struct MmaTransformsDefaultSelector<MmaOp,
+                                    CompilerTarget,
+                                    enable_if_target_family_gfx11_t<CompilerTarget>>
 {
     using SelectedTransforms = MmaDefaultTransformsGfx11;
 };
@@ -104,11 +102,9 @@ struct MmaTransformsDefaultSelector<
 template <typename MmaOp, typename CompilerTarget>
 // TODO: c++20 template <MmaOpI MmaOp, amdgcn_target_arch_id GfxTargetId>
 // TODO: c++20 requires
-struct MmaTransformsDefaultSelector<
-    MmaOp,
-    CompilerTarget,
-    enable_if_all<enable_if_target_family_gfx12_t<CompilerTarget>,
-                  std::enable_if_t<MmaOp::OpFamily == MmaOpFamily::DENSE>>>
+struct MmaTransformsDefaultSelector<MmaOp,
+                                    CompilerTarget,
+                                    enable_if_target_family_gfx12_t<CompilerTarget>>
 {
     using SelectedTransforms = MmaDefaultTransformsGfx12;
 };

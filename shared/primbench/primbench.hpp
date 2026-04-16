@@ -95,10 +95,6 @@
 namespace primbench
 {
 
-inline constexpr size_t KiB = 1024;
-inline constexpr size_t MiB = 1024 * KiB;
-inline constexpr size_t GiB = 1024 * MiB;
-
 // Forward declarations for the detail namespace.
 extern const size_t MiB;
 template<typename... Args>
@@ -3165,14 +3161,6 @@ public:
             // For bools, explicitly output "true" or "false" instead of "0" or "1"
             if constexpr(std::is_same_v<T, bool>)
             {
-                if(default_val)
-                {
-                    std::cerr << "Error: Boolean flag --" << key
-                              << " cannot be registered with a default value of true. "
-                              << "Flags are implicitly false.\n";
-                    std::exit(EXIT_FAILURE);
-                }
-
                 oss << std::boolalpha;
             }
             oss << default_val;
@@ -3253,33 +3241,6 @@ public:
                           << it->second << "\"\n";
                 std::exit(EXIT_FAILURE);
             }
-
-            // When "--size" is specified, the number can optionally be suffixed with KiB/MiB/GiB.
-            if(key == "size")
-            {
-                if constexpr(std::is_same_v<T, size_t>)
-                {
-                    std::string suffix;
-                    ss >> suffix;
-
-                    if(!suffix.empty())
-                    {
-                        if(suffix == "KiB")
-                            out *= KiB;
-                        else if(suffix == "MiB")
-                            out *= MiB;
-                        else if(suffix == "GiB")
-                            out *= GiB;
-                        else
-                        {
-                            std::cerr << "Error: Failed to parse --" << key << ": unknown suffix \""
-                                      << suffix << "\"\n";
-                            std::exit(EXIT_FAILURE);
-                        }
-                    }
-                }
-            }
-
             return out;
         }
     }
@@ -3410,11 +3371,7 @@ private:
             auto it_def = _defaults.find(key);
             if(it_def != _defaults.end() && !it_def->second.empty())
             {
-                // Boolean flags are implicitly false by default.
-                if(it_def->second != "false")
-                {
-                    std::cout << " (default: " << it_def->second << ")";
-                }
+                std::cout << " (default: " << it_def->second << ")";
             }
             std::cout << "\n";
 
@@ -3475,6 +3432,10 @@ private:
 }; // class cli
 
 } // namespace detail
+
+inline constexpr size_t KiB = 1024;
+inline constexpr size_t MiB = 1024 * KiB;
+inline constexpr size_t GiB = 1024 * MiB;
 
 using json  = detail::json;
 using state = detail::state;
@@ -3842,8 +3803,7 @@ private:
         s.size = cli.get<size_t>("size",
                                  s.size,
                                  "Input size. Benchmarks decide what this represents, but it is "
-                                 "commonly the number of bytes or items."
-                                 " Supports the suffixes KiB/MiB/GiB, e.g. `--size 256KiB`.");
+                                 "commonly the number of bytes or items.");
         if(s.size == 0)
         {
             std::cerr << "Error: --size must be greater than 0\n";

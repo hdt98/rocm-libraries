@@ -158,16 +158,8 @@ struct Conv
 
 struct CreateCBAFusionPlan
 {
-    miopenFusionPlanDescriptor_t fusePlanDesc = nullptr;
+    miopenFusionPlanDescriptor_t fusePlanDesc;
     miopen::OperatorArgs op_args;
-
-    ~CreateCBAFusionPlan()
-    {
-        if(fusePlanDesc != nullptr)
-        {
-            miopenDestroyFusionPlan(fusePlanDesc);
-        }
-    }
 
     void CBAPlan()
     {
@@ -189,16 +181,8 @@ struct CreateCBAFusionPlan
 template <typename T>
 struct CreateBNormFusionPlan
 {
-    miopenFusionPlanDescriptor_t fusePlanDesc = nullptr;
+    miopenFusionPlanDescriptor_t fusePlanDesc;
     miopen::OperatorArgs op_args;
-
-    ~CreateBNormFusionPlan()
-    {
-        if(fusePlanDesc != nullptr)
-        {
-            miopenDestroyFusionPlan(fusePlanDesc);
-        }
-    }
 
     miopen::TensorDescriptor bn_desc;
     miopen::ActivationDescriptor activ_desc;
@@ -401,7 +385,7 @@ void TestLogBufferEnvEnabled()
         }
     }
 
-    // test log dump after 2nd error
+    // test log dump after throw
     MIOPEN_LOG_W("warn 2nd");
     MIOPEN_LOG_I("info 2nd");
     MIOPEN_LOG_I2("info2 2nd");

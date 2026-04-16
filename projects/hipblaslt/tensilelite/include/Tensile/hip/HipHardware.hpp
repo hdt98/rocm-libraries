@@ -39,7 +39,7 @@ namespace TensileLite
         struct HipAMDGPU : public AMDGPU
         {
             HipAMDGPU() = default;
-            HipAMDGPU(hipDeviceProp_t const& prop, std::optional<int> pciChipId = std::nullopt);
+            HipAMDGPU(hipDeviceProp_t const& prop);
 
             hipDeviceProp_t properties;
 

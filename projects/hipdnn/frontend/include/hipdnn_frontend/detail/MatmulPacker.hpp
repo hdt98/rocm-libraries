@@ -17,7 +17,7 @@ inline Error
                           std::vector<ScopedHipdnnBackendDescriptor>& operations)
 {
     // Create operation descriptor
-    ScopedHipdnnBackendDescriptor opDesc(HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR);
+    ScopedHipdnnBackendDescriptor opDesc(HIPDNN_BACKEND_OPERATION_MATMUL_DESCRIPTOR_EXT);
     if(!opDesc.valid())
     {
         return {ErrorCode::HIPDNN_BACKEND_ERROR, "Failed to create matmul operation descriptor"};
@@ -25,24 +25,24 @@ inline Error
 
     // Create tensor descriptors (if needed) and set them on the operation
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
-                                             HIPDNN_ATTR_OPERATION_MATMUL_ADESC,
+                                             HIPDNN_ATTR_OPERATION_MATMUL_A_EXT,
                                              attributes.get_a(),
                                              tensorDescs,
                                              "matmul A"));
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
-                                             HIPDNN_ATTR_OPERATION_MATMUL_BDESC,
+                                             HIPDNN_ATTR_OPERATION_MATMUL_B_EXT,
                                              attributes.get_b(),
                                              tensorDescs,
                                              "matmul B"));
     HIPDNN_CHECK_ERROR(ensureAndSetTensorRef(opDesc.get(),
-                                             HIPDNN_ATTR_OPERATION_MATMUL_CDESC,
+                                             HIPDNN_ATTR_OPERATION_MATMUL_C_EXT,
                                              attributes.get_c(),
                                              tensorDescs,
                                              "matmul C"));
 
     // Set compute data type
     HIPDNN_CHECK_ERROR(setDescriptorAttrDataType(opDesc.get(),
-                                                 HIPDNN_ATTR_MATMUL_COMP_TYPE,
+                                                 HIPDNN_ATTR_MATMUL_MATH_PREC_EXT,
                                                  attributes.compute_data_type,
                                                  "matmul compute data type"));
 

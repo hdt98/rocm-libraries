@@ -9,7 +9,6 @@
 #include <rocRoller/DataTypes/DataTypes.hpp>
 #include <rocRoller/GPUArchitecture/GPUArchitectureTarget.hpp>
 #include <rocRoller/Operations/BlockScale_fwd.hpp>
-#include <rocRoller/Parameters/Solution/LDSBankSwizzleMode.hpp>
 #include <rocRoller/Parameters/Solution/LoadOption.hpp>
 #include <rocRoller/Parameters/Solution/ScaleSkipPermlaneMode.hpp>
 #include <rocRoller/Parameters/Solution/StoreOption.hpp>
@@ -185,8 +184,6 @@ namespace rocRoller
                 bool tailLoops = true;
 
                 StreamKMode streamK = StreamKMode::None;
-
-                LDSBankSwizzleMode ldsBankSwizzle = LDSBankSwizzleMode::None;
 
                 std::string version;
 

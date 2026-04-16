@@ -33,7 +33,6 @@
 #include "miopen/rnn.hpp"
 #include "miopen/tensor.hpp"
 #include "workspace.hpp"
-#include "gtest_desc_guard.hpp"
 
 #define MIO_RNN_TEST_DEBUG 0
 #define MIO_RNN_TIME_EVERYTHING 0
@@ -1200,17 +1199,13 @@ protected:
 
         int batch_n = std::accumulate(batchSeq.begin(), batchSeq.end(), 0);
 
-        RNNDescGuard rnnDesc;
-        DropoutDescGuard DropoutDesc;
+        miopenRNNDescriptor_t rnnDesc;
+        miopenCreateRNNDescriptor(&rnnDesc);
+        miopenDropoutDescriptor_t DropoutDesc;
+        miopenCreateDropoutDescriptor(&DropoutDesc);
         size_t statesSizeInBytes = 0;
 
-        miopenRNNAlgo_t algoMode  = miopenRNNdefault;
-        miopenHandle_t mio_handle = nullptr;
-#if MIOPEN_BACKEND_HIP
-        void* dropout_state_buf = nullptr;
-#elif MIOPEN_BACKEND_OPENCL
-        cl_mem dropout_state_buf = nullptr;
-#endif
+        miopenRNNAlgo_t algoMode = miopenRNNdefault;
         if(useDropout != 0)
         {
 // Workaround for issue #2335.
@@ -1218,6 +1213,7 @@ protected:
 #if MIOPEN_BACKEND_OPENCL
             GTEST_SKIP() << "Skip test for Issue #2335: " << std::endl;
 #endif
+            miopenHandle_t mio_handle;
             miopenCreateWithStream(&mio_handle, handle.GetStream());
 
             float dropout_rate              = 0.5;
@@ -1228,9 +1224,10 @@ protected:
             cl_context ctx;
             clGetCommandQueueInfo(
                 handle.GetStream(), CL_QUEUE_CONTEXT, sizeof(cl_context), &ctx, nullptr);
-            dropout_state_buf =
+            cl_mem dropout_state_buf =
                 clCreateBuffer(ctx, CL_MEM_READ_WRITE, statesSizeInBytes, nullptr, nullptr);
 #elif MIOPEN_BACKEND_HIP
+            void* dropout_state_buf;
             (void)hipMalloc(static_cast<void**>(&dropout_state_buf), statesSizeInBytes);
 #endif
 
@@ -1478,16 +1475,6 @@ protected:
         //                                        seqLength, numLayers,
         //                                        biasMode, dirMode,
         //                                        inputMode, rnnMode, inVecReal});
-
-        if(useDropout != 0)
-        {
-#if MIOPEN_BACKEND_HIP
-            (void)hipFree(dropout_state_buf);
-#elif MIOPEN_BACKEND_OPENCL
-            (void)clReleaseMemObject(dropout_state_buf);
-#endif
-            miopenDestroy(mio_handle);
-        }
     }
 
 private:

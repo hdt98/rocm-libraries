@@ -50,5 +50,4 @@ __all__ = [
     "StreamK",
     "PersistentLoop",
     "LSU",
-    "TensorDataMover",
     ]

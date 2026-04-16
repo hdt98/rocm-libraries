@@ -84,6 +84,7 @@ struct UniversalInvoker
                                              GemmConfig::NumWaveGroups,
                                              false, /*FixedVectorSize_*/
                                              1,     /*VectorSizeC_*/
+                                             false, /*TiledMMAPermuteN_*/
                                              1,     /*BlockedXDLN_PerWarp_*/
                                              GemmConfig::DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
 
@@ -227,6 +228,7 @@ struct UniversalInvoker
                                              GemmConfig::NumWaveGroups,
                                              false, /*FixedVectorSize_*/
                                              1,     /*VectorSizeC_*/
+                                             false, /*TiledMMAPermuteN_*/
                                              1,     /*BlockedXDLN_PerWarp_*/
                                              GemmConfig::DoubleSmemBuffer>>;
 

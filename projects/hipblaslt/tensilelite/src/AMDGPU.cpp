@@ -47,11 +47,10 @@ namespace TensileLite
 
     TENSILE_API AMDGPU::AMDGPU() {}
 
-    TENSILE_API AMDGPU::AMDGPU(AMDGPU::Processor p, int cus, std::string const& name, std::optional<int> pciChipId)
+    TENSILE_API AMDGPU::AMDGPU(AMDGPU::Processor p, int cus, std::string const& name)
         : processor(p)
         , computeUnitCount(cus)
         , deviceName(name)
-        , _pciChipId(pciChipId)
         , skDynamicGrid(getSKDynamicGrid())
         , skDynamicWGM(getSKDynamicWGM())
         , skMaxCUs(getSKMaxCUs())
@@ -116,10 +115,7 @@ namespace TensileLite
     {
         std::ostringstream rv;
 
-        rv << deviceName << "(" << computeUnitCount << "-CU " << processor;
-        if(_pciChipId.has_value())
-            rv << " PCI ChipId: 0x" << std::hex << _pciChipId.value() << std::dec;
-        rv << ")";
+        rv << deviceName << "(" << computeUnitCount << "-CU " << processor << ")";
 
         return rv.str();
     }

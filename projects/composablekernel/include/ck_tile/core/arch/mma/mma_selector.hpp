@@ -72,4 +72,3 @@ concept MmaSelectorI = requires(MmaSelector op) {
 // Include the implementations
 #include "wmma/wmma_selector.hpp"
 #include "mfma/mfma_selector.hpp"
-#include "sparse/sparse_selector.hpp"

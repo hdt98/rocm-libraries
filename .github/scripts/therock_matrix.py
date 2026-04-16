@@ -17,7 +17,7 @@ subtree_to_project_map = {
     "projects/hiprand": "rand",
     "projects/hipsolver": "solver",
     "projects/hipsparse": "sparse",
-    "projects/hipsparselt": "sparselt",
+    "projects/hipsparselt": "sparse",
     "projects/miopen": "miopen",
     "projects/rocblas": "blas",
     "projects/rocfft": "fft",
@@ -67,12 +67,7 @@ project_map = {
 additional_options = {
     "sparse": {
         "cmake_options": ["-DTHEROCK_ENABLE_SPARSE=ON"],
-        "projects_to_test": ["rocsparse", "hipsparse"],
-        "project_to_add": "blas",
-    },
-    "sparselt": {
-        "cmake_options": ["-DTHEROCK_ENABLE_SPARSE=ON"],
-        "projects_to_test": ["hipsparselt"],
+        "projects_to_test": ["rocsparse", "hipsparse", "hipsparselt"],
         "project_to_add": "blas",
     },
     "solver": {

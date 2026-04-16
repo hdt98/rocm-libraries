@@ -348,7 +348,6 @@ class MasterSolutionLibrary:
                           assembler,
                           isaInfoMap: Dict[str, IsaInfo],
                           lazyLibraryLoading: bool,
-                          logicFile=None,
                           solutionClass=Contractions.Solution,
                           libraryOrder=None,
                           placeholderName='TensileLibrary'):
@@ -358,28 +357,16 @@ class MasterSolutionLibrary:
             devicePart = d["ArchitectureName"]
             cuCount = d["CUCount"]
 
-            pciChipId = d.get("DeviceNames", None)
-
             newLib = PredicateLibrary(tag="Hardware")
             if devicePart == "fallback":
                 pred = Hardware.HardwarePredicate("TruePred")
             else:
-                pred = Hardware.HardwarePredicate.FromHardware(
-                    gfxToIsa(devicePart), cuCount, pciChipId, logicFile=logicFile
-                )
+                pred = Hardware.HardwarePredicate.FromHardware(gfxToIsa(devicePart), cuCount)
 
             newLib.rows.append({"predicate": pred, "library": library})
 
             if lazyLibrary:
                 if cuCount: placeholderName += "_CU" + str(cuCount)
-                if pciChipId:
-                    # Convert device names list to a sanitized string for filename
-                    # e.g., ['Device 75a0', 'Device 75b0'] -> 'ID75a0-75b0'
-                    if isinstance(pciChipId, list):
-                        chipIdStr = '-'.join([str(d).replace('Device ', '').strip() for d in pciChipId])
-                    else:
-                        chipIdStr = str(pciChipId).replace('Device ', '').strip()
-                    placeholderName += "_ID" + chipIdStr
                 placeholderName += "_" + str(devicePart)
 
             return newLib, placeholderName
@@ -459,11 +446,8 @@ class MasterSolutionLibrary:
                 assert 0 and "Unrecognized LibraryType."
 
             if lazyLibraryLoading:
-                computeInputTypeStr = str(problemType.computeInputTypeA)
-                if problemType.computeInputTypeA != problemType.computeInputTypeB:
-                    computeInputTypeStr = str(problemType.computeInputTypeA) + str(problemType.computeInputTypeB)
                 placeholderName += '_' + str(problemType.aType) + str(problemType.bType)
-                placeholderName += '_' + str(problemType.cType) + computeInputTypeStr
+                placeholderName += '_' + str(problemType.cType) + str(problemType.computeInputType)
                 if problemType.activationType != 'none':
                     if str(problemType.activationType).upper() == 'ALL':
                         placeholderName += "_A"
@@ -471,11 +455,6 @@ class MasterSolutionLibrary:
                         placeholderName += "_HA"
                     else:
                         placeholderName += "_%s"%str(problemType.activationType).upper()
-
-                if problemType.mxBlockA:
-                    placeholderName += ('_MXA' + str(problemType.mxTypeA) + 'B' + str(problemType.mxBlockA))
-                if problemType.mxBlockB:
-                    placeholderName += ('_MXB' + str(problemType.mxTypeB) + 'B' + str(problemType.mxBlockB))
 
                 if problemType.swizzleTensorA:
                     placeholderName += '_STA'
@@ -501,8 +480,7 @@ class MasterSolutionLibrary:
                     placeholderName += '_SAV'
                 if problemType.sparse:
                     placeholderName += '_SPB' if problemType.sparse == 2 else '_SPA'
-                    placeholderName += "ML" + str(problemType.metadataLayout)
-                if not problemType.f32XdlMathOp.isSingle() and problemType.computeInputTypeA.isSingle() and problemType.computeInputTypeB.isSingle():
+                if not problemType.f32XdlMathOp.isSingle() and problemType.computeInputType.isSingle():
                     placeholderName += '_M' + str(problemType.f32XdlMathOp)
                 if problemType.supportDeviceUserArguments:
                     placeholderName += '_UA'
@@ -536,7 +514,6 @@ class MasterSolutionLibrary:
                                                         assembler,
                                                         isaInfoMap,
                                                         lazyLibraryLoading,
-                                                        logicFile,
                                                         solutionClass,
                                                         libraryOrder[placeholderIndex:],
                                                         placeholderName)

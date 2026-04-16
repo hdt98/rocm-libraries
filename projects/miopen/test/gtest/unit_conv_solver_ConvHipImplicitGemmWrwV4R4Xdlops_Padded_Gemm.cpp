@@ -46,28 +46,22 @@ auto GetConvTestCases(miopenDataType_t datatype)
 }
 
 template <miopenDataType_t datatype>
-miopen::unit_tests::UnitTestConvSolverParams GetTestParams()
+const auto& GetTestParams()
 {
-    Gpu supported_gpus = Gpu::gfx908 | Gpu::gfx90A;
-    auto p             = miopen::unit_tests::UnitTestConvSolverParams(supported_gpus);
-    p.Tunable(5);
-    p.SetConvAttrFp16Alt(0);
-    p.SetTolerance(Gpu::gfx90A, miopenFloat, 2.0f);
-    return p;
+    static const auto params = [] {
+        Gpu supported_gpus = Gpu::gfx908 | Gpu::gfx90A;
+        auto p             = miopen::unit_tests::UnitTestConvSolverParams(supported_gpus);
+        p.Tunable(5);
+        p.SetConvAttrFp16Alt(0);
+        p.SetTolerance(Gpu::gfx90A, miopenFloat, 2.0f);
+        return p;
+    }();
+    return params;
 }
 
-miopen::unit_tests::UnitTestConvSolverParams GetTestParamsFP16()
-{
-    return GetTestParams<miopenHalf>();
-}
-miopen::unit_tests::UnitTestConvSolverParams GetTestParamsBFP16()
-{
-    return GetTestParams<miopenBFloat16>();
-}
-miopen::unit_tests::UnitTestConvSolverParams GetTestParamsFP32()
-{
-    return GetTestParams<miopenFloat>();
-}
+const auto& GetTestParamsFP16() { return GetTestParams<miopenHalf>(); }
+const auto& GetTestParamsBFP16() { return GetTestParams<miopenBFloat16>(); }
+const auto& GetTestParamsFP32() { return GetTestParams<miopenFloat>(); }
 
 } // namespace
 

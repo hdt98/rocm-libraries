@@ -4,7 +4,6 @@
 #pragma once
 
 #include "KernelOptions.hpp"
-#include <rocRoller/Parameters/Solution/LDSBankSwizzleMode.hpp>
 #include <rocRoller/Parameters/Solution/ScaleSkipPermlaneMode.hpp>
 
 namespace rocRoller
@@ -124,13 +123,6 @@ namespace rocRoller
          * Enable/Disable the RemoveSetCoordinate transformation
          */
         bool removeSetCoordinate = false;
-
-        /**
-         * LDS bank conflict elimination via intra-wave column rotation + pair-swap swizzle.
-         * When set to Swizzle, remaps K-column indices on
-         * both the LoadTiled (write) and LoadLDSTile (read) sides to eliminate ds_read_b128 bank conflicts.
-         */
-        LDSBankSwizzleMode ldsSwizzleMode = LDSBankSwizzleMode::None;
 
         std::string toString() const;
     };

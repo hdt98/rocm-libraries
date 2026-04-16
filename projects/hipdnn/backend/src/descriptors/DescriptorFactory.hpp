@@ -19,10 +19,6 @@ public:
                                const uint8_t* serializedGraph,
                                size_t graphByteSize);
 
-    static void createGraphFromJsonExt(hipdnnBackendDescriptor_t* descriptor,
-                                       const char* jsonGraph,
-                                       size_t jsonByteSize);
-
     static void destroy(hipdnnBackendDescriptor_t descriptor);
 };
 

@@ -3,10 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include <hip_kernel_provider_common/HipDeviceUtils.hpp>
 #include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
-#include <hipdnn_frontend/Types.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 
 #include "HipKernelHandle.hpp"
@@ -43,23 +40,8 @@ TEST_F(TestAsmSdpaEngine, IsApplicableReturnsFalseForNonSdpaGraph)
 
 TEST_F(TestAsmSdpaEngine, IsApplicableReturnsTrueForSdpaGraph)
 {
-    if(hip_kernel_provider_common::getDeviceString(_handle.getStream()) != "gfx942")
-    {
-        GTEST_SKIP();
-    }
-
-    std::vector<int64_t> dims{4, 8, 256, 128};
-    auto strides = hipdnn_data_sdk::utilities::generateStrides(dims);
-    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFwdGraph(
-        dims,
-        strides,
-        dims,
-        strides,
-        dims,
-        strides,
-        dims,
-        strides,
-        hipdnn_data_sdk::data_objects::DataType::BFLOAT16);
+    // Create a SDPA forward inference graph
+    auto builder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
 
     hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrapper(builder.GetBufferPointer(),
                                                                      builder.GetSize());

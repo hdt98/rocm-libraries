@@ -10,21 +10,23 @@ using TestCase     = miopen::unit_tests::GroupXdlopsNumericData;
 using TestDataType = miopen::unit_tests::TestDataType;
 
 template <TestDataType type>
-std::vector<TestCase> GetConvSmokeTestCases()
+auto GetConvSmokeTestCases()
 {
-    const bool tf32_compute = type == TestDataType::TF32;
-    return {
+    const bool tf32_compute          = type == TestDataType::TF32;
+    std::vector<TestCase> test_cases = {
         // clang-format off
         TestCase{{64, 32, 28, 28, 28}, {32, 32, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, false, tf32_compute}
         // clang-format on
     };
+
+    return test_cases;
 }
 
 template <TestDataType type>
-std::vector<TestCase> GetConvFullTestCases()
+auto GetConvFullTestCases()
 {
-    const bool tf32_compute = type == TestDataType::TF32;
-    return {
+    const bool tf32_compute          = type == TestDataType::TF32;
+    std::vector<TestCase> test_cases = {
         // clang-format off
         // Group Count 1
         TestCase{{6, 448, 3, 118, 182}, {896, 448, 1, 1, 1}, {0, 0, 0}, {1, 2, 2}, {1, 1, 1}, 1, false, tf32_compute},
@@ -37,6 +39,8 @@ std::vector<TestCase> GetConvFullTestCases()
         TestCase{{64, 32, 28, 28, 28}, {32, 2, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {1, 1, 1}, 16, false, tf32_compute},
         // clang-format on  
     };
+
+    return test_cases;
 }
 
 auto GetDevApplicabilityConvCase()
@@ -59,35 +63,37 @@ auto GetDeterministicConvCase()
 }
 
 template <TestDataType type>
-miopen::unit_tests::UnitTestConvSolverParams GetTestParams()
+const auto& GetTestParams()
 {
+    static const auto params = [] {
 // If MIOpen is built without CK these tests will fail, skip them to avoid failing
 #if MIOPEN_BACKEND_HIP && MIOPEN_USE_COMPOSABLEKERNEL
-    Gpu supportedDevices;
-    if constexpr(type == TestDataType::FP32)
-    {
-        supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950;
-    }
-    else if constexpr(type == TestDataType::TF32)
-    {
-        supportedDevices = Gpu::gfx94X | Gpu::gfx950;
-    }
-    else
-    {
-        supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950 | Gpu::gfx110X |
-                           Gpu::gfx115X | Gpu::gfx120X;
-    }
+        Gpu supportedDevices;
+        if constexpr(type == TestDataType::FP32)
+        {
+            supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950;
+        }
+        else if constexpr(type == TestDataType::TF32)
+        {
+            supportedDevices = Gpu::gfx94X | Gpu::gfx950;
+        }
+        else
+        {
+            supportedDevices = Gpu::gfx908 | Gpu::gfx90A | Gpu::gfx94X | Gpu::gfx950 |
+                               Gpu::gfx110X | Gpu::gfx115X | Gpu::gfx120X;
+        }
 #else
-    Gpu supportedDevices = Gpu::None;
+        Gpu supportedDevices = Gpu::None;
 #endif
-    miopen::unit_tests::UnitTestConvSolverParams p(supportedDevices);
-    p.Tunable(5);
-    p.UsesCKDynamicLib();
+        auto p = miopen::unit_tests::UnitTestConvSolverParams(supportedDevices);
+        p.Tunable(5);
 
-    // Increased tolerance factor to 2 because of the following errors observed :
-    // Expected: (error) < (threshold), actual: 1.4733528696833642e-07 vs 1.1920928955078125e-07
-    p.SetTolerance(supportedDevices, miopenFloat, 2.0f);
-    return p;
+        // Increased tolerance factor to 2 because of the following errors observed :
+        // Expected: (error) < (threshold), actual: 1.4733528696833642e-07 vs 1.1920928955078125e-07
+        p.SetTolerance(supportedDevices, miopenFloat, 2.0f);
+        return p;
+    }();
+    return params;
 }
 
 } // namespace

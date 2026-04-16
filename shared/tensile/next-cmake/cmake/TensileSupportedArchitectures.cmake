@@ -56,8 +56,7 @@ if(NOT BUILD_ADDRESS_SANITIZER)
         "gfx1152"
         "gfx1153"
         "gfx1200"
-        "gfx1201"
-        "gfx1250")
+        "gfx1201")
 
     set(SUPPORTED_ARCHITECTURES ${BASE_ARCHITECTURES})
     list(APPEND SUPPORTED_ARCHITECTURES

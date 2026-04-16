@@ -15,6 +15,7 @@ Key Features:
   - Use arch_filter validation on loaded configs
   - Export to C++ DECL_KERNEL_SET format
 
+Complexity: ★★★☆☆
 
 Usage:
     python3 11_json_import.py
@@ -44,7 +45,6 @@ from ctypes_utils import (  # noqa: E402
     cleanup_gemm,
     reset_for_example,
     validate_kernel_config,
-    detect_gpu_arch,
 )
 
 # Sample JSON configuration (embedded for demonstration)
@@ -141,8 +141,8 @@ Examples:
     )
     parser.add_argument(
         "--arch",
-        default=detect_gpu_arch(),
-        help="Target GPU architecture (auto-detected from rocminfo, override with --arch gfxNNN)",
+        default="gfx942",
+        help="Target GPU architecture (default: gfx942)",
     )
     args = parser.parse_args()
 
@@ -236,13 +236,13 @@ Examples:
             else:
                 invalid_count += 1
                 if invalid_count <= 3:  # Show first 3 invalid
-                    print(f"\n  FAIL Invalid: {config.kernel_name()}")
+                    print(f"\n  ✗ Invalid: {config.kernel_name()}")
                     for error in result.errors:
                         print(f"    Error: {error}")
 
         print("\n  Validation Summary:")
-        print(f"    OK Valid: {valid_count}")
-        print(f"    FAIL Invalid: {invalid_count}")
+        print(f"    ✓ Valid: {valid_count}")
+        print(f"    ✗ Invalid: {invalid_count}")
         print(f"    Total: {len(configs)}")
 
     # =========================================================================
@@ -275,12 +275,12 @@ Examples:
             disp_config, registry_name="json_import", verbose=False
         )
         if setup.success:
-            print("  OK Dispatcher setup successful")
+            print("  ✓ Dispatcher setup successful")
             print(
                 f"    Kernel header: {setup.kernel_header.name if setup.kernel_header else 'N/A'}"
             )
         else:
-            print(f"  WARNING Dispatcher setup: {setup.error}")
+            print(f"  ⚠ Dispatcher setup: {setup.error}")
             print("    (This is expected if kernels aren't generated)")
 
     # =========================================================================

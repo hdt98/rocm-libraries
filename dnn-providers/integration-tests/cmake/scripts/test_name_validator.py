@@ -32,9 +32,8 @@ class TestNameValidator:
     )
 
     FULL_NAME_RE: Pattern[str] = re.compile(
-        r"^(?:(?P<prefix>(?:DISABLED_)?[A-Z][A-Za-z0-9]*)/)?"
+        r"^(?:(?P<prefix>[A-Z][A-Za-z0-9]*)/)?"
         r"(?P<suite>[A-Z][A-Za-z0-9]*)"
-        r"(?:/\d+)?"
         r"\.(?P<case>(?:DISABLED_[A-Z][A-Za-z0-9]+|[A-Z][A-Za-z0-9]*))"
         r"(?:/.*)?$"
     )
@@ -208,15 +207,13 @@ class TestNameValidator:
                     if not line:
                         continue
 
-                    # Strip gtest comments (e.g. "# TypeParam = float")
-                    line = line.split("#")[0].strip()
-                    if not line:
-                        continue
-
                     if line.endswith(".") and not line.endswith("..."):
                         current_suite = line[:-1]
                     elif line and current_suite:
-                        test_names.append(f"{current_suite}.{line}")
+                        test_case = line.strip()
+                        test_names.append(
+                            f"{current_suite}.{test_case.split("#")[0].strip()}"
+                        )
 
             except subprocess.TimeoutExpired:
                 print(f"Warning: Timeout running {executable}", file=sys.stderr)
@@ -424,9 +421,6 @@ class TestTestNameValidator(unittest.TestCase):
         valid_names = [
             "TestMyClass.DISABLED_Something",
             "IntegrationGpuConvolutionFp32.DISABLED_Forward",
-            "DISABLED_Medium2d/TestGpuConvRefShapesFp32.MatchesCpuRef/Basic3x3",
-            "DISABLED_Large2d/TestGpuConvRefShapesFp32.MatchesCpuRef/ResNet",
-            "DISABLED_Nhwc2dMedium/TestGpuConvRefShapesFp16.MatchesCpuRef/Stride2",
         ]
 
         for name in valid_names:

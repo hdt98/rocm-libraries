@@ -32,12 +32,6 @@
 
 namespace hiptensor
 {
-    /* static */ std::unique_ptr<HiptensorOptions> const& HiptensorOptions::instance()
-    {
-        static auto sInstance = std::make_unique<HiptensorOptions>();
-        return sInstance;
-    }
-
     HiptensorOptions::HiptensorOptions()
         : mOstream()
         , mLogOstream()

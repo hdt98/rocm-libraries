@@ -396,10 +396,10 @@ struct SolverContainer
                 {
                     auto db = [&]() -> PerformanceDb& {
                         constexpr auto db_getter =
-                            []([[maybe_unused]] const ExecutionContext& ctx_,
-                               [[maybe_unused]] const auto& problem_) -> PerformanceDb {
+                            []([[maybe_unused]] const ExecutionContext& ctx,
+                               [[maybe_unused]] const auto& problem) -> PerformanceDb {
                             if constexpr(IsTunable<decltype(solver)>())
-                                return GetDb(ctx_, problem_);
+                                return GetDb(ctx, problem);
                             else
                                 MIOPEN_THROW(miopenStatusInternalError);
                         };

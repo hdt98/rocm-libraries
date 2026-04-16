@@ -17,8 +17,6 @@
 
 #include <hipdnn_frontend/knob/KnobSetting.hpp>
 
-#include <unordered_set>
-
 namespace hipdnn_frontend
 {
 

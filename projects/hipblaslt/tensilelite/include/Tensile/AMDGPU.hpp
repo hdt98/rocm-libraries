@@ -27,7 +27,6 @@
 #pragma once
 
 #include <Tensile/Tensile.hpp>
-#include <optional>
 
 namespace TensileLite
 {
@@ -77,8 +76,7 @@ namespace TensileLite
             gfx1152 = 1152,
             gfx1153 = 1153,
             gfx1200 = 1200,
-            gfx1201 = 1201,
-            gfx1250 = 1250
+            gfx1201 = 1201
         };
 
         static Processor toProcessor(std::string archName)
@@ -175,10 +173,6 @@ namespace TensileLite
             {
                 return Processor::gfx1201;
             }
-            else if(archName.find("gfx1250") != std::string::npos)
-            {
-                return Processor::gfx1250;
-            }
             return static_cast<Processor>(0);
         }
 
@@ -232,8 +226,6 @@ namespace TensileLite
                 return "gfx1200";
             case AMDGPU::Processor::gfx1201:
                 return "gfx1201";
-            case AMDGPU::Processor::gfx1250:
-                return "gfx1250";
             case AMDGPU::Processor::gfx000:
                 return "gfx000";
             }
@@ -241,7 +233,7 @@ namespace TensileLite
         }
 
         AMDGPU();
-        AMDGPU(Processor p, int computeUnitCount, std::string const& deviceName, std::optional<int> pciChipId = std::nullopt);
+        AMDGPU(Processor p, int computeUnitCount, std::string const& deviceName);
         ~AMDGPU();
 
         Processor   processor                = Processor::gfx900;
@@ -265,22 +257,17 @@ namespace TensileLite
 
         virtual bool   isStandardCU() const;
         virtual bool   runsKernelTargeting(Processor p) const;
-        virtual size_t id() const override
+        virtual size_t id() const
         {
             return (size_t)processor;
         }
 
-        virtual std::string archName() const override
+        virtual std::string archName() const
         {
             return toString(processor);
         }
 
-        virtual std::optional<int> pciChipId() const override
-        {
-            return _pciChipId;
-        }
-
-        virtual std::string description() const override;
+        virtual std::string description() const;
 
         const int getSKDynamicGrid() const
         {
@@ -368,11 +355,8 @@ namespace TensileLite
 
         bool operator==(AMDGPU const& rhs) const
         {
-            return processor == rhs.processor && computeUnitCount == rhs.computeUnitCount && _pciChipId == rhs._pciChipId;
+            return processor == rhs.processor && computeUnitCount == rhs.computeUnitCount;
         }
-
-    private:
-        std::optional<int> _pciChipId = std::nullopt;
     };
 
     inline bool operator<(AMDGPU::Processor l, AMDGPU::Processor r)

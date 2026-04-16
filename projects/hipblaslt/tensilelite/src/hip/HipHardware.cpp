@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2022-2023 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,22 +25,17 @@
  *******************************************************************************/
 
 #include <Tensile/AMDGPU.hpp>
-#include <Tensile/AMDGPUPredicates.hpp>
 #include <Tensile/hip/HipHardware.hpp>
 #include <Tensile/hip/HipUtils.hpp>
-
-#include <iostream>
-#include <stdexcept>
 
 namespace TensileLite
 {
     namespace hip
     {
-        HipAMDGPU::HipAMDGPU(hipDeviceProp_t const& prop, std::optional<int> pciChipId)
+        HipAMDGPU::HipAMDGPU(hipDeviceProp_t const& prop)
             : AMDGPU(AMDGPU::toProcessor(prop.gcnArchName),
                      prop.multiProcessorCount,
-                     std::string(prop.name),
-                     pciChipId)
+                     std::string(prop.name))
             , properties(prop)
         {
             if(origami::hardware_t::is_hardware_supported(prop))
@@ -75,33 +70,13 @@ namespace TensileLite
                                                     deviceId));
             }
 #endif
-            const auto processor = AMDGPU::toProcessor(prop.gcnArchName);
-            if(!ChipIdRegistry::supportsChipIdPredicate(processor))
-            {
-                return std::make_shared<HipAMDGPU>(prop, std::nullopt);
-            }
 
-            int pciChipId = 0;
-            hipError_t chipIdResult = hipDeviceGetAttribute(&pciChipId, hipDeviceAttributePciChipId, deviceId);
-
-            // Check hip runtime support for PCI Chip ID attribute
-            if(chipIdResult == hipErrorInvalidValue)
-                throw std::runtime_error(pciChipIdUnsupportedErrorMessage(prop));
-
-            // For any other error, use standard error checking
-            HIP_CHECK_EXC(chipIdResult);
-
-            if(!ChipIdRegistry::isKnownChipId(pciChipId))
-                logUnregisteredPciChipIdWarningOnce(prop, pciChipId);
-
-            return std::make_shared<HipAMDGPU>(prop, std::make_optional(pciChipId));
+            return GetDevice(prop);
         }
 
         std::shared_ptr<Hardware> GetDevice(hipDeviceProp_t const& prop)
         {
-            // When called with just prop (no device ID available), chip ID is unknown
-            // This maintains backwards compatibility for code paths that don't have the device ID
-            return std::make_shared<HipAMDGPU>(prop, std::nullopt);
+            return std::make_shared<HipAMDGPU>(prop);
         }
     } // namespace hip
 } // namespace TensileLite

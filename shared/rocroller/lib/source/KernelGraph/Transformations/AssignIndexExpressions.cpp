@@ -40,14 +40,6 @@ namespace rocRoller::KernelGraph
         int              forLoop                    = -1;
         bool             replaceWithScope           = true;
         bool             isStorePartOfGlobalToLDSOp = false;
-
-        // When >= 0, this unroll coordinate's value is incorporated into
-        // the base address (rather than appearing as a stride). This is
-        // needed when a non-affine transform (e.g. LDS bank swizzle)
-        // depends on the unroll position -- the base must be recomputed
-        // per unroll value, producing separate chains.
-        int inlineUnrollValue = -1; // literal value for this chain (-1 = unused)
-        int inlineUnrollCoord = -1; // coordinate tag of the unroll dimension
     };
 
     bool operator<(const IndexChainSpec& a, const IndexChainSpec& b)
@@ -58,18 +50,14 @@ namespace rocRoller::KernelGraph
                         a.direction,
                         a.forLoop,
                         a.replaceWithScope,
-                        a.isStorePartOfGlobalToLDSOp,
-                        a.inlineUnrollValue,
-                        a.inlineUnrollCoord)
+                        a.isStorePartOfGlobalToLDSOp)
                < std::tie(b.target,
                           b.coords,
                           b.location,
                           b.direction,
                           b.forLoop,
                           b.replaceWithScope,
-                          b.isStorePartOfGlobalToLDSOp,
-                          b.inlineUnrollValue,
-                          b.inlineUnrollCoord);
+                          b.isStorePartOfGlobalToLDSOp);
     }
 
     /**
@@ -434,8 +422,7 @@ namespace rocRoller::KernelGraph
                                    int                              candidate,
                                    bool                             isStorePartOfGlobalToLDSOp,
                                    const std::vector<int>&          strideCoords,
-                                   std::vector<DeferredConnection>& connections,
-                                   int                              inlineUnrollCoord = -1)
+                                   std::vector<DeferredConnection>& connections)
     {
         auto [target, direction]
             = getOperationTarget(candidate, kgraph, isStorePartOfGlobalToLDSOp);
@@ -444,10 +431,6 @@ namespace rocRoller::KernelGraph
 
         for(auto const& unroll : unrolls)
         {
-            // Skip the unroll coordinate whose value is incorporated into
-            // the base address -- no stride needed for it.
-            if(inlineUnrollCoord >= 0 && unroll == inlineUnrollCoord)
-                continue;
             auto proxy = followIdentify(unroll, kgraph);
 
             auto const subDimension = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
@@ -649,12 +632,8 @@ namespace rocRoller::KernelGraph
                     graph, edges.offset, edges.stride, offsetDataType, step);
         }
 
-        addUnrollStrideConnection(graph,
-                                  op,
-                                  spec.isStorePartOfGlobalToLDSOp,
-                                  strideCoords,
-                                  connections,
-                                  spec.inlineUnrollCoord);
+        addUnrollStrideConnection(
+            graph, op, spec.isStorePartOfGlobalToLDSOp, strideCoords, connections);
 
         // Link chain nodes with Sequence edges
         for(size_t i = 1; i < chain.size(); ++i)
@@ -1116,102 +1095,6 @@ namespace rocRoller::KernelGraph
             return assignTag;
         }
 
-        std::pair<int, int> GetInlineUnrollInfo(KernelGraph const& kgraph, int candidate)
-        {
-            if(!kgraph.control.get<LoadLDSTile>(candidate))
-                return {-1, -1};
-
-            auto macTileTag = kgraph.mapper.get<MacroTile>(candidate);
-            auto macTile    = kgraph.coordinates.getNode<MacroTile>(macTileTag);
-            auto dataType   = getDataType(kgraph.control.getNode(candidate));
-
-            if(isScaleType(dataType))
-                return {-1, -1};
-
-            int kSubdim = -1;
-            if(macTile.layoutType == LayoutType::MATRIX_A)
-                kSubdim = 1;
-            else if(macTile.layoutType == LayoutType::MATRIX_B)
-                kSubdim = 0;
-            else
-                return {-1, -1};
-
-            auto [target, direction]
-                = getOperationTarget(candidate, kgraph, /*isStorePartOfGlobalToLDSOp=*/false);
-            auto [required, path] = findRequiredCoordinates(target, direction, kgraph);
-            auto unrolls          = filterCoordinates<Unroll>(required, kgraph);
-
-            int kUnrollCoord = -1;
-            for(auto const& unroll : unrolls)
-            {
-                auto sdim = kgraph.mapper.getConnectionSubdimension(candidate, unroll);
-                if(sdim == kSubdim)
-                {
-                    kUnrollCoord = unroll;
-                    break;
-                }
-            }
-
-            if(kUnrollCoord < 0)
-                return {-1, -1};
-
-            // PairSwap and Rotate edges are used for LDS bank swizzling.
-            // They are non-affine with respect to the K dimension: the
-            // column permutation depends on the row index, so the unroll
-            // value cannot be applied as a simple stride and must be
-            // folded into the base address (done elsewhere).
-            bool hasLDSSwizzle = false;
-            for(auto nodeTag : path)
-            {
-                for(auto edgeTag :
-                    kgraph.coordinates.getNeighbours(nodeTag, Graph::opposite(direction)))
-                {
-                    if(kgraph.coordinates.get<PairSwap>(edgeTag).has_value()
-                       || kgraph.coordinates.get<Rotate>(edgeTag).has_value())
-                    {
-                        hasLDSSwizzle = true;
-                        break;
-                    }
-                }
-                if(hasLDSSwizzle)
-                    break;
-            }
-
-            if(!hasLDSSwizzle)
-                return {-1, -1};
-
-            int current = candidate;
-            while(true)
-            {
-                auto parents = kgraph.control.getInputNodeIndices<Body>(current).to<std::vector>();
-                if(parents.empty())
-                    break;
-
-                AssertFatal(parents.size() == 1,
-                            "GetInlineUnrollInfo: expected single Body parent",
-                            ShowValue(current),
-                            ShowValue(parents.size()));
-
-                current            = parents[0];
-                auto maybeSetCoord = kgraph.control.get<SetCoordinate>(current);
-                if(!maybeSetCoord)
-                    continue;
-
-                auto coordTag = kgraph.mapper.get<Unroll>(current);
-                if(coordTag != kUnrollCoord)
-                    continue;
-
-                auto valueExpr = maybeSetCoord->value;
-                if(!evaluationTimes(valueExpr)[EvaluationTime::Translate])
-                    break;
-
-                auto value = static_cast<int>(getUnsignedInt(evaluate(valueExpr)));
-                return {kUnrollCoord, value};
-            }
-
-            return {-1, -1};
-        }
-
     } // namespace AssignIndexExpressionsDetail
 
     // Import detail namespace for internal use
@@ -1261,10 +1144,8 @@ namespace rocRoller::KernelGraph
                         int                location,
                         Graph::Direction   direction,
                         bool               isStorePartOfGlobalToLDSOp,
-                        int                forLoop           = -1,
-                        bool               replaceWithScope  = true,
-                        int                inlineUnrollValue = -1,
-                        int                inlineUnrollCoord = -1)
+                        int                forLoop          = -1,
+                        bool               replaceWithScope = true)
         {
             // Build coordinate list for deduplication key
             std::vector<int> specCoords;
@@ -1280,9 +1161,7 @@ namespace rocRoller::KernelGraph
                                 direction,
                                 forLoop,
                                 replaceWithScope,
-                                isStorePartOfGlobalToLDSOp,
-                                inlineUnrollValue,
-                                inlineUnrollCoord};
+                                isStorePartOfGlobalToLDSOp};
             m_chains[spec].push_back(candidate);
         }
 
@@ -1366,11 +1245,6 @@ namespace rocRoller::KernelGraph
             for(auto r : required)
                 Log::debug("  required: {}: {}", r, toString(kgraph.coordinates.getNode(r)));
 
-            // Check if an unroll coordinate must be incorporated into the base address
-            auto [inlineUnrollCoord, inlineUnrollValue]
-                = isStorePartOfGlobalToLDSOp ? std::pair{-1, -1}
-                                             : GetInlineUnrollInfo(kgraph, candidate);
-
             // Gather loop context information
             auto maybeForLoop  = findContainingOperation<ForLoopOp>(candidate, kgraph);
             auto maybeScope    = findContainingOperation<Scope>(candidate, kgraph);
@@ -1389,9 +1263,7 @@ namespace rocRoller::KernelGraph
                            placement->direction,
                            isStorePartOfGlobalToLDSOp,
                            placement->forLoop,
-                           placement->replaceWithScope,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           placement->replaceWithScope);
                 return;
             }
 
@@ -1409,9 +1281,7 @@ namespace rocRoller::KernelGraph
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
                            -1,
-                           false,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           false);
                 return;
             }
 
@@ -1425,10 +1295,7 @@ namespace rocRoller::KernelGraph
                            *maybeForLoop,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           *maybeForLoop,
-                           true,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           *maybeForLoop);
                 return;
             }
 
@@ -1444,10 +1311,7 @@ namespace rocRoller::KernelGraph
                            *maybeScope,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           -1,
-                           true,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           -1);
                 return;
             }
 
@@ -1466,9 +1330,7 @@ namespace rocRoller::KernelGraph
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
                            -1,
-                           false,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           false);
                 return;
             }
 
@@ -1485,10 +1347,7 @@ namespace rocRoller::KernelGraph
                            kernel,
                            GD::Downstream,
                            isStorePartOfGlobalToLDSOp,
-                           -1,
-                           true,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           -1);
                 return;
             }
 
@@ -1502,10 +1361,7 @@ namespace rocRoller::KernelGraph
                            *maybeForLoop,
                            GD::Upstream,
                            isStorePartOfGlobalToLDSOp,
-                           *maybeForLoop,
-                           true,
-                           inlineUnrollValue,
-                           inlineUnrollCoord);
+                           *maybeForLoop);
                 return;
             }
 
@@ -1661,12 +1517,7 @@ namespace rocRoller::KernelGraph
 
                 // Create Assign nodes for each placeholder
                 for(auto const& nodeInfo : chain.nodeInfos)
-                    createAssignsForPlaceholder(kgraph,
-                                                nodeInfo,
-                                                m_context,
-                                                m_command,
-                                                spec.inlineUnrollValue,
-                                                spec.inlineUnrollCoord);
+                    createAssignsForPlaceholder(kgraph, nodeInfo, m_context, m_command);
             }
 
             return kgraph;
@@ -1679,9 +1530,7 @@ namespace rocRoller::KernelGraph
         static void createAssignsForPlaceholder(KernelGraph&         kgraph,
                                                 ChainNodeInfo const& nodeInfo,
                                                 ContextPtr           context,
-                                                CommandPtr           command,
-                                                int                  inlineUnrollValue = -1,
-                                                int                  inlineUnrollCoord = -1)
+                                                CommandPtr           command)
         {
             int target = nodeInfo.target;
 
@@ -1747,16 +1596,6 @@ namespace rocRoller::KernelGraph
                     if(!xform.hasCoordinate(coord))
                         xform.setCoordinate(coord, coordDF);
                 }
-            }
-
-            // Incorporate the unroll value into the base address so that
-            // non-affine transforms (e.g. LDS bank swizzle) receive the
-            // correct input. Must precede zeroing so the loop skips it.
-            if(inlineUnrollCoord >= 0 && inlineUnrollValue >= 0
-               && !xform.hasCoordinate(inlineUnrollCoord))
-            {
-                xform.setCoordinate(inlineUnrollCoord,
-                                    L(static_cast<unsigned int>(inlineUnrollValue)));
             }
 
             // Set remaining coordinates to 0

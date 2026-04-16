@@ -931,10 +931,10 @@ namespace rocRoller::Client::GEMMClient
             Settings::getInstance()->set(Settings::SchedulerCost, cost);
         }
 
-        auto context = Context::ForTarget(arch,
-                                          solution.generateKernelName().shortName,
-                                          {{.scaleSkipPermlane = solution.types.scaleSkipPermlane,
-                                            .ldsSwizzleMode    = solution.ldsBankSwizzle}});
+        auto context
+            = Context::ForTarget(arch,
+                                 solution.generateKernelName().shortName,
+                                 {{.scaleSkipPermlane = solution.types.scaleSkipPermlane}});
 
         if(doInfo)
         {
@@ -1238,8 +1238,7 @@ namespace rocRoller::Client::GEMMClient::CLI
         std::make_pair("--scheduler", &SolutionParameters::scheduler),
         std::make_pair("--schedulerCost", &SolutionParameters::schedulerCost),
         std::make_pair("--tailLoops", &SolutionParameters::tailLoops),
-        std::make_pair("--streamK", &SolutionParameters::streamK),
-        std::make_pair("--ldsBankSwizzle", &SolutionParameters::ldsBankSwizzle));
+        std::make_pair("--streamK", &SolutionParameters::streamK));
 
     template <typename T, typename U>
     std::string getSolutionParameterArgumentName(U T::*member_ptr)
@@ -1444,7 +1443,6 @@ namespace rocRoller::Client::GEMMClient::CLI
         update(SN(&SP::swizzleScale), solution.swizzleScale);
         update(SN(&SP::swizzleTileSize), solution.swizzleTileSize);
         update(SN(&SP::prefetchScale), solution.prefetchScale);
-        update(SN(&SP::ldsBankSwizzle), solution.ldsBankSwizzle);
 
         // Prefetching
 
@@ -1767,8 +1765,6 @@ int main(int argc, const char* argv[])
     app.add_option(SN(&SP::streamK),
                    "StreamK mode (None, Standard, TwoTile, TwoTileDPFirst). Default: None")
         ->check(CLI::IsMember(rocRoller::enumStrings<StreamKMode>()));
-    app.add_option(SN(&SP::ldsBankSwizzle), "LDS bank swizzle mode (None, Swizzle). Default: None")
-        ->check(CLI::IsMember(rocRoller::enumStrings<LDSBankSwizzleMode>()));
 
     app.add_option(SN(&SP::loadPathAScale),
                    "How to load AScale (BufferToVGPR, BufferToLDSViaVGPR, BufferToLDS). Default: "

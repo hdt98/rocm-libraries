@@ -147,8 +147,6 @@ struct is_default_or_has_tag<default_config, Tag>
 /// In this example a device-level lower bound computation on a haystack of double precision type
 /// values is performed on an input array of integer values.
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_binary_search.cpp).
-///
 /// \code{.cpp}
 /// #include <rocprim/rocprim.hpp>
 ///
@@ -189,7 +187,7 @@ struct is_default_or_has_tag<default_config, Tag>
 ///                              stream,
 ///                              debug_synchronous);
 ///
-/// // output = {1, 2, 2, 3, 4}
+/// // output = {0, 1, 2, 2, 3}
 /// \endcode
 /// \endparblock
 template<

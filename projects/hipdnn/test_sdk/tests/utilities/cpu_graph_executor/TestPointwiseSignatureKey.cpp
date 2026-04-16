@@ -114,11 +114,10 @@ TEST(TestPointwiseSignatureKey, CreateFromNodeAndTensorMapUnary)
                                    hipdnn_frontend::PointwiseMode::RELU_FWD,
                                    1,
                                    TensorLayout::NCHW);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
-                                                                         serializedGraph.size());
+    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(flatbufferGraph.data(),
+                                                                         flatbufferGraph.size());
 
     const PointwiseSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());
 
@@ -157,11 +156,10 @@ TEST(TestPointwiseSignatureKey, CreateFromNodeAndTensorMapBinary)
                                     hipdnn_frontend::PointwiseMode::ADD,
                                     1,
                                     TensorLayout::NCHW);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
-                                                                         serializedGraph.size());
+    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(flatbufferGraph.data(),
+                                                                         flatbufferGraph.size());
 
     const PointwiseSignatureKey keyFromNode(graphWrap.getNode(0), graphWrap.getTensorMap());
 

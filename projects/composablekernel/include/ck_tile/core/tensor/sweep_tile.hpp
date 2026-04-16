@@ -295,6 +295,10 @@ struct tile_sweeper
     F f;
 };
 
+// partial deduction is not allowed
+// template <typename T, typename F, typename U>
+// tile_sweeper(const F&, U = {})->tile_sweeper<T, F, U>;
+
 // deduction guide
 template <typename T,
           typename F,

@@ -11,7 +11,6 @@
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
-#include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
@@ -122,9 +121,7 @@ protected:
             _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createAllCloseValidator(
-                     hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
-                     absoluteTolerance,
-                     relativeTolerance)});
+                     toSdkType(attr->get_data_type()), absoluteTolerance, relativeTolerance)});
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -159,11 +156,6 @@ protected:
         }
     }
 
-    virtual hipStream_t stream() const
-    {
-        return _stream;
-    }
-
 private:
     void executeGpuGraph(hipdnnHandle_t handle,
                          hipdnn_frontend::graph::Graph& graph,
@@ -183,11 +175,10 @@ private:
     void executeCpuGraph(hipdnn_frontend::graph::Graph& graph,
                          hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
     {
-        auto [serializedGraph, serErr] = graph.to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+        auto flatbufferGraph = graph.buildFlatbufferOperationGraph();
 
         hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
-            serializedGraph.data(), serializedGraph.size(), bundle.toHostVariantPack());
+            flatbufferGraph.data(), flatbufferGraph.size(), bundle.toHostVariantPack());
     }
 
     bool tryAddTensorToBundles(
@@ -204,9 +195,9 @@ private:
         }
 
         cpuBundle.tensors.insert(
-            {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
         gpuBundle.tensors.insert(
-            {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
+            {tensorId, hipdnn_frontend::graph::createTensorFromAttribute(*tensorAttr)});
         _tensorIdToNameMap.insert({tensorId, tensorAttr->get_name()});
 
         return true;

@@ -74,11 +74,10 @@ TEST_F(TestCpuFpReferenceMatmul, IsApplicable)
         auto graphTuple = buildMatmulGraph(tensorBundle, DataType::FLOAT, DataType::FLOAT);
 
         auto& graph = std::get<0>(graphTuple);
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(serializedGraph.data(),
-                                                                            serializedGraph.size());
+        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(flatbufferGraph.data(),
+                                                                            flatbufferGraph.size());
         EXPECT_TRUE(CpuFpReferenceMatmul::isApplicable(graphWrap.getNode(0)));
     }
 
@@ -96,11 +95,10 @@ TEST_F(TestCpuFpReferenceMatmul, IsApplicable)
                                                    TensorLayout::NCHW);
 
         auto& graph = std::get<0>(graphTuple);
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(serializedGraph.data(),
-                                                                            serializedGraph.size());
+        const hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper graphWrap(flatbufferGraph.data(),
+                                                                            flatbufferGraph.size());
         EXPECT_FALSE(CpuFpReferenceMatmul::isApplicable(graphWrap.getNode(0)));
     }
 }

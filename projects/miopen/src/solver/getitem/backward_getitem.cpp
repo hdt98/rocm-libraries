@@ -175,24 +175,24 @@ ConvSolution GetitemBackward::GetSolution(const ExecutionContext& /*context*/,
                 output_dims[i] = static_cast<int32_t>(dx_dims[dims[i]]);
             }
 
-            const auto& index_count = params.indexCount;
-            const auto& index_dims  = params.indexDescs[0]->GetLengths();
-            const auto& slice_count = params.sliceCount;
-            const auto& slices      = params.slices;
+            const auto& indexCount = params.indexCount;
+            const auto& index_dims = params.indexDescs[0]->GetLengths();
+            const auto& sliceCount = params.sliceCount;
+            const auto& slices     = params.slices;
             auto dim_info_offset =
-                index_count > 0 ? index_count * static_cast<int32_t>(index_dims[0]) : 0;
+                indexCount > 0 ? indexCount * static_cast<int32_t>(index_dims[0]) : 0;
 
             auto dy_tv = get_inner_expanded_tv<5>(params.dyDesc);
             auto dx_tv = get_inner_expanded_tv<5>(params.dxDesc);
 
-            slice_tv<5>(dx_tv, slice_count, slices);
+            slice_tv<5>(dx_tv, sliceCount, slices);
 
             auto elapsed = 0.f;
             HipEventPtr start;
             HipEventPtr stop;
             bool reset_profiling_state = false;
 
-            for(int32_t i = 0; i < index_count; i++)
+            for(int32_t i = 0; i < indexCount; i++)
             {
                 decltype(auto) build_index_kernel = handle_.Run(kernels[i]);
 
@@ -214,14 +214,14 @@ ConvSolution GetitemBackward::GetSolution(const ExecutionContext& /*context*/,
                                    params.workspace,
                                    params.error,
                                    index_dim,
-                                   index_count,
+                                   indexCount,
                                    dim_size,
                                    index_tv,
                                    dim_offset,
                                    dim_info_offset);
             }
 
-            if((index_count == 0) && handle_.IsProfilingEnabled())
+            if((indexCount == 0) && handle_.IsProfilingEnabled())
             {
                 handle_.EnableProfiling(false);
                 reset_profiling_state = true;
@@ -230,13 +230,13 @@ ConvSolution GetitemBackward::GetSolution(const ExecutionContext& /*context*/,
                 (void)hipEventRecord(start.get(), handle_.GetStream());
             }
 
-            decltype(auto) kernel = handle_.Run(kernels[index_count]);
+            decltype(auto) kernel = handle_.Run(kernels[indexCount]);
 
             kernel(params.dy,
                    params.workspace,
                    params.dx,
                    start_dim,
-                   index_count,
+                   indexCount,
                    dy_tv,
                    dx_tv,
                    dim_info_offset,

@@ -56,11 +56,6 @@ struct Arguments
         Scalar                  = 1,
         Vector                  = 2,
         Block_32_UE8M0          = 3,
-        Block_16_UE8M0          = 4,
-        Block_32_UE4M3          = 5,
-        Block_16_UE4M3          = 6,
-        Block_32_UE5M3          = 7,
-        Block_16_UE5M3          = 8,
         Block_32_UE8M0_32_8_EXT = 1001,
     };
 
@@ -114,9 +109,6 @@ struct Arguments
     hipDataType          scale_type;
 
     hipblaslt_initialization initialization;
-    hipblaslt_initialization initialization_a; // when set (non-zero), overrides initialization for matrix A
-    hipblaslt_initialization initialization_b; // when set (non-zero), overrides initialization for matrix B
-    int8_t norm_dist_one_special_type; // for norm_dist_one_special: -1=from seed, 0=inf, 1=neg_inf, 2=nan
 
     // the gpu arch string after "gfx" for which the test is valid,
     // it represents a regular expression.
@@ -235,9 +227,6 @@ struct Arguments
     OPER(compute_input_typeB) SEP    \
     OPER(scale_type) SEP             \
     OPER(initialization) SEP         \
-    OPER(initialization_a) SEP      \
-    OPER(initialization_b) SEP      \
-    OPER(norm_dist_one_special_type) SEP \
     OPER(gpu_arch) SEP               \
     OPER(gpu_arch_exclude) SEP       \
     OPER(pad) SEP                    \

@@ -4,7 +4,7 @@
 #include <cstdio>
 #include <gtest/gtest.h>
 
-#include "engines/plans/batchnorm/BatchnormFwdInferencePlan.hpp"
+#include "engines/plans/BatchnormFwdInferencePlan.hpp"
 #include "mocks/MockCompiledProgram.hpp"
 #include "mocks/MockKernelCompiler.hpp"
 #include "mocks/MockRunnableKernel.hpp"
@@ -14,8 +14,7 @@
 #include <hipdnn_plugin_sdk/interfaces/IPlan.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferGraphTestUtils.hpp>
 
-namespace hip_kernel_provider::batchnorm::test
-{
+using namespace hip_kernel_provider;
 
 // ============================================================================
 // BatchnormFwdInferenceParams - construction from valid graph data
@@ -456,5 +455,3 @@ TEST(TestBatchnormFwdInferencePlan, CompileWithUnsupportedDimensionThrows)
 
     EXPECT_THROW(plan.compile(mockCompiler, deviceProps), hipdnn_plugin_sdk::HipdnnPluginException);
 }
-
-} // namespace hip_kernel_provider::batchnorm::test

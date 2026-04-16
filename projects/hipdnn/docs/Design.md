@@ -116,7 +116,7 @@ The central abstraction in the Frontend is the `Graph` class, which:
 Nodes represent individual operations within a graph:
 - Each node type (e.g., `BatchnormNode`, `PointwiseNode`) inherits from `INode`
 - Nodes encapsulate their specific attributes and tensor connections
-- Support lowering to backend descriptors for execution
+- Support serialization to Flatbuffer format for Backend consumption
 
 ##### Attributes
 Attributes configure the behavior of nodes:
@@ -164,7 +164,7 @@ The Backend uses descriptors as opaque handles to manage different aspects of gr
 ##### 1. Operation Graph Descriptor (`HIPDNN_BACKEND_OPERATIONGRAPH_DESCRIPTOR`)
 - Represents the computational graph to be executed
 - Contains nodes, tensors, and their connections
-- Created from serialized graph data or frontend graph lowering
+- Created from serialized Flatbuffer data
 
 ##### 2. Engine Heuristic Descriptor (`HIPDNN_BACKEND_ENGINEHEUR_DESCRIPTOR`)
 - Manages the selection of appropriate engines for a graph

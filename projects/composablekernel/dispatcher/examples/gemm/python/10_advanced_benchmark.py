@@ -33,7 +33,6 @@ from ctypes_utils import (
     setup_gemm_dispatcher,
     cleanup_gemm,
     reset_for_example,
-    detect_gpu_arch,
 )
 
 
@@ -70,11 +69,7 @@ def parse_args():
     # Kernel configuration
     parser.add_argument("--dtype", default="fp16", help="Data type")
     parser.add_argument("--pipeline", default="compv4", help="Pipeline type")
-    parser.add_argument(
-        "--arch",
-        default=detect_gpu_arch(),
-        help="GPU architecture (auto-detected from rocminfo)",
-    )
+    parser.add_argument("--arch", default="gfx942", help="GPU architecture")
 
     return parser.parse_args()
 

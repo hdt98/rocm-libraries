@@ -12,10 +12,7 @@
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_frontend.hpp>
 #include <hipdnn_test_sdk/constants/BnInfVarExtConstants.hpp>
-#include <hipdnn_test_sdk/utilities/IntegrationTestFixture.hpp>
-#include <hipdnn_test_sdk/utilities/LoweringTestHelpers.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
-#include <hipdnn_test_sdk/utilities/TestableGraph.hpp>
 #include <hipdnn_test_sdk/utilities/ToVec.hpp>
 
 #include "test_plugins/TestPluginConstants.hpp"
@@ -23,16 +20,20 @@
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 using namespace hipdnn_tests::constants;
-using hipdnn_tests::IntegrationTestFixture;
 using hipdnn_tests::toVec;
 using DataTypeSdk = hipdnn_data_sdk::data_objects::DataType;
 using NodeAttrType = hipdnn_data_sdk::data_objects::NodeAttributes;
-using hipdnn_tests::buildTensorMap;
-using hipdnn_tests::lowerAndDeserialize;
-using hipdnn_tests::TestableGraphLowering;
 
 namespace
 {
+
+// Exposes protected Graph methods for testing
+class TestableGraph : public Graph
+{
+public:
+    using Graph::build_operation_graph_via_descriptors;
+    using Graph::get_raw_graph_descriptor;
+};
 
 // -- Test constants for AutoAssignedUidsPreservedInRoundTrip --
 constexpr std::array<int64_t, 4> K_AUTO_X_DIMS = {2, 32, 8, 8};
@@ -43,8 +44,33 @@ constexpr std::array<int64_t, 4> K_AUTO_PARAM_STRIDES = {32, 1, 1, 1};
 
 // Lowers a frontend graph via build_operation_graph_via_descriptors, then
 // retrieves the serialized graph and deserializes it for verification.
-class IntegrationBnInfVarExtDescriptorLowering : public IntegrationTestFixture
+class IntegrationBnInfVarExtDescriptorLowering : public ::testing::Test
 {
+protected:
+    void SetUp() override
+    {
+        SKIP_IF_NO_DEVICES();
+
+        ASSERT_EQ(hipInit(0), hipSuccess);
+
+        const std::array<const char*, 1> paths
+            = {hipdnn_tests::plugin_constants::testGoodPluginPath().c_str()};
+        ASSERT_EQ(hipdnnSetEnginePluginPaths_ext(
+                      paths.size(), paths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+
+        ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
+    }
+
+    void TearDown() override
+    {
+        if(_handle != nullptr)
+        {
+            hipdnnDestroy(_handle);
+        }
+    }
+
+    hipdnnHandle_t _handle = nullptr;
 };
 
 // Builds a batchnorm_inference_variance_ext graph via the frontend API, lowers it
@@ -52,7 +78,7 @@ class IntegrationBnInfVarExtDescriptorLowering : public IntegrationTestFixture
 // graph, and verifies all tensor and operation attributes match.
 TEST_F(IntegrationBnInfVarExtDescriptorLowering, BnInfVarExtGraphRoundTrip)
 {
-    auto graph = std::make_shared<TestableGraphLowering>();
+    auto graph = std::make_shared<TestableGraph>();
     graph->set_name("TestBnInfVarExtGraph")
         .set_io_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -99,7 +125,32 @@ TEST_F(IntegrationBnInfVarExtDescriptorLowering, BnInfVarExtGraphRoundTrip)
         x, mean, variance, scale, bias, epsilon, std::move(bnAttrs));
     y->set_uid(K_BN_INF_VAR_EXT_Y_UID).set_output(true).set_name("Y");
 
-    auto graphT = lowerAndDeserialize(*graph, _handle);
+    // -- Validate and lower --
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph_via_descriptors(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    // -- Retrieve serialized graph --
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    ASSERT_NE(rawDesc, nullptr);
+
+    size_t serializedSize = 0;
+    ASSERT_EQ(hipdnnBackendGetSerializedBinaryGraph_ext(rawDesc, 0, &serializedSize, nullptr),
+              HIPDNN_STATUS_SUCCESS);
+    ASSERT_GT(serializedSize, 0u);
+
+    std::vector<uint8_t> serializedData(serializedSize);
+    ASSERT_EQ(hipdnnBackendGetSerializedBinaryGraph_ext(
+                  rawDesc, serializedSize, &serializedSize, serializedData.data()),
+              HIPDNN_STATUS_SUCCESS);
+
+    // -- Deserialize into GraphT --
+    auto graphFb = hipdnn_data_sdk::data_objects::GetGraph(serializedData.data());
+    ASSERT_NE(graphFb, nullptr);
+    hipdnn_data_sdk::data_objects::GraphT graphT;
+    graphFb->UnPackTo(&graphT);
 
     // -- Verify graph-level attributes --
     EXPECT_EQ(graphT.compute_data_type, DataTypeSdk::FLOAT);
@@ -109,7 +160,11 @@ TEST_F(IntegrationBnInfVarExtDescriptorLowering, BnInfVarExtGraphRoundTrip)
     // -- Verify tensors --
     ASSERT_EQ(graphT.tensors.size(), 7u);
 
-    auto tensorMap = buildTensorMap(graphT);
+    std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributesT*> tensorMap;
+    for(const auto& t : graphT.tensors)
+    {
+        tensorMap[t->uid] = t.get();
+    }
 
     // Verify X tensor
     ASSERT_NE(tensorMap.count(K_BN_INF_VAR_EXT_X_UID), 0u);
@@ -181,7 +236,7 @@ TEST_F(IntegrationBnInfVarExtDescriptorLowering, BnInfVarExtGraphRoundTrip)
 // through the lowering round-trip.
 TEST_F(IntegrationBnInfVarExtDescriptorLowering, AutoAssignedUidsPreservedInRoundTrip)
 {
-    auto graph = std::make_shared<TestableGraphLowering>();
+    auto graph = std::make_shared<TestableGraph>();
     graph->set_name("AutoUidBnGraph")
         .set_io_data_type(DataType::FLOAT)
         .set_intermediate_data_type(DataType::FLOAT)
@@ -219,7 +274,26 @@ TEST_F(IntegrationBnInfVarExtDescriptorLowering, AutoAssignedUidsPreservedInRoun
         x, mean, variance, scale, bias, epsilon, BatchnormInferenceAttributesVarianceExt{bnAttrs});
     y->set_output(true);
 
-    auto graphT = lowerAndDeserialize(*graph, _handle);
+    auto result = graph->validate();
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    result = graph->build_operation_graph_via_descriptors(_handle);
+    ASSERT_EQ(result.code, ErrorCode::OK) << result.err_msg;
+
+    // Retrieve serialized graph
+    auto rawDesc = graph->get_raw_graph_descriptor();
+    size_t serializedSize = 0;
+    ASSERT_EQ(hipdnnBackendGetSerializedBinaryGraph_ext(rawDesc, 0, &serializedSize, nullptr),
+              HIPDNN_STATUS_SUCCESS);
+    ASSERT_GT(serializedSize, 0u);
+
+    std::vector<uint8_t> serializedData(serializedSize);
+    ASSERT_EQ(hipdnnBackendGetSerializedBinaryGraph_ext(
+                  rawDesc, serializedSize, &serializedSize, serializedData.data()),
+              HIPDNN_STATUS_SUCCESS);
+
+    hipdnn_data_sdk::data_objects::GraphT graphT;
+    hipdnn_data_sdk::data_objects::GetGraph(serializedData.data())->UnPackTo(&graphT);
 
     // All tensors should have been auto-assigned unique UIDs
     ASSERT_EQ(graphT.tensors.size(), 7u);

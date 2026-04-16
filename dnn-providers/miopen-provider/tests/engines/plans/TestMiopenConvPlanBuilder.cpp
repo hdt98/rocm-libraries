@@ -10,7 +10,6 @@
 #include <hipdnn_test_sdk/utilities/MockEngineConfig.hpp>
 #include <hipdnn_test_sdk/utilities/MockGraph.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
-#include <hipdnn_test_sdk/utilities/detail/FlatbufferTensorAttributesUtils.hpp>
 #include <miopen/miopen.h>
 
 #include "HipdnnMiopenHandle.hpp"
@@ -54,7 +53,7 @@ protected:
                 auto strides = hipdnn_data_sdk::utilities::convertFlatBufferVectorToStdVector(
                     tensorAttrPtr->strides());
 
-                auto tensor = hipdnn_test_sdk::detail::createTensor(
+                auto tensor = hipdnn_data_sdk::utilities::createTensor(
                     tensorAttrPtr->data_type(), dims, strides);
 
                 deviceBuffers.push_back({tensorAttrPtr->uid(), tensor->rawDeviceData()});

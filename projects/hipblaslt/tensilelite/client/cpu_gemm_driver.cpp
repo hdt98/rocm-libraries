@@ -180,8 +180,7 @@ int runGemm(size_t m,
                                                -1,
                                                static_cast<double>(beta));
 
-    contraction.setComputeInputTypeA(dtypeEnum);
-    contraction.setComputeInputTypeB(dtypeEnum);
+    contraction.setComputeInputType(dtypeEnum);
 
     // Allocate host memory for inputs and outputs
     std::vector<InputT> a(m * k);

@@ -235,7 +235,6 @@ if(NOT MIOPENPROVIDER_SKIP_TESTS)
             TARGET_NAME   ${PROJECT_NAME}-external-integration-check
             PLUGIN_TARGET miopen_plugin
             ENGINE_NAME   MIOPEN_ENGINE
-            TEST_CONFIG   ${CMAKE_CURRENT_SOURCE_DIR}/config/MIOPEN_ENGINE.toml
             GTEST_FILTER
                 *IsSupported*
                 *ConvFwd*

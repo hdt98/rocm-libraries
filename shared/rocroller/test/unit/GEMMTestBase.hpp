@@ -200,7 +200,6 @@ namespace GEMMTests
             }
 
             m_kernelOptions->scaleSkipPermlane = gemm.scaleSkipPermlane;
-            m_kernelOptions->ldsSwizzleMode    = gemm.ldsSwizzleMode;
 
             // Host data
             using PackedTypeA = typename PackedTypeOf<TA>::type;

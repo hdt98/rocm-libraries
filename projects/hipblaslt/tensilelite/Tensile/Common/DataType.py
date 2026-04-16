@@ -35,9 +35,7 @@ def _is8bitFloat(value):
             or value == DataTypeEnum.Float8_fnuz.value \
             or value == DataTypeEnum.BFloat8_fnuz.value \
             or value == DataTypeEnum.Float8BFloat8_fnuz.value \
-            or value == DataTypeEnum.BFloat8Float8_fnuz.value \
-            or value == DataTypeEnum.E8.value \
-            or value == DataTypeEnum.E5M3.value)
+            or value == DataTypeEnum.BFloat8Float8_fnuz.value)
 
 @functools.total_ordering
 class DataType:
@@ -152,7 +150,7 @@ class DataType:
         {   # NANOO E4M3
             'enum': DataTypeEnum.Float8_fnuz,
             'char': 'F8N',
-            'nameAbbrev': 'fp8',               # to match v_mfma inst
+            'nameAbbrev': 'fp8_fp8',               # to match v_mfma inst
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.25,
             'hip': 'tensile_float8_fnuz',
@@ -161,7 +159,7 @@ class DataType:
         {   # NANOO E5M2
             'enum': DataTypeEnum.BFloat8_fnuz,
             'char': 'B8N',
-            'nameAbbrev': 'bf8',               # to match v_mfma inst
+            'nameAbbrev': 'bf8_bf8',               # to match v_mfma inst
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.25,
             'hip': 'tensile_bfloat8_fnuz',
@@ -188,7 +186,7 @@ class DataType:
         {   # OCP E4M3
             'enum': DataTypeEnum.Float8,
             'char': 'F8',
-            'nameAbbrev': 'fp8',               # to match v_mfma inst
+            'nameAbbrev': 'fp8_fp8',               # to match v_mfma inst
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.25,
             'hip': 'tensile_float8',
@@ -197,7 +195,7 @@ class DataType:
         {   # OCP E5M2
             'enum': DataTypeEnum.BFloat8,
             'char': 'B8',
-            'nameAbbrev': 'bf8',               # to match v_mfma inst
+            'nameAbbrev': 'bf8_bf8',               # to match v_mfma inst
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.25,
             'hip': 'tensile_bfloat8',
@@ -216,51 +214,6 @@ class DataType:
             'enum': DataTypeEnum.BFloat8Float8,
             'char': 'B8F8',
             'nameAbbrev': 'bf8_fp8',               # to match v_mfma
-            'miOutTypeNameAbbrev': 'f32',
-            'reg': 0.25,
-            'hip': 'ERROR',
-            'isComplex': False,
-        },
-        {
-            'enum': DataTypeEnum.Float6,
-            'char': 'F6',
-            'nameAbbrev': 'fp6',
-            'miOutTypeNameAbbrev': 'f32',
-            'reg': 0.1875,
-            'hip': 'tensile_Float6x16',
-            'isComplex': False
-        },
-        {
-            'enum': DataTypeEnum.BFloat6,
-            'char': 'B6',
-            'nameAbbrev': 'bf6',
-            'miOutTypeNameAbbrev': 'f32',
-            'reg': 0.1875,
-            'hip': 'tensile_bFloat6x16',
-            'isComplex': False
-        },
-        {
-            'enum': DataTypeEnum.Float4,
-            'char': 'F4',
-            'nameAbbrev': 'fp4',
-            'miOutTypeNameAbbrev': 'f32',
-            'reg': 0.125,
-            'hip': 'tensile_float4x2',
-            'isComplex': False
-        },
-        {
-            'enum': DataTypeEnum.E8,
-            'char': 'E8',
-            'nameAbbrev': 'e8',
-            'miOutTypeNameAbbrev': 'f32',
-            'reg': 0.25,
-            'hip': 'ERROR',
-            'isComplex': False,
-        },
-        {
-            'enum': DataTypeEnum.E5M3,
-            'char': 'E5M3',
-            'nameAbbrev': 'e5m3',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.25,
             'hip': 'ERROR',
@@ -426,22 +379,13 @@ class DataType:
                 or self.value == DataTypeEnum.Float8BFloat8.value \
                 or self.value == DataTypeEnum.BFloat8_fnuz.value \
                 or self.value == DataTypeEnum.Float8BFloat8_fnuz.value)
-    def is6bitFloat(self):
-        return (self.value == DataTypeEnum.Float6.value \
-                or self.value == DataTypeEnum.BFloat6.value)
-    def isFloat6(self):
-        return self.value == DataTypeEnum.Float6.value
-    def isBFloat6(self):
-        return self.value == DataTypeEnum.BFloat6.value
-    def isFloat4(self):
-        return self.value == DataTypeEnum.Float4.value
     def isNone(self):
         return self.value == None
 
     def numRegisters(self):
         return self.properties['reg']
     def numBytes(self):
-        return self.numRegisters() * 4
+        return int(self.numRegisters() * 4)
     def MIOutputTypeNameAbbrev(self):
         return self.properties['miOutTypeNameAbbrev']
     def flopsPerMac(self):

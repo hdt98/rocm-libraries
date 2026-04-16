@@ -30,9 +30,8 @@ TEST(TestRMSNormFwdPlan, ExecutePlan)
     const unsigned int seed = getGlobalTestSeed();
     auto graph = buildRMSNormFwdGraph(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
     const INodeWrapper& node = graphWrapper.getNodeWrapper(0);
     RMSNormFwdTensorBundle planTensorBundle(node, graphWrapper.getTensorMap(), seed);
     RMSNormFwdTensorBundle directTensorBundle(node, graphWrapper.getTensorMap(), seed);
@@ -81,9 +80,8 @@ TEST(TestRMSNormFwdPlanBuilder, PlanConstruction)
     const std::vector<int64_t> dims = {1, 1, 1, 1};
     auto graph = buildRMSNormFwdGraph(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     const RMSNormFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;
@@ -100,9 +98,8 @@ TEST(TestRMSNormFwdPlanBuilder, IsApplicable)
     const std::vector<int64_t> dims = {1, 1, 1, 1};
     auto graph = buildRMSNormFwdGraph(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     const RMSNormFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         floatPlanBuilder;
@@ -122,9 +119,8 @@ TEST(TestRMSNormFwdPlan, ExecutePlanWithBias)
     const unsigned int seed = getGlobalTestSeed();
     auto graph = buildRMSNormFwdGraphWithBias(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
     const INodeWrapper& node = graphWrapper.getNodeWrapper(0);
     RMSNormFwdWithBiasTensorBundle planTensorBundle(node, graphWrapper.getTensorMap(), seed);
     RMSNormFwdWithBiasTensorBundle directTensorBundle(node, graphWrapper.getTensorMap(), seed);
@@ -183,9 +179,8 @@ TEST(TestRMSNormFwdPlanBuilder, PlanConstructionWithBias)
     const std::vector<int64_t> dims = {1, 2, 1, 1};
     auto graph = buildRMSNormFwdGraphWithBias(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     const RMSNormFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         patient;
@@ -202,9 +197,8 @@ TEST(TestRMSNormFwdPlanBuilder, IsApplicableWithBias)
     const std::vector<int64_t> dims = {1, 2, 1, 1};
     auto graph = buildRMSNormFwdGraphWithBias(
         DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, dims, TensorLayout::NHWC);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-    const GraphWrapper graphWrapper(serializedGraph.data(), serializedGraph.size());
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+    const GraphWrapper graphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
 
     const RMSNormFwdPlanBuilder<DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT>
         floatPlanBuilder;

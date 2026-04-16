@@ -45,7 +45,7 @@ from Tensile.Common import ensurePath, print1, printExit, printWarning, ClientEx
 from Tensile.Common.Architectures import isaToGfx
 from Tensile.Common.GlobalParameters import globalParameters
 from Tensile.Common.TimingInstrumentation import timing_context
-from .TensileCreateLibrary import copyStaticFiles, libraryDir
+from .TensileCreateLibrary import copyStaticFiles
 from .ParallelExecution import detectAvailableGpus, runClientParallel
 from .Contractions import FreeIndex, BatchIndex
 from .Contractions import ProblemType as ContractionsProblemType
@@ -115,13 +115,10 @@ def main(config, assembler: Assembler, cCompiler: str, isaInfoMap, outputPath: P
   else:
     env["PYTHONPATH"] = module_path
 
-  targetGfx = isaToGfx(list(isaInfoMap.keys())[0])
-  createLibraryScript = getBuildClientLibraryScript(clientLibraryPath, libraryLogicPath, str(assembler.path), targetGfx)
+  createLibraryScript = getBuildClientLibraryScript(clientLibraryPath, libraryLogicPath, str(assembler.path), isaToGfx(list(isaInfoMap.keys())[0]))
   subprocess.run(shlex.split(createLibraryScript), env=env, cwd=clientLibraryPath)
-  archs = [isaToGfx(isa) for isa in isaInfoMap.keys()]
-  libraryGlobBase = libraryDir(clientLibraryPath, archs)
-  coList = glob(os.path.join(libraryGlobBase, "*.co"))
-  yamlList = glob(os.path.join(libraryGlobBase, "*.yaml"))
+  coList = glob(os.path.join(clientLibraryPath, "library/*.co"))
+  yamlList = glob(os.path.join(clientLibraryPath, "library/*.yaml"))
 
   clientParametersPaths = []
   splitGSU = False
@@ -509,8 +506,6 @@ def dataInitParams(problemType):
     initScaleC  = globalParameters['DataInitTypeScaleC']
     initScaleD  = globalParameters['DataInitTypeScaleD']
     initScaleAlphaVec  = globalParameters['DataInitTypeScaleAlphaVec']
-    initMXScaleA = globalParameters["DataInitTypeMXSA"]
-    initMXScaleB = globalParameters["DataInitTypeMXSB"]
 
     if not problemType.useBeta:
         initBeta = 0
@@ -530,9 +525,7 @@ def dataInitParams(problemType):
             ('init-scaleB',        DataInitName(initScaleB).name),
             ('init-scaleC',        DataInitName(initScaleC).name),
             ('init-scaleD',        DataInitName(initScaleD).name),
-            ('init-scaleAlphaVec', DataInitName(initScaleAlphaVec).name),
-            ('init-mx-a',      DataInitName(initMXScaleA).name),
-            ('init-mx-b',      DataInitName(initMXScaleB).name)]
+            ('init-scaleAlphaVec', DataInitName(initScaleAlphaVec).name)]
 
 def boundsCheckName(mode):
     if mode == 0: return 'Disable'
@@ -570,8 +563,7 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param('results-file', resultsFileName)
         param('performance-metric', globalParameters["PerformanceMetric"])
         param('problem-identifier', problemType.operationIdentifier)
-        param('compute-input-type-A', problemType.computeInputTypeA.toName())
-        param('compute-input-type-B', problemType.computeInputTypeB.toName())
+        param('compute-input-type', problemType.computeInputType.toName())
         param('a-type',     problemType.aType.toName())
         param('b-type',     problemType.bType.toName())
         param('c-type',     problemType.cType.toName())
@@ -594,13 +586,6 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
         param('use-scaleAlphaVec',   problemType.useScaleAlphaVec)
         param('swizzle-tensor-a', problemType.swizzleTensorA)
         param('swizzle-tensor-b', problemType.swizzleTensorB)
-        if problemType.mxBlockA:
-            param('mx-a-block', problemType.mxBlockA)
-            param('mx-a-type', problemType.mxTypeA.toName())
-        if problemType.mxBlockB:
-            param('mx-b-block', problemType.mxBlockB)
-            param('mx-b-type', problemType.mxTypeB.toName())
-
         if biasTypeArgs:
           for btype in biasTypeArgs.biasTypes:
             param('bias-type-args',  btype.toName())
@@ -614,7 +599,6 @@ def writeClientConfigIni(forBenchmark, problemSizes, biasTypeArgs, factorDimArgs
             param('icache-flush-args', opt)
 
         param('sparse',   problemType.sparse)
-        param('metadata-layout', problemType.metadataLayout)
         param('high-precision-accumulate', problemType.highPrecisionAccumulate)
         param('strided-batched', problemType.stridedBatched)
         param('grouped-gemm', problemType.groupedGemm)
@@ -752,10 +736,10 @@ def writeClientConfig(
 
     return filename
 
-def CreateBenchmarkClientParametersForSizes(libraryRootPath, problemSizes, dataFilePath, configFile, deviceId, gfxName, problemTypeDict=None, archs=None):
+def CreateBenchmarkClientParametersForSizes(libraryRootPath, problemSizes, dataFilePath, configFile, deviceId, gfxName, problemTypeDict=None):
 
-    libraryPath = libraryDir(libraryRootPath, archs or [])
-    libraryFiles = [os.path.join(str(libraryPath), f) for f in os.listdir(libraryPath)]
+    libraryPath = os.path.join(libraryRootPath, "library")
+    libraryFiles = [os.path.join(libraryPath, f) for f in os.listdir(libraryPath)]
     codeObjectFiles = [f for f in libraryFiles if f.endswith("co")]
 
     if problemTypeDict:

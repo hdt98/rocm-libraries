@@ -19,6 +19,7 @@ Heuristic strategies:
 - Memory-bound: Optimize memory access for bandwidth-limited cases
 - Latency-focused: Minimize kernel launch overhead for small problems
 
+Complexity: ★★★★☆
 
 Usage:
     python3 08_heuristics.py
@@ -42,7 +43,6 @@ from ctypes_utils import (
     setup_gemm_dispatcher,
     cleanup_gemm,
     reset_for_example,
-    detect_gpu_arch,
 )
 
 
@@ -561,8 +561,8 @@ Examples:
     )
     parser.add_argument(
         "--arch",
-        default=detect_gpu_arch(),
-        help="Target architecture (auto-detected from rocminfo, override with --arch gfxNNN)",
+        default="gfx942",
+        help="Target architecture (default: gfx942)",
     )
     args = parser.parse_args()
 

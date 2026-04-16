@@ -19,18 +19,6 @@ struct PassThroughTransform
 };
 
 /**
- * @struct MmaDefaultPassThroughTransforms
- * @brief Implements the default MMA transforms
- */
-struct MmaDefaultPassThroughTransforms
-{
-    using ATransform = PassThroughTransform;
-    using BTransform = PassThroughTransform;
-    using CTransform = PassThroughTransform;
-    using DTransform = PassThroughTransform;
-};
-
-/**
  *  @class MmaTransformsDefaultSelector
  *  @brief  Default selector for MmaTransforms based on MmaOp and CompilerTarget
  *  @tparam MmaOp The Mma operation type
@@ -39,10 +27,7 @@ struct MmaDefaultPassThroughTransforms
  */
 template <typename MmaOp, typename CompilerTarget, typename Enable = void>
 // TODO: c++20 template <MmaOpI MmaOp, amdgcn_target_arch_id CompilerTarget, typename Enable = void>
-struct MmaTransformsDefaultSelector
-{
-    using SelectedTransforms = MmaDefaultPassThroughTransforms;
-};
+struct MmaTransformsDefaultSelector;
 
 #if CK_TILE_CONCEPTS
 

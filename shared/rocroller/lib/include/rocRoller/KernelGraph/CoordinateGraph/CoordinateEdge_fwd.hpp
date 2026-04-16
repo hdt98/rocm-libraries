@@ -15,8 +15,6 @@ namespace rocRoller
         struct Forget;
         struct Inherit;
         struct Join;
-        struct PairSwap;
-        struct Rotate;
         struct MakeOutput;
         struct PassThrough;
         struct PiecewiseAffineJoin;
@@ -30,8 +28,6 @@ namespace rocRoller
                                                      Forget,
                                                      Inherit,
                                                      Join,
-                                                     PairSwap,
-                                                     Rotate,
                                                      MakeOutput,
                                                      PassThrough,
                                                      PiecewiseAffineJoin,

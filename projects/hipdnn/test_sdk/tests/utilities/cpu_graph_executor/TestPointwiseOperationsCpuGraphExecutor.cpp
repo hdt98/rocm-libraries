@@ -68,9 +68,8 @@ public:
         auto result = graph->validate();
         ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
 
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-        auto graphWrap = GraphWrapper(serializedGraph.data(), serializedGraph.size());
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+        auto graphWrap = GraphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
         const auto& nodeWrap = graphWrap.getNodeWrapper(0);
         const auto& attributes = nodeWrap.attributesAs<PointwiseAttributes>();
 
@@ -78,7 +77,7 @@ public:
             params.in0TensorValue);
 
         CpuReferenceGraphExecutor().execute(
-            serializedGraph.data(), serializedGraph.size(), variantPack);
+            flatbufferGraph.data(), flatbufferGraph.size(), variantPack);
 
         const auto& outTensor = tensorBundle.tensors.at(attributes.out_0_tensor_uid());
 
@@ -107,9 +106,8 @@ public:
         auto result = graph->validate();
         ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
 
-        auto [serializedGraph, serErr] = graph->to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
-        auto graphWrap = GraphWrapper(serializedGraph.data(), serializedGraph.size());
+        auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
+        auto graphWrap = GraphWrapper(flatbufferGraph.data(), flatbufferGraph.size());
         const auto& nodeWrap = graphWrap.getNodeWrapper(0);
         const auto& attributes = nodeWrap.attributesAs<PointwiseAttributes>();
 
@@ -119,7 +117,7 @@ public:
             params.in1TensorValue);
 
         CpuReferenceGraphExecutor().execute(
-            serializedGraph.data(), serializedGraph.size(), variantPack);
+            flatbufferGraph.data(), flatbufferGraph.size(), variantPack);
 
         const auto& outTensor = tensorBundle.tensors.at(attributes.out_0_tensor_uid());
 

@@ -12,13 +12,16 @@
  * underlying storage — a descriptor, not the data itself.
  *
  * The `makeTensorAttributes()` helpers create these descriptors from
- * shapes you provide.
+ * shapes you provide or from existing Data SDK Tensor objects.
  */
 
 #pragma once
 
 #include "attributes/TensorAttributes.hpp"
 #include <hipdnn_backend.h>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+#include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <numeric>
 #include <vector>
 
 #include <hipdnn_frontend/Logging.hpp>
@@ -50,22 +53,24 @@ namespace graph
 {
 
 /**
- * @brief Create TensorAttributes by copying shape and layout from an existing tensor-like object
+ * @brief Create TensorAttributes by copying shape and layout from an existing Tensor
  *
- * Extracts dims and strides from any object that provides `.dims()` and
- * `.strides()` methods returning containers of int64_t. Works with
- * Data SDK Tensor objects and any compatible type without pulling in
- * their headers.
+ * Extracts dims and strides from a Data SDK Tensor object. Useful when
+ * you already have allocated test tensors and want matching descriptors.
  *
- * @tparam TensorLike Any type with `.dims()` and `.strides()` methods
+ * @tparam T Element type of the source tensor (e.g. float, half)
  * @param name Human-readable name for debugging and serialization
- * @param dataType The numeric precision (e.g. DataType::FLOAT)
- * @param tensor Source object whose dims and strides are copied
+ * @param dataType The numeric precision (e.g. DataType::HALF)
+ * @param tensor Source tensor whose dims and strides are copied
  * @return Configured TensorAttributes ready to pass to Graph operations
  */
-template <typename TensorLike>
-inline TensorAttributes
-    makeTensorAttributes(const std::string& name, DataType dataType, const TensorLike& tensor)
+template <class T,
+          class HostAlloc = hipdnn_data_sdk::utilities::HostAllocator<T>,
+          class DeviceAlloc = hipdnn_data_sdk::utilities::DeviceAllocator<T>>
+inline TensorAttributes makeTensorAttributes(
+    const std::string& name,
+    DataType dataType,
+    const hipdnn_data_sdk::utilities::Tensor<T, HostAlloc, DeviceAlloc>& tensor)
 {
     return TensorAttributes()
         .set_name(name)
@@ -127,6 +132,25 @@ template <typename T>
 inline TensorAttributes makeTensorAttributes(const std::string& name, const T value)
 {
     return TensorAttributes().set_name(name).set_value(value);
+}
+
+/**
+ * @brief Allocate a Data SDK ITensor that matches the given attributes
+ *
+ * Creates an actual tensor object from a descriptor. Host memory is
+ * allocated immediately; device memory is allocated lazily on first
+ * access. Primarily used in tests and utilities — in production code
+ * you typically manage your own device memory and just pass pointers
+ * via the variant pack.
+ *
+ * @param attribute The tensor descriptor (type, dims, strides)
+ * @return Owning pointer to the created ITensor
+ */
+inline std::unique_ptr<hipdnn_data_sdk::utilities::ITensor>
+    createTensorFromAttribute(const TensorAttributes& attribute)
+{
+    return hipdnn_data_sdk::utilities::createTensor(
+        toSdkType(attribute.get_data_type()), attribute.get_dim(), attribute.get_stride());
 }
 
 } // namespace graph

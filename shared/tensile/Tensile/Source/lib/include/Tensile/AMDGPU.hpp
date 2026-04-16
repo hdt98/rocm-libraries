@@ -81,8 +81,7 @@ namespace Tensile
             gfx1152 = 1152,
             gfx1153 = 1153,
             gfx1200 = 1200,
-            gfx1201 = 1201,
-            gfx1250 = 1250
+            gfx1201 = 1201
         };
 
         static std::string toString(Processor p)
@@ -143,8 +142,6 @@ namespace Tensile
                 return "gfx1200";
             case AMDGPU::Processor::gfx1201:
                 return "gfx1201";
-            case AMDGPU::Processor::gfx1250:
-                return "gfx1250";
             }
             return "";
         }
@@ -258,10 +255,6 @@ namespace Tensile
             else if(deviceString.find("gfx1201") != std::string::npos)
             {
                 return AMDGPU::Processor::gfx1201;
-            }
-            else if(deviceString.find("gfx1250") != std::string::npos)
-            {
-                return AMDGPU::Processor::gfx1250;
             }
             else
             {

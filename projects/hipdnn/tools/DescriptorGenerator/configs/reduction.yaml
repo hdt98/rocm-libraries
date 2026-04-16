@@ -101,12 +101,10 @@ operation:
   has_compute_data_type: true
   compute_data_type_attr: "HIPDNN_ATTR_REDUCTION_COMP_TYPE"
 
-  operation_type_enum: "HIPDNN_OPERATION_TYPE_REDUCTION_EXT"
+  operation_type_enum: "HIPDNN_OPERATION_TYPE_REDUCTION"
 
   test_data:
-    constants_include: "ReductionConstants"
-    tensor_const_prefix: "K_REDUCTION_"
-    tensor_uids: { x: 1700, y: 1701 }
+    tensor_uids: { x: 90, y: 91 }
     tensor_configs:
       x: { dims: [2, 3, 4, 4], strides: [48, 16, 4, 1] }
       y: { dims: [2, 3, 1, 1], strides: [3, 1, 1, 1] }

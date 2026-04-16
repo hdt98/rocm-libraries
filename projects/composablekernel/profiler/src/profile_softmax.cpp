@@ -278,4 +278,11 @@ int profile_softmax(int argc, char* argv[])
     return 0;
 }
 
+// hijack main() for quick debugging
+// int main(int argc, char* argv[])
+// {
+//     profile_normalization(argc, argv);
+//     return 0;
+// }
+
 REGISTER_PROFILER_OPERATION("softmax", "Softmax", profile_softmax);

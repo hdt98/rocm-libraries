@@ -123,9 +123,9 @@ TEST(TestJson, GraphToJsonAndBack)
             context = "(valid matmul graph)";
             break;
         case hipdnn_data_sdk::data_objects::NodeAttributes::SdpaAttributes:
-            graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaFwdGraph();
+            graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaFpropGraph();
             graph = hipdnn_data_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
-            context = "(valid sdpa fwd graph)";
+            context = "(valid sdpa fprop graph)";
             break;
         case hipdnn_data_sdk::data_objects::NodeAttributes::LayernormAttributes:
             graphBuilder = hipdnn_test_sdk::utilities::createValidLayernormFpropGraph();
@@ -153,7 +153,7 @@ TEST(TestJson, GraphToJsonAndBack)
             context = "(valid block scale quantize graph)";
             break;
         case hipdnn_data_sdk::data_objects::NodeAttributes::SdpaBackwardAttributes:
-            graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaBwdGraph();
+            graphBuilder = hipdnn_test_sdk::utilities::createValidSdpaBpropGraph();
             graph = hipdnn_data_sdk::data_objects::GetGraph(graphBuilder.GetBufferPointer());
             context = "(valid sdpa backward graph)";
             break;

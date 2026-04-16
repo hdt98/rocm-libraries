@@ -99,18 +99,17 @@ TEST_F(TestBatchnormTrainPlan, ExecutePlan)
 
 TEST(TestBatchnormTrainPlanBuilder, PlanConstruction)
 {
-    const std::vector<int64_t> dims = {2, 1, 1, 1};
+    const std::vector<int64_t> dims = {1, 1, 1, 1};
     BatchnormTrainTensorBundle<float, float, float> tensorBundle(dims, 1, TensorLayout::NCHW);
 
     auto graphTuple = buildBatchnormTrainGraph(
         tensorBundle, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, false);
 
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
-                                                                         serializedGraph.size());
+    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(flatbufferGraph.data(),
+                                                                         flatbufferGraph.size());
 
     const BatchnormTrainPlanBuilder<DataType::FLOAT,
                                     DataType::FLOAT,
@@ -129,18 +128,17 @@ TEST(TestBatchnormTrainPlanBuilder, PlanConstruction)
 
 TEST(TestBatchnormTrainPlanBuilder, IsApplicable)
 {
-    const std::vector<int64_t> dims = {2, 1, 1, 1};
+    const std::vector<int64_t> dims = {1, 1, 1, 1};
     BatchnormTrainTensorBundle<float, float, float> tensorBundle(dims, 1, TensorLayout::NCHW);
 
     auto graphTuple = buildBatchnormTrainGraph(
         tensorBundle, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, DataType::FLOAT, false);
 
     auto& graph = std::get<0>(graphTuple);
-    auto [serializedGraph, serErr] = graph->to_binary();
-    ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+    auto flatbufferGraph = graph->buildFlatbufferOperationGraph();
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(serializedGraph.data(),
-                                                                         serializedGraph.size());
+    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(flatbufferGraph.data(),
+                                                                         flatbufferGraph.size());
 
     const BatchnormTrainPlanBuilder<DataType::FLOAT,
                                     DataType::FLOAT,

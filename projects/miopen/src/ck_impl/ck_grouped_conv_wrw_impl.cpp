@@ -4,10 +4,9 @@
 #include "ck_grouped_conv_common.hpp"
 #include "ck_grouped_conv_impl_helpers.hpp"
 #include <miopen/conv_solution.hpp>
-#include <miopen/solver/ck_impl_interface.hpp>
-#include <miopen/solver/ck_impl_error.hpp>
+#include <miopen/solver/ck_grouped_conv_interface.hpp>
 #include <miopen/solver/ck_utility_common.hpp>
-#include "implicitgemm_ck_util.hpp"
+#include <miopen/solver/implicitgemm_ck_util.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/conv/problem_description.hpp>
 #include <miopen/execution_context.hpp>
@@ -111,78 +110,85 @@ size_t GetWorkspaceSize(const ProblemDescription& problem, bool use_tf32)
 
 extern "C" {
 
-ck_impl_status_t ck_impl_wrw_fill_valid_kernels(const miopen::conv::ProblemDescription* problem,
-                                                miopenDataType_t data_type,
-                                                bool use_tf32,
-                                                CKKernelListHandle** out_handle)
+CKKernelListHandle* ckgrpconv_wrw_fill_valid_kernels(
+    const miopen::conv::ProblemDescription* problem, miopenDataType_t data_type, bool use_tf32)
 {
-    return ck_impl_try_catch([&]() {
-        CK_IMPL_THROW_IF_NULL(out_handle, CK_IMPL_STATUS_BAD_PARAM, "Null out_handle");
-        CK_IMPL_THROW_IF_NULL(problem, CK_IMPL_STATUS_BAD_PARAM, "Null problem");
+    try
+    {
         auto result     = std::make_unique<CKKernelListHandle>();
         result->kernels = DispatchByDataType(data_type, [&](auto type_val) {
             return FillValidKernels<decltype(type_val)>(*problem, use_tf32);
         });
-        *out_handle     = result.release();
-    });
+        return result.release();
+    }
+    catch(...)
+    {
+        return nullptr;
+    }
 }
 
-ck_impl_status_t ck_impl_wrw_is_applicable(const miopen::conv::ProblemDescription* problem,
-                                           miopenDataType_t data_type,
-                                           bool use_tf32,
-                                           bool* out_result)
+bool ckgrpconv_wrw_is_applicable(const miopen::conv::ProblemDescription* problem,
+                                 miopenDataType_t data_type,
+                                 bool use_tf32)
 {
-    return ck_impl_try_catch([&]() {
-        CK_IMPL_THROW_IF_NULL(out_result, CK_IMPL_STATUS_BAD_PARAM, "Null out_result");
-        CK_IMPL_THROW_IF_NULL(problem, CK_IMPL_STATUS_BAD_PARAM, "Null problem");
-        *out_result = DispatchByDataType(data_type, [&](auto type_val) {
+    try
+    {
+        return DispatchByDataType(data_type, [&](auto type_val) {
             return CheckCKApplicability<decltype(type_val)>(*problem, use_tf32);
         });
-    });
+    }
+    catch(...)
+    {
+        return false;
+    }
 }
 
-ck_impl_status_t ck_impl_wrw_is_args_supported(const miopen::conv::ProblemDescription* problem,
-                                               const char* kernel_id,
-                                               miopenDataType_t data_type,
-                                               bool use_tf32,
-                                               bool* out_result)
+bool ckgrpconv_wrw_is_args_supported(const miopen::conv::ProblemDescription* problem,
+                                     const char* kernel_id,
+                                     miopenDataType_t data_type,
+                                     bool use_tf32)
 {
-    return ck_impl_try_catch([&]() {
-        CK_IMPL_THROW_IF_NULL(out_result, CK_IMPL_STATUS_BAD_PARAM, "Null out_result");
-        CK_IMPL_THROW_IF_NULL(problem, CK_IMPL_STATUS_BAD_PARAM, "Null problem");
-        CK_IMPL_THROW_IF_NULL(kernel_id, CK_IMPL_STATUS_BAD_PARAM, "Null kernel_id");
+    try
+    {
+        if(!kernel_id)
+            return false;
         std::string kid(kernel_id);
-        *out_result = DispatchByDataType(data_type, [&](auto type_val) {
+        return DispatchByDataType(data_type, [&](auto type_val) {
             return CheckIsArgSupported<decltype(type_val)>(*problem, kid, use_tf32);
         });
-    });
+    }
+    catch(...)
+    {
+        return false;
+    }
 }
 
-ck_impl_status_t ck_impl_wrw_get_workspace_size(const miopen::conv::ProblemDescription* problem,
-                                                miopenDataType_t data_type,
-                                                bool use_tf32,
-                                                size_t* out_size)
+size_t ckgrpconv_wrw_get_workspace_size(const miopen::conv::ProblemDescription* problem,
+                                        miopenDataType_t data_type,
+                                        bool use_tf32)
 {
-    return ck_impl_try_catch([&]() {
-        CK_IMPL_THROW_IF_NULL(out_size, CK_IMPL_STATUS_BAD_PARAM, "Null out_size");
-        CK_IMPL_THROW_IF_NULL(problem, CK_IMPL_STATUS_BAD_PARAM, "Null problem");
-        *out_size = DispatchByDataType(data_type, [&](auto type_val) {
+    try
+    {
+        return DispatchByDataType(data_type, [&](auto type_val) {
             return GetWorkspaceSize<decltype(type_val)>(*problem, use_tf32);
         });
-    });
+    }
+    catch(...)
+    {
+        return 0;
+    }
 }
 
-ck_impl_status_t ck_impl_wrw_get_solution(const miopen::ExecutionContext* ctx,
-                                          const miopen::conv::ProblemDescription* problem,
-                                          const char* kernel_id,
-                                          bool use_tf32,
-                                          miopen::solver::ConvSolution** out_solution)
+miopen::solver::ConvSolution*
+ckgrpconv_wrw_get_solution(const miopen::ExecutionContext* ctx,
+                           const miopen::conv::ProblemDescription* problem,
+                           const char* kernel_id,
+                           bool use_tf32)
 {
-    return ck_impl_try_catch([&]() {
-        CK_IMPL_THROW_IF_NULL(out_solution, CK_IMPL_STATUS_BAD_PARAM, "Null out_solution");
-        CK_IMPL_THROW_IF_NULL(ctx, CK_IMPL_STATUS_BAD_PARAM, "Null ctx");
-        CK_IMPL_THROW_IF_NULL(problem, CK_IMPL_STATUS_BAD_PARAM, "Null problem");
-        CK_IMPL_THROW_IF_NULL(kernel_id, CK_IMPL_STATUS_BAD_PARAM, "Null kernel_id");
+    try
+    {
+        if(!ctx || !problem || !kernel_id)
+            return nullptr;
 
         std::string kid(kernel_id);
 
@@ -209,8 +215,12 @@ ck_impl_status_t ck_impl_wrw_get_solution(const miopen::ExecutionContext* ctx,
             },
             use_tf32);
 
-        *out_solution = new miopen::solver::ConvSolution(std::move(solution));
-    });
+        return new miopen::solver::ConvSolution(std::move(solution));
+    }
+    catch(...)
+    {
+        return nullptr;
+    }
 }
 
 } // extern "C"

@@ -15,6 +15,9 @@
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/unordered_map.h>
 #include <nanobind/stl/vector.h>
+#ifndef HIPDNN_FRONTEND_SKIP_JSON_LIB
+#include <nlohmann/json.hpp>
+#endif
 
 namespace nb = nanobind;
 using namespace hipdnn_frontend;
@@ -26,6 +29,7 @@ void graph_bindings(nb::module_& m)
         .def("validate", &graph::Graph::validate)
         .def("checkNoDuplicateTensorIds", &graph::Graph::checkNoDuplicateTensorIds)
         .def("topologicallySortGraph", &graph::Graph::topologicallySortGraph)
+        .def("buildFlatbufferOperationGraph", &graph::Graph::buildFlatbufferOperationGraph)
         .def(
             "build_operation_graph",
             [](graph::Graph& g, nb::object handle) {
@@ -132,70 +136,23 @@ void graph_bindings(nb::module_& m)
         .def("tensor", &graph::Graph::tensor, nb::rv_policy::reference)
         .def_static(
             "tensor_like", &graph::Graph::tensor_like, nb::arg("tensor"), nb::arg("name") = "")
+#ifndef HIPDNN_FRONTEND_SKIP_JSON_LIB
         .def(
             "to_json",
             [](graph::Graph& g) {
-                auto [json, err] = g.to_json();
-                if(err.is_bad())
-                {
-                    throw std::runtime_error(err.get_message());
-                }
-                return json;
+                // toJson() is non-const, assigns UIDs if not set
+                nlohmann::json j = g.toJson();
+                return j.dump(); // Convert to JSON string
             },
             "Serialize the graph to a JSON string")
         .def(
             "from_json",
-            [](graph::Graph& g, nb::object handle, const std::string& jsonStr) {
-                auto handlePtr = handle.attr("get")();
-                hipdnnHandle_t rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
-                return g.deserialize(rawHandle, jsonStr);
+            [](graph::Graph& g, const std::string& jsonStr) {
+                nlohmann::json j = nlohmann::json::parse(jsonStr);
+                return g.deserialize(j);
             },
-            nb::arg("handle"),
             nb::arg("json_string"),
-            "Deserialize and finalize graph from JSON with a backend handle.\n"
-            "The graph is ready for create_execution_plans() after this call.")
-        .def(
-            "from_json",
-            [](graph::Graph& g, const std::string& jsonStr) { return g.deserialize(jsonStr); },
-            nb::arg("json_string"),
-            "Deserialize graph structure from JSON without a handle.\n"
-            "Only restores the graph topology and attributes (nodes, tensors, parameters).\n"
-            "Call build_operation_graph(handle) after to finalize for execution.")
-        .def(
-            "to_binary",
-            [](graph::Graph& g) {
-                auto [data, err] = g.to_binary();
-                if(err.is_bad())
-                {
-                    throw std::runtime_error(err.get_message());
-                }
-                return nb::bytes(reinterpret_cast<const char*>(data.data()), data.size());
-            },
-            "Serialize the graph to binary bytes")
-        .def(
-            "from_binary",
-            [](graph::Graph& g, nb::object handle, nb::bytes data) {
-                auto handlePtr = handle.attr("get")();
-                hipdnnHandle_t rawHandle
-                    = reinterpret_cast<hipdnnHandle_t>(nb::cast<uintptr_t>(handlePtr));
-                auto* ptr = reinterpret_cast<const uint8_t*>(data.c_str());
-                std::vector<uint8_t> vec(ptr, ptr + data.size());
-                return g.deserialize(rawHandle, vec);
-            },
-            nb::arg("handle"),
-            nb::arg("data"),
-            "Deserialize and finalize graph from binary with a backend handle.\n"
-            "The graph is ready for create_execution_plans() after this call.")
-        .def(
-            "from_binary",
-            [](graph::Graph& g, nb::bytes data) {
-                auto* ptr = reinterpret_cast<const uint8_t*>(data.c_str());
-                std::vector<uint8_t> vec(ptr, ptr + data.size());
-                return g.deserialize(vec);
-            },
-            nb::arg("data"),
-            "Deserialize graph structure from binary without a handle.\n"
-            "Only restores the graph topology and attributes (nodes, tensors, parameters).\n"
-            "Call build_operation_graph(handle) after to finalize for execution.");
+            "Deserialize a graph from a JSON string")
+#endif
+        ;
 }

@@ -6,8 +6,9 @@
 """
 Example 03: Benchmark
 
-Performance benchmarking with compute-optimized kernel configuration
-using JIT compilation.
+Performance benchmarking with compute-optimized kernel configuration.
+
+Complexity: ★★★☆☆
 
 Usage:
     python3 03_benchmark.py
@@ -25,8 +26,9 @@ import numpy as np
 
 from ctypes_utils import (
     KernelConfig,
-    Registry,
-    detect_gpu_arch,
+    setup_gemm_dispatcher,
+    cleanup_gemm,
+    reset_for_example,
 )
 
 
@@ -61,20 +63,20 @@ Examples:
         "--iterations", type=int, default=10, help="Benchmark iterations (default: 10)"
     )
     parser.add_argument(
-        "--arch",
-        default=detect_gpu_arch(),
-        help="Target architecture (auto-detected from rocminfo)",
+        "--arch", default="gfx942", help="Target architecture (default: gfx942)"
     )
     args = parser.parse_args()
+
+    reset_for_example()
 
     print("=" * 60)
     print("Example 03: Benchmark")
     print("=" * 60)
 
     # =========================================================================
-    # Step 1: JIT build dispatcher with compute-optimized config
+    # Step 1: Setup dispatcher with compute-optimized config
     # =========================================================================
-    print("\nStep 1: JIT Build Dispatcher")
+    print("\nStep 1: Setup Dispatcher")
 
     config = KernelConfig(
         dtype_a=args.dtype,
@@ -88,16 +90,12 @@ Examples:
         gfx_arch=args.arch,
     )
 
-    reg = Registry(name="benchmark")
-    reg.register_kernel(config)
-
-    setups = reg.build(verbose=True)
-    if not setups or not setups[0].success:
-        error = setups[0].error if setups else "No kernels built"
-        print(f"  ERROR: {error}")
+    setup = setup_gemm_dispatcher(config, registry_name="benchmark", verbose=True)
+    if not setup.success:
+        print(f"  ERROR: {setup.error}")
         return 1
 
-    dispatcher = setups[0].dispatcher
+    dispatcher = setup.dispatcher
 
     # =========================================================================
     # Step 2: Benchmark
@@ -132,9 +130,11 @@ Examples:
         A = np.random.randn(M, K).astype(np_dtype) * 0.1
         B = np.random.randn(K, N).astype(np_dtype) * 0.1
 
+        # Warmup
         for _ in range(args.warmup):
             dispatcher.run(A, B, M, N, K)
 
+        # Benchmark
         times = []
         for _ in range(args.iterations):
             result = dispatcher.run(A, B, M, N, K)
@@ -149,6 +149,9 @@ Examples:
             print(
                 f"  {M:>4}x{N:>4}x{K:<4} | {min_time:>10.4f} | {avg_time:>10.4f} | {tflops:>10.2f}"
             )
+
+    # Cleanup
+    cleanup_gemm()
 
     # Summary
     print("\n" + "=" * 60)

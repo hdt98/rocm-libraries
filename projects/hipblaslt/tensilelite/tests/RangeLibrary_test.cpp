@@ -140,8 +140,7 @@ TEST_P(RangeLibraryTest, SpecificSizes)
                                                             M,    // ldd
                                                             M*N,  // strided
                                                             2.0); // beta
-        problem.setComputeInputTypeA(rocisa::DataType::BFloat16);
-        problem.setComputeInputTypeB(rocisa::DataType::BFloat16);
+        problem.setComputeInputType(rocisa::DataType::BFloat16);
         problem.setHighPrecisionAccumulate(true);
         problem.setWorkspaceSize(120324096);
 

@@ -27,13 +27,6 @@ public:
     {
     }
     FakeAttributes attributes;
-
-    Error create_operation(
-        std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor>& /*tensorDescs*/,
-        std::vector<detail::ScopedHipdnnBackendDescriptor>& /*operations*/) const override
-    {
-        return {ErrorCode::HIPDNN_BACKEND_ERROR, "Not implemented in test"};
-    }
 };
 
 TEST(TestNode, PostValidateNodeComputeDataType)

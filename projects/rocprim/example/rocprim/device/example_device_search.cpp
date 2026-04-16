@@ -27,28 +27,27 @@ int main()
     common::device_ptr<int> key(std::vector{5, 4, 1});
     common::device_ptr<int> output(1);
 
-    // Temporary storage and its size
-    std::size_t              temp_storage_size = 0;
-    common::device_ptr<void> temp_storage;
+    // Get required size of the temporary storage
+    size_t temp_storage_size;
+    HIP_CHECK(rocprim::search(nullptr,
+                              temp_storage_size,
+                              input.get(),
+                              key.get(),
+                              output.get(),
+                              input.size(),
+                              key.size()));
 
-    // Lambda to launch rocprim::search
-    const auto launch = [&]
-    {
-        return rocprim::search(temp_storage.get(),
-                               temp_storage_size,
-                               input.get(),
-                               key.get(),
-                               output.get(),
-                               input.size(),
-                               key.size());
-    };
+    // Allocate temporary storage
+    common::device_ptr<void> temp_storage(temp_storage_size);
 
-    // First launch: query required temp storage size
-    HIP_CHECK(launch());
-    temp_storage.resize(temp_storage_size);
-
-    // Second launch: actual search
-    HIP_CHECK(launch());
+    // Perform search
+    HIP_CHECK(rocprim::search(temp_storage.get(),
+                              temp_storage_size,
+                              input.get(),
+                              key.get(),
+                              output.get(),
+                              input.size(),
+                              key.size()));
 
     // Check for any errors
     HIP_CHECK(hipGetLastError());

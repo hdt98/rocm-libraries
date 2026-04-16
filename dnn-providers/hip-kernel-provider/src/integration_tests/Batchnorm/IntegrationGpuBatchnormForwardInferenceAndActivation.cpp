@@ -15,13 +15,9 @@
 using namespace hipdnn_frontend;
 using namespace hipdnn_frontend::graph;
 using namespace hipdnn_data_sdk::utilities;
-using namespace hipdnn_test_sdk::utilities::batchnorm;
+using namespace hipdnn_test_sdk::utilities;
 using namespace hip_kernel_provider::test_utilities;
-
-namespace hip_kernel_provider::batchnorm::test
-{
-
-using namespace common;
+using namespace hip_kernel_provider::test_bn_common;
 
 namespace
 {
@@ -199,7 +195,7 @@ using IntegrationGpuBatchnormForwardInferenceAndActivationNdhwcFp16
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNchwFp32, Correctness)
 {
-    runGraphTest(getToleranceInference<float>(), TensorLayout::NCHW);
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NCHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -220,7 +216,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNchwBfp16, Correctness)
 {
-    runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NCHW);
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NCHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -241,7 +237,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNchwFp16, Correctness)
 {
-    runGraphTest(getToleranceInference<half>(), TensorLayout::NCHW);
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NCHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -262,7 +258,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNhwcFp32, Correctness)
 {
-    runGraphTest(getToleranceInference<float>(), TensorLayout::NHWC);
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -283,7 +279,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNhwcBfp16, Correctness)
 {
-    runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NHWC);
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -304,7 +300,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNhwcFp16, Correctness)
 {
-    runGraphTest(getToleranceInference<half>(), TensorLayout::NHWC);
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -325,7 +321,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNcdhwFp32, Correctness)
 {
-    runGraphTest(getToleranceInference<float>(), TensorLayout::NCDHW);
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NCDHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -340,7 +336,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNcdhwBfp16, Correctness)
 {
-    runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NCDHW);
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NCDHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -355,7 +351,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNcdhwFp16, Correctness)
 {
-    runGraphTest(getToleranceInference<half>(), TensorLayout::NCDHW);
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NCDHW);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -370,7 +366,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNdhwcFp32, Correctness)
 {
-    runGraphTest(getToleranceInference<float>(), TensorLayout::NDHWC);
+    runGraphTest(batchnorm::getToleranceInference<float>(), TensorLayout::NDHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -385,7 +381,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNdhwcBfp16, Correctness)
 {
-    runGraphTest(getToleranceInference<bfloat16>(), TensorLayout::NDHWC);
+    runGraphTest(batchnorm::getToleranceInference<bfloat16>(), TensorLayout::NDHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -400,7 +396,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(IntegrationGpuBatchnormForwardInferenceAndActivationNdhwcFp16, Correctness)
 {
-    runGraphTest(getToleranceInference<half>(), TensorLayout::NDHWC);
+    runGraphTest(batchnorm::getToleranceInference<half>(), TensorLayout::NDHWC);
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -408,5 +404,3 @@ INSTANTIATE_TEST_SUITE_P(
     IntegrationGpuBatchnormForwardInferenceAndActivationNdhwcFp16,
     testing::Combine(testing::ValuesIn(getBnFwdInference3dTestCases()),
                      testing::ValuesIn(test_activation_common::createFwdActivationSmokeCases())));
-
-} // namespace hip_kernel_provider::batchnorm::test

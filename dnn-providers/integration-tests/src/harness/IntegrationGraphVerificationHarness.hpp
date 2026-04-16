@@ -11,11 +11,9 @@
 #include <hipdnn_frontend/Graph.hpp>
 #include <hipdnn_frontend/Utilities.hpp>
 #include <hipdnn_frontend/attributes/TensorAttributes.hpp>
-#include <hipdnn_frontend/node/ReductionNode.hpp>
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
-#include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
@@ -192,35 +190,13 @@ protected:
                            float absoluteTolerance,
                            float relativeTolerance)
     {
-        // Check for per-test tolerance override from TOML config
-        float finalAtol = absoluteTolerance;
-        float finalRtol = relativeTolerance;
-
-        auto* testInfo = ::testing::UnitTest::GetInstance()->current_test_info();
-        if(testInfo != nullptr)
-        {
-            std::string testName
-                = std::string(testInfo->test_suite_name()) + "." + testInfo->name();
-            auto override = TestConfig::get().findToleranceOverride(testName);
-            if(override.has_value())
-            {
-                finalAtol = override->atol;
-                finalRtol = override->rtol;
-                HIPDNN_PLUGIN_LOG_INFO("Tolerance override applied for " << testName
-                                                                         << ": atol=" << finalAtol
-                                                                         << " rtol=" << finalRtol);
-            }
-        }
-
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
-        _deferredValidators.emplace_back([this, attr, finalAtol, finalRtol]() {
+        _deferredValidators.emplace_back([this, attr, absoluteTolerance, relativeTolerance]() {
             _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createAllCloseValidator(
-                     hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
-                     finalAtol,
-                     finalRtol)});
+                     toSdkType(attr->get_data_type()), absoluteTolerance, relativeTolerance)});
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -231,11 +207,9 @@ protected:
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
         _deferredValidators.emplace_back([this, attr, rmsThreshold]() {
-            _tensorIdToValidatorMap.insert(
-                {attr->get_uid(),
-                 hipdnn_test_sdk::utilities::createRmsValidator(
-                     hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
-                     rmsThreshold)});
+            _tensorIdToValidatorMap.insert({attr->get_uid(),
+                                            hipdnn_test_sdk::utilities::createRmsValidator(
+                                                toSdkType(attr->get_data_type()), rmsThreshold)});
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -309,8 +283,6 @@ protected:
             return static_cast<float>(batchnorm::getToleranceBackward<T>());
         if(dynamic_cast<const fe::MatmulNode*>(&node) != nullptr)
             return static_cast<float>(matmul::getTolerance<T>());
-        if(dynamic_cast<const fe::ReductionNode*>(&node) != nullptr)
-            return static_cast<float>(reduction::getTolerance<T>());
 
         ADD_FAILURE() << "toleranceForNodeTyped: unsupported node type";
         return 0.0f;
@@ -334,11 +306,10 @@ protected:
     void executeCpuGraph(hipdnn_frontend::graph::Graph& graph,
                          hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
     {
-        auto [serializedGraph, serErr] = graph.to_binary();
-        ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
+        auto flatbufferGraph = graph.buildFlatbufferOperationGraph();
 
         hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
-            serializedGraph.data(), serializedGraph.size(), bundle.toHostVariantPack());
+            flatbufferGraph.data(), flatbufferGraph.size(), bundle.toHostVariantPack());
     }
 
     std::string getOutputTensorName(int64_t tensorId)
@@ -359,10 +330,8 @@ protected:
             return false;
         }
 
-        cpuBundle.tensors.insert(
-            {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
-        gpuBundle.tensors.insert(
-            {tensorId, hipdnn_test_sdk::utilities::createTensorFromAttribute(*tensorAttr)});
+        cpuBundle.tensors.insert({tensorId, createTensorFromAttribute(*tensorAttr)});
+        gpuBundle.tensors.insert({tensorId, createTensorFromAttribute(*tensorAttr)});
         _tensorIdToNameMap.insert({tensorId, tensorAttr->get_name()});
 
         return true;
