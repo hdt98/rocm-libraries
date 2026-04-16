@@ -194,17 +194,18 @@ namespace rocRoller
             Log::debug("Argument: {} ({}) ({})", arg.getName(), arg.getSize(), arg.getPreloaded());
         }
 
-        // Assign offsets for validation. Note: when called from SortArguments::apply,
-        // these offsets are overridden with explicit contiguous packing.
-        int  offset              = 0;
-        bool startedNonPreloaded = false;
+        // Assign offsets. The manually-loaded block is aligned to kMaxScalarLoadBytes
+        // to enable the widest possible scalar load instructions (s_load_dwordx16).
+        constexpr int kMaxScalarLoadBytes = 64;
+        int           offset              = 0;
+        bool          startedNonPreloaded = false;
 
         for(auto& arg : args)
         {
             if(!arg.getPreloaded() && !startedNonPreloaded)
             {
                 startedNonPreloaded = true;
-                arg.setOffset(RoundUpToMultiple(offset, arg.getSize()));
+                arg.setOffset(RoundUpToMultiple(offset, kMaxScalarLoadBytes));
             }
             else
             {
