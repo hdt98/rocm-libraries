@@ -16,10 +16,15 @@
 
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
+#include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp"
 #include "ck_tile/experimental/core/tensor/transform_graph.hpp"
 #include "ck_tile/experimental/core/tensor/make_transform.hpp"
 
 namespace ck_tile {
+
+static_assert(MAX_TENSOR_DIMS <= MAX_IO_DIMS, "MAX_TENSOR_DIMS must not exceed MAX_IO_DIMS");
+
+namespace detail {
 
 /** @brief Zero-fill all unused array slots to guarantee NTTP deduplication.
  *
@@ -47,112 +52,78 @@ constexpr void canonicalize(TransformGraph& g)
     {
         g.lower_slots[i] = 0;
     }
-    for(index_t i = g.num_slots; i < MAX_SLOTS; ++i)
-    {
-        g.guaranteed_vector_lengths[i] = 0;
-        g.guaranteed_vector_strides[i] = 0;
-    }
 }
 
-/** @brief Create a graph for an N-D tensor with explicit strides.
+/** @brief Create a transform graph from a tensor descriptor.
  *
- *  Produces a single Embed transform: N input dims -> 1 output dim.
- *  The output is a linear memory offset computed as sum(input[i] * stride[i]).
+ *  Produces a single Embed transform that maps the descriptor's dimensions
+ *  to a 1D memory offset using its lengths and strides.
  *
- *  Slot layout:
- *    slot 0 = output (memory offset)
- *    slots 1..N = input dimensions
+ *  This is the bridge between tensor metadata (TensorDescriptor) and
+ *  coordinate mapping (TransformGraph). The descriptor describes WHAT
+ *  the tensor looks like; the graph describes HOW to compute offsets.
  *
- *  @tparam NDim  Number of tensor dimensions (deduced from array size)
- *  @param lengths  Size of each dimension
- *  @param strides  Stride of each dimension (in elements)
- *  @return TransformGraph with 1 Embed transform, ndim_upper=NDim, ndim_lower=1
+ *  @param desc  Tensor descriptor with lengths and strides
+ *  @return TransformGraph with 1 Embed transform, ndim_upper=desc.ndim, ndim_lower=1
  *
- *  Example: make_strided_graph({8, 128, 8}, {1032, 8, 1})
- *    -> graph mapping (d0, d1, d2) to d0*1032 + d1*8 + d2*1
+ *  Example:
+ *    constexpr auto desc = make_tensor_descriptor({8, 128, 8}, {1032, 8, 1});
+ *    constexpr auto graph = make_transform_graph(desc);
  */
-template <index_t NDim>
-constexpr TransformGraph make_strided_graph(const static_array<index_t, NDim>& lengths,
-                                            const static_array<index_t, NDim>& strides)
+constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc)
 {
-    static_assert(NDim <= MAX_DIMS_PER_TRANSFORM,
-                  "make_strided_graph: too many dims (max MAX_DIMS_PER_TRANSFORM)");
-    static_assert(NDim >= 1, "make_strided_graph: need at least 1 dim");
-    static_assert(NDim <= MAX_IO_DIMS,
-                  "make_strided_graph: too many dims for graph input (max MAX_IO_DIMS)");
+    detail::TransformGraph g{};
 
-    TransformGraph g{};
+    // Create Embed transform from the descriptor's lengths and strides.
+    // NOTE: This intentionally mirrors make_embed() logic rather than calling it,
+    // because make_embed is templated on NDim (compile-time) while desc.ndim is
+    // a constexpr value. Cross-reference make_embed() in make_transform.hpp if
+    // modifying this code.
+    CoordinateTransform embed{};
+    embed.type       = TransformType::EMBED;
+    embed.ndim_upper = desc.ndim;
+    embed.ndim_lower = 1;
 
-    // Create Embed transform
-    g.transforms[0]  = make_embed(lengths, strides);
+    for(index_t i = 0; i < desc.ndim; ++i)
+    {
+        embed.lengths[i]      = desc.lengths[i];
+        embed.coefficients[i] = desc.strides[i];
+    }
+
+    // Check bijectivity: stride[k] >= stride[k+1] * length[k+1]
+    embed.is_bijective = true;
+    for(index_t i = 0; i < desc.ndim - 1; ++i)
+    {
+        if(desc.strides[i] < desc.strides[i + 1] * desc.lengths[i + 1])
+        {
+            embed.is_bijective = false;
+        }
+        embed.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
+    }
+
+    g.transforms[0]  = embed;
     g.num_transforms = 1;
 
-    // Routing: Embed reads from slots 1..NDim, writes to slot 0
-    g.t_lower_slots[0][0] = 0; // output slot = 0 (memory offset)
-    for(index_t i = 0; i < NDim; ++i)
+    // Routing: Embed reads from slots 1..N, writes to slot 0
+    g.t_lower_slots[0][0] = 0;
+    for(index_t i = 0; i < desc.ndim; ++i)
     {
         g.t_upper_slots[0][i] = 1 + i;
     }
 
     // Graph endpoints
-    g.ndim_upper = NDim;
+    g.ndim_upper = desc.ndim;
     g.ndim_lower = 1;
-    for(index_t i = 0; i < NDim; ++i)
+    for(index_t i = 0; i < desc.ndim; ++i)
     {
-        g.upper_slots[i] = 1 + i; // input dims map to slots 1..NDim
+        g.upper_slots[i] = 1 + i;
     }
-    g.lower_slots[0] = 0; // output dim maps to slot 0
+    g.lower_slots[0] = 0;
 
-    g.num_slots = 1 + NDim; // slot 0 + NDim input slots
+    g.num_slots = 1 + desc.ndim;
 
-    // Compute element_space_size = 1 + sum((length[i] - 1) * stride[i])
-    index_t ess = 1;
-    for(index_t i = 0; i < NDim; ++i)
-    {
-        ess += (lengths[i] - 1) * strides[i];
-    }
-    g.element_space_size = ess;
-
-    // Initialize guaranteed vector info to -1 (unknown)
-    for(index_t i = 0; i < MAX_SLOTS; ++i)
-    {
-        g.guaranteed_vector_lengths[i] = -1;
-        g.guaranteed_vector_strides[i] = -1;
-    }
-
-    canonicalize(g);
+    detail::canonicalize(g);
     return g;
-}
-
-/** @brief Create a graph for a packed (row-major) N-D tensor.
- *
- *  Produces a single Embed transform: N input dims -> 1 output dim.
- *  Computes row-major strides automatically from lengths.
- *
- *  Slot layout:
- *    slot 0 = output (memory offset)
- *    slots 1..N = input dimensions
- *
- *  @tparam NDim  Number of tensor dimensions (deduced from array size)
- *  @param lengths  Size of each dimension (row-major: last dim is contiguous)
- *  @return TransformGraph with ndim_upper=NDim, ndim_lower=1
- */
-template <index_t NDim>
-constexpr TransformGraph make_packed_graph(const static_array<index_t, NDim>& lengths)
-{
-    static_assert(NDim <= MAX_DIMS_PER_TRANSFORM,
-                  "make_packed_graph: too many dims (max MAX_DIMS_PER_TRANSFORM)");
-    static_assert(NDim >= 1, "make_packed_graph: need at least 1 dim");
-
-    // Compute row-major strides: stride[i] = product(lengths[i+1..N-1])
-    static_array<index_t, NDim> strides{};
-    strides[NDim - 1] = 1;
-    for(index_t i = NDim - 2; i >= 0; --i)
-    {
-        strides[i] = strides[i + 1] * lengths[i + 1];
-    }
-
-    return make_strided_graph(lengths, strides);
 }
 
 /** @brief Push new transforms onto the graph's transform stack.
@@ -173,25 +144,17 @@ constexpr TransformGraph make_packed_graph(const static_array<index_t, NDim>& le
  *  @param output_dims  Which NEW user-facing dims each transform CREATES.
  *                      Controls READ routing during traversal.
  *  @return New graph with transforms appended, routing computed, and canonicalized.
- *
- *  @note element_space_size is inherited unchanged from the input graph.
- *        Transforms remap coordinates within the existing element space --
- *        they do not change the underlying buffer size.
  */
 template <index_t NumNewTransforms>
-constexpr TransformGraph
-applyTransforms(const TransformGraph& graph,
+constexpr detail::TransformGraph
+applyTransforms(const detail::TransformGraph& graph,
                 const static_array<CoordinateTransform, NumNewTransforms>& new_transforms,
                 const static_array<DimIds, NumNewTransforms>& input_dims,
                 const static_array<DimIds, NumNewTransforms>& output_dims)
 {
     static_assert(NumNewTransforms >= 1, "applyTransforms: need at least 1 transform");
 
-    TransformGraph g = graph;
-
-    // Validate capacity
-    // Note: can't use static_assert on graph.num_transforms (runtime value in constexpr)
-    // The constexpr evaluation will fail naturally if bounds are exceeded.
+    detail::TransformGraph g = graph;
 
     index_t next_slot = g.num_slots;
 
@@ -206,8 +169,8 @@ applyTransforms(const TransformGraph& graph,
         // Wire the transform's output slots to those old dim slots.
         for(index_t d = 0; d < new_transforms[i].ndim_lower; ++d)
         {
-            index_t old_input_dim     = input_dims[i][d];
-            g.t_lower_slots[t_idx][d] = graph.upper_slots[old_input_dim];
+            index_t old_upper_dim     = input_dims[i][d];
+            g.t_lower_slots[t_idx][d] = graph.upper_slots[old_upper_dim];
         }
 
         // Allocate fresh slots for the transform's READ side.
@@ -259,19 +222,8 @@ applyTransforms(const TransformGraph& graph,
     g.upper_slots = new_upper_slots;
 
     // lower_slots and ndim_lower remain unchanged from original graph
-    // (transforms remap coordinates, they don't change the final output)
 
-    // Inherit element_space_size unchanged
-    // (transforms remap within existing element space)
-
-    // Extend guaranteed vector info for new slots (initialize to -1 = unknown)
-    for(index_t i = graph.num_slots; i < next_slot; ++i)
-    {
-        g.guaranteed_vector_lengths[i] = -1;
-        g.guaranteed_vector_strides[i] = -1;
-    }
-
-    canonicalize(g);
+    detail::canonicalize(g);
     return g;
 }
 
@@ -283,7 +235,7 @@ applyTransforms(const TransformGraph& graph,
  *  @tparam G  The transform graph (NTTP)
  *  @return true if all transforms are bijective
  */
-template <TransformGraph G>
+template <detail::TransformGraph G>
 constexpr bool isGraphBijective()
 {
     for(index_t t = 0; t < G.num_transforms; ++t)
@@ -296,4 +248,5 @@ constexpr bool isGraphBijective()
     return true;
 }
 
+} // namespace detail
 } // namespace ck_tile

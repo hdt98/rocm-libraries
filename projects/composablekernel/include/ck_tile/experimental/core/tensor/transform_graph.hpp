@@ -234,6 +234,8 @@ inline constexpr index_t MAX_TRANSFORMS = 5;  ///< Max transforms per graph
 inline constexpr index_t MAX_SLOTS      = 16; ///< Max working array slots
 inline constexpr index_t MAX_IO_DIMS    = 6;  ///< Max input or output dimensions
 
+namespace detail {
+
 /** @brief A directed acyclic graph of coordinate transforms.
  *
  *  General coordinate mapping: N input dimensions -> M output dimensions.
@@ -278,13 +280,6 @@ struct TransformGraph
     index_t ndim_lower = 0;                           ///< Number of output coordinate dimensions
     static_array<index_t, MAX_IO_DIMS> upper_slots{}; ///< Which slots receive input coords
     static_array<index_t, MAX_IO_DIMS> lower_slots{}; ///< Which slots hold output coords
-
-    // --- Metadata (tensor-layout specific, zero for general mappings) ---
-    index_t element_space_size = 0; ///< Total elements in underlying buffer (incl. padding)
-    // TODO: move guaranteed_vector_* to a TensorLayout wrapper when the graph
-    // is used for non-tensor-layout mappings (tile distributions, SFCs, etc.)
-    static_array<index_t, MAX_SLOTS> guaranteed_vector_lengths{};
-    static_array<index_t, MAX_SLOTS> guaranteed_vector_strides{};
 
     constexpr bool operator==(const TransformGraph&) const = default;
 };
@@ -394,8 +389,6 @@ CK_TILE_HOST_DEVICE constexpr index_t calculateOffset(const static_array<index_t
     return output;
 }
 
-namespace detail {
-
 /// Check a single transform (compile-time index) for a matching slot.
 template <TransformGraph G, index_t T>
 CK_TILE_HOST_DEVICE constexpr index_t tryUpperLengthAt(index_t slot)
@@ -426,8 +419,6 @@ CK_TILE_HOST_DEVICE constexpr index_t upperDimLengthDispatch(index_t slot, seque
     (check(tryUpperLengthAt<G, G.num_transforms - 1 - Ts>(slot)), ...);
     return result;
 }
-
-} // namespace detail
 
 /** @brief Query the length of the i-th input dimension.
  *
@@ -540,4 +531,5 @@ reverseCalculateOffset(index_t offset)
     return result;
 }
 
+} // namespace detail
 } // namespace ck_tile
