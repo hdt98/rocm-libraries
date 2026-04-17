@@ -610,6 +610,14 @@ TEST_P(Dropout, DataTypeConfig)
     auto [drop_seed, drop_offset, drop_prefs]                     = drop_seed_offset_prefs;
     auto [batch, nhead, nhead_k, seqlen_q, seqlen_k, mask_str]    = dims_mask;
 
+#if CK_TILE_WORKAROUND_ROCM_7_1_FP16_DROPOUT_MISCOMPILE
+    if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp16>)
+    {
+        if(hdim_q > 128 && mode == mode_enum::batch)
+            GTEST_SKIP() << "Skipped: fp16 dropout d256 batch — compiler VGPR aliasing "
+                            "bug (ROCm 7.1.x)";
+    }
+#endif
 #if CK_TILE_WORKAROUND_ROCM_7_12_FP16_DROPOUT_MISCOMPILE
     if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp16>)
     {
