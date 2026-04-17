@@ -1196,7 +1196,15 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
                 m_split_sizes = computeOrigamiOptimizedSplits(M, num_splits, macrotile_m,
                                                               N, K, true);
             }
-            use_intelligent_splits = true;
+            if (m_split_sizes.empty())
+            {
+                // Origami decided splitting won't help - return single problem
+                num_splits = 1;
+            }
+            else
+            {
+                use_intelligent_splits = true;
+            }
         }
         else if(strat == SplitStrategy::KAwareM)
         {
@@ -1253,7 +1261,14 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
                 n_split_sizes = computeOrigamiOptimizedSplits(N, num_splits, macrotile_n,
                                                               M, K, false);
             }
-            use_intelligent_splits = true;
+            if (n_split_sizes.empty())
+            {
+                num_splits = 1;
+            }
+            else
+            {
+                use_intelligent_splits = true;
+            }
         }
         else if(strat == SplitStrategy::KAwareN)
         {

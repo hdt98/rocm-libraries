@@ -235,34 +235,38 @@ inline std::vector<OrigamiSolutionInfo> queryAllSolutionsForSubProblem(
             else
 #endif
             {
-                // Fall back to size-based estimation if cannot parse MacroTile or no Origami
-                // wavesCount is not reliable from getAllAlgos (only filled after actual execution)
-                // Use a simple roofline model based on problem size
-                double ops = 2.0 * M * N * K;  // FLOPs for GEMM
-                double peak_gflops = 1400.0 * 1024.0;  // Peak compute in GFLOPS
+                // Fallback estimation without Origami headers.
+                // Use a roofline model that considers workgroup utilization.
+                const int NUM_CUS = 256; // MI355X
+                double peak_gflops = 1400.0 * 1024.0;
 
-                // Estimate based on problem size relative to GPU capacity
-                // Small problems: memory-bound, medium: balanced, large: compute-bound
-                double problem_size_mb = (M * N + M * K + N * K) * 2.0 / (1024.0 * 1024.0);  // Approx memory footprint in MB
-                double memory_bw_gbs = 3000.0;  // MI355X memory bandwidth ~3 TB/s
-                double memory_bound_gflops = (memory_bw_gbs * 1024.0) / 2.0;  // Rough estimate
+                // Compute arithmetic intensity (FLOPs / bytes)
+                double ops = 2.0 * M * N * K;
+                double bytes = (double)(M * K + K * N + M * N + M * N) * 2.0; // FP16
+                double arithmetic_intensity = ops / bytes;
 
-                // Use min of compute and memory bounds
-                double achievable_gflops = std::min(peak_gflops * 0.7, memory_bound_gflops);  // 70% peak efficiency
+                // Memory-bound ceiling
+                double memory_bw_gbs = 3000.0;
+                double mem_bound_gflops = memory_bw_gbs * arithmetic_intensity;
 
-                // Adjust based on MacroTile size (if parsed)
-                if (parsed_mt) {
-                    // Larger MacroTiles tend to be more efficient
+                double achievable_gflops = std::min(peak_gflops * 0.7, mem_bound_gflops);
+
+                // Workgroup utilization: penalize when WGs don't fill CUs evenly
+                if (parsed_mt && mt_m > 0 && mt_n > 0) {
+                    int wg_m = (M + mt_m - 1) / mt_m;
+                    int wg_n = (N + mt_n - 1) / mt_n;
+                    int total_wgs = wg_m * wg_n;
+                    double waves = (double)total_wgs / NUM_CUS;
+                    double tail_efficiency = (waves > 0) ? (waves / std::ceil(waves)) : 1.0;
+                    achievable_gflops *= tail_efficiency;
+
                     double mt_size = mt_m * mt_n;
-                    double mt_factor = std::min(1.0, mt_size / (256.0 * 256.0));  // Normalize to 256x256
-                    achievable_gflops *= (0.5 + 0.5 * mt_factor);  // 50%-100% based on MT size
+                    double mt_factor = std::min(1.0, mt_size / (256.0 * 256.0));
+                    achievable_gflops *= (0.5 + 0.5 * mt_factor);
                 }
 
                 info.estimated_gflops = achievable_gflops;
-                info.estimated_latency_cycles = 0.0;  // Unknown
-
-                // Debug output removed - enable only for debugging
-                // std::cout << "DEBUG: Solution " << info.solution_name << " estimated_gflops=" << info.estimated_gflops << std::endl;
+                info.estimated_latency_cycles = 0.0;
             }
 
             solutions.push_back(info);
