@@ -260,6 +260,9 @@ inline std::vector<OrigamiSolutionInfo> queryAllSolutionsForSubProblem(
 
                 info.estimated_gflops = achievable_gflops;
                 info.estimated_latency_cycles = 0.0;  // Unknown
+
+                // Debug output removed - enable only for debugging
+                // std::cout << "DEBUG: Solution " << info.solution_name << " estimated_gflops=" << info.estimated_gflops << std::endl;
             }
 
             solutions.push_back(info);

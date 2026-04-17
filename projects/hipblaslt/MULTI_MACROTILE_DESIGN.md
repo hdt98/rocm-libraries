@@ -1821,6 +1821,123 @@ Improvement over S10: +0.8% (12 GFLOPS)
 
 ---
 
+### Improved Origami Implementation (2026-04-17) ⭐⭐⭐ **EXPERIMENTAL**
+
+**Purpose**: Enhanced Origami optimization with MacroTile-aware filtering, adaptive splitting, and overhead modeling.
+
+**Implementation Status**: ✅ Code Complete | ⚠️ Requires Build Configuration
+
+The improved Origami implementation addresses the root cause of performance regressions identified in testing:
+
+**Root Cause Analysis**:
+- **Problem**: Splitting forces sub-problems into smaller MacroTiles
+- **Example**: 11264×11264 baseline uses MT256×256, but 8× split (1408×11264) forces MT128×256
+- **Result**: 50% smaller MacroTile → -23% performance
+
+**Implemented Improvements**:
+
+**P0: MacroTile-Aware Filtering** (HIGH IMPACT)
+```cpp
+// Reject splits that force significantly smaller MacroTiles
+if (sub_mt_m < baseline_mt_m * 0.75 || sub_mt_n < baseline_mt_n * 0.75) {
+    // Skip this split - MacroTile mismatch would hurt performance
+    continue;
+}
+```
+
+**P1: Adaptive Number of Splits**
+```cpp
+// Choose split count based on problem size and MacroTile
+int computeAdaptiveNumSplits(int64_t total_size, size_t baseline_mt_size) {
+    for (int num_splits : {2, 4, 8, 16}) {
+        int64_t size_per_split = total_size / num_splits;
+        if (size_per_split >= baseline_mt_size * 1.5) {
+            return num_splits;  // Can use good MacroTile
+        }
+    }
+    return 1;  // Don't split - would force too-small sub-problems
+}
+```
+
+**P2: Hybrid Enable/Disable**
+```cpp
+// Only enable splitting if MacroTile preserved
+bool shouldEnableMultiMacroTileSplit(...) {
+    auto baseline_mt = queryBestMacroTile(M, N, K);
+    auto split_mt = queryBestMacroTile(M/num_splits, N, K);
+    
+    if (split_mt.m < baseline_mt.m * 0.75) {
+        return false;  // Splitting would hurt - disable
+    }
+    return true;
+}
+```
+
+**P3: MacroTile-Aligned Splitting**
+```cpp
+// Split on MacroTile boundaries for better workgroup mapping
+std::vector<int64_t> generateMacroTileAlignedSplits(...) {
+    int64_t size_per_split = (total_size / num_splits / mt_size) * mt_size;
+    // Round to MacroTile multiple
+}
+```
+
+**P4: Cost Model with Overhead**
+```cpp
+// Include launch and synchronization overhead
+double estimateTotalTimeWithOverhead(double kernel_time_us, int num_splits) {
+    const double LAUNCH_OVERHEAD_US = 30.0;
+    const double SYNC_OVERHEAD_US = 5.0;
+    
+    return kernel_time_us + 
+           LAUNCH_OVERHEAD_US * num_splits +
+           SYNC_OVERHEAD_US * (num_splits - 1);
+}
+```
+
+**Expected Performance Impact**:
+
+Before Improvements:
+| Problem Size | Baseline | S17 Current | Change |
+|--------------|----------|-------------|--------|
+| 10240²×8192 | 1.159 TF | 1.262 TF | **+8.9%** ✅ |
+| 11264²×8192 | 1.379 TF | 1.064 TF | **-22.8%** ❌ |
+| 12288²×8192 | 1.497 TF | 1.046 TF | **-30.1%** ❌ |
+
+After Improvements (P0+P1+P2+P4):
+| Problem Size | Baseline | S17 Improved | Change | Improvement |
+|--------------|----------|--------------|--------|-------------|
+| 10240²×8192 | 1.159 TF | ~1.280 TF | **+10-12%** ✅ | Better split selection |
+| 11264²×8192 | 1.379 TF | 1.379 TF | **0%** ✅ | Auto-disabled (MT mismatch) |
+| 12288²×8192 | 1.497 TF | 1.497 TF | **0%** ✅ | Auto-disabled (MT mismatch) |
+
+**Key Benefit**: Eliminates catastrophic regressions (-23% to -30%) by auto-disabling when splitting would hurt.
+
+**Current Limitation**: Requires Origami headers in client build for full functionality.
+- The improved code is implemented in `multi_macrotile_origami_improved.hpp`
+- Falls back to simple estimation when Origami headers not available
+- To enable: Add Origami include path to `clients/CMakeLists.txt`
+
+**Usage**:
+```bash
+# Strategy 17/18 automatically use improved version when available
+./hipblaslt-bench -m 11264 -n 11264 -k 8192 \
+  --precision bf16_r \
+  --multi_macrotile --split_strategy 17 \
+  -i 10
+```
+
+**Files**:
+- `clients/common/include/multi_macrotile_origami_improved.hpp` - Improved implementation
+- `clients/common/include/multi_macrotile_origami.hpp` - Base with conditional compilation
+- `clients/common/include/multi_macrotile.hpp` - Integration with splitGemmProblem
+
+**Documentation**:
+- See `ORIGAMI_ROOT_CAUSE_AND_IMPROVEMENTS.md` for detailed analysis
+- See `IMPROVED_ORIGAMI_IMPLEMENTATION_STATUS.md` for implementation status
+
+---
+
 ### Strategy 0: Automatic Selection ⭐⭐⭐ **RECOMMENDED** (2026-04-17)
 
 **Purpose**: Automatically choose the best splitting strategy based on problem characteristics.
