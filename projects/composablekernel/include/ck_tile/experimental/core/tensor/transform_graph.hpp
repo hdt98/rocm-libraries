@@ -230,9 +230,10 @@
 
 namespace ck_tile {
 
-inline constexpr index_t MAX_TRANSFORMS = 5;  ///< Max transforms per graph
-inline constexpr index_t MAX_SLOTS      = 16; ///< Max working array slots
-inline constexpr index_t MAX_IO_DIMS    = 6;  ///< Max input or output dimensions
+inline constexpr index_t MAX_TRANSFORMS = 5; ///< Max transforms per graph
+inline constexpr index_t MAX_SLOTS =
+    70; ///< Max working array slots (1 + MAX_IO_DIMS for base Embed)
+inline constexpr index_t MAX_IO_DIMS = 64; ///< Max input or output dimensions
 
 namespace detail {
 

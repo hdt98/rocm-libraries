@@ -24,7 +24,7 @@
 namespace ck_tile {
 
 /// Maximum tensor dimensions. Matches MAX_IO_DIMS from transform_graph.hpp.
-inline constexpr index_t MAX_TENSOR_DIMS = 6;
+inline constexpr index_t MAX_TENSOR_DIMS = 64;
 
 /** @brief Pure metadata describing a tensor's shape and memory layout.
  *
