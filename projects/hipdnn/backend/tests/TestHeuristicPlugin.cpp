@@ -455,8 +455,7 @@ TEST_F(TestHeuristicPlugin, MockPluginLongPolicyNameIsValid)
 {
     const NiceMock<MockHeuristicPlugin> plugin;
 
-    const std::string_view longName
-        = "VeryLongPolicyNameThatExceedsTypicalLengthsButIsStillValid";
+    const std::string_view longName = "VeryLongPolicyNameThatExceedsTypicalLengthsButIsStillValid";
     EXPECT_CALL(plugin, policyName()).WillOnce(Return(longName));
 
     const auto name = plugin.policyName();

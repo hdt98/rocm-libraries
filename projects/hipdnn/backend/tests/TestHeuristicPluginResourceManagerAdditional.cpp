@@ -12,8 +12,8 @@
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
-#include <gtest/gtest.h>
 #include <array>
+#include <gtest/gtest.h>
 #include <memory>
 
 using namespace hipdnn_backend;
@@ -31,10 +31,7 @@ protected:
 TEST_F(TestHeuristicPluginResourceManagerAdditional, ConstructorWithNullPluginManagerThrows)
 {
     EXPECT_THROW(
-        {
-            auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr);
-        },
-        HipdnnException);
+        { auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); }, HipdnnException);
 }
 
 // ========== Policy Info Caching Tests ==========
