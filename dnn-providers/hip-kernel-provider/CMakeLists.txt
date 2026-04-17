@@ -1,10 +1,10 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-if(NOT ENABLE_HIP_KERNEL_PROVIDER)
+if(NOT HIP_KERNEL_PROVIDER_ENABLE)
     message(WARNING
             "You must explicitly turn on hip-kernel-provider using "
-            " -DENABLE_HIP_KERNEL_PROVIDER=ON in order to build it")
+            " -DHIP_KERNEL_PROVIDER_ENABLE=ON in order to build it")
     return()
 endif()
 
