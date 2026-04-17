@@ -931,29 +931,69 @@ void hipblaslt_init_device(ABC_dims                 abc,
                                              norm_dist_one_special_type);
         break;
     case HIP_R_8F_UE8M0:
-        hipblaslt_init_device<hipblaslt_e8>(
-            abc, init, is_nan, static_cast<hipblaslt_e8*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_device<hipblaslt_e8>(abc,
+                                            init,
+                                            is_nan,
+                                            static_cast<hipblaslt_e8*>(A),
+                                            M,
+                                            N,
+                                            lda,
+                                            stride,
+                                            batch_count,
+                                            norm_dist_one_special_type);
         break;
     case HIP_R_8F_E5M3_EXT:
-        hipblaslt_init_device<hipblaslt_e5m3>(
-            abc, init, is_nan, static_cast<hipblaslt_e5m3*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_device<hipblaslt_e5m3>(abc,
+                                              init,
+                                              is_nan,
+                                              static_cast<hipblaslt_e5m3*>(A),
+                                              M,
+                                              N,
+                                              lda,
+                                              stride,
+                                              batch_count,
+                                              norm_dist_one_special_type);
         break;
 #if defined(HIPBLASLT_USE_FP6)
     case static_cast<hipDataType>(HIP_R_6F_E2M3_EXT):
-        hipblaslt_init_device<hipblaslt_f6x16>(
-            abc, init, is_nan, static_cast<hipblaslt_f6x16*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_device<hipblaslt_f6x16>(abc,
+                                               init,
+                                               is_nan,
+                                               static_cast<hipblaslt_f6x16*>(A),
+                                               M,
+                                               N,
+                                               lda,
+                                               stride,
+                                               batch_count,
+                                               norm_dist_one_special_type);
         break;
 #endif
 #if defined(HIPBLASLT_USE_BF6)
     case static_cast<hipDataType>(HIP_R_6F_E3M2_EXT):
-        hipblaslt_init_device<hipblaslt_bf6x16>(
-            abc, init, is_nan, static_cast<hipblaslt_bf6x16*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_device<hipblaslt_bf6x16>(abc,
+                                                  init,
+                                                  is_nan,
+                                                  static_cast<hipblaslt_bf6x16*>(A),
+                                                  M,
+                                                  N,
+                                                  lda,
+                                                  stride,
+                                                  batch_count,
+                                                  norm_dist_one_special_type);
         break;
 #endif
 #if defined(HIPBLASLT_USE_FP4)
     case static_cast<hipDataType>(HIP_R_4F_E2M1_EXT):
-        hipblaslt_init_device<hipblaslt_f4x2>(
-            abc, init, is_nan, static_cast<hipblaslt_f4x2*>(A), M, N, lda, stride, batch_count);
+        hipblaslt_init_device<hipblaslt_f4x2>(abc,
+                                              init,
+                                              is_nan,
+                                              static_cast<hipblaslt_f4x2*>(A),
+                                              M,
+                                              N,
+                                              lda,
+                                              stride,
+                                              batch_count,
+                                              norm_dist_one_special_type);
         break;
 #endif
     default:
