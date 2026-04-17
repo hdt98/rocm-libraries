@@ -47,12 +47,12 @@ target_include_directories(hip_kernel_provider_tests PRIVATE ${CMAKE_CURRENT_SOU
 
 if(ENABLE_ASM_SDPA_ENGINE)
     if(NOT HIPDNN_ENABLE_SDPA)
-        message(FATAL_ERROR
-                "ENABLE_ASM_SDPA_ENGINE requires hipDNN built with HIPDNN_ENABLE_SDPA=ON. "
-                "Rebuild hipDNN with -DHIPDNN_ENABLE_SDPA=ON or disable the SDPA engine with "
-                "-DENABLE_ASM_SDPA_ENGINE=OFF.")
+        message(WARNING
+                "ENABLE_ASM_SDPA_ENGINE is ON but hipDNN was built with HIPDNN_ENABLE_SDPA=OFF. "
+                "Skipping SDPA unit tests. Rebuild hipDNN with -DHIPDNN_ENABLE_SDPA=ON to enable them.")
+    else()
+        add_subdirectory(engines/asm_sdpa_engine)
     endif()
-    add_subdirectory(engines/asm_sdpa_engine)
 endif()
 
 clang_tidy_check(hip_kernel_provider_tests)
