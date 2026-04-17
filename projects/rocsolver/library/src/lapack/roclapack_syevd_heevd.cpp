@@ -1,5 +1,5 @@
 /* ************************************************************************
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc.
  * *************************************************************************/
 
 #include "roclapack_syevd_heevd.hpp"
@@ -87,8 +87,8 @@ rocblas_status rocsolver_syevd_heevd_impl(rocblas_handle handle,
     // execution
     return rocsolver_syevd_heevd_template<false, false, T>(
         handle, evect, uplo, n, A, shiftA, lda, strideA, D, strideD, E, strideE, info, batch_count,
-        (T*)scalars, work1, work2, work3, work4, (S*)tmpz, (I*)splits, (T*)tmptau_W,
-        (T*)tau, (T**)workArr, optim_mem);
+        (T*)scalars, work1, work2, work3, work4, (S*)tmpz, (I*)splits, (T*)tmptau_W, (T*)tau,
+        (T**)workArr, optim_mem);
 }
 
 ROCSOLVER_END_NAMESPACE
@@ -156,78 +156,77 @@ rocblas_status rocsolver_zheevd(rocblas_handle handle,
 }
 
 rocblas_status rocsolver_ssyevd_64(rocblas_handle handle,
-                                const rocblas_evect evect,
-                                const rocblas_fill uplo,
-                                const int64_t n,
-                                float* A,
-                                const int64_t lda,
-                                float* D,
-                                float* E,
-                                rocblas_int* info)
+                                   const rocblas_evect evect,
+                                   const rocblas_fill uplo,
+                                   const int64_t n,
+                                   float* A,
+                                   const int64_t lda,
+                                   float* D,
+                                   float* E,
+                                   rocblas_int* info)
 {
-    #ifdef HAVE_ROCBLAS_64
+#ifdef HAVE_ROCBLAS_64
 
     return rocsolver::rocsolver_syevd_heevd_impl<float>(handle, evect, uplo, n, A, lda, D, E, info);
-    #else
+#else
     return rocblas_status_not_implemented;
 #endif
 }
 
 rocblas_status rocsolver_dsyevd_64(rocblas_handle handle,
-                                const rocblas_evect evect,
-                                const rocblas_fill uplo,
-                                const int64_t n,
-                                double* A,
-                                const int64_t lda,
-                                double* D,
-                                double* E,
-                                rocblas_int* info)
+                                   const rocblas_evect evect,
+                                   const rocblas_fill uplo,
+                                   const int64_t n,
+                                   double* A,
+                                   const int64_t lda,
+                                   double* D,
+                                   double* E,
+                                   rocblas_int* info)
 {
-    #ifdef HAVE_ROCBLAS_64
+#ifdef HAVE_ROCBLAS_64
 
     return rocsolver::rocsolver_syevd_heevd_impl<double>(handle, evect, uplo, n, A, lda, D, E, info);
-    #else
+#else
     return rocblas_status_not_implemented;
 #endif
 }
 
 rocblas_status rocsolver_cheevd_64(rocblas_handle handle,
-                                const rocblas_evect evect,
-                                const rocblas_fill uplo,
-                                const int64_t n,
-                                rocblas_float_complex* A,
-                                const int64_t lda,
-                                float* D,
-                                float* E,
-                                rocblas_int* info)
+                                   const rocblas_evect evect,
+                                   const rocblas_fill uplo,
+                                   const int64_t n,
+                                   rocblas_float_complex* A,
+                                   const int64_t lda,
+                                   float* D,
+                                   float* E,
+                                   rocblas_int* info)
 {
-    #ifdef HAVE_ROCBLAS_64
+#ifdef HAVE_ROCBLAS_64
 
     return rocsolver::rocsolver_syevd_heevd_impl<rocblas_float_complex>(handle, evect, uplo, n, A,
                                                                         lda, D, E, info);
-                                                                        #else
+#else
     return rocblas_status_not_implemented;
 #endif
 }
 
 rocblas_status rocsolver_zheevd_64(rocblas_handle handle,
-                                const rocblas_evect evect,
-                                const rocblas_fill uplo,
-                                const int64_t n,
-                                rocblas_double_complex* A,
-                                const int64_t lda,
-                                double* D,
-                                double* E,
-                                rocblas_int* info)
+                                   const rocblas_evect evect,
+                                   const rocblas_fill uplo,
+                                   const int64_t n,
+                                   rocblas_double_complex* A,
+                                   const int64_t lda,
+                                   double* D,
+                                   double* E,
+                                   rocblas_int* info)
 {
-    #ifdef HAVE_ROCBLAS_64
+#ifdef HAVE_ROCBLAS_64
 
     return rocsolver::rocsolver_syevd_heevd_impl<rocblas_double_complex>(handle, evect, uplo, n, A,
                                                                          lda, D, E, info);
-                                                                         #else
+#else
     return rocblas_status_not_implemented;
 #endif
 }
-
 
 } // extern C
