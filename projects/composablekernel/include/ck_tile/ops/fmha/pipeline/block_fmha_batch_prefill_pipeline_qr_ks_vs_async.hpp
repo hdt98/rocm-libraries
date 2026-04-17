@@ -429,6 +429,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                const index_t page_stride_v,
                DropoutType& dropout,
                const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr,
                // KV_BLOCKSCALE parameters (only used when QScaleEnum == KV_BLOCKSCALE)
                const float* k_descale_ptr             = nullptr,
                const float* v_descale_ptr             = nullptr,
@@ -1549,7 +1550,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                const index_t page_stride_k,
                const index_t page_stride_v,
                DropoutType& dropout,
-               float sink_v) const
+               float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -1578,7 +1580,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                           page_stride_k,
                           page_stride_v,
                           dropout,
-                          sink_v);
+                          sink_v,
+                          block_mask_row_ptr);
     }
 
     // Overload for KV_BLOCKSCALE: K/V descale is per-page
@@ -1613,6 +1616,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                const index_t page_stride_v,
                DropoutType& dropout,
                float sink_v,
+               const int32_t* block_mask_row_ptr,
                const float* k_descale_ptr,
                const float* v_descale_ptr,
                index_t nblock_stride_kv_block_descale,
@@ -1646,6 +1650,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                           page_stride_v,
                           dropout,
                           sink_v,
+                          block_mask_row_ptr,
                           k_descale_ptr,
                           v_descale_ptr,
                           nblock_stride_kv_block_descale,

@@ -8,6 +8,7 @@
 #include "fmha_fwd.hpp"
 #include "fmha_fwd_head_grouping.hpp"
 #include "utils.hpp"
+#include "block_mask_utils.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
 #include <array>
@@ -248,6 +249,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         uint32_t seed,
                         int do_validation,
                         int init_sink_value,
+                        std::string block_mask_str,
                         const ck_tile::stream_config& stream_config,
                         std::optional<std::string> json = std::nullopt)
 {
@@ -726,6 +728,25 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                    : std::array<ck_tile::index_t, 2>{batch, nhead})
             : std::array<ck_tile::index_t, 2>{1, 1});
 
+    // Block mask generation
+    auto block_mask_config = ck_tile::parse_block_mask_config(block_mask_str);
+    // block sizes will be set from kernel shape; use default kN0=128 for generation
+    // The actual kN0 used by the kernel determines block granularity
+    block_mask_config.block_size_q  = 128; // kM0 (typical)
+    block_mask_config.block_size_kv = 128; // kN0 (typical)
+    auto block_mask_host = (block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+        ? ck_tile::generate_block_mask(
+              block_mask_config, batch, nhead, max_seqlen_q, max_seqlen_k, next_seed())
+        : ck_tile::HostTensor<int32_t>({1, 1});
+    if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+    {
+        ck_tile::index_t num_q_blocks = (max_seqlen_q + block_mask_config.block_size_q - 1) /
+                                        block_mask_config.block_size_q;
+        ck_tile::index_t num_kv_blocks = (max_seqlen_k + block_mask_config.block_size_kv - 1) /
+                                         block_mask_config.block_size_kv;
+        ck_tile::print_block_mask_stats(block_mask_host, num_q_blocks, num_kv_blocks);
+    }
+
     auto [rotary_cos_host, rotary_sin_host] = generate_rotary_cos_sin<KDataType>(
         std::max(shape_seqlen_q, shape_seqlen_k), rotary_dim, next_seed());
 
@@ -989,6 +1010,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem alibi_slope_buf(alibi_slope_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem block_table_buf(block_table_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem cache_batch_idx_buf(cache_batch_idx_host.get_element_space_size_in_bytes());
+    ck_tile::DeviceMem block_mask_buf(block_mask_host.get_element_space_size_in_bytes());
 
     q_buf.ToDevice(q_host.data());
     k_buf.ToDevice(k_host.data());
@@ -1024,6 +1046,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     alibi_slope_buf.ToDevice(alibi_slope_host.data());
     block_table_buf.ToDevice(block_table_host.data());
     cache_batch_idx_buf.ToDevice(cache_batch_idx_host.data());
+    block_mask_buf.ToDevice(block_mask_host.data());
 
     // clang-format off
     auto layout_str = [&](bool permute){
@@ -1313,6 +1336,26 @@ fwd_result fmha_fwd_run(mode_enum mode,
             args.window_size_right = mask.right;
             args.sink_size         = mask.sink;
             args.mask_type         = static_cast<ck_tile::index_t>(mask.type);
+
+            // Block mask setup
+            if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+            {
+                ck_tile::index_t num_kv_blocks =
+                    (max_seqlen_k + block_mask_config.block_size_kv - 1) /
+                    block_mask_config.block_size_kv;
+                args.block_mask_ptr          = static_cast<const int32_t*>(
+                    block_mask_buf.GetDeviceBuffer());
+                args.stride_block_mask       = num_kv_blocks;
+                args.nhead_stride_block_mask = 0;
+                args.batch_stride_block_mask = 0;
+            }
+            else
+            {
+                args.block_mask_ptr          = nullptr;
+                args.stride_block_mask       = 0;
+                args.nhead_stride_block_mask = 0;
+                args.batch_stride_block_mask = 0;
+            }
 
             if constexpr(std::is_same_v<fmha_fwd_args, std::decay_t<decltype(args)>>)
             {
@@ -2147,6 +2190,28 @@ fwd_result fmha_fwd_run(mode_enum mode,
                             real_seqlen_q,
                             real_seqlen_k,
                             mask.type == mask_enum::mask_top_left));
+            }
+            // Apply block sparsity mask to S for CPU reference validation
+            if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+            {
+                ck_tile::index_t num_kv_blocks =
+                    (real_seqlen_k + block_mask_config.block_size_kv - 1) /
+                    block_mask_config.block_size_kv;
+                for(ck_tile::index_t h = 0; h < nhead; h++)
+                {
+                    for(ck_tile::index_t qi = 0; qi < real_seqlen_q; qi++)
+                    {
+                        ck_tile::index_t q_block_idx = qi / block_mask_config.block_size_q;
+                        for(ck_tile::index_t ki = 0; ki < real_seqlen_k; ki++)
+                        {
+                            ck_tile::index_t kv_block_idx = ki / block_mask_config.block_size_kv;
+                            if(block_mask_host(q_block_idx, kv_block_idx) == 0)
+                            {
+                                s_host_ref(h, qi, ki) = -ck_tile::numeric<SaccDataType>::infinity();
+                            }
+                        }
+                    }
+                }
             }
             const ck_tile::HostTensor<SaccDataType> masked_s_host_ref = s_host_ref;
             if(init_sink_value != 0)

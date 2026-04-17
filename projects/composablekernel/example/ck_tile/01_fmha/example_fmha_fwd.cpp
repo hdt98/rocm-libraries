@@ -119,7 +119,16 @@ auto create_args(int argc, char* argv[])
                 "",
                 "Batch-mode only: per-batch effective seqlen for KV (exclude PAD).\n"
                 "Comma-separated list of length 'b'. If empty, no override.")
-        .insert("init_sink", "0", "value to init the output tensor sink value for validation");
+        .insert("init_sink", "0", "value to init the output tensor sink value for validation")
+        .insert("block_mask",
+                "none",
+                "Block sparsity pattern:\n"
+                "  none or 0 - no block sparsity (default)\n"
+                "  random:ratio or r:ratio - random sparsity (e.g., random:0.5 for 50%% sparse)\n"
+                "  causal or c - causal-aligned block mask\n"
+                "  stripe:ratio or s:ratio - diagonal stripe pattern\n"
+                "  checkerboard or cb - alternating blocks (50%% sparse)\n"
+                "  file:path or f:path - load from file (not yet implemented)");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -163,6 +172,7 @@ auto run(const ck_tile::ArgParser& arg_parser)
     std::string init_method          = arg_parser.get_str("init");
     uint32_t seed                    = arg_parser.get_uint32("seed");
     int init_sink_value              = arg_parser.get_int("init_sink");
+    std::string block_mask_str       = arg_parser.get_str("block_mask");
 
     ck_tile::stream_config stream_config{nullptr,
                                          true,
@@ -210,6 +220,7 @@ auto run(const ck_tile::ArgParser& arg_parser)
                                         seed,
                                         do_validation,
                                         init_sink_value,
+                                        block_mask_str,
                                         stream_config,
                                         json);
 }

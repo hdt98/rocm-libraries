@@ -149,7 +149,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                PositionEncoding position_encoding,
                float scale_s,
                void* smem_ptr,
-               float sink_v) const
+               float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&

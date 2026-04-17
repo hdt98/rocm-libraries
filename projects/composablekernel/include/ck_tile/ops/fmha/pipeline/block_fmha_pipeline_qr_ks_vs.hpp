@@ -203,7 +203,8 @@ struct BlockFmhaPipelineQRKSVS
                    k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
                const VScaleDramBlockWindowTmp&
                    v_scale_dram_block_window_tmp, // N1*(K1/kVScaleGranularity) tile
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
@@ -460,6 +461,33 @@ struct BlockFmhaPipelineQRKSVS
         static_assert(1 <= k1_loops);
         do
         {
+            // Block sparsity: skip fully-masked KV blocks
+            if(block_mask_row_ptr != nullptr)
+            {
+                const auto k_origin_check = k_dram_block_window.get_window_origin();
+                const index_t kv_block_idx = k_origin_check.at(number<0>{}) / kN0;
+                if(block_mask_row_ptr[kv_block_idx] == 0)
+                {
+                    if constexpr(kHasSink)
+                    {
+                        move_tile_window(sink_k_dram_block_window, {kN0, 0});
+                        move_tile_window(sink_v_dram_window, {0, kN0});
+                    }
+                    move_tile_window(k_dram_block_window, {kN0, 0});
+                    move_tile_window(v_dram_window, {0, kN0});
+                    move_tile_window(bias_dram_window, {0, kN0});
+                    if constexpr(kHasDropout)
+                    {
+                        move_tile_window(randval_dram_window, {0, kN0});
+                    }
+                    if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                    {
+                        move_tile_window(k_scale_dram_block_window_tmp, {kN0, 0});
+                        move_tile_window(v_scale_dram_block_window_tmp, {0, kN0 / kVScaleGranularity});
+                    }
+                    continue;
+                }
+            }
             float k_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
             {
@@ -1099,7 +1127,8 @@ struct BlockFmhaPipelineQRKSVS
                const BlockIndices& block_indices,
                void* smem_ptr,
                DropoutType& dropout,
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -1129,7 +1158,8 @@ struct BlockFmhaPipelineQRKSVS
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
-                          sink_v);
+                          sink_v,
+                          block_mask_row_ptr);
     }
 };
 

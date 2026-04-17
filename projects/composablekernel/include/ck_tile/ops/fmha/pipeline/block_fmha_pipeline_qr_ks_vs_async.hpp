@@ -204,7 +204,8 @@ struct BlockFmhaPipelineQRKSVSAsync
                const QScaleDramBlockWindowTmp&, // M0*(K0/kQKScaleGranularity) tile
                const KScaleDramBlockWindowTmp&, // N0*(K0/kQKScaleGranularity) tile
                const VScaleDramBlockWindowTmp&, // N1*(K1/kVScaleGranularity) tile
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
@@ -967,7 +968,8 @@ struct BlockFmhaPipelineQRKSVSAsync
                const BlockIndices& block_indices,
                void* smem_ptr,
                DropoutType& dropout,
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -997,7 +999,8 @@ struct BlockFmhaPipelineQRKSVSAsync
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
-                          sink_v);
+                          sink_v,
+                          block_mask_row_ptr);
     }
 };
 

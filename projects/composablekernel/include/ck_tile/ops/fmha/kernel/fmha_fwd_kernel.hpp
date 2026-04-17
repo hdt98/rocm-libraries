@@ -293,6 +293,14 @@ struct FmhaFwdKernel
         ck_tile::index_t min_seqlen_q = 0;
     };
 
+    struct FmhaFwdBlockMaskKargs
+    {
+        const int32_t* block_mask_ptr = nullptr;
+        ck_tile::index_t stride_block_mask = 0;
+        ck_tile::index_t nhead_stride_block_mask = 0;
+        ck_tile::index_t batch_stride_block_mask = 0;
+    };
+
     struct FmhaFwdBatchModeKargs
         : FmhaFwdCommonKargs,
           std::conditional_t<BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS,
@@ -311,7 +319,8 @@ struct FmhaFwdKernel
                                                     FmhaFwdBatchMXKargs,
                                                     FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdBatchModeDropoutKargs, FmhaFwdEmptyKargs<4>>,
-          std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>
+          std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>,
+          FmhaFwdBlockMaskKargs
     {
         ck_tile::index_t batch_stride_q;
         ck_tile::index_t batch_stride_k;
@@ -343,7 +352,8 @@ struct FmhaFwdKernel
                                                     FmhaFwdEmptyKargs<3>>>>,
           std::conditional_t<kHasDropout, FmhaFwdCommonDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>,
-          std::conditional_t<kSkipMinSeqlenQ, FmhaFwdSkipMinSeqlenQKargs, FmhaFwdEmptyKargs<6>>
+          std::conditional_t<kSkipMinSeqlenQ, FmhaFwdSkipMinSeqlenQKargs, FmhaFwdEmptyKargs<6>>,
+          FmhaFwdBlockMaskKargs
     {
         const int32_t* seqstart_q_ptr;
         const int32_t* seqstart_k_ptr;
@@ -459,6 +469,7 @@ struct FmhaFwdKernel
                     {},               // placeholder for qscale
                     {},               // placeholder for dropout
                     {},               // placeholder for logits_soft_cap
+                    {},               // placeholder for block_mask
                     batch_stride_q,
                     batch_stride_k,
                     batch_stride_v,
@@ -913,6 +924,7 @@ struct FmhaFwdKernel
                     {},               // placeholder for dropout
                     {},               // placeholder for logits_soft_cap
                     {},               // placeholder for min_seqlen_q
+                    {},               // placeholder for block_mask
                     reinterpret_cast<const int32_t*>(seqstart_q_ptr),
                     reinterpret_cast<const int32_t*>(seqstart_k_ptr),
                     reinterpret_cast<const int32_t*>(seqlen_q_ptr),
@@ -1892,6 +1904,16 @@ struct FmhaFwdKernel
 
             BlockIndices block_indices{i_batch, i_nhead, i_nhead_k};
 
+            const int32_t* block_mask_row_ptr = nullptr;
+            if(kargs.block_mask_ptr != nullptr)
+            {
+                const index_t q_block_idx = i_tile_m;
+                block_mask_row_ptr = kargs.block_mask_ptr +
+                    static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
+                    static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
+                    static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
+            }
+
             auto o_acc_tile = [&, i_nhead_ = i_nhead, i_nhead_k_ = i_nhead_k]() {
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERTENSOR)
                 {
@@ -1939,7 +1961,8 @@ struct FmhaFwdKernel
                                           make_null_tile_window(make_tuple()),
                                           make_null_tile_window(make_tuple()),
                                           make_null_tile_window(make_tuple()),
-                                          sink_value);
+                                          sink_value,
+                                          block_mask_row_ptr);
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
                 {
@@ -1993,7 +2016,8 @@ struct FmhaFwdKernel
                         make_null_tile_window(make_tuple()),
                         make_null_tile_window(make_tuple()),
                         make_null_tile_window(make_tuple()),
-                        sink_value);
+                        sink_value,
+                        block_mask_row_ptr);
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
@@ -2126,7 +2150,8 @@ struct FmhaFwdKernel
                                           q_scale_dram_window,
                                           k_scale_dram_window,
                                           v_scale_dram_window,
-                                          sink_value);
+                                          sink_value,
+                                          block_mask_row_ptr);
                 }
                 else
                 {
@@ -2144,7 +2169,8 @@ struct FmhaFwdKernel
                                           block_indices,
                                           smem_ptr,
                                           dropout,
-                                          sink_value);
+                                          sink_value,
+                                          block_mask_row_ptr);
                 }
             }();
 
