@@ -57,12 +57,7 @@ namespace TensileLite
             , m_mxBlockB(args["mx-b-block"].as<int>())
             , m_swizzleTensorA(false)
             , m_swizzleTensorB(false)
-<<<<<<< HEAD
-            , m_mxBlockA(args["mx-block-a"].as<int>())
-            , m_mxBlockB(args["mx-block-b"].as<int>())
-=======
             , m_metadataLayout(args["metadata-layout"].as<int>())
->>>>>>> origin/develop
             , m_aOps(args["a-ops"].as<TensorOps>())
             , m_bOps(args["b-ops"].as<TensorOps>())
             , m_cOps(args["c-ops"].as<TensorOps>())
@@ -450,19 +445,11 @@ namespace TensileLite
                             rv.back().setUseDeviceUserArguments(m_useUserArgs);
                             if(m_mxBlockA)
                             {
-<<<<<<< HEAD
-                                rv.back().setMXScaleA(m_mxBlockA);
-                            }
-                            if(m_mxBlockB)
-                            {
-                                rv.back().setMXScaleB(m_mxBlockB);
-=======
                                 rv.back().setMXScaleA(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSA], m_mxBlockA);
                             }
                             if(m_mxBlockB)
                             {
                                 rv.back().setMXScaleB(m_tensorTypes[ContractionProblemGemm::TENSOR::MXSB], m_mxBlockB);
->>>>>>> origin/develop
                             }
                         }
                     }
