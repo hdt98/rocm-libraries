@@ -628,11 +628,12 @@ try
         "  6=macrotile_align (non-uniform, MacroTile-aligned),\n"
         "  7=power_of_2 (non-uniform, power-of-2 biased),\n"
         "  8=cu_balanced (non-uniform, CU-balanced for stream-parallel),\n"
-        "  9=performance (non-uniform, performance-based)")
+        "  9=performance (non-uniform, performance-based),\n"
+        "  10=adaptive_power_of_2 (non-uniform, power-of-2 with balance check)")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(0),
-        "Number of splits (0=auto, 2-16=manual). Only used with --multi_macrotile")
+        "Number of splits (0=auto, 2-16=manual). Auto-selection recommended. Only used with --multi_macrotile")
 
         ("target_wgs_per_split",
         value<int32_t>(&arg.target_wgs_per_split)->default_value(256),

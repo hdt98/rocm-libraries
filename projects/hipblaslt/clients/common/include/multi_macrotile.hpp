@@ -36,16 +36,17 @@
 // Split strategies
 enum class SplitStrategy
 {
-    Auto = 0,           // Automatically choose best strategy
-    Workgroup = 1,      // Optimize for workgroup alignment
-    Memory = 2,         // Split based on memory constraints
-    MOnly = 3,          // Force split along M dimension only
-    NOnly = 4,          // Force split along N dimension only
-    TwoD = 5,           // 2D tiling (split both M and N)
-    MacroTileAlign = 6, // MacroTile-aligned splitting (non-uniform)
-    PowerOf2 = 7,       // Power-of-2 biased splitting
-    CUBalanced = 8,     // CU-balanced for stream-parallel
-    Performance = 9     // Performance-based (query heuristics)
+    Auto = 0,            // Automatically choose best strategy
+    Workgroup = 1,       // Optimize for workgroup alignment
+    Memory = 2,          // Split based on memory constraints
+    MOnly = 3,           // Force split along M dimension only
+    NOnly = 4,           // Force split along N dimension only
+    TwoD = 5,            // 2D tiling (split both M and N)
+    MacroTileAlign = 6,  // MacroTile-aligned splitting (non-uniform)
+    PowerOf2 = 7,        // Power-of-2 biased splitting
+    CUBalanced = 8,      // CU-balanced for stream-parallel
+    Performance = 9,     // Performance-based (query heuristics)
+    AdaptivePowerOf2 = 10 // Adaptive power-of-2 (falls back to uniform if imbalanced)
 };
 
 // Structure to describe a sub-problem for multi-MacroTile GEMM
@@ -73,6 +74,189 @@ struct GemmSubProblem
     int macrotile_m;
     int macrotile_n;
 };
+
+// Helper: Check if number is power of 2
+inline bool isPowerOf2(int64_t n)
+{
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+// Helper: Round to nearest power of 2
+inline int64_t roundToPowerOf2(int64_t n)
+{
+    if (n <= 0) return 1;
+
+    int64_t power = 1;
+    while (power < n)
+        power *= 2;
+
+    // Choose closer power of 2
+    int64_t lower = power / 2;
+    return (n - lower < power - n) ? lower : power;
+}
+
+// Estimate workgroups for a given problem size
+inline int estimateWorkgroupsSimple(int64_t M, int64_t N, int macrotile_m = 128, int macrotile_n = 128)
+{
+    int tiles_m = (M + macrotile_m - 1) / macrotile_m;
+    int tiles_n = (N + macrotile_n - 1) / macrotile_n;
+    return tiles_m * tiles_n;
+}
+
+// Automatic strategy selection based on problem characteristics
+inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K)
+{
+    // Rule 1: Disable for small K (minimal benefit)
+    if (K < 8192)
+    {
+        return 0; // Use baseline - overhead not amortized
+    }
+
+    // Rule 2: Rectangular matrices - split along larger dimension
+    // Allow even if one dimension is small
+    double aspect_ratio = (double)M / N;
+    if (aspect_ratio > 1.5)
+    {
+        // Tall matrix (M > N)
+        if (M >= 10240) // Only disable if both dimensions too small
+        {
+            return 3; // M-split for tall matrices
+        }
+        return 0; // Both dimensions too small
+    }
+    if (aspect_ratio < 0.67)
+    {
+        // Wide matrix (M < N)
+        if (N >= 10240) // Only disable if both dimensions too small
+        {
+            return 4; // N-split for wide matrices
+        }
+        return 0; // Both dimensions too small
+    }
+
+    // Rule 3: Square or nearly-square matrices
+    // Disable for small square matrices (known to lose performance)
+    if (M < 10240 || N < 10240)
+    {
+        return 0; // Use baseline - multi-MT hurts small square matrices
+    }
+
+    // Rule 4: Large square matrices with large K
+    if (std::abs(aspect_ratio - 1.0) < 0.2) // Nearly square (within 20%)
+    {
+        // Check if dimensions are power-of-2 or close to it
+        bool m_is_pow2 = isPowerOf2(M);
+        bool n_is_pow2 = isPowerOf2(N);
+
+        // Also check if close to power-of-2 (within 10%)
+        int64_t m_rounded = roundToPowerOf2(M);
+        int64_t n_rounded = roundToPowerOf2(N);
+        double m_deviation = std::abs((double)(M - m_rounded) / M);
+        double n_deviation = std::abs((double)(N - n_rounded) / N);
+
+        bool m_close_to_pow2 = (m_is_pow2 || m_deviation < 0.10);
+        bool n_close_to_pow2 = (n_is_pow2 || n_deviation < 0.10);
+
+        if (m_close_to_pow2 && n_close_to_pow2)
+        {
+            return 10; // Adaptive power-of-2 (safer than regular power-of-2)
+        }
+        else
+        {
+            return 3; // Uniform M-split for non-power-of-2
+        }
+    }
+
+    // Rule 5: Default to uniform M-split
+    return 3;
+}
+
+// Automatic num_splits selection based on problem size
+inline int autoSelectNumSplits(int64_t M, int64_t N, int64_t K, int num_CUs = 256)
+{
+    int total_wgs = estimateWorkgroupsSimple(M, N);
+
+    // Target: 80-120 workgroups per sub-problem for good occupancy
+    if (total_wgs < 200)
+    {
+        return 1; // Too small for splitting
+    }
+    else if (total_wgs < 400)
+    {
+        return 2; // 2-way split
+    }
+    else if (total_wgs < 800)
+    {
+        return 4; // 4-way split
+    }
+    else if (total_wgs < 1600)
+    {
+        return 8; // 8-way split
+    }
+    else
+    {
+        return 8; // Cap at 8-way (diminishing returns beyond this)
+    }
+}
+
+// Check if multi-MacroTile should be used for this problem
+inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K, int split_strategy)
+{
+    // If user explicitly disabled (strategy 0), respect it
+    if (split_strategy == 0)
+    {
+        return false;
+    }
+
+    if (K < 4096)
+    {
+        return false; // Very small K has negligible benefit
+    }
+
+    // Check aspect ratio to determine if rectangular
+    double aspect_ratio = (double)M / N;
+    bool is_rectangular = (aspect_ratio > 1.5 || aspect_ratio < 0.67);
+
+    if (is_rectangular)
+    {
+        // For rectangular matrices, only require the larger dimension to be >= 10240
+        if (std::max(M, N) >= 10240)
+        {
+            return true; // Rectangular matrices often benefit
+        }
+        return false; // Both dimensions too small
+    }
+    else
+    {
+        // For square/nearly-square matrices, require both dimensions >= 10240
+        if (M < 10240 || N < 10240)
+        {
+            return false; // Small square matrices lose -16% to -25%
+        }
+    }
+
+    // Non-power-of-2 with regular power-of-2 strategy can be problematic
+    if (split_strategy == 7) // PowerOf2 strategy (regular, not adaptive)
+    {
+        if (!isPowerOf2(M) || !isPowerOf2(N))
+        {
+            // Power-of-2 strategy can create imbalanced splits
+            // Only allow if dimensions are reasonably close to power-of-2
+            int64_t m_rounded = roundToPowerOf2(M);
+            int64_t n_rounded = roundToPowerOf2(N);
+
+            double m_deviation = std::abs((double)(M - m_rounded) / M);
+            double n_deviation = std::abs((double)(N - n_rounded) / N);
+
+            if (m_deviation > 0.15 || n_deviation > 0.15)
+            {
+                return false; // Too far from power-of-2, would create bad splits
+            }
+        }
+    }
+
+    return true; // Safe to use multi-MacroTile
+}
 
 // Calculate data type size in bytes
 inline size_t getDataTypeSize(hipDataType dataType)
@@ -359,6 +543,48 @@ inline std::vector<int64_t> computePowerOf2Splits(int64_t total_size, int num_sp
     return sizes;
 }
 
+// Adaptive Power-of-2: Falls back to uniform if splits are too imbalanced
+inline std::vector<int64_t> computeAdaptivePowerOf2Splits(int64_t total_size, int num_splits)
+{
+    auto pow2_splits = computePowerOf2Splits(total_size, num_splits);
+
+    // Check balance - find min and max split sizes
+    int64_t min_split = pow2_splits[0];
+    int64_t max_split = pow2_splits[0];
+
+    for (size_t i = 1; i < pow2_splits.size(); i++)
+    {
+        min_split = std::min(min_split, pow2_splits[i]);
+        max_split = std::max(max_split, pow2_splits[i]);
+    }
+
+    // Calculate imbalance ratio
+    double imbalance_ratio = (double)max_split / min_split;
+
+    // If too imbalanced (>40% difference), fall back to uniform
+    if (imbalance_ratio > 1.4)
+    {
+        // Use uniform splits instead
+        std::vector<int64_t> uniform_splits;
+        int64_t base_size = total_size / num_splits;
+        int64_t remainder = total_size % num_splits;
+
+        for (int i = 0; i < num_splits; i++)
+        {
+            int64_t size = base_size;
+            if (i < remainder)
+                size++; // Distribute remainder
+
+            uniform_splits.push_back(size);
+        }
+
+        return uniform_splits;
+    }
+
+    // Balance is acceptable, use power-of-2 splits
+    return pow2_splits;
+}
+
 // CU-balanced splitting: Distribute workgroups evenly across CUs
 inline std::vector<int64_t> computeCUBalancedSplits(int64_t total_size,
                                                      int num_splits,
@@ -539,6 +765,11 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             split_along_m = true;
             split_along_n = false;
             break;
+        case SplitStrategy::AdaptivePowerOf2:
+            num_splits = 2;  // Start with 2-way split
+            split_along_m = true;
+            split_along_n = false;
+            break;
         }
     }
 
@@ -596,6 +827,11 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             m_split_sizes = computePerformanceSplits(M, num_splits);
             use_intelligent_splits = true;
         }
+        else if(strat == SplitStrategy::AdaptivePowerOf2)
+        {
+            m_split_sizes = computeAdaptivePowerOf2Splits(M, num_splits);
+            use_intelligent_splits = true;
+        }
     }
     else if(!split_along_m && split_along_n)
     {
@@ -618,6 +854,11 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         else if(strat == SplitStrategy::Performance)
         {
             n_split_sizes = computePerformanceSplits(N, num_splits);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::AdaptivePowerOf2)
+        {
+            n_split_sizes = computeAdaptivePowerOf2Splits(N, num_splits);
             use_intelligent_splits = true;
         }
     }

@@ -4700,6 +4700,32 @@ void testing_matmul_with_bias(const Arguments& arg,
             CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));
             int num_CUs = deviceProps.multiProcessorCount;
 
+            // Automatic strategy selection if strategy is 0 (Auto)
+            int actual_strategy = arg.split_strategy;
+            if (actual_strategy == 0)
+            {
+                actual_strategy = autoSelectStrategy(M[0], N[0], K[0]);
+                hipblaslt_cout << "Auto-selected strategy: " << actual_strategy << std::endl;
+            }
+
+            // Check if multi-MacroTile should be used for this problem
+            if (!shouldUseMultiMacroTile(M[0], N[0], K[0], actual_strategy))
+            {
+                hipblaslt_cout << "Multi-MacroTile disabled for this problem size (would hurt performance)" << std::endl;
+                hipblaslt_cout << "Falling back to baseline single-kernel execution" << std::endl;
+                hipblaslt_cout << std::endl;
+                // Skip multi-MT, continue with normal timing path
+                goto skip_multimt;
+            }
+
+            // Automatic num_splits selection if num_splits is 0 (Auto)
+            int actual_num_splits = arg.num_splits;
+            if (actual_num_splits == 0)
+            {
+                actual_num_splits = autoSelectNumSplits(M[0], N[0], K[0], num_CUs);
+                hipblaslt_cout << "Auto-selected num_splits: " << actual_num_splits << std::endl;
+            }
+
             // Estimate MacroTile size from algorithm (if available)
             int macrotile_m = 128;  // Common default
             int macrotile_n = 128;
@@ -4711,8 +4737,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 transA, transB,
                 arg.a_type, arg.b_type, arg.c_type, arg.d_type,
                 Taux, Tbias,
-                arg.split_strategy,
-                arg.num_splits,
+                actual_strategy,
+                actual_num_splits,
                 256,  // target_wgs
                 macrotile_m,
                 macrotile_n,
@@ -4723,11 +4749,11 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             const char* strategy_names[] = {
                 "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
-                "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance"
+                "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance", "Adaptive-Power-of-2"
             };
 
             hipblaslt_cout << "Multi-MacroTile: Using "
-                          << strategy_names[std::min(arg.split_strategy, 9)]
+                          << strategy_names[std::min(actual_strategy, 10)]
                           << " strategy with " << subProblems.size()
                           << " sub-problems:" << std::endl;
 
@@ -5021,6 +5047,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             return;
         }
 
+        skip_multimt:
         // Get device information
         hipDeviceProp_t deviceProps;
         CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));
