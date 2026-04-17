@@ -419,3 +419,46 @@ TEST_F(TestHeuristicPlugin, MockPluginCanReturnNullDescriptor)
     const auto descriptor = plugin.createPolicyDescriptor(handle);
     EXPECT_EQ(descriptor, nullptr);
 }
+
+// ========== Policy ID Caching Tests ==========
+
+TEST_F(TestHeuristicPlugin, MockPluginPolicyIdCanBeCached)
+{
+    const NiceMock<MockHeuristicPlugin> plugin;
+
+    const int64_t testPolicyId = 0xABCDEF;
+
+    // First call should query the mock
+    EXPECT_CALL(plugin, policyId()).Times(2).WillRepeatedly(Return(testPolicyId));
+
+    // Multiple calls
+    const int64_t id1 = plugin.policyId();
+    const int64_t id2 = plugin.policyId();
+
+    EXPECT_EQ(id1, testPolicyId);
+    EXPECT_EQ(id2, testPolicyId);
+}
+
+// ========== Policy Name Edge Cases ==========
+
+TEST_F(TestHeuristicPlugin, MockPluginEmptyPolicyNameIsValid)
+{
+    const NiceMock<MockHeuristicPlugin> plugin;
+
+    EXPECT_CALL(plugin, policyName()).WillOnce(Return(""));
+
+    const auto name = plugin.policyName();
+    EXPECT_TRUE(name.empty());
+}
+
+TEST_F(TestHeuristicPlugin, MockPluginLongPolicyNameIsValid)
+{
+    const NiceMock<MockHeuristicPlugin> plugin;
+
+    const std::string_view longName
+        = "VeryLongPolicyNameThatExceedsTypicalLengthsButIsStillValid";
+    EXPECT_CALL(plugin, policyName()).WillOnce(Return(longName));
+
+    const auto name = plugin.policyName();
+    EXPECT_EQ(name, longName);
+}
