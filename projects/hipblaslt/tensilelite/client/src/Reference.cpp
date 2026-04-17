@@ -1367,7 +1367,7 @@ namespace TensileLite
                                        && !std::is_same<Float6x16, Type>::value
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
-                                       && !std::is_same<BFloat6x16, Type>::value
+                                       && !std::is_same<BFloat6x32, Type>::value
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
                                        && !std::is_same<Float4x2, Type>::value
@@ -1419,7 +1419,7 @@ namespace TensileLite
                                        || std::is_same<Float6x16, Type>::value
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
-                                       || std::is_same<BFloat6x16, Type>::value
+                                       || std::is_same<BFloat6x32, Type>::value
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
                                        || std::is_same<Float4x2, Type>::value
