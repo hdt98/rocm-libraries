@@ -16,7 +16,7 @@ namespace ck_tile {
  *  Definition:  1 dim --> 1 dim (same value, same length)
  *  Traversal:   1 dim --> 1 dim (identity in both directions)
  *
- *  ndim_input = 1, ndim_output = 1
+ *  ndim_upper = 1, ndim_lower = 1
  *  lengths[0] = dimension length
  *
  *  PassThrough is its own inverse --- the same operation in both
@@ -40,23 +40,30 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::PASS_THROUGH>
 {
-    /** @brief Map input to output (identity). */
+    /** @brief Forward: upper to lower (identity). */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& /*t*/, index_t* output, const index_t* input)
+    mapIndices(const CoordinateTransform& /*t*/, index_t* lower, const index_t* upper)
     {
-        output[0] = input[0];
+        lower[0] = upper[0];
+    }
+
+    /** @brief Reverse: identity (same as forward). */
+    static CK_TILE_HOST_DEVICE constexpr void
+    reverseMapIndices(const CoordinateTransform& /*t*/, index_t* upper, const index_t* lower)
+    {
+        upper[0] = lower[0];
     }
 
     /** @brief Always valid — identity cannot produce out-of-bounds. */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& /*t*/,
-                                                           const index_t* /*input*/)
+    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& /*t*/,
+                                                           const index_t* /*upper*/)
     {
         return true;
     }
 
-    /** @brief Input dimension length (same as output for identity). */
-    static CK_TILE_HOST_DEVICE constexpr index_t input_length(const CoordinateTransform& t,
-                                                              index_t /*i*/)
+    /** @brief Upper dimension length (same as lower for identity). */
+    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+                                                             index_t /*i*/)
     {
         return t.lengths[0];
     }

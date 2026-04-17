@@ -35,17 +35,17 @@ constexpr void canonicalize(TransformGraph& g)
 {
     for(index_t t = g.num_transforms; t < MAX_TRANSFORMS; ++t)
     {
-        g.transforms[t]     = CoordinateTransform{};
-        g.t_input_slots[t]  = DimIds{};
-        g.t_output_slots[t] = DimIds{};
+        g.transforms[t]    = CoordinateTransform{};
+        g.t_upper_slots[t] = DimIds{};
+        g.t_lower_slots[t] = DimIds{};
     }
-    for(index_t i = g.ndim_input; i < MAX_IO_DIMS; ++i)
+    for(index_t i = g.ndim_upper; i < MAX_IO_DIMS; ++i)
     {
-        g.input_slots[i] = 0;
+        g.upper_slots[i] = 0;
     }
-    for(index_t i = g.ndim_output; i < MAX_IO_DIMS; ++i)
+    for(index_t i = g.ndim_lower; i < MAX_IO_DIMS; ++i)
     {
-        g.output_slots[i] = 0;
+        g.lower_slots[i] = 0;
     }
     for(index_t i = g.num_slots; i < MAX_SLOTS; ++i)
     {
@@ -66,7 +66,7 @@ constexpr void canonicalize(TransformGraph& g)
  *  @tparam NDim  Number of tensor dimensions (deduced from array size)
  *  @param lengths  Size of each dimension
  *  @param strides  Stride of each dimension (in elements)
- *  @return TransformGraph with 1 Embed transform, ndim_input=NDim, ndim_output=1
+ *  @return TransformGraph with 1 Embed transform, ndim_upper=NDim, ndim_lower=1
  *
  *  Example: make_strided_graph({8, 128, 8}, {1032, 8, 1})
  *    -> graph mapping (d0, d1, d2) to d0*1032 + d1*8 + d2*1
@@ -88,20 +88,20 @@ constexpr TransformGraph make_strided_graph(const static_array<index_t, NDim>& l
     g.num_transforms = 1;
 
     // Routing: Embed reads from slots 1..NDim, writes to slot 0
-    g.t_output_slots[0][0] = 0; // output slot = 0 (memory offset)
+    g.t_lower_slots[0][0] = 0; // output slot = 0 (memory offset)
     for(index_t i = 0; i < NDim; ++i)
     {
-        g.t_input_slots[0][i] = 1 + i;
+        g.t_upper_slots[0][i] = 1 + i;
     }
 
     // Graph endpoints
-    g.ndim_input  = NDim;
-    g.ndim_output = 1;
+    g.ndim_upper = NDim;
+    g.ndim_lower = 1;
     for(index_t i = 0; i < NDim; ++i)
     {
-        g.input_slots[i] = 1 + i; // input dims map to slots 1..NDim
+        g.upper_slots[i] = 1 + i; // input dims map to slots 1..NDim
     }
-    g.output_slots[0] = 0; // output dim maps to slot 0
+    g.lower_slots[0] = 0; // output dim maps to slot 0
 
     g.num_slots = 1 + NDim; // slot 0 + NDim input slots
 
@@ -135,7 +135,7 @@ constexpr TransformGraph make_strided_graph(const static_array<index_t, NDim>& l
  *
  *  @tparam NDim  Number of tensor dimensions (deduced from array size)
  *  @param lengths  Size of each dimension (row-major: last dim is contiguous)
- *  @return TransformGraph with ndim_input=NDim, ndim_output=1
+ *  @return TransformGraph with ndim_upper=NDim, ndim_lower=1
  */
 template <index_t NDim>
 constexpr TransformGraph make_packed_graph(const static_array<index_t, NDim>& lengths)
@@ -180,12 +180,12 @@ constexpr TransformGraph make_packed_graph(const static_array<index_t, NDim>& le
  */
 template <index_t NumNewTransforms>
 constexpr TransformGraph
-apply_transforms(const TransformGraph& graph,
-                 const static_array<CoordinateTransform, NumNewTransforms>& new_transforms,
-                 const static_array<DimIds, NumNewTransforms>& input_dims,
-                 const static_array<DimIds, NumNewTransforms>& output_dims)
+applyTransforms(const TransformGraph& graph,
+                const static_array<CoordinateTransform, NumNewTransforms>& new_transforms,
+                const static_array<DimIds, NumNewTransforms>& input_dims,
+                const static_array<DimIds, NumNewTransforms>& output_dims)
 {
-    static_assert(NumNewTransforms >= 1, "apply_transforms: need at least 1 transform");
+    static_assert(NumNewTransforms >= 1, "applyTransforms: need at least 1 transform");
 
     TransformGraph g = graph;
 
@@ -204,17 +204,17 @@ apply_transforms(const TransformGraph& graph,
         // input_dims controls WRITE routing during traversal:
         // "which old dims does this transform replace?"
         // Wire the transform's output slots to those old dim slots.
-        for(index_t d = 0; d < new_transforms[i].ndim_output; ++d)
+        for(index_t d = 0; d < new_transforms[i].ndim_lower; ++d)
         {
-            index_t old_input_dim      = input_dims[i][d];
-            g.t_output_slots[t_idx][d] = graph.input_slots[old_input_dim];
+            index_t old_input_dim     = input_dims[i][d];
+            g.t_lower_slots[t_idx][d] = graph.upper_slots[old_input_dim];
         }
 
         // Allocate fresh slots for the transform's READ side.
         // output_dims (below) will map these to user-facing dimensions.
-        for(index_t d = 0; d < new_transforms[i].ndim_input; ++d)
+        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
         {
-            g.t_input_slots[t_idx][d] = next_slot++;
+            g.t_upper_slots[t_idx][d] = next_slot++;
         }
     }
 
@@ -224,41 +224,41 @@ apply_transforms(const TransformGraph& graph,
     // output_dims controls READ routing during traversal:
     // "which new user-facing dim does each transform's input become?"
     // Map user dim indices to the fresh slots allocated above.
-    index_t new_ndim_input = 0;
+    index_t new_ndim_upper = 0;
     for(index_t i = 0; i < NumNewTransforms; ++i)
     {
-        for(index_t d = 0; d < new_transforms[i].ndim_input; ++d)
+        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
         {
             if(output_dims[i][d] >= 0)
             {
                 index_t new_dim_idx = output_dims[i][d];
-                if(new_dim_idx + 1 > new_ndim_input)
+                if(new_dim_idx + 1 > new_ndim_upper)
                 {
-                    new_ndim_input = new_dim_idx + 1;
+                    new_ndim_upper = new_dim_idx + 1;
                 }
             }
         }
     }
 
     // Wire user-facing dim indices to the fresh slots that transforms read from.
-    static_array<index_t, MAX_IO_DIMS> new_input_slots{};
+    static_array<index_t, MAX_IO_DIMS> new_upper_slots{};
     for(index_t i = 0; i < NumNewTransforms; ++i)
     {
-        for(index_t d = 0; d < new_transforms[i].ndim_input; ++d)
+        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
         {
             if(output_dims[i][d] >= 0)
             {
                 index_t new_dim_idx          = output_dims[i][d];
                 index_t t_idx                = graph.num_transforms + i;
-                new_input_slots[new_dim_idx] = g.t_input_slots[t_idx][d];
+                new_upper_slots[new_dim_idx] = g.t_upper_slots[t_idx][d];
             }
         }
     }
 
-    g.ndim_input  = new_ndim_input;
-    g.input_slots = new_input_slots;
+    g.ndim_upper  = new_ndim_upper;
+    g.upper_slots = new_upper_slots;
 
-    // output_slots and ndim_output remain unchanged from original graph
+    // lower_slots and ndim_lower remain unchanged from original graph
     // (transforms remap coordinates, they don't change the final output)
 
     // Inherit element_space_size unchanged
@@ -284,7 +284,7 @@ apply_transforms(const TransformGraph& graph,
  *  @return true if all transforms are bijective
  */
 template <TransformGraph G>
-constexpr bool is_graph_bijective()
+constexpr bool isGraphBijective()
 {
     for(index_t t = 0; t < G.num_transforms; ++t)
     {
@@ -294,80 +294,6 @@ constexpr bool is_graph_bijective()
         }
     }
     return true;
-}
-
-/** @brief Produce a reversed graph that maps output → input.
- *
- *  Given a graph G that maps user coordinates to a memory offset,
- *  reverse_graph<G>() produces a graph G' that maps a memory offset
- *  back to user coordinates.
- *
- *  The reversal works by:
- *    1. Reversing the transform array order
- *    2. Swapping each transform's input/output slots and dim counts
- *    3. Swapping transform types: Merge <-> Unmerge, Embed -> Merge
- *       (the inverse of a composition is a decomposition, and vice versa;
- *        the data — prefix products and magic constants — is identical)
- *    4. Swapping the graph's input/output endpoints
- *
- *  Then the normal map<G'>() traversal computes the inverse mapping.
- *
- *  Requires: all transforms must be bijective (checked at compile time).
- *
- *  @tparam G  The transform graph (NTTP)
- *  @return A new TransformGraph that computes the inverse mapping
- */
-template <TransformGraph G>
-constexpr TransformGraph reverse_graph()
-{
-    static_assert(is_graph_bijective<G>(), "reverse_graph: all transforms must be bijective");
-
-    TransformGraph r{};
-
-    r.num_transforms = G.num_transforms;
-    r.num_slots      = G.num_slots;
-
-    // Reverse transform order and swap input/output for each
-    for(index_t i = 0; i < G.num_transforms; ++i)
-    {
-        index_t src = G.num_transforms - 1 - i;
-
-        r.transforms[i] = G.transforms[src];
-
-        // Swap ndim_input <-> ndim_output
-        r.transforms[i].ndim_input  = G.transforms[src].ndim_output;
-        r.transforms[i].ndim_output = G.transforms[src].ndim_input;
-
-        // Swap transform types: the inverse operation
-        //   Merge (decompose 1->N) <-> Unmerge (compose N->1)
-        //   Embed (linear combination N->1) -> Merge (decompose 1->N)
-        //   PassThrough, Pad: unchanged (self-inverse)
-        switch(G.transforms[src].type)
-        {
-        case TransformType::MERGE: r.transforms[i].type = TransformType::UNMERGE; break;
-        case TransformType::UNMERGE: r.transforms[i].type = TransformType::MERGE; break;
-        case TransformType::EMBED: r.transforms[i].type = TransformType::MERGE; break;
-        default: break; // PassThrough, Pad, XOR: keep type
-        }
-
-        // Swap input/output slot wiring
-        r.t_input_slots[i]  = G.t_output_slots[src];
-        r.t_output_slots[i] = G.t_input_slots[src];
-    }
-
-    // Swap graph endpoints: old outputs become new inputs, and vice versa
-    r.ndim_input   = G.ndim_output;
-    r.ndim_output  = G.ndim_input;
-    r.input_slots  = G.output_slots;
-    r.output_slots = G.input_slots;
-
-    // Preserve metadata
-    r.element_space_size        = G.element_space_size;
-    r.guaranteed_vector_lengths = G.guaranteed_vector_lengths;
-    r.guaranteed_vector_strides = G.guaranteed_vector_strides;
-
-    canonicalize(r);
-    return r;
 }
 
 } // namespace ck_tile

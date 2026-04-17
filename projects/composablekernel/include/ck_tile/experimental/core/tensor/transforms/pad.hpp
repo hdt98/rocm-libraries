@@ -14,10 +14,10 @@ namespace ck_tile {
 /** @brief Padding transform: expands a dimension with boundary elements.
  *
  *  Definition:  1 dim (unpadded) --> 1 dim (padded, larger)
- *  Traversal:   1 input --> 1 output   (subtract left_pad to map into
+ *  Traversal:   1 upper --> 1 lower    (subtract left_pad to map into
  *                                       the unpadded coordinate space)
  *
- *  ndim_input  = 1, ndim_output = 1
+ *  ndim_upper  = 1, ndim_lower = 1
  *  lengths[0]      = unpadded dimension length
  *  coefficients[0] = left_pad amount
  *  coefficients[1] = right_pad amount
@@ -52,9 +52,9 @@ namespace ck_tile {
  *      mapIndices(5) = 3
  *
  *      Boundary check: input must be in [left_pad, left_pad + length).
- *        isValidInput(1) = false  (in left padding zone)
- *        isValidInput(5) = true   (maps to base index 3)
- *        isValidInput(13) = false (in right padding zone)
+ *        isValidUpper(1) = false  (in left padding zone)
+ *        isValidUpper(5) = true   (maps to base index 3)
+ *        isValidUpper(13) = false (in right padding zone)
  *
  *  skip_bounds_check: Set to true for halo regions where out-of-bounds
  *  access is intentional (the caller handles boundary conditions).
@@ -62,20 +62,27 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::PAD>
 {
-    /** @brief Map input to output by subtracting left_pad. */
+    /** @brief Forward: upper to lower by subtracting left_pad. */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
+    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
-        output[0] = input[0] - t.coefficients[0]; // subtract left_pad
+        lower[0] = upper[0] - t.coefficients[0]; // subtract left_pad
     }
 
-    /** @brief Check if input is within the valid (non-padded) range.
+    /** @brief Reverse: add left_pad back. */
+    static CK_TILE_HOST_DEVICE constexpr void
+    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
+    {
+        upper[0] = lower[0] + t.coefficients[0]; // add left_pad
+    }
+
+    /** @brief Check if upper index is within the valid (non-padded) range.
      *
      *  Valid range: [left_pad, left_pad + unpadded_length)
      *  Returns true unconditionally if skip_bounds_check is set.
      */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
-                                                           const index_t* input)
+    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
+                                                           const index_t* upper)
     {
         if(t.skip_bounds_check)
         {
@@ -83,12 +90,12 @@ struct TransformImpl<TransformType::PAD>
         }
         index_t left_pad      = t.coefficients[0];
         index_t padded_length = t.lengths[0] + t.coefficients[0] + t.coefficients[1];
-        return input[0] >= left_pad && input[0] < padded_length - t.coefficients[1];
+        return upper[0] >= left_pad && upper[0] < padded_length - t.coefficients[1];
     }
 
-    /** @brief Input dimension length = unpadded + left + right. */
-    static CK_TILE_HOST_DEVICE constexpr index_t input_length(const CoordinateTransform& t,
-                                                              index_t /*i*/)
+    /** @brief Upper dimension length = unpadded + left + right. */
+    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+                                                             index_t /*i*/)
     {
         return t.lengths[0] + t.coefficients[0] + t.coefficients[1];
     }

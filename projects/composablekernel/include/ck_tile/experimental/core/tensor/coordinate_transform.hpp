@@ -55,10 +55,10 @@ using DimIds = static_array<index_t, MAX_DIMS_PER_TRANSFORM>;
  *  | MODULO        | [0]=modulus              | [0]=dim_length           | --             |
  *
  *  Note on MERGE vs UNMERGE (direction matches v1's upper/lower convention):
- *  - MERGE: ndim_input=1 (user-facing merged value), ndim_output=N (memory-side components).
+ *  - MERGE: ndim_upper=1 (user-facing merged value), ndim_lower=N (memory-side components).
  *    During traversal: DECOMPOSES 1 merged value into N components via magic division.
  *    lengths = component sizes, coefficients = divisors, magic_divs = pre-computed constants.
- *  - UNMERGE: ndim_input=N (user-facing components), ndim_output=1 (memory-side flat value).
+ *  - UNMERGE: ndim_upper=N (user-facing components), ndim_lower=1 (memory-side flat value).
  *    During traversal: COMPOSES N components into 1 flat value via multiply-accumulate.
  *    lengths = component sizes, coefficients = strides (prefix products).
  *
@@ -67,9 +67,9 @@ using DimIds = static_array<index_t, MAX_DIMS_PER_TRANSFORM>;
  */
 struct CoordinateTransform
 {
-    TransformType type  = TransformType::UNDEFINED;
-    index_t ndim_input  = 0; ///< Number of input dimensions (consumed by this transform)
-    index_t ndim_output = 0; ///< Number of output dimensions (produced by this transform)
+    TransformType type = TransformType::UNDEFINED;
+    index_t ndim_upper = 0; ///< Dims on the user side (top of stack)
+    index_t ndim_lower = 0; ///< Dims on the memory side (bottom of stack)
 
     static_array<index_t, MAX_DIMS_PER_TRANSFORM> lengths{};
     static_array<index_t, MAX_DIMS_PER_TRANSFORM> coefficients{};

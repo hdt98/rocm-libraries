@@ -14,10 +14,10 @@ namespace ck_tile {
 /** @brief Split 1 base dim into N user-facing component dims.
  *
  *  Definition:  1 base dim --> N user dims   (split / expand / unflatten)
- *  Traversal:   N inputs --> 1 output        (COMPOSE via multiply-accumulate)
+ *  Traversal:   N upper --> 1 lower           (COMPOSE via multiply-accumulate)
  *
- *  ndim_input  = N   (receives N component values from above)
- *  ndim_output = 1   (sends 1 flat value below)
+ *  ndim_upper  = N   (receives N component values from above)
+ *  ndim_lower = 1   (sends 1 flat value below)
  *  lengths[0..N-1]      = component sizes
  *  coefficients[0..N-1] = strides (prefix products of subsequent lengths)
  *
@@ -65,28 +65,43 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::UNMERGE>
 {
-    /** @brief Compose N inputs into 1 output via multiply-accumulate.
+    /** @brief Compose N upper values into 1 lower value via multiply-accumulate.
      *
      *  Uses pre-computed strides (in coefficients[]) to flatten the
      *  multi-dimensional input into a single flat index.
      */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
+    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
-        output[0] = 0;
-        for(index_t d = 0; d < t.ndim_input; ++d)
+        lower[0] = 0;
+        for(index_t d = 0; d < t.ndim_upper; ++d)
         {
-            output[0] += input[d] * t.coefficients[d];
+            lower[0] += upper[d] * t.coefficients[d];
         }
     }
 
-    /** @brief Check all component input indices are within [0, length). */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
-                                                           const index_t* input)
+    /** @brief Reverse: decompose 1 flat value into N components (magic division). */
+    static CK_TILE_HOST_DEVICE constexpr void
+    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
-        for(index_t d = 0; d < t.ndim_input; ++d)
+        index_t remaining = lower[0];
+        for(index_t d = 0; d < t.ndim_upper - 1; ++d)
         {
-            if(input[d] < 0 || input[d] >= t.lengths[d])
+            index_t quotient =
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
+            upper[d] = quotient;
+            remaining -= quotient * t.coefficients[d];
+        }
+        upper[t.ndim_upper - 1] = remaining;
+    }
+
+    /** @brief Check all upper component indices are within [0, length). */
+    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
+                                                           const index_t* upper)
+    {
+        for(index_t d = 0; d < t.ndim_upper; ++d)
+        {
+            if(upper[d] < 0 || upper[d] >= t.lengths[d])
             {
                 return false;
             }
@@ -94,9 +109,9 @@ struct TransformImpl<TransformType::UNMERGE>
         return true;
     }
 
-    /** @brief Get the length of the i-th input (component) dimension. */
-    static CK_TILE_HOST_DEVICE constexpr index_t input_length(const CoordinateTransform& t,
-                                                              index_t i)
+    /** @brief Get the length of the i-th upper (component) dimension. */
+    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+                                                             index_t i)
     {
         return t.lengths[i];
     }

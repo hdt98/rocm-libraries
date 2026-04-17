@@ -25,7 +25,7 @@ namespace ck_tile {
 
 /** @brief Create a DimIds array with -1 padding for unused slots.
  *
- *  Convenience helper for specifying dimension index arrays in apply_transforms().
+ *  Convenience helper for specifying dimension index arrays in applyTransforms().
  *  Unused slots are set to -1 (sentinel value).
  *
  *  @param is  Dimension indices (variadic)
@@ -50,14 +50,14 @@ constexpr DimIds dims(Ts... is)
 
 /** @brief Create a PASS_THROUGH transform (identity mapping).
  *  @param dim_length  Length of the dimension
- *  @return CoordinateTransform with type = PASS_THROUGH, ndim_input = 1, ndim_output = 1
+ *  @return CoordinateTransform with type = PASS_THROUGH, ndim_upper = 1, ndim_lower = 1
  */
 constexpr CoordinateTransform make_pass_through(index_t dim_length)
 {
     CoordinateTransform t{};
     t.type         = TransformType::PASS_THROUGH;
-    t.ndim_input   = 1;
-    t.ndim_output  = 1;
+    t.ndim_upper   = 1;
+    t.ndim_lower   = 1;
     t.lengths[0]   = dim_length;
     t.is_bijective = true; // identity is always bijective
     return t;
@@ -69,14 +69,14 @@ constexpr CoordinateTransform make_pass_through(index_t dim_length)
  *  1 merged value from the user side and DECOMPOSES it into N component
  *  values toward memory using magic division.
  *
- *  ndim_input = 1 (user side: the single merged value)
- *  ndim_output = N (memory side: the N components)
+ *  ndim_upper = 1 (user side: the single merged value)
+ *  ndim_lower = N (memory side: the N components)
  *
  *  This matches v1's merge_v2_magic_division where NDimUp=1, NDimLow=N.
  *
  *  @tparam N  Number of component dimensions (deduced from array size)
  *  @param component_lengths  Sizes of each component dimension
- *  @return CoordinateTransform with type = MERGE, ndim_input = 1, ndim_output = N
+ *  @return CoordinateTransform with type = MERGE, ndim_upper = 1, ndim_lower = N
  *
  *  Example: make_merge({4, 8}) with input=19 → output = {2, 3} (19 = 2*8 + 3)
  */
@@ -88,9 +88,9 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
     static_assert(N >= 2, "make_merge: need at least 2 dims to merge");
 
     CoordinateTransform t{};
-    t.type        = TransformType::MERGE;
-    t.ndim_input  = 1; // user side: 1 merged value
-    t.ndim_output = N; // memory side: N component values
+    t.type       = TransformType::MERGE;
+    t.ndim_upper = 1; // user side: 1 merged value
+    t.ndim_lower = N; // memory side: N component values
 
     for(index_t i = 0; i < N; ++i)
     {
@@ -111,7 +111,7 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
     // Pre-compute magic division constants for decomposition at runtime.
     for(index_t i = 0; i < N - 1; ++i)
     {
-        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(t.coefficients[i]));
+        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(t.coefficients[i]));
     }
 
     t.is_bijective = true; // mixed-radix representation is always a bijection
@@ -125,14 +125,14 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
  *  N component values from the user side and COMPOSES them into 1 flat
  *  value toward memory using multiply-accumulate.
  *
- *  ndim_input = N (user side: the N component values)
- *  ndim_output = 1 (memory side: the single flat value)
+ *  ndim_upper = N (user side: the N component values)
+ *  ndim_lower = 1 (memory side: the single flat value)
  *
  *  This matches v1's unmerge where NDimUp=N, NDimLow=1.
  *
  *  @tparam N  Number of component dimensions (deduced from array size)
  *  @param component_lengths  Sizes of each component dimension
- *  @return CoordinateTransform with type = UNMERGE, ndim_input = N, ndim_output = 1
+ *  @return CoordinateTransform with type = UNMERGE, ndim_upper = N, ndim_lower = 1
  *
  *  Example: make_unmerge({4, 8}) with input={2, 3} → output = 2*8 + 3 = 19
  */
@@ -144,9 +144,9 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
     static_assert(N >= 2, "make_unmerge: need at least 2 dims to unmerge");
 
     CoordinateTransform t{};
-    t.type        = TransformType::UNMERGE;
-    t.ndim_input  = N; // user side: N component values
-    t.ndim_output = 1; // memory side: 1 flat value
+    t.type       = TransformType::UNMERGE;
+    t.ndim_upper = N; // user side: N component values
+    t.ndim_lower = 1; // memory side: 1 flat value
 
     for(index_t i = 0; i < N; ++i)
     {
@@ -166,7 +166,7 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
     // Divisors are the same prefix products stored in coefficients.
     for(index_t i = 0; i < N - 1; ++i)
     {
-        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(t.coefficients[i]));
+        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(t.coefficients[i]));
     }
 
     t.is_bijective = true; // mixed-radix representation is always a bijection
@@ -179,7 +179,7 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
  *  @tparam N  Number of input dimensions (deduced from array size)
  *  @param dim_lengths  Sizes of each input dimension
  *  @param strides      Coefficients for the linear combination
- *  @return CoordinateTransform with type = EMBED, ndim_input = N, ndim_output = 1
+ *  @return CoordinateTransform with type = EMBED, ndim_upper = N, ndim_lower = 1
  *
  *  Example: make_embed({128, 8}, {8, 1}) -> output = input[0]*8 + input[1]*1
  */
@@ -191,9 +191,9 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
                   "make_embed: too many dims (max MAX_DIMS_PER_TRANSFORM)");
 
     CoordinateTransform t{};
-    t.type        = TransformType::EMBED;
-    t.ndim_input  = N;
-    t.ndim_output = 1;
+    t.type       = TransformType::EMBED;
+    t.ndim_upper = N;
+    t.ndim_lower = 1;
 
     for(index_t i = 0; i < N; ++i)
     {
@@ -211,7 +211,7 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
         {
             t.is_bijective = false;
         }
-        t.magic_divs[i] = compute_magic_div(static_cast<uint32_t>(strides[i]));
+        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(strides[i]));
     }
 
     return t;
@@ -225,15 +225,15 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
  *  @param left_pad    Left padding amount (0 for right-only)
  *  @param right_pad   Right padding amount (0 for left-only)
  *  @param skip_check  If true, skip bounds validation (e.g., halo regions)
- *  @return CoordinateTransform with type = PAD, ndim_input = 1, ndim_output = 1
+ *  @return CoordinateTransform with type = PAD, ndim_upper = 1, ndim_lower = 1
  */
 constexpr CoordinateTransform
 make_pad(index_t dim_length, index_t left_pad, index_t right_pad, bool skip_check = false)
 {
     CoordinateTransform t{};
     t.type              = TransformType::PAD;
-    t.ndim_input        = 1;
-    t.ndim_output       = 1;
+    t.ndim_upper        = 1;
+    t.ndim_lower        = 1;
     t.lengths[0]        = dim_length;
     t.coefficients[0]   = left_pad;
     t.coefficients[1]   = right_pad;
@@ -255,14 +255,14 @@ constexpr CoordinateTransform make_right_pad(index_t dim_length, index_t pad_amo
 /** @brief Create an XOR transform for LDS bank conflict avoidance.
  *  @param length_0  Length of first dimension
  *  @param length_1  Length of second dimension
- *  @return CoordinateTransform with type = XOR, ndim_input = 2, ndim_output = 2
+ *  @return CoordinateTransform with type = XOR, ndim_upper = 2, ndim_lower = 2
  */
 constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 {
     CoordinateTransform t{};
     t.type         = TransformType::XOR;
-    t.ndim_input   = 2;
-    t.ndim_output  = 2;
+    t.ndim_upper   = 2;
+    t.ndim_lower   = 2;
     t.lengths[0]   = length_0;
     t.lengths[1]   = length_1;
     t.is_bijective = true; // XOR is its own inverse

@@ -17,9 +17,9 @@ namespace ck_tile {
  *  Definition:  N dims --> 1 dim   (weighted sum with strides)
  *  Traversal:   N dims --> 1 dim   (same --- Embed is always at the base)
  *
- *  ndim_input = N, ndim_output = 1
- *  lengths[0..N-1]      = size of each input dimension
- *  coefficients[0..N-1] = stride of each input dimension
+ *  ndim_upper = N, ndim_lower = 1
+ *  lengths[0..N-1]      = size of each upper dimension
+ *  coefficients[0..N-1] = stride of each upper dimension
  *
  *  Embed always sits at the BASE of the transform stack. It defines
  *  the physical memory layout. During traversal it runs FORWARD
@@ -58,24 +58,39 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::EMBED>
 {
-    /** @brief Compute output = sum(input[i] * coefficient[i]). */
+    /** @brief Forward: N upper dims to 1 lower offset via linear combination. */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
+    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
-        output[0] = 0;
-        for(index_t d = 0; d < t.ndim_input; ++d)
+        lower[0] = 0;
+        for(index_t d = 0; d < t.ndim_upper; ++d)
         {
-            output[0] += input[d] * t.coefficients[d];
+            lower[0] += upper[d] * t.coefficients[d];
         }
     }
 
-    /** @brief Check all input indices are within [0, length). */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
-                                                           const index_t* input)
+    /** @brief Reverse: decompose offset into N indices via magic division on strides. */
+    static CK_TILE_HOST_DEVICE constexpr void
+    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
-        for(index_t d = 0; d < t.ndim_input; ++d)
+        index_t remaining = lower[0];
+        for(index_t d = 0; d < t.ndim_upper - 1; ++d)
         {
-            if(input[d] < 0 || input[d] >= t.lengths[d])
+            index_t quotient =
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
+            upper[d] = quotient;
+            remaining -= quotient * t.coefficients[d];
+        }
+        upper[t.ndim_upper - 1] = remaining;
+    }
+
+    /** @brief Check all upper indices are within [0, length). */
+    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
+                                                           const index_t* upper)
+    {
+        for(index_t d = 0; d < t.ndim_upper; ++d)
+        {
+            if(upper[d] < 0 || upper[d] >= t.lengths[d])
             {
                 return false;
             }
@@ -83,9 +98,9 @@ struct TransformImpl<TransformType::EMBED>
         return true;
     }
 
-    /** @brief Get the length of the i-th input dimension. */
-    static CK_TILE_HOST_DEVICE constexpr index_t input_length(const CoordinateTransform& t,
-                                                              index_t i)
+    /** @brief Get the length of the i-th upper dimension. */
+    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+                                                             index_t i)
     {
         return t.lengths[i];
     }

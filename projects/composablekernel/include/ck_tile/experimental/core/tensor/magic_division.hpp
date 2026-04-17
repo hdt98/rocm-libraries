@@ -25,7 +25,7 @@ namespace ck_tile {
 /** @brief Pre-computed magic division constants for one divisor.
  *
  *  Structural type (aggregate, defaulted ==) — safe for use in NTTPs.
- *  Compute via compute_magic_div(). Execute via do_magic_div().
+ *  Compute via computeMagicDiv(). Execute via doMagicDiv().
  */
 struct MagicDivConstants
 {
@@ -38,11 +38,11 @@ struct MagicDivConstants
 /** @brief Compute magic division constants for a given divisor at compile time.
  *
  *  @param divisor  The divisor (must be >= 1 and <= INT32_MAX)
- *  @return Pre-computed multiplier and shift for use with do_magic_div()
+ *  @return Pre-computed multiplier and shift for use with doMagicDiv()
  *
  *  @pre divisor >= 1 && divisor <= INT32_MAX
  */
-constexpr MagicDivConstants compute_magic_div(uint32_t divisor)
+constexpr MagicDivConstants computeMagicDiv(uint32_t divisor)
 {
     uint32_t shift_val = 0;
 
@@ -64,10 +64,10 @@ constexpr MagicDivConstants compute_magic_div(uint32_t divisor)
  *  In constexpr context, uses portable 64-bit arithmetic.
  *
  *  @param dividend  The value to divide (must be non-negative)
- *  @param md        Pre-computed magic constants from compute_magic_div()
+ *  @param md        Pre-computed magic constants from computeMagicDiv()
  *  @return dividend / original_divisor
  */
-CK_TILE_HOST_DEVICE constexpr uint32_t do_magic_div(uint32_t dividend, MagicDivConstants md)
+CK_TILE_HOST_DEVICE constexpr uint32_t doMagicDiv(uint32_t dividend, MagicDivConstants md)
 {
 #ifdef __HIP_DEVICE_COMPILE__
     if(!__builtin_is_constant_evaluated())

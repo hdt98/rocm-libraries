@@ -14,10 +14,10 @@ namespace ck_tile {
 /** @brief Combine N component dims into 1 user-facing dim.
  *
  *  Definition:  N base dims --> 1 user dim   (flatten / combine)
- *  Traversal:   1 input --> N outputs        (DECOMPOSE via magic division)
+ *  Traversal:   1 upper --> N lower           (DECOMPOSE via magic division)
  *
- *  ndim_input  = 1   (receives 1 merged value from above)
- *  ndim_output = N   (sends N component values below)
+ *  ndim_upper  = 1   (receives 1 merged value from above)
+ *  ndim_lower = N   (sends N component values below)
  *  lengths[0..N-1]      = component sizes
  *  coefficients[0..N-2] = divisors (product of subsequent lengths)
  *  magic_divs[0..N-2]   = pre-computed magic division constants
@@ -67,46 +67,57 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::MERGE>
 {
-    /** @brief Decompose 1 input into N outputs via magic division.
+    /** @brief Decompose 1 upper value into N lower values via magic division.
      *
      *  Iterates from most significant component (d=0) to least significant.
      *  Uses pre-computed magic_divs for quotients and coefficients (divisors)
      *  for remainder computation.
      */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
+    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
-        index_t remaining = input[0];
+        index_t remaining = upper[0];
 
-        for(index_t d = 0; d < t.ndim_output - 1; ++d)
+        for(index_t d = 0; d < t.ndim_lower - 1; ++d)
         {
-            index_t quotient = static_cast<index_t>(
-                do_magic_div(static_cast<uint32_t>(remaining), t.magic_divs[d]));
-            output[d] = quotient;
+            index_t quotient =
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
+            lower[d] = quotient;
             remaining -= quotient * t.coefficients[d]; // coefficients[d] = divisor
         }
 
-        output[t.ndim_output - 1] = remaining;
+        lower[t.ndim_lower - 1] = remaining;
     }
 
-    /** @brief Check the merged input index is within [0, product_of_lengths). */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
-                                                           const index_t* input)
+    /** @brief Reverse: compose N components into 1 flat value (multiply-accumulate). */
+    static CK_TILE_HOST_DEVICE constexpr void
+    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
+    {
+        upper[0] = 0;
+        for(index_t d = 0; d < t.ndim_lower; ++d)
+        {
+            upper[0] += lower[d] * t.coefficients[d];
+        }
+    }
+
+    /** @brief Check the merged upper index is within [0, product_of_lengths). */
+    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
+                                                           const index_t* upper)
     {
         index_t product = 1;
-        for(index_t d = 0; d < t.ndim_output; ++d)
+        for(index_t d = 0; d < t.ndim_lower; ++d)
         {
             product *= t.lengths[d];
         }
-        return input[0] >= 0 && input[0] < product;
+        return upper[0] >= 0 && upper[0] < product;
     }
 
-    /** @brief Input dimension length = product of all component lengths. */
-    static CK_TILE_HOST_DEVICE constexpr index_t input_length(const CoordinateTransform& t,
-                                                              index_t /*i*/)
+    /** @brief Upper dimension length = product of all component lengths. */
+    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+                                                             index_t /*i*/)
     {
         index_t product = 1;
-        for(index_t d = 0; d < t.ndim_output; ++d)
+        for(index_t d = 0; d < t.ndim_lower; ++d)
         {
             product *= t.lengths[d];
         }
