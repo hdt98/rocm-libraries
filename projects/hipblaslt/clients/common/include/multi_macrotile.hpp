@@ -28,6 +28,24 @@
 
 #include <hipblaslt/hipblaslt.h>
 #include <vector>
+
+// Forward declaration of Origami optimization function
+// The actual implementation will be available when multi_macrotile_origami_improved.hpp is included later
+std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
+    hipblasLtHandle_t handle,
+    int64_t total_size,
+    int num_splits,
+    int macrotile_size,
+    int64_t other_dim,
+    int64_t K,
+    bool is_m_split,
+    hipblasOperation_t transA,
+    hipblasOperation_t transB,
+    hipDataType a_type,
+    hipDataType b_type,
+    hipDataType c_type,
+    hipDataType d_type,
+    hipblasComputeType_t compute_type);
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
@@ -926,7 +944,9 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
     int macrotile_n = 128,
     int num_CUs = 256,            // MI355X has 256 CUs
     size_t available_memory = 512ULL * 1024 * 1024,  // 512 MiB default
-    size_t workspace_size = 128ULL * 1024 * 1024)
+    size_t workspace_size = 128ULL * 1024 * 1024,
+    hipblasLtHandle_t handle = nullptr,  // Optional handle for Origami optimization
+    hipblasComputeType_t compute_type = HIPBLAS_COMPUTE_32F)  // Compute type for Origami
 {
     std::vector<GemmSubProblem> subProblems;
 
@@ -1100,10 +1120,19 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         }
         else if(strat == SplitStrategy::OrigamiOptimizedM)
         {
-            // Origami optimization requires handle - use heuristic here
-            // Actual Origami query will happen in timing path
-            m_split_sizes = computeOrigamiOptimizedSplits(M, num_splits, macrotile_m,
-                                                          N, K, true);
+            // Origami optimization - use WithHandle version if handle available
+            if (handle != nullptr)
+            {
+                m_split_sizes = computeOrigamiOptimizedSplitsWithHandle(
+                    handle, M, num_splits, macrotile_m, N, K, true,
+                    transA, transB, a_type, b_type, c_type, d_type, compute_type);
+            }
+            else
+            {
+                // Fallback to heuristic version if no handle
+                m_split_sizes = computeOrigamiOptimizedSplits(M, num_splits, macrotile_m,
+                                                              N, K, true);
+            }
             use_intelligent_splits = true;
         }
     }
@@ -1144,10 +1173,19 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         }
         else if(strat == SplitStrategy::OrigamiOptimizedN)
         {
-            // Origami optimization requires handle - use heuristic here
-            // Actual Origami query will happen in timing path
-            n_split_sizes = computeOrigamiOptimizedSplits(N, num_splits, macrotile_n,
-                                                          M, K, false);
+            // Origami optimization - use WithHandle version if handle available
+            if (handle != nullptr)
+            {
+                n_split_sizes = computeOrigamiOptimizedSplitsWithHandle(
+                    handle, N, num_splits, macrotile_n, M, K, false,
+                    transA, transB, a_type, b_type, c_type, d_type, compute_type);
+            }
+            else
+            {
+                // Fallback to heuristic version if no handle
+                n_split_sizes = computeOrigamiOptimizedSplits(N, num_splits, macrotile_n,
+                                                              M, K, false);
+            }
             use_intelligent_splits = true;
         }
     }

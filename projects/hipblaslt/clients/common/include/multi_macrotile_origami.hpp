@@ -15,9 +15,20 @@
 #include <limits>
 #include <iostream>
 #include <regex>
+
+// Origami headers - check if available
+#if __has_include(<origami/gemm.hpp>)
 #include <origami/gemm.hpp>
 #include <origami/hardware.hpp>
 #include <origami/types.hpp>
+#define HAVE_ORIGAMI_HEADERS 1
+#else
+#warning "Origami headers not found - using fallback estimation"
+#define HAVE_ORIGAMI_HEADERS 0
+#endif
+
+// Note: Improved version with all optimizations is in multi_macrotile_origami_improved.hpp
+// and is automatically used when available
 
 // Structure to hold per-solution performance estimates
 struct OrigamiSolutionInfo
@@ -69,6 +80,7 @@ inline bool parseMacroTileFromSolutionName(const std::string& solution_name,
     return false;
 }
 
+#if HAVE_ORIGAMI_HEADERS
 /**
  * @brief Convert hipblasDatatype_t to origami::data_type_t
  */
@@ -115,6 +127,7 @@ inline origami::problem_t createOrigamiProblem(int64_t M, int64_t N, int64_t K,
     problem.mi_dtype = hipblasltTypeToOrigamiType(compute_type);
     return problem;
 }
+#endif // HAVE_ORIGAMI_HEADERS
 
 /**
  * @brief Query all available solutions for a given sub-problem
@@ -178,7 +191,10 @@ inline std::vector<OrigamiSolutionInfo> queryAllSolutionsForSubProblem(
 
             // Try to extract MacroTile configuration and use Origami for latency estimation
             size_t mt_m, mt_n, mt_k;
-            if (parseMacroTileFromSolutionName(info.solution_name, mt_m, mt_n, mt_k))
+            bool parsed_mt = parseMacroTileFromSolutionName(info.solution_name, mt_m, mt_n, mt_k);
+
+#if HAVE_ORIGAMI_HEADERS
+            if (parsed_mt)
             {
                 try {
                     // Create Origami problem and config
@@ -217,11 +233,32 @@ inline std::vector<OrigamiSolutionInfo> queryAllSolutionsForSubProblem(
                 }
             }
             else
+#endif
             {
-                // Fall back to wavesCount-based estimation if cannot parse MacroTile
-                double peak_gflops = 1400.0 * 1024.0;  // Peak in GFLOPS
-                double utilization_factor = std::min(1.0, (double)heuristic.wavesCount);
-                info.estimated_gflops = peak_gflops * utilization_factor * 0.5;
+                // Fall back to size-based estimation if cannot parse MacroTile or no Origami
+                // wavesCount is not reliable from getAllAlgos (only filled after actual execution)
+                // Use a simple roofline model based on problem size
+                double ops = 2.0 * M * N * K;  // FLOPs for GEMM
+                double peak_gflops = 1400.0 * 1024.0;  // Peak compute in GFLOPS
+
+                // Estimate based on problem size relative to GPU capacity
+                // Small problems: memory-bound, medium: balanced, large: compute-bound
+                double problem_size_mb = (M * N + M * K + N * K) * 2.0 / (1024.0 * 1024.0);  // Approx memory footprint in MB
+                double memory_bw_gbs = 3000.0;  // MI355X memory bandwidth ~3 TB/s
+                double memory_bound_gflops = (memory_bw_gbs * 1024.0) / 2.0;  // Rough estimate
+
+                // Use min of compute and memory bounds
+                double achievable_gflops = std::min(peak_gflops * 0.7, memory_bound_gflops);  // 70% peak efficiency
+
+                // Adjust based on MacroTile size (if parsed)
+                if (parsed_mt) {
+                    // Larger MacroTiles tend to be more efficient
+                    double mt_size = mt_m * mt_n;
+                    double mt_factor = std::min(1.0, mt_size / (256.0 * 256.0));  // Normalize to 256x256
+                    achievable_gflops *= (0.5 + 0.5 * mt_factor);  // 50%-100% based on MT size
+                }
+
+                info.estimated_gflops = achievable_gflops;
                 info.estimated_latency_cycles = 0.0;  // Unknown
             }
 
@@ -406,10 +443,27 @@ next_ratio:
     return best_config;
 }
 
-/**
- * @brief Wrapper function compatible with existing split API
- * Returns just the split sizes (solutions are stored separately)
- */
+// Forward declaration - implementation in multi_macrotile_origami_improved.hpp if included,
+// otherwise fallback implementation below
+inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
+    hipblasLtHandle_t handle,
+    int64_t total_size,
+    int num_splits,
+    int macrotile_size,
+    int64_t other_dim,
+    int64_t K,
+    bool is_m_split,
+    hipblasOperation_t transA,
+    hipblasOperation_t transB,
+    hipDataType a_type,
+    hipDataType b_type,
+    hipDataType c_type,
+    hipDataType d_type,
+    hipblasComputeType_t compute_type);
+
+// Original (fallback) implementation - only defined if improved version not included
+#ifndef MULTI_MACROTILE_ORIGAMI_IMPROVED_HPP
+
 inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasLtHandle_t handle,
     int64_t total_size,
@@ -426,6 +480,7 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipDataType d_type,
     hipblasComputeType_t compute_type)
 {
+    // Original version (used when improved version is not included)
     auto config = findOptimalOrigamiSplit(
         handle, total_size, other_dim, K,
         num_splits, macrotile_size, is_m_split,
@@ -453,3 +508,5 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
         return uniform;
     }
 }
+
+#endif // !MULTI_MACROTILE_ORIGAMI_IMPROVED_HPP

@@ -40,6 +40,7 @@
 #include "hipblaslt_vector.hpp"
 #include "mxDataGen.hpp"
 #include "multi_macrotile.hpp"
+#include "multi_macrotile_origami_improved.hpp"  // Enable improved Origami optimization
 // Fused host header only needed for host code, not device
 #if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
 #include "multi_macrotile_fused_host.hpp"
@@ -4745,7 +4746,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                 macrotile_n,
                 num_CUs,
                 512ULL * 1024 * 1024,  // available_memory
-                workspace_size
+                workspace_size,
+                handle,  // Pass handle for Origami optimization
+                arg.compute_type  // Pass compute type for Origami
             );
 
             const char* strategy_names[] = {
