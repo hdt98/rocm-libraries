@@ -68,7 +68,9 @@ enum class SplitStrategy
     CacheOptimizedM = 15,  // Cache-optimized M-split (uneven split when B fits in L2)
     CacheOptimizedN = 16,  // Cache-optimized N-split (uneven split when A fits in L2)
     OrigamiOptimizedM = 17, // Origami-optimized M-split (query all solutions, minimize total latency)
-    OrigamiOptimizedN = 18  // Origami-optimized N-split (query all solutions, minimize total latency)
+    OrigamiOptimizedN = 18, // Origami-optimized N-split (query all solutions, minimize total latency)
+    KAwareM = 19,           // K-dimension aware M-split (optimizes sub-A L2 cache residency)
+    KAwareN = 20            // K-dimension aware N-split (optimizes sub-B L2 cache residency)
 };
 
 // Structure to describe a sub-problem for multi-MacroTile GEMM
@@ -225,31 +227,24 @@ inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K, size_t elem_size 
 }
 
 // Automatic num_splits selection based on problem size
-inline int autoSelectNumSplits(int64_t M, int64_t N, int64_t K, int num_CUs = 256)
+// Benchmarks overwhelmingly show 2 splits is optimal for sequential execution.
+// 4+ splits only makes sense with stream-parallel where they run concurrently.
+inline int autoSelectNumSplits(int64_t M, int64_t N, int64_t K,
+                                int num_CUs = 256,
+                                bool stream_parallel = false)
 {
     int total_wgs = estimateWorkgroupsSimple(M, N);
 
-    // Target: 80-120 workgroups per sub-problem for good occupancy
     if (total_wgs < 200)
-    {
-        return 1; // Too small for splitting
-    }
-    else if (total_wgs < 400)
-    {
-        return 2; // 2-way split
-    }
-    else if (total_wgs < 800)
-    {
-        return 4; // 4-way split
-    }
-    else if (total_wgs < 1600)
-    {
-        return 8; // 8-way split
-    }
-    else
-    {
-        return 8; // Cap at 8-way (diminishing returns beyond this)
-    }
+        return 1;
+
+    if (!stream_parallel)
+        return 2; // Sequential: 2 is almost always best (overhead kills 4+)
+
+    // Stream-parallel: can handle more splits since they run concurrently
+    if (total_wgs >= 1600)
+        return 4;
+    return 2;
 }
 
 // Check if multi-MacroTile should be used for this problem
@@ -293,8 +288,20 @@ inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K, int split_s
     {
         if (!isPowerOf2(M) || !isPowerOf2(N))
         {
-            // Power-of-2 strategy can create imbalanced splits
-            // Only allow if dimensions are reasonably close to power-of-2
+            // Check if the resulting splits would create power-of-2 sub-problems
+            // e.g. 12288 -> [8192, 4096] (both pow2!) is great even though 12288 isn't pow2
+            auto test_splits = computePowerOf2Splits(M, 2);
+            bool splits_are_pow2 = true;
+            for (auto s : test_splits)
+            {
+                if (!isPowerOf2(s))
+                    splits_are_pow2 = false;
+            }
+
+            if (splits_are_pow2)
+                return true; // Splits create clean pow2 sub-problems
+
+            // Otherwise, only allow if dimensions are reasonably close to power-of-2
             int64_t m_rounded = roundToPowerOf2(M);
             int64_t n_rounded = roundToPowerOf2(N);
 
@@ -303,12 +310,12 @@ inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K, int split_s
 
             if (m_deviation > 0.15 || n_deviation > 0.15)
             {
-                return false; // Too far from power-of-2, would create bad splits
+                return false;
             }
         }
     }
 
-    return true; // Safe to use multi-MacroTile
+    return true;
 }
 
 // Calculate data type size in bytes
@@ -884,6 +891,31 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplits(
     }
 }
 
+// K-aware splitting: choose split sizes so each sub-A (or sub-B) tile has good L2 residency
+inline std::vector<int64_t> computeKAwareSplits(int64_t total_size,
+                                                 int num_splits,
+                                                 int macrotile_size,
+                                                 int64_t K,
+                                                 size_t elem_size,
+                                                 bool is_m_split)
+{
+    const size_t L2_SIZE = 96 * 1024 * 1024; // 96 MB on MI355X
+
+    // For M-split: each sub-problem accesses A_sub[M/P × K] and full B[K×N].
+    // Want each A_sub to occupy ~1/3 of L2 so B panels can coexist.
+    size_t target_sub_matrix_bytes = L2_SIZE / 3;
+    int64_t ideal_dim_per_split = target_sub_matrix_bytes / (K * elem_size);
+
+    // Round to macrotile boundary
+    ideal_dim_per_split = (ideal_dim_per_split / macrotile_size) * macrotile_size;
+    ideal_dim_per_split = std::max(ideal_dim_per_split, (int64_t)macrotile_size);
+
+    int ideal_splits = (total_size + ideal_dim_per_split - 1) / ideal_dim_per_split;
+    ideal_splits = std::max(2, std::min(ideal_splits, num_splits));
+
+    return computeMacroTileAlignedSplits(total_size, ideal_splits, macrotile_size);
+}
+
 // Performance-based splitting: Would require heuristic queries (placeholder for now)
 // This is complex as it needs hipblasLtMatmulAlgoGetHeuristic calls
 // We'll implement a simplified version based on known good sizes
@@ -928,6 +960,29 @@ inline std::vector<int64_t> computePerformanceSplits(int64_t total_size, int num
 
     return sizes;
 }
+
+// Structure to hold pre-created sub-problem context for the hot loop
+struct SubProblemContext
+{
+    hipblasLtMatrixLayout_t matA;
+    hipblasLtMatrixLayout_t matB;
+    hipblasLtMatrixLayout_t matC;
+    hipblasLtMatrixLayout_t matD;
+    hipblasLtMatmulAlgo_t   algo;
+    void* A_ptr;
+    void* B_ptr;
+    void* C_ptr;
+    void* D_ptr;
+    bool valid; // heuristic returned a result
+};
+
+// Candidate result for micro-benchmark strategy selection
+struct MicroBenchCandidate
+{
+    int strategy;
+    int num_splits;
+    double avg_time_us;
+};
 
 // Main splitting function with intelligent strategy selection
 inline std::vector<GemmSubProblem> splitGemmProblem(
@@ -1049,6 +1104,16 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             split_along_m = false;
             split_along_n = true;
             break;
+        case SplitStrategy::KAwareM:
+            num_splits = 2;
+            split_along_m = true;
+            split_along_n = false;
+            break;
+        case SplitStrategy::KAwareN:
+            num_splits = 2;
+            split_along_m = false;
+            split_along_n = true;
+            break;
         }
     }
 
@@ -1120,7 +1185,6 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         }
         else if(strat == SplitStrategy::OrigamiOptimizedM)
         {
-            // Origami optimization - use WithHandle version if handle available
             if (handle != nullptr)
             {
                 m_split_sizes = computeOrigamiOptimizedSplitsWithHandle(
@@ -1129,10 +1193,15 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             }
             else
             {
-                // Fallback to heuristic version if no handle
                 m_split_sizes = computeOrigamiOptimizedSplits(M, num_splits, macrotile_m,
                                                               N, K, true);
             }
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::KAwareM)
+        {
+            size_t elem_size = getDataTypeSize(a_type);
+            m_split_sizes = computeKAwareSplits(M, num_splits, macrotile_m, K, elem_size, true);
             use_intelligent_splits = true;
         }
     }
@@ -1173,7 +1242,6 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         }
         else if(strat == SplitStrategy::OrigamiOptimizedN)
         {
-            // Origami optimization - use WithHandle version if handle available
             if (handle != nullptr)
             {
                 n_split_sizes = computeOrigamiOptimizedSplitsWithHandle(
@@ -1182,10 +1250,15 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             }
             else
             {
-                // Fallback to heuristic version if no handle
                 n_split_sizes = computeOrigamiOptimizedSplits(N, num_splits, macrotile_n,
                                                               M, K, false);
             }
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::KAwareN)
+        {
+            size_t elem_size = getDataTypeSize(b_type);
+            n_split_sizes = computeKAwareSplits(N, num_splits, macrotile_n, K, elem_size, false);
             use_intelligent_splits = true;
         }
     }

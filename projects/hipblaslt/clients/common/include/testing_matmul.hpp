@@ -4016,43 +4016,58 @@ void testing_matmul_with_bias(const Arguments& arg,
                         std::vector<std::string> subproblem_kernel_names(subProblems.size());
                         std::vector<int> subproblem_solution_indices(subProblems.size(), -1);
 
-                        for(int warmup = 0; warmup < warmup_iters; warmup++)
+                        // === OPT 1: Pre-create all layouts and cache heuristics ONCE ===
+                        std::vector<SubProblemContext> spCtxs(subProblems.size());
+                        for(size_t sp = 0; sp < subProblems.size(); sp++)
                         {
-                            for(size_t sp = 0; sp < subProblems.size(); sp++)
+                            const auto& sub = subProblems[sp];
+                            auto& ctx = spCtxs[sp];
+
+                            int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                            int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                            hipblasLtMatrixLayoutCreate(&ctx.matA, arg.a_type, matA_rows, matA_cols, lda[0]);
+                            int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                            int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                            hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                            hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                            hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                            hipblasLtMatmulHeuristicResult_t heur_tmp;
+                            int ret_tmp = 0;
+                            hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
+                            ctx.valid = (ret_tmp > 0);
+                            if(ctx.valid)
+                                ctx.algo = heur_tmp.algo;
+
+                            ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                            ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                            ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                            ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+                        }
+
+                        // === OPT 5: Concurrent warmup on separate streams ===
+                        {
+                            std::vector<hipStream_t> warmup_streams(subProblems.size());
+                            for(size_t i = 0; i < warmup_streams.size(); i++)
+                                hipStreamCreate(&warmup_streams[i]);
+
+                            for(int warmup = 0; warmup < warmup_iters; warmup++)
                             {
-                                const auto& sub = subProblems[sp];
-
-                                // Create temp matrix layouts
-                                hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
-                                int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                                int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                                hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
-                                int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                                int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                                hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
-                                hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                                hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                                // Query heuristic
-                                hipblasLtMatmulHeuristicResult_t heur_tmp;
-                                int ret_tmp = 0;
-                                hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
-
-                                if(ret_tmp > 0)
+                                for(size_t sp = 0; sp < subProblems.size(); sp++)
                                 {
-                                    void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                                    void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                                    void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                                    void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-
-                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                                   &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                                    if(!spCtxs[sp].valid) continue;
+                                    auto& ctx = spCtxs[sp];
+                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                                   ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                                   &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
+                                                   &ctx.algo, *dWorkspace, workspace_size,
+                                                   warmup_streams[sp % warmup_streams.size()]);
                                 }
-
-                                hipblasLtMatrixLayoutDestroy(matA_tmp);
-                                hipblasLtMatrixLayoutDestroy(matB_tmp);
-                                hipblasLtMatrixLayoutDestroy(matC_tmp);
-                                hipblasLtMatrixLayoutDestroy(matD_tmp);
+                            }
+                            for(size_t i = 0; i < warmup_streams.size(); i++)
+                            {
+                                hipStreamSynchronize(warmup_streams[i]);
+                                hipStreamDestroy(warmup_streams[i]);
                             }
                         }
                         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -4246,112 +4261,99 @@ void testing_matmul_with_bias(const Arguments& arg,
                         if(!used_fused_dispatch && arg.stream_parallel && subProblems.size() > 1)
                         {
                             hipblaslt_cout << "\n=== Stream-Parallel Multi-MacroTile ===" << std::endl;
-                            hipblaslt_cout << "Creating " << subProblems.size() << " HIP streams for concurrent execution" << std::endl;
 
-                            // Create one stream per sub-problem
-                            std::vector<hipStream_t> streams(subProblems.size());
-                            for(size_t i = 0; i < streams.size(); i++)
+                            size_t num_streams = subProblems.size();
+
+                            // === OPT 2: CU-mask partitioned streams ===
+                            // Partition CUs so each stream owns its own slice of the GPU,
+                            // eliminating resource contention.
+                            std::vector<hipStream_t> streams(num_streams);
+                            bool cu_mask_ok = true;
+
+                            hipDeviceProp_t devProp;
+                            hipGetDeviceProperties(&devProp, 0);
+                            int total_CUs = devProp.multiProcessorCount;
+                            int cus_per_stream = total_CUs / (int)num_streams;
+
+                            for(size_t i = 0; i < num_streams; i++)
                             {
-                                hipError_t err = hipStreamCreate(&streams[i]);
+                                // Build a CU mask: each uint32_t covers 32 CUs
+                                int cu_start = (int)i * cus_per_stream;
+                                int cu_end   = (i == num_streams - 1) ? total_CUs : cu_start + cus_per_stream;
+                                int mask_words = (total_CUs + 31) / 32;
+                                std::vector<uint32_t> cu_mask(mask_words, 0);
+
+                                for(int cu = cu_start; cu < cu_end; cu++)
+                                    cu_mask[cu / 32] |= (1u << (cu % 32));
+
+                                hipError_t err = hipExtStreamCreateWithCUMask(&streams[i], mask_words, cu_mask.data());
                                 if(err != hipSuccess)
                                 {
-                                    hipblaslt_cout << "ERROR: Failed to create stream " << i
-                                                   << ", falling back to sequential" << std::endl;
-                                    // Clean up already created streams
-                                    for(size_t j = 0; j < i; j++)
-                                        hipStreamDestroy(streams[j]);
-                                    goto sequential_fallback;
+                                    cu_mask_ok = false;
+                                    // Fall back to plain streams for remaining
+                                    for(size_t j = 0; j <= i; j++)
+                                    {
+                                        if(j < i) hipStreamDestroy(streams[j]);
+                                    }
+                                    break;
                                 }
                             }
 
-                            hipblaslt_cout << "Launching all sub-problems concurrently..." << std::endl;
-
-                            // Pre-create matrix layouts and query algorithms for all sub-problems
-                            std::vector<hipblasLtMatrixLayout_t> matA_layouts(subProblems.size());
-                            std::vector<hipblasLtMatrixLayout_t> matB_layouts(subProblems.size());
-                            std::vector<hipblasLtMatrixLayout_t> matC_layouts(subProblems.size());
-                            std::vector<hipblasLtMatrixLayout_t> matD_layouts(subProblems.size());
-                            std::vector<hipblasLtMatmulAlgo_t> algos(subProblems.size());
-
-                            for(size_t sp = 0; sp < subProblems.size(); sp++)
+                            if(!cu_mask_ok)
                             {
-                                const auto& sub = subProblems[sp];
-
-                                // Create matrix layouts
-                                int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                                int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                                hipblasLtMatrixLayoutCreate(&matA_layouts[sp], arg.a_type, matA_rows, matA_cols, lda[0]);
-
-                                int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                                int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                                hipblasLtMatrixLayoutCreate(&matB_layouts[sp], arg.b_type, matB_rows, matB_cols, ldb[0]);
-
-                                hipblasLtMatrixLayoutCreate(&matC_layouts[sp], arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                                hipblasLtMatrixLayoutCreate(&matD_layouts[sp], arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                                // Query heuristic once
-                                hipblasLtMatmulHeuristicResult_t heur_tmp;
-                                int ret_tmp = 0;
-                                hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0],
-                                                               matA_layouts[sp], matB_layouts[sp],
-                                                               matC_layouts[sp], matD_layouts[sp],
-                                                               pref, 1, &heur_tmp, &ret_tmp);
-
-                                if(ret_tmp > 0)
+                                hipblaslt_cout << "  CU-mask streams unavailable, using standard streams" << std::endl;
+                                for(size_t i = 0; i < num_streams; i++)
                                 {
-                                    algos[sp] = heur_tmp.algo;
+                                    hipError_t err = hipStreamCreate(&streams[i]);
+                                    if(err != hipSuccess)
+                                    {
+                                        for(size_t j = 0; j < i; j++) hipStreamDestroy(streams[j]);
+                                        goto sequential_fallback;
+                                    }
                                 }
                             }
+                            else
+                            {
+                                hipblaslt_cout << "  CU-mask partitioning: " << cus_per_stream << " CUs per stream" << std::endl;
+                            }
 
-                            // Timing loop with stream-parallel execution
+                            hipblaslt_cout << "  Creating " << num_streams << " HIP streams for concurrent execution" << std::endl;
+
+                            // === OPT 3: Separate workspace per stream ===
+                            size_t per_stream_ws_size = workspace_size / num_streams;
+                            // Align each region to 256 bytes
+                            per_stream_ws_size = (per_stream_ws_size / 256) * 256;
+
+                            // Reuse pre-created contexts from OPT 1
+                            // Timing loop
                             start_time = std::chrono::high_resolution_clock::now();
 
                             for(int iter = 0; iter < timing_iters; iter++)
                             {
-                                // Launch ALL sub-problems on their respective streams
-                                // They will execute concurrently on the GPU!
                                 for(size_t sp = 0; sp < subProblems.size(); sp++)
                                 {
-                                    const auto& sub = subProblems[sp];
+                                    if(!spCtxs[sp].valid) continue;
+                                    auto& ctx = spCtxs[sp];
 
-                                    void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                                    void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                                    void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                                    void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+                                    void* sub_workspace = static_cast<char*>(*dWorkspace) + sp * per_stream_ws_size;
 
-                                    // Launch on dedicated stream - doesn't wait for others!
                                     hipblasLtMatmul(handle, matmul[0][0],
-                                                   alpha_in[0], A_ptr, matA_layouts[sp],
-                                                   B_ptr, matB_layouts[sp],
-                                                   &(h_beta[0]), C_ptr, matC_layouts[sp],
-                                                   D_ptr, matD_layouts[sp],
-                                                   &algos[sp], *dWorkspace, workspace_size,
-                                                   streams[sp]);  // ← Different stream per sub-problem!
+                                                   alpha_in[0], ctx.A_ptr, ctx.matA,
+                                                   ctx.B_ptr, ctx.matB,
+                                                   &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                                   ctx.D_ptr, ctx.matD,
+                                                   &ctx.algo, sub_workspace, per_stream_ws_size,
+                                                   streams[sp]);
                                 }
 
-                                // Synchronize ALL streams (wait for all sub-problems to finish)
                                 for(size_t i = 0; i < streams.size(); i++)
-                                {
                                     CHECK_HIP_ERROR(hipStreamSynchronize(streams[i]));
-                                }
                             }
 
                             auto end_time = std::chrono::high_resolution_clock::now();
 
-                            // Cleanup matrix layouts
-                            for(size_t sp = 0; sp < subProblems.size(); sp++)
-                            {
-                                hipblasLtMatrixLayoutDestroy(matA_layouts[sp]);
-                                hipblasLtMatrixLayoutDestroy(matB_layouts[sp]);
-                                hipblasLtMatrixLayoutDestroy(matC_layouts[sp]);
-                                hipblasLtMatrixLayoutDestroy(matD_layouts[sp]);
-                            }
-
-                            // Cleanup streams
                             for(size_t i = 0; i < streams.size(); i++)
-                            {
                                 hipStreamDestroy(streams[i]);
-                            }
 
                             double total_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
                             double avg_time_us = (total_time_ms * 1000.0) / timing_iters;
@@ -4362,7 +4364,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hipblaslt_cout << "  Iterations: " << timing_iters << " (hot iterations)" << std::endl;
                             hipblaslt_cout << "  Average time: " << avg_time_us << " us" << std::endl;
                             hipblaslt_cout << "  Performance: " << gflops << " GFLOPS (" << (gflops/1000.0) << " TFLOPS)" << std::endl;
-                            hipblaslt_cout << "  Sub-problems launched concurrently on " << streams.size() << " streams" << std::endl;
+                            hipblaslt_cout << "  Sub-problems launched concurrently on " << num_streams << " streams" << std::endl;
+                            if(cu_mask_ok)
+                                hipblaslt_cout << "  CU partitioning: " << cus_per_stream << " CUs/stream, separate workspaces" << std::endl;
                             hipblaslt_cout << "=========================================\n" << std::endl;
 
                             used_stream_parallel = true;
@@ -4370,62 +4374,40 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                         sequential_fallback:
 
-                        // Fall back to sequential if fused dispatch not used or failed
+                        // === OPT 1: Sequential fallback using pre-created contexts ===
                         if(!used_fused_dispatch && !used_stream_parallel)
                         {
+                            // Capture kernel info from pre-created contexts
+                            if(arg.print_kernel_info)
+                            {
+                                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                                {
+                                    if(!spCtxs[sp].valid) continue;
+                                    try {
+                                        subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, spCtxs[sp].algo);
+                                        subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, spCtxs[sp].algo);
+                                        int* solutionIndex = (int*)spCtxs[sp].algo.data;
+                                        subproblem_solution_indices[sp] = *solutionIndex;
+                                    } catch (...) {
+                                        subproblem_solution_names[sp] = "ERROR";
+                                        subproblem_kernel_names[sp] = "ERROR";
+                                        subproblem_solution_indices[sp] = -1;
+                                    }
+                                }
+                            }
+
                             start_time = std::chrono::high_resolution_clock::now();
                             for(int iter = 0; iter < timing_iters; iter++)
                             {
                                 for(size_t sp = 0; sp < subProblems.size(); sp++)
                                 {
-                                    const auto& sub = subProblems[sp];
-
-                                    // Create temp matrix layouts
-                                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
-                                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
-                                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
-                                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                                    // Query heuristic
-                                    hipblasLtMatmulHeuristicResult_t heur_tmp;
-                                    int ret_tmp = 0;
-                                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
-
-                                    // Store kernel info on first iteration
-                                    if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info && !used_fused_dispatch)
-                                    {
-                                        try {
-                                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
-                                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
-                                            int* solutionIndex = (int*)heur_tmp.algo.data;
-                                            subproblem_solution_indices[sp] = *solutionIndex;
-                                        } catch (...) {
-                                            subproblem_solution_names[sp] = "ERROR";
-                                            subproblem_kernel_names[sp] = "ERROR";
-                                            subproblem_solution_indices[sp] = -1;
-                                        }
-                                    }
-
-                                    if(ret_tmp > 0)
-                                    {
-                                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-
-                                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
-                                    }
-
-                                    hipblasLtMatrixLayoutDestroy(matA_tmp);
-                                    hipblasLtMatrixLayoutDestroy(matB_tmp);
-                                    hipblasLtMatrixLayoutDestroy(matC_tmp);
-                                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                                    if(!spCtxs[sp].valid) continue;
+                                    auto& ctx = spCtxs[sp];
+                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                                   ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                                   &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                                   ctx.D_ptr, ctx.matD,
+                                                   &ctx.algo, *dWorkspace, workspace_size, stream);
                                 }
                             }
                         }
@@ -4470,6 +4452,15 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 }
                             }
                             hipblaslt_cout << std::endl;
+                        }
+
+                        // Cleanup pre-created layouts from OPT 1
+                        for(size_t sp = 0; sp < spCtxs.size(); sp++)
+                        {
+                            hipblasLtMatrixLayoutDestroy(spCtxs[sp].matA);
+                            hipblasLtMatrixLayoutDestroy(spCtxs[sp].matB);
+                            hipblasLtMatrixLayoutDestroy(spCtxs[sp].matC);
+                            hipblasLtMatrixLayoutDestroy(spCtxs[sp].matD);
                         }
 
                         // Now do verification run with full output
@@ -4724,7 +4715,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             int actual_num_splits = arg.num_splits;
             if (actual_num_splits == 0)
             {
-                actual_num_splits = autoSelectNumSplits(M[0], N[0], K[0], num_CUs);
+                actual_num_splits = autoSelectNumSplits(M[0], N[0], K[0], num_CUs, arg.stream_parallel);
                 hipblaslt_cout << "Auto-selected num_splits: " << actual_num_splits << std::endl;
             }
 
@@ -4784,236 +4775,245 @@ void testing_matmul_with_bias(const Arguments& arg,
             std::vector<std::string> subproblem_kernel_names(subProblems.size());
             std::vector<int> subproblem_solution_indices(subProblems.size(), -1);
 
-            // Warmup iterations
-            for(int warmup = 0; warmup < warmup_iters; warmup++)
+            // === OPT 1: Pre-create all layouts and cache heuristics ONCE ===
+            std::vector<SubProblemContext> spCtxs(subProblems.size());
+            for(size_t sp = 0; sp < subProblems.size(); sp++)
             {
-                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                const auto& sub = subProblems[sp];
+                auto& ctx = spCtxs[sp];
+
+                int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                hipblasLtMatrixLayoutCreate(&ctx.matA, arg.a_type, matA_rows, matA_cols, lda[0]);
+                int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                hipblasLtMatmulHeuristicResult_t heur_tmp;
+                int ret_tmp = 0;
+                hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
+                ctx.valid = (ret_tmp > 0);
+                if(ctx.valid)
                 {
-                    const auto& sub = subProblems[sp];
-
-                    // Create temp matrix layouts
-                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
-                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
-                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
-                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                    // Query heuristic
-                    hipblasLtMatmulHeuristicResult_t heur_tmp;
-                    int ret_tmp = 0;
-                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
-
-                    if(ret_tmp > 0)
+                    ctx.algo = heur_tmp.algo;
+                    if(arg.print_kernel_info)
                     {
-                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-
-                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                        try {
+                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                            int* solutionIndex = (int*)heur_tmp.algo.data;
+                            subproblem_solution_indices[sp] = *solutionIndex;
+                        } catch (...) {
+                            subproblem_solution_names[sp] = "ERROR";
+                            subproblem_kernel_names[sp] = "ERROR";
+                        }
                     }
+                }
 
-                    hipblasLtMatrixLayoutDestroy(matA_tmp);
-                    hipblasLtMatrixLayoutDestroy(matB_tmp);
-                    hipblasLtMatrixLayoutDestroy(matC_tmp);
-                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+            }
+
+            // === OPT 5: Concurrent warmup on separate streams ===
+            {
+                std::vector<hipStream_t> warmup_streams(subProblems.size());
+                for(size_t i = 0; i < warmup_streams.size(); i++)
+                    hipStreamCreate(&warmup_streams[i]);
+
+                for(int warmup = 0; warmup < warmup_iters; warmup++)
+                {
+                    for(size_t sp = 0; sp < subProblems.size(); sp++)
+                    {
+                        if(!spCtxs[sp].valid) continue;
+                        auto& ctx = spCtxs[sp];
+                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                       &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
+                                       &ctx.algo, *dWorkspace, workspace_size,
+                                       warmup_streams[sp % warmup_streams.size()]);
+                    }
+                }
+                for(size_t i = 0; i < warmup_streams.size(); i++)
+                {
+                    hipStreamSynchronize(warmup_streams[i]);
+                    hipStreamDestroy(warmup_streams[i]);
                 }
             }
 
             CHECK_HIP_ERROR(hipStreamSynchronize(stream));
 
-            // Timing iterations - check if stream-parallel execution requested
+            // === OPT 6: Micro-benchmark strategy selection ===
+            // Run 3 quick iterations each for baseline vs multi-MT, pick the winner
+            // (Only when auto-strategy is used and we haven't already chosen)
+            if(arg.split_strategy == 0 && subProblems.size() > 1)
+            {
+                const int MICRO_ITERS = 3;
+
+                // Measure multi-MT time (3 iterations)
+                auto mb_start = std::chrono::high_resolution_clock::now();
+                for(int mi = 0; mi < MICRO_ITERS; mi++)
+                {
+                    for(size_t sp = 0; sp < subProblems.size(); sp++)
+                    {
+                        if(!spCtxs[sp].valid) continue;
+                        auto& ctx = spCtxs[sp];
+                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                       &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
+                                       &ctx.algo, *dWorkspace, workspace_size, stream);
+                    }
+                }
+                CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                auto mb_end = std::chrono::high_resolution_clock::now();
+                double multi_mt_us = std::chrono::duration<double, std::micro>(mb_end - mb_start).count() / MICRO_ITERS;
+
+                // Measure baseline time (single kernel, 3 iterations)
+                auto bl_start = std::chrono::high_resolution_clock::now();
+                for(int mi = 0; mi < MICRO_ITERS; mi++)
+                {
+                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                   dA[0].buf(), matA[0], dB[0].buf(), matB[0],
+                                   &(h_beta[0]), dC[0].buf(), matC[0],
+                                   (*dDp)[0].buf(), matD[0],
+                                   &heuristicResult[sol].algo, *dWorkspace, workspace_size, stream);
+                }
+                CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                auto bl_end = std::chrono::high_resolution_clock::now();
+                double baseline_us = std::chrono::duration<double, std::micro>(bl_end - bl_start).count() / MICRO_ITERS;
+
+                hipblaslt_cout << "  Micro-benchmark: baseline=" << std::fixed << std::setprecision(1)
+                              << baseline_us << " us, multi-MT=" << multi_mt_us << " us" << std::endl;
+
+                if(multi_mt_us > baseline_us * 0.98)
+                {
+                    hipblaslt_cout << "  Multi-MT would not improve performance, using baseline" << std::endl;
+                    // Cleanup pre-created contexts
+                    for(size_t sp = 0; sp < spCtxs.size(); sp++)
+                    {
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matA);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matB);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matC);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matD);
+                    }
+                    goto skip_multimt;
+                }
+                hipblaslt_cout << "  Multi-MT confirmed faster, proceeding" << std::endl;
+            }
+
+            // Timing iterations
             auto start_time = std::chrono::high_resolution_clock::now();
             auto end_time = start_time;
 
             if(arg.stream_parallel && subProblems.size() > 1)
             {
-                // ===================================================================
-                // STREAM-PARALLEL EXECUTION: Launch sub-problems concurrently
-                // ===================================================================
+                // === OPT 2 + 3: Stream-parallel with CU-mask partitioning + separate workspace ===
                 hipblaslt_cout << "\n=== Stream-Parallel Execution ===" << std::endl;
-                hipblaslt_cout << "Creating " << subProblems.size() << " HIP streams for concurrent execution" << std::endl;
 
-                // Create one stream per sub-problem
-                std::vector<hipStream_t> streams(subProblems.size());
-                for(size_t i = 0; i < streams.size(); i++)
+                size_t num_streams = subProblems.size();
+                std::vector<hipStream_t> streams(num_streams);
+                bool cu_mask_ok = true;
+
+                hipDeviceProp_t devProp;
+                hipGetDeviceProperties(&devProp, 0);
+                int total_CUs = devProp.multiProcessorCount;
+                int cus_per_stream = total_CUs / (int)num_streams;
+
+                for(size_t i = 0; i < num_streams; i++)
                 {
-                    CHECK_HIP_ERROR(hipStreamCreate(&streams[i]));
-                }
+                    int cu_start = (int)i * cus_per_stream;
+                    int cu_end   = (i == num_streams - 1) ? total_CUs : cu_start + cus_per_stream;
+                    int mask_words = (total_CUs + 31) / 32;
+                    std::vector<uint32_t> cu_mask(mask_words, 0);
+                    for(int cu = cu_start; cu < cu_end; cu++)
+                        cu_mask[cu / 32] |= (1u << (cu % 32));
 
-                // Pre-create matrix layouts and query algorithms for all sub-problems
-                std::vector<hipblasLtMatrixLayout_t> matA_layouts(subProblems.size());
-                std::vector<hipblasLtMatrixLayout_t> matB_layouts(subProblems.size());
-                std::vector<hipblasLtMatrixLayout_t> matC_layouts(subProblems.size());
-                std::vector<hipblasLtMatrixLayout_t> matD_layouts(subProblems.size());
-                std::vector<hipblasLtMatmulAlgo_t> algos(subProblems.size());
-
-                for(size_t sp = 0; sp < subProblems.size(); sp++)
-                {
-                    const auto& sub = subProblems[sp];
-
-                    // Create matrix layouts
-                    int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                    int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                    hipblasLtMatrixLayoutCreate(&matA_layouts[sp], arg.a_type, matA_rows, matA_cols, lda[0]);
-
-                    int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                    int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                    hipblasLtMatrixLayoutCreate(&matB_layouts[sp], arg.b_type, matB_rows, matB_cols, ldb[0]);
-
-                    hipblasLtMatrixLayoutCreate(&matC_layouts[sp], arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                    hipblasLtMatrixLayoutCreate(&matD_layouts[sp], arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                    // Query heuristic once per sub-problem
-                    hipblasLtMatmulHeuristicResult_t heur_tmp;
-                    int ret_tmp = 0;
-                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0],
-                                                   matA_layouts[sp], matB_layouts[sp],
-                                                   matC_layouts[sp], matD_layouts[sp],
-                                                   pref, 1, &heur_tmp, &ret_tmp);
-
-                    if(ret_tmp > 0)
+                    hipError_t err = hipExtStreamCreateWithCUMask(&streams[i], mask_words, cu_mask.data());
+                    if(err != hipSuccess)
                     {
-                        algos[sp] = heur_tmp.algo;
-
-                        // Store kernel info for first sub-problem
-                        if(arg.print_kernel_info)
-                        {
-                            try {
-                                subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
-                                subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
-                                int* solutionIndex = (int*)heur_tmp.algo.data;
-                                subproblem_solution_indices[sp] = *solutionIndex;
-                            } catch (...) {
-                                subproblem_solution_names[sp] = "ERROR";
-                                subproblem_kernel_names[sp] = "ERROR";
-                                subproblem_solution_indices[sp] = -1;
-                            }
-                        }
+                        cu_mask_ok = false;
+                        for(size_t j = 0; j < i; j++) hipStreamDestroy(streams[j]);
+                        break;
                     }
                 }
 
-                hipblaslt_cout << "Launching all sub-problems concurrently on " << streams.size() << " streams..." << std::endl;
+                if(!cu_mask_ok)
+                {
+                    hipblaslt_cout << "  CU-mask streams unavailable, using standard streams" << std::endl;
+                    for(size_t i = 0; i < num_streams; i++)
+                        CHECK_HIP_ERROR(hipStreamCreate(&streams[i]));
+                }
+                else
+                {
+                    hipblaslt_cout << "  CU-mask partitioning: " << cus_per_stream << " CUs per stream" << std::endl;
+                }
 
-                // Timing loop with stream-parallel execution
+                // Separate workspace per stream
+                size_t per_stream_ws = (workspace_size / num_streams / 256) * 256;
+
+                hipblaslt_cout << "  Launching on " << num_streams << " streams..." << std::endl;
+
                 start_time = std::chrono::high_resolution_clock::now();
 
                 for(int iter = 0; iter < timing_iters; iter++)
                 {
-                    // Launch ALL sub-problems on their respective streams
-                    // They will execute concurrently on the GPU!
                     for(size_t sp = 0; sp < subProblems.size(); sp++)
                     {
-                        const auto& sub = subProblems[sp];
+                        if(!spCtxs[sp].valid) continue;
+                        auto& ctx = spCtxs[sp];
+                        void* sub_ws = static_cast<char*>(*dWorkspace) + sp * per_stream_ws;
 
-                        void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                        void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                        void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                        void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-
-                        // Launch on dedicated stream - doesn't wait for others!
                         hipblasLtMatmul(handle, matmul[0][0],
-                                       alpha_in[0], A_ptr, matA_layouts[sp],
-                                       B_ptr, matB_layouts[sp],
-                                       &(h_beta[0]), C_ptr, matC_layouts[sp],
-                                       D_ptr, matD_layouts[sp],
-                                       &algos[sp], *dWorkspace, workspace_size,
-                                       streams[sp]);  // ← Different stream per sub-problem!
+                                       alpha_in[0], ctx.A_ptr, ctx.matA,
+                                       ctx.B_ptr, ctx.matB,
+                                       &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                       ctx.D_ptr, ctx.matD,
+                                       &ctx.algo, sub_ws, per_stream_ws,
+                                       streams[sp]);
                     }
 
-                    // Synchronize ALL streams (wait for all sub-problems to finish)
                     for(size_t i = 0; i < streams.size(); i++)
-                    {
                         CHECK_HIP_ERROR(hipStreamSynchronize(streams[i]));
-                    }
                 }
 
                 end_time = std::chrono::high_resolution_clock::now();
 
-                // Cleanup matrix layouts
-                for(size_t sp = 0; sp < subProblems.size(); sp++)
-                {
-                    hipblasLtMatrixLayoutDestroy(matA_layouts[sp]);
-                    hipblasLtMatrixLayoutDestroy(matB_layouts[sp]);
-                    hipblasLtMatrixLayoutDestroy(matC_layouts[sp]);
-                    hipblasLtMatrixLayoutDestroy(matD_layouts[sp]);
-                }
-
-                // Cleanup streams
                 for(size_t i = 0; i < streams.size(); i++)
-                {
                     CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
-                }
 
-                hipblaslt_cout << "Stream-parallel execution complete!" << std::endl;
+                hipblaslt_cout << "  Stream-parallel execution complete!" << std::endl;
             }
             else
             {
-                // ===================================================================
-                // SEQUENTIAL EXECUTION: Launch sub-problems one after another
-                // ===================================================================
+                // Sequential execution using pre-created contexts
                 for(int iter = 0; iter < timing_iters; iter++)
                 {
                     for(size_t sp = 0; sp < subProblems.size(); sp++)
                     {
-                        const auto& sub = subProblems[sp];
-
-                        // Create temp matrix layouts
-                        hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
-                        int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                        int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                        hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
-                        int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                        int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                        hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
-                        hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                        hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-
-                        // Query heuristic
-                        hipblasLtMatmulHeuristicResult_t heur_tmp;
-                        int ret_tmp = 0;
-                        hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
-
-                        // Store kernel info on first iteration
-                        if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
-                        {
-                            try {
-                                subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
-                                subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
-                                int* solutionIndex = (int*)heur_tmp.algo.data;
-                                subproblem_solution_indices[sp] = *solutionIndex;
-                            } catch (...) {
-                                subproblem_solution_names[sp] = "ERROR";
-                                subproblem_kernel_names[sp] = "ERROR";
-                                subproblem_solution_indices[sp] = -1;
-                            }
-                        }
-
-                        if(ret_tmp > 0)
-                        {
-                            void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                            void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                            void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                            void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-
-                            hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                           &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
-                        }
-
-                        hipblasLtMatrixLayoutDestroy(matA_tmp);
-                        hipblasLtMatrixLayoutDestroy(matB_tmp);
-                        hipblasLtMatrixLayoutDestroy(matC_tmp);
-                        hipblasLtMatrixLayoutDestroy(matD_tmp);
+                        if(!spCtxs[sp].valid) continue;
+                        auto& ctx = spCtxs[sp];
+                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                       &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                       ctx.D_ptr, ctx.matD,
+                                       &ctx.algo, *dWorkspace, workspace_size, stream);
                     }
                 }
 
                 CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                 end_time = std::chrono::high_resolution_clock::now();
+            }
+
+            // Cleanup pre-created layouts
+            for(size_t sp = 0; sp < spCtxs.size(); sp++)
+            {
+                hipblasLtMatrixLayoutDestroy(spCtxs[sp].matA);
+                hipblasLtMatrixLayoutDestroy(spCtxs[sp].matB);
+                hipblasLtMatrixLayoutDestroy(spCtxs[sp].matC);
+                hipblasLtMatrixLayoutDestroy(spCtxs[sp].matD);
             }
 
             double total_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
