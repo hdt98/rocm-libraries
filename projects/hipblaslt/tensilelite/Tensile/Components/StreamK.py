@@ -472,6 +472,7 @@ class StreamK(Component):
         if kernel["StreamKAtomic"]:
             return module
 
+        skConstsInVgprs = writer.isStreamKConstantsToVgprEnabled(kernel)
         skStoreLabel = Label(label=writer.labels.getNameInc("SK_Store"), comment="")
 
         if kernel["StreamKFixupTreeReduction"] == 1:
@@ -646,7 +647,6 @@ class StreamK(Component):
             # module.add(SCBranchSCC0(labelName=skPartialsLabel.getLabelName(), comment="Branch if not start tile, store partials"))
 
             if kernel["DebugStreamK"] & 1 == 0:
-                skConstsInVgprs = writer.isStreamKConstantsToVgprEnabled(kernel)
                 # if we started and finished the tile, regular store code
                 # branch to regular store code, skip fixup step
                 sIpt = writer.acquireStreamKConstSgpr(kernel, "ItersPerTile")
