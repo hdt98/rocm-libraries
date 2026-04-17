@@ -17,29 +17,32 @@ namespace ck_tile {
  *  Traversal:   1 dim --> 1 dim (identity in both directions)
  *
  *  ndim_upper = 1, ndim_lower = 1
- *  lengths[0] = dimension length
- *
- *  PassThrough is its own inverse --- the same operation in both
- *  the definition and traversal directions.
- *
- *  Example: PassThrough(M=128)
- *
- *    User dim (M)              Base dim (M)
- *        |                         ^
- *        v    definition (up)      |
- *       idx ===================> idx        (same value)
- *        |    traversal (down)     ^
- *        '========================'
- *
- *    mapIndices(5) = 5
- *
- *  Used when a dimension needs to pass through a transform layer
- *  without modification --- e.g., the M dimension in a GEMM LDS
- *  descriptor where only K is being reshaped.
  */
 template <>
 struct TransformImpl<TransformType::PASS_THROUGH>
 {
+    // ── Schema ──
+    struct Schema
+    {
+        index_t dim_length = 0;
+
+        private:
+        static_array<uint8_t, MAX_TRANSFORM_DATA_SIZE - sizeof(index_t)> _pad{};
+    };
+    static_assert(sizeof(Schema) == MAX_TRANSFORM_DATA_SIZE);
+
+    // ── Schema conversion ──
+    static constexpr Schema readSchema(const CoordinateTransform& t)
+    {
+        return bit_cast<Schema>(t.data);
+    }
+    static constexpr void writeSchema(CoordinateTransform& t, const Schema& d)
+    {
+        t.data = bit_cast<TransformDataBuffer>(d);
+    }
+
+    // ── Operations ──
+
     /** @brief Forward: upper to lower (identity). */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& /*t*/, index_t* lower, const index_t* upper)
@@ -61,11 +64,12 @@ struct TransformImpl<TransformType::PASS_THROUGH>
         return true;
     }
 
-    /** @brief Upper dimension length (same as lower for identity). */
+    /** @brief Upper dimension length. */
     static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
-        return t.lengths[0];
+        auto d = readSchema(t);
+        return d.dim_length;
     }
 };
 

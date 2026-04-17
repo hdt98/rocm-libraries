@@ -14,69 +14,51 @@ namespace ck_tile {
 /** @brief Split 1 base dim into N user-facing component dims.
  *
  *  Definition:  1 base dim --> N user dims   (split / expand / unflatten)
- *  Traversal:   N upper --> 1 lower           (COMPOSE via multiply-accumulate)
+ *  Traversal:   N upper --> 1 lower          (COMPOSE via multiply-accumulate)
  *
- *  ndim_upper  = N   (receives N component values from above)
- *  ndim_lower = 1   (sends 1 flat value below)
- *  lengths[0..N-1]      = component sizes
- *  coefficients[0..N-1] = strides (prefix products of subsequent lengths)
- *
- *  Unmerge is the INVERSE of Merge:
- *    - Merge definition: N --> 1 (flatten). Merge traversal: 1 --> N (decompose).
- *    - Unmerge definition: 1 --> N (split). Unmerge traversal: N --> 1 (compose).
- *    - Unmerge's traversal (compose) does the SAME MATH as Merge's definition.
- *    - Merge's traversal (decompose) does the SAME MATH as Unmerge's definition.
- *
- *  Example: Unmerge with component_lengths = {4, 8}
- *
- *    Definition direction (bottom-up):
- *
- *      Base dim:        flat index          User dims:    dim 0     dim 1
- *                          (32)                         (rows=4)  (cols=8)
- *                           |                              ^         ^
- *                           |                              |         |
- *                     .-----'-----.                  .-----'----.----'
- *                     | 19 / 8 = 2|   division       |          |
- *                     | 19 % 8 = 3|   (split)        |          |
- *                     '----.------'                   |          |
- *                          '==========================.==========.
- *
- *    Traversal direction (top-down) --- what mapIndices computes:
- *
- *      User provides:     row = 2       col = 3
- *                           |             |
- *                           v             v
- *                     .-----'-----'-------.
- *                     | 2 * 8  +  3 * 1   |   multiply-accumulate
- *                     | = 16   +  3       |   strides = {8, 1}
- *                     | = 19              |
- *                     '---------.--------.'
- *                               |
- *                               v
- *      To base:            flat = 19
- *
- *      mapIndices({2, 3}) = 19
- *
- *  Note: Unmerge's traversal is a simple multiply-accumulate (no magic
- *  division needed), because composing components into a flat index
- *  is cheap. Magic division is only needed in Merge's traversal, where
- *  a flat index must be decomposed back into components.
+ *  ndim_upper = N, ndim_lower = 1
  */
 template <>
 struct TransformImpl<TransformType::UNMERGE>
 {
-    /** @brief Compose N upper values into 1 lower value via multiply-accumulate.
-     *
-     *  Uses pre-computed strides (in coefficients[]) to flatten the
-     *  multi-dimensional input into a single flat index.
-     */
+    // ── Schema ──
+    // Same layout as TransformImpl<MERGE>::Schema — they are inverses using the same data.
+    struct Schema
+    {
+        static_array<index_t, MAX_TENSOR_DIMS> component_lengths{};
+        static_array<index_t, MAX_TENSOR_DIMS> strides{};
+        static_array<MagicDivConstants, MAX_TENSOR_DIMS> magic_divs{};
+
+        private:
+        static_array<uint8_t,
+                     MAX_TRANSFORM_DATA_SIZE - sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<MagicDivConstants, MAX_TENSOR_DIMS>)>
+            _pad{};
+    };
+    static_assert(sizeof(Schema) == MAX_TRANSFORM_DATA_SIZE);
+
+    // ── Schema conversion ──
+    static constexpr Schema readSchema(const CoordinateTransform& t)
+    {
+        return bit_cast<Schema>(t.data);
+    }
+    static constexpr void writeSchema(CoordinateTransform& t, const Schema& d)
+    {
+        t.data = bit_cast<TransformDataBuffer>(d);
+    }
+
+    // ── Operations ──
+
+    /** @brief Compose N upper values into 1 lower value via multiply-accumulate. */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
+        auto d   = readSchema(t);
         lower[0] = 0;
-        for(index_t d = 0; d < t.ndim_upper; ++d)
+        for(index_t i = 0; i < t.ndim_upper; ++i)
         {
-            lower[0] += upper[d] * t.coefficients[d];
+            lower[0] += upper[i] * d.strides[i];
         }
     }
 
@@ -84,13 +66,14 @@ struct TransformImpl<TransformType::UNMERGE>
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
+        auto d            = readSchema(t);
         index_t remaining = lower[0];
-        for(index_t d = 0; d < t.ndim_upper - 1; ++d)
+        for(index_t i = 0; i < t.ndim_upper - 1; ++i)
         {
             index_t quotient =
-                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
-            upper[d] = quotient;
-            remaining -= quotient * t.coefficients[d];
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), d.magic_divs[i]));
+            upper[i] = quotient;
+            remaining -= quotient * d.strides[i];
         }
         upper[t.ndim_upper - 1] = remaining;
     }
@@ -99,12 +82,11 @@ struct TransformImpl<TransformType::UNMERGE>
     static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
                                                            const index_t* upper)
     {
-        for(index_t d = 0; d < t.ndim_upper; ++d)
+        auto d = readSchema(t);
+        for(index_t i = 0; i < t.ndim_upper; ++i)
         {
-            if(upper[d] < 0 || upper[d] >= t.lengths[d])
-            {
+            if(upper[i] < 0 || upper[i] >= d.component_lengths[i])
                 return false;
-            }
         }
         return true;
     }
@@ -113,7 +95,8 @@ struct TransformImpl<TransformType::UNMERGE>
     static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
                                                              index_t i)
     {
-        return t.lengths[i];
+        auto d = readSchema(t);
+        return d.component_lengths[i];
     }
 };
 

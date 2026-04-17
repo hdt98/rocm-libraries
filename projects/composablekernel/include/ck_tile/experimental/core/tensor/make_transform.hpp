@@ -36,8 +36,7 @@ namespace ck_tile {
 template <typename... Ts>
 constexpr DimIds dims(Ts... is)
 {
-    static_assert(sizeof...(Ts) <= MAX_DIMS_PER_TRANSFORM,
-                  "dims: too many indices (max MAX_DIMS_PER_TRANSFORM)");
+    static_assert(sizeof...(Ts) <= MAX_TENSOR_DIMS, "dims: too many indices (max MAX_TENSOR_DIMS)");
     DimIds result{};
     for(auto& x : result.elems)
     {
@@ -54,12 +53,18 @@ constexpr DimIds dims(Ts... is)
  */
 constexpr CoordinateTransform make_pass_through(index_t dim_length)
 {
+    using Impl = TransformImpl<TransformType::PASS_THROUGH>;
+
     CoordinateTransform t{};
     t.type         = TransformType::PASS_THROUGH;
     t.ndim_upper   = 1;
     t.ndim_lower   = 1;
-    t.lengths[0]   = dim_length;
-    t.is_bijective = true; // identity is always bijective
+    t.is_bijective = true;
+
+    Impl::Schema d{};
+    d.dim_length = dim_length;
+    Impl::writeSchema(t, d);
+
     return t;
 }
 
@@ -83,39 +88,31 @@ constexpr CoordinateTransform make_pass_through(index_t dim_length)
 template <index_t N>
 constexpr CoordinateTransform make_merge(const static_array<index_t, N>& component_lengths)
 {
-    static_assert(N <= MAX_DIMS_PER_TRANSFORM,
-                  "make_merge: too many dims (max MAX_DIMS_PER_TRANSFORM)");
+    static_assert(N <= MAX_TENSOR_DIMS, "make_merge: too many dims (max MAX_TENSOR_DIMS)");
     static_assert(N >= 2, "make_merge: need at least 2 dims to merge");
 
+    using Impl = TransformImpl<TransformType::MERGE>;
+
     CoordinateTransform t{};
-    t.type       = TransformType::MERGE;
-    t.ndim_upper = 1; // user side: 1 merged value
-    t.ndim_lower = N; // memory side: N component values
+    t.type         = TransformType::MERGE;
+    t.ndim_upper   = 1;
+    t.ndim_lower   = N;
+    t.is_bijective = true;
 
+    Impl::Schema d{};
     for(index_t i = 0; i < N; ++i)
-    {
-        t.lengths[i] = component_lengths[i];
-    }
+        d.component_lengths[i] = component_lengths[i];
 
-    // Compute prefix-product strides (same values as Unmerge).
-    // stride[i] = product of lengths[i+1..N-1].
-    // E.g., lengths = {4, 8}: strides = {8, 1}.
-    // These serve as divisors for forward decomposition (mapIndices)
-    // and as strides for reverse composition (when reversed to Unmerge).
-    t.coefficients[N - 1] = 1;
+    // Compute prefix-product strides
+    d.strides[N - 1] = 1;
     for(index_t i = N - 2; i >= 0; --i)
-    {
-        t.coefficients[i] = t.coefficients[i + 1] * component_lengths[i + 1];
-    }
+        d.strides[i] = d.strides[i + 1] * component_lengths[i + 1];
 
-    // Pre-compute magic division constants for decomposition at runtime.
+    // Pre-compute magic division constants
     for(index_t i = 0; i < N - 1; ++i)
-    {
-        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(t.coefficients[i]));
-    }
+        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
 
-    t.is_bijective = true; // mixed-radix representation is always a bijection
-
+    Impl::writeSchema(t, d);
     return t;
 }
 
@@ -139,38 +136,31 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
 template <index_t N>
 constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& component_lengths)
 {
-    static_assert(N <= MAX_DIMS_PER_TRANSFORM,
-                  "make_unmerge: too many dims (max MAX_DIMS_PER_TRANSFORM)");
+    static_assert(N <= MAX_TENSOR_DIMS, "make_unmerge: too many dims (max MAX_TENSOR_DIMS)");
     static_assert(N >= 2, "make_unmerge: need at least 2 dims to unmerge");
 
+    using Impl = TransformImpl<TransformType::UNMERGE>;
+
     CoordinateTransform t{};
-    t.type       = TransformType::UNMERGE;
-    t.ndim_upper = N; // user side: N component values
-    t.ndim_lower = 1; // memory side: 1 flat value
+    t.type         = TransformType::UNMERGE;
+    t.ndim_upper   = N;
+    t.ndim_lower   = 1;
+    t.is_bijective = true;
 
+    Impl::Schema d{};
     for(index_t i = 0; i < N; ++i)
-    {
-        t.lengths[i] = component_lengths[i];
-    }
+        d.component_lengths[i] = component_lengths[i];
 
-    // Compute strides as reverse exclusive scan (prefix products from right)
-    // For lengths = {4, 8}: strides = {8, 1}
-    // Used for multiply-accumulate composition in mapIndices.
-    t.coefficients[N - 1] = 1;
+    // Compute prefix-product strides
+    d.strides[N - 1] = 1;
     for(index_t i = N - 2; i >= 0; --i)
-    {
-        t.coefficients[i] = t.coefficients[i + 1] * component_lengths[i + 1];
-    }
+        d.strides[i] = d.strides[i + 1] * component_lengths[i + 1];
 
-    // Pre-compute magic division for reversal (decomposition direction).
-    // Divisors are the same prefix products stored in coefficients.
+    // Pre-compute magic division for reversal
     for(index_t i = 0; i < N - 1; ++i)
-    {
-        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(t.coefficients[i]));
-    }
+        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
 
-    t.is_bijective = true; // mixed-radix representation is always a bijection
-
+    Impl::writeSchema(t, d);
     return t;
 }
 
@@ -187,33 +177,32 @@ template <index_t N>
 constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_lengths,
                                          const static_array<index_t, N>& strides)
 {
-    static_assert(N <= MAX_DIMS_PER_TRANSFORM,
-                  "make_embed: too many dims (max MAX_DIMS_PER_TRANSFORM)");
+    static_assert(N <= MAX_TENSOR_DIMS, "make_embed: too many dims (max MAX_TENSOR_DIMS)");
+
+    using Impl = TransformImpl<TransformType::EMBED>;
 
     CoordinateTransform t{};
     t.type       = TransformType::EMBED;
     t.ndim_upper = N;
     t.ndim_lower = 1;
 
+    Impl::Schema d{};
     for(index_t i = 0; i < N; ++i)
     {
-        t.lengths[i]      = dim_lengths[i];
-        t.coefficients[i] = strides[i];
+        d.dim_lengths[i] = dim_lengths[i];
+        d.strides[i]     = strides[i];
     }
 
-    // Check bijectivity: stride[k] >= stride[k+1] * length[k+1] for all k.
-    // This ensures no two valid index tuples map to the same offset.
-    // Also pre-compute magic division constants for reversal.
+    // Check bijectivity: stride[k] >= stride[k+1] * length[k+1]
     t.is_bijective = true;
     for(index_t i = 0; i < N - 1; ++i)
     {
         if(strides[i] < strides[i + 1] * dim_lengths[i + 1])
-        {
             t.is_bijective = false;
-        }
-        t.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(strides[i]));
+        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(strides[i]));
     }
 
+    Impl::writeSchema(t, d);
     return t;
 }
 
@@ -230,15 +219,21 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
 constexpr CoordinateTransform
 make_pad(index_t dim_length, index_t left_pad, index_t right_pad, bool skip_check = false)
 {
+    using Impl = TransformImpl<TransformType::PAD>;
+
     CoordinateTransform t{};
     t.type              = TransformType::PAD;
     t.ndim_upper        = 1;
     t.ndim_lower        = 1;
-    t.lengths[0]        = dim_length;
-    t.coefficients[0]   = left_pad;
-    t.coefficients[1]   = right_pad;
     t.skip_bounds_check = skip_check;
-    t.is_bijective      = true; // bijective within valid range [left_pad, left_pad+length)
+    t.is_bijective      = true;
+
+    Impl::Schema d{};
+    d.dim_length = dim_length;
+    d.left_pad   = left_pad;
+    d.right_pad  = right_pad;
+    Impl::writeSchema(t, d);
+
     return t;
 }
 
@@ -259,13 +254,19 @@ constexpr CoordinateTransform make_right_pad(index_t dim_length, index_t pad_amo
  */
 constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 {
+    using Impl = TransformImpl<TransformType::XOR>;
+
     CoordinateTransform t{};
     t.type         = TransformType::XOR;
     t.ndim_upper   = 2;
     t.ndim_lower   = 2;
-    t.lengths[0]   = length_0;
-    t.lengths[1]   = length_1;
-    t.is_bijective = true; // XOR is its own inverse
+    t.is_bijective = true;
+
+    Impl::Schema d{};
+    d.length_0 = length_0;
+    d.length_1 = length_1;
+    Impl::writeSchema(t, d);
+
     return t;
 }
 

@@ -14,78 +14,55 @@ namespace ck_tile {
 /** @brief Combine N component dims into 1 user-facing dim.
  *
  *  Definition:  N base dims --> 1 user dim   (flatten / combine)
- *  Traversal:   1 upper --> N lower           (DECOMPOSE via magic division)
+ *  Traversal:   1 upper --> N lower          (DECOMPOSE via magic division)
  *
- *  ndim_upper  = 1   (receives 1 merged value from above)
- *  ndim_lower = N   (sends N component values below)
- *  lengths[0..N-1]      = component sizes
- *  coefficients[0..N-2] = divisors (product of subsequent lengths)
- *  magic_divs[0..N-2]   = pre-computed magic division constants
- *
- *  Merge is a CONSTRAINED, INVERTIBLE Embed:
- *    - Like Embed, the definition is a linear combination: flat = sum(c[i]*s[i])
- *    - Unlike Embed, the strides are exactly the prefix products of the
- *      component lengths. This constraint makes it invertible via division.
- *    - During traversal, mapIndices computes the INVERSE (decomposition),
- *      which is why it needs magic division.
- *
- *  Example: Merge with component_lengths = {8, 8}
- *
- *    Definition direction (bottom-up):
- *
- *      Base dims:      dim 0        dim 1          Merged dim:
- *                     (K_div8)     (K_mod8)            (K)
- *                        |            |                 ^
- *                        |            |                 |
- *                        '-------.----'           .-----'
- *                                |                |
- *                          K = i0 * 8 + i1        |  strides = {8, 1}
- *                                |                |  from prefix products
- *                                '================.  of lengths {8, 8}
- *
- *    Traversal direction (top-down) --- what mapIndices computes:
- *
- *      User provides:      K = 19
- *                            |
- *                            v
- *                     .------'------.
- *                     | 19 / 8 = 2  |   magic division
- *                     | 19 % 8 = 3  |   (remainder)
- *                     '----.----.---'
- *                          |    |
- *                          v    v
- *      To base:         K_div8=2  K_mod8=3
- *
- *      mapIndices(19) = {2, 3}
- *
- *  Contrast with Embed: Embed also computes a linear combination, but
- *  it sits at the base and only runs forward (N-->1) during traversal.
- *  Merge sits above the base and must run inverse (1-->N) during
- *  traversal, which is why it needs magic division constants.
- *  Merge is essentially an Embed that also carries its own inverse.
+ *  ndim_upper = 1, ndim_lower = N
  */
 template <>
 struct TransformImpl<TransformType::MERGE>
 {
-    /** @brief Decompose 1 upper value into N lower values via magic division.
-     *
-     *  Iterates from most significant component (d=0) to least significant.
-     *  Uses pre-computed magic_divs for quotients and coefficients (divisors)
-     *  for remainder computation.
-     */
+    // ── Schema ──
+    struct Schema
+    {
+        static_array<index_t, MAX_TENSOR_DIMS> component_lengths{};
+        static_array<index_t, MAX_TENSOR_DIMS> strides{};
+        static_array<MagicDivConstants, MAX_TENSOR_DIMS> magic_divs{};
+
+        private:
+        static_array<uint8_t,
+                     MAX_TRANSFORM_DATA_SIZE - sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<MagicDivConstants, MAX_TENSOR_DIMS>)>
+            _pad{};
+    };
+    static_assert(sizeof(Schema) == MAX_TRANSFORM_DATA_SIZE);
+
+    // ── Schema conversion ──
+    static constexpr Schema readSchema(const CoordinateTransform& t)
+    {
+        return bit_cast<Schema>(t.data);
+    }
+    static constexpr void writeSchema(CoordinateTransform& t, const Schema& d)
+    {
+        t.data = bit_cast<TransformDataBuffer>(d);
+    }
+
+    // ── Operations ──
+
+    /** @brief Decompose 1 upper value into N lower values via magic division. */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
+        auto d            = readSchema(t);
         index_t remaining = upper[0];
 
-        for(index_t d = 0; d < t.ndim_lower - 1; ++d)
+        for(index_t i = 0; i < t.ndim_lower - 1; ++i)
         {
             index_t quotient =
-                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
-            lower[d] = quotient;
-            remaining -= quotient * t.coefficients[d]; // coefficients[d] = divisor
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), d.magic_divs[i]));
+            lower[i] = quotient;
+            remaining -= quotient * d.strides[i];
         }
-
         lower[t.ndim_lower - 1] = remaining;
     }
 
@@ -93,10 +70,11 @@ struct TransformImpl<TransformType::MERGE>
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
+        auto d   = readSchema(t);
         upper[0] = 0;
-        for(index_t d = 0; d < t.ndim_lower; ++d)
+        for(index_t i = 0; i < t.ndim_lower; ++i)
         {
-            upper[0] += lower[d] * t.coefficients[d];
+            upper[0] += lower[i] * d.strides[i];
         }
     }
 
@@ -104,10 +82,11 @@ struct TransformImpl<TransformType::MERGE>
     static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
                                                            const index_t* upper)
     {
+        auto d          = readSchema(t);
         index_t product = 1;
-        for(index_t d = 0; d < t.ndim_lower; ++d)
+        for(index_t i = 0; i < t.ndim_lower; ++i)
         {
-            product *= t.lengths[d];
+            product *= d.component_lengths[i];
         }
         return upper[0] >= 0 && upper[0] < product;
     }
@@ -116,10 +95,11 @@ struct TransformImpl<TransformType::MERGE>
     static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
+        auto d          = readSchema(t);
         index_t product = 1;
-        for(index_t d = 0; d < t.ndim_lower; ++d)
+        for(index_t i = 0; i < t.ndim_lower; ++i)
         {
-            product *= t.lengths[d];
+            product *= d.component_lengths[i];
         }
         return product;
     }

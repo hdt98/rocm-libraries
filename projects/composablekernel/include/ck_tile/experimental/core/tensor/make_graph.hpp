@@ -22,8 +22,6 @@
 
 namespace ck_tile {
 
-static_assert(MAX_TENSOR_DIMS <= MAX_IO_DIMS, "MAX_TENSOR_DIMS must not exceed MAX_IO_DIMS");
-
 namespace detail {
 
 /** @brief Zero-fill all unused array slots to guarantee NTTP deduplication.
@@ -44,11 +42,11 @@ constexpr void canonicalize(TransformGraph& g)
         g.t_upper_slots[t] = DimIds{};
         g.t_lower_slots[t] = DimIds{};
     }
-    for(index_t i = g.ndim_upper; i < MAX_IO_DIMS; ++i)
+    for(index_t i = g.ndim_upper; i < MAX_TENSOR_DIMS; ++i)
     {
         g.upper_slots[i] = 0;
     }
-    for(index_t i = g.ndim_lower; i < MAX_IO_DIMS; ++i)
+    for(index_t i = g.ndim_lower; i < MAX_TENSOR_DIMS; ++i)
     {
         g.lower_slots[i] = 0;
     }
@@ -72,35 +70,35 @@ constexpr void canonicalize(TransformGraph& g)
  */
 constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc)
 {
+    using EmbedImpl = TransformImpl<TransformType::EMBED>;
+
     detail::TransformGraph g{};
 
-    // Create Embed transform from the descriptor's lengths and strides.
-    // NOTE: This intentionally mirrors make_embed() logic rather than calling it,
-    // because make_embed is templated on NDim (compile-time) while desc.ndim is
-    // a constexpr value. Cross-reference make_embed() in make_transform.hpp if
-    // modifying this code.
+    // Build Embed transform via Schema.
+    // Cannot delegate to make_embed() because it is templated on NDim
+    // (compile-time) while desc.ndim is a constexpr runtime value.
+    // Both use the same Schema layout and bijectivity/magic_div logic.
     CoordinateTransform embed{};
     embed.type       = TransformType::EMBED;
     embed.ndim_upper = desc.ndim;
     embed.ndim_lower = 1;
 
+    EmbedImpl::Schema d{};
     for(index_t i = 0; i < desc.ndim; ++i)
     {
-        embed.lengths[i]      = desc.lengths[i];
-        embed.coefficients[i] = desc.strides[i];
+        d.dim_lengths[i] = desc.lengths[i];
+        d.strides[i]     = desc.strides[i];
     }
 
-    // Check bijectivity: stride[k] >= stride[k+1] * length[k+1]
     embed.is_bijective = true;
     for(index_t i = 0; i < desc.ndim - 1; ++i)
     {
         if(desc.strides[i] < desc.strides[i + 1] * desc.lengths[i + 1])
-        {
             embed.is_bijective = false;
-        }
-        embed.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
+        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
     }
 
+    EmbedImpl::writeSchema(embed, d);
     g.transforms[0]  = embed;
     g.num_transforms = 1;
 
@@ -204,7 +202,7 @@ applyTransforms(const detail::TransformGraph& graph,
     }
 
     // Wire user-facing dim indices to the fresh slots that transforms read from.
-    static_array<index_t, MAX_IO_DIMS> new_upper_slots{};
+    static_array<index_t, MAX_TENSOR_DIMS> new_upper_slots{};
     for(index_t i = 0; i < NumNewTransforms; ++i)
     {
         for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
@@ -327,7 +325,7 @@ constexpr detail::TransformGraph make_transform_graph(TransformBinding first, Bi
     // Wire based on the first binding's dims
     // Lower dims: where the transform writes (toward memory)
     index_t num_lower = 0;
-    for(index_t i = 0; i < MAX_DIMS_PER_TRANSFORM; ++i)
+    for(index_t i = 0; i < MAX_TENSOR_DIMS; ++i)
     {
         if(first.lower_dims[i] >= 0)
         {
@@ -344,7 +342,7 @@ constexpr detail::TransformGraph make_transform_graph(TransformBinding first, Bi
     // Upper dims: where the transform reads (from user side)
     index_t num_upper = 0;
     index_t max_slot  = num_lower;
-    for(index_t i = 0; i < MAX_DIMS_PER_TRANSFORM; ++i)
+    for(index_t i = 0; i < MAX_TENSOR_DIMS; ++i)
     {
         if(first.upper_dims[i] >= 0)
         {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /** @file transforms/embed.hpp
- *  @brief TransformImpl specialization for EMBED (linear combination).
+ *  @brief TransformImpl specialization for EMBED (linear combination with strides).
  */
 
 #pragma once
@@ -12,60 +12,52 @@
 namespace ck_tile {
 
 /** @brief Linear combination with strides. Computes a 1D memory offset
- *  from N-dimensional indices.
- *
- *  Definition:  N dims --> 1 dim   (weighted sum with strides)
- *  Traversal:   N dims --> 1 dim   (same --- Embed is always at the base)
+ *  from N-dimensional indices. Sits at the BASE of the transform stack.
  *
  *  ndim_upper = N, ndim_lower = 1
- *  lengths[0..N-1]      = size of each upper dimension
- *  coefficients[0..N-1] = stride of each upper dimension
- *
- *  Embed always sits at the BASE of the transform stack. It defines
- *  the physical memory layout. During traversal it runs FORWARD
- *  (N dims --> 1 offset). The memory offset is the end of the line,
- *  so no transform ever needs to undo an Embed.
- *
- *  Compare with Merge: Merge also does a linear combination in its
- *  definition direction, but during traversal it must run in REVERSE
- *  (1 --> N, decomposing via magic division). Merge is essentially
- *  an Embed that also carries its own inverse. Embed does not need
- *  an inverse because it only ever runs forward.
- *
- *  Example: Embed with lengths={8, 128, 8}, strides={1032, 8, 1}
- *
- *    Base dims:     dim 0       dim 1      dim 2
- *                  (K_div8)      (M)      (K_mod8)
- *                    |           |           |
- *                    v           v           v
- *                .---'----------'-----------.
- *                |                           |
- *                | offset = 2*1032 + 5*8 + 3 |
- *                |        = 2064 + 40 + 3    |
- *                |        = 2107             |
- *                |                           |
- *                '-----------.---------------'
- *                            |
- *                            v
- *                    Memory offset (1D)
- *
- *    mapIndices({2, 5, 3}) = 2107
- *
- *    The stride 1032 = (128+1)*8 includes 1 element of padding per
- *    row for LDS bank conflict avoidance. These are arbitrary strides
- *    that do not need to be prefix products of the lengths.
  */
 template <>
 struct TransformImpl<TransformType::EMBED>
 {
+    // ── Schema ──
+    // Embed maps ALL tensor dims to a single offset, so it needs
+    // MAX_TENSOR_DIMS capacity (64 entries per array).
+    struct Schema
+    {
+        static_array<index_t, MAX_TENSOR_DIMS> dim_lengths{};
+        static_array<index_t, MAX_TENSOR_DIMS> strides{};
+        static_array<MagicDivConstants, MAX_TENSOR_DIMS> magic_divs{};
+
+        private:
+        static_array<uint8_t,
+                     MAX_TRANSFORM_DATA_SIZE - sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<index_t, MAX_TENSOR_DIMS>) -
+                         sizeof(static_array<MagicDivConstants, MAX_TENSOR_DIMS>)>
+            _pad{};
+    };
+    static_assert(sizeof(Schema) == MAX_TRANSFORM_DATA_SIZE);
+
+    // ── Schema conversion ──
+    static constexpr Schema readSchema(const CoordinateTransform& t)
+    {
+        return bit_cast<Schema>(t.data);
+    }
+    static constexpr void writeSchema(CoordinateTransform& t, const Schema& d)
+    {
+        t.data = bit_cast<TransformDataBuffer>(d);
+    }
+
+    // ── Operations ──
+
     /** @brief Forward: N upper dims to 1 lower offset via linear combination. */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
+        auto d   = readSchema(t);
         lower[0] = 0;
-        for(index_t d = 0; d < t.ndim_upper; ++d)
+        for(index_t i = 0; i < t.ndim_upper; ++i)
         {
-            lower[0] += upper[d] * t.coefficients[d];
+            lower[0] += upper[i] * d.strides[i];
         }
     }
 
@@ -73,27 +65,27 @@ struct TransformImpl<TransformType::EMBED>
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
+        auto d            = readSchema(t);
         index_t remaining = lower[0];
-        for(index_t d = 0; d < t.ndim_upper - 1; ++d)
+        for(index_t i = 0; i < t.ndim_upper - 1; ++i)
         {
             index_t quotient =
-                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), t.magic_divs[d]));
-            upper[d] = quotient;
-            remaining -= quotient * t.coefficients[d];
+                static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), d.magic_divs[i]));
+            upper[i] = quotient;
+            remaining -= quotient * d.strides[i];
         }
         upper[t.ndim_upper - 1] = remaining;
     }
 
-    /** @brief Check all upper indices are within [0, length). */
+    /** @brief Check all upper indices are within [0, dim_length). */
     static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
                                                            const index_t* upper)
     {
-        for(index_t d = 0; d < t.ndim_upper; ++d)
+        auto d = readSchema(t);
+        for(index_t i = 0; i < t.ndim_upper; ++i)
         {
-            if(upper[d] < 0 || upper[d] >= t.lengths[d])
-            {
+            if(upper[i] < 0 || upper[i] >= d.dim_lengths[i])
                 return false;
-            }
         }
         return true;
     }
@@ -102,7 +94,8 @@ struct TransformImpl<TransformType::EMBED>
     static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
                                                              index_t i)
     {
-        return t.lengths[i];
+        auto d = readSchema(t);
+        return d.dim_lengths[i];
     }
 };
 

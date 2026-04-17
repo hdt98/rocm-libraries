@@ -64,3 +64,4 @@ struct TransformImpl
 #include "ck_tile/experimental/core/tensor/transforms/merge.hpp"
 #include "ck_tile/experimental/core/tensor/transforms/unmerge.hpp"
 #include "ck_tile/experimental/core/tensor/transforms/pad.hpp"
+#include "ck_tile/experimental/core/tensor/transforms/xor.hpp"

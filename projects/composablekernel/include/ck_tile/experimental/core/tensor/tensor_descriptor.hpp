@@ -20,10 +20,10 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-
 namespace ck_tile {
 
-/// Maximum tensor dimensions. Matches MAX_IO_DIMS from transform_graph.hpp.
+/// Maximum tensor dimensions. Determines capacity of TensorDescriptor,
+/// DimIds routing arrays, Embed schema, and TransformGraph endpoints.
 inline constexpr index_t MAX_TENSOR_DIMS = 64;
 
 /** @brief Pure metadata describing a tensor's shape and memory layout.

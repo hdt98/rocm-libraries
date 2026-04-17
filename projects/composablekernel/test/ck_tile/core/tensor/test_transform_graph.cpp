@@ -460,16 +460,45 @@ static_assert(doMagicDiv(8, computeMagicDiv(8)) == 1, "8 / 8 = 1");
 static_assert(doMagicDiv(1000000, computeMagicDiv(1000)) == 1000);
 
 // ============================================================================
-// Test 19: make_xor factory (no TransformImpl yet, just verify data)
+// Test 19: XOR factory and traversal
 // ============================================================================
 
 constexpr auto xor_xform = make_xor(4, 8);
 static_assert(xor_xform.type == TransformType::XOR);
 static_assert(xor_xform.ndim_upper == 2);
 static_assert(xor_xform.ndim_lower == 2);
-static_assert(xor_xform.lengths[0] == 4);
-static_assert(xor_xform.lengths[1] == 8);
 static_assert(xor_xform.is_bijective == true);
+
+// XOR schema access via readSchema
+constexpr auto xor_schema = TransformImpl<TransformType::XOR>::readSchema(xor_xform);
+static_assert(xor_schema.length_0 == 4);
+static_assert(xor_schema.length_1 == 8);
+
+// XOR traversal: apply to a 2D graph
+constexpr auto desc_xor_base =
+    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{8, 1});
+constexpr auto xor_base = detail::make_transform_graph(desc_xor_base);
+constexpr auto xor_graph =
+    detail::applyTransforms(xor_base,
+                            static_array<CoordinateTransform, 1>{make_xor(4, 8)},
+                            static_array<DimIds, 1>{dims(0, 1)},
+                            static_array<DimIds, 1>{dims(0, 1)});
+
+// XOR(row=2, col=5): lower[0]=2, lower[1]=5^(2%8)=5^2=7
+// offset = 2*8 + 7 = 23
+static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{2, 5}) == 23);
+
+// XOR(row=0, col=3): lower[0]=0, lower[1]=3^(0%8)=3^0=3
+// offset = 0*8 + 3 = 3
+static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{0, 3}) == 3);
+
+// XOR(row=3, col=0): lower[0]=3, lower[1]=0^(3%8)=0^3=3
+// offset = 3*8 + 3 = 27
+static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{3, 0}) == 27);
+
+// XOR is self-inverse: reverse(offset) -> original coords
+static_assert(detail::reverseCalculateOffset<xor_graph>(23)[0] == 2);
+static_assert(detail::reverseCalculateOffset<xor_graph>(23)[1] == 5);
 
 // ============================================================================
 // Test 20: transform() / upper() / lower() API — GEMM LDS via new syntax
@@ -531,6 +560,136 @@ static_assert(binding.lower_dims[1] == -1);
 // upper() and lower() are aliases for dims()
 static_assert(upper(0, 2) == dims(0, 2));
 static_assert(lower(1) == dims(1));
+
+// ============================================================================
+// Test 23: MAX_TENSOR_DIMS (5-way merge/unmerge)
+// ============================================================================
+
+constexpr auto desc_flat_720 = make_tensor_descriptor(static_array<index_t, 1>{720});
+constexpr auto flat_720      = detail::make_transform_graph(desc_flat_720);
+
+// 5-way unmerge: 720 = 2 * 3 * 4 * 5 * 6
+constexpr auto unmerged_5 = detail::applyTransforms(
+    flat_720,
+    static_array<CoordinateTransform, 1>{make_unmerge(static_array<index_t, 5>{2, 3, 4, 5, 6})},
+    static_array<DimIds, 1>{dims(0)},
+    static_array<DimIds, 1>{dims(0, 1, 2, 3, 4)});
+
+static_assert(unmerged_5.ndim_upper == 5);
+// {1, 2, 3, 4, 5} -> 1*360 + 2*120 + 3*30 + 4*6 + 5*1 = 360+240+90+24+5 = 719
+static_assert(detail::calculateOffset<unmerged_5>(static_array<index_t, 5>{1, 2, 3, 4, 5}) == 719);
+static_assert(detail::calculateOffset<unmerged_5>(static_array<index_t, 5>{0, 0, 0, 0, 0}) == 0);
+
+// 5-way merge back: roundtrip
+constexpr auto remerged_5 = detail::applyTransforms(
+    unmerged_5,
+    static_array<CoordinateTransform, 1>{make_merge(static_array<index_t, 5>{2, 3, 4, 5, 6})},
+    static_array<DimIds, 1>{dims(0, 1, 2, 3, 4)},
+    static_array<DimIds, 1>{dims(0)});
+
+static_assert(remerged_5.ndim_upper == 1);
+static_assert(detail::calculateOffset<remerged_5>(static_array<index_t, 1>{0}) == 0);
+static_assert(detail::calculateOffset<remerged_5>(static_array<index_t, 1>{719}) == 719);
+static_assert(detail::calculateOffset<remerged_5>(static_array<index_t, 1>{360}) == 360);
+
+// Reverse 5-way
+static_assert(detail::reverseCalculateOffset<remerged_5>(719)[0] == 719);
+
+// ============================================================================
+// Test 24: MAX_TENSOR_DIMS boundary (64 dimensions)
+// ============================================================================
+
+// Create a 64-dim packed descriptor (all lengths = 1 except last = 2)
+consteval auto make_64d_descriptor()
+{
+    static_array<index_t, 64> lengths{};
+    for(index_t i = 0; i < 63; ++i)
+        lengths[i] = 1;
+    lengths[63] = 2;
+    return make_tensor_descriptor(lengths);
+}
+
+constexpr auto desc_64d = make_64d_descriptor();
+static_assert(desc_64d.ndim == 64);
+static_assert(desc_64d.element_space_size == 2);
+static_assert(desc_64d.lengths[0] == 1);
+static_assert(desc_64d.lengths[63] == 2);
+static_assert(desc_64d.strides[63] == 1);
+static_assert(desc_64d.strides[62] == 2);
+
+// A more practical high-dim test: 10 dimensions
+constexpr auto desc_10d =
+    make_tensor_descriptor(static_array<index_t, 10>{2, 2, 2, 2, 2, 2, 2, 2, 2, 2});
+static_assert(desc_10d.ndim == 10);
+static_assert(desc_10d.element_space_size == 1024);
+static_assert(desc_10d.strides[0] == 512);
+static_assert(desc_10d.strides[9] == 1);
+
+// ============================================================================
+// Test 25: Descriptor with explicit strides at max dims (5D strided)
+// ============================================================================
+
+constexpr auto desc_5d_strided = make_tensor_descriptor(
+    static_array<index_t, 5>{4, 8, 16, 32, 64},
+    static_array<index_t, 5>{16384 * 2, 16384, 1024, 32, 1}); // padded strides
+
+static_assert(desc_5d_strided.ndim == 5);
+// element_space_size = 1 + 3*32768 + 7*16384 + 15*1024 + 31*32 + 63*1
+//                    = 1 + 98304 + 114688 + 15360 + 992 + 63 = 229408
+static_assert(desc_5d_strided.element_space_size == 229408);
+
+// ============================================================================
+// Test 26: 64D Embed transform (TransformGraph from 64D descriptor)
+// ============================================================================
+
+// Build a transform graph from the 64D descriptor — creates a 64D Embed
+constexpr auto graph_64d = detail::make_transform_graph(desc_64d);
+static_assert(graph_64d.ndim_upper == 64);
+static_assert(graph_64d.ndim_lower == 1);
+static_assert(graph_64d.num_transforms == 1);
+
+// All-zero coordinate -> offset 0
+consteval index_t test_64d_zero()
+{
+    static_array<index_t, 64> coord{};
+    return detail::calculateOffset<graph_64d>(coord);
+}
+static_assert(test_64d_zero() == 0);
+
+// Only the last dim set to 1 -> offset 1 (stride[63] = 1)
+consteval index_t test_64d_last()
+{
+    static_array<index_t, 64> coord{};
+    coord[63] = 1;
+    return detail::calculateOffset<graph_64d>(coord);
+}
+static_assert(test_64d_last() == 1);
+
+// 10D graph from 10D descriptor — exercises multi-dim Embed
+constexpr auto graph_10d = detail::make_transform_graph(desc_10d);
+static_assert(graph_10d.ndim_upper == 10);
+static_assert(graph_10d.ndim_lower == 1);
+
+// All ones: offset = sum of strides = 512+256+128+64+32+16+8+4+2+1 = 1023
+consteval index_t test_10d_all_ones()
+{
+    static_array<index_t, 10> coord{};
+    for(index_t i = 0; i < 10; ++i)
+        coord[i] = 1;
+    return detail::calculateOffset<graph_10d>(coord);
+}
+static_assert(test_10d_all_ones() == 1023);
+
+// Reverse 10D: offset 1023 -> all ones
+consteval bool test_10d_reverse()
+{
+    auto result = detail::reverseCalculateOffset<graph_10d>(1023);
+    for(index_t i = 0; i < 10; ++i)
+        if(result[i] != 1)
+            return false;
+    return true;
+}
+static_assert(test_10d_reverse());
 
 } // anonymous namespace
 

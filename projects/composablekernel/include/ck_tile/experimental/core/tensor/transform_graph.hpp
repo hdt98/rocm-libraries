@@ -232,8 +232,7 @@ namespace ck_tile {
 
 inline constexpr index_t MAX_TRANSFORMS = 5; ///< Max transforms per graph
 inline constexpr index_t MAX_SLOTS =
-    70; ///< Max working array slots (1 + MAX_IO_DIMS for base Embed)
-inline constexpr index_t MAX_IO_DIMS = 64; ///< Max input or output dimensions
+    70; ///< Max working array slots (1 + MAX_TENSOR_DIMS for base Embed)
 
 namespace detail {
 
@@ -277,15 +276,15 @@ struct TransformGraph
     index_t num_slots = 0;
 
     // --- Input / output dimensions ---
-    index_t ndim_upper = 0;                           ///< Number of input coordinate dimensions
-    index_t ndim_lower = 0;                           ///< Number of output coordinate dimensions
-    static_array<index_t, MAX_IO_DIMS> upper_slots{}; ///< Which slots receive input coords
-    static_array<index_t, MAX_IO_DIMS> lower_slots{}; ///< Which slots hold output coords
+    index_t ndim_upper = 0; ///< Number of input coordinate dimensions
+    index_t ndim_lower = 0; ///< Number of output coordinate dimensions
+    static_array<index_t, MAX_TENSOR_DIMS> upper_slots{}; ///< Which slots receive input coords
+    static_array<index_t, MAX_TENSOR_DIMS> lower_slots{}; ///< Which slots hold output coords
 
     constexpr bool operator==(const TransformGraph&) const = default;
 };
 
-static_assert(sizeof(TransformGraph) < 2048,
+static_assert(sizeof(TransformGraph) < 16384,
               "TransformGraph NTTP size canary — consider capacity templating if this fires");
 
 // ============================================================================
@@ -305,7 +304,7 @@ CK_TILE_HOST_DEVICE constexpr void applySingleTransform(static_array<index_t, G.
     constexpr auto transform = G.transforms[t];
 
     // Gather inputs from working array
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> t_upper{};
+    static_array<index_t, MAX_TENSOR_DIMS> t_upper{};
     for(index_t d = 0; d < transform.ndim_upper; ++d)
     {
         t_upper[d] = slots[G.t_upper_slots[t][d]];
@@ -313,7 +312,7 @@ CK_TILE_HOST_DEVICE constexpr void applySingleTransform(static_array<index_t, G.
 
     // Static dispatch — TransformImpl<Type> selected at compile time.
     // No switch, no dead branches, no runtime dispatch.
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> t_lower{};
+    static_array<index_t, MAX_TENSOR_DIMS> t_lower{};
     TransformImpl<transform.type>::mapIndices(transform, t_lower.elems, t_upper.elems);
 
     // Scatter outputs back to working array
@@ -458,14 +457,14 @@ reverseApplySingleTransform(static_array<index_t, G.num_slots>& slots)
     constexpr auto transform = G.transforms[t];
 
     // Gather from output slots (we're going backwards through the wiring)
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> t_lower{};
+    static_array<index_t, MAX_TENSOR_DIMS> t_lower{};
     for(index_t d = 0; d < transform.ndim_lower; ++d)
     {
         t_lower[d] = slots[G.t_lower_slots[t][d]];
     }
 
     // Reverse dispatch — each TransformImpl provides reverseMapIndices
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> t_upper{};
+    static_array<index_t, MAX_TENSOR_DIMS> t_upper{};
     TransformImpl<transform.type>::reverseMapIndices(transform, t_upper.elems, t_lower.elems);
 
     // Scatter to input slots
@@ -497,6 +496,15 @@ reverseApplyAllTransforms(static_array<index_t, G.num_slots>& slots, sequence<Is
 template <TransformGraph G>
 CK_TILE_HOST_DEVICE constexpr void reverseMap(index_t* upper, const index_t* lower)
 {
+    // Verify all transforms are bijective at compile time
+    static_assert(
+        []() constexpr {
+            for(index_t t = 0; t < G.num_transforms; ++t)
+                if(!G.transforms[t].is_bijective)
+                    return false;
+            return true;
+        }(),
+        "reverseMap: all transforms must be bijective");
     static_array<index_t, G.num_slots> slots{};
 
     // Place lower coordinate into lower slots

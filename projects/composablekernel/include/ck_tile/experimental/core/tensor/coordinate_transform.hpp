@@ -4,13 +4,19 @@
 /** @file coordinate_transform.hpp
  *  @brief Pure data struct describing a single coordinate transform.
  *
- *  CoordinateTransform carries ONLY data — no dispatch logic, no mapping functions.
- *  Behavior is provided by TransformImpl<Type> specializations (static polymorphism).
+ *  CoordinateTransform carries an opaque data buffer interpreted by
+ *  TransformImpl<Type> specializations via typed schema structs.
  *
- *  This separation means:
- *  - CoordinateTransform is a structural NTTP (pure aggregate, defaulted ==)
- *  - Adding a new transform type does NOT modify this struct
- *  - Each TransformImpl<Type> is self-contained in its own file
+ *  Each TransformImpl defines:
+ *    - A nested Schema struct with named fields + private padding
+ *    - readSchema(CoordinateTransform) to read buffer -> typed Schema via bit_cast
+ *    - writeSchema(CoordinateTransform&, Schema) to write typed Schema -> buffer via bit_cast
+ *
+ *  This design means:
+ *    - CoordinateTransform is a structural NTTP (aggregate, defaulted ==)
+ *    - Adding a new transform does NOT modify this struct
+ *    - Field names are self-documenting per-transform (e.g., PadData::left_pad)
+ *    - No field interpretation table needed
  *
  *  WARNING: Do NOT replace static_array with ck_tile::array or std::array.
  *  - ck_tile::array has user-provided constructors -> not a structural type -> breaks NTTP.
@@ -23,70 +29,47 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
+#include "ck_tile/core/utility/bit_cast.hpp"
+#include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp" // MAX_TENSOR_DIMS
 #include "ck_tile/experimental/core/tensor/transform_type.hpp"
 #include "ck_tile/experimental/core/tensor/magic_division.hpp"
 
 namespace ck_tile {
 
-/// Maximum dimensions per transform. Observed max in ck_tile: 5 (3D conv merge).
-inline constexpr index_t MAX_DIMS_PER_TRANSFORM = 5;
-
 /// Alias for dimension index arrays used in graph routing.
-using DimIds = static_array<index_t, MAX_DIMS_PER_TRANSFORM>;
+using DimIds = static_array<index_t, MAX_TENSOR_DIMS>;
+
+/// Size of the opaque data buffer in CoordinateTransform.
+/// Must accommodate the largest Schema: Embed with MAX_TENSOR_DIMS (64) dimensions
+/// requires 64 dim_lengths (256B) + 64 strides (256B) + 64 magic_divs (512B) = 1024B.
+inline constexpr index_t MAX_TRANSFORM_DATA_SIZE = 1032;
+
+/// Type alias for the opaque data buffer.
+using TransformDataBuffer = static_array<uint8_t, MAX_TRANSFORM_DATA_SIZE>;
 
 /** @brief Pure data describing a single coordinate mapping.
  *
- *  Each CoordinateTransform describes WHAT a transform does (its parameters),
- *  not HOW it does it (that is in TransformImpl<Type>).
+ *  The data buffer is opaque — each TransformImpl<Type> defines a typed
+ *  Schema struct with named fields. The Schema is the same
+ *  size as the buffer (padded with a private _pad member). Conversion
+ *  between buffer and schema uses constexpr bit_cast.
  *
- *  Field interpretation by TransformType:
+ *  Example usage in a TransformImpl:
+ *    auto d = readSchema(t);        // bit_cast<Schema>(t.data) — typed view
+ *    lower[0] = d.left_pad;     // self-documenting field access
  *
- *  | Type          | lengths[]                | coefficients[]           | magic_divs[]   |
- *  |---------------|--------------------------|--------------------------|----------------|
- *  | PASS_THROUGH  | [0]=dim_length           | --                       | --             |
- *  | PAD           | [0]=unpadded_length      | [0]=left_pad,[1]=right   | --             |
- *  | EMBED         | dim_lengths[0..N-1]      | strides[0..N-1]          | --             |
- *  | MERGE         | component_lengths[0..N-1]| divisors[0..N-2]         | [0..N-2]       |
- *  | UNMERGE       | component_lengths[0..N-1]| strides[0..N-1] (prefix) | --             |
- *  | XOR           | [0],[1]=dim_lengths      | --                       | --             |
- *  | OFFSET        | [0]=dim_length           | [0]=offset_value         | --             |
- *  | FREEZE        | [0]=frozen_index         | --                       | --             |
- *  | SLICE         | [0]=unsliced_length      | [0]=begin,[1]=end        | --             |
- *  | MODULO        | [0]=modulus              | [0]=dim_length           | --             |
- *
- *  Note on MERGE vs UNMERGE (direction matches v1's upper/lower convention):
- *  - MERGE: ndim_upper=1 (user-facing merged value), ndim_lower=N (memory-side components).
- *    During traversal: DECOMPOSES 1 merged value into N components via magic division.
- *    lengths = component sizes, coefficients = divisors, magic_divs = pre-computed constants.
- *  - UNMERGE: ndim_upper=N (user-facing components), ndim_lower=1 (memory-side flat value).
- *    During traversal: COMPOSES N components into 1 flat value via multiply-accumulate.
- *    lengths = component sizes, coefficients = strides (prefix products).
- *
- *  Unused array slots MUST be zero-initialized for NTTP deduplication.
- *  Factory functions (make_pass_through, make_merge, etc.) guarantee this.
+ *  Unused buffer bytes MUST be zero-initialized for NTTP deduplication.
+ *  Factory functions guarantee this via schema default initialization.
  */
 struct CoordinateTransform
 {
-    TransformType type = TransformType::UNDEFINED;
-    index_t ndim_upper = 0; ///< Dims on the user side (top of stack)
-    index_t ndim_lower = 0; ///< Dims on the memory side (bottom of stack)
-
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> lengths{};
-    static_array<index_t, MAX_DIMS_PER_TRANSFORM> coefficients{};
-    static_array<MagicDivConstants, MAX_DIMS_PER_TRANSFORM> magic_divs{};
+    TransformType type     = TransformType::UNDEFINED;
+    index_t ndim_upper     = 0; ///< Dims on the user side (top of stack)
+    index_t ndim_lower     = 0; ///< Dims on the memory side (bottom of stack)
     bool skip_bounds_check = false;
+    bool is_bijective      = false;
 
-    /// True if the transform is a bijection (1-1) over its valid input domain.
-    /// Set automatically by factory functions based on mathematical conditions:
-    ///   - Merge/Unmerge: always bijective (mixed-radix uniqueness)
-    ///   - Embed: bijective iff stride[k] >= stride[k+1] * length[k+1] for all k
-    ///   - PassThrough: always bijective (identity)
-    ///   - Pad: bijective within valid range
-    /// A TransformGraph is reversible iff ALL its transforms are bijective.
-    bool is_bijective = false;
-
-    // Pure data — no member functions for dispatch.
-    // Behavior is in TransformImpl<Type> specializations.
+    TransformDataBuffer data{}; ///< Opaque — interpreted by TransformImpl via schema
 
     constexpr bool operator==(const CoordinateTransform&) const = default;
 };
