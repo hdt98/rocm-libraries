@@ -1989,7 +1989,7 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
 
         // find number of sub-blocks
         I levs = stedc_num_levels(n);
-        I blks = 1 << levs;
+        I blks = static_cast<I>(1) << levs;
 
         // initialize identity matrix in V
         // if evect is tridiagonal we can store V directly in C
@@ -2025,9 +2025,9 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
         // launch merge for level k
         for(I k = 0; k < levs; ++k)
         {
-            I n_merges = 1 << (levs - k - 1);
-            ROCSOLVER_LAUNCH_KERNEL(stedc_update_splits, dim3(1, batch_count), dim3(STEDC_BDIM),
-                                    (I)0, stream, levs, k, n, splits);
+            I n_merges = static_cast<I>(1) << (levs - k - 1);
+            ROCSOLVER_LAUNCH_KERNEL(stedc_update_splits, dim3(1, batch_count), dim3(STEDC_BDIM), (I) 0,
+                                    stream, levs, k, n, splits);
 
             // a. prepare secular equations
             ROCSOLVER_LAUNCH_KERNEL((stedc_mergePrepare_DeflateZero_kernel<S>),
@@ -2124,7 +2124,7 @@ rocblas_status rocsolver_stedc_template(rocblas_handle handle,
                             }
                         }
                         // there can only be 2 block sizes: ns[0] and ns[0]+1
-                        std::array<std::vector<rocblas_int>, 2> uniform_batch;
+                        std::array<std::vector<I>, 2> uniform_batch;
                         uniform_batch[0].reserve(n_merges);
                         uniform_batch[1].reserve(n_merges);
                         for(I i = 0, ps = 0; i < n_merges; ps += ns[i++])
