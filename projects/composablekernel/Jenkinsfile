@@ -552,32 +552,18 @@ def build_and_run_fmha(String arch){
     return cmd
 }
 
-// Dispatcher CI commands live in script/dispatcher_ci.sh (one mode per stage).
-// Keeping them out of the Jenkinsfile reduces Groovy CPS bytecode and lets
-// developers reproduce CI locally with `bash script/dispatcher_ci.sh <mode>`.
-def dispatcher_ci(String mode){
-    return "BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()} bash ../script/dispatcher_ci.sh ${mode}"
-}
-
-// Drives the dispatcher stage entirely from outside pipeline {} so it adds
-// almost nothing to the main CPS method's bytecode (Jenkins 64KB limit).
-// Outer stage allocates one nogpu agent for orchestration; the GPU branch
-// allocates its own gfx950 node via scripted node() and runs in parallel
-// with the sequential nogpu workloads (CPU → Heuristics → Stress).
+// Dispatcher CI: orchestration logic lives in script/dispatcher_ci.sh.
+// Jenkins side just selects nogpu vs gpu node and forwards RUN_* env vars;
+// the script picks which sub-modes to execute based on those env vars.
+// Reproduce locally: `RUN_CPU=true bash script/dispatcher_ci.sh nogpu`.
 def run_dispatcher_all(){
-    def runJob = { String mode -> buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci(mode)) }
+    def envs = "RUN_CPU=${params.RUN_DISPATCHER_CPU_TESTS} RUN_HEUR=${params.RUN_DISPATCHER_HEURISTICS_TESTS} RUN_STRESS=${params.RUN_DISPATCHER_STRESS_TESTS} BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()}"
     def branches = [:]
-    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean() ||
-        params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() ||
-        params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
-        branches['DISPATCHER nogpu'] = {
-            if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean())        { runJob('cpu') }
-            if (params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean()) { runJob('heuristics') }
-            if (params.RUN_DISPATCHER_STRESS_TESTS.toBoolean())     { runJob('stress') }
-        }
+    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean() || params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() || params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
+        branches['DISPATCHER nogpu'] = { node(rocmnode("nogpu")) { buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: "${envs} bash ../script/dispatcher_ci.sh nogpu"); cleanWs() } }
     }
     if (params.RUN_DISPATCHER_GPU_TESTS.toBoolean()) {
-        branches['DISPATCHER gfx950'] = { node(rocmnode("gfx950")) { runJob('gpu'); cleanWs() } }
+        branches['DISPATCHER gfx950'] = { node(rocmnode("gfx950")) { buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: "${envs} bash ../script/dispatcher_ci.sh gpu"); cleanWs() } }
     }
     if (branches) { parallel(branches) }
 }
@@ -695,6 +681,14 @@ def cmake_build(Map conf=[:]){
     def execute_cmd = conf.get("execute_cmd", "")
     //check the node gpu architecture
     def arch_name = check_arch_name()
+    // Common smart-build env exports — sourced by both NINJA_BUILD_TRACE and
+    // non-trace sh blocks. 
+    def smart_build_env = """
+        export WORKSPACE_ROOT=${env.WORKSPACE}
+        export PARALLEL=32
+        export NINJA_JOBS=${nt}
+        export ARCH_NAME=${arch_name}
+    """
     if(!setup_args.contains("NO_CK_BUILD")){
         if (params.NINJA_BUILD_TRACE) {
             echo "running ninja build trace"
@@ -782,10 +776,7 @@ def cmake_build(Map conf=[:]){
                     if (!runAllUnitTests){
                         // Smart Build: Run smart_build_and_test.sh
                         sh """
-                            export WORKSPACE_ROOT=${env.WORKSPACE}
-                            export PARALLEL=32
-                            export NINJA_JOBS=${nt}
-                            export ARCH_NAME=${arch_name}
+                            ${smart_build_env}
                             export PROCESS_NINJA_TRACE=true
                             export NINJA_FTIME_TRACE=${params.NINJA_FTIME_TRACE ? 'true' : 'false'}
                             bash ../script/dependency-parser/smart_build_and_test.sh
@@ -841,10 +832,7 @@ def cmake_build(Map conf=[:]){
                     if (!runAllUnitTests){
                         // Smart Build: Run smart_build_and_test.sh
                         sh """
-                            export WORKSPACE_ROOT=${env.WORKSPACE}
-                            export PARALLEL=32
-                            export NINJA_JOBS=${nt}
-                            export ARCH_NAME=${arch_name}
+                            ${smart_build_env}
                             export PROCESS_NINJA_TRACE=false
                             export NINJA_FTIME_TRACE=false
                             bash ../script/dependency-parser/smart_build_and_test.sh
@@ -1913,11 +1901,8 @@ pipeline {
 
         stage("Run DISPATCHER Tests")
         {
-            when {
-                beforeAgent true
-                expression { env.SHOULD_RUN_CI.toBoolean() }
-            }
-            agent{ label rocmnode("nogpu") }
+            when { beforeAgent true; expression { env.SHOULD_RUN_CI.toBoolean() } }
+            agent none
             steps{ script { run_dispatcher_all() } }
         }
 

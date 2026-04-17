@@ -2,12 +2,13 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 #
-# Usage: dispatcher_ci.sh <mode>
-#   mode = cpu | gpu | stress | heuristics
+# Usage: dispatcher_ci.sh <node_type>
+#   node_type = nogpu | gpu
 #
-# Configures, builds, and runs dispatcher tests for the requested mode.
-# Invoked from the CK Jenkinsfile (one wrapper per dispatcher sub-stage),
-# but also runnable locally for reproducing CI failures.
+# nogpu: Runs CPU + Heuristics + Stress sub-modes based on env vars
+#        RUN_CPU, RUN_HEUR, RUN_STRESS (each "true" to enable). Shares
+#        cmake+ninja across CPU and Stress (identical build args) for speed.
+# gpu:   Runs GPU integration tests on a gfx950 node.
 #
 # Working directory: must be a fresh build/ directory under
 # projects/composablekernel/ (the script invokes cmake with `..`).
@@ -16,25 +17,21 @@
 #   BUILD_COMPILER   Path to clang++ (default: /opt/rocm/llvm/bin/clang++)
 #   NUM_THREADS      Build parallelism (default: $(nproc))
 #   GPU_TARGET       GPU arch (default: gfx950 — only validated arch)
+#   RUN_CPU/RUN_HEUR/RUN_STRESS   "true" to enable each nogpu sub-mode
+#
+# Reproduce locally:
+#   RUN_CPU=true RUN_STRESS=true bash script/dispatcher_ci.sh nogpu
 
 set -eu
 set -o pipefail 2>/dev/null | true
 
-MODE="${1:?Usage: dispatcher_ci.sh <cpu|gpu|stress|heuristics>}"
+NODE_TYPE="${1:?Usage: dispatcher_ci.sh <nogpu|gpu>}"
 BUILD_COMPILER="${BUILD_COMPILER:-/opt/rocm/llvm/bin/clang++}"
 NUM_THREADS="${NUM_THREADS:-$(nproc)}"
 GPU_TARGET="${GPU_TARGET:-gfx950}"
 
-# Heuristics is a pure-Python pytest run with no cmake build.
-if [ "$MODE" = "heuristics" ]; then
-    cd ../dispatcher
-    pip install -r requirements-ml.txt
-    exec python3 -m pytest heuristics/tests/ -v --tb=short
-fi
-
-# Common cmake args for all build-based modes. BUILD_TESTING=OFF skips CK's
-# test/ subdir; dispatcher's own enable_testing() still registers tests in
-# build/dispatcher/CTestTestfile.cmake.
+# Common cmake args. BUILD_TESTING=OFF skips CK's test/ subdir; dispatcher's
+# own enable_testing() still registers tests in build/dispatcher/CTestTestfile.cmake.
 COMMON_CMAKE_ARGS=(
     -G Ninja
     -D CMAKE_PREFIX_PATH=/opt/rocm
@@ -52,19 +49,27 @@ COMMON_CMAKE_ARGS=(
     -D BUILD_DISPATCHER_TESTS=ON
 )
 
-case "$MODE" in
-    cpu)
-        cmake "${COMMON_CMAKE_ARGS[@]}" \
-            -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF ..
-        ninja -j"${NUM_THREADS}"
-        cd dispatcher
-        # Note: cpp tests (-L dispatcher -L cpp) are intentionally NOT run.
-        # 8 of 16 dispatcher cpp tests fail/segfault on current source —
-        # pre-existing dispatcher bugs to be fixed separately. Re-add the
-        # cpp ctest invocation once those tests are stabilized.
-        # Multi -L AND-intersects; -LE excludes by label. Skips stress and
-        # integration on PR runs (they have dedicated stages).
-        ctest --output-on-failure -L dispatcher -L python -LE 'stress|integration'
+case "$NODE_TYPE" in
+    nogpu)
+        # Build once if any cmake-based sub-mode is enabled (CPU or Stress
+        # have identical cmake args, so they share build+ninja).
+        if [ "${RUN_CPU:-false}" = "true" ] || [ "${RUN_STRESS:-false}" = "true" ]; then
+            cmake "${COMMON_CMAKE_ARGS[@]}" -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF ..
+            ninja -j"${NUM_THREADS}"
+        fi
+        # CPU: skips stress + integration (have dedicated runs); cpp tests
+        # intentionally NOT run (8/16 cpp tests fail; tracked separately).
+        if [ "${RUN_CPU:-false}" = "true" ]; then
+            ( cd dispatcher && ctest --output-on-failure -L dispatcher -L python -LE 'stress|integration' )
+        fi
+        if [ "${RUN_STRESS:-false}" = "true" ]; then
+            ( cd dispatcher && ctest --output-on-failure -L dispatcher -L stress )
+        fi
+        # Heuristics is a pure-Python pytest run with no cmake build.
+        if [ "${RUN_HEUR:-false}" = "true" ]; then
+            ( cd ../dispatcher && pip install -r requirements-ml.txt && \
+              python3 -m pytest heuristics/tests/ -v --tb=short )
+        fi
         ;;
 
     gpu)
@@ -78,17 +83,9 @@ case "$MODE" in
         ctest --output-on-failure -L dispatcher -L python -L integration -LE stress
         ;;
 
-    stress)
-        cmake "${COMMON_CMAKE_ARGS[@]}" \
-            -D BUILD_DISPATCHER_REAL_KERNEL_TESTS=OFF ..
-        ninja -j"${NUM_THREADS}"
-        cd dispatcher
-        ctest --output-on-failure -L dispatcher -L stress
-        ;;
-
     *)
-        echo "Error: unknown mode '$MODE'" >&2
-        echo "Usage: dispatcher_ci.sh <cpu|gpu|stress|heuristics>" >&2
+        echo "Error: unknown node_type '$NODE_TYPE'" >&2
+        echo "Usage: dispatcher_ci.sh <nogpu|gpu>" >&2
         exit 2
         ;;
 esac
