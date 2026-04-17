@@ -221,6 +221,7 @@ endif()
 
 # Benchmarks
 if(BUILD_BENCHMARK)
+  find_package(amd_smi REQUIRED)
   if (ROCPRIM_PROJECT_IS_TOP_LEVEL)
     rocm_package_setup_client_component(benchmarks)
   endif()
