@@ -16,7 +16,8 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Changed
 
-* Replaced occurrences of double underscores in test suite names within the benchmarking client, for example, `checkin_lapack/GETRS.__float/0` was changed to `checkin_lapack/GETRS._float/0`.
+* Renamed the LARFB parameterized GTest cases from `_float`/`_double`/`_float_complex`/`_double_complex` to `type_float`/`type_double`/`type_float_complex`/`type_double_complex` to avoid generating reserved C++ identifiers (double underscores) in the test class names.
+* Replaced opaque numeric parameter indices in LARFB test names with a descriptive encoding of the argument values, for example, `daily_lapack/LARFB._float/0` is now `daily_lapack/LARFB.type_float/direct_F_k_35_lda_192_ldt_35_ldv_192_m_192_n_192_side_L_storev_C_trans_T`.
 
 ### Removed
 ### Optimized
