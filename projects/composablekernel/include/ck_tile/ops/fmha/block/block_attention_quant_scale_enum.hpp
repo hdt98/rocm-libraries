@@ -15,6 +15,8 @@ enum class BlockAttentionQuantScaleEnum
     BLOCKSCALE    = 2,
     KV_BLOCKSCALE = 3, // Q per-tensor, K/V per-page block scale
     MX            = 4, // Microscaling
+    PERBLOCK      = 5, // Per-block (per-tile) Q/K/V descaling
+    ROWWISE       = 6, // Row-wise Q/K/V descaling
 };
 
 template <BlockAttentionQuantScaleEnum>
@@ -44,6 +46,16 @@ template <>
 struct BlockAttentionQuantScaleEnumToStr<BlockAttentionQuantScaleEnum::MX>
 {
     static constexpr const char* name = "mx";
+};
+template <>
+struct BlockAttentionQuantScaleEnumToStr<BlockAttentionQuantScaleEnum::PERBLOCK>
+{
+    static constexpr const char* name = "perblock";
+};
+template <>
+struct BlockAttentionQuantScaleEnumToStr<BlockAttentionQuantScaleEnum::ROWWISE>
+{
+    static constexpr const char* name = "rowwise";
 };
 
 } // namespace ck_tile

@@ -19,6 +19,8 @@ enum class quant_scale_enum
     blockscale    = 2,
     kv_blockscale = 3, // Q per-tensor, K/V per-page block scale
     mx            = 4, // Microscaling (MX)
+    perblock      = 5, // Per-block (per-tile) Q/K/V descaling
+    rowwise       = 6, // Row-wise Q/K/V descaling
 };
 
 struct quant_scale_info
@@ -37,6 +39,10 @@ struct quant_scale_info
             os << "kvbs";
         else if(type == quant_scale_enum::mx)
             os << "mx";
+        else if(type == quant_scale_enum::perblock)
+            os << "pb";
+        else if(type == quant_scale_enum::rowwise)
+            os << "rw";
     }
 
     static quant_scale_info decode(std::string str)
@@ -61,6 +67,14 @@ struct quant_scale_info
         else if(str == "mx" || str == "4")
         {
             info.type = quant_scale_enum::mx;
+        }
+        else if(str == "pb" || str == "5")
+        {
+            info.type = quant_scale_enum::perblock;
+        }
+        else if(str == "rw" || str == "6")
+        {
+            info.type = quant_scale_enum::rowwise;
         }
         else
         {

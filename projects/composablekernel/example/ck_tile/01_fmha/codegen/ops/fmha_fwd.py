@@ -1052,7 +1052,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
             # no need lse/dropout kernels
             for logits, qscale, mask, bias, sink in itertools.product(
                 ["t", "f"],
-                ["no", "pertensor", "blockscale"],
+                ["no", "pertensor", "blockscale", "perblock"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
                 ["f", "t"],
@@ -1327,7 +1327,7 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
             # no need lse/dropout kernels
             for logits, qscale, mask, bias in itertools.product(
                 ["f"],
-                ["no", "pertensor", "blockscale"],
+                ["no", "pertensor", "blockscale", "perblock"],
                 get_mask_map(mask_impl).keys(),
                 ["no"],
             ):
