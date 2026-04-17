@@ -228,14 +228,8 @@ class DataType:
             'nameAbbrev': 'fp6',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.1875,
-<<<<<<< HEAD
-            'hip': 'ERROR' if platform.system() == 'Windows' else 'tensile_float6x32',
-            'isComplex': False,
-            'packing': 1 if platform.system() == 'Windows' else 32,
-=======
             'hip': 'tensile_Float6x16',
             'isComplex': False
->>>>>>> origin/develop
         },
         {
             'enum': DataTypeEnum.BFloat6,
@@ -243,14 +237,8 @@ class DataType:
             'nameAbbrev': 'bf6',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.1875,
-<<<<<<< HEAD
-            'hip': 'ERROR' if platform.system() == 'Windows' else 'tensile_bfloat6x32',
-            'isComplex': False,
-            'packing': 1 if platform.system() == 'Windows' else 32,
-=======
             'hip': 'tensile_bFloat6x16',
             'isComplex': False
->>>>>>> origin/develop
         },
         {
             'enum': DataTypeEnum.Float4,
@@ -258,11 +246,6 @@ class DataType:
             'nameAbbrev': 'fp4',
             'miOutTypeNameAbbrev': 'f32',
             'reg': 0.125,
-<<<<<<< HEAD
-            'hip': 'ERROR' if platform.system() == 'Windows' else 'tensile_float4x2',
-            'isComplex': False,
-            'packing': 1 if platform.system() == 'Windows' else 2,
-=======
             'hip': 'tensile_float4x2',
             'isComplex': False
         },
@@ -283,7 +266,6 @@ class DataType:
             'reg': 0.25,
             'hip': 'ERROR',
             'isComplex': False,
->>>>>>> origin/develop
         },
     ]
     lookup = {}
