@@ -49,7 +49,7 @@ static bool isMovableSideEffect(const StinkyInstruction& inst) {
 // (only when both endpoints are inside the region).
 static void scheduleRegionWithMovableSideEffects(
     IRList::iterator regionStart, IRList::iterator regionEnd, IRList::iterator blockBegin,
-    std::vector<StinkyInstruction*>& scheduled, ReadyQueue& readyQueue,
+    std::vector<IRBase*>& scheduled, ReadyQueue& readyQueue,
     const std::unordered_map<StinkyInstruction*, unsigned>& wmmaIndex) {
     if (regionStart == regionEnd) {
         return;  // Empty region, nothing to schedule.
@@ -308,6 +308,14 @@ static void scheduleRegionWithMovableSideEffects(
     }
 }
 
+static bool hasLdsPseudoRegs(const StinkyInstruction& inst) {
+    for (const StinkyRegister& r : inst.getSrcRegs())
+        if (r.isRegister() && r.reg.type == RegType::LDS) return true;
+    for (const StinkyRegister& r : inst.getDestRegs())
+        if (r.isRegister() && r.reg.type == RegType::LDS) return true;
+    return false;
+}
+
 static bool hasSideEffect(const StinkyInstruction& inst) {
     if (
         // TODO: provide a configurable way to ignore certain instructions,
@@ -317,6 +325,11 @@ static bool hasSideEffect(const StinkyInstruction& inst) {
         //
         isGlobalMemStore(inst) || isBranch(inst) || isBarrier(inst) || isWaitCnt(inst) ||
         isHasSideEffect(inst)) {
+        return true;
+    }
+    // Memory ops without LDS pseudo-registers (no MemTokenData assigned)
+    // must be treated as non-movable side effects to preserve strict ordering.
+    if ((isTensorLoad(inst) || isDSRead(inst) || isDSWrite(inst)) && !hasLdsPseudoRegs(inst)) {
         return true;
     }
     return false;
@@ -334,7 +347,7 @@ static void scheduleInDAG(BasicBlock& bb, ReadyQueue& readyQueue,
 
     if (bb.empty()) return;
 
-    std::vector<StinkyInstruction*> scheduled;
+    std::vector<IRBase*> scheduled;
     scheduled.reserve(bb.size());
 
     BasicBlock::iterator beginIt = bb.begin();
@@ -345,7 +358,20 @@ static void scheduleInDAG(BasicBlock& bb, ReadyQueue& readyQueue,
     BasicBlock::iterator regionStart = beginIt;
 
     for (BasicBlock::iterator it = beginIt; it != endIt; ++it) {
-        StinkyInstruction& inst = getStinkyInst(it);
+        IRBase* irNode = it.getNodePtr();
+        auto* instPtr = dyn_cast<StinkyInstruction>(irNode);
+
+        if (!instPtr) {
+            // Non-instruction IR (e.g. AsmDirective): treat as non-movable
+            // side-effect boundary so its position is strictly preserved.
+            scheduleRegionWithMovableSideEffects(regionStart, it, beginIt, scheduled, readyQueue,
+                                                 wmmaIndex);
+            scheduled.push_back(irNode);
+            regionStart = std::next(it);
+            continue;
+        }
+
+        StinkyInstruction& inst = *instPtr;
         // Only break regions on non-movable side effects
         if (hasSideEffect(inst) && !isMovableSideEffect(inst)) {
             scheduleRegionWithMovableSideEffects(regionStart, it, beginIt, scheduled, readyQueue,
@@ -369,9 +395,9 @@ static void scheduleInDAG(BasicBlock& bb, ReadyQueue& readyQueue,
 
     // Now we have a scheduled list of instructions.
     // Reorder the block to reflect the scheduling (move each to end in order).
-    for (StinkyInstruction* inst : scheduled) {
-        bb.removeIR(inst);
-        bb.appendIR(inst);
+    for (IRBase* ir : scheduled) {
+        bb.removeIR(ir);
+        bb.appendIR(ir);
     }
 
     readyQueue.onFinishBB();
@@ -411,8 +437,9 @@ class StinkyDAGSchedulerPass : public StinkyInstPass {
             unsigned idx = 0;
             traverseCFGInRPO(func, [&](BasicBlock* bb) {
                 for (auto it = bb->begin(); it != bb->end(); ++it) {
-                    StinkyInstruction& inst = getStinkyInst(it);
-                    if (isWMMA(inst) || isSWMMA(inst)) wmmaIndex[&inst] = idx++;
+                    auto* inst = dyn_cast<StinkyInstruction>(it.getNodePtr());
+                    if (!inst) continue;
+                    if (isWMMA(*inst) || isSWMMA(*inst)) wmmaIndex[inst] = idx++;
                 }
             });
         }
