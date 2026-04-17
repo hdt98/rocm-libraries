@@ -4752,10 +4752,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                 "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
                 "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance", "Adaptive-Power-of-2",
                 "Unknown", "Unknown", "Unknown", "Unknown",
-                "Cache-Optimized-M", "Cache-Optimized-N"
+                "Cache-Optimized-M", "Cache-Optimized-N",
+                "Origami-Optimized-M", "Origami-Optimized-N"
             };
 
-            const char* strategy_name = (actual_strategy <= 16) ? strategy_names[actual_strategy] : "Unknown";
+            const char* strategy_name = (actual_strategy <= 18) ? strategy_names[actual_strategy] : "Unknown";
 
             hipblaslt_cout << "Multi-MacroTile: Using "
                           << strategy_name

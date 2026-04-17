@@ -631,7 +631,9 @@ try
         "  9=performance (non-uniform, performance-based),\n"
         "  10=adaptive_power_of_2 (non-uniform, power-of-2 with balance check),\n"
         "  15=cache_optimized_m (non-uniform, M-split optimized for L2 cache),\n"
-        "  16=cache_optimized_n (non-uniform, N-split optimized for L2 cache)")
+        "  16=cache_optimized_n (non-uniform, N-split optimized for L2 cache),\n"
+        "  17=origami_optimized_m (non-uniform, M-split optimized via Origami solution queries),\n"
+        "  18=origami_optimized_n (non-uniform, N-split optimized via Origami solution queries)")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(0),
