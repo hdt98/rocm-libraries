@@ -559,16 +559,27 @@ def dispatcher_ci(String mode){
     return "BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()} bash ../script/dispatcher_ci.sh ${mode}"
 }
 
-def run_dispatcher_nogpu_workloads(){
-    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('cpu'))
+// Drives the dispatcher stage entirely from outside pipeline {} so it adds
+// almost nothing to the main CPS method's bytecode (Jenkins 64KB limit).
+// Outer stage allocates one nogpu agent for orchestration; the GPU branch
+// allocates its own gfx950 node via scripted node() and runs in parallel
+// with the sequential nogpu workloads (CPU → Heuristics → Stress).
+def run_dispatcher_all(){
+    def runJob = { String mode -> buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci(mode)) }
+    def branches = [:]
+    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean() ||
+        params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() ||
+        params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
+        branches['DISPATCHER nogpu'] = {
+            if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean())        { runJob('cpu') }
+            if (params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean()) { runJob('heuristics') }
+            if (params.RUN_DISPATCHER_STRESS_TESTS.toBoolean())     { runJob('stress') }
+        }
     }
-    if (params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('heuristics'))
+    if (params.RUN_DISPATCHER_GPU_TESTS.toBoolean()) {
+        branches['DISPATCHER gfx950'] = { node(rocmnode("gfx950")) { runJob('gpu'); cleanWs() } }
     }
-    if (params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
-        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('stress'))
-    }
+    if (branches) { parallel(branches) }
 }
 
 def cmake_build(Map conf=[:]){
@@ -1906,35 +1917,8 @@ pipeline {
                 beforeAgent true
                 expression { env.SHOULD_RUN_CI.toBoolean() }
             }
-            parallel
-            {
-                stage("Run DISPATCHER nogpu Tests")
-                {
-                    when {
-                        beforeAgent true
-                        expression { params.RUN_DISPATCHER_CPU_TESTS.toBoolean() ||
-                                     params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() ||
-                                     params.RUN_DISPATCHER_STRESS_TESTS.toBoolean() }
-                    }
-                    agent{ label rocmnode("nogpu") }
-                    steps{
-                        script { run_dispatcher_nogpu_workloads() }
-                        cleanWs()
-                    }
-                }
-                stage("Run DISPATCHER GPU Tests on gfx950")
-                {
-                    when {
-                        beforeAgent true
-                        expression { params.RUN_DISPATCHER_GPU_TESTS.toBoolean() }
-                    }
-                    agent{ label rocmnode("gfx950") }
-                    steps{
-                        buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: dispatcher_ci('gpu'))
-                        cleanWs()
-                    }
-                }
-            }
+            agent{ label rocmnode("nogpu") }
+            steps{ script { run_dispatcher_all() } }
         }
 
 		stage("Build CK and run Tests")
