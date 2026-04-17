@@ -245,7 +245,13 @@ protected:
         return data;
     }
 
-    static void ResetDbFile(TempFile& tmp_file) { tmp_file = TempFile{tmp_file.GetPathInfix()}; }
+    static void ResetDbFile(TempFile& tmp_file)
+    {
+        std::error_code ec;
+        fs::remove(tmp_file.Path(), ec);
+        // File will be recreated on first write. Keep directory alive to avoid
+        // race with lingering file operations from previous tests.
+    }
 
     void ResetDb() { ResetDbFile(temp_file); }
 
