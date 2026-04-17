@@ -1308,9 +1308,9 @@ namespace TensileLite
                     | (args["bias-type-args"].as<std::vector<rocisa::DataType>>().size() > 1));
 
             // Force problem-dependent initialization for MX FP4 to enable mxDataGenerator
-            if(args.count("mx-block-a") && args["mx-block-a"].as<int>() > 0)
+            if(args.count("mx-a-block") && args["mx-a-block"].as<int>() > 0)
                 m_problemDependentData = true;
-            if(args.count("mx-block-b") && args["mx-block-b"].as<int>() > 0)
+            if(args.count("mx-b-block") && args["mx-b-block"].as<int>() > 0)
                 m_problemDependentData = true;
 
             allocNewCPUInputs();

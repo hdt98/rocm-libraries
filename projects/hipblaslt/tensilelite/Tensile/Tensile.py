@@ -218,15 +218,11 @@ def addCommonArguments(argParser):
     argParser.add_argument("--library-format", dest="LibraryFormat", choices=["yaml", "msgpack"], \
         action="store", default="yaml", help="select which library format to use")
     argParser.add_argument("--client-lock", default=None)
-    argParser.add_argument("--prebuilt-client", default=str(TENSILE_CLIENT_PATH),
+    argParser.add_argument("--prebuilt-client", default=str(TENSILE_CLIENT_PATH), \
         type=os.path.abspath, help="Specify the full path to a pre-built tensilelite-client executable")
-<<<<<<< HEAD
-    argParser.add_argument("--mx-scale-format", dest="MXScaleFormat", type=int, default=0,
+    argParser.add_argument("--mx-scale-format", dest="MXScaleFormat", type=int, default=0, \
         help="MX scale data format (0=none, 1=pre-swizzle for GPU kernel layout)")
-=======
     argParser.add_argument("--rocm-agent-enumerator", default=None, action="store", dest="rocm_agent_enumerator")
->>>>>>> origin/develop
-
     argParser.add_argument("--global-parameters", nargs="+", type=splitExtraParameters, default=[])
 
 
