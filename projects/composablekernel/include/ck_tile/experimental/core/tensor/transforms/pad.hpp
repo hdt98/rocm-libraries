@@ -14,8 +14,9 @@ namespace ck_tile {
 /** @brief Padding transform: expands a dimension with boundary elements.
  *
  *  Definition:  1 dim (unpadded) --> 1 dim (padded, larger)
- *  Traversal:   1 upper --> 1 lower    (subtract left_pad to map into
- *                                       the unpadded coordinate space)
+ *  Traversal:   1 upper --> 1 lower    (subtract left_pad to map padded
+ *                                       index into the unpadded space;
+ *                                       right_pad affects bounds only)
  *
  *  ndim_upper  = 1, ndim_lower = 1
  *  lengths[0]      = unpadded dimension length
@@ -51,7 +52,8 @@ namespace ck_tile {
  *
  *      mapIndices(5) = 3
  *
- *      Boundary check: input must be in [left_pad, left_pad + length).
+ *      Boundary check: index must be in [left_pad, left_pad + length).
+ *      Rejects both left and right padding zones.
  *        isValidUpper(1) = false  (in left padding zone)
  *        isValidUpper(5) = true   (maps to base index 3)
  *        isValidUpper(13) = false (in right padding zone)
@@ -62,14 +64,22 @@ namespace ck_tile {
 template <>
 struct TransformImpl<TransformType::PAD>
 {
-    /** @brief Forward: upper to lower by subtracting left_pad. */
+    /** @brief Forward: upper to lower by subtracting left_pad.
+     *
+     *  lower = upper - left_pad. The right_pad does not affect the
+     *  index mapping itself --- it only affects bounds checking in
+     *  isValidUpper() and the padded length in upperLength().
+     */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
     {
         lower[0] = upper[0] - t.coefficients[0]; // subtract left_pad
     }
 
-    /** @brief Reverse: add left_pad back. */
+    /** @brief Reverse: recover padded index by adding left_pad back.
+     *
+     *  upper = lower + left_pad. Inverse of mapIndices.
+     */
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
     {
@@ -78,7 +88,12 @@ struct TransformImpl<TransformType::PAD>
 
     /** @brief Check if upper index is within the valid (non-padded) range.
      *
-     *  Valid range: [left_pad, left_pad + unpadded_length)
+     *  The padded dimension has three zones:
+     *    [0, left_pad)                         --> left padding (invalid)
+     *    [left_pad, left_pad + unpadded_length) --> valid (maps to base)
+     *    [left_pad + unpadded_length, total)    --> right padding (invalid)
+     *
+     *  Returns false if the index falls in either padding zone.
      *  Returns true unconditionally if skip_bounds_check is set.
      */
     static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
