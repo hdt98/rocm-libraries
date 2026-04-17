@@ -107,30 +107,11 @@ struct MIOpenBatchNormFwdTrainSpatialImpl<0, FpType, FpPrecType, FpAccumType>
         }
         __syncthreads();
 
-        constexpr auto lcl_data_size =
-            mio_bn_config::use_amdgcn ? mio_bn_config::lds_gcn_size : mio_bn_config::lds_size;
-        __shared__ FpAccumType lcl_data_x[lcl_data_size];
-        __shared__ FpAccumType lcl_data_y[lcl_data_size];
-        if constexpr(mio_bn_config::use_amdgcn)
-        {
-            miopen::reduction::gcn_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
-        else
-        {
-            miopen::reduction::lds_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
+        miopen::reduction::reduce2<FpAccumType, mio_bn_config::lds_size>(
+            reinterpret_cast<FpAccumType&>(mean),
+            reinterpret_cast<FpAccumType&>(variance),
+            cast<FpAccumType>(INHW),
+            lid);
 
         // Reduction complete
 
@@ -335,30 +316,11 @@ struct MIOpenBatchNormFwdTrainSpatialImpl<1, FpType, FpPrecType, FpAccumType>
 
         __syncthreads();
 
-        constexpr auto lcl_data_size =
-            mio_bn_config::use_amdgcn ? mio_bn_config::lds_gcn_size : mio_bn_config::lds_size;
-        __shared__ FpAccumType lcl_data_x[lcl_data_size];
-        __shared__ FpAccumType lcl_data_y[lcl_data_size];
-        if constexpr(mio_bn_config::use_amdgcn)
-        {
-            miopen::reduction::gcn_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                static_cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
-        else
-        {
-            miopen::reduction::lds_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                static_cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
+        miopen::reduction::reduce2<FpAccumType, mio_bn_config::lds_size>(
+            reinterpret_cast<FpAccumType&>(mean),
+            reinterpret_cast<FpAccumType&>(variance),
+            static_cast<FpAccumType>(INHW),
+            lid);
 
         // REDUCTION COMPLETE ---------------------------
         variance = fma(-mean, mean, variance);
@@ -415,9 +377,28 @@ struct MIOpenBatchNormFwdTrainSpatialImpl<1, FpType, FpPrecType, FpAccumType>
                         xhat[j]              = (cast<FpPrecType>(in[index]) - mean) * invVariance;
                     }
 
+                    // Synchronization is not required for correctness but enhances performance.
+                    //
+                    // Loop is memory bound as it iterates across all the batches in the tensor,
+                    // and has memory access strides of CHW size once all the elements in a single
+                    // sample have been processed, which may be large.
+                    //
+                    // `__syncthreads()` helps to coalesce memory accesses as each work-item
+                    // accesses adjacent elements to its neighbours on the same loop iteration,
+                    // leading to contiguous memory access across all the waves in a workgroup. By
+                    // keeping all the waves on the same loop iteration it prevents waves on
+                    // different loop iterations from stalling as they wait for memory.
+                    //
+                    // This can be seen by profiling the kernel with rocprofv3 and comparing the
+                    // `TCP_PENDING_STALL_CYCLES_sum` counter and also looking at a thread trace in
+                    // compute viewer and seeing the impact on occupancy.
+                    //
+                    // TODO: This call is within the scope of an `if` condition, but it is not clear
+                    // that this control flow is guanteed to be uniform across all threads in a
+                    // workgroup, risking deadlock. Further investigation is needed.
                     __syncthreads();
 
-                    for(unsigned int j = 0; j < max_read; ++j) // This part takes 0.405
+                    for(unsigned int j = 0; j < max_read; ++j)
                     {
                         const unsigned int l = k + (max_read * lid) + j;
                         nidx                 = l / mio_bn_config::hw;
@@ -523,30 +504,11 @@ struct MIOpenBatchNormFwdTrainSpatialImpl<3, FpType, FpPrecType, FpAccumType>
         }
         __syncthreads();
 
-        constexpr auto lcl_data_size =
-            mio_bn_config::use_amdgcn ? mio_bn_config::lds_gcn_size : mio_bn_config::lds_size;
-        __shared__ FpAccumType lcl_data_x[lcl_data_size];
-        __shared__ FpAccumType lcl_data_y[lcl_data_size];
-        if constexpr(mio_bn_config::use_amdgcn)
-        {
-            miopen::reduction::gcn_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                static_cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
-        else
-        {
-            miopen::reduction::lds_reduce2<FpAccumType, lcl_data_size>(
-                reinterpret_cast<FpAccumType&>(mean),
-                reinterpret_cast<FpAccumType&>(variance),
-                static_cast<FpAccumType>(INHW),
-                lcl_data_x,
-                lcl_data_y,
-                lid);
-        }
+        miopen::reduction::reduce2<FpAccumType, mio_bn_config::lds_size>(
+            reinterpret_cast<FpAccumType&>(mean),
+            reinterpret_cast<FpAccumType&>(variance),
+            static_cast<FpAccumType>(INHW),
+            lid);
 
         variance = fma(-mean, mean, variance);
         if(variance < 0)
@@ -706,7 +668,7 @@ struct MIOpenBatchNormFwdTrainSpatialImplVar2
             } // end for(n)
 
         } // end if(inImgIndex)
-    }     // end spatial norm
+    } // end spatial norm
 
     static constexpr __forceinline__ __device__ void
     FinalMeanVariance(FpType* __restrict__ meanvarbuff,
@@ -780,11 +742,14 @@ struct MIOpenBatchNormFwdTrainSpatialImplVar2
             }
         }
 
+        // Total workgroup size for final kernel - reused in condition and array declarations
+        constexpr auto grp_final_total = MIO_BN_GRP0_FINAL * MIO_BN_GRP1_FINAL * MIO_BN_GRP2_FINAL;
+
         if constexpr(!mio_bn_config::use_amdgcn || mio_bn_config::launch_dim.grp0 > 1 ||
-                     (mio_bn_config::lds_gcn_size == 1) || mio_bn_config::vec_size_x > 1)
+                     (mio_bn_config::lds_gcn_size == 1) || mio_bn_config::vec_size_x > 1 ||
+                     (grp_final_total < 64))
         {
-            __shared__ FpAccumCType
-                lcl_data[2 * MIO_BN_GRP0_FINAL * MIO_BN_GRP1_FINAL * MIO_BN_GRP2_FINAL];
+            __shared__ FpAccumCType lcl_data[2 * grp_final_total];
 
             miopen::reduction::lds_reduce2_2d(mean,
                                               variance,
@@ -797,13 +762,8 @@ struct MIOpenBatchNormFwdTrainSpatialImplVar2
         }
         else
         {
-            commitID = 64;
-            __shared__ FpAccumCType
-                lcl_data_x[MIO_BN_GRP0_FINAL * MIO_BN_GRP1_FINAL * MIO_BN_GRP2_FINAL / 64];
-            __shared__ FpAccumCType
-                lcl_data_y[MIO_BN_GRP0_FINAL * MIO_BN_GRP1_FINAL * MIO_BN_GRP2_FINAL / 64];
-            miopen::reduction::gcn_reduce2(
-                mean, variance, INHW, lcl_data_x, lcl_data_y, ylid + zlid * ygrp_sz);
+            miopen::reduction::reduce2<FpPrecType_C, grp_final_total>(
+                mean, variance, static_cast<FpPrecType_C>(INHW), ylid + zlid * ygrp_sz);
         }
 
         variance    = miopen::fma(-mean, mean, variance);
@@ -902,14 +862,8 @@ struct MIOpenBatchNormFwdTrainSpatialImplVar2
         }
         else
         {
-            __shared__ FpAccumCType lcl_data_x[mio_bn_config::lds_gcn_size];
-            __shared__ FpAccumCType lcl_data_y[mio_bn_config::lds_gcn_size];
-            miopen::reduction::gcn_reduce2(mean,
-                                           variance,
-                                           cast<FpAccumType>(1.0),
-                                           lcl_data_x,
-                                           lcl_data_y,
-                                           ylid + zlid * ygrp_sz);
+            miopen::reduction::reduce2<FpPrecType_C, mio_bn_config::lds_size>(
+                mean, variance, static_cast<FpPrecType_C>(1.0), ylid + zlid * ygrp_sz);
         }
 
         if(ylid == 0 && zlid == 0)
@@ -1072,8 +1026,8 @@ __launch_bounds__(MIO_BN_GRP0_FINAL* MIO_BN_GRP1_FINAL* MIO_BN_GRP2_FINAL)
 {
     // mean, variance, invVariance
 
-    using fp_prec_c_type = mio_bn_config::fp_prec_c_type;
-    using fp_accum_type = mio_bn_config::fp_accum_type;
+    using fp_prec_c_type  = mio_bn_config::fp_prec_c_type;
+    using fp_accum_type   = mio_bn_config::fp_accum_type;
     using fp_accum_c_type = mio_bn_config::fp_accum_c_type;
 
     fp_prec_c_type mean;

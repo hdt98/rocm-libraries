@@ -55,8 +55,8 @@ bool PerformanceConfigBnFwdTraining::IsValid(
 
     // if default config is variant 2, check if it can be applied
     // (based on variant 2 restrictions)
-    size_t vectorsize, xlocalsize, ylocalsize, zlocalsize, nelements;
-    int variant;
+    size_t vectorsize = 1, xlocalsize = 1, ylocalsize = 1, zlocalsize = 1, nelements = 1;
+    int variant = -1;
     GetVariantFromKernelId(
         this->kernel_id, variant, vectorsize, xlocalsize, ylocalsize, zlocalsize, nelements);
     if(variant == 2)
@@ -220,12 +220,12 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
 
     int variant       = -1;
     size_t vectorsize = 1;
-    size_t xlocalsize, xgridsize;
+    size_t xlocalsize = 1, xgridsize = 1;
     size_t ylocalsize = 1, ygridsize = 1;
     size_t zlocalsize = 1, zgridsize = 1;
-    unsigned int ldsgcn, ldsnogcn;
+    unsigned int ldsgcn = 0, ldsnogcn = 0;
     int stash_method = 0;
-    size_t nelements;
+    size_t nelements = 1;
 
     GetVariantFromKernelId(
         config.kernel_id, variant, vectorsize, xlocalsize, ylocalsize, zlocalsize, nelements);
@@ -314,8 +314,8 @@ ConvSolution BnFwdTrainingSpatial::GetSolution(const ExecutionContext& context,
             {"MIO_BN_GRP2_FINAL", zlocalsize_final},
             {"MIO_BN_GFX103X", (StartsWith(handle.GetDeviceName(), "gfx103") ? "1" : "0")},
             {"MIO_BN_GFX110X", (StartsWith(handle.GetDeviceName(), "gfx110") ? "1" : "0")},
-            {"MIO_BN_GFX120X", (StartsWith(handle.GetDeviceName(), "gfx120") ? "1" : "0")},
             {"MIO_BN_GFX115X", (StartsWith(handle.GetDeviceName(), "gfx115") ? "1" : "0")},
+            {"MIO_BN_GFX120X", (StartsWith(handle.GetDeviceName(), "gfx120") ? "1" : "0")},
             {"MIO_LAYOUT_NHWC", static_cast<int>(problem.IsLayoutNHWC())},
             {"MIO_BN_VECTORIZE", static_cast<int>(vectorsize > 1)},
             {"MIO_BN_VEC_SIZE", vectorsize},
