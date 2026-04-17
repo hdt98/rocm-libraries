@@ -4324,7 +4324,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                             // Align each region to 256 bytes
                             per_stream_ws_size = (per_stream_ws_size / 256) * 256;
 
-                            // Reuse pre-created contexts from OPT 1
+                            // Get base workspace pointer for offset arithmetic
+                            void* ws_base = *dWorkspace;
+
                             // Timing loop
                             start_time = std::chrono::high_resolution_clock::now();
 
@@ -4335,7 +4337,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                     if(!spCtxs[sp].valid) continue;
                                     auto& ctx = spCtxs[sp];
 
-                                    void* sub_workspace = static_cast<char*>(*dWorkspace) + sp * per_stream_ws_size;
+                                    void* sub_workspace = static_cast<char*>(ws_base) + sp * per_stream_ws_size;
 
                                     hipblasLtMatmul(handle, matmul[0][0],
                                                    alpha_in[0], ctx.A_ptr, ctx.matA,
@@ -4879,7 +4881,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                    dA[0].buf(), matA[0], dB[0].buf(), matB[0],
                                    &(h_beta[0]), dC[0].buf(), matC[0],
                                    (*dDp)[0].buf(), matD[0],
-                                   &heuristicResult[sol].algo, *dWorkspace, workspace_size, stream);
+                                   &heuristicResult[0].algo, *dWorkspace, workspace_size, stream);
                 }
                 CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                 auto bl_end = std::chrono::high_resolution_clock::now();
@@ -4953,6 +4955,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                 // Separate workspace per stream
                 size_t per_stream_ws = (workspace_size / num_streams / 256) * 256;
+                void* ws_base = *dWorkspace;
 
                 hipblaslt_cout << "  Launching on " << num_streams << " streams..." << std::endl;
 
@@ -4964,7 +4967,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        void* sub_ws = static_cast<char*>(*dWorkspace) + sp * per_stream_ws;
+                        void* sub_ws = static_cast<char*>(ws_base) + sp * per_stream_ws;
 
                         hipblasLtMatmul(handle, matmul[0][0],
                                        alpha_in[0], ctx.A_ptr, ctx.matA,

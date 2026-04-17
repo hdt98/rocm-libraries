@@ -288,18 +288,18 @@ inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K, int split_s
     {
         if (!isPowerOf2(M) || !isPowerOf2(N))
         {
-            // Check if the resulting splits would create power-of-2 sub-problems
+            // Check if a 2-way pow2 split creates clean pow2 sub-problems
             // e.g. 12288 -> [8192, 4096] (both pow2!) is great even though 12288 isn't pow2
-            auto test_splits = computePowerOf2Splits(M, 2);
-            bool splits_are_pow2 = true;
-            for (auto s : test_splits)
             {
-                if (!isPowerOf2(s))
-                    splits_are_pow2 = false;
+                int64_t target = M / 2;
+                int64_t pow2 = 1;
+                while(pow2 * 2 <= target) pow2 *= 2;
+                int64_t s1 = (target - pow2 > pow2 / 4) ? pow2 * 2 : pow2;
+                s1 = std::min(s1, M);
+                int64_t s2 = M - s1;
+                if (isPowerOf2(s1) && isPowerOf2(s2))
+                    return true;
             }
-
-            if (splits_are_pow2)
-                return true; // Splits create clean pow2 sub-problems
 
             // Otherwise, only allow if dimensions are reasonably close to power-of-2
             int64_t m_rounded = roundToPowerOf2(M);
