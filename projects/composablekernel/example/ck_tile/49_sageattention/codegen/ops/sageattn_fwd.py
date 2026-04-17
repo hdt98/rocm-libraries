@@ -27,7 +27,6 @@ from codegen.cpp_symbol_map import (
 )
 from codegen.utils import check_duplicates_and_paddings, if_, indent, update_file
 
-
 DTYPE_BITS = {
     "fp16": 16,
     "bf16": 16,
@@ -336,7 +335,9 @@ class SageAttnFwdApiTrait:
                 if self.mask == "causal":
                     return f"(a.hdim_v % {bk0submax} == 0) && (a.hdim_v <= {self.bn1})"
                 else:
-                    return f"(a.hdim_v % {bk0submax} == 0) && (a.hdim_v % {self.bn1} == 0)"
+                    return (
+                        f"(a.hdim_v % {bk0submax} == 0) && (a.hdim_v % {self.bn1} == 0)"
+                    )
         else:
             assert False
 
@@ -735,12 +736,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
 
     @classmethod
     def supported_dtypes(cls) -> Tuple[str]:
-        return (
-            cls._DT_BF16
-            + cls._DT_FP8BF16
-            + cls._DT_I8FP8BF16
-            + cls._DT_I4FP8BF16
-        )
+        return cls._DT_BF16 + cls._DT_FP8BF16 + cls._DT_I8FP8BF16 + cls._DT_I4FP8BF16
 
     # TODO: design a more practical way to do it
     # this is current supported tile size per hdim
@@ -817,12 +813,12 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         # forces alignment=1 when padding is enabled, but packed types need alignment >= PackedSize.
         if dtype in cls._DT_I4FP8BF16:
             for p in pipelines:
-                assert p.F_dpad == "f", (
-                    f"int4 dtype '{dtype}' requires pad_d=false, got '{p.F_dpad}'"
-                )
-                assert p.F_dvpad == "f", (
-                    f"int4 dtype '{dtype}' requires pad_dv=false, got '{p.F_dvpad}'"
-                )
+                assert (
+                    p.F_dpad == "f"
+                ), f"int4 dtype '{dtype}' requires pad_d=false, got '{p.F_dpad}'"
+                assert (
+                    p.F_dvpad == "f"
+                ), f"int4 dtype '{dtype}' requires pad_dv=false, got '{p.F_dvpad}'"
 
         return pipelines
 
@@ -842,7 +838,11 @@ class KernelComponentFactoryGfx950(
         # To avoid NumIssues=0, we need MPerBlock >= 128 and NPerBlock >= 128
         if dtype not in cls._DT_BF16:
             for key in result:
-                result[key] = [tile for tile in result[key] if tile.F_bm0 >= 128 and tile.F_bn0 >= 128]
+                result[key] = [
+                    tile
+                    for tile in result[key]
+                    if tile.F_bm0 >= 128 and tile.F_bn0 >= 128
+                ]
 
         return result
 
@@ -928,9 +928,9 @@ def get_fwd_blobs(
                 if hdim not in optdim_list:
                     continue
             for tile, next_tile in zip(tiles, tiles[1:]):
-                assert next_tile.F_bm0 >= tile.F_bm0, (
-                    "Tiles must be ordered by increasing bm0"
-                )
+                assert (
+                    next_tile.F_bm0 >= tile.F_bm0
+                ), "Tiles must be ordered by increasing bm0"
 
             for tile, pipeline in itertools.product(
                 tiles, factory.get_pipelines(dtype, hdim, hdim_v, receipt, mask_impl)
@@ -1006,4 +1006,6 @@ def list_blobs(
         )
         for kernel in kernels:
             f.write((file_path.parent / GEN_DIR / kernel.filename).as_posix() + "\n")
-        f.write((file_path.parent / GEN_DIR / SAGEATTN_FWD_API_FILENAME).as_posix() + "\n")
+        f.write(
+            (file_path.parent / GEN_DIR / SAGEATTN_FWD_API_FILENAME).as_posix() + "\n"
+        )

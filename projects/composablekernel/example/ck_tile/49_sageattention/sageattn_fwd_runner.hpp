@@ -191,9 +191,9 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                                                                                               : 128;
 
     // blockscale, perwarp, or perthread
-    const bool qscale_uses_bwp =
-        qscale.type == quant_scale_enum::blockscale ||
-        qscale.type == quant_scale_enum::perwarp || qscale.type == quant_scale_enum::perthread;
+    const bool qscale_uses_bwp = qscale.type == quant_scale_enum::blockscale ||
+                                 qscale.type == quant_scale_enum::perwarp ||
+                                 qscale.type == quant_scale_enum::perthread;
 
     const auto seqstart_q_host              = to_seqstarts(seqlen_qs);
     const auto seqstart_k_host              = to_seqstarts(seqlen_ks);
@@ -374,18 +374,15 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                       : get_lengths(i_perm, shape_batch, nhead_k, hdim_v, shape_seqlen_k));
 
     ck_tile::HostTensor<float> q_descale_host(
-        qscale_uses_bwp
-            ? std::array<ck_tile::index_t, 3>{shape_batch, nhead, num_block_scale_q}
-            : std::array<ck_tile::index_t, 3>{1, 1, 1});
+        qscale_uses_bwp ? std::array<ck_tile::index_t, 3>{shape_batch, nhead, num_block_scale_q}
+                        : std::array<ck_tile::index_t, 3>{1, 1, 1});
     ck_tile::HostTensor<float> k_descale_host(
-        qscale_uses_bwp
-            ? std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_k}
-            : std::array<ck_tile::index_t, 3>{1, 1, 1});
+        qscale_uses_bwp ? std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_k}
+                        : std::array<ck_tile::index_t, 3>{1, 1, 1});
     // BLOCKSCALE, PERWARP, and PERTHREAD V all use per-channel scale (col-major layout)
     ck_tile::HostTensor<float> v_descale_host(
-        qscale_uses_bwp
-            ? std::array<ck_tile::index_t, 3>{batch, nhead_k, hdim_v}
-            : std::array<ck_tile::index_t, 3>{1, 1, 1});
+        qscale_uses_bwp ? std::array<ck_tile::index_t, 3>{batch, nhead_k, hdim_v}
+                        : std::array<ck_tile::index_t, 3>{1, 1, 1});
 
     ck_tile::HostTensor<ODataType> o_host(
         get_lengths(o_perm, shape_batch, nhead, shape_seqlen_q, hdim_v));
@@ -498,16 +495,11 @@ fwd_result sageattn_fwd_run(mode_enum mode,
         cukv_cum.empty() ? 0 : cukv_cum.size() * sizeof(ck_tile::index_t));
     // Must match args.block_scale_seqstart_* (group + bs/pw/pth only). bf16 validation (qscale=n)
     // never binds these pointers; allocating only when the kernel uses them avoids empty uploads.
-    const bool need_block_scale_seqstart_buf =
-        mode == mode_enum::group && qscale_uses_bwp;
-    ck_tile::DeviceMem block_scale_seqstart_q_buf(need_block_scale_seqstart_buf
-                                                      ? block_scale_seqstart_q_host.size() *
-                                                            sizeof(int32_t)
-                                                      : 0);
-    ck_tile::DeviceMem block_scale_seqstart_k_buf(need_block_scale_seqstart_buf
-                                                      ? block_scale_seqstart_k_host.size() *
-                                                            sizeof(int32_t)
-                                                      : 0);
+    const bool need_block_scale_seqstart_buf = mode == mode_enum::group && qscale_uses_bwp;
+    ck_tile::DeviceMem block_scale_seqstart_q_buf(
+        need_block_scale_seqstart_buf ? block_scale_seqstart_q_host.size() * sizeof(int32_t) : 0);
+    ck_tile::DeviceMem block_scale_seqstart_k_buf(
+        need_block_scale_seqstart_buf ? block_scale_seqstart_k_host.size() * sizeof(int32_t) : 0);
 
     if constexpr(need_q_i4_permute)
     {
@@ -544,12 +536,10 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     cu_seqlen_kv_buf.ToDevice(cukv_cum.empty() ? nullptr : cukv_cum.data());
     seqlen_q_buf.ToDevice(has_group_q_padding ? seqlen_qs.data() : nullptr);
     seqlen_k_buf.ToDevice(has_group_k_padding ? seqlen_ks.data() : nullptr);
-    block_scale_seqstart_q_buf.ToDevice(need_block_scale_seqstart_buf
-                                            ? block_scale_seqstart_q_host.data()
-                                            : nullptr);
-    block_scale_seqstart_k_buf.ToDevice(need_block_scale_seqstart_buf
-                                            ? block_scale_seqstart_k_host.data()
-                                            : nullptr);
+    block_scale_seqstart_q_buf.ToDevice(
+        need_block_scale_seqstart_buf ? block_scale_seqstart_q_host.data() : nullptr);
+    block_scale_seqstart_k_buf.ToDevice(
+        need_block_scale_seqstart_buf ? block_scale_seqstart_k_host.data() : nullptr);
 
     // clang-format off
     auto layout_str = [&](bool permute){
