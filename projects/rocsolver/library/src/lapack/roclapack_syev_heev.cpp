@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -163,6 +163,60 @@ rocblas_status rocsolver_zheev(rocblas_handle handle,
                                double* D,
                                double* E,
                                rocblas_int* info)
+{
+    return rocsolver::rocsolver_syev_heev_impl<rocblas_double_complex>(handle, evect, uplo, n, A,
+                                                                       lda, D, E, info);
+}
+
+rocblas_status rocsolver_ssyev_64(rocblas_handle handle,
+                                  const rocblas_evect evect,
+                                  const rocblas_fill uplo,
+                                  const int64_t n,
+                                  float* A,
+                                  const int64_t lda,
+                                  float* D,
+                                  float* E,
+                                  rocblas_int* info)
+{
+    return rocsolver::rocsolver_syev_heev_impl<float>(handle, evect, uplo, n, A, lda, D, E, info);
+}
+
+rocblas_status rocsolver_dsyev_64(rocblas_handle handle,
+                                  const rocblas_evect evect,
+                                  const rocblas_fill uplo,
+                                  const int64_t n,
+                                  double* A,
+                                  const int64_t lda,
+                                  double* D,
+                                  double* E,
+                                  rocblas_int* info)
+{
+    return rocsolver::rocsolver_syev_heev_impl<double>(handle, evect, uplo, n, A, lda, D, E, info);
+}
+
+rocblas_status rocsolver_cheev_64(rocblas_handle handle,
+                                  const rocblas_evect evect,
+                                  const rocblas_fill uplo,
+                                  const int64_t n,
+                                  rocblas_float_complex* A,
+                                  const int64_t lda,
+                                  float* D,
+                                  float* E,
+                                  rocblas_int* info)
+{
+    return rocsolver::rocsolver_syev_heev_impl<rocblas_float_complex>(handle, evect, uplo, n, A,
+                                                                      lda, D, E, info);
+}
+
+rocblas_status rocsolver_zheev_64(rocblas_handle handle,
+                                  const rocblas_evect evect,
+                                  const rocblas_fill uplo,
+                                  const int64_t n,
+                                  rocblas_double_complex* A,
+                                  const int64_t lda,
+                                  double* D,
+                                  double* E,
+                                  rocblas_int* info)
 {
     return rocsolver::rocsolver_syev_heev_impl<rocblas_double_complex>(handle, evect, uplo, n, A,
                                                                        lda, D, E, info);
