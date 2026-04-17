@@ -269,4 +269,76 @@ constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
     return t;
 }
 
+// ============================================================================
+// Transform binding API: transform() + upper() + lower()
+// ============================================================================
+
+/** @brief Specify upper (user-side) dimension indices for a transform binding.
+ *
+ *  Alias for dims(). Documents that these are the dimensions on the user side
+ *  (top of the transform stack) that this transform creates.
+ *
+ *  @param ids  Dimension indices (variadic)
+ *  @return DimIds array with -1 padding for unused slots
+ *
+ *  Example: upper(0) means "this transform creates user-facing dim 0"
+ */
+template <typename... Ts>
+constexpr DimIds upper(Ts... ids)
+{
+    return dims(ids...);
+}
+
+/** @brief Specify lower (memory-side) dimension indices for a transform binding.
+ *
+ *  Alias for dims(). Documents that these are the dimensions on the memory side
+ *  (bottom of the transform stack) that this transform replaces.
+ *
+ *  @param ids  Dimension indices (variadic)
+ *  @return DimIds array with -1 padding for unused slots
+ *
+ *  Example: lower(0, 2) means "this transform replaces lower dims 0 and 2"
+ */
+template <typename... Ts>
+constexpr DimIds lower(Ts... ids)
+{
+    return dims(ids...);
+}
+
+/** @brief Bundles a transform with its upper/lower dimension routing.
+ *
+ *  Structural NTTP — pure aggregate with defaulted ==.
+ *  Created by the transform() factory. Used by make_transform_graph().
+ *
+ *  Fields (upper before lower, consistent with struct field ordering):
+ *    - xform: the coordinate transform to apply
+ *    - upper_dims: which user-facing dims this transform creates
+ *    - lower_dims: which lower dims this transform replaces
+ */
+struct TransformBinding
+{
+    CoordinateTransform xform{};
+    DimIds upper_dims{};
+    DimIds lower_dims{};
+
+    constexpr bool operator==(const TransformBinding&) const = default;
+};
+
+/** @brief Bind a transform to its upper and lower dimension routing.
+ *
+ *  @param xform       The coordinate transform
+ *  @param upper_dims  Upper (user-side) dimension indices this transform creates
+ *  @param lower_dims  Lower (memory-side) dimension indices this transform replaces
+ *  @return TransformBinding bundling all three
+ *
+ *  Example:
+ *    transform(make_pass_through(128), upper(0), lower(1))
+ *    transform(make_merge({8, 8}),     upper(1), lower(0, 2))
+ */
+constexpr TransformBinding
+transform(CoordinateTransform xform, DimIds upper_dims, DimIds lower_dims)
+{
+    return {xform, upper_dims, lower_dims};
+}
+
 } // namespace ck_tile

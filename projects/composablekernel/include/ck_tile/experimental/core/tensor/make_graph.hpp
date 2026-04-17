@@ -248,5 +248,127 @@ constexpr bool isGraphBijective()
     return true;
 }
 
+/// Unpack N TransformBindings into parallel arrays for applyTransforms.
+template <index_t N>
+constexpr detail::TransformGraph applyBindings(const detail::TransformGraph& graph,
+                                               const static_array<TransformBinding, N>& bindings)
+{
+    static_array<CoordinateTransform, N> transforms{};
+    static_array<DimIds, N> lower_dims{}; // which old dims to replace
+    static_array<DimIds, N> upper_dims{}; // which new dims to create
+
+    for(index_t i = 0; i < N; ++i)
+    {
+        transforms[i] = bindings[i].xform;
+        lower_dims[i] = bindings[i].lower_dims;
+        upper_dims[i] = bindings[i].upper_dims;
+    }
+
+    // applyTransforms param order: (transforms, input_dims=lower, output_dims=upper)
+    return applyTransforms(graph, transforms, lower_dims, upper_dims);
+}
+
 } // namespace detail
+
+// ============================================================================
+// User-facing make_transform_graph overloads using TransformBinding
+// ============================================================================
+
+/** @brief Create a transform graph from a descriptor and transform bindings.
+ *
+ *  Combines make_transform_graph(desc) + applyTransforms into a single call.
+ *  All bindings are applied as a single batch (not sequentially), so lower()
+ *  indices always refer to the original descriptor's dimensions.
+ *
+ *  @param desc      Tensor descriptor (creates the base Embed)
+ *  @param bindings  Transform bindings (variadic)
+ *  @return TransformGraph with base Embed + all bindings applied
+ *
+ *  Example:
+ *    constexpr auto g = make_transform_graph(desc,
+ *        transform(make_pass_through(M),  upper(0), lower(1)),
+ *        transform(make_merge({K/8, 8}),  upper(1), lower(0, 2)));
+ */
+template <typename... Bindings>
+constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc,
+                                                      Bindings... bindings)
+{
+    constexpr index_t N = sizeof...(Bindings);
+    auto g              = detail::make_transform_graph(desc);
+    static_array<TransformBinding, N> arr{bindings...};
+    return detail::applyBindings(g, arr);
+}
+
+/** @brief Create a transform graph from transform bindings only (no descriptor).
+ *
+ *  For general coordinate mappings that don't involve a tensor. The first
+ *  binding typically provides the base transform (e.g., an Embed defining
+ *  the memory layout).
+ *
+ *  @param first     First transform binding (typically the base/Embed)
+ *  @param rest      Additional transform bindings (variadic)
+ *  @return TransformGraph with all bindings applied
+ *
+ *  Example:
+ *    constexpr auto g = make_transform_graph(
+ *        transform(make_embed({8,128,8}, {1032,8,1}), upper(0,1,2), lower(0)),
+ *        transform(make_pass_through(128),            upper(0),     lower(1)),
+ *        transform(make_merge({8, 8}),                upper(1),     lower(0, 2)));
+ */
+template <typename... Bindings>
+constexpr detail::TransformGraph make_transform_graph(TransformBinding first, Bindings... rest)
+{
+    // Build the base graph from the first binding
+    detail::TransformGraph g{};
+
+    g.transforms[0]  = first.xform;
+    g.num_transforms = 1;
+
+    // Wire based on the first binding's dims
+    // Lower dims: where the transform writes (toward memory)
+    index_t num_lower = 0;
+    for(index_t i = 0; i < MAX_DIMS_PER_TRANSFORM; ++i)
+    {
+        if(first.lower_dims[i] >= 0)
+        {
+            g.t_lower_slots[0][i] = first.lower_dims[i];
+            num_lower++;
+        }
+    }
+    g.ndim_lower = num_lower;
+    for(index_t i = 0; i < num_lower; ++i)
+    {
+        g.lower_slots[i] = first.lower_dims[i];
+    }
+
+    // Upper dims: where the transform reads (from user side)
+    index_t num_upper = 0;
+    index_t max_slot  = num_lower;
+    for(index_t i = 0; i < MAX_DIMS_PER_TRANSFORM; ++i)
+    {
+        if(first.upper_dims[i] >= 0)
+        {
+            index_t slot                       = num_lower + i;
+            g.t_upper_slots[0][i]              = slot;
+            g.upper_slots[first.upper_dims[i]] = slot;
+            if(slot >= max_slot)
+                max_slot = slot + 1;
+            num_upper++;
+        }
+    }
+    g.ndim_upper = num_upper;
+    g.num_slots  = max_slot;
+
+    detail::canonicalize(g);
+
+    // Apply remaining bindings as a batch
+    if constexpr(sizeof...(rest) > 0)
+    {
+        constexpr index_t N = sizeof...(rest);
+        static_array<TransformBinding, N> arr{rest...};
+        g = detail::applyBindings(g, arr);
+    }
+    return g;
+}
+
 } // namespace ck_tile

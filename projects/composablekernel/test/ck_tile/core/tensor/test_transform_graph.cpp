@@ -471,6 +471,67 @@ static_assert(xor_xform.lengths[0] == 4);
 static_assert(xor_xform.lengths[1] == 8);
 static_assert(xor_xform.is_bijective == true);
 
+// ============================================================================
+// Test 20: transform() / upper() / lower() API — GEMM LDS via new syntax
+// ============================================================================
+
+// Same GEMM LDS descriptor as Test 3, but using the new binding API
+constexpr auto gemm_lds_new =
+    make_transform_graph(desc_strided_3d,
+                         transform(make_pass_through(M), upper(0), lower(DIM_M)),
+                         transform(make_merge(static_array<index_t, 2>{K_DIV8, K_MOD8}),
+                                   upper(1),
+                                   lower(DIM_K_DIV8, DIM_K_MOD8)));
+
+// Must produce identical offsets to the old API (Test 3)
+static_assert(gemm_lds_new.ndim_upper == 2);
+static_assert(gemm_lds_new.ndim_lower == 1);
+static_assert(gemm_lds_new.num_transforms == 3);
+
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{1, 0}) == 8);
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{0, 1}) == 1);
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{5, 19}) ==
+              manual_strided_offset(2, 5, 3, S0, S1, S2));
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{127, 63}) ==
+              manual_strided_offset(7, 127, 7, S0, S1, S2));
+
+// Verify it matches the old API exactly
+static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{64, 32}) ==
+              detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}));
+
+// ============================================================================
+// Test 21: transform() / upper() / lower() API — padded graph
+// ============================================================================
+
+constexpr auto padded_new =
+    make_transform_graph(desc_pad_base,
+                         transform(make_right_pad(10, 6), upper(0), lower(0)),
+                         transform(make_pass_through(20), upper(1), lower(1)));
+
+static_assert(padded_new.ndim_upper == 2);
+static_assert(detail::calculateOffset<padded_new>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(detail::calculateOffset<padded_new>(static_array<index_t, 2>{5, 10}) == 110);
+
+// Must match old API
+static_assert(detail::calculateOffset<padded_new>(static_array<index_t, 2>{5, 10}) ==
+              detail::calculateOffset<padded>(static_array<index_t, 2>{5, 10}));
+
+// ============================================================================
+// Test 22: TransformBinding struct
+// ============================================================================
+
+constexpr auto binding = transform(make_pass_through(128), upper(0), lower(1));
+static_assert(binding.xform.type == TransformType::PASS_THROUGH);
+static_assert(binding.upper_dims[0] == 0);
+static_assert(binding.upper_dims[1] == -1);
+static_assert(binding.lower_dims[0] == 1);
+static_assert(binding.lower_dims[1] == -1);
+
+// upper() and lower() are aliases for dims()
+static_assert(upper(0, 2) == dims(0, 2));
+static_assert(lower(1) == dims(1));
+
 } // anonymous namespace
 
 // If this file compiles, all tests pass.
