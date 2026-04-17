@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <cctype>
 #include <set>
 
 #include <fmt/format.h>
@@ -335,5 +336,29 @@ public:
         if(!to_consume.empty())
             throw std::invalid_argument(
                 fmt::format("Not all arguments were consumed: {}", fmt::join(to_consume, " ")));
+    }
+
+    std::string to_test_name() const
+    {
+        std::string name;
+        for(const auto& key : to_consume)
+        {
+            if(!name.empty())
+                name += '_';
+            std::string val = at(key).to_string();
+            std::string sanitized;
+            for(size_t i = 0; i < val.size(); ++i)
+            {
+                char c = val[i];
+                if(c == '-')
+                    sanitized += "neg";
+                else if(c == '.')
+                    sanitized += "p";
+                else if(std::isalnum(static_cast<unsigned char>(c)))
+                    sanitized += c;
+            }
+            name += key + "_" + sanitized;
+        }
+        return name;
     }
 };
