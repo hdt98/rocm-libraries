@@ -138,22 +138,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LARFB, _float)
+TEST_P(LARFB, type_float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARFB, _double)
+TEST_P(LARFB, type_double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARFB, _float_complex)
+TEST_P(LARFB, type_float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARFB, _double_complex)
+TEST_P(LARFB, type_double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
@@ -161,8 +161,14 @@ TEST_P(LARFB, _double_complex)
 INSTANTIATE_TEST_SUITE_P(daily_lapack,
                          LARFB,
                          Combine(ValuesIn(large_matrix_size_range),
-                                 ValuesIn(large_reflector_size_range)));
+                                 ValuesIn(large_reflector_size_range)),
+                         [](const testing::TestParamInfo<larfb_tuple>& info) {
+                             return larfb_setup_arguments(info.param).to_test_name();
+                         });
 
 INSTANTIATE_TEST_SUITE_P(checkin_lapack,
                          LARFB,
-                         Combine(ValuesIn(matrix_size_range), ValuesIn(reflector_size_range)));
+                         Combine(ValuesIn(matrix_size_range), ValuesIn(reflector_size_range)),
+                         [](const testing::TestParamInfo<larfb_tuple>& info) {
+                             return larfb_setup_arguments(info.param).to_test_name();
+                         });
