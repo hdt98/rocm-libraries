@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2020-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2020-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -173,6 +173,30 @@ public:
             return val->get_value();
         else
             throw std::logic_error("Internal error: Invalid cast");
+    }
+
+    std::string to_string() const
+    {
+        auto* base = m_val.get();
+        if(auto* p = dynamic_cast<value<int32_t>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<uint32_t>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<int64_t>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<uint64_t>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<char>*>(base))
+            return std::string(1, p->get_value());
+        if(auto* p = dynamic_cast<value<float>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<double>*>(base))
+            return std::to_string(p->get_value());
+        if(auto* p = dynamic_cast<value<bool>*>(base))
+            return p->get_value() ? "true" : "false";
+        if(auto* p = dynamic_cast<value<std::string>*>(base))
+            return p->get_value();
+        return "unknown";
     }
 };
 
