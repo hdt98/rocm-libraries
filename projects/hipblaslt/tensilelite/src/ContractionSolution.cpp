@@ -3073,46 +3073,17 @@ namespace TensileLite
         auto cInfo = DataTypeInfo::Get(problemType.cType);
         auto dInfo = DataTypeInfo::Get(problemType.dType);
 
-<<<<<<< HEAD
-        // TODO: For MX data types, their size is smaller than a bytes, so we can't use
-        // segmentSize which would be 0. This needs to be enhanaced.
-        assert( ((NumBatches * M * N * K) * aInfo.elementSize / aInfo.packing) % MT1 == 0);
-        assert( ((NumBatches * M * N * K) * bInfo.elementSize / bInfo.packing) % MT0 == 0);
-        spm.memReadBytesA = (NumBatches * M * N * K) * aInfo.elementSize / aInfo.packing / MT1;
-        spm.memReadBytesB = (NumBatches * M * N * K) * bInfo.elementSize / bInfo.packing / MT0;
-        spm.memReadBytesC = (NumBatches * M * N) * betaReads * cInfo.elementSize / cInfo.packing;
-
-        if(GlobalSplitU == 1)
-        {
-            // Use segmentSize as D currently does not support MX data types.
-            spm.memWriteBytesD = (NumBatches * M * N) * (1 + betaWrites) * dInfo.elementSize;
-        }
-=======
         spm.memReadBytesA = multiplyElementSize((NumBatches * M * N * K) / MT1, aInfo.elementSize);
         spm.memReadBytesB = multiplyElementSize((NumBatches * M * N * K) / MT0, bInfo.elementSize);
         spm.memReadBytesC = multiplyElementSize((NumBatches * M * N) * betaReads, cInfo.elementSize);
 
         if(GlobalSplitU == 1)
             spm.memWriteBytesD = multiplyElementSize((NumBatches * M * N) * (1 + betaWrites), dInfo.elementSize);
->>>>>>> origin/develop
         else
         {
             bool   hardwareAtomic   = false; // TODO-model
             double atomicOperations = hardwareAtomic ? 2 : 3; // read-mod-write or cas  //TODO-model
             double atomicCollisions = 1.0; // TODO-could be based on K, GSU
-<<<<<<< HEAD
-            // Use segmentSize as D currently does not support MX data types.
-            spm.memWriteBytesD      = (NumBatches * M * N)
-                                 * (betaWrites + atomicOperations * atomicCollisions)
-                                 * dInfo.segmentSize;
-        }
-        spm.memReadBytes   = spm.memReadBytesA + spm.memReadBytesB + spm.memReadBytesC;
-
-        spm.memGlobalReads = spm.memReadBytesA   * aInfo.packing / aInfo.elementSize
-                             + spm.memReadBytesB * bInfo.packing / bInfo.elementSize
-                             + spm.memReadBytesC * cInfo.packing / cInfo.elementSize;
-        spm.memGlobalWrites = spm.memWriteBytesD / dInfo.segmentSize;
-=======
             spm.memWriteBytesD      = multiplyElementSize((NumBatches * M * N)
                                  * (betaWrites + atomicOperations * atomicCollisions)
                                  , dInfo.elementSize);
@@ -3122,7 +3093,6 @@ namespace TensileLite
                              + divideElementSize(spm.memReadBytesB, bInfo.elementSize)
                              + divideElementSize(spm.memReadBytesC, cInfo.elementSize);
         spm.memGlobalWrites = divideElementSize(spm.memWriteBytesD, dInfo.elementSize);
->>>>>>> origin/develop
 
         return spm;
     }
@@ -3267,13 +3237,7 @@ namespace TensileLite
         if(problemType.outputAmaxD)
         {
             auto numWGS = getNumWorkGroups(problem, sizeMapping);
-<<<<<<< HEAD
-            // Use elementBytes instead of segmentSize beceause D currently
-            // does not support sub-byte data types
-            size += numWGS * problem.amaxd().elementBytes();
-=======
             size += multiplyElementSize(numWGS, problem.amaxd().elementBytes());
->>>>>>> origin/develop
         }
 
         return size;
