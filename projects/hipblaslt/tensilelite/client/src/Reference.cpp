@@ -385,7 +385,6 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-<<<<<<< HEAD
 #ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
 #endif // #ifdef TENSILE_USE_FP6
@@ -396,12 +395,6 @@ namespace TensileLite
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
             case rocisa::DataType::MXScale:;
-=======
-            case rocisa::DataType::Float6:
-            case rocisa::DataType::BFloat6:
-            case rocisa::DataType::Float4:
-                ;
->>>>>>> origin/develop
             }
             return DataInitialization::getValue<Accumulator, InitMode::Zero>();
         }
@@ -512,7 +505,6 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-<<<<<<< HEAD
 #ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
 #endif // #ifdef TENSILE_USE_FP6
@@ -522,15 +514,10 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
-            case rocisa::DataType::MXScale:;
-=======
-            case rocisa::DataType::Float6:
-            case rocisa::DataType::BFloat6:
-            case rocisa::DataType::Float4:
+            case rocisa::DataType::MXScale:
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
->>>>>>> origin/develop
             }
         }
 
@@ -578,7 +565,6 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-<<<<<<< HEAD
 #ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
 #endif // #ifdef TENSILE_USE_FP6
@@ -588,15 +574,10 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
-            case rocisa::DataType::MXScale:;
-=======
-            case rocisa::DataType::Float6:
-            case rocisa::DataType::BFloat6:
-            case rocisa::DataType::Float4:
+            case rocisa::DataType::MXScale:
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
->>>>>>> origin/develop
             }
         }
 
@@ -1386,7 +1367,7 @@ namespace TensileLite
                                        && !std::is_same<Float6x16, Type>::value
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
-                                       && !std::is_same<BFloat6x16, Type>::value
+                                       && !std::is_same<BFloat6x32, Type>::value
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
                                        && !std::is_same<Float4x2, Type>::value
@@ -1438,7 +1419,7 @@ namespace TensileLite
                                        || std::is_same<Float6x16, Type>::value
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
-                                       || std::is_same<BFloat6x16, Type>::value
+                                       || std::is_same<BFloat6x32, Type>::value
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
                                        || std::is_same<Float4x2, Type>::value
@@ -1620,11 +1601,7 @@ namespace TensileLite
                     if(mxsaCoord.size())
                         mxsaCoord[idx.a] = coord;
                     if(mxsbCoord.size())
-<<<<<<< HEAD
-                        mxsbCoord[idx.a] = coord;
-=======
                         mxsbCoord[idx.b] = coord;
->>>>>>> origin/develop
                 }
 
                 for(size_t i = 0; i < problem.freeIndices().size(); i++)
@@ -1676,7 +1653,6 @@ namespace TensileLite
                                     = boundSize[i] - bCoord[boundIndices[i].b] - 1;
 
                             if(problem.mxBlockA())
-<<<<<<< HEAD
                                 mxsaCoord[boundIndices[i].a]
                                     = aCoord[boundIndices[i].a] / problem.mxBlockA();
 
@@ -1746,59 +1722,6 @@ namespace TensileLite
                                       / problem.mxBlockB();
                                 size_t mxsbIdx = mxsbIndex + (mxsbI * mxsbStride);
                                 mxScale        = multiply<float>(mxScale, mxsbPtr[mxsbIdx]);
-=======
-                               mxsaCoord[boundIndices[i].a] = aCoord[boundIndices[i].a] / problem.mxBlockA();
-                            if(problem.mxBlockB())
-                               mxsbCoord[boundIndices[i].b] = bCoord[boundIndices[i].b] / problem.mxBlockB();
-                        }
-
-                        size_t aIndex = a.index(aCoord);
-                        size_t bIndex = b.index(bCoord);
-                        size_t mxsaIndex = problem.mxBlockA() ? mxsa.index(mxsaCoord) : 0;
-                        size_t mxsbIndex = problem.mxBlockB() ? mxsb.index(mxsbCoord) : 0;
-
-                        auto aStride = problem.a().strides()[boundIndices[0].a];
-                        auto bStride = problem.b().strides()[boundIndices[0].b];
-                        auto mxsaStride = problem.mxBlockA() ? mxsa.strides()[boundIndices[0].a] : 0;
-                        auto mxsbStride = problem.mxBlockB() ? mxsb.strides()[boundIndices[0].b] : 0;
-
-                        // innermost bound calculation:
-                        size_t innerMXLoop = std::max<size_t>(std::max<size_t>(problem.mxBlockA(), problem.mxBlockB()), 1);
-                        for(size_t i = 0; i < boundSize[0]; i+=innerMXLoop)
-                        {
-                            Accumulator val(0);
-                            for(size_t j = 0; j<innerMXLoop ; j++)
-                            {
-                                size_t idx = i + j;
-                                size_t aI = boundIndices[0].aMirror ? (boundSize[0] - idx - 1) : idx;
-                                size_t bI = boundIndices[0].bMirror ? (boundSize[0] - idx - 1) : idx;
-
-                                size_t aIdx = aIndex + (aI * aStride);
-                                size_t bIdx = bIndex + (bI * bStride);
-                                val += multiply<Inputs, Accumulator, MathOpAccum,
-                                                  typename Inputs::AType,
-                                                  typename Inputs::BType,
-                                                  typename Inputs::ComputeInputTypeA,
-                                                  typename Inputs::ComputeInputTypeB>(
-                                    problem, inputs, aPtr, bPtr, aIdx, bIdx, aConjugate, bConjugate);
-                            }
-
-                            Accumulator mxScale(1);
-                            if (problem.mxBlockA())
-                            {
-                                size_t mxsaI = (boundIndices[0].aMirror ? (boundSize[0] - i - 1) : i) / problem.mxBlockA();
-                                size_t mxsaIdx = mxsaIndex + (mxsaI * mxsaStride);
-                                Accumulator sa = abs(GetValue<Accumulator>(mxsa.dataType(), inputs.mxsa, mxsaIdx, 0));
-                                mxScale = multiply<Accumulator>(mxScale, sa);
-                            }
-
-                            if (problem.mxBlockB())
-                            {
-                                size_t mxsbI = (boundIndices[0].bMirror ? (boundSize[0] - i - 1) : i) / problem.mxBlockB();
-                                size_t mxsbIdx = mxsbIndex + (mxsbI * mxsbStride);
-                                Accumulator sb = abs(GetValue<Accumulator>(mxsb.dataType(), inputs.mxsb, mxsbIdx, 0));
-                                mxScale = multiply<Accumulator>(mxScale, sb);
->>>>>>> origin/develop
                             }
                             value += multiply<Accumulator>(val, mxScale);
                         }
@@ -2589,17 +2512,13 @@ namespace TensileLite
 #endif // TENSILE_USE_HALF
 #endif // TENSILE_USE_FP8_BF8
 
-<<<<<<< HEAD
 #ifndef _WIN32
-=======
->>>>>>> origin/develop
 #ifdef TENSILE_USE_FP6
             case TypedGemm_F6_S_S::TypeId():
             {
                 return ReferenceSolution<TypedGemm_F6_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-<<<<<<< HEAD
             case TypedGemm_F8F6_S_S::TypeId():
             {
                 return ReferenceSolution<TypedGemm_F8F6_S_S>::SolveCPU(
@@ -2610,8 +2529,6 @@ namespace TensileLite
                 return ReferenceSolution<TypedGemm_F6F8_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-=======
->>>>>>> origin/develop
 #endif //TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
             case TypedGemm_BF6_S_S::TypeId():
@@ -2620,7 +2537,6 @@ namespace TensileLite
                     problem, inputs, elementsToValidate);
             }
 #endif //TENSILE_USE_BF6
-<<<<<<< HEAD
 #ifdef TENSILE_USE_FP4
 
             case TypedGemm_F4_S_S::TypeId():
@@ -2639,8 +2555,6 @@ namespace TensileLite
                     problem, inputs, elementsToValidate);
             }
 #endif //TENSILE_USE_FP4
-=======
->>>>>>> origin/develop
 #if defined(TENSILE_USE_FP6) && defined(TENSILE_USE_BF6)
             case TypedGemm_F6B6_S_S::TypeId():
             {
@@ -2653,29 +2567,17 @@ namespace TensileLite
                     problem, inputs, elementsToValidate);
             }
 #endif // defined(TENSILE_USE_FP6) && defined(TENSILE_USE_BF6)
-<<<<<<< HEAD
 #if defined(TENSILE_USE_FP6) && defined(TENSILE_USE_FP4)
             case TypedGemm_F6F4_S_S::TypeId():
             {
                 return ReferenceSolution<TypedGemm_F6F4_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-=======
-#ifdef TENSILE_USE_FP4
-            case TypedGemm_F4_S_S::TypeId():
-            {
-                return ReferenceSolution<TypedGemm_F4_S_S>::SolveCPU(
-                    problem, inputs, elementsToValidate);
-            }
-#endif //TENSILE_USE_FP4
-#if defined(TENSILE_USE_FP4) && defined(TENSILE_USE_FP6)
->>>>>>> origin/develop
             case TypedGemm_F4F6_S_S::TypeId():
             {
                 return ReferenceSolution<TypedGemm_F4F6_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-<<<<<<< HEAD
 #endif // defined(TENSILE_USE_FP6) && defined(TENSILE_USE_FP4)
 #if defined(TENSILE_USE_BF6) && defined(TENSILE_USE_FP4)
             case TypedGemm_B6F4_S_S::TypeId():
@@ -2683,30 +2585,13 @@ namespace TensileLite
                 return ReferenceSolution<TypedGemm_B6F4_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-=======
-            case TypedGemm_F6F4_S_S::TypeId():
-            {
-                return ReferenceSolution<TypedGemm_F6F4_S_S>::SolveCPU(
-                    problem, inputs, elementsToValidate);
-            }
-#endif // defined(TENSILE_USE_FP4) && defined(TENSILE_USE_FP6)
-#if defined(TENSILE_USE_FP4) && defined(TENSILE_USE_BF6)
->>>>>>> origin/develop
             case TypedGemm_F4B6_S_S::TypeId():
             {
                 return ReferenceSolution<TypedGemm_F4B6_S_S>::SolveCPU(
                     problem, inputs, elementsToValidate);
             }
-<<<<<<< HEAD
 #endif // defined(TENSILE_USE_BF6) && defined(TENSILE_USE_FP4)
 #endif // !_WIN32
-=======
-            case TypedGemm_B6F4_S_S::TypeId():
-            {
-                return ReferenceSolution<TypedGemm_B6F4_S_S>::SolveCPU(
-                    problem, inputs, elementsToValidate);
-            }
-#endif // defined(TENSILE_USE_FP4) && defined(TENSILE_USE_BF6)
 #if defined(TENSILE_USE_FP8_BF8) && defined(TENSILE_USE_FP4)
             // DestDataType: S
             case TypedGemm_F8F4_S_S::TypeId():
@@ -2862,7 +2747,6 @@ namespace TensileLite
                     problem, inputs, elementsToValidate);
             }
 #endif // defined(TENSILE_USE_FP8_BF8) && defined(TENSILE_USE_BF6)
->>>>>>> origin/develop
             default:;
             }
 

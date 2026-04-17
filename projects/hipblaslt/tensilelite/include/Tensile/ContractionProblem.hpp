@@ -1050,22 +1050,12 @@ namespace TensileLite
 
         void setMXScaleA(rocisa::DataType mxType, int mxBlock, std::vector<size_t> saStride = {});
 
-        size_t mxBlockA() const
-        {
-            return m_mxBlockA;
-        }
-
         rocisa::DataType mxTypeA() const
         {
             return m_mxTypeA;
         }
 
         void setMXScaleB(rocisa::DataType mxType, int mxBlock, std::vector<size_t> sbStride = {});
-
-        size_t mxBlockB() const
-        {
-            return m_mxBlockB;
-        }
 
         rocisa::DataType mxTypeB() const
         {
@@ -1092,14 +1082,10 @@ namespace TensileLite
             m_swizzleTensorB = swizzle;
         }
 
-        void setMXScaleA(int mxBlock, std::vector<size_t> saStride = {});
-
         size_t mxBlockA() const
         {
             return m_mxBlockA;
         }
-
-        void setMXScaleB(int mxBlock, std::vector<size_t> sbStride = {});
 
         size_t mxBlockB() const
         {
@@ -1164,14 +1150,6 @@ namespace TensileLite
         TensorDescriptor const& amaxd() const
         {
             return m_tensors[ContractionProblemGemm::TENSOR::AMAXD];
-        }
-        TensorDescriptor const& mxsa() const
-        {
-            return m_tensors[ContractionProblemGemm::TENSOR::MXSA];
-        }
-        TensorDescriptor const& mxsb() const
-        {
-            return m_tensors[ContractionProblemGemm::TENSOR::MXSB];
         }
         TensorOps const& aOps() const
         {
@@ -1367,16 +1345,11 @@ namespace TensileLite
         ActivationType   m_activationType          = ActivationType::None;
         bool             m_activationNoGuard       = false;
         int              m_sparse                  = 0;
-<<<<<<< HEAD
-        int              m_mxBlockA                = 0;
-        int              m_mxBlockB                = 0;
-=======
         int              m_metadataLayout          = 0;
         int              m_mxBlockA                = 0;
         int              m_mxBlockB                = 0;
         rocisa::DataType m_mxTypeA                 = rocisa::DataType::None;
         rocisa::DataType m_mxTypeB                 = rocisa::DataType::None;
->>>>>>> origin/develop
 
         KernelLanguage    m_kernelLanguage    = KernelLanguage::Any;
         PerformanceMetric m_performanceMetric = PerformanceMetric::DeviceEfficiency;
