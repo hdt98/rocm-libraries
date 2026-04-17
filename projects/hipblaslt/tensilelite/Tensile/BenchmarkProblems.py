@@ -205,6 +205,74 @@ def _generateCustomKernelSolutions(
 
     return solutions
 
+def _create_solution_from_state(solutionState, problemType,
+                                splitGSU, printSolutionRejectionReason,
+                                printIndexAssignmentInfo, assembler, isaInfoMap, srcFile):
+    """Top-level function for parallel Solution construction from a pool solution state dict.
+
+    Preserves the AssignedDerivedParameters flags from the lib so that the
+    Solution constructor uses the parameters as-is without re-applying
+    derivation rules.
+    """
+    try:
+        solutionState.pop("SolutionIndex", None)
+        solutionState["ProblemType"] = problemType
+        return Solution(
+            solutionState, splitGSU, printSolutionRejectionReason,
+            printIndexAssignmentInfo, assembler, isaInfoMap, srcFile
+        )
+    except Exception as e:
+        print(f"Error creating solution from pool: {e}")
+        return None
+
+def _constructAllPoolSolutions(poolEntries, assembler, debugConfig, isaInfoMap):
+    """Construct Solution objects from all matched pool entries in a single parallel pass."""
+    problemType = ProblemType(poolEntries[0][1]["ProblemType"], debugConfig.printIndexAssignmentInfo)
+
+    allSolStates = []
+    allSrcFiles = []
+    for poolFile, poolData in poolEntries:
+        data = poolData["Solutions"]
+        nSols = len(data)
+        allSolStates.append(data)
+        allSrcFiles.append(itertools.repeat(poolFile, nSols))
+        print1("# Pool file {}: {} solutions".format(poolFile, nSols))
+
+    solIters = zip(
+        itertools.chain.from_iterable(allSolStates),
+        itertools.repeat(problemType),
+        itertools.repeat(debugConfig.splitGSU),
+        itertools.repeat(debugConfig.printSolutionRejectionReason),
+        itertools.repeat(debugConfig.printIndexAssignmentInfo),
+        itertools.repeat(assembler),
+        itertools.repeat(isaInfoMap),
+        itertools.chain.from_iterable(allSrcFiles),
+    )
+    raw = ParallelMap2(_create_solution_from_state, solIters,
+                       "Constructing solutions from {} pool file(s)".format(len(poolEntries)),
+                       return_as="list")
+    return [s for s in raw if s is not None]
+
+def _parsePoolFile(poolFile):
+    """Read and parse a pool file. Returns (ptStr, data, poolFile)."""
+    data = LibraryIO.read(poolFile, customizedLoader=True)
+    if isinstance(data, list):
+        data = LibraryIO.parseLibraryLogicList(data, poolFile)
+    ptStr = str(ProblemType(data["ProblemType"], False))
+    return (ptStr, poolFile, data)
+
+def _loadSolutionPool(solutionPoolFiles):
+    """Parse all pool files and index by ProblemType string.
+
+    Returns {ptStr: [(poolFile, parsedData), ...]}.
+    Each file is parsed once; the parsed data is cached for later solution construction.
+    """
+    poolIndex = {}
+    for (ptStr, poolFile, data) in ParallelMap2(_parsePoolFile, zip(solutionPoolFiles), "load solution pool", return_as="list"):
+        print2("# Pool file {}: ProblemType={}, {} solutions".format(poolFile, ptStr, len(data["Solutions"])))
+        poolIndex.setdefault(ptStr, []).append((poolFile, data))
+    return poolIndex
+
 def writeBenchmarkFiles(
         stepBaseDir,
         solutions,
@@ -350,12 +418,17 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
                          debugConfig: DebugConfig, deviceId: int,
                          gfxName: str, isaInfoMap: Dict[str, IsaInfo], probSolMap: dict,
                          buildOnly: bool = False,
+                         solutionPoolIndex: dict = None,
     ):
     """Run the benchmarking for a single entry in the BenchmarkProblems of a Tensile config
 
     Args:
         buildOnly: If True, generate and build kernels but skip benchmarking.
+        solutionPoolIndex: Dict mapping ProblemType string to pool file path.
+            Only the matched file's solutions are constructed (on demand).
     """
+    if solutionPoolIndex is None:
+        solutionPoolIndex = {}
     benchmarkTestFails = 0
 
     print1("")
@@ -394,11 +467,14 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
         print1("# Bias Type steps: {}".format(benchmarkStep.biasTypeArgs.totalProblemSizes))
         print1("# Activation steps: {}".format(benchmarkStep.activationArgs.totalProblemSizes))
         print1("# ICacheFlush steps: {}".format(len(benchmarkStep.icacheFlushArgs)))
-        print1("# Fork Parameters:")
-        for k, v in benchmarkStep.forkParams.items():
-            print1("#     {}: {}".format(k, v))
-        if benchmarkStep.internalSupportParams:
-            print("# InternalSupportParams: {}".format(benchmarkStep.internalSupportParams))
+        if solutionPoolIndex:
+            print1("# Solution Pool: (solutions loaded from library logic file)")
+        else:
+            print1("# Fork Parameters:")
+            for k, v in benchmarkStep.forkParams.items():
+                print1("#     {}: {}".format(k, v))
+            if benchmarkStep.internalSupportParams:
+                print("# InternalSupportParams: {}".format(benchmarkStep.internalSupportParams))
 
         shortNamePath = ensurePath(groupNamePath / shortName)
         stepBaseDir = shortNamePath
@@ -413,45 +489,57 @@ def _benchmarkProblemType(problemTypeConfig, problemSizeGroupConfig, problemSize
         cachePath = os.path.join(stepBaseDir, "cache.yaml")
         sourcePath = ensurePath(shortNamePath / "source")
 
-        with timing_context("python_cache_check"):
+        configPTStr = str(benchmarkProcess.problemType)
+        useSolutionPool = configPTStr in solutionPoolIndex
+
+        if useSolutionPool:
             cacheValid = False
-            if useCache and os.path.isfile(cachePath):
-                c = LibraryIO.read(cachePath)
-                if c["ConstantParams"] == benchmarkStep.constantParams and \
-                        c["ForkParams"] == benchmarkStep.forkParams and \
-                        c["ParamGroups"] == benchmarkStep.paramGroups and \
-                        c["CustomKernels"] == benchmarkStep.customKernels and \
-                        c["InternalSupportParams"] == benchmarkStep.internalSupportParams and \
-                        c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
-                    cacheValid = True
-                    codeObjectFiles = c["CodeObjectFiles"]
-                else:
-                    printWarning("Cache data does not match config: redoing solution generation")
+        else:
+            with timing_context("python_cache_check"):
+                cacheValid = False
+                if useCache and os.path.isfile(cachePath):
+                    c = LibraryIO.read(cachePath)
+                    if c["ConstantParams"] == benchmarkStep.constantParams and \
+                            c["ForkParams"] == benchmarkStep.forkParams and \
+                            c["ParamGroups"] == benchmarkStep.paramGroups and \
+                            c["CustomKernels"] == benchmarkStep.customKernels and \
+                            c["InternalSupportParams"] == benchmarkStep.internalSupportParams and \
+                            c["CustomKernelWildcard"] == benchmarkStep.customKernelWildcard:
+                        cacheValid = True
+                        codeObjectFiles = c["CodeObjectFiles"]
+                    else:
+                        printWarning("Cache data does not match config: redoing solution generation")
 
         if not cacheValid:
-            # enumerate benchmark permutations and create resulting solution objects
-            with timing_context("python_solution_generation"):
-                with timing_context("python_solgen_fork_permutations"):
-                    forkPermutations = constructForkPermutations(benchmarkStep.forkParams, \
-                            benchmarkStep.paramGroups) if problemSizeGroupConfig["ForkParameters"] else []
-                    maxPossibleSolutions = len(forkPermutations)
+            if useSolutionPool:
+                poolEntries = solutionPoolIndex[configPTStr]
+                with timing_context("python_solution_pool_construction"):
+                    solutions = _constructAllPoolSolutions(poolEntries, asmToolchain.assembler, debugConfig, isaInfoMap)
+                print1("# Total {} solutions from {} pool file(s)".format(len(solutions), len(poolEntries)))
+            else:
+                # enumerate benchmark permutations and create resulting solution objects
+                with timing_context("python_solution_generation"):
+                    with timing_context("python_solgen_fork_permutations"):
+                        forkPermutations = constructForkPermutations(benchmarkStep.forkParams, \
+                                benchmarkStep.paramGroups) if problemSizeGroupConfig["ForkParameters"] else []
+                        maxPossibleSolutions = len(forkPermutations)
 
-                with timing_context("python_solgen_forked_solutions"):
-                    regSolutions = _generateForkedSolutions(benchmarkProcess.problemType, \
-                            benchmarkStep.constantParams, forkPermutations, asmToolchain.assembler, \
-                                debugConfig, isaInfoMap)
+                    with timing_context("python_solgen_forked_solutions"):
+                        regSolutions = _generateForkedSolutions(benchmarkProcess.problemType, \
+                                benchmarkStep.constantParams, forkPermutations, asmToolchain.assembler, \
+                                    debugConfig, isaInfoMap)
 
-                with timing_context("python_solgen_custom_kernels"):
-                    kcSolutions = _generateCustomKernelSolutions(benchmarkProcess.problemType, \
-                            benchmarkStep.customKernels, benchmarkStep.internalSupportParams, \
-                            not benchmarkStep.customKernelWildcard, asmToolchain.assembler, debugConfig, \
-                                isaInfoMap)
+                    with timing_context("python_solgen_custom_kernels"):
+                        kcSolutions = _generateCustomKernelSolutions(benchmarkProcess.problemType, \
+                                benchmarkStep.customKernels, benchmarkStep.internalSupportParams, \
+                                not benchmarkStep.customKernelWildcard, asmToolchain.assembler, debugConfig, \
+                                    isaInfoMap)
 
-                maxPossibleSolutions += len(kcSolutions)
-                solutions = regSolutions + kcSolutions
+                    maxPossibleSolutions += len(kcSolutions)
+                    solutions = regSolutions + kcSolutions
 
-            print1("# Actual Solutions: {} / {} after SolutionStructs\n" \
-                .format(len(solutions), maxPossibleSolutions))
+                print1("# Actual Solutions: {} / {} after SolutionStructs\n" \
+                    .format(len(solutions), maxPossibleSolutions))
 
             # handle no valid solutions
             if len(solutions) == 0:
@@ -559,17 +647,24 @@ def main(
     isaInfoMap: Dict[str, IsaInfo],
     probSolMap: dict,
     buildOnly: bool = False,
+    solutionPoolFiles: list = None,
 ):
     """Entry point for the "BenchmarkProblems" section of a Tensile config yaml
 
     Args:
         buildOnly: If True, generate and build kernels but skip benchmarking.
+        solutionPoolFiles: If non-empty, load solutions from matching pool files
+            instead of generating from ForkParameters.
     """
     getClientExecutablePath()
 
     if config is None:
         print(f'No config specified in {globalParameters["ConfigPath"]}, built client only')
         return
+
+    solutionPoolIndex = None
+    if solutionPoolFiles:
+        solutionPoolIndex = _loadSolutionPool(solutionPoolFiles)
 
     benchmarkDataPath = ensurePath(outputPath / BENCHMARK_DATA_DIR)
 
@@ -618,6 +713,7 @@ def main(
                             isaInfoMap,
                             probSolMap,
                             buildOnly,
+                            solutionPoolIndex,
                         )
                 totalTestFails += benchmarkErrors
 
