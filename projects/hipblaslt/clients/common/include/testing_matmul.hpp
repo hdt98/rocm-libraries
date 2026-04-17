@@ -4704,7 +4704,8 @@ void testing_matmul_with_bias(const Arguments& arg,
             int actual_strategy = arg.split_strategy;
             if (actual_strategy == 0)
             {
-                actual_strategy = autoSelectStrategy(M[0], N[0], K[0]);
+                size_t elem_size = getDataTypeSize(arg.b_type);
+                actual_strategy = autoSelectStrategy(M[0], N[0], K[0], elem_size);
                 hipblaslt_cout << "Auto-selected strategy: " << actual_strategy << std::endl;
             }
 
@@ -4749,11 +4750,15 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             const char* strategy_names[] = {
                 "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
-                "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance", "Adaptive-Power-of-2"
+                "MacroTile-Align", "Power-of-2", "CU-Balanced", "Performance", "Adaptive-Power-of-2",
+                "Unknown", "Unknown", "Unknown", "Unknown",
+                "Cache-Optimized-M", "Cache-Optimized-N"
             };
 
+            const char* strategy_name = (actual_strategy <= 16) ? strategy_names[actual_strategy] : "Unknown";
+
             hipblaslt_cout << "Multi-MacroTile: Using "
-                          << strategy_names[std::min(actual_strategy, 10)]
+                          << strategy_name
                           << " strategy with " << subProblems.size()
                           << " sub-problems:" << std::endl;
 

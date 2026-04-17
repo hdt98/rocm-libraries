@@ -46,7 +46,9 @@ enum class SplitStrategy
     PowerOf2 = 7,        // Power-of-2 biased splitting
     CUBalanced = 8,      // CU-balanced for stream-parallel
     Performance = 9,     // Performance-based (query heuristics)
-    AdaptivePowerOf2 = 10 // Adaptive power-of-2 (falls back to uniform if imbalanced)
+    AdaptivePowerOf2 = 10, // Adaptive power-of-2 (falls back to uniform if imbalanced)
+    CacheOptimizedM = 15,  // Cache-optimized M-split (uneven split when B fits in L2)
+    CacheOptimizedN = 16   // Cache-optimized N-split (uneven split when A fits in L2)
 };
 
 // Structure to describe a sub-problem for multi-MacroTile GEMM
@@ -104,32 +106,49 @@ inline int estimateWorkgroupsSimple(int64_t M, int64_t N, int macrotile_m = 128,
 }
 
 // Automatic strategy selection based on problem characteristics
-inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K)
+inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K, size_t elem_size = 2)
 {
-    // Rule 1: Disable for small K (minimal benefit)
-    if (K < 8192)
+    const size_t L2_SIZE = 96 * 1024 * 1024;  // 96 MB on MI355X
+
+    // Rule 1: Check for very small K (but cache optimization can help even with smaller K)
+    // Only completely disable for K < 4096
+    if (K < 4096)
     {
-        return 0; // Use baseline - overhead not amortized
+        return 0; // Use baseline - very small K has negligible benefit
     }
 
     // Rule 2: Rectangular matrices - split along larger dimension
-    // Allow even if one dimension is small
+    // Consider cache optimization if shared matrix fits in L2
     double aspect_ratio = (double)M / N;
+
     if (aspect_ratio > 1.5)
     {
-        // Tall matrix (M > N)
-        if (M >= 10240) // Only disable if both dimensions too small
+        // Tall matrix (M > N) - prefer M-split
+        if (M >= 10240)
         {
-            return 3; // M-split for tall matrices
+            // Check if B matrix fits in cache
+            size_t B_size = K * N * elem_size;
+            if (B_size < L2_SIZE * 0.75)
+            {
+                return 15; // Cache-optimized M-split (uneven when B fits)
+            }
+            return 3; // Standard uniform M-split
         }
         return 0; // Both dimensions too small
     }
+
     if (aspect_ratio < 0.67)
     {
-        // Wide matrix (M < N)
-        if (N >= 10240) // Only disable if both dimensions too small
+        // Wide matrix (M < N) - prefer N-split
+        if (N >= 10240)
         {
-            return 4; // N-split for wide matrices
+            // Check if A matrix fits in cache
+            size_t A_size = M * K * elem_size;
+            if (A_size < L2_SIZE * 0.75)
+            {
+                return 16; // Cache-optimized N-split (uneven when A fits)
+            }
+            return 4; // Standard uniform N-split
         }
         return 0; // Both dimensions too small
     }
@@ -144,7 +163,16 @@ inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K)
     // Rule 4: Large square matrices with large K
     if (std::abs(aspect_ratio - 1.0) < 0.2) // Nearly square (within 20%)
     {
-        // Check if dimensions are power-of-2 or close to it
+        // Check cache benefit for square matrices
+        size_t B_size = K * N * elem_size;
+
+        if (B_size < L2_SIZE * 0.75)
+        {
+            // B fits in cache - use cache-optimized M-split
+            return 15;
+        }
+
+        // B doesn't fit - use power-of-2 or uniform based on dimensions
         bool m_is_pow2 = isPowerOf2(M);
         bool n_is_pow2 = isPowerOf2(N);
 
@@ -167,8 +195,13 @@ inline int autoSelectStrategy(int64_t M, int64_t N, int64_t K)
         }
     }
 
-    // Rule 5: Default to uniform M-split
-    return 3;
+    // Rule 5: Default to cache-optimized or uniform M-split
+    size_t B_size = K * N * elem_size;
+    if (B_size < L2_SIZE * 0.75)
+    {
+        return 15; // Cache-optimized M-split
+    }
+    return 3; // Standard uniform M-split
 }
 
 // Automatic num_splits selection based on problem size
@@ -627,6 +660,97 @@ inline std::vector<int64_t> computeCUBalancedSplits(int64_t total_size,
     return sizes;
 }
 
+// Calculate optimal split ratio based on L2 cache behavior
+inline double calculateOptimalSplitRatio(int64_t M, int64_t N, int64_t K,
+                                         size_t elem_size, bool is_m_split)
+{
+    const size_t L2_SIZE = 96 * 1024 * 1024;  // 96 MB on MI355X
+
+    // Determine which matrix is shared across splits
+    size_t shared_matrix_size;
+    if (is_m_split)
+        shared_matrix_size = K * N * elem_size;  // B matrix
+    else
+        shared_matrix_size = M * K * elem_size;  // A matrix
+
+    // If shared matrix fits in cache (with 75% threshold for safety), use uneven split
+    if (shared_matrix_size < L2_SIZE * 0.75)
+    {
+        // Adjust ratio based on compute intensity (K dimension)
+        // Smaller K = more memory-bound = more aggressive uneven split
+        if (K >= 16384)
+            return 0.60;  // High compute, less cache-sensitive
+        else if (K >= 8192)
+            return 0.65;  // Medium compute
+        else if (K >= 4096)
+            return 0.70;  // Lower compute, cache matters more
+        else
+            return 0.75;  // Very memory-bound, aggressive split
+    }
+
+    // Shared matrix doesn't fit, uniform split is best
+    return 0.50;
+}
+
+// Cache-Optimized Split: Uneven splits when shared matrix fits in L2 cache
+inline std::vector<int64_t> computeCacheOptimizedSplits(
+    int64_t total_size,
+    int num_splits,
+    int macrotile_size,
+    int64_t other_dim,
+    int64_t K,
+    size_t elem_size,
+    bool is_m_split)
+{
+    std::vector<int64_t> sizes;
+
+    if (num_splits != 2)
+    {
+        // For 3+ splits, fall back to uniform
+        int64_t base = (total_size / num_splits / macrotile_size) * macrotile_size;
+        int64_t remainder = total_size - (base * num_splits);
+
+        for (int i = 0; i < num_splits; i++)
+        {
+            int64_t size = base;
+            if (i == 0 && remainder > 0)
+                size += (remainder / macrotile_size) * macrotile_size;  // Give extra to first split
+            sizes.push_back(size);
+        }
+
+        // Handle any remaining after alignment
+        int64_t total_assigned = 0;
+        for (auto s : sizes) total_assigned += s;
+        if (total_assigned < total_size)
+            sizes[0] += (total_size - total_assigned);
+
+        return sizes;
+    }
+
+    // 2-way split: use cache-aware ratio
+    double ratio = calculateOptimalSplitRatio(
+        is_m_split ? total_size : other_dim,
+        is_m_split ? other_dim : total_size,
+        K, elem_size, is_m_split);
+
+    // Calculate split sizes
+    int64_t first_split = (int64_t)(total_size * ratio);
+
+    // Align to MacroTile
+    first_split = (first_split / macrotile_size) * macrotile_size;
+
+    // Ensure minimum size
+    first_split = std::max(first_split, (int64_t)macrotile_size);
+    first_split = std::min(first_split, total_size - (int64_t)macrotile_size);
+
+    int64_t second_split = total_size - first_split;
+
+    sizes.push_back(first_split);
+    sizes.push_back(second_split);
+
+    return sizes;
+}
+
 // Performance-based splitting: Would require heuristic queries (placeholder for now)
 // This is complex as it needs hipblasLtMatmulAlgoGetHeuristic calls
 // We'll implement a simplified version based on known good sizes
@@ -770,6 +894,16 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             split_along_m = true;
             split_along_n = false;
             break;
+        case SplitStrategy::CacheOptimizedM:
+            num_splits = 2;  // 2-way split optimized for cache
+            split_along_m = true;
+            split_along_n = false;
+            break;
+        case SplitStrategy::CacheOptimizedN:
+            num_splits = 2;  // 2-way split optimized for cache
+            split_along_m = false;
+            split_along_n = true;
+            break;
         }
     }
 
@@ -832,6 +966,13 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
             m_split_sizes = computeAdaptivePowerOf2Splits(M, num_splits);
             use_intelligent_splits = true;
         }
+        else if(strat == SplitStrategy::CacheOptimizedM)
+        {
+            size_t elem_size = getDataTypeSize(b_type);
+            m_split_sizes = computeCacheOptimizedSplits(M, num_splits, macrotile_m,
+                                                        N, K, elem_size, true);
+            use_intelligent_splits = true;
+        }
     }
     else if(!split_along_m && split_along_n)
     {
@@ -859,6 +1000,13 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         else if(strat == SplitStrategy::AdaptivePowerOf2)
         {
             n_split_sizes = computeAdaptivePowerOf2Splits(N, num_splits);
+            use_intelligent_splits = true;
+        }
+        else if(strat == SplitStrategy::CacheOptimizedN)
+        {
+            size_t elem_size = getDataTypeSize(a_type);
+            n_split_sizes = computeCacheOptimizedSplits(N, num_splits, macrotile_n,
+                                                        M, K, elem_size, false);
             use_intelligent_splits = true;
         }
     }

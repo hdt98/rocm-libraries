@@ -629,7 +629,9 @@ try
         "  7=power_of_2 (non-uniform, power-of-2 biased),\n"
         "  8=cu_balanced (non-uniform, CU-balanced for stream-parallel),\n"
         "  9=performance (non-uniform, performance-based),\n"
-        "  10=adaptive_power_of_2 (non-uniform, power-of-2 with balance check)")
+        "  10=adaptive_power_of_2 (non-uniform, power-of-2 with balance check),\n"
+        "  15=cache_optimized_m (non-uniform, M-split optimized for L2 cache),\n"
+        "  16=cache_optimized_n (non-uniform, N-split optimized for L2 cache)")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(0),
