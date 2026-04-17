@@ -54,8 +54,8 @@ TEST(BinaryElementWiseOp_Host, Add_float_float_half)
     // This tests the fix: should convert half_t to float, not the other way
     Add op;
     float y;
-    float x0       = 1.0f + 1e-6f; // Value with precision beyond half_t
-    half_t x1      = type_convert<half_t>(2.0f);
+    float x0  = 1.0f + 1e-6f; // Value with precision beyond half_t
+    half_t x1 = type_convert<half_t>(2.0f);
     // Reference: x1 promoted to float (not x0 demoted to half_t)
     float expected = x0 + type_convert<float>(x1);
 
@@ -149,8 +149,8 @@ TEST(BinaryElementWiseOp_Host, Multiply_float_float_half)
     // This tests the fix: should convert half_t to float
     Multiply op;
     float y;
-    float x0       = 1.0f + 1e-6f;
-    half_t x1      = type_convert<half_t>(2.0f);
+    float x0  = 1.0f + 1e-6f;
+    half_t x1 = type_convert<half_t>(2.0f);
     // Reference: x1 promoted to float (not x0 demoted to half_t)
     float expected = x0 * type_convert<float>(x1);
 
@@ -923,9 +923,9 @@ TEST(BinaryElementWiseOp_Device, Add_float_float_float)
 TEST(BinaryElementWiseOp_Device, Add_float_float_half)
 {
     // Test precision fix on device: should convert half_t to float, not the other way
-    float x0       = 1.0f + 1e-6f; // Value with precision beyond half_t
-    half_t x1      = type_convert<half_t>(2.0f);
-    float y        = run_binary_op_on_device<Add, float>(x0, x1);
+    float x0  = 1.0f + 1e-6f; // Value with precision beyond half_t
+    half_t x1 = type_convert<half_t>(2.0f);
+    float y   = run_binary_op_on_device<Add, float>(x0, x1);
     // Reference: x1 promoted to float (not x0 demoted to half_t)
     float expected = x0 + type_convert<float>(x1);
     EXPECT_FLOAT_EQ(y, expected);
@@ -963,9 +963,9 @@ TEST(BinaryElementWiseOp_Device, Multiply_float_float_float)
 TEST(BinaryElementWiseOp_Device, Multiply_float_float_half)
 {
     // Test precision fix on device: should convert half_t to float
-    float x0       = 1.0f + 1e-6f;
-    half_t x1      = type_convert<half_t>(2.0f);
-    float y        = run_binary_op_on_device<Multiply, float>(x0, x1);
+    float x0  = 1.0f + 1e-6f;
+    half_t x1 = type_convert<half_t>(2.0f);
+    float y   = run_binary_op_on_device<Multiply, float>(x0, x1);
     // Reference: x1 promoted to float (not x0 demoted to half_t)
     float expected = x0 * type_convert<float>(x1);
     EXPECT_FLOAT_EQ(y, expected);
