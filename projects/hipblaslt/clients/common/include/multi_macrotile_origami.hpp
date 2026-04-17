@@ -14,6 +14,10 @@
 #include <algorithm>
 #include <limits>
 #include <iostream>
+#include <regex>
+#include <origami/gemm.hpp>
+#include <origami/hardware.hpp>
+#include <origami/types.hpp>
 
 // Structure to hold per-solution performance estimates
 struct OrigamiSolutionInfo
@@ -24,9 +28,11 @@ struct OrigamiSolutionInfo
     float waves_count;
     size_t workspace_size;
     double estimated_gflops;  // Estimated performance in GFLOPS
+    double estimated_latency_cycles;  // Estimated latency in cycles from Origami
 
     OrigamiSolutionInfo() : solution_index(-1), waves_count(0.0f),
-                            workspace_size(0), estimated_gflops(0.0) {}
+                            workspace_size(0), estimated_gflops(0.0),
+                            estimated_latency_cycles(0.0) {}
 };
 
 // Structure to describe a split configuration with performance data
@@ -42,6 +48,73 @@ struct OrigamiSplitConfig
     OrigamiSplitConfig() : estimated_total_gflops(0.0),
                            estimated_total_time_us(1e9), valid(false) {}
 };
+
+/**
+ * @brief Parse MacroTile dimensions from solution name
+ * Solution names have format like: "...MT256x96x16..."
+ */
+inline bool parseMacroTileFromSolutionName(const std::string& solution_name,
+                                            size_t& mt_m, size_t& mt_n, size_t& mt_k)
+{
+    std::regex mt_regex("MT(\\d+)x(\\d+)x(\\d+)");
+    std::smatch match;
+
+    if (std::regex_search(solution_name, match, mt_regex) && match.size() == 4)
+    {
+        mt_m = std::stoull(match[1].str());
+        mt_n = std::stoull(match[2].str());
+        mt_k = std::stoull(match[3].str());
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Convert hipblasDatatype_t to origami::data_type_t
+ */
+inline origami::data_type_t hipblasltTypeToOrigamiType(hipblasDatatype_t type)
+{
+    switch(type)
+    {
+        case HIPBLAS_R_16F:
+            return origami::data_type_t::Half;
+        case HIPBLAS_R_32F:
+            return origami::data_type_t::Float;
+        case HIPBLAS_R_16B:
+            return origami::data_type_t::BFloat16;
+        case HIPBLAS_R_8F_E4M3:
+            return origami::data_type_t::Float8;
+        case HIPBLAS_R_8F_E5M2:
+            return origami::data_type_t::BFloat8;
+        default:
+            return origami::data_type_t::Half;  // Default to Half
+    }
+}
+
+/**
+ * @brief Create Origami problem_t from hipBLASLt parameters
+ */
+inline origami::problem_t createOrigamiProblem(int64_t M, int64_t N, int64_t K,
+                                                hipblasOperation_t transA,
+                                                hipblasOperation_t transB,
+                                                hipblasDatatype_t a_type,
+                                                hipblasDatatype_t b_type,
+                                                hipblasDatatype_t c_type,
+                                                hipblasDatatype_t d_type,
+                                                hipblasDatatype_t compute_type)
+{
+    origami::problem_t problem;
+    problem.size = {(size_t)M, (size_t)N, (size_t)K};
+    problem.batch = 1;
+    problem.a_transpose = (transA == HIPBLAS_OP_T) ? origami::transpose_t::T : origami::transpose_t::N;
+    problem.b_transpose = (transB == HIPBLAS_OP_T) ? origami::transpose_t::T : origami::transpose_t::N;
+    problem.a_dtype = hipblasltTypeToOrigamiType(a_type);
+    problem.b_dtype = hipblasltTypeToOrigamiType(b_type);
+    problem.c_dtype = hipblasltTypeToOrigamiType(c_type);
+    problem.d_dtype = hipblasltTypeToOrigamiType(d_type);
+    problem.mi_dtype = hipblasltTypeToOrigamiType(compute_type);
+    return problem;
+}
 
 /**
  * @brief Query all available solutions for a given sub-problem
@@ -103,25 +176,54 @@ inline std::vector<OrigamiSolutionInfo> queryAllSolutionsForSubProblem(
             // Get solution name
             info.solution_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, info.algo);
 
-            // Estimate GFLOPS based on wavesCount
-            // Higher wavesCount = better GPU utilization = higher GFLOPS
-            // This is a heuristic - actual performance varies
-            // We could also use analytical models if available
+            // Try to extract MacroTile configuration and use Origami for latency estimation
+            size_t mt_m, mt_n, mt_k;
+            if (parseMacroTileFromSolutionName(info.solution_name, mt_m, mt_n, mt_k))
+            {
+                try {
+                    // Create Origami problem and config
+                    origami::problem_t problem = createOrigamiProblem(
+                        M, N, K, transA, transB, a_type, b_type, c_type, d_type, compute_type);
 
-            // Calculate theoretical GFLOPS for this problem size
-            // GEMM operations: 2*M*N*K floating point ops
-            double ops = 2.0 * M * N * K;
+                    // Create origami config from MacroTile
+                    origami::config_t config;
+                    config.mt = {mt_m, mt_n, mt_k};
+                    config.mi = {16, 16, 1};  // Default micro-tile, could parse from solution name
+                    config.occupancy = 1;     // Default occupancy
+                    config.streamk = false;   // Data-parallel
 
-            // Estimate performance as proportional to wavesCount
-            // Assume peak performance scales with waves
-            // This is a rough approximation - real Origami would be more accurate
-            double utilization_factor = std::min(1.0, (double)heuristic.wavesCount);
+                    // Get hardware info (assuming device 0)
+                    origami::hardware_t hardware = origami::hardware_t::get_hardware_for_device(0);
 
-            // Assume baseline GFLOPS (this should come from device properties)
-            // For MI355X: ~1400 TFLOPS peak FP16
-            double peak_gflops = 1400.0 * 1024.0;  // Peak in GFLOPS
+                    // Compute total latency using Origami
+                    info.estimated_latency_cycles = origami::compute_total_latency(
+                        problem, hardware, config, hardware.N_CU);
 
-            info.estimated_gflops = peak_gflops * utilization_factor * 0.5;  // 50% efficiency estimate
+                    // Convert latency (cycles) to time (microseconds)
+                    // Clock frequency in MHz -> cycles to microseconds
+                    double clock_mhz = hardware.f_CU / 1e6;  // Convert Hz to MHz
+                    double time_us = info.estimated_latency_cycles / clock_mhz;
+
+                    // Calculate theoretical GFLOPS from latency
+                    double ops = 2.0 * M * N * K;
+                    info.estimated_gflops = (ops / time_us) * 1e-3;  // Convert to GFLOPS
+
+                } catch (...) {
+                    // Fall back to wavesCount-based estimation if Origami fails
+                    double peak_gflops = 1400.0 * 1024.0;  // Peak in GFLOPS
+                    double utilization_factor = std::min(1.0, (double)heuristic.wavesCount);
+                    info.estimated_gflops = peak_gflops * utilization_factor * 0.5;
+                    info.estimated_latency_cycles = 0.0;  // Unknown
+                }
+            }
+            else
+            {
+                // Fall back to wavesCount-based estimation if cannot parse MacroTile
+                double peak_gflops = 1400.0 * 1024.0;  // Peak in GFLOPS
+                double utilization_factor = std::min(1.0, (double)heuristic.wavesCount);
+                info.estimated_gflops = peak_gflops * utilization_factor * 0.5;
+                info.estimated_latency_cycles = 0.0;  // Unknown
+            }
 
             solutions.push_back(info);
         }
