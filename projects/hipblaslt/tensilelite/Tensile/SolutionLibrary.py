@@ -473,15 +473,9 @@ class MasterSolutionLibrary:
                         placeholderName += "_%s"%str(problemType.activationType).upper()
 
                 if problemType.mxBlockA:
-<<<<<<< HEAD
-                    placeholderName += ('_MXA' + str(problemType.mxBlockA))
-                if problemType.mxBlockB:
-                    placeholderName += ('_MXB' + str(problemType.mxBlockB))
-=======
                     placeholderName += ('_MXA' + str(problemType.mxTypeA) + 'B' + str(problemType.mxBlockA))
                 if problemType.mxBlockB:
                     placeholderName += ('_MXB' + str(problemType.mxTypeB) + 'B' + str(problemType.mxBlockB))
->>>>>>> origin/develop
 
                 if problemType.swizzleTensorA:
                     placeholderName += '_STA'
@@ -507,10 +501,7 @@ class MasterSolutionLibrary:
                     placeholderName += '_SAV'
                 if problemType.sparse:
                     placeholderName += '_SPB' if problemType.sparse == 2 else '_SPA'
-<<<<<<< HEAD
-=======
                     placeholderName += "ML" + str(problemType.metadataLayout)
->>>>>>> origin/develop
                 if not problemType.f32XdlMathOp.isSingle() and problemType.computeInputTypeA.isSingle() and problemType.computeInputTypeB.isSingle():
                     placeholderName += '_M' + str(problemType.f32XdlMathOp)
                 if problemType.supportDeviceUserArguments:

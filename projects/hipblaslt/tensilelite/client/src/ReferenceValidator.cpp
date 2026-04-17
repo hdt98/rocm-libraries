@@ -376,10 +376,7 @@ namespace TensileLite
             auto k = problem.transA() ? problem.a().sizes().at(0) : problem.a().sizes().at(1);
             bool isTF32 = (problem.f32XdlMathOp() == rocisa::DataType::XFloat32);
             bool isTF32x1 = (problem.computeInputTypeA() == rocisa::DataType::BFloat16
-<<<<<<< HEAD
-=======
                 && problem.computeInputTypeB() == rocisa::DataType::BFloat16
->>>>>>> origin/develop
                 && problem.computeType() == rocisa::DataType::Float
                 && problem.a().dataType() == rocisa::DataType::Float
                 && problem.b().dataType() == rocisa::DataType::Float);
