@@ -144,42 +144,42 @@ class BDSQR_HYBRID : public BDSQR_BASE<1>
 
 // non-batch tests
 
-TEST_P(BDSQR, _float)
+TEST_P(BDSQR, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(BDSQR, _double)
+TEST_P(BDSQR, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(BDSQR, _float_complex)
+TEST_P(BDSQR, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(BDSQR, _double_complex)
+TEST_P(BDSQR, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(BDSQR_HYBRID, _float)
+TEST_P(BDSQR_HYBRID, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(BDSQR_HYBRID, _double)
+TEST_P(BDSQR_HYBRID, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(BDSQR_HYBRID, _float_complex)
+TEST_P(BDSQR_HYBRID, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(BDSQR_HYBRID, _double_complex)
+TEST_P(BDSQR_HYBRID, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

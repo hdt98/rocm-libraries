@@ -153,42 +153,42 @@ class UNMLQ : public ORMLX_UNMLX<true>
 
 // non-batch tests
 
-TEST_P(ORML2, _float)
+TEST_P(ORML2, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORML2, _double)
+TEST_P(ORML2, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNML2, _float_complex)
+TEST_P(UNML2, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNML2, _double_complex)
+TEST_P(UNML2, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMLQ, _float)
+TEST_P(ORMLQ, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMLQ, _double)
+TEST_P(ORMLQ, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMLQ, _float_complex)
+TEST_P(UNMLQ, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMLQ, _double_complex)
+TEST_P(UNMLQ, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

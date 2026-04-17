@@ -133,42 +133,42 @@ class UNGQL : public ORGXL_UNGXL<true>
 
 // non-batch tests
 
-TEST_P(ORG2L, _float)
+TEST_P(ORG2L, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORG2L, _double)
+TEST_P(ORG2L, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNG2L, _float_complex)
+TEST_P(UNG2L, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNG2L, _double_complex)
+TEST_P(UNG2L, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGQL, _float)
+TEST_P(ORGQL, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGQL, _double)
+TEST_P(ORGQL, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGQL, _float_complex)
+TEST_P(UNGQL, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGQL, _double_complex)
+TEST_P(UNGQL, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

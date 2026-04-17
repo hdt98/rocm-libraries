@@ -140,12 +140,12 @@ protected:
 
 // non-batch tests
 
-TEST_P(BDSVDX, _float)
+TEST_P(BDSVDX, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(BDSVDX, _double)
+TEST_P(BDSVDX, __double)
 {
     run_tests<double>();
 }

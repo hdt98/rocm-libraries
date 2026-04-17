@@ -111,22 +111,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LASWP, _float)
+TEST_P(LASWP, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LASWP, _double)
+TEST_P(LASWP, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LASWP, _float_complex)
+TEST_P(LASWP, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LASWP, _double_complex)
+TEST_P(LASWP, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

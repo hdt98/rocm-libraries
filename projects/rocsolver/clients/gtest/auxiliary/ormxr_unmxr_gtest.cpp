@@ -156,42 +156,42 @@ class UNMQR : public ORMXR_UNMXR<true>
 
 // non-batch tests
 
-TEST_P(ORM2R, _float)
+TEST_P(ORM2R, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORM2R, _double)
+TEST_P(ORM2R, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNM2R, _float_complex)
+TEST_P(UNM2R, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNM2R, _double_complex)
+TEST_P(UNM2R, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORMQR, _float)
+TEST_P(ORMQR, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMQR, _double)
+TEST_P(ORMQR, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMQR, _float_complex)
+TEST_P(UNMQR, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMQR, _double_complex)
+TEST_P(UNMQR, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

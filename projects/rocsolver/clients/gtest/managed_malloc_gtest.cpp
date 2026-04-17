@@ -96,22 +96,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(MANAGED_MALLOC, _float)
+TEST_P(MANAGED_MALLOC, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(MANAGED_MALLOC, _double)
+TEST_P(MANAGED_MALLOC, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(MANAGED_MALLOC, _float_complex)
+TEST_P(MANAGED_MALLOC, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(MANAGED_MALLOC, _double_complex)
+TEST_P(MANAGED_MALLOC, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

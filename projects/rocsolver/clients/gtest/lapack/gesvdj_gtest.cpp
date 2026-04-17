@@ -182,106 +182,106 @@ protected:
 
 // non-batch tests
 
-TEST_P(GESVDJ, _float)
+TEST_P(GESVDJ, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ, _double)
+TEST_P(GESVDJ, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ, _float_complex)
+TEST_P(GESVDJ, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, _double_complex)
+TEST_P(GESVDJ, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, _float)
+TEST_P(GESVDJ_NOTRANSV, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, _double)
+TEST_P(GESVDJ_NOTRANSV, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, _float_complex)
+TEST_P(GESVDJ_NOTRANSV, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, _double_complex)
+TEST_P(GESVDJ_NOTRANSV, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(GESVDJ, batched_float)
+TEST_P(GESVDJ, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GESVDJ, batched_double)
+TEST_P(GESVDJ, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GESVDJ, batched_float_complex)
+TEST_P(GESVDJ, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, batched_double_complex)
+TEST_P(GESVDJ, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(GESVDJ, strided_batched_float)
+TEST_P(GESVDJ, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESVDJ, strided_batched_double)
+TEST_P(GESVDJ, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESVDJ, strided_batched_float_complex)
+TEST_P(GESVDJ, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ, strided_batched_double_complex)
+TEST_P(GESVDJ, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched_float)
+TEST_P(GESVDJ_NOTRANSV, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched_double)
+TEST_P(GESVDJ_NOTRANSV, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched_float_complex)
+TEST_P(GESVDJ_NOTRANSV, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESVDJ_NOTRANSV, strided_batched_double_complex)
+TEST_P(GESVDJ_NOTRANSV, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

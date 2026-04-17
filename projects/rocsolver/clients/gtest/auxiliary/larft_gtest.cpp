@@ -119,22 +119,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LARFT, _float)
+TEST_P(LARFT, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARFT, _double)
+TEST_P(LARFT, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARFT, _float_complex)
+TEST_P(LARFT, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARFT, _double_complex)
+TEST_P(LARFT, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

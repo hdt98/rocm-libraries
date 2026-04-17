@@ -132,12 +132,12 @@ protected:
 
 // non-batch tests
 
-TEST_P(STEBZ, _float)
+TEST_P(STEBZ, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEBZ, _double)
+TEST_P(STEBZ, __double)
 {
     run_tests<double>();
 }

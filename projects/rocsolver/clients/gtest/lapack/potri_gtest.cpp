@@ -109,66 +109,66 @@ protected:
 
 // non-batch tests
 
-TEST_P(POTRI, _float)
+TEST_P(POTRI, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRI, _double)
+TEST_P(POTRI, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRI, _float_complex)
+TEST_P(POTRI, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRI, _double_complex)
+TEST_P(POTRI, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(POTRI, batched_float)
+TEST_P(POTRI, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(POTRI, batched_double)
+TEST_P(POTRI, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(POTRI, batched_float_complex)
+TEST_P(POTRI, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRI, batched_double_complex)
+TEST_P(POTRI, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(POTRI, strided_batched_float)
+TEST_P(POTRI, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTRI, strided_batched_double)
+TEST_P(POTRI, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTRI, strided_batched_float_complex)
+TEST_P(POTRI, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRI, strided_batched_double_complex)
+TEST_P(POTRI, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

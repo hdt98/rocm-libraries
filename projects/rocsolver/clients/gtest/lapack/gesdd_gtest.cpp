@@ -179,106 +179,106 @@ protected:
 
 // non-batch tests
 
-TEST_P(GESDD, _float)
+TEST_P(GESDD, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GESDD, _double)
+TEST_P(GESDD, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GESDD, _float_complex)
+TEST_P(GESDD, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GESDD, _double_complex)
+TEST_P(GESDD, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-/* TEST_P(GESDD_NOTRANSV, _float) */
+/* TEST_P(GESDD_NOTRANSV, __float) */
 /* { */
 /*     run_tests<false, false, float>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, _double) */
+/* TEST_P(GESDD_NOTRANSV, __double) */
 /* { */
 /*     run_tests<false, false, double>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, _float_complex) */
+/* TEST_P(GESDD_NOTRANSV, __float_complex) */
 /* { */
 /*     run_tests<false, false, rocblas_float_complex>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, _double_complex) */
+/* TEST_P(GESDD_NOTRANSV, __double_complex) */
 /* { */
 /*     run_tests<false, false, rocblas_double_complex>(); */
 /* } */
 
 // batched tests
 
-TEST_P(GESDD, batched_float)
+TEST_P(GESDD, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GESDD, batched_double)
+TEST_P(GESDD, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GESDD, batched_float_complex)
+TEST_P(GESDD, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GESDD, batched_double_complex)
+TEST_P(GESDD, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(GESDD, strided_batched_float)
+TEST_P(GESDD, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GESDD, strided_batched_double)
+TEST_P(GESDD, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GESDD, strided_batched_float_complex)
+TEST_P(GESDD, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GESDD, strided_batched_double_complex)
+TEST_P(GESDD, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-/* TEST_P(GESDD_NOTRANSV, strided_batched_float) */
+/* TEST_P(GESDD_NOTRANSV, strided_batched__float) */
 /* { */
 /*     run_tests<false, true, float>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, strided_batched_double) */
+/* TEST_P(GESDD_NOTRANSV, strided_batched__double) */
 /* { */
 /*     run_tests<false, true, double>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, strided_batched_float_complex) */
+/* TEST_P(GESDD_NOTRANSV, strided_batched__float_complex) */
 /* { */
 /*     run_tests<false, true, rocblas_float_complex>(); */
 /* } */
 
-/* TEST_P(GESDD_NOTRANSV, strided_batched_double_complex) */
+/* TEST_P(GESDD_NOTRANSV, strided_batched__double_complex) */
 /* { */
 /*     run_tests<false, true, rocblas_double_complex>(); */
 /* } */

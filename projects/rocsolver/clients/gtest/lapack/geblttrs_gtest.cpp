@@ -154,88 +154,88 @@ protected:
 
 // non-batch tests
 
-TEST_P(GEBLTTRS_NPVT, _float)
+TEST_P(GEBLTTRS_NPVT, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBLTTRS_NPVT, _double)
+TEST_P(GEBLTTRS_NPVT, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBLTTRS_NPVT, _float_complex)
+TEST_P(GEBLTTRS_NPVT, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBLTTRS_NPVT, _double_complex)
+TEST_P(GEBLTTRS_NPVT, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(GEBLTTRS_NPVT, batched_float)
+TEST_P(GEBLTTRS_NPVT, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GEBLTTRS_NPVT, batched_double)
+TEST_P(GEBLTTRS_NPVT, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GEBLTTRS_NPVT, batched_float_complex)
+TEST_P(GEBLTTRS_NPVT, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBLTTRS_NPVT, batched_double_complex)
+TEST_P(GEBLTTRS_NPVT, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(GEBLTTRS_NPVT, strided_batched_float)
+TEST_P(GEBLTTRS_NPVT, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GEBLTTRS_NPVT, strided_batched_double)
+TEST_P(GEBLTTRS_NPVT, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GEBLTTRS_NPVT, strided_batched_float_complex)
+TEST_P(GEBLTTRS_NPVT, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBLTTRS_NPVT, strided_batched_double_complex)
+TEST_P(GEBLTTRS_NPVT, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched_float)
+TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched__float)
 {
     run_tests<float>();
 }
 
-TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched_double)
+TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched__double)
 {
     run_tests<double>();
 }
 
-TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched_float_complex)
+TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched__float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched_double_complex)
+TEST_P(GEBLTTRS_NPVT_INTERLEAVED, interleaved_batched__double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

@@ -93,22 +93,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LAUUM, _float)
+TEST_P(LAUUM, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LAUUM, _double)
+TEST_P(LAUUM, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LAUUM, _float_complex)
+TEST_P(LAUUM, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LAUUM, _double_complex)
+TEST_P(LAUUM, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

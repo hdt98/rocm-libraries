@@ -160,126 +160,126 @@ class POTRS_64 : public POTRS_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(POTRS, _float)
+TEST_P(POTRS, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRS, _double)
+TEST_P(POTRS, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRS, _float_complex)
+TEST_P(POTRS, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRS, _double_complex)
+TEST_P(POTRS, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(POTRS_64, _float)
+TEST_P(POTRS_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(POTRS_64, _double)
+TEST_P(POTRS_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(POTRS_64, _float_complex)
+TEST_P(POTRS_64, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(POTRS_64, _double_complex)
+TEST_P(POTRS_64, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(POTRS, batched_float)
+TEST_P(POTRS, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(POTRS, batched_double)
+TEST_P(POTRS, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(POTRS, batched_float_complex)
+TEST_P(POTRS, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRS, batched_double_complex)
+TEST_P(POTRS, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(POTRS_64, batched_float)
+TEST_P(POTRS_64, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(POTRS_64, batched_double)
+TEST_P(POTRS_64, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(POTRS_64, batched_float_complex)
+TEST_P(POTRS_64, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRS_64, batched_double_complex)
+TEST_P(POTRS_64, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(POTRS, strided_batched_float)
+TEST_P(POTRS, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTRS, strided_batched_double)
+TEST_P(POTRS, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTRS, strided_batched_float_complex)
+TEST_P(POTRS, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRS, strided_batched_double_complex)
+TEST_P(POTRS, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(POTRS_64, strided_batched_float)
+TEST_P(POTRS_64, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(POTRS_64, strided_batched_double)
+TEST_P(POTRS_64, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(POTRS_64, strided_batched_float_complex)
+TEST_P(POTRS_64, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(POTRS_64, strided_batched_double_complex)
+TEST_P(POTRS_64, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

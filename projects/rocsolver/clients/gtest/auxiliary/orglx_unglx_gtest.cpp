@@ -128,42 +128,42 @@ class UNGLQ : public ORGLX_UNGLX<true>
 
 // non-batch tests
 
-TEST_P(ORGL2, _float)
+TEST_P(ORGL2, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGL2, _double)
+TEST_P(ORGL2, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGL2, _float_complex)
+TEST_P(UNGL2, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGL2, _double_complex)
+TEST_P(UNGL2, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(ORGLQ, _float)
+TEST_P(ORGLQ, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORGLQ, _double)
+TEST_P(ORGLQ, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNGLQ, _float_complex)
+TEST_P(UNGLQ, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNGLQ, _double_complex)
+TEST_P(UNGLQ, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

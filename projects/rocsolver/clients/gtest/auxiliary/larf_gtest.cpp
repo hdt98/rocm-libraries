@@ -151,42 +151,42 @@ class LARF_64 : public LARF_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(LARF, _float)
+TEST_P(LARF, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARF, _double)
+TEST_P(LARF, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARF, _float_complex)
+TEST_P(LARF, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARF, _double_complex)
+TEST_P(LARF, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LARF_64, _float)
+TEST_P(LARF_64, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARF_64, _double)
+TEST_P(LARF_64, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARF_64, _float_complex)
+TEST_P(LARF_64, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARF_64, _double_complex)
+TEST_P(LARF_64, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

@@ -109,42 +109,42 @@ class STEQR_HYBRID : public STEQR_BASE<1>
 
 // non-batch tests
 
-TEST_P(STEQR, _float)
+TEST_P(STEQR, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEQR, _double)
+TEST_P(STEQR, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(STEQR, _float_complex)
+TEST_P(STEQR, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(STEQR, _double_complex)
+TEST_P(STEQR, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(STEQR_HYBRID, _float)
+TEST_P(STEQR_HYBRID, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEQR_HYBRID, _double)
+TEST_P(STEQR_HYBRID, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(STEQR_HYBRID, _float_complex)
+TEST_P(STEQR_HYBRID, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(STEQR_HYBRID, _double_complex)
+TEST_P(STEQR_HYBRID, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

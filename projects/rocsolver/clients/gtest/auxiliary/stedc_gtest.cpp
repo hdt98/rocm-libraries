@@ -99,22 +99,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(STEDC, _float)
+TEST_P(STEDC, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STEDC, _double)
+TEST_P(STEDC, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(STEDC, _float_complex)
+TEST_P(STEDC, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(STEDC, _double_complex)
+TEST_P(STEDC, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

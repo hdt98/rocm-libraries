@@ -116,22 +116,22 @@ class LACGV_64 : public LACGV_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(LACGV, _float_complex)
+TEST_P(LACGV, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LACGV, _double_complex)
+TEST_P(LACGV, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LACGV_64, _float_complex)
+TEST_P(LACGV_64, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LACGV_64, _double_complex)
+TEST_P(LACGV_64, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

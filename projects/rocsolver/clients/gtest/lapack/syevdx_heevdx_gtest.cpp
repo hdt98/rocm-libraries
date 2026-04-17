@@ -165,86 +165,86 @@ class HEEVDX_INPLACE : public SYEVDX_HEEVDX_INPLACE
 
 // non-batch tests
 
-TEST_P(SYEVDX, _float)
+TEST_P(SYEVDX, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVDX, _double)
+TEST_P(SYEVDX, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVDX, _float_complex)
+TEST_P(HEEVDX, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX, _double_complex)
+TEST_P(HEEVDX, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYEVDX_INPLACE, _float)
+TEST_P(SYEVDX_INPLACE, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEVDX_INPLACE, _double)
+TEST_P(SYEVDX_INPLACE, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEVDX_INPLACE, _float_complex)
+TEST_P(HEEVDX_INPLACE, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX_INPLACE, _double_complex)
+TEST_P(HEEVDX_INPLACE, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(SYEVDX, batched_float)
+TEST_P(SYEVDX, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYEVDX, batched_double)
+TEST_P(SYEVDX, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEEVDX, batched_float_complex)
+TEST_P(HEEVDX, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX, batched_double_complex)
+TEST_P(HEEVDX, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(SYEVDX, strided_batched_float)
+TEST_P(SYEVDX, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEVDX, strided_batched_double)
+TEST_P(SYEVDX, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEVDX, strided_batched_float_complex)
+TEST_P(HEEVDX, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEVDX, strided_batched_double_complex)
+TEST_P(HEEVDX, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

@@ -118,42 +118,42 @@ class GECON_64 : public GECON_BASE<int64_t>
 {
 };
 
-TEST_P(GECON, _float)
+TEST_P(GECON, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(GECON, _double)
+TEST_P(GECON, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(GECON, _float_complex)
+TEST_P(GECON, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(GECON, _double_complex)
+TEST_P(GECON, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(GECON_64, _float)
+TEST_P(GECON_64, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(GECON_64, _double)
+TEST_P(GECON_64, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(GECON_64, _float_complex)
+TEST_P(GECON_64, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(GECON_64, _double_complex)
+TEST_P(GECON_64, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

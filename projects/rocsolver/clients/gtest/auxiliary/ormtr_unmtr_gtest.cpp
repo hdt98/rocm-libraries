@@ -155,22 +155,22 @@ class UNMTR : public ORMTR_UNMTR
 
 // non-batch tests
 
-TEST_P(ORMTR, _float)
+TEST_P(ORMTR, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(ORMTR, _double)
+TEST_P(ORMTR, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(UNMTR, _float_complex)
+TEST_P(UNMTR, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(UNMTR, _double_complex)
+TEST_P(UNMTR, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

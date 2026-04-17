@@ -147,42 +147,42 @@ class LARFG_64 : public LARFG_BASE<int64_t>
 
 // non-batch tests
 
-TEST_P(LARFG, _float)
+TEST_P(LARFG, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARFG, _double)
+TEST_P(LARFG, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARFG, _float_complex)
+TEST_P(LARFG, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARFG, _double_complex)
+TEST_P(LARFG, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }
 
-TEST_P(LARFG_64, _float)
+TEST_P(LARFG_64, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LARFG_64, _double)
+TEST_P(LARFG_64, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LARFG_64, _float_complex)
+TEST_P(LARFG_64, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LARFG_64, _double_complex)
+TEST_P(LARFG_64, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

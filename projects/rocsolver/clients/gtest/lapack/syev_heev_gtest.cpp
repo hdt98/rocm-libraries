@@ -123,126 +123,126 @@ class HEEV_HYBRID : public SYEV_HEEV<1>
 
 // non-batch tests
 
-TEST_P(SYEV, _float)
+TEST_P(SYEV, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEV, _double)
+TEST_P(SYEV, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEV, _float_complex)
+TEST_P(HEEV, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEV, _double_complex)
+TEST_P(HEEV, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(SYEV_HYBRID, _float)
+TEST_P(SYEV_HYBRID, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(SYEV_HYBRID, _double)
+TEST_P(SYEV_HYBRID, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(HEEV_HYBRID, _float_complex)
+TEST_P(HEEV_HYBRID, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(HEEV_HYBRID, _double_complex)
+TEST_P(HEEV_HYBRID, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(SYEV, batched_float)
+TEST_P(SYEV, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYEV, batched_double)
+TEST_P(SYEV, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEEV, batched_float_complex)
+TEST_P(HEEV, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEV, batched_double_complex)
+TEST_P(HEEV, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(SYEV_HYBRID, batched_float)
+TEST_P(SYEV_HYBRID, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(SYEV_HYBRID, batched_double)
+TEST_P(SYEV_HYBRID, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(HEEV_HYBRID, batched_float_complex)
+TEST_P(HEEV_HYBRID, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEV_HYBRID, batched_double_complex)
+TEST_P(HEEV_HYBRID, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched tests
 
-TEST_P(SYEV, strided_batched_float)
+TEST_P(SYEV, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEV, strided_batched_double)
+TEST_P(SYEV, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEV, strided_batched_float_complex)
+TEST_P(HEEV, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEV, strided_batched_double_complex)
+TEST_P(HEEV, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(SYEV_HYBRID, strided_batched_float)
+TEST_P(SYEV_HYBRID, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(SYEV_HYBRID, strided_batched_double)
+TEST_P(SYEV_HYBRID, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(HEEV_HYBRID, strided_batched_float_complex)
+TEST_P(HEEV_HYBRID, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(HEEV_HYBRID, strided_batched_double_complex)
+TEST_P(HEEV_HYBRID, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

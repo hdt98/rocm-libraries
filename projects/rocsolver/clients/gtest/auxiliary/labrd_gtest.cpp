@@ -125,22 +125,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LABRD, _float)
+TEST_P(LABRD, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LABRD, _double)
+TEST_P(LABRD, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LABRD, _float_complex)
+TEST_P(LABRD, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LABRD, _double_complex)
+TEST_P(LABRD, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

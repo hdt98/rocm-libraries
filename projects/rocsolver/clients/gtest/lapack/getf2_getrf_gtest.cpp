@@ -181,484 +181,484 @@ class GETRF_NPVT_64 : public GETF2_GETRF_NPVT<true, int64_t>
 };
 
 // non-batch tests
-TEST_P(GETF2_NPVT, _float)
+TEST_P(GETF2_NPVT, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETF2_NPVT, _double)
+TEST_P(GETF2_NPVT, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETF2_NPVT, _float_complex)
+TEST_P(GETF2_NPVT, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT, _double_complex)
+TEST_P(GETF2_NPVT, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT, _float)
+TEST_P(GETRF_NPVT, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_NPVT, _double)
+TEST_P(GETRF_NPVT, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_NPVT, _float_complex)
+TEST_P(GETRF_NPVT, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT, _double_complex)
+TEST_P(GETRF_NPVT, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETF2, _float)
+TEST_P(GETF2, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETF2, _double)
+TEST_P(GETF2, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETF2, _float_complex)
+TEST_P(GETF2, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETF2, _double_complex)
+TEST_P(GETF2, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETRF, _float)
+TEST_P(GETRF, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF, _double)
+TEST_P(GETRF, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF, _float_complex)
+TEST_P(GETRF, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETRF, _double_complex)
+TEST_P(GETRF, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, _float)
+TEST_P(GETF2_NPVT_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETF2_NPVT_64, _double)
+TEST_P(GETF2_NPVT_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETF2_NPVT_64, _float_complex)
+TEST_P(GETF2_NPVT_64, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, _double_complex)
+TEST_P(GETF2_NPVT_64, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, _float)
+TEST_P(GETRF_NPVT_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_NPVT_64, _double)
+TEST_P(GETRF_NPVT_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_NPVT_64, _float_complex)
+TEST_P(GETRF_NPVT_64, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, _double_complex)
+TEST_P(GETRF_NPVT_64, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_64, _float)
+TEST_P(GETF2_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETF2_64, _double)
+TEST_P(GETF2_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETF2_64, _float_complex)
+TEST_P(GETF2_64, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_64, _double_complex)
+TEST_P(GETF2_64, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_64, _float)
+TEST_P(GETRF_64, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GETRF_64, _double)
+TEST_P(GETRF_64, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GETRF_64, _float_complex)
+TEST_P(GETRF_64, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_64, _double_complex)
+TEST_P(GETRF_64, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
-TEST_P(GETF2_NPVT, batched_float)
+TEST_P(GETF2_NPVT, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETF2_NPVT, batched_double)
+TEST_P(GETF2_NPVT, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETF2_NPVT, batched_float_complex)
+TEST_P(GETF2_NPVT, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT, batched_double_complex)
+TEST_P(GETF2_NPVT, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT, batched_float)
+TEST_P(GETRF_NPVT, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETRF_NPVT, batched_double)
+TEST_P(GETRF_NPVT, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETRF_NPVT, batched_float_complex)
+TEST_P(GETRF_NPVT, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT, batched_double_complex)
+TEST_P(GETRF_NPVT, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2, batched_float)
+TEST_P(GETF2, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETF2, batched_double)
+TEST_P(GETF2, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETF2, batched_float_complex)
+TEST_P(GETF2, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2, batched_double_complex)
+TEST_P(GETF2, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF, batched_float)
+TEST_P(GETRF, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETRF, batched_double)
+TEST_P(GETRF, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETRF, batched_float_complex)
+TEST_P(GETRF, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF, batched_double_complex)
+TEST_P(GETRF, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, batched_float)
+TEST_P(GETF2_NPVT_64, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETF2_NPVT_64, batched_double)
+TEST_P(GETF2_NPVT_64, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETF2_NPVT_64, batched_float_complex)
+TEST_P(GETF2_NPVT_64, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, batched_double_complex)
+TEST_P(GETF2_NPVT_64, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, batched_float)
+TEST_P(GETRF_NPVT_64, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETRF_NPVT_64, batched_double)
+TEST_P(GETRF_NPVT_64, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETRF_NPVT_64, batched_float_complex)
+TEST_P(GETRF_NPVT_64, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, batched_double_complex)
+TEST_P(GETRF_NPVT_64, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_64, batched_float)
+TEST_P(GETF2_64, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETF2_64, batched_double)
+TEST_P(GETF2_64, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETF2_64, batched_float_complex)
+TEST_P(GETF2_64, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_64, batched_double_complex)
+TEST_P(GETF2_64, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_64, batched_float)
+TEST_P(GETRF_64, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GETRF_64, batched_double)
+TEST_P(GETRF_64, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GETRF_64, batched_float_complex)
+TEST_P(GETRF_64, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_64, batched_double_complex)
+TEST_P(GETRF_64, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched cases
-TEST_P(GETF2_NPVT, strided_batched_float)
+TEST_P(GETF2_NPVT, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETF2_NPVT, strided_batched_double)
+TEST_P(GETF2_NPVT, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETF2_NPVT, strided_batched_float_complex)
+TEST_P(GETF2_NPVT, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT, strided_batched_double_complex)
+TEST_P(GETF2_NPVT, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT, strided_batched_float)
+TEST_P(GETRF_NPVT, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETRF_NPVT, strided_batched_double)
+TEST_P(GETRF_NPVT, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETRF_NPVT, strided_batched_float_complex)
+TEST_P(GETRF_NPVT, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT, strided_batched_double_complex)
+TEST_P(GETRF_NPVT, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2, strided_batched_float)
+TEST_P(GETF2, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETF2, strided_batched_double)
+TEST_P(GETF2, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETF2, strided_batched_float_complex)
+TEST_P(GETF2, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2, strided_batched_double_complex)
+TEST_P(GETF2, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF, strided_batched_float)
+TEST_P(GETRF, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETRF, strided_batched_double)
+TEST_P(GETRF, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETRF, strided_batched_float_complex)
+TEST_P(GETRF, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF, strided_batched_double_complex)
+TEST_P(GETRF, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, strided_batched_float)
+TEST_P(GETF2_NPVT_64, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETF2_NPVT_64, strided_batched_double)
+TEST_P(GETF2_NPVT_64, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETF2_NPVT_64, strided_batched_float_complex)
+TEST_P(GETF2_NPVT_64, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_NPVT_64, strided_batched_double_complex)
+TEST_P(GETF2_NPVT_64, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, strided_batched_float)
+TEST_P(GETRF_NPVT_64, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETRF_NPVT_64, strided_batched_double)
+TEST_P(GETRF_NPVT_64, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETRF_NPVT_64, strided_batched_float_complex)
+TEST_P(GETRF_NPVT_64, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_NPVT_64, strided_batched_double_complex)
+TEST_P(GETRF_NPVT_64, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETF2_64, strided_batched_float)
+TEST_P(GETF2_64, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETF2_64, strided_batched_double)
+TEST_P(GETF2_64, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETF2_64, strided_batched_float_complex)
+TEST_P(GETF2_64, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETF2_64, strided_batched_double_complex)
+TEST_P(GETF2_64, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GETRF_64, strided_batched_float)
+TEST_P(GETRF_64, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GETRF_64, strided_batched_double)
+TEST_P(GETRF_64, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GETRF_64, strided_batched_float_complex)
+TEST_P(GETRF_64, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GETRF_64, strided_batched_double_complex)
+TEST_P(GETRF_64, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

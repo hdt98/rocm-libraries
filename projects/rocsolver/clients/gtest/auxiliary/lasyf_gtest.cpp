@@ -121,22 +121,22 @@ protected:
 
 // non-batch tests
 
-TEST_P(LASYF, _float)
+TEST_P(LASYF, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(LASYF, _double)
+TEST_P(LASYF, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(LASYF, _float_complex)
+TEST_P(LASYF, __float_complex)
 {
     run_tests<rocblas_float_complex>();
 }
 
-TEST_P(LASYF, _double_complex)
+TEST_P(LASYF, __double_complex)
 {
     run_tests<rocblas_double_complex>();
 }

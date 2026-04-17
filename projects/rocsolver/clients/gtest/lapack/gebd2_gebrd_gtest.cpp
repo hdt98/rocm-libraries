@@ -119,126 +119,126 @@ class GEBRD : public GEBD2_GEBRD<true>
 
 // non-batch tests
 
-TEST_P(GEBD2, _float)
+TEST_P(GEBD2, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBD2, _double)
+TEST_P(GEBD2, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBD2, _float_complex)
+TEST_P(GEBD2, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBD2, _double_complex)
+TEST_P(GEBD2, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
-TEST_P(GEBRD, _float)
+TEST_P(GEBRD, __float)
 {
     run_tests<false, false, float>();
 }
 
-TEST_P(GEBRD, _double)
+TEST_P(GEBRD, __double)
 {
     run_tests<false, false, double>();
 }
 
-TEST_P(GEBRD, _float_complex)
+TEST_P(GEBRD, __float_complex)
 {
     run_tests<false, false, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD, _double_complex)
+TEST_P(GEBRD, __double_complex)
 {
     run_tests<false, false, rocblas_double_complex>();
 }
 
 // batched tests
 
-TEST_P(GEBD2, batched_float)
+TEST_P(GEBD2, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GEBD2, batched_double)
+TEST_P(GEBD2, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GEBD2, batched_float_complex)
+TEST_P(GEBD2, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBD2, batched_double_complex)
+TEST_P(GEBD2, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
-TEST_P(GEBRD, batched_float)
+TEST_P(GEBRD, batched__float)
 {
     run_tests<true, true, float>();
 }
 
-TEST_P(GEBRD, batched_double)
+TEST_P(GEBRD, batched__double)
 {
     run_tests<true, true, double>();
 }
 
-TEST_P(GEBRD, batched_float_complex)
+TEST_P(GEBRD, batched__float_complex)
 {
     run_tests<true, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD, batched_double_complex)
+TEST_P(GEBRD, batched__double_complex)
 {
     run_tests<true, true, rocblas_double_complex>();
 }
 
 // strided_batched cases
 
-TEST_P(GEBD2, strided_batched_float)
+TEST_P(GEBD2, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GEBD2, strided_batched_double)
+TEST_P(GEBD2, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GEBD2, strided_batched_float_complex)
+TEST_P(GEBD2, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBD2, strided_batched_double_complex)
+TEST_P(GEBD2, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }
 
-TEST_P(GEBRD, strided_batched_float)
+TEST_P(GEBRD, strided_batched__float)
 {
     run_tests<false, true, float>();
 }
 
-TEST_P(GEBRD, strided_batched_double)
+TEST_P(GEBRD, strided_batched__double)
 {
     run_tests<false, true, double>();
 }
 
-TEST_P(GEBRD, strided_batched_float_complex)
+TEST_P(GEBRD, strided_batched__float_complex)
 {
     run_tests<false, true, rocblas_float_complex>();
 }
 
-TEST_P(GEBRD, strided_batched_double_complex)
+TEST_P(GEBRD, strided_batched__double_complex)
 {
     run_tests<false, true, rocblas_double_complex>();
 }

@@ -97,22 +97,22 @@ class STERF_HYBRID : public STERF_BASE<1>
 
 // non-batch tests
 
-TEST_P(STERF, _float)
+TEST_P(STERF, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STERF, _double)
+TEST_P(STERF, __double)
 {
     run_tests<double>();
 }
 
-TEST_P(STERF_HYBRID, _float)
+TEST_P(STERF_HYBRID, __float)
 {
     run_tests<float>();
 }
 
-TEST_P(STERF_HYBRID, _double)
+TEST_P(STERF_HYBRID, __double)
 {
     run_tests<double>();
 }
