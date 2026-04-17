@@ -4792,66 +4792,194 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             CHECK_HIP_ERROR(hipStreamSynchronize(stream));
 
-            // Timing iterations
+            // Timing iterations - check if stream-parallel execution requested
             auto start_time = std::chrono::high_resolution_clock::now();
+            auto end_time = start_time;
 
-            for(int iter = 0; iter < timing_iters; iter++)
+            if(arg.stream_parallel && subProblems.size() > 1)
             {
+                // ===================================================================
+                // STREAM-PARALLEL EXECUTION: Launch sub-problems concurrently
+                // ===================================================================
+                hipblaslt_cout << "\n=== Stream-Parallel Execution ===" << std::endl;
+                hipblaslt_cout << "Creating " << subProblems.size() << " HIP streams for concurrent execution" << std::endl;
+
+                // Create one stream per sub-problem
+                std::vector<hipStream_t> streams(subProblems.size());
+                for(size_t i = 0; i < streams.size(); i++)
+                {
+                    CHECK_HIP_ERROR(hipStreamCreate(&streams[i]));
+                }
+
+                // Pre-create matrix layouts and query algorithms for all sub-problems
+                std::vector<hipblasLtMatrixLayout_t> matA_layouts(subProblems.size());
+                std::vector<hipblasLtMatrixLayout_t> matB_layouts(subProblems.size());
+                std::vector<hipblasLtMatrixLayout_t> matC_layouts(subProblems.size());
+                std::vector<hipblasLtMatrixLayout_t> matD_layouts(subProblems.size());
+                std::vector<hipblasLtMatmulAlgo_t> algos(subProblems.size());
+
                 for(size_t sp = 0; sp < subProblems.size(); sp++)
                 {
                     const auto& sub = subProblems[sp];
 
-                    // Create temp matrix layouts
-                    hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
+                    // Create matrix layouts
                     int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
                     int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                    hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
+                    hipblasLtMatrixLayoutCreate(&matA_layouts[sp], arg.a_type, matA_rows, matA_cols, lda[0]);
+
                     int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
                     int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                    hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
-                    hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                    hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+                    hipblasLtMatrixLayoutCreate(&matB_layouts[sp], arg.b_type, matB_rows, matB_cols, ldb[0]);
 
-                    // Query heuristic
+                    hipblasLtMatrixLayoutCreate(&matC_layouts[sp], arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                    hipblasLtMatrixLayoutCreate(&matD_layouts[sp], arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                    // Query heuristic once per sub-problem
                     hipblasLtMatmulHeuristicResult_t heur_tmp;
                     int ret_tmp = 0;
-                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
-
-                    // Store kernel info on first iteration
-                    if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
-                    {
-                        try {
-                            subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
-                            subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
-                            int* solutionIndex = (int*)heur_tmp.algo.data;
-                            subproblem_solution_indices[sp] = *solutionIndex;
-                        } catch (...) {
-                            subproblem_solution_names[sp] = "ERROR";
-                            subproblem_kernel_names[sp] = "ERROR";
-                            subproblem_solution_indices[sp] = -1;
-                        }
-                    }
+                    hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0],
+                                                   matA_layouts[sp], matB_layouts[sp],
+                                                   matC_layouts[sp], matD_layouts[sp],
+                                                   pref, 1, &heur_tmp, &ret_tmp);
 
                     if(ret_tmp > 0)
                     {
+                        algos[sp] = heur_tmp.algo;
+
+                        // Store kernel info for first sub-problem
+                        if(arg.print_kernel_info)
+                        {
+                            try {
+                                subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                                int* solutionIndex = (int*)heur_tmp.algo.data;
+                                subproblem_solution_indices[sp] = *solutionIndex;
+                            } catch (...) {
+                                subproblem_solution_names[sp] = "ERROR";
+                                subproblem_kernel_names[sp] = "ERROR";
+                                subproblem_solution_indices[sp] = -1;
+                            }
+                        }
+                    }
+                }
+
+                hipblaslt_cout << "Launching all sub-problems concurrently on " << streams.size() << " streams..." << std::endl;
+
+                // Timing loop with stream-parallel execution
+                start_time = std::chrono::high_resolution_clock::now();
+
+                for(int iter = 0; iter < timing_iters; iter++)
+                {
+                    // Launch ALL sub-problems on their respective streams
+                    // They will execute concurrently on the GPU!
+                    for(size_t sp = 0; sp < subProblems.size(); sp++)
+                    {
+                        const auto& sub = subProblems[sp];
+
                         void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
                         void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
                         void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
                         void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
 
-                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
-                                       &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                        // Launch on dedicated stream - doesn't wait for others!
+                        hipblasLtMatmul(handle, matmul[0][0],
+                                       alpha_in[0], A_ptr, matA_layouts[sp],
+                                       B_ptr, matB_layouts[sp],
+                                       &(h_beta[0]), C_ptr, matC_layouts[sp],
+                                       D_ptr, matD_layouts[sp],
+                                       &algos[sp], *dWorkspace, workspace_size,
+                                       streams[sp]);  // ← Different stream per sub-problem!
                     }
 
-                    hipblasLtMatrixLayoutDestroy(matA_tmp);
-                    hipblasLtMatrixLayoutDestroy(matB_tmp);
-                    hipblasLtMatrixLayoutDestroy(matC_tmp);
-                    hipblasLtMatrixLayoutDestroy(matD_tmp);
+                    // Synchronize ALL streams (wait for all sub-problems to finish)
+                    for(size_t i = 0; i < streams.size(); i++)
+                    {
+                        CHECK_HIP_ERROR(hipStreamSynchronize(streams[i]));
+                    }
                 }
-            }
 
-            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-            auto end_time = std::chrono::high_resolution_clock::now();
+                end_time = std::chrono::high_resolution_clock::now();
+
+                // Cleanup matrix layouts
+                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                {
+                    hipblasLtMatrixLayoutDestroy(matA_layouts[sp]);
+                    hipblasLtMatrixLayoutDestroy(matB_layouts[sp]);
+                    hipblasLtMatrixLayoutDestroy(matC_layouts[sp]);
+                    hipblasLtMatrixLayoutDestroy(matD_layouts[sp]);
+                }
+
+                // Cleanup streams
+                for(size_t i = 0; i < streams.size(); i++)
+                {
+                    CHECK_HIP_ERROR(hipStreamDestroy(streams[i]));
+                }
+
+                hipblaslt_cout << "Stream-parallel execution complete!" << std::endl;
+            }
+            else
+            {
+                // ===================================================================
+                // SEQUENTIAL EXECUTION: Launch sub-problems one after another
+                // ===================================================================
+                for(int iter = 0; iter < timing_iters; iter++)
+                {
+                    for(size_t sp = 0; sp < subProblems.size(); sp++)
+                    {
+                        const auto& sub = subProblems[sp];
+
+                        // Create temp matrix layouts
+                        hipblasLtMatrixLayout_t matA_tmp, matB_tmp, matC_tmp, matD_tmp;
+                        int64_t matA_rows = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
+                        int64_t matA_cols = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
+                        hipblasLtMatrixLayoutCreate(&matA_tmp, arg.a_type, matA_rows, matA_cols, lda[0]);
+                        int64_t matB_rows = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
+                        int64_t matB_cols = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
+                        hipblasLtMatrixLayoutCreate(&matB_tmp, arg.b_type, matB_rows, matB_cols, ldb[0]);
+                        hipblasLtMatrixLayoutCreate(&matC_tmp, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
+                        hipblasLtMatrixLayoutCreate(&matD_tmp, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+
+                        // Query heuristic
+                        hipblasLtMatmulHeuristicResult_t heur_tmp;
+                        int ret_tmp = 0;
+                        hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], matA_tmp, matB_tmp, matC_tmp, matD_tmp, pref, 1, &heur_tmp, &ret_tmp);
+
+                        // Store kernel info on first iteration
+                        if(iter == 0 && ret_tmp > 0 && arg.print_kernel_info)
+                        {
+                            try {
+                                subproblem_solution_names[sp] = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                subproblem_kernel_names[sp] = hipblaslt_ext::getKernelNameFromAlgo(handle, heur_tmp.algo);
+                                int* solutionIndex = (int*)heur_tmp.algo.data;
+                                subproblem_solution_indices[sp] = *solutionIndex;
+                            } catch (...) {
+                                subproblem_solution_names[sp] = "ERROR";
+                                subproblem_kernel_names[sp] = "ERROR";
+                                subproblem_solution_indices[sp] = -1;
+                            }
+                        }
+
+                        if(ret_tmp > 0)
+                        {
+                            void* A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
+                            void* B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
+                            void* C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
+                            void* D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                            hipblasLtMatmul(handle, matmul[0][0], alpha_in[0], A_ptr, matA_tmp, B_ptr, matB_tmp,
+                                           &(h_beta[0]), C_ptr, matC_tmp, D_ptr, matD_tmp, &heur_tmp.algo, *dWorkspace, workspace_size, stream);
+                        }
+
+                        hipblasLtMatrixLayoutDestroy(matA_tmp);
+                        hipblasLtMatrixLayoutDestroy(matB_tmp);
+                        hipblasLtMatrixLayoutDestroy(matC_tmp);
+                        hipblasLtMatrixLayoutDestroy(matD_tmp);
+                    }
+                }
+
+                CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                end_time = std::chrono::high_resolution_clock::now();
+            }
 
             double total_time_ms = std::chrono::duration<double, std::milli>(end_time - start_time).count();
             double avg_time_us = (total_time_ms * 1000.0) / timing_iters;
