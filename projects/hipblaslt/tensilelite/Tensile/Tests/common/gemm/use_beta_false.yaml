@@ -9,7 +9,7 @@ GlobalParameters:
   ForceRedoLibraryClient: True
   CMakeBuildType: Release
   EnqueuesPerSync: 1
-  SyncsPerBenchmark: 1
+  SyncsPerBenchmark: 0
   NumElementsToValidate: 128
   Platform: 0
   Device: 0

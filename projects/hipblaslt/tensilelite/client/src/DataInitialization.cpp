@@ -808,7 +808,6 @@ namespace TensileLite
             {
                 HIP_CHECK_EXC(hipMemcpy(
                     dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));
-                //HIP_CHECK_EXC(hipMemcpy(dst, src, descriptor.elementBytes() * totalElements, kind));
             }
             return dst;
         }

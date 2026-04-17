@@ -362,6 +362,36 @@ namespace TensileLite
             return rv;
         }
 
+        bool ReferenceValidator::shouldSkipNullTensor(const std::string& tensorName,
+                                                      bool hasNullPointer,
+                                                      bool hasZeroElements) const
+        {
+            // Skip validation if pointers are null or no data to validate
+            // Only tensor C can be null when beta is zero (UseBeta=false)
+            if(!hasNullPointer && !hasZeroElements)
+                return false;
+
+            // Tensor C is allowed to be null when beta is zero (not used)
+            bool isTensorC = (tensorName == "C");
+            bool isBetaZero = false;
+            if(m_problem != nullptr)
+            {
+                auto* gemmProblem = dynamic_cast<ContractionProblemGemm const*>(m_problem);
+                if(gemmProblem != nullptr)
+                    isBetaZero = (gemmProblem->beta() == 0.0);
+            }
+
+            if(isTensorC && isBetaZero)
+            {
+                if(Debug::Instance().printTensorInfo())
+                    std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
+                return true;
+            }
+
+            // For all other cases, null pointers or no data to validate is an error
+            return false;
+        }
+
         bool ReferenceValidator::validate(ContractionProblemGemm const& problem,
                                           ContractionInputs const&      reference,
                                           ContractionInputs const&      result)
@@ -489,22 +519,18 @@ namespace TensileLite
                               << refPtr << ", gpu pointer " << resPtr
                               << ", size = " << result.maxElements[i] << std::endl;
 
-                // Skip validation if pointers are null or maxElements is 0
-                // Only tensor C can be null when beta is zero (UseBeta=false)
-                if(resPtr == nullptr || refPtr == nullptr || result.maxElements[i] == 0)
+                // Check if we should skip this tensor due to null pointers or zero elements
+                bool hasNullPointer = (resPtr == nullptr || refPtr == nullptr);
+                bool hasZeroElements = (result.maxElements[i] == 0);
+
+                if(shouldSkipNullTensor(tensor.getName(), hasNullPointer, hasZeroElements))
                 {
-                    // Tensor C is allowed to be null when beta is zero (not used)
-                    bool isTensorC = (static_cast<ContractionProblemGemm::TENSOR>(i) == ContractionProblemGemm::TENSOR::C);
-                    bool isBetaZero = (problem.beta() == 0.0);
+                    continue;
+                }
 
-                    if(isTensorC && isBetaZero)
-                    {
-                        if(Debug::Instance().printTensorInfo())
-                            std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
-                        continue;
-                    }
-
-                    // For all other cases, null pointers are an error
+                // If we reach here with null pointers or zero elements, it's an error
+                if(hasNullPointer || hasZeroElements)
+                {
                     std::stringstream ss;
                     ss << "Unexpected null pointer or zero elements for tensor " << tensor.getName()
                        << " (resPtr=" << resPtr << ", refPtr=" << refPtr
@@ -711,34 +737,24 @@ namespace TensileLite
             size_t elementsAfterData    = 0;
 
             BoundsCheckMode boundsCheck = m_dataInit->getCurBoundsCheck();
-            // For output tensors, don't use maxElement with padding since the kernel only writes actual data
-            // Only input tensors have bounds checking padding in their buffers
+            // For input tensors with NaN bounds checking, copy the full padded buffer from GPU
+            // Output tensors don't have NaN padding initialized by copyBadInputBuffers, so skip them
             if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
                 elementsToCopy = maxElement;
             size_t bytesToCopy = elementsToCopy * sizeof(ValidType);
 
-            // Skip validation if pointers are null or no bytes to copy
-            // Only tensor C can be null when beta is zero (UseBeta=false)
-            if(result == nullptr || reference == nullptr || bytesToCopy == 0 || maxElement == 0)
+            // Check if we should skip this tensor due to null pointers or no data
+            bool hasNullPointer = (result == nullptr || reference == nullptr);
+            bool hasZeroElements = (bytesToCopy == 0 || maxElement == 0);
+
+            if(shouldSkipNullTensor(tensor.getName(), hasNullPointer, hasZeroElements))
             {
-                // Tensor C is allowed to be null when beta is zero (not used)
-                bool isTensorC = (tensor.getName() == "C");
-                bool isBetaZero = false;
-                if(m_problem != nullptr)
-                {
-                    auto* gemmProblem = dynamic_cast<ContractionProblemGemm const*>(m_problem);
-                    if(gemmProblem != nullptr)
-                        isBetaZero = (gemmProblem->beta() == 0.0);
-                }
+                return true;
+            }
 
-                if(isTensorC && isBetaZero)
-                {
-                    if(Debug::Instance().printTensorInfo())
-                        std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
-                    return true;
-                }
-
-                // For all other cases, null pointers or no data to validate is an error
+            // If we reach here with null pointers or no data, it's an error
+            if(hasNullPointer || hasZeroElements)
+            {
                 std::stringstream ss;
                 ss << "Unexpected null pointer or no data for tensor " << tensor.getName()
                    << " (result=" << result << ", reference=" << reference
@@ -756,7 +772,8 @@ namespace TensileLite
                 HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
             }
 
-            // Only check bounds for input tensors (output tensors don't have padding buffers)
+            // For input tensors, check NaN padding on the GPU result buffer
+            // Note: Output tensors have NaN padding allocated but not initialized by copyBadInputBuffers
             if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
             {
                 ptrdiff_t bPadding = maxElement - tensor.totalAllocatedElements();
