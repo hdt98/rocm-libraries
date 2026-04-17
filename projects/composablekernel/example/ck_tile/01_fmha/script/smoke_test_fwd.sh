@@ -17,6 +17,16 @@ fi
 export CK_WARMUP=0
 export CK_REPEAT=1
 
+# Detect ROCm 7.1.x: compiler VGPR aliasing miscompile affects fp16 d256 batch+dropout+bias+mask
+_hip_ver=$(hipcc --version 2>/dev/null | awk '/HIP version/{print $NF}')
+_hip_major=${_hip_ver%%.*}
+_hip_minor=${_hip_ver#*.}; _hip_minor=${_hip_minor%%.*}
+SKIP_ROCM_71_FP16_D256_BATCH_DROPOUT=0
+if [ "${_hip_major}" = "7" ] && [ "${_hip_minor}" = "1" ]; then
+    SKIP_ROCM_71_FP16_D256_BATCH_DROPOUT=1
+    echo ">>> ROCm 7.1.x detected: skipping fp16 d256 batch bias=e mask dropout cases (VGPR aliasing miscompile)"
+fi
+
 CURR_FAILS_FILE=${CURR_FAILS_FILE:-"fmha_fwd_fails_$GPU_arch.txt"}
 rm -f $CURR_FAILS_FILE
 touch $CURR_FAILS_FILE
@@ -110,7 +120,11 @@ run_fp16_bf16_tests() {
     run_exe -prec=$prec -mode=$mode -b=1 -h=3        -d=$hdim            -s=100  -s_k=51             -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm                -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
     run_exe -prec=$prec -mode=$mode -b=2 -h=1        -d=16    -d_v=$hdim -s=99   -s_k=256            -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=1        -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
     run_exe -prec=$prec -mode=$mode -b=1 -h=2 -h_k=1 -d=$hdim            -s=1024 -s_k=256            -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=2        -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
+    # Skip fp16 d256 batch bias=e mask dropout on ROCm 7.1.x (VGPR aliasing miscompile bug)
+    if ! { [ "$SKIP_ROCM_71_FP16_D256_BATCH_DROPOUT" = "1" ] && [ "$prec" = "fp16" ] && \
+           [ "$mode" = "0" ] && [ "$hdim" = "256" ] && [ "$bias" = "e" ] && [ "$p_drop" != "0.0" ]; }; then
     run_exe -prec=$prec -mode=$mode -b=2 -h=1        -d=$hdim -d_v=24    -s=3    -s_k=99             -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=2        -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
+    fi
     run_exe -prec=$prec -mode=$mode -b=3 -h=2 -h_k=1 -d=$hdim            -s=200  -s_k=520            -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=t:128,30 -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
     run_exe -prec=$prec -mode=$mode -b=2 -h=1        -d=$hdim            -s=99   -s_k=32             -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=b:4,35   -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
     run_exe -prec=$prec -mode=$mode -b=1 -h=2 -h_k=1 -d=$hdim            -s=33   -s_k=0              -bias=$bias -p_drop=$p_drop -lse=$lse -iperm=$perm -operm=$perm -mask=2        -num_splits=$num_splits -page_block_size=$page_block_size -cache_batch_idx=$cache_batch_idx -kname=$KNAME $COMMON_ARGS
