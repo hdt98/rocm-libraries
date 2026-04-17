@@ -349,6 +349,12 @@ struct fmha_fwd_args
 
     ck_tile::index_t block_scale_size_q;
     ck_tile::index_t block_scale_size_kv;
+
+    const int32_t* block_mask_ptr = nullptr;
+    ck_tile::index_t block_mask_stride = 0;
+    ck_tile::index_t stride_block_mask = 0;
+    ck_tile::index_t nhead_stride_block_mask = 0;
+    ck_tile::index_t batch_stride_block_mask = 0;
 };
 
 struct fmha_fwd_pagedkv_args

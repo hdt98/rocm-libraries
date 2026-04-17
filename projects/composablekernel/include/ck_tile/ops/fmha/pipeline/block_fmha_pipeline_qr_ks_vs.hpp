@@ -468,11 +468,6 @@ struct BlockFmhaPipelineQRKSVS
                 const index_t kv_block_idx = k_origin_check.at(number<0>{}) / kN0;
                 if(block_mask_row_ptr[kv_block_idx] == 0)
                 {
-                    if constexpr(kHasSink)
-                    {
-                        move_tile_window(sink_k_dram_block_window, {kN0, 0});
-                        move_tile_window(sink_v_dram_window, {0, kN0});
-                    }
                     move_tile_window(k_dram_block_window, {kN0, 0});
                     move_tile_window(v_dram_window, {0, kN0});
                     move_tile_window(bias_dram_window, {0, kN0});
