@@ -174,11 +174,7 @@ def makeValidSMFMA():
     validSMFMA["F8NB8N"] = validSMFMA["F8NF8N"]
     validSMFMA["B8NF8N"] = validSMFMA["F8NF8N"]
     validSMFMA["_format9"] = []
-<<<<<<< HEAD
-    for SMFMA in [validSMFMA["HH"], validSMFMA["BB"], validSMFMA["4xi84xi8"], validSMFMA["F8NF8N"]]:
-=======
-    for SMFMA in [validSMFMA["H"], validSMFMA["B"], validSMFMA["4xi8"], validSMFMA["F8N"], makeValidSWMMAC()]:
->>>>>>> origin/develop
+    for SMFMA in [validSMFMA["HH"], validSMFMA["BB"], validSMFMA["4xi84xi8"], validSMFMA["F8NF8N"], makeValidSWMMAC()]:
         for MI in SMFMA:
             for bm in range(int(math.log(MI[3], 2)) + 1):
                 for tt0 in range(1, validTT + 1):
@@ -202,18 +198,11 @@ def makeValidMatrixInstructions():
         + mfma["BB"]
         + mfma["DD"]
         + mfma["B1k"]
-<<<<<<< HEAD
         + mfma["XX"]
         + smfma["HH"]
         + smfma["BB"]
         + smfma["4xi84xi8"]
-=======
-        + mfma["X"]
-        + smfma["H"]
-        + smfma["B"]
-        + smfma["4xi8"]
         + wmma
->>>>>>> origin/develop
     )
     return validMatrixInstructions + mfma["_format9"] + smfma["_format9"]
 
