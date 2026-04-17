@@ -100,8 +100,8 @@ jobs:
       - name: Test
         timeout-minutes: ${{ fromJSON(inputs.component).timeout_minutes }}
         env:
-          SHARD_INDEX: ${{ matrix.shard }}
-          TOTAL_SHARDS: ${{ fromJSON(inputs.component).total_shards }}
+          SHARD_INDEX: 1
+          TOTAL_SHARDS: 1
           TEST_TYPE: ${{ fromJSON(inputs.component).test_type }}
         run: |
           # Create logs directory

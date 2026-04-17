@@ -29,25 +29,31 @@ bool False()
 
 struct TestNameGenerator
 {
-    std::string operator()(const auto& info)
+    std::string operator()(const auto& _param)
     {
-        const auto& tc = info.param;
+        const auto& param = _param.param;
+        const auto& info = param.info;
         std::stringstream ss;
 
-        ss << "input_" << GetRangeAsString(tc.input, "x") << "_lr_" << tc.lr << "_beta1_"
-           << tc.beta1 << "_beta2_" << tc.beta2 << "_weight_decay_" << tc.weight_decay << "_eps_"
-           << tc.eps << "_lr_" << tc.lr << "_lr_" << tc.lr << std::boolalpha << "_amsgrad_"
-           << tc.amsgrad << "_maximize_" << tc.maximize << "_adamw_" << tc.adamw
-           << "_use_step_tensor_" << tc.use_step_tensor << "_test_id_" << info.index;
+        ss << "adapter_" << info.adapter_index << "_dv_" << info.dedicated_vram
+           << "_sr_" << info.shared_ram << "_dr_" << info.dedicated_ram
+           << "_gpu";
 
-        std::string str(ss.str());
+        for(auto block : param.vram_blocks)
+        {
+            ss << "_" << block; 
+        }
 
-        // Name format only supports letters, numbers and underscores.
-        std::transform(str.begin(), str.end(), str.begin(), [](char c) -> char {
-            return (c == '.') ? 'p' : (std::isalnum(c) ? c : '_');
-        });
+        ss << "_cpu";
 
-        return str;
+        for(auto block : param.cpu_blocks)
+        {
+            ss << "_" << block; 
+        }
+
+        ss << "_expect_" << param.able;
+
+        return ss.str();
     }
 };
 
@@ -104,4 +110,5 @@ TEST_P(GPU_MemoryEcosystem_None, AbleToAllocate)
 
 INSTANTIATE_TEST_SUITE_P(Full,
                          GPU_MemoryEcosystem_None,
-                         testing::ValuesIn(AllocateCases()));
+                         testing::ValuesIn(AllocateCases()),
+                        TestNameGenerator{});
