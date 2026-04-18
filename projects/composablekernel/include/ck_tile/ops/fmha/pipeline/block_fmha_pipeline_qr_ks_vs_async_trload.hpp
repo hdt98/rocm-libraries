@@ -1105,16 +1105,12 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                         o_acc(i_j_idx) *= tmp;
                     });
                 });
-            } // !skip_this_block (V tile read + masking + softmax + o_acc rescaling)
+                // K prefetch (inside skip block to preserve v_tile/p_tile scope)
+                block_sync_lds<v_lds_insts>();
+                move_tile_window(k_dram_window, {kN0, 0});
+                k_lds_write_window.set_bottom_tensor_view_data_ptr(k_lds_write_ptr);
+                async_load_tile(k_lds_write_window, k_dram_window);
 
-            // ALWAYS: K prefetch
-            block_sync_lds<v_lds_insts>();
-            move_tile_window(k_dram_window, {kN0, 0});
-            k_lds_write_window.set_bottom_tensor_view_data_ptr(k_lds_write_ptr);
-            async_load_tile(k_lds_write_window, k_dram_window);
-
-            if(!skip_this_block)
-            {
                 if constexpr(1 < k1_loops)
                 {
                     static_for<0, k1_loops - 1, 1>{}([&](auto i_k1) {
@@ -1139,7 +1135,15 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                                       sequence<0, (k1_loops - 1) * kK1>{},
                                       sequence<kM0, k1_loops * kK1>{}),
                        v_tile);
-            } // !skip_this_block (PV GEMM)
+            }
+            else
+            {
+                // Skip case: still need K prefetch to maintain pipeline
+                block_sync_lds<v_lds_insts>();
+                move_tile_window(k_dram_window, {kN0, 0});
+                k_lds_write_window.set_bottom_tensor_view_data_ptr(k_lds_write_ptr);
+                async_load_tile(k_lds_write_window, k_dram_window);
+            } // skip_this_block
 
             // ALWAYS: K read from LDS + scheduling barriers
             block_sync_lds_direct_load<k_vmem_insts + v_vmem_insts>();
