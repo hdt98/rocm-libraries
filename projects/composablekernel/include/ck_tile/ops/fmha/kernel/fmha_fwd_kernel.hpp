@@ -1348,11 +1348,11 @@ struct FmhaFwdKernel
             // XCD-interleave scheduling: remap block indices so that adjacent
             // Q-tiles land on the same XCD (chiplet), improving L2 cache
             // locality for KV reuse. Adapted from FA4 (Tri Dao, 2025).
-            // MI300X/MI350X have 8 XCDs; CUs are assigned round-robin across
-            // XCDs, so without remapping adjacent tiles scatter across chiplets.
-            // Only activate when grid is large enough for balanced distribution
-            // (at least kMinTilesPerXCD tiles per XCD); small grids regress
-            // due to load imbalance from uneven tile distribution.
+            // Only enabled on gfx942 (MI300X) where it gives up to 3.3x on
+            // GQA workloads. On gfx950 (MI350X), the V3 persistent kernel
+            // provides better scheduling; V2 XCD-interleave regresses some
+            // configs there.
+#if !defined(__gfx950__)
             constexpr index_t kNumXCDs = 8;
             constexpr index_t kMinTilesPerXCD = 16;
             {
@@ -1368,6 +1368,7 @@ struct FmhaFwdKernel
                     }
                 }
             }
+#endif
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
@@ -1400,6 +1401,7 @@ struct FmhaFwdKernel
             const index_t i_batch = blockIdx.z;
 
             // XCD-interleave scheduling (see padded path above for details).
+#if !defined(__gfx950__)
             constexpr index_t kNumXCDs = 8;
             constexpr index_t kMinTilesPerXCD = 16;
             {
@@ -1415,6 +1417,7 @@ struct FmhaFwdKernel
                     }
                 }
             }
+#endif
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
