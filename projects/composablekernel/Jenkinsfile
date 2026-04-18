@@ -553,13 +553,12 @@ def build_and_run_fmha(String arch){
 }
 
 // Dispatcher CI: orchestration logic lives in script/dispatcher_ci.sh.
-// Jenkins side just selects nogpu vs gpu node and forwards RUN_* env vars;
-// the script picks which sub-modes to execute based on those env vars.
-// Reproduce locally: `RUN_CPU=true bash script/dispatcher_ci.sh nogpu`.
+// Jenkins runs nogpu (CPU + ML heuristics) and gpu in parallel.
+// Reproduce locally: `bash script/dispatcher_ci.sh nogpu` (or cpu/gpu/stress).
 def run_dispatcher_all(){
-    def envs = "RUN_CPU=${params.RUN_DISPATCHER_CPU_TESTS} RUN_HEUR=${params.RUN_DISPATCHER_HEURISTICS_TESTS} RUN_STRESS=${params.RUN_DISPATCHER_STRESS_TESTS} BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()}"
+    def envs = "BUILD_COMPILER='${params.BUILD_COMPILER}' NUM_THREADS=${nthreads()}"
     def branches = [:]
-    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean() || params.RUN_DISPATCHER_HEURISTICS_TESTS.toBoolean() || params.RUN_DISPATCHER_STRESS_TESTS.toBoolean()) {
+    if (params.RUN_DISPATCHER_CPU_TESTS.toBoolean()) {
         branches['DISPATCHER nogpu'] = { node(rocmnode("nogpu")) { buildHipClangJobAndReboot(setup_args:"NO_CK_BUILD", build_type:'Release', execute_cmd: "${envs} bash ../script/dispatcher_ci.sh nogpu"); cleanWs() } }
     }
     if (params.RUN_DISPATCHER_GPU_TESTS.toBoolean()) {
@@ -1207,7 +1206,7 @@ def getFaTestsCmds() {
 
 //launch develop branch daily jobs
 CRON_SETTINGS = BRANCH_NAME == "develop" ? '''0 23 * * * % RUN_FULL_QA=true;RUN_CK_TILE_FMHA_TESTS=true;RUN_PERFORMANCE_TESTS=true;FORCE_CI=true
-                                              0 22 * * * % RUN_FULL_QA=true;DISABLE_DL_KERNELS=true;RUN_TILE_ENGINE_BASIC_TESTS=true;RUN_TILE_ENGINE_GEMM_TESTS=true;RUN_DISPATCHER_GPU_TESTS=true;RUN_DISPATCHER_HEURISTICS_TESTS=true;RUN_DISPATCHER_STRESS_TESTS=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
+                                              0 22 * * * % RUN_FULL_QA=true;DISABLE_DL_KERNELS=true;RUN_TILE_ENGINE_BASIC_TESTS=true;RUN_TILE_ENGINE_GEMM_TESTS=true;RUN_DISPATCHER_GPU_TESTS=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
                                               0 21 * * * % RUN_GROUPED_CONV_LARGE_CASES_TESTS=true;hipTensor_test=true;BUILD_GFX101=false;BUILD_GFX908=false;BUILD_GFX942=true;BUILD_GFX950=true;RUN_PERFORMANCE_TESTS=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true;BUILD_PACKAGES=true
                                               0 19 * * * % BUILD_DOCKER=true;COMPILER_VERSION=develop;BUILD_COMPILER=/llvm-project/build/bin/clang++;USE_SCCACHE=false;NINJA_BUILD_TRACE=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
                                               0 17 * * * % BUILD_DOCKER=true;COMPILER_VERSION=therock;USE_SCCACHE=false;NINJA_BUILD_TRACE=true;RUN_ALL_UNIT_TESTS=true;FORCE_CI=true
@@ -1413,19 +1412,11 @@ pipeline {
         booleanParam(
             name: "RUN_DISPATCHER_CPU_TESTS",
             defaultValue: true,
-            description: "Run dispatcher CPU-only unit + integration tests on a nogpu node (default: ON)")
+            description: "Run dispatcher CPU-only unit + integration + ML heuristics tests on a nogpu node (default: ON)")
         booleanParam(
             name: "RUN_DISPATCHER_GPU_TESTS",
             defaultValue: false,
             description: "Run dispatcher GPU kernel + integration tests on gfx950 (default: OFF)")
-        booleanParam(
-            name: "RUN_DISPATCHER_HEURISTICS_TESTS",
-            defaultValue: false,
-            description: "Run dispatcher ML heuristics pytest suite (requires lightgbm, pandas, sklearn) (default: OFF)")
-        booleanParam(
-            name: "RUN_DISPATCHER_STRESS_TESTS",
-            defaultValue: false,
-            description: "Run dispatcher stress tests (autocorrect/random-config exercises) — nightly only (default: OFF)")
         booleanParam(
             name: "FORCE_CI",
             defaultValue: false,
