@@ -63,10 +63,12 @@ struct DeterministicTestConfig
 
     friend std::ostream& operator<<(std::ostream& os, const DeterministicTestConfig& tc)
     {
-        os << "N:" << tc.N << " C:" << tc.C << " K:" << tc.K << " H:" << tc.H << " W:" << tc.W
-           << " y:" << tc.y << " x:" << tc.x << " pad:{" << tc.pad_h << "," << tc.pad_w << "}"
-           << " stride:{" << tc.stride_h << "," << tc.stride_w << "}"
-           << " dilation:{" << tc.dilation_h << "," << tc.dilation_w << "}";
+        os << "N:" << tc.N << " C:" << tc.C << " K:" << tc.K;
+        os << " H:" << tc.H << " W:" << tc.W;
+        os << " y:" << tc.y << " x:" << tc.x;
+        os << " pad:{" << tc.pad_h << "," << tc.pad_w << "}";
+        os << " stride:{" << tc.stride_h << "," << tc.stride_w << "}";
+        os << " dilation:{" << tc.dilation_h << "," << tc.dilation_w << "}";
         return os;
     }
 };
