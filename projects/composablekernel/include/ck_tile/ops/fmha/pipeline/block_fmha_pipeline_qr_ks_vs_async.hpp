@@ -440,11 +440,6 @@ struct BlockFmhaPipelineQRKSVSAsync
                 {
                     dropout.Move(randval_dram_window, kN0);
                 }
-                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
-                {
-                    move_tile_window(k_scale_dram_block_window, {kN0, 0});
-                    move_tile_window(v_scale_dram_window, {0, kN0 / kVScaleGranularity});
-                }
                 continue;
             }
 
