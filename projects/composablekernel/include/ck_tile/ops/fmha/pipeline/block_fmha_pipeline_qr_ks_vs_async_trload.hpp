@@ -669,7 +669,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                void* __restrict__ smem_ptrk0,
                void* __restrict__ smem_ptrk1,
                void* __restrict__ smem_ptrv0,
-               void* __restrict__ smem_ptrv1) const
+               void* __restrict__ smem_ptrv1,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
@@ -864,6 +865,7 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
             integer_divide_ceil(physical_seqlen_k_end - aligned_physical_seqlen_k_start, kN0);
 
         index_t i_total_loops      = 0;
+        const index_t kv_block_idx_base = physical_seqlen_k_start / kN0;
         constexpr index_t k0_loops = kQKHeaddim / kK0;
         constexpr index_t k1_loops = kN0 / kK1;
 
@@ -893,236 +895,253 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                             KDataType* __restrict__ k_lds_read_ptr,
                             KDataType* __restrict__ v_lds_write_ptr,
                             KDataType* __restrict__ v_lds_read_ptr) {
-            // move V tile windows
+            // Block sparsity: check if this KV block is masked out
+            const bool skip_this_block = (block_mask_row_ptr != nullptr) &&
+                (block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0);
+
+            // ALWAYS: V prefetch
             block_sync_lds<k_lds_insts>();
             move_tile_window(v_dram_window, {kN0, 0});
             v_lds_write_window.set_bottom_tensor_view_data_ptr(v_lds_write_ptr);
             async_load_tile(v_lds_write_window, v_dram_window);
 
-            // STAGE 1, QK gemm
-            clear_tile(s_acc); // initialize C
-
-            if constexpr(1 < k0_loops)
+            if(!skip_this_block)
             {
-                static_for<0, k0_loops - 1, 1>{}([&](auto i_k0) {
-                    // loop over along the [K]ey head dimension
-                    move_tile_window(k_lds_read_window, {0, kK0});
-                    auto k_tile_switch = load_tile(k_lds_read_window);
+                // STAGE 1, QK gemm
+                clear_tile(s_acc); // initialize C
 
-                    gemm_0(s_acc,
-                           get_slice_tile(q_tile,
-                                          sequence<0, i_k0 * kK0>{},
-                                          sequence<kM0, (i_k0 + 1) * kK0>{}),
-                           k_tile);
+                if constexpr(1 < k0_loops)
+                {
+                    static_for<0, k0_loops - 1, 1>{}([&](auto i_k0) {
+                        // loop over along the [K]ey head dimension
+                        move_tile_window(k_lds_read_window, {0, kK0});
+                        auto k_tile_switch = load_tile(k_lds_read_window);
 
-                    k_tile = k_tile_switch;
-                });
-                // move back to the origin
-                move_tile_window(k_lds_read_window, {0, -kK0 * (k0_loops - 1)});
-            }
+                        gemm_0(s_acc,
+                               get_slice_tile(q_tile,
+                                              sequence<0, i_k0 * kK0>{},
+                                              sequence<kM0, (i_k0 + 1) * kK0>{}),
+                               k_tile);
 
-            gemm_0(s_acc,
-                   get_slice_tile(q_tile,
-                                  sequence<0, (k0_loops - 1) * kK0>{},
-                                  sequence<kM0, k0_loops * kK0>{}),
-                   k_tile);
+                        k_tile = k_tile_switch;
+                    });
+                    // move back to the origin
+                    move_tile_window(k_lds_read_window, {0, -kK0 * (k0_loops - 1)});
+                }
 
+                gemm_0(s_acc,
+                       get_slice_tile(q_tile,
+                                      sequence<0, (k0_loops - 1) * kK0>{},
+                                      sequence<kM0, k0_loops * kK0>{}),
+                       k_tile);
+            } // !skip_this_block (QK GEMM)
+
+            // ALWAYS: sync and set V read ptr
             block_sync_lds_direct_load<k_vmem_insts + v_vmem_insts>();
             v_lds_read_window.set_bottom_tensor_view_data_ptr(v_lds_read_ptr);
-            auto v_tile = load_tile_transpose(v_lds_read_window);
 
-            if constexpr(kHasUnevenSplits)
+            if(!skip_this_block)
             {
-                if(i_total_loops == (num_total_loop - 1))
+                auto v_tile = load_tile_transpose(v_lds_read_window);
+
+                if constexpr(kHasUnevenSplits)
                 {
-                    const auto k_origin =
-                        make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
-                    set_tile_if(s_acc,
-                                -numeric<SMPLComputeDataType>::infinity(),
-                                [&,
-                                 physical_seqlen_k_start_ = physical_seqlen_k_start,
-                                 physical_seqlen_k_end_   = physical_seqlen_k_end](auto tile_idx) {
-                                    const auto col = k_origin.at(I0) + tile_idx.at(I1);
-
-                                    {
-                                        return physical_seqlen_k_end_ <= col;
-                                    }
-                                });
-                }
-            }
-
-            if constexpr(kPadSeqLenK || FmhaMask::IsMasking)
-            {
-                const auto k_origin = make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
-
-                bool need_perpixel_check =
-                    mask.IsEdgeTile(q_origin.at(I0), k_origin.at(I0), number<kM0>{}, number<kN0>{});
-                if(need_perpixel_check)
-                {
-                    set_tile_if(
-                        s_acc, -numeric<SMPLComputeDataType>::infinity(), [&](auto tile_idx) {
-                            const auto row = q_origin.at(I0) + tile_idx.at(I0);
-                            const auto col = k_origin.at(I0) + tile_idx.at(I1);
-                            return mask.IsOutOfBound(row, col);
-                        });
-                }
-            }
-
-            // Gemm1
-            auto s_new = [&]() {
-                if constexpr(kNWarp > 1)
-                {
-                    auto s = cast_tile<SMPLComputeDataType>(s_acc); // S{j}
-
-                    store_tile(s_write_lds_window, s);
-                    block_sync_lds();
-                    return load_tile(s_read_lds_window);
-                }
-                else
-                {
-                    return cast_tile<SMPLComputeDataType>(s_acc); // S{j}
-                }
-            }();
-
-            auto m_local = block_tile_reduce<SMPLComputeDataType>(
-                s_new,
-                sequence<1>{},
-                f_max,
-                -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
-            block_tile_reduce_sync(
-                m_local, f_max, bool_constant<false>{} /*, bool_constant<false>{}*/);
-
-            static_for<0, 12, 1>{}([&](auto i) {
-                ignore = i;
-                __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // MFMA
-                __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS_READ
-            });
-
-            static_for<0, 4, 1>{}([&](auto i) {
-                ignore = i;
-                __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // MFMA
-                __builtin_amdgcn_sched_group_barrier(0x100, 2, 0); // DS_READ
-            });
-
-            const auto m_old = m; // m{j-1}
-            tile_elementwise_inout(
-                [](auto& e0, auto e1, auto e2) { e0 = max(e1, e2); }, m, m_old, m_local); // m{j}
-
-            auto p_compute = make_static_distributed_tensor<SMPLComputeDataType>(
-                s_new.get_tile_distribution()); // Pcompute{j}
-
-            static const auto get_validated_m = [](SMPLComputeDataType raw_m) {
-                /// NOTICE: bias might be materialized mask including -inf values, need
-                /// consideration
-                if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                             FmhaMask::IsMasking)
-                {
-                    return raw_m == -numeric<SMPLComputeDataType>::infinity()
-                               ? type_convert<SMPLComputeDataType>(0.f)
-                               : raw_m;
-                }
-                else
-                {
-                    return raw_m;
-                }
-            };
-
-            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
-            sweep_tile_span(p_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                auto row_max         = scale_s * get_validated_m(m[i_idx]);
-                sweep_tile_span(p_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
+                    if(i_total_loops == (num_total_loop - 1))
                     {
-                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                        const auto k_origin =
+                            make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
+                        set_tile_if(s_acc,
+                                    -numeric<SMPLComputeDataType>::infinity(),
+                                    [&,
+                                     physical_seqlen_k_start_ = physical_seqlen_k_start,
+                                     physical_seqlen_k_end_   = physical_seqlen_k_end](auto tile_idx) {
+                                        const auto col = k_origin.at(I0) + tile_idx.at(I1);
+
+                                        {
+                                            return physical_seqlen_k_end_ <= col;
+                                        }
+                                    });
+                    }
+                }
+
+                if constexpr(kPadSeqLenK || FmhaMask::IsMasking)
+                {
+                    const auto k_origin = make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
+
+                    bool need_perpixel_check =
+                        mask.IsEdgeTile(q_origin.at(I0), k_origin.at(I0), number<kM0>{}, number<kN0>{});
+                    if(need_perpixel_check)
+                    {
+                        set_tile_if(
+                            s_acc, -numeric<SMPLComputeDataType>::infinity(), [&](auto tile_idx) {
+                                const auto row = q_origin.at(I0) + tile_idx.at(I0);
+                                const auto col = k_origin.at(I0) + tile_idx.at(I1);
+                                return mask.IsOutOfBound(row, col);
+                            });
+                    }
+                }
+
+                // Gemm1
+                auto s_new = [&]() {
+                    if constexpr(kNWarp > 1)
+                    {
+                        auto s = cast_tile<SMPLComputeDataType>(s_acc); // S{j}
+
+                        store_tile(s_write_lds_window, s);
+                        block_sync_lds();
+                        return load_tile(s_read_lds_window);
                     }
                     else
                     {
-                        if constexpr(kHasLogitsSoftCap)
+                        return cast_tile<SMPLComputeDataType>(s_acc); // S{j}
+                    }
+                }();
+
+                auto m_local = block_tile_reduce<SMPLComputeDataType>(
+                    s_new,
+                    sequence<1>{},
+                    f_max,
+                    -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
+                block_tile_reduce_sync(
+                    m_local, f_max, bool_constant<false>{} /*, bool_constant<false>{}*/);
+
+                static_for<0, 12, 1>{}([&](auto i) {
+                    ignore = i;
+                    __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // MFMA
+                    __builtin_amdgcn_sched_group_barrier(0x100, 1, 0); // DS_READ
+                });
+
+                static_for<0, 4, 1>{}([&](auto i) {
+                    ignore = i;
+                    __builtin_amdgcn_sched_group_barrier(0x008, 1, 0); // MFMA
+                    __builtin_amdgcn_sched_group_barrier(0x100, 2, 0); // DS_READ
+                });
+
+                const auto m_old = m; // m{j-1}
+                tile_elementwise_inout(
+                    [](auto& e0, auto e1, auto e2) { e0 = max(e1, e2); }, m, m_old, m_local); // m{j}
+
+                auto p_compute = make_static_distributed_tensor<SMPLComputeDataType>(
+                    s_new.get_tile_distribution()); // Pcompute{j}
+
+                static const auto get_validated_m = [](SMPLComputeDataType raw_m) {
+                    /// NOTICE: bias might be materialized mask including -inf values, need
+                    /// consideration
+                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                                 FmhaMask::IsMasking)
+                    {
+                        return raw_m == -numeric<SMPLComputeDataType>::infinity()
+                                   ? type_convert<SMPLComputeDataType>(0.f)
+                                   : raw_m;
+                    }
+                    else
+                    {
+                        return raw_m;
+                    }
+                };
+
+                constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
+                sweep_tile_span(p_spans[I0], [&](auto idx0) {
+                    constexpr auto i_idx = make_tuple(idx0);
+                    auto row_max         = scale_s * get_validated_m(m[i_idx]);
+                    sweep_tile_span(p_spans[I1], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                        if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                                     BiasEnum == BlockAttentionBiasEnum::ALIBI)
                         {
                             p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
-                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                            if constexpr(kHasLogitsSoftCap)
+                            {
+                                p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                            }
+                            else
+                            {
+                                p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                            }
                         }
-                    }
+                    });
                 });
-            });
 
-            auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
-                p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
+                auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
+                    p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
 
-            block_tile_reduce_sync(
-                rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
+                block_tile_reduce_sync(
+                    rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
 
-            auto p_tile = make_static_distributed_tensor<PDataType>(
-                Policy::template MakePRegTileDistribution<Problem>());
-            p_tile.get_thread_buffer() = cast_tile<PDataType>(p_compute).get_thread_buffer();
+                auto p_tile = make_static_distributed_tensor<PDataType>(
+                    Policy::template MakePRegTileDistribution<Problem>());
+                p_tile.get_thread_buffer() = cast_tile<PDataType>(p_compute).get_thread_buffer();
 
-            // l{j}, Oacc{j}
-            constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
-            sweep_tile_span(o_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                const auto tmp       = [&]() {
-                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
-                    {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
-                    }
-                    else
-                    {
-                        if constexpr(kHasLogitsSoftCap)
+                // l{j}, Oacc{j}
+                constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+                sweep_tile_span(o_spans[I0], [&](auto idx0) {
+                    constexpr auto i_idx = make_tuple(idx0);
+                    const auto tmp       = [&]() {
+                        if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                                     BiasEnum == BlockAttentionBiasEnum::ALIBI)
                         {
                             return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
-                            auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            if constexpr(kHasLogitsSoftCap)
+                            {
+                                return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            }
+                            else
+                            {
+                                auto row_max = scale_s * get_validated_m(m[i_idx]);
+                                return exp2(scale_s * m_old[i_idx] - row_max);
+                            }
                         }
-                    }
-                }();
-                l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
-                sweep_tile_span(o_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                    }();
+                    l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
+                    sweep_tile_span(o_spans[I1], [&](auto idx1) {
+                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
 
-                    o_acc(i_j_idx) *= tmp;
+                        o_acc(i_j_idx) *= tmp;
+                    });
                 });
-            });
+            } // !skip_this_block (V tile read + masking + softmax + o_acc rescaling)
 
+            // ALWAYS: K prefetch
             block_sync_lds<v_lds_insts>();
             move_tile_window(k_dram_window, {kN0, 0});
             k_lds_write_window.set_bottom_tensor_view_data_ptr(k_lds_write_ptr);
             async_load_tile(k_lds_write_window, k_dram_window);
 
-            if constexpr(1 < k1_loops)
+            if(!skip_this_block)
             {
-                static_for<0, k1_loops - 1, 1>{}([&](auto i_k1) {
-                    // loop over along the [V]alue Sequence length
-                    move_tile_window(v_lds_read_window, {kK1, 0});
-                    auto v_tile_switch = load_tile_transpose(v_lds_read_window);
+                if constexpr(1 < k1_loops)
+                {
+                    static_for<0, k1_loops - 1, 1>{}([&](auto i_k1) {
+                        // loop over along the [V]alue Sequence length
+                        move_tile_window(v_lds_read_window, {kK1, 0});
+                        auto v_tile_switch = load_tile_transpose(v_lds_read_window);
 
-                    gemm_1(o_acc,
-                           get_slice_tile(p_tile,
-                                          sequence<0, i_k1 * kK1>{},
-                                          sequence<kM0, (i_k1 + 1) * kK1>{}),
-                           v_tile);
+                        gemm_1(o_acc,
+                               get_slice_tile(p_tile,
+                                              sequence<0, i_k1 * kK1>{},
+                                              sequence<kM0, (i_k1 + 1) * kK1>{}),
+                               v_tile);
 
-                    v_tile = v_tile_switch;
-                });
-                // move back to the origin
-                move_tile_window(v_lds_read_window, {-kK1 * (k1_loops - 1), 0});
-            }
+                        v_tile = v_tile_switch;
+                    });
+                    // move back to the origin
+                    move_tile_window(v_lds_read_window, {-kK1 * (k1_loops - 1), 0});
+                }
 
-            gemm_1(o_acc,
-                   get_slice_tile(p_tile,
-                                  sequence<0, (k1_loops - 1) * kK1>{},
-                                  sequence<kM0, k1_loops * kK1>{}),
-                   v_tile);
+                gemm_1(o_acc,
+                       get_slice_tile(p_tile,
+                                      sequence<0, (k1_loops - 1) * kK1>{},
+                                      sequence<kM0, k1_loops * kK1>{}),
+                       v_tile);
+            } // !skip_this_block (PV GEMM)
 
+            // ALWAYS: K read from LDS + scheduling barriers
             block_sync_lds_direct_load<k_vmem_insts + v_vmem_insts>();
             k_lds_read_window.set_bottom_tensor_view_data_ptr(k_lds_read_ptr);
             k_tile = load_tile(k_lds_read_window);

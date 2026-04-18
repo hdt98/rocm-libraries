@@ -2848,6 +2848,16 @@ struct FmhaFwdKernel
                 }
             }();
 
+            const int32_t* block_mask_row_ptr = nullptr;
+            if(kargs.block_mask_ptr != nullptr)
+            {
+                const index_t q_block_idx = i_tile_m;
+                block_mask_row_ptr = kargs.block_mask_ptr +
+                    static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
+                    static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
+                    static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
+            }
+
             auto o_acc_tile = [&]() {
                 if constexpr(PrefillCase)
                 {
@@ -2876,7 +2886,8 @@ struct FmhaFwdKernel
                                           smem_ptrk0,
                                           smem_ptrk1,
                                           smem_ptrv0,
-                                          smem_ptrv1);
+                                          smem_ptrv1,
+                                          block_mask_row_ptr);
                 }
                 else
                 {
@@ -2890,7 +2901,8 @@ struct FmhaFwdKernel
                                           position_encoding,
                                           kargs.scale_s,
                                           smem_ptr,
-                                          sink_value);
+                                          sink_value,
+                                          block_mask_row_ptr);
                 }
             }();
 
