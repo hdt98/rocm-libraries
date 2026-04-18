@@ -28,10 +28,17 @@ protected:
 
 // ========== Constructor Null Pointer Tests ==========
 
-TEST_F(TestHeuristicPluginResourceManagerAdditional, ConstructorWithNullPluginManagerThrows)
+TEST_F(TestHeuristicPluginResourceManagerAdditional, ConstructorWithNullPluginManagerAccepted)
 {
-    EXPECT_THROW(
-        { auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); }, HipdnnException);
+    // Null plugin manager is accepted during static destruction scenarios
+    // The constructor should not throw - it just skips initialization
+    EXPECT_NO_THROW(
+        { auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); });
+
+    // Verify the resource manager works with null manager
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr);
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(1), nullptr);
+    EXPECT_EQ(rm->getPluginForPolicyId(1), nullptr);
 }
 
 // ========== Policy Info Caching Tests ==========
