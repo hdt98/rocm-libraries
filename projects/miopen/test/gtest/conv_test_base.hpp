@@ -147,6 +147,10 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
         return {
             // g   n     C     K      img       filter   pad    stride  dilation
               {32, 256, 1024, 2048, {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
+/* bad one */ {4,   8,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
+/* bad one */ {4,  10,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
+/* bad one */ {4,  12,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
+/* bad one */ {4,  14,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
 /* bad one */ {4,  16,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}}, // TRJS can't be last
               {1,  64,  1024, 2048, {14, 14},   {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {1,  256, 192,  192,  {28, 28},   {3, 3}, {1, 1}, {1, 1}, {1, 1}},
@@ -382,25 +386,11 @@ protected:
             
         output = tensor<T>{tensor_layout, output_desc.GetLengths()};
 
-        std::vector<size_t> gpu_bufs = {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()};
-        std::vector<size_t> cpu_bufs;
-        if(use_cpu_ref)
-            cpu_bufs = gpu_bufs;
-        else
-        {
-            auto tmp = gpu_bufs;
-            gpu_bufs.insert(gpu_bufs.end(), tmp.begin(), tmp.end());
-            cpu_bufs.push_back(output.GetDataByteSize());
-        }
-
-        MemoryEcosystem::SkipTestIfUnableToAllocate(gpu_bufs, cpu_bufs, test_skipped);
+        MemoryEcosystem::SkipTestIfUnableToAllocate(
+            {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
+            {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
+            test_skipped);
         if(test_skipped) { return; }
-
-        if(!MemoryEcosystem::AbleToAllocate(gpu_bufs, cpu_bufs))
-        {
-            test_skipped = true;
-            GTEST_SKIP() << "Skipping due to unable to allocate enough memory";
-        }
 
         input.generate(GenData<T>{});
         weights.generate(GenWeights<T>{});
