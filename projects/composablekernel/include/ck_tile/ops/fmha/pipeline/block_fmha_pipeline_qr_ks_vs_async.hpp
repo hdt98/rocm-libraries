@@ -408,9 +408,46 @@ struct BlockFmhaPipelineQRKSVSAsync
 
         static_assert(1 <= k0_loops);
         static_assert(1 <= k1_loops);
+        const index_t kv_block_idx_base = kv_load_start / kN0;
+
         // main loop
         do
         {
+            // Block sparsity: skip fully-masked KV blocks
+            if(block_mask_row_ptr != nullptr &&
+               block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0)
+            {
+                // Drain the prefetched K sub-tile (already in flight from previous iteration)
+                async_load_fence();
+                __builtin_amdgcn_s_barrier();
+
+                // Advance windows to next KV block
+                i_total_loops++;
+                if(i_total_loops < num_total_loop)
+                {
+                    move_tile_window(k_dram_block_window, {kN0, 0});
+                    k_dram_window.set_window_origin(k_dram_block_window.get_window_origin());
+                    async_load_tile_raw(k_lds_store(LdsSeq.at(number<0>{})),
+                                        k_dram_window,
+                                        number<-1>{},
+                                        k_oob_ck,
+                                        k_pre_np);
+                    move_tile_window(k_dram_window, {0, kK0});
+                }
+                move_tile_window(v_dram_window, {0, kN0});
+                move_tile_window(bias_dram_window, {0, kN0});
+                if constexpr(kHasDropout)
+                {
+                    dropout.Move(randval_dram_window, kN0);
+                }
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
+                {
+                    move_tile_window(k_scale_dram_block_window, {kN0, 0});
+                    move_tile_window(v_scale_dram_window, {0, kN0 / kVScaleGranularity});
+                }
+                continue;
+            }
+
             float k_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
             {
