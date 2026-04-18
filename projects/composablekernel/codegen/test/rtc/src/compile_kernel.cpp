@@ -299,4 +299,37 @@ kernel compile_kernel(const std::vector<src_file>& srcs, compile_options options
 #endif
 }
 
+compiled_artifact compile_kernel_with_code_object(const std::vector<src_file>& srcs,
+                                                  compile_options              options)
+{
+#ifdef HIPRTC_FOR_CODEGEN_TESTS
+    // Mirror hiprtc_compile_kernel's flag assembly so a cache hit
+    // produced from this path is byte-identical to a plain
+    // compile_kernel() call (the same compile flags reach hiprtc).
+    options.flags += " -I. -O3";
+    options.flags += " -std=c++20";
+    options.flags += " -DCK_CODE_GEN_RTC";
+    options.flags += " --offload-arch=" + get_device_name();
+
+    auto cos = compile_hip_src_with_hiprtc(srcs, options);
+    if(cos.size() != 1)
+        throw std::runtime_error("compile_kernel_with_code_object: expected exactly one code object");
+    auto code_obj = std::move(cos.front());
+    return compiled_artifact{kernel{code_obj.data(), options.kernel_name}, std::move(code_obj)};
+#else
+    // The clang backend does not go through hiprtc and has no code-
+    // object blob to expose, so we return an empty `code_object`
+    // vector. Callers relying on the disk cache must be configured
+    // against the hiprtc backend (HIPRTC_FOR_CODEGEN_TESTS).
+    return compiled_artifact{clang_compile_kernel(srcs, options), {}};
+#endif
+}
+
+kernel kernel_from_code_object(const std::vector<char>& code_object, const std::string& kernel_name)
+{
+    if(code_object.empty())
+        throw std::runtime_error("kernel_from_code_object: empty code object");
+    return kernel{code_object.data(), kernel_name};
+}
+
 } // namespace rtc

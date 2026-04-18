@@ -2,7 +2,13 @@
 # SPDX-License-Identifier: MIT
 
 list(APPEND CMAKE_PREFIX_PATH /opt/rocm)
-add_subdirectory(rtc)
+# Phase 1: ck_rtc is now defined publicly at codegen/rtc/ and already
+# added as a subdirectory from codegen/CMakeLists.txt before this
+# directory is entered. We no longer add_subdirectory(rtc) here to
+# avoid defining a duplicate target.
+if(NOT TARGET ck_rtc)
+    add_subdirectory(rtc)
+endif()
 file(GLOB TEST_SRCS CONFIGURE_DEPENDS *.cpp)
 
 # TODO: These tests need to be refactored to remove dependency on main ck

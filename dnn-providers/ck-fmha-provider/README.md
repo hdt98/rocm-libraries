@@ -42,19 +42,314 @@ what was run on an MI355X (gfx950) to produce the verified TFLOPS output below.
 
 ### JIT Mode (optional)
 
-For shapes without precompiled kernels (e.g., h256), the plugin can
-JIT-compile kernels on demand via the CK codegen + hipcc pipeline:
+For shapes without precompiled kernels, the plugin can JIT-compile them
+on demand. Two backends ship in the box:
+
+- **`rtc`** (preferred) -- in-process hipRTC + `ck_tile_headers_preprocessor`.
+  No Python, no `hipcc` subprocess, no `.so` on disk. First compile per
+  (shape, arch) is ~7-15 s on MI355X, subsequent calls in the same
+  process are a registry cache hit (~0.1 ms). See
+  [**Using hipRTC (JIT backend)**](#using-hiprtc-jit-backend) below for
+  the walk-through.
+- **`hipcc`** (legacy) -- shells out to `python3 -> generate_fmha_fallback.py -> hipcc -> .so`,
+  then dlopens. Kept as a fallback so deployments can still use the
+  Phase 10 offline warm-up path (see `fmha_utils.setup_multiple_fmha_dispatchers`).
+
+Quick-start for hipRTC:
 
 ```bash
-CK_FMHA_ENABLE_JIT=1 \
+CK_FMHA_ENABLE_JIT=1          \
+CK_FMHA_JIT_BACKEND=rtc       \
+HIPDNN_PLUGIN_PATH=<plugin_dir> \
+  ./ck_fmha_e2e_rtc_demo --warmup 2 --repeat 5
+```
+
+Quick-start for legacy hipcc:
+
+```bash
+CK_FMHA_ENABLE_JIT=1          \
+CK_FMHA_JIT_BACKEND=hipcc     \
 CK_DISPATCHER_PYTHON_PATH=<ck>/dispatcher/python \
 HIPDNN_PLUGIN_PATH=<plugin_dir> \
   ./ck_fmha_e2e_demo --warmup 2 --repeat 5
 ```
 
-First compilation takes ~16-31s per kernel. Subsequent calls load from
-disk cache instantly. See [docs/EndToEndGuide.md](docs/EndToEndGuide.md#part-2-jit-path)
-for the full JIT walkthrough.
+See [docs/EndToEndGuide.md](docs/EndToEndGuide.md#part-2-jit-path) for
+the full walk-through of both paths, including kernel-cache semantics
+and Phase 10's offline warm-up.
+
+## Using hipRTC (JIT backend)
+
+The hipRTC backend compiles FMHA kernels **in-process** via `libhiprtc`
+directly against `CK_TILE_HOST`-stripped CK Tile headers. There is no
+Python runtime, no `hipcc` subprocess, and no `.so` artefact on disk.
+
+### Prerequisites
+
+1. A ROCm install providing `libamdhip64.so`, `libhiprtc.so`, and
+   `libcomgr.so` (tested against ROCm 7.0.1).
+2. An AMD GPU. Primary support is `gfx950` (MI355X); `gfx942`, `gfx908`,
+   `gfx1100`, `gfx1200` work as well after their per-arch tile tables
+   and predicates land in upstream CK codegen.
+
+### Build the plugin with the RTC backend
+
+The CK FMHA plugin gates RTC behind a build-time flag. Default is
+**on**, but you can flip it explicitly:
+
+```bash
+cd dnn-providers/ck-fmha-provider
+cmake -B build -G Ninja                                                 \
+  -DCMAKE_BUILD_TYPE=Release                                            \
+  -DCMAKE_CXX_COMPILER=/opt/rocm/bin/hipcc                              \
+  -DCK_ROOT=/workspace/rocm-lib-copy/projects/composablekernel          \
+  -DHIPDNN_ROOT=/workspace/rocm-lib-copy/projects/hipdnn                \
+  -DCK_FMHA_WITH_RTC=ON                                                 \
+  -DCK_FMHA_PROVIDER_BUILD_TESTS=ON
+ninja -C build ck_fmha_plugin ck_fmha_e2e_rtc_demo
+```
+
+This produces:
+
+- `build/libck_fmha_provider_plugin.so` -- plugin with both backends
+  linked in (`compile_rtc` and `compile_hipcc`).
+- `build/integration_tests/ck_fmha_e2e_rtc_demo` -- the end-to-end
+  demo that drives the full hipDNN Graph API -> CK plugin -> hipRTC
+  -> GPU path and validates each shape against a CPU reference.
+
+Verify the RTC backend is linked:
+
+```bash
+readelf -d build/libck_fmha_provider_plugin.so | grep NEEDED | grep hiprtc
+#   0x0000000000000001 (NEEDED)  Shared library: [libhiprtc.so.7]
+
+nm -D build/libck_fmha_provider_plugin.so | grep -E "compile_rtc|strip_host_bodies"
+#   ... T ck_fmha_plugin::jit::compile_rtc(...)
+#   ... T ck::host::strip_host_bodies(std::string_view)
+```
+
+Both symbols must be present for the RTC backend to be active.
+
+### Runtime configuration
+
+The plugin reads three environment variables:
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `CK_FMHA_ENABLE_JIT` | Must be `1` for any JIT path (RTC or hipcc). Without this the plugin only uses precompiled kernels. | `1` |
+| `CK_FMHA_JIT_BACKEND` | Selects the JIT backend: `rtc`, `hipcc`, or `auto`. Default is `auto` (try RTC first, fall back to hipcc on failure). Set to `rtc` to pin RTC. | `rtc` |
+| `CK_FMHA_RTC_TRACE` | Opt-in trace. Prints one line per kernel launch (name, grid, block, shape). Useful for validating that new shapes actually go through the RTC path. | `1` |
+
+And hipDNN itself needs to know where your plugin `.so` lives:
+
+| Variable | Purpose |
+|---|---|
+| `HIPDNN_PLUGIN_PATH` | Directory containing `ck_fmha_provider_plugin.so`. |
+
+### Running the end-to-end demo
+
+The included `ck_fmha_e2e_rtc_demo` target builds an SDPA forward graph
+through the hipDNN Graph API (`Graph::sdpa` -> `graph.build` ->
+`graph.execute`), forces the RTC backend, runs the kernel, and
+compares the GPU output against a CPU reference computed as
+`softmax(Q @ K^T / sqrt(d)) @ V`.
+
+```bash
+cd dnn-providers/ck-fmha-provider/build
+
+HIPDNN_PLUGIN_PATH=$PWD                                                  \
+LD_LIBRARY_PATH=/workspace/rocm-lib-copy/projects/hipdnn/build/release/lib:$LD_LIBRARY_PATH \
+  ./integration_tests/ck_fmha_e2e_rtc_demo --warmup 2 --repeat 5
+```
+
+Expected output on MI355X (gfx950):
+
+```
+================================================================
+  CK FMHA hipDNN plugin -- hipRTC end-to-end demo
+  Device: AMD Instinct MI355X (gfx950:sramecc+:xnack-)
+  Warmup: 2  Repeat: 5
+  JIT backend: hipRTC (CK_FMHA_JIT_BACKEND=rtc)
+================================================================
+
+Shape                                 build(ms)   exec(ms)    TFLOPS    match?    max_abs     mean_abs    ref_rms
+----------------------------------------------------------------------------------------------------------------------
+B=2 H=4 Sq=128 Sk=128 Dq=128 Dv=128   7798.257    0.008       8.216     OK        0.000       0.000       0.002
+B=2 H=8 Sq=256 Sk=256 Dq=128 Dv=128   7649.292    0.013       42.528    OK        0.000       0.000       0.001
+B=1 H=8 Sq=512 Sk=512 Dq=128 Dv=128   7766.993    0.021       50.363    OK        0.000       0.000       0.001
+
+================================================================
+  Parity vs CPU reference: 3/3 shapes match.
+================================================================
+```
+
+Three things to notice:
+
+1. `build(ms) ~ 7-8 s per shape`. That's a full hipRTC compile of
+   `ck_tile::TileFmhaFwdKernel<...>` for `gfx950`. The MGX template
+   bakes `batch/nhead/seqlen_q/seqlen_k` into `make_descriptor` as
+   `constexpr`, so each distinct shape triggers a fresh compile (see
+   [_Per-shape compile is intrinsic to the MGX template_](#per-shape-compile-is-intrinsic-to-the-mgx-template)
+   below).
+2. `exec(ms) << 1 ms`. Once compiled, the kernel runs at standard CK
+   Tile throughput. TFLOPS scales with workload as expected.
+3. `match? = OK` under a strict, scale-aware tolerance
+   (`atol = 1e-3 * ref_rms`, `rtol = 2e-2`). The demo fails loudly
+   if the hipRTC path disagrees with the CPU reference.
+
+### Telemetry
+
+The plugin maintains a process-wide `RtcStats` counter so operators can
+observe JIT churn in production. Enable the stderr summary with
+`CK_FMHA_RTC_STATS=1`:
+
+```bash
+CK_FMHA_RTC_STATS=1 ./your_hipdnn_binary
+# at process exit:
+#   [CK FMHA hipRTC stats: attempts=5 (success=5, fail=0), cache=5/5 hits,
+#    cold_avg=0.0ms, hot_avg=1.53ms, total_compile=0.00s,
+#    total_cache_load=0.01s]
+```
+
+Fields:
+
+- `attempts` -- total calls into `compile_rtc` (in-process registry hits
+  don't count; those never reach the compile layer).
+- `success / fail` -- split of `attempts` into successful compiles vs
+  hipRTC errors. The last failure's message is kept in
+  `RtcStats::last_error` for a richer post-mortem.
+- `cache=<hits>/<attempts>` -- how many attempts were served from the
+  on-disk HSACO cache. In a steady-state production workload this
+  should approach 100 % of attempts after the first deploy.
+- `cold_avg` -- mean `compile_rtc` wall-time for cache misses. Realistic
+  numbers on gfx950 are ~7-9 s per kernel; `CK_FMHA_RTC_CACHE_DIR`
+  amortises this across processes.
+- `hot_avg` -- mean wall-time for cache hits. Should be ~1-5 ms on a
+  warm page cache, dominated by `hipModuleLoadData`.
+- `total_compile` / `total_cache_load` -- cumulative JIT wall-time, so
+  you can account for the first-process tax when sizing warm-up
+  budgets.
+
+### Debugging a failing RTC compile
+
+Set `CK_FMHA_RTC_SHOW_BUILD_STDERR=1` to un-silence the hipRTC
+warnings that the demo suppresses by default. Real errors from
+the RTC backend flow through `HIPDNN_PLUGIN_LOG_WARN` and appear
+via `hipdnnSetCallback` once a logger is registered.
+
+Set `CK_FMHA_RTC_TRACE=1` to get a per-launch diagnostic line,
+useful for confirming that the right shape reached
+`RtcFmhaKernelInstance::launch`:
+
+```
+[CK_FMHA_RTC] rtc_fwd_fp16_gfx950_B2H4Sq128Sk128 batch=2 nhead_q=4
+              Sq=128 Sk=128 Dq=128 Dv=128 grid=(4,2,2) block=(256)
+```
+
+### On-disk RTC cache layout
+
+The RTC backend persists every successful compile as a standard
+AMDGPU HSA Code Object, so the cache is interoperable with the
+rest of the ROCm toolchain:
+
+```
+$CK_FMHA_RTC_CACHE_DIR/
+    gfx950-384b08261326a825.hsaco   # single-arch HSACO (ELF64 EM_AMDGPU)
+    gfx950-384b08261326a825.json    # sidecar: arch / kernel / solution / hash
+    gfx950-67ca4ae935f16c71.hsaco
+    gfx950-67ca4ae935f16c71.json
+    ...
+```
+
+Every `.hsaco` is a raw single-arch code object. No
+`__CLANG_OFFLOAD_BUNDLE__` wrapper, so the file is directly
+inspectable:
+
+```bash
+# Verify an entry is a valid gfx950 HSACO
+file  $CK_FMHA_RTC_CACHE_DIR/gfx950-<hash>.hsaco
+#   -> ELF 64-bit LSB shared object, AMD GPU architecture version 1
+
+llvm-readelf -h $CK_FMHA_RTC_CACHE_DIR/gfx950-<hash>.hsaco | grep -E "OS/ABI|Machine|Flags"
+#   OS/ABI:  AMDGPU - HSA
+#   Machine: EM_AMDGPU
+#   Flags:   0xE4F, gfx950, xnack-, sramecc+
+
+# Disassemble the kernel's `.text` with standard ROCm tooling
+llvm-objdump -d --arch-name=amdgcn --mcpu=gfx950 \
+    $CK_FMHA_RTC_CACHE_DIR/gfx950-<hash>.hsaco
+
+# Read the AMDGPU metadata note (kargs, group/private sizes, register usage)
+llvm-readelf --notes $CK_FMHA_RTC_CACHE_DIR/gfx950-<hash>.hsaco
+
+# Peek at the sidecar to see what CK-Tile template the hsaco came from
+cat $CK_FMHA_RTC_CACHE_DIR/gfx950-<hash>.json
+```
+
+At load time the plugin re-verifies every `.hsaco` before handing
+it to `hipModuleLoadData`:
+
+- magic must be `\x7fELF` + ELF64
+- `e_machine == EM_AMDGPU`
+- `e_flags[0..9]` must decode to the expected gfx* machine for the
+  current device
+
+Stale or cross-arch entries are removed on sight and fall through
+to recompile rather than risk a runtime memory fault.
+
+Because the per-entry format is the standard HSACO, you can also:
+
+- Package the cache into a fat binary with `clang-offload-bundler`
+  when shipping multi-arch deployments
+- Feed entries into existing rocprofv2 / MIOpen cache tooling
+- Pre-build caches in CI (run the plugin once, archive the
+  directory) and ship them with your container
+
+### Per-shape compile is intrinsic to the MGX template
+
+The current `ck::host::fmha_rtc::compile_fwd` renders a kernel source
+derived from the MGX validation kernel in
+`projects/composablekernel/codegen/test/fmha_fwd.cpp`. That template
+passes runtime shapes as `constexpr` into `Kernel::make_descriptor`,
+so the **compiled** kernel is valid only for the exact
+`(batch, nhead, seqlen_q, seqlen_k)` tuple it was emitted for.
+
+`RtcFmhaKernelInstance::supports()` enforces that invariant at
+kernel-selection time -- a new shape cannot alias onto an existing
+registry entry. Concretely:
+
+- Each unique `(signature, tile, shape)` triple gets its own
+  `FmhaKernelKey` (we fold a 32-bit hash of the runtime shape into
+  `algorithm.selection_rank`) and its own hipRTC compile.
+- The first call per shape costs ~7-15 s (fresh compile). Subsequent
+  calls with the same shape in the same process cost ~0.1 ms
+  (registry cache hit).
+- Moving across processes invalidates the in-memory cache. See
+  [Phase 10 on-disk RTC cache](#phase-10-on-disk-rtc-cache) below for
+  how persistent caching drops the cold-cache cost to `hipModuleLoadData`
+  (~50 ms).
+
+Phase 2 follow-up work on `fmha_fwd_wrapper.hpp` will expose
+`batch/nhead/seqlen_q/seqlen_k` as runtime kargs, at which point one
+compiled kernel can service any shape in its hdim bucket, the way
+production FMHA kernels already do. Until that lands, per-shape
+compilation is the correct default.
+
+### How RTC relates to precompiled kernels
+
+The two are complementary. A production deployment typically uses:
+
+```
+Precompiled kernels (registered at handle construction) -----.
+    .---> tried first by CkFmhaFwdPlanBuilder::isApplicable   |
+    |                                                         |
+RTC fallback on miss (CK_FMHA_ENABLE_JIT=1)   <---------------'
+    .---> compile + register; subsequent calls hit the cache
+```
+
+Set `CK_FMHA_DEFAULT_BACKEND_RTC=ON` at build time to make `rtc` the
+default backend (today the default is `auto`: try RTC first, fall
+back to hipcc on failure).
 
 ## End-to-End Flow
 
@@ -170,13 +465,43 @@ hipdnnEnginePluginDestroy()                  Drops CkFmhaHandle
                                               Registry + dispatcher destroyed
 ```
 
-### 7. JIT Compilation Path (Slow Mode)
+### 7. JIT Compilation Path
 
-When the precompiled registry has no matching kernel:
+When the precompiled registry has no matching kernel, the plugin falls
+back to a JIT compilation step. The backend is selected at runtime via
+`CK_FMHA_JIT_BACKEND`:
+
+```
+CK_FMHA_JIT_BACKEND=rtc     in-process hipRTC (preferred)
+CK_FMHA_JIT_BACKEND=hipcc   python3 + hipcc subprocess (legacy)
+CK_FMHA_JIT_BACKEND=auto    try rtc, fall back to hipcc (default)
+```
+
+The compile-time flag `CK_FMHA_DEFAULT_BACKEND_RTC` (off by default)
+changes the default from Auto to Rtc once the deployment has validated
+RTC on its (arch, dtype, family, shape) matrix.
+
+**RTC path** (preferred):
 
 ```
 FmhaProblem (no kernel found in registry)
-  jit_compile_kernel(problem, arch)
+  jit::compile_rtc(problem, arch)
+    ck::host::fmha_rtc::compile_fwd(...)
+      GetTileHeaders()           strip_host_bodies on each ck_tile/**.hpp
+      InterpolateString()        kernel source from wrapper template
+      rtc::compile_kernel()      hipRTC -> hipModule_t + hipFunction_t
+    RtcFmhaKernelInstance        registered directly into FmhaRegistry
+  Retry: dispatcher->select_kernel()  now finds the RTC kernel
+```
+
+First-call latency: ~5-15 s (hipRTC skips the host-compile stage that
+dominates hipcc). Cache hit: ~1 ms (`hipModule_t` held in-process).
+
+**hipcc path** (legacy, still supported):
+
+```
+FmhaProblem (no kernel found in registry)
+  jit::compile_hipcc(problem, arch)
     Shells out to: python3 -c "from fmha_utils import setup_fmha_dispatcher; ..."
     generate_fmha_fallback.py  hipcc  .so  (~20-40s first time)
     Cached to CK_FMHA_JIT_CACHE_DIR (instant on subsequent calls)
@@ -185,10 +510,14 @@ FmhaProblem (no kernel found in registry)
   Retry: dispatcher->select_kernel()  now finds the JIT'd kernel
 ```
 
-The JIT `.so` persists to disk, so it only compiles once per unique kernel
-config per deployment. The offline warmup tool
-(`fmha_utils.setup_multiple_fmha_dispatchers`) can pre-build these for
-production deployments with zero runtime compilation cost.
+The hipcc `.so` persists to disk, so it only compiles once per unique
+kernel config per deployment. The offline warmup tool
+(`fmha_utils.setup_multiple_fmha_dispatchers`) remains the recommended
+way to pre-build kernels for production deployments with zero runtime
+compilation cost, regardless of backend choice.
+
+See [docs/ADRs/0001-hiprtc-as-jit-backend.md](docs/ADRs/0001-hiprtc-as-jit-backend.md)
+for the architecture decision record and rollback procedure.
 
 ## End-to-End Usage (hipDNN Frontend API)
 
@@ -343,10 +672,16 @@ cmake --build build
 
 | Variable | Description |
 |----------|-------------|
-| `CK_FMHA_KERNEL_LIB_PATH` | Directory of supplemental precompiled kernel `.so` files |
-| `CK_FMHA_ENABLE_JIT` | Set to `1` to enable JIT compilation fallback for missing kernels |
-| `CK_FMHA_JIT_CACHE_DIR` | Cache directory for JIT-compiled kernels (default: `/tmp/ck_fmha_jit`) |
-| `CK_DISPATCHER_PYTHON_PATH` | Path to CK dispatcher Python modules (required for JIT) |
+| `HIPDNN_PLUGIN_PATH` | Directory hipDNN searches for `ck_fmha_provider_plugin.so`. Required by every demo and test that talks to the plugin. |
+| `CK_FMHA_KERNEL_LIB_PATH` | Directory of supplemental precompiled kernel `.so` files, loaded at `CkFmhaHandle` construction. |
+| `CK_FMHA_ENABLE_JIT` | Set to `1` to enable JIT compilation fallback for missing kernels. Without this the plugin only serves problems whose kernel is already in `FmhaRegistry`. |
+| `CK_FMHA_JIT_BACKEND` | JIT backend selector. `rtc` = in-process hipRTC (requires `-DCK_FMHA_WITH_RTC=ON`); `hipcc` = python3 + hipcc subprocess (legacy); `auto` = try RTC, fall back to hipcc on failure (default). |
+| `CK_FMHA_JIT_CACHE_DIR` | Cache directory for hipcc-backend JIT-compiled `.so`s (default: `/tmp/ck_fmha_jit`). Unused by the RTC backend. |
+| `CK_FMHA_RTC_CACHE_DIR` | On-disk cache directory for RTC-compiled code objects (default: `$HOME/.cache/ck_fmha_rtc`). Set to `""` to disable persistent RTC caching. |
+| `CK_FMHA_RTC_TRACE` | Set to `1` to print one diagnostic line per kernel launch from `RtcFmhaKernelInstance::launch`. |
+| `CK_FMHA_RTC_SHOW_BUILD_STDERR` | Set to `1` to see the hipRTC compile warnings that the demo normally silences. Useful when debugging a compile failure. |
+| `CK_FMHA_RTC_STATS` | Set to `1` to print a one-line summary of `RtcStats` (compile attempts, cache hits/misses, cold_avg, hot_avg, total_compile_time, total_cache_load_time) to stderr at process exit. |
+| `CK_DISPATCHER_PYTHON_PATH` | Path to CK dispatcher Python modules. Required only when using the `hipcc` backend. |
 
 ## Architecture
 

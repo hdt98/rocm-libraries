@@ -10,10 +10,24 @@
 
 #include "CkFmhaJit.hpp"
 
-// REGISTER_GENERATED_KERNELS is defined via -include of the generated dispatch header
+// REGISTER_GENERATED_KERNELS is normally defined via -include of the
+// generated dispatch header produced by generate_fmha_fallback.py's
+// offline codegen. When the plugin is built against the hipRTC JIT
+// path (Phase 9+) without any pre-baked kernels, the registry starts
+// empty and every shape triggers JIT compilation on first use; we
+// stub the macro to a no-op so CkFmhaHandle::CkFmhaHandle() still
+// compiles in that configuration.
+#ifndef REGISTER_GENERATED_KERNELS
+#define REGISTER_GENERATED_KERNELS(registry, arch) \
+    do { (void)(registry); (void)(arch); } while(0)
+#endif
+
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 
 #include "CkFmhaContainer.hpp"
+#ifdef CK_FMHA_WITH_RTC
+#include "CkFmhaRtcStats.hpp"
+#endif
 
 namespace {
 
@@ -32,6 +46,11 @@ std::string detect_gfx_arch() {
 }  // namespace
 
 CkFmhaHandle::CkFmhaHandle() {
+#ifdef CK_FMHA_WITH_RTC
+    // Arm the CK_FMHA_RTC_STATS=1 at-exit summary the very first time
+    // a handle is constructed. Idempotent across multiple handles.
+    ck_fmha_plugin::RtcStats::maybeInstallAtExitDump();
+#endif
     gfx_arch_ = detect_gfx_arch();
     auto colon = gfx_arch_.find(':');
     if (colon != std::string::npos) gfx_arch_ = gfx_arch_.substr(0, colon);
@@ -110,22 +129,31 @@ bool CkFmhaHandle::jitAndLoad(const ck_tile::dispatcher::FmhaProblem& problem) c
 
     HIPDNN_PLUGIN_LOG_INFO("JIT: compiling kernel for " << problem.to_string());
 
-    auto result = ck_fmha_plugin::jit_compile_kernel(problem, gfx_arch_);
+    auto result = ck_fmha_plugin::jit_compile_kernel(problem, gfx_arch_, /*output_dir=*/"",
+                                                     registry_.get());
     if (!result.success) {
         HIPDNN_PLUGIN_LOG_WARN("JIT compilation failed: " << result.error);
         return false;
     }
 
-    HIPDNN_PLUGIN_LOG_INFO("JIT: compiled in " << result.build_time_s << "s -> " << result.so_path);
-
-    int added = ck_fmha_plugin::load_jit_library(result.so_path, *registry_, gfx_arch_);
-    if (added <= 0) {
-        HIPDNN_PLUGIN_LOG_WARN("JIT: no kernels loaded from " << result.so_path);
-        return false;
+    if (result.already_registered) {
+        // RTC backend path: compile_rtc() has already merged the new
+        // kernel into the dispatcher's registry via the ck_host
+        // facade, so there is nothing for us to dlopen.
+        HIPDNN_PLUGIN_LOG_INFO("JIT (rtc): compiled + registered in "
+                               << result.build_time_s << "s, total="
+                               << registry_->get_all().size());
+    } else {
+        HIPDNN_PLUGIN_LOG_INFO("JIT (hipcc): compiled in " << result.build_time_s
+                                                           << "s -> " << result.so_path);
+        int added = ck_fmha_plugin::load_jit_library(result.so_path, *registry_, gfx_arch_);
+        if (added <= 0) {
+            HIPDNN_PLUGIN_LOG_WARN("JIT: no kernels loaded from " << result.so_path);
+            return false;
+        }
+        HIPDNN_PLUGIN_LOG_INFO("JIT: loaded " << added << " kernel(s), total="
+                                              << registry_->get_all().size());
     }
-
-    HIPDNN_PLUGIN_LOG_INFO("JIT: loaded " << added
-                                          << " kernel(s), total=" << registry_->get_all().size());
 
     return dispatcher_->select_kernel(problem) != nullptr;
 }
