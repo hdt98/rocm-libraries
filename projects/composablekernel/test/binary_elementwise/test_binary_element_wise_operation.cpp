@@ -224,9 +224,10 @@ TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half)
                             [=](float a, float b) { return alpha * a + beta * b; });
 }
 
-TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision)
+TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision_regression_small_coeffs)
 {
-    // Precision is maintained with small alpha/beta.
+    // Before fix: alpha/beta demoted to half_t, losing precision (e.g. 0.001f -> 0.0009994f).
+    // After fix:  alpha/beta stay float, computation done in float, demoted only at the end.
     const float alpha = 0.001f;
     const float beta  = 0.002f;
     check_binary_op<half_t>(Bilinear(alpha, beta),
@@ -1022,9 +1023,10 @@ TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half)
     check_device_result(y, x0, x1, [=](float a, float b) { return alpha * a + beta * b; });
 }
 
-TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision)
+TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision_regression_small_coeffs)
 {
-    // Test precision with small alpha/beta on device
+    // Before fix: alpha/beta demoted to half_t, losing precision.
+    // After fix:  alpha/beta stay float, computation done in float, demoted only at the end.
     const float alpha = 0.001f;
     const float beta  = 0.002f;
     half_t x0         = type_convert<half_t>(100.0f);
