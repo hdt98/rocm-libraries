@@ -138,7 +138,9 @@ struct MemoryEcosystem
 #endif
     }
 
-    static bool AbleToAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+    static bool AbleToAllocate(const MemoryEcosystemInfo& info,
+        const std::vector<size_t>& vram_blocks,
+        const std::vector<size_t> cpu_blocks)
     {
         auto reserved = std::accumulate(cpu_blocks.begin(), cpu_blocks.end(), 0);
         return AbleToAllocate(info, vram_blocks, reserved);
