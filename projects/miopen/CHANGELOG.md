@@ -2,12 +2,19 @@
 # Change Log for MIOpen
 
 Full documentation for MIOpen is available [here](https://rocm.docs.amd.com/projects/MIOpen/en/latest/)
-## MIOpen 3.5.1 for ROCm 7.13.0
+
+## MIOpen 3.6.0 for ROCm 7.13.0
 ### Added
 * Added `MIOPEN_LOG_BUFFER_SIZE` option: when set to non-zero, dumps recent MIOpen logs to file on error.
+### Deprecated
+* Deprecated `miopenConvolutionBackwardBias`: the underlying OpenCL kernel (`MIOpenConvBwdBias.cl`) has been removed. The function now returns `miopenStatusNotImplemented` and will be removed in a future release.
+### Removed
+* Removed GraphAPI experimental feature and related code
+* Removed OpenCL kernel `MIOpenConvBwdBias.cl` and its implementation (`ConvolutionBackwardBias`)
 
 ## MIOpen 3.5.1 for ROCm 7.12.0
 ### Added
+* [Conv] Enabled gfx1103 (Phoenix).
 * [Conv] Enabled CK wrw and bwd solvers with split-k disabled in deterministic mode.
 * [Conv] Added `ConvDepthwiseFwd2D` solver for optimizing specific depthwise convolutions.
 

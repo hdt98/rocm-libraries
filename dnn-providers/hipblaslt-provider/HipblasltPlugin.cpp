@@ -19,9 +19,10 @@
 #include "HipblasltPlugin.hpp"
 #include "HipdnnEnginePluginExecutionContext.hpp"
 #include "HipdnnEnginePluginHandle.hpp"
+#include "version.h"
 
 static const char* pluginName = "hipblaslt_plugin";
-static const char* pluginVersion = "1.0.0";
+static const char* pluginVersion = HIPBLASLT_PROVIDER_VERSION_STRING;
 
 using namespace hipdnn_plugin_sdk;
 using namespace hipblaslt_plugin;
@@ -92,6 +93,14 @@ hipdnnPluginStatus_t hipdnnPluginSetLoggingCallbackImpl(hipdnnCallback_t callbac
         throwIfNull(callback);
         hipdnn_plugin_sdk::logging::initializeCallbackLogging(pluginName, callback);
         LOG_API_SUCCESS(apiName, "");
+    });
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLogLevelImpl(hipdnnSeverity_t level)
+{
+    return hipdnn_plugin_sdk::tryCatch([&, apiName = __func__]() {
+        hipdnn_plugin_sdk::logging::setLogLevel(level);
+        LOG_API_SUCCESS(apiName, "level=" << level);
     });
 }
 
