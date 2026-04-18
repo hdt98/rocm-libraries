@@ -2248,7 +2248,7 @@ struct FmhaFwdKernel
                                           randval_dram_window,
                                           lse_dram_window,
                                           identity{},               // lse_element_func
-                                          identity{},               // s_acc_element_func
+                                          scales<float>{1.0f},      // s_acc_element_func
                                           scales<remove_cvref_t<decltype(scale_p)>>{
                                               scale_p},       // p_compute_element_func
                                           o_acc_element_func, // o_acc_element_func
