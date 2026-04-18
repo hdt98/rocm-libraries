@@ -352,8 +352,19 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
         constexpr index_t k_vmem_insts = k_dram_window.get_num_of_access();
         constexpr index_t v_vmem_insts = v_dram_window.get_num_of_access();
 
+        const index_t kv_block_idx_base_decode = physical_seqlen_k_start / kN0;
+
         do
         {
+            // Block sparsity: skip fully-masked KV blocks
+            if(block_mask_row_ptr != nullptr &&
+               block_mask_row_ptr[kv_block_idx_base_decode + i_total_loops] == 0)
+            {
+                move_tile_window(k_dram_window, {kN0, 0});
+                move_tile_window(v_dram_window, {kN0, 0});
+                continue;
+            }
+
             block_sync_lds();
             async_load_tile(v_lds_write_window, v_dram_window); // prefetch load v tile
 
