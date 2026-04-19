@@ -279,7 +279,7 @@ INSTANTIATE_TEST_SUITE_P(
                            testing::Values(miopenTensorNDHWC, miopenTensorNCDHW)));
 
 INSTANTIATE_TEST_SUITE_P(
-    Full1,  // TRJS
+    Full,
     GPU_ConvGrpBiasActivInfer_BFP16,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
@@ -302,7 +302,7 @@ INSTANTIATE_TEST_SUITE_P(
                            testing::Values(miopenTensorNDHWC, miopenTensorNCDHW)));
 
 INSTANTIATE_TEST_SUITE_P(
-    Full1,  // TRJS
+    Full,
     GPU_ConvGrpBiasActivInfer_FP16,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
@@ -325,7 +325,7 @@ INSTANTIATE_TEST_SUITE_P(
                            testing::Values(miopenTensorNDHWC, miopenTensorNCDHW)));
 
 INSTANTIATE_TEST_SUITE_P(
-    Full1,  // TRJS
+    Full,
     GPU_ConvGrpBiasActivInfer_FP32,
     gcbaInferParamGenFull(GroupConvTestConfig<2u>::GetConfigs<Direction::Forward>(),
                           testing::Values(miopenTensorNHWC, miopenTensorNCHW)));
