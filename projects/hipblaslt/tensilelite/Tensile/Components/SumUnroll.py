@@ -107,13 +107,9 @@ class SumUnrollMfma(SumUnroll):
                 valuStr    = "Valu%s_X%u_I%u+%u+%u" % (tc, vgprBuffer_new, iui_new, new, vgprBuffer_new_offset)
                 valuSumStr = "ValuSum+%u"%idx
                 # If direct ot vgpr, use "G2LA+%u+%u+%u", currently not supported
-<<<<<<< HEAD
-                if kernel["ProblemType"]["MacDataType%s"%tc].isHalf():
-=======
                 if kernel["ProblemType"]["DataType"].isHalf():
                     # FP16 BiasSrcA,B
                     tmpVgpr = writer.vgprPool.checkOut(1)
->>>>>>> origin/develop
                     # First version only supports mfma with K > 1
                     if vgprPerInput > 1 and (vgprPerInput % 2 == 0):
                         for inputIdx in range(0, vgprPerInput):
@@ -126,12 +122,8 @@ class SumUnrollMfma(SumUnroll):
                                 imod.add(VAddF32(dst=vgpr(valuSumStr), src0=vgpr(tmpVgpr), src1=vgpr(valuSumStr), comment="sum K"))
                     else:
                         printExit("Currently unsupported vgprPerInput %u"%vgprPerInput)
-<<<<<<< HEAD
-                elif kernel["ProblemType"]["MacDataType%s"%tc].isSingle():
-=======
                     writer.vgprPool.checkIn(tmpVgpr)
                 elif kernel["ProblemType"]["DataType"].isSingle():
->>>>>>> origin/develop
                     inputIdx = 0
                     while inputIdx < vgprPerInput:
                         imod.add(VAddF32(dst=vgpr(valuSumStr), src0=vgpr("%s+%s"%(valuStr, iui_new_offset + inputIdx)), src1=vgpr(valuSumStr), comment="sum K"))
