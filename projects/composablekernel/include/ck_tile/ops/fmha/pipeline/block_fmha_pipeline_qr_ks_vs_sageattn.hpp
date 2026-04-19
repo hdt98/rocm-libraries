@@ -359,6 +359,15 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
         static_assert(2 <= k0_loops);
         static_assert(1 <= k1_loops);
+
+        // Prologue: prefetch K sub-tile[0] for iteration 0
+        auto k_dram_window = make_tile_window(
+            k_dram_block_window.get_bottom_tensor_view(),
+            k_dram_block_window.get_window_lengths(),
+            k_dram_block_window.get_window_origin(),
+            Policy::template MakeKDramTileDistribution<Problem>());
+        auto k_block_tile = load_tile(k_dram_window);
+
         do
         {
             // Select K scale for this block from dwordx4
@@ -369,13 +378,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 (block_in_pair == 0) ? k_scale_4[1] : k_scale_4[3];
 
             // STAGE 1: QK GEMM
-            auto k_dram_window = make_tile_window(
-                k_dram_block_window.get_bottom_tensor_view(),
-                k_dram_block_window.get_window_lengths(),
-                k_dram_block_window.get_window_origin(),
-                Policy::template MakeKDramTileDistribution<Problem>());
-
-            auto k_block_tile = load_tile(k_dram_window);
+            // k_block_tile already holds sub-tile[0] (from prologue or prev iter)
             {
                 move_tile_window(k_dram_window, {0, kK0});
                 clear_tile(s_acc);
@@ -702,6 +705,18 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     k_scale_4 = load_k_scale_dwordx4(scale_pair_idx);
                     v_scale_4 = load_v_scale_dwordx4(scale_pair_idx);
                 }
+            }
+
+            // Prefetch K sub-tile[0] for next iteration during GEMM1 drain
+            if(i_total_loops + 1 < num_total_loop)
+            {
+                k_dram_window = make_tile_window(
+                    k_dram_block_window.get_bottom_tensor_view(),
+                    k_dram_block_window.get_window_lengths(),
+                    k_dram_block_window.get_window_origin(),
+                    Policy::template MakeKDramTileDistribution<Problem>());
+                k_block_tile = load_tile(k_dram_window);
+                __builtin_amdgcn_sched_group_barrier(0x020, 2, 0); // VMEM_READ: 2
             }
 
         } while(++i_total_loops < num_total_loop);
