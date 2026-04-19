@@ -574,11 +574,17 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
             constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
 #if CK_TILE_FMHA_FWD_FAST_EXP2
-            // Deferred rescale: P = exp2(scale_s * s - scale_s * m - cum_log_scale)
+            // Deferred rescale with p_scale_factor absorbed into exp2 exponent:
+            // P = exp2(scale_s * s - scale_s * m - cum_log_scale + log2(p_scale_factor))
+            // This eliminates the separate p_norm = p * p_scale_factor multiply (64 VALU)
+            const auto log2_p_scale =
+                type_convert<SMPLComputeDataType>(__builtin_amdgcn_logf(p_scale_factor) *
+                                                  1.442695040888963f);
             sweep_tile_span(p_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
                 auto row_base =
-                    scale_s * get_validated_m(m[i_idx]) + cum_log_scale[i_idx];
+                    scale_s * get_validated_m(m[i_idx]) + cum_log_scale[i_idx] -
+                    log2_p_scale;
                 sweep_tile_span(p_spans[number<1>{}], [&](auto idx1) {
                     constexpr auto i_j_idx = make_tuple(idx0, idx1);
                     p_compute(i_j_idx) = exp2(scale_s * s[i_j_idx] - row_base);
@@ -639,20 +645,21 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 (block_in_pair == 0) ? v_scale_4[1] : v_scale_4[3]
             };
 
-            // Level-1 P scaling
-            auto p_norm = make_static_distributed_tensor<SMPLComputeDataType>(
-                p_compute.get_tile_distribution());
-            constexpr auto pn_spans = decltype(p_norm)::get_distributed_spans();
-            sweep_tile_span(pn_spans[number<0>{}], [&](auto idx0) {
-                sweep_tile_span(pn_spans[number<1>{}], [&](auto idx1) {
+#if CK_TILE_FMHA_FWD_FAST_EXP2
+            // p_compute already includes p_scale_factor (absorbed into exp2 exponent)
+#else
+            // Level-1 P scaling (non-FAST_EXP2 path)
+            sweep_tile_span(p_spans[number<0>{}], [&](auto idx0) {
+                sweep_tile_span(p_spans[number<1>{}], [&](auto idx1) {
                     constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    p_norm(i_j_idx)        = p_compute(i_j_idx) * p_scale_factor;
+                    p_compute(i_j_idx) *= p_scale_factor;
                 });
             });
+#endif
 
-            // Level-2: MXFP4 quantization
+            // MXFP4 quantization
             auto p_result = make_static_distributed_tensor<PDataType>(
-                p_norm.get_tile_distribution());
+                p_compute.get_tile_distribution());
             auto p_scale_result = make_static_distributed_tensor<PScaleDataType>(
                 Policy::template MakePScaleRegTileDistribution<Problem>());
 
@@ -661,7 +668,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             using WG = remove_cvref_t<decltype(config.template at<0>())>;
 
             cast_tile_mx<kVScaleGranularity, WG::WarpGemmAttribute::Impl::kAMLane>(
-                p_result, p_scale_result, p_norm);
+                p_result, p_scale_result, p_compute);
 
             const auto& p       = p_result;
             const auto& p_scale = p_scale_result;
@@ -707,7 +714,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 }
             }
 
-            // Prefetch K sub-tile[0] for next iteration during GEMM1 drain
+            // Prefetch K sub-tile[0] for next iteration (after GEMM1 frees VGPRs)
             if(i_total_loops + 1 < num_total_loop)
             {
                 k_dram_window = make_tile_window(
@@ -721,7 +728,27 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
         } while(++i_total_loops < num_total_loop);
 
-        // Normalize O (includes inv_p_scale_factor correction)
+        // Normalize O
+#if CK_TILE_FMHA_FWD_FAST_EXP2
+        // l already includes p_scale_factor (absorbed into exp2 exponent)
+        constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+        sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
+            constexpr auto i_idx = make_tuple(idx0);
+            const auto tmp       = [&]() {
+                if constexpr(FmhaMask::IsMasking ||
+                             BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
+                {
+                    return l[i_idx] == 0.f ? 0.f : 1.0f / l[i_idx];
+                }
+                else
+                    return 1.0f / l[i_idx];
+            }();
+            sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
+                constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                o_acc(i_j_idx) *= tmp;
+            });
+        });
+#else
         const float inv_p_scale_factor = 1.0f / p_scale_factor;
         constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
         sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
@@ -741,6 +768,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 o_acc(i_j_idx) *= tmp;
             });
         });
+#endif
 
         o_acc = tile_elementwise_in(o_acc_element_func, o_acc);
 
