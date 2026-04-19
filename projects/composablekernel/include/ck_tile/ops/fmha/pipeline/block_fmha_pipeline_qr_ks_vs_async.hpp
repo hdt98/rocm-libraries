@@ -438,7 +438,7 @@ struct BlockFmhaPipelineQRKSVSAsync
                 move_tile_window(bias_dram_window, {0, kN0});
                 if constexpr(kHasDropout)
                 {
-                    dropout.Move(randval_dram_window, kN0);
+                    move_tile_window(randval_dram_window, {0, kN0});
                 }
                 continue;
             }
