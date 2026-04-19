@@ -57,7 +57,7 @@ protected:
         this->GetParam();
         
         cfsb::SetUpImpl(conv_config, tensor_layout);
-        if(cfsb::test_skipped) { MIOPEN_LOG_E("skipped from base"); return; }
+        if(cfsb::test_skipped) { return; }
 
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         int dim    = cfsb::output.desc.GetNumDims() - 2;
