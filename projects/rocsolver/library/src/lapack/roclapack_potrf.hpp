@@ -79,22 +79,23 @@ template <bool BATCHED, bool STRIDED, typename T, typename I>
 void rocsolver_potrf_getMemorySize(const I n,
                                    const rocblas_fill uplo,
                                    const I batch_count,
-                                   size_t* size_scalars,
-                                   size_t* size_work1,
-                                   size_t* size_work2,
-                                   size_t* size_work3,
-                                   size_t* size_work4,
-                                   size_t* size_pivots,
-                                   size_t* size_iinfo,
+
+                                   size_t* p_size_scalars,
+                                   size_t* p_size_work1,
+                                   size_t* p_size_work2,
+                                   size_t* p_size_work3,
+                                   size_t* p_size_work4,
+                                   size_t* p_size_pivots,
+                                   size_t* p_size_iinfo,
                                    bool* optim_mem)
 {
-    *size_scalars = 0;
-    *size_work1 = 0;
-    *size_work2 = 0;
-    *size_work3 = 0;
-    *size_work4 = 0;
-    *size_pivots = 0;
-    *size_iinfo = 0;
+    *p_size_scalars = 0;
+    *p_size_work1 = 0;
+    *p_size_work2 = 0;
+    *p_size_work3 = 0;
+    *p_size_work4 = 0;
+    *p_size_pivots = 0;
+    *p_size_iinfo = 0;
     *optim_mem = true;
 
     // if quick return no need of workspace
@@ -103,30 +104,41 @@ void rocsolver_potrf_getMemorySize(const I n,
         return;
     }
 
-    I nb = potrf_get_block_size<T>(n);
+    I const nb = potrf_get_block_size<T>(n);
     if(n <= POTRF_POTF2_SWITCHSIZE(T))
     {
         // requirements for calling a single POTF2
-        rocsolver_potf2_getMemorySize<T>(n, batch_count, size_scalars, size_work1, size_pivots);
-        *size_work2 = 0;
-        *size_work3 = 0;
-        *size_work4 = 0;
-        *size_iinfo = 0;
+        rocsolver_potf2_getMemorySize<T>(n, batch_count, p_size_scalars, p_size_work1, p_size_pivots);
+        *p_size_work2 = 0;
+        *p_size_work3 = 0;
+        *p_size_work4 = 0;
+        *p_size_iinfo = 0;
         *optim_mem = true;
     }
     else
     {
-        I jb = nb;
-        size_t s1{}, s2{};
+        I const jb = nb;
+
+        size_t size_work1 = 0;
+        size_t size_work2 = 0;
+        size_t size_work3 = 0;
+        size_t size_work4 = 0;
 
         // size to store info about positiveness of each subblock
         if(use_iinfo)
         {
-            *size_iinfo = sizeof(I) * batch_count;
+            *p_size_iinfo = sizeof(I) * batch_count;
         }
 
         // requirements for calling POTF2 for the subblocks
-        rocsolver_potf2_getMemorySize<T>(jb, batch_count, size_scalars, &s1, size_pivots);
+        {
+            size_t lsize_work1 = 0;
+
+            rocsolver_potf2_getMemorySize<T>(jb, batch_count, p_size_scalars, &lsize_work1,
+                                             p_size_pivots);
+
+            size_work1 = std::max(size_work1, lsize_work1);
+        }
 
         // extra requirements for calling TRSM
         if(uplo == rocblas_fill_upper)
@@ -139,15 +151,38 @@ void rocsolver_potrf_getMemorySize(const I n,
                 // ----------------------------------
                 // U12 = U11' \ A12, note U12 has size n1 by n2
                 // ----------------------------------
+
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
                 (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
                     rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
-                    &s2, size_work2, size_work3, size_work4, optim_mem);
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
             }
             else
             {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
                 (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                    rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb,
-                    batch_count, &s2, size_work2, size_work3, size_work4, optim_mem);
+                    rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
             }
         }
         else
@@ -161,19 +196,45 @@ void rocsolver_potrf_getMemorySize(const I n,
                 // L21 = A21 / L11',  note L21 has size n2 by n1
                 // ----------------------------------
 
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
                 (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
                     rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1, batch_count,
-                    &s2, size_work2, size_work3, size_work4, optim_mem);
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
             }
             else
             {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
                 (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
                     rocblas_side_right, rocblas_operation_conjugate_transpose, n - jb, jb,
-                    batch_count, &s2, size_work2, size_work3, size_work4, optim_mem);
+                    batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
             }
         }
 
-        *size_work1 = std::max(s1, s2);
+        *p_size_work1 = std::max(*p_size_work1, size_work1);
+        *p_size_work2 = std::max(*p_size_work2, size_work2);
+        *p_size_work3 = std::max(*p_size_work3, size_work3);
+        *p_size_work4 = std::max(*p_size_work4, size_work4);
     }
 }
 
