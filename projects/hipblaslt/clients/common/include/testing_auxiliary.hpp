@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (C) 2022-2025 Advanced Micro Devices, Inc.
+ * Copyright (C) 2022-2026 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -691,9 +691,7 @@ void testing_aux_matmul_set_get_attr(const Arguments& arg)
                                                           &sizeWritten),
                           HIPBLAS_STATUS_SUCCESS);
 
-    ASSERT_TRUE(
-        scale_mode_a_r
-        == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3); // validate round-trip
+    ASSERT_TRUE(scale_mode_a_r == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3); // validate round-trip
     ASSERT_TRUE(scale_mode_b_r == HIPBLASLT_MATMUL_MATRIX_SCALE_VEC16_UE4M3); // ditto
 
     hipStream_t stream;
@@ -1889,7 +1887,7 @@ void testing_aux_float8_func(const Arguments& arg)
         ASSERT_TRUE(c.__x == v.__x);
     }
 
-    // hipblaslt_f8 (OCP E4M3): ±0 = 0x00/0x80; canonical NaN = 0x7f/0xff; no Inf.
+    // hipblaslt_f8 (OCP E4M3): +-0 = 0x00/0x80; canonical NaN = 0x7f/0xff; no Inf.
     {
         hipblaslt_f8 v(f16);
         ASSERT_TRUE(f16 == static_cast<_Float16>(v));
@@ -1949,7 +1947,7 @@ void testing_aux_float8_func(const Arguments& arg)
         ASSERT_TRUE(c.__x == v.__x);
     }
 
-    // hipblaslt_bf8 (OCP E5M2): ±0; Inf 0x7c/0xfc; NaN when exp=max and mantissa non-zero.
+    // hipblaslt_bf8 (OCP E5M2): +-0; Inf 0x7c/0xfc; NaN when exp=max and mantissa non-zero.
     {
         hipblaslt_bf8 v(f16);
         ASSERT_TRUE(f16 == static_cast<_Float16>(v));
@@ -3118,9 +3116,9 @@ void testing_aux_tensile_host_func(const Arguments& arg)
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_xf32)
                 == rocisa::DataType::XFloat32);
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f16)
-                == rocisa::DataType::Half);
+                == rocisa::DataType::Float);
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_bf16)
-                == rocisa::DataType::BFloat16);
+                == rocisa::DataType::Float);
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f16) == rocisa::DataType::Float);
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32) == rocisa::DataType::Float);
     ASSERT_TRUE(rocComputeType_to_tensile_type(rocblaslt_compute_f32_fast_f8_fnuz)
