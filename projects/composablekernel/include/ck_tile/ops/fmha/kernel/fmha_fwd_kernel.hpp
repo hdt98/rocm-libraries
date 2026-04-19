@@ -2266,36 +2266,35 @@ struct FmhaFwdKernel
                             return ck_tile::scales<remove_cvref_t<decltype(scale_o)>>{scale_o};
                     }();
 
-                    return FmhaPipeline{}(q_dram_window,
-                                          identity{}, // q_element_func
-                                          k_dram_window,
-                                          identity{}, // k_element_func
-                                          v_dram_window,
-                                          identity{}, // v_element_func
-                                          bias_dram_window,
-                                          identity{}, // bias_element_func
-                                          randval_dram_window,
-                                          lse_dram_window,
-                                          identity{},               // lse_element_func
-                                          scales<float>{1.0f},      // s_acc_element_func
-                                          scales<remove_cvref_t<decltype(scale_p)>>{
-                                              scale_p},       // p_compute_element_func
-                                          o_acc_element_func, // o_acc_element_func
-                                          mask,
-                                          position_encoding,
-                                          fused_scale_s,
-                                          variant,
-                                          variant_params,
-                                          block_indices,
-                                          smem_ptr,
-                                          dropout,
-                                          k_descale_ptr,
-                                          v_descale_ptr,
-                                          kN0,
-                                          make_null_tile_window(make_tuple()),
-                                          make_null_tile_window(make_tuple()),
-                                          make_null_tile_window(make_tuple()),
-                                          sink_value);
+                    return invoke_fmha_pipeline(q_dram_window,
+                                                identity{}, // q_element_func
+                                                k_dram_window,
+                                                identity{}, // k_element_func
+                                                v_dram_window,
+                                                identity{}, // v_element_func
+                                                bias_dram_window,
+                                                identity{}, // bias_element_func
+                                                randval_dram_window,
+                                                lse_dram_window,
+                                                identity{},               // lse_element_func
+                                                scales<float>{1.0f},      // s_acc_element_func
+                                                scales<remove_cvref_t<decltype(scale_p)>>{
+                                                    scale_p},       // p_compute_element_func
+                                                o_acc_element_func, // o_acc_element_func
+                                                mask,
+                                                position_encoding,
+                                                fused_scale_s,
+                                                variant,
+                                                variant_params,
+                                                block_indices,
+                                                smem_ptr,
+                                                dropout,
+                                                k_descale_ptr,
+                                                v_descale_ptr,
+                                                kN0,
+                                                make_null_tile_window(make_tuple()),
+                                                make_null_tile_window(make_tuple()),
+                                                make_null_tile_window(make_tuple()));
                 }
                 else
                 {
