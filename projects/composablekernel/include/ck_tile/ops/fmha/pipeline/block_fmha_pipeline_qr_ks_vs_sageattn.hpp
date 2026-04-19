@@ -172,7 +172,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                float p_scale_factor,
                const float sink_v,
                const int32_t* k_scale_packed_ptr = nullptr,
-               const int32_t* v_scale_packed_ptr = nullptr) const
+               const int32_t* v_scale_packed_ptr = nullptr,
+               const float* delta_s_raw_ptr = nullptr) const
     {
         (void)p_compute_element_func;
         (void)randval_dram_block_window_tmp;
@@ -310,15 +311,22 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                              Policy::template MakeQScaleRegTileDistribution<Problem>());
         auto q_scale = load_tile(q_scale_dram_window);
 
-        const auto delta_s_origin = delta_s_dram_block_window_tmp.get_window_origin();
-        auto delta_s_dram_window =
-            make_tile_window(delta_s_dram_block_window_tmp.get_bottom_tensor_view(),
-                             delta_s_dram_block_window_tmp.get_window_lengths(),
-                             {delta_s_origin.at(number<0>{}), seqlen_k_start},
-                             Policy::template MakeBiasDramTileDistribution<decltype(gemm_0)>());
+        (void)delta_s_dram_block_window_tmp;
+
+        // delta_s: manual buffer load (4 unique values per thread vs 62 from load_tile)
+        using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
+        constexpr index_t kCNLane0       = BlockGemm0::WarpGemm::WarpGemmAttribute::Impl::kCNLane;
+        constexpr index_t kNIterPerWarp0 = BlockGemm0::NIterPerWarp;
+        constexpr index_t kCMPerLane0    = BlockGemm0::CMPerLane;
+        constexpr index_t kMIterPerWarp0 = BlockGemm0::MIterPerWarp;
+
+        auto delta_s_res = make_wave_buffer_resource(
+            delta_s_raw_ptr != nullptr ? delta_s_raw_ptr
+                                       : reinterpret_cast<const float*>(smem_ptr));
 
         // Packed K/V scale: dwordx4 loading
         const index_t k_group = get_lane_id() / 32;
+        const index_t lane_n  = get_lane_id() % kCNLane0;
 
         auto k_scale_res = make_wave_buffer_resource(
             k_scale_packed_ptr != nullptr ? k_scale_packed_ptr
@@ -381,8 +389,19 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
                 __builtin_amdgcn_sched_barrier(0);
 
-            const auto delta_s_tile = load_tile(delta_s_dram_window);
-            move_tile_window(delta_s_dram_window, {0, kN0});
+            // Load 4 unique delta_s values (replaces 62× redundant buffer_load_dword)
+            float delta_s_unique[kNIterPerWarp0];
+            {
+                const index_t delta_s_byte_base = static_cast<index_t>(
+                    (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
+                static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
+                    const index_t byte_offset = delta_s_byte_base +
+                        static_cast<index_t>((ni * kCNLane0 + lane_n) * sizeof(float));
+                    delta_s_unique[ni] = bit_cast<float>(
+                        llvm_amdgcn_raw_buffer_load_i32(
+                            delta_s_res, byte_offset, 0, 0));
+                });
+            }
 
             // GEMM0 uses KIterPerWarp=1, so each call gets 1 packed int32
             auto run_gemm_0_packed = [&](auto i_k0, const int32_t* k_scale_arr) {
@@ -425,13 +444,20 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
             s_acc = tile_elementwise_in(s_acc_element_func, s_acc);
 
-            // Add delta_s correction
+            // Add delta_s correction via thread buffer direct access
+            // s_acc buffer layout: [MIterPerWarp][NIterPerWarp][CMPerLane]
+            // nIter determines which unique delta_s value to use
             {
-                constexpr auto s_spans = decltype(s_acc)::get_distributed_spans();
-                sweep_tile_span(s_spans[number<0>{}], [&](auto idx0) {
-                    sweep_tile_span(s_spans[number<1>{}], [&](auto idx1) {
-                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        s_acc(i_j_idx) += type_convert<SaccDataType>(delta_s_tile[i_j_idx]);
+                auto& s_acc_buf = s_acc.get_thread_buffer();
+                static_for<0, kMIterPerWarp0, 1>{}([&](auto mIter) {
+                    static_for<0, kNIterPerWarp0, 1>{}([&](auto nIter) {
+                        static_for<0, kCMPerLane0, 1>{}([&](auto mi) {
+                            constexpr index_t buf_idx =
+                                mIter * kNIterPerWarp0 * kCMPerLane0 +
+                                nIter * kCMPerLane0 + mi;
+                            s_acc_buf(number<buf_idx>{}) +=
+                                type_convert<SaccDataType>(delta_s_unique[nIter]);
+                        });
                     });
                 });
             }

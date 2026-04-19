@@ -2281,7 +2281,8 @@ struct FmhaFwdKernel
                                           kargs.p_scale_factor,
                                           sink_value,
                                           k_scale_packed_ptr,
-                                          v_scale_packed_ptr);
+                                          v_scale_packed_ptr,
+                                          delta_s_base);
                 }
                 else
                 {
