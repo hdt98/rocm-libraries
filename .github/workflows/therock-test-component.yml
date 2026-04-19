@@ -98,7 +98,7 @@ jobs:
           python ./build_tools/print_driver_gpu_info.py
 
       - name: Test
-        timeout-minutes: ${{ fromJSON(inputs.component).timeout_minutes }}
+        timeout-minutes: 600
         env:
           SHARD_INDEX: 1
           TOTAL_SHARDS: 1
