@@ -88,6 +88,14 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeKScaleRegTileDistributionPackedInt32()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetQKBlockGemm<Problem>())>;
+
+        return BlockGemm::MakeBScaleBlockTileDistributionPackedInt32();
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetQKBlockGemm()
     {
         using GemmProblem =
@@ -135,7 +143,7 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                 constexpr auto AttrNumAccess = std::is_same_v<typename Problem::PDataType, pk_fp4_t>
                                                    ? WGAttrNumAccessEnum::Single
                                                    : WGAttrNumAccessEnum::Double;
-                using WarpGemm =
+                using WarpGemm_KV =
                     WarpGemmDispatcher<typename Problem::PDataType,
                                        typename Problem::VDataType,
                                        typename Problem::OaccDataType,
@@ -146,10 +154,17 @@ struct BlockFmhaPipelineQXCustomPolicy</* QLoadOnce = */ true>
                                        false, // SwizzleA
                                        false,
                                        AttrNumAccess>;
-                // fp8: kABKPerLane / WGAttrNumAccessEnum::Double = 16
-                // fp4: kABKPerLane / WGAttrNumAccessEnum::Single = 32
-                return WarpGemm::WarpGemmAttribute::Impl::kABKPerLane /
-                       WarpGemm::WarpGemmAttribute::AttrNumAccessV;
+                constexpr index_t base = WarpGemm_KV::WarpGemmAttribute::Impl::kABKPerLane /
+                                         WarpGemm_KV::WarpGemmAttribute::AttrNumAccessV;
+                // SA3: boost to 4*CMPerLane for OPSEL scale cycling
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3)
+                {
+                    using Impl_QK = typename decltype(warp_gemm)::WarpGemmAttribute::Impl;
+                    constexpr index_t cm = Impl_QK::kCM0PerLane * Impl_QK::kCM1PerLane;
+                    return max(base, index_t{4} * cm);
+                }
+                else
+                    return base;
             }();
 
             using BlockGemmPolicy = BlockGemmMxARegBSmemCRegV1CustomPolicy<
@@ -1090,6 +1105,14 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
     }
 
     template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeVScaleRegTileDistributionPackedInt32()
+    {
+        using BlockGemm = remove_cvref_t<decltype(GetKVBlockGemm<Problem>())>;
+
+        return BlockGemm::MakeBScaleBlockTileDistributionPackedInt32();
+    }
+
+    template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetKVBlockGemm()
     {
         using GemmProblem =
@@ -1138,7 +1161,19 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
                 typename Problem::BlockFmhaShape::Gemm1BlockWarps,
                 decltype(warp_gemm)>;
 
-            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy>{};
+            // SA3: boost TargetCMPerLane for OPSEL scale cycling
+            constexpr index_t KVTargetCMPerLane = [&]() {
+                if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3)
+                {
+                    using Impl_KV = typename decltype(warp_gemm)::WarpGemmAttribute::Impl;
+                    constexpr index_t cm = Impl_KV::kCM0PerLane * Impl_KV::kCM1PerLane;
+                    return index_t{4} * cm;
+                }
+                else
+                    return index_t{-1};
+            }();
+            return BlockGemmMxARegBSmemCRegV1<GemmProblem, BlockGemmPolicy,
+                                              KVTargetCMPerLane>{};
         }
         else
         {

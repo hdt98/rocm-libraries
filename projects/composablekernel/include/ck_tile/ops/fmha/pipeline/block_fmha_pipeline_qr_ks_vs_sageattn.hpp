@@ -170,7 +170,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                const VScaleDramBlockWindowTmp& v_scale_dram_block_window_tmp,
                const DeltaSDramBlockWindowTmp& delta_s_dram_block_window_tmp,
                float p_scale_factor,
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* k_scale_packed_ptr = nullptr,
+               const int32_t* v_scale_packed_ptr = nullptr) const
     {
         (void)p_compute_element_func;
         (void)randval_dram_block_window_tmp;
@@ -178,6 +180,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         (void)lse_element_func;
         (void)dropout;
         (void)sink_v;
+        (void)k_scale_dram_block_window_tmp;
+        (void)v_scale_dram_block_window_tmp;
 
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
@@ -306,23 +310,40 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                              Policy::template MakeQScaleRegTileDistribution<Problem>());
         auto q_scale = load_tile(q_scale_dram_window);
 
-        auto k_scale_dram_block_window =
-            make_tile_window(k_scale_dram_block_window_tmp.get_bottom_tensor_view(),
-                             k_scale_dram_block_window_tmp.get_window_lengths(),
-                             {seqlen_k_start, 0});
-
-        auto v_scale_dram_window =
-            make_tile_window(v_scale_dram_block_window_tmp.get_bottom_tensor_view(),
-                             v_scale_dram_block_window_tmp.get_window_lengths(),
-                             {0, seqlen_k_start / kVScaleGranularity},
-                             Policy::template MakeVScaleRegTileDistribution<Problem>());
-
         const auto delta_s_origin = delta_s_dram_block_window_tmp.get_window_origin();
         auto delta_s_dram_window =
             make_tile_window(delta_s_dram_block_window_tmp.get_bottom_tensor_view(),
                              delta_s_dram_block_window_tmp.get_window_lengths(),
                              {delta_s_origin.at(number<0>{}), seqlen_k_start},
                              Policy::template MakeBiasDramTileDistribution<decltype(gemm_0)>());
+
+        // Packed K/V scale: dwordx4 loading
+        const index_t k_group = get_lane_id() / 32;
+
+        auto k_scale_res = make_wave_buffer_resource(
+            k_scale_packed_ptr != nullptr ? k_scale_packed_ptr
+                                          : reinterpret_cast<const int32_t*>(smem_ptr));
+        auto v_scale_res = make_wave_buffer_resource(
+            v_scale_packed_ptr != nullptr ? v_scale_packed_ptr
+                                          : reinterpret_cast<const int32_t*>(smem_ptr));
+
+        index_t scale_pair_idx = (seqlen_k_start / kN0) / 2;
+
+        auto load_k_scale_dwordx4 = [&](index_t pair_idx) {
+            return llvm_amdgcn_raw_buffer_load_i32x4(
+                k_scale_res,
+                static_cast<index_t>((pair_idx * 8 + k_group * 4) * sizeof(int32_t)),
+                0, 0);
+        };
+        auto load_v_scale_dwordx4 = [&](index_t pair_idx) {
+            return llvm_amdgcn_raw_buffer_load_i32x4(
+                v_scale_res,
+                static_cast<index_t>((pair_idx * 8 + k_group * 4) * sizeof(int32_t)),
+                0, 0);
+        };
+
+        int32x4_t k_scale_4 = load_k_scale_dwordx4(scale_pair_idx);
+        int32x4_t v_scale_4 = load_v_scale_dwordx4(scale_pair_idx);
 
         index_t i_total_loops      = 0;
         constexpr index_t k0_loops = kQKHeaddim / kK0;
@@ -332,22 +353,19 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         static_assert(1 <= k1_loops);
         do
         {
+            // Select K scale for this block from dwordx4
+            const index_t block_in_pair = i_total_loops % 2;
+            const int32_t k_scale_ki0 =
+                (block_in_pair == 0) ? k_scale_4[0] : k_scale_4[2];
+            const int32_t k_scale_ki1 =
+                (block_in_pair == 0) ? k_scale_4[1] : k_scale_4[3];
+
             // STAGE 1: QK GEMM
             auto k_dram_window = make_tile_window(
                 k_dram_block_window.get_bottom_tensor_view(),
                 k_dram_block_window.get_window_lengths(),
                 k_dram_block_window.get_window_origin(),
                 Policy::template MakeKDramTileDistribution<Problem>());
-            auto k_scale_dram_window =
-                make_tile_window(k_scale_dram_block_window.get_bottom_tensor_view(),
-                                 k_scale_dram_block_window.get_window_lengths(),
-                                 k_scale_dram_block_window.get_window_origin(),
-                                 Policy::template MakeKScaleRegTileDistribution<Problem>());
-            auto load_k_scale_block_tile = [&] {
-                auto t = load_tile(k_scale_dram_window);
-                move_tile_window(k_scale_dram_window, {0, kK0 / kQKScaleGranularity});
-                return t;
-            };
 
             auto k_block_tile = load_tile(k_dram_window);
             {
@@ -356,7 +374,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
                 k_block_tile = load_tile(k_dram_window);
             }
-            auto k_scale_block_tile = load_k_scale_block_tile();
 
             if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
                 __builtin_amdgcn_sched_barrier(0);
@@ -367,38 +384,42 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             const auto delta_s_tile = load_tile(delta_s_dram_window);
             move_tile_window(delta_s_dram_window, {0, kN0});
 
-            auto run_gemm_0 = [&](auto i_k0) {
+            // GEMM0 uses KIterPerWarp=1, so each call gets 1 packed int32
+            auto run_gemm_0_packed = [&](auto i_k0, const int32_t* k_scale_arr) {
                 auto q_slice = get_slice_tile(
                     q_tile, sequence<0, i_k0 * kK0>{}, sequence<kM0, (i_k0 + 1) * kK0>{});
                 auto q_scale_slice =
                     get_slice_tile(q_scale,
                                    sequence<0, i_k0*(kK0 / kQKScaleGranularity)>{},
                                    sequence<kM0, (i_k0 + 1) * (kK0 / kQKScaleGranularity)>{});
-                gemm_0(s_acc, q_slice, q_scale_slice, k_lds_window, k_scale_block_tile);
+                gemm_0(s_acc, q_slice, q_scale_slice, k_lds_window, k_scale_arr);
             };
+
+            // K scale: 1 int32 per k0_iter (KIterPerWarp=1 for GEMM0)
+            const int32_t k_scale_arr_k0_0[1] = {k_scale_ki0};
+            const int32_t k_scale_arr_k0_1[1] = {k_scale_ki1};
 
             if constexpr(k0_loops > 2)
             {
                 static_for<0, k0_loops - 2, 1>{}([&](auto i_k0) {
                     block_sync_lds();
-                    run_gemm_0(number<i_k0>{});
+                    const int32_t k_arr[1] = {(i_k0 == 0) ? k_scale_ki0 : k_scale_ki1};
+                    run_gemm_0_packed(number<i_k0>{}, k_arr);
                     block_sync_lds();
                     move_tile_window(k_dram_window, {0, kK0});
                     store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
-                    k_block_tile        = load_tile(k_dram_window);
-                    k_scale_block_tile  = load_k_scale_block_tile();
+                    k_block_tile = load_tile(k_dram_window);
                 });
             }
 
             const auto v_prefetch = load_tile(v_dram_window);
             {
                 block_sync_lds();
-                run_gemm_0(number<k0_loops - 2>{});
+                run_gemm_0_packed(number<k0_loops - 2>{}, k_scale_arr_k0_0);
                 block_sync_lds();
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
-                k_scale_block_tile = load_k_scale_block_tile();
                 block_sync_lds();
-                run_gemm_0(number<k0_loops - 1>{});
+                run_gemm_0_packed(number<k0_loops - 1>{}, k_scale_arr_k0_1);
             }
 
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
@@ -583,12 +604,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             store_tile(v_lds_window, tile_elementwise_in(v_element_func, v_prefetch));
             move_tile_window(v_dram_window, {0, kK1});
 
-            auto load_v_scale_block_tile = [&] {
-                auto t = load_tile(v_scale_dram_window);
-                move_tile_window(v_scale_dram_window, {0, kK1 / kVScaleGranularity});
-                return t;
+            // V scale from dwordx4: 2 int32 for this block (KIterPerWarp=2 for GEMM1)
+            const int32_t v_scale_arr[2] = {
+                (block_in_pair == 0) ? v_scale_4[0] : v_scale_4[2],
+                (block_in_pair == 0) ? v_scale_4[1] : v_scale_4[3]
             };
-            auto v_scale_block_tile = load_v_scale_block_tile();
 
             // Level-1 P scaling
             auto p_norm = make_static_distributed_tensor<SMPLComputeDataType>(
@@ -617,20 +637,16 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             const auto& p       = p_result;
             const auto& p_scale = p_scale_result;
 
-            // STAGE 3: PV GEMM
-            auto o_acc0 = OaccBlockTileType{};
-            clear_tile(o_acc0);
-
-            const float inv_p_scale_factor = 1.0f / p_scale_factor;
-
-            auto run_gemm_1 = [&](auto i_k1) {
+            // STAGE 3: PV GEMM — accumulate directly into o_acc
+            // GEMM1 KIterPerWarp=2: pass 2 int32 via v_scale_arr
+            auto run_gemm_1_packed = [&](auto i_k1) {
                 auto p_slice =
                     get_slice_tile(p, sequence<0, i_k1 * kK1>{}, sequence<kM0, (i_k1 + 1) * kK1>{});
                 auto p_scale_slice =
                     get_slice_tile(p_scale,
                                    sequence<0, i_k1*(kK1 / kVScaleGranularity)>{},
                                    sequence<kM0, (i_k1 + 1) * (kK1 / kVScaleGranularity)>{});
-                gemm_1(o_acc0, p_slice, p_scale_slice, v_lds_window, v_scale_block_tile);
+                gemm_1(o_acc, p_slice, p_scale_slice, v_lds_window, v_scale_arr);
             };
 
             if constexpr(k1_loops > 1)
@@ -638,33 +654,34 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 static_for<0, k1_loops - 1, 1>{}([&](auto i_k1) {
                     const auto v = load_tile(v_dram_window);
                     block_sync_lds();
-                    run_gemm_1(number<i_k1>{});
+                    run_gemm_1_packed(number<i_k1>{});
                     block_sync_lds();
                     store_tile(v_lds_window, tile_elementwise_in(v_element_func, v));
                     move_tile_window(v_dram_window, {0, kK1});
-                    v_scale_block_tile = load_v_scale_block_tile();
                 });
             }
             move_tile_window(k_dram_block_window, {kN0, 0});
-            move_tile_window(k_scale_dram_block_window, {kN0, 0});
             {
                 block_sync_lds();
-                run_gemm_1(number<k1_loops - 1>{});
+                run_gemm_1_packed(number<k1_loops - 1>{});
                 block_sync_lds();
             }
 
-            // Level-1 correction
-            constexpr auto o0_spans = decltype(o_acc0)::get_distributed_spans();
-            sweep_tile_span(o0_spans[number<0>{}], [&](auto idx0) {
-                sweep_tile_span(o0_spans[number<1>{}], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    o_acc(i_j_idx) += o_acc0(i_j_idx) * inv_p_scale_factor;
-                });
-            });
+            // Reload dwordx4 scale after processing second block of pair
+            if(block_in_pair == 1)
+            {
+                scale_pair_idx++;
+                if(i_total_loops + 1 < num_total_loop)
+                {
+                    k_scale_4 = load_k_scale_dwordx4(scale_pair_idx);
+                    v_scale_4 = load_v_scale_dwordx4(scale_pair_idx);
+                }
+            }
 
         } while(++i_total_loops < num_total_loop);
 
-        // Normalize O
+        // Normalize O (includes inv_p_scale_factor correction)
+        const float inv_p_scale_factor = 1.0f / p_scale_factor;
         constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
         sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
             constexpr auto i_idx = make_tuple(idx0);
@@ -672,10 +689,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 if constexpr(FmhaMask::IsMasking ||
                              BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
                 {
-                    return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
+                    return l[i_idx] == 0.f ? 0.f
+                                           : inv_p_scale_factor / l[i_idx];
                 }
                 else
-                    return 1 / l[i_idx];
+                    return inv_p_scale_factor / l[i_idx];
             }();
             sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
                 constexpr auto i_j_idx = make_tuple(idx0, idx1);

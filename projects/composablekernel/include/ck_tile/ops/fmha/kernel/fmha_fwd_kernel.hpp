@@ -223,6 +223,13 @@ struct FmhaFwdKernel
         ck_tile::index_t stride_delta_s;         // innermost stride (along seqlen_k)
         ck_tile::index_t nhead_stride_delta_s;
         ck_tile::index_t q_block_stride_delta_s; // stride along num_q_blocks dim
+
+        // Packed K/V scale for dwordx4 OPSEL loading
+        // Layout: [num_block_pairs, 2_k_groups, 4] int32 per (batch, head)
+        const int32_t* k_scale_packed_ptr = nullptr;
+        const int32_t* v_scale_packed_ptr = nullptr;
+        ck_tile::index_t nhead_stride_k_scale_packed = 0;
+        ck_tile::index_t nhead_stride_v_scale_packed = 0;
     };
 
     struct FmhaFwdBatchSageAttnV3Kargs : FmhaFwdCommonSageAttnV3Kargs
@@ -231,6 +238,8 @@ struct FmhaFwdKernel
         ck_tile::index_t batch_stride_k_descale;
         ck_tile::index_t batch_stride_v_descale;
         ck_tile::index_t batch_stride_delta_s;
+        ck_tile::index_t batch_stride_k_scale_packed = 0;
+        ck_tile::index_t batch_stride_v_scale_packed = 0;
     };
 
     struct FmhaFwdCommonLSEKargs
@@ -2225,6 +2234,24 @@ struct FmhaFwdKernel
                                                     number<FmhaPipeline::kN0>{}),
                                          {0, 0});
 
+                    // Packed K/V scale for dwordx4 OPSEL
+                    const int32_t* k_scale_packed_ptr =
+                        (kargs.k_scale_packed_ptr != nullptr)
+                            ? kargs.k_scale_packed_ptr +
+                                  static_cast<long_index_t>(i_nhead_k_) *
+                                      kargs.nhead_stride_k_scale_packed +
+                                  static_cast<long_index_t>(i_batch) *
+                                      kargs.batch_stride_k_scale_packed
+                            : nullptr;
+                    const int32_t* v_scale_packed_ptr =
+                        (kargs.v_scale_packed_ptr != nullptr)
+                            ? kargs.v_scale_packed_ptr +
+                                  static_cast<long_index_t>(i_nhead_k_) *
+                                      kargs.nhead_stride_v_scale_packed +
+                                  static_cast<long_index_t>(i_batch) *
+                                      kargs.batch_stride_v_scale_packed
+                            : nullptr;
+
                     return FmhaPipeline{}(q_dram_window,
                                           identity{}, // q_element_func
                                           k_dram_window,
@@ -2252,7 +2279,9 @@ struct FmhaFwdKernel
                                           v_scale_dram_window,
                                           delta_s_dram_window,
                                           kargs.p_scale_factor,
-                                          sink_value);
+                                          sink_value,
+                                          k_scale_packed_ptr,
+                                          v_scale_packed_ptr);
                 }
                 else
                 {

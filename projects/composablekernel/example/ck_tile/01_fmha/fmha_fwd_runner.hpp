@@ -999,6 +999,126 @@ fwd_result fmha_fwd_run(mode_enum mode,
         // delta_s = Q_mean @ K^T, small random values matching typical scale of attention scores
         ck_tile::FillUniformDistribution<float>{-0.5f, 0.5f, next_seed()}(delta_s_host);
     }
+
+    // SA3 OPSEL: repack K/V scale from [batch, nhead_k, seqlen, cols] e8m0
+    //   to [batch, nhead_k, num_block_pairs, 2_k_groups, 4] int32
+    constexpr ck_tile::index_t kN0_sa3       = 128;
+    constexpr ck_tile::index_t kABScaleKLane = 2;
+    constexpr ck_tile::index_t kNIterPerWarp = 4;
+
+    ck_tile::index_t k_scale_packed_size_per_head = 0;
+    ck_tile::index_t v_scale_packed_size_per_head = 0;
+    std::vector<int32_t> k_scale_packed_host;
+    std::vector<int32_t> v_scale_packed_host;
+
+    if constexpr(is_sageattnv3)
+    {
+        const ck_tile::index_t num_k_blocks =
+            ck_tile::integer_divide_ceil(shape_seqlen_k, kN0_sa3);
+        const ck_tile::index_t num_k_pairs =
+            ck_tile::integer_divide_ceil(num_k_blocks, 2);
+        const ck_tile::index_t k0_loops =
+            ck_tile::integer_divide_ceil(hdim_q, 64); // kK0=64 for 32x32x64
+
+        k_scale_packed_size_per_head = num_k_pairs * kABScaleKLane * 4;
+        k_scale_packed_host.resize(shape_batch * nhead_k * k_scale_packed_size_per_head, 0);
+
+        for(ck_tile::index_t b = 0; b < shape_batch; b++)
+        {
+            for(ck_tile::index_t h = 0; h < nhead_k; h++)
+            {
+                for(ck_tile::index_t pair = 0; pair < num_k_pairs; pair++)
+                {
+                    for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
+                    {
+                        for(ck_tile::index_t bip = 0; bip < 2; bip++)
+                        {
+                            ck_tile::index_t block = pair * 2 + bip;
+                            for(ck_tile::index_t ki = 0; ki < k0_loops; ki++)
+                            {
+                                int32_t packed = 0;
+                                ck_tile::index_t col = ki * kABScaleKLane + kg;
+                                for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
+                                {
+                                    ck_tile::index_t row = block * kN0_sa3 + ni * 32;
+                                    uint8_t byte_val     = 0;
+                                    if(row < shape_seqlen_k && col < hdim_q_scale)
+                                    {
+                                        byte_val = ck_tile::bit_cast<uint8_t>(
+                                            i_perm ? k_descale_host(b, h, row, col)
+                                                   : k_descale_host(b, row, h, col));
+                                    }
+                                    packed |= static_cast<int32_t>(byte_val) << (ni * 8);
+                                }
+                                ck_tile::index_t dst_idx =
+                                    (b * nhead_k + h) * k_scale_packed_size_per_head +
+                                    pair * (kABScaleKLane * 4) + kg * 4 +
+                                    bip * k0_loops + ki;
+                                k_scale_packed_host[dst_idx] = packed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // V scale repack: V is column-major, scale is [hdim_v, seqlen_v_scale]
+        // GEMM1: KIterPerWarp=2 for kK1=128, WarpGemm::kK=64
+        constexpr ck_tile::index_t kK1_gemm1         = 128;
+        constexpr ck_tile::index_t kKIterPerWarp_gemm1 = kK1_gemm1 / 64;
+
+        v_scale_packed_size_per_head = num_k_pairs * kABScaleKLane * 4;
+        v_scale_packed_host.resize(shape_batch * nhead_k * v_scale_packed_size_per_head, 0);
+
+        for(ck_tile::index_t b = 0; b < shape_batch; b++)
+        {
+            for(ck_tile::index_t h = 0; h < nhead_k; h++)
+            {
+                for(ck_tile::index_t pair = 0; pair < num_k_pairs; pair++)
+                {
+                    for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
+                    {
+                        for(ck_tile::index_t bip = 0; bip < 2; bip++)
+                        {
+                            ck_tile::index_t block = pair * 2 + bip;
+                            for(ck_tile::index_t ki = 0; ki < kKIterPerWarp_gemm1; ki++)
+                            {
+                                int32_t packed = 0;
+                                // V scale: [hdim_v, seqlen_k/kVScaleGranularity]
+                                // For GEMM1 iteration, the K-dim corresponds to
+                                // seqlen_k direction. Each outer-loop block advances
+                                // by kK1/kVScaleGranularity = 128/32 = 4 columns.
+                                ck_tile::index_t v_scale_col_base =
+                                    block * (kK1_gemm1 / kVScaleGranularity);
+                                ck_tile::index_t v_col =
+                                    v_scale_col_base + ki * kABScaleKLane + kg;
+                                for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
+                                {
+                                    // V scale N-dim = hdim_v direction
+                                    ck_tile::index_t v_row = ni * 32;
+                                    uint8_t byte_val       = 0;
+                                    if(v_row < hdim_v &&
+                                       v_col < shape_seqlen_v_scale)
+                                    {
+                                        byte_val = ck_tile::bit_cast<uint8_t>(
+                                            i_perm ? v_descale_host(b, h, v_row, v_col)
+                                                   : v_descale_host(b, v_row, h, v_col));
+                                    }
+                                    packed |= static_cast<int32_t>(byte_val) << (ni * 8);
+                                }
+                                ck_tile::index_t dst_idx =
+                                    (b * nhead_k + h) * v_scale_packed_size_per_head +
+                                    pair * (kABScaleKLane * 4) + kg * 4 +
+                                    bip * kKIterPerWarp_gemm1 + ki;
+                                v_scale_packed_host[dst_idx] = packed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     ck_tile::DeviceMem q_buf(q_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem k_buf(k_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem v_buf(v_host.get_element_space_size_in_bytes());
@@ -1050,6 +1170,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem block_table_buf(block_table_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem cache_batch_idx_buf(cache_batch_idx_host.get_element_space_size_in_bytes());
 
+    ck_tile::DeviceMem k_scale_packed_buf(k_scale_packed_host.size() * sizeof(int32_t));
+    ck_tile::DeviceMem v_scale_packed_buf(v_scale_packed_host.size() * sizeof(int32_t));
+
     q_buf.ToDevice(q_host.data());
     k_buf.ToDevice(k_host.data());
     v_buf.ToDevice(v_host.data());
@@ -1085,6 +1208,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
     alibi_slope_buf.ToDevice(alibi_slope_host.data());
     block_table_buf.ToDevice(block_table_host.data());
     cache_batch_idx_buf.ToDevice(cache_batch_idx_host.data());
+    if(!k_scale_packed_host.empty())
+        k_scale_packed_buf.ToDevice(k_scale_packed_host.data());
+    if(!v_scale_packed_host.empty())
+        v_scale_packed_buf.ToDevice(v_scale_packed_host.data());
 
     // clang-format off
     auto layout_str = [&](bool permute){
@@ -1443,6 +1570,21 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         args.q_block_stride_delta_s = shape_seqlen_k;
                         args.nhead_stride_delta_s   = num_q_blocks_sa3 * shape_seqlen_k;
                         args.batch_stride_delta_s   = nhead * num_q_blocks_sa3 * shape_seqlen_k;
+
+                        // Packed K/V scale for dwordx4 OPSEL
+                        if(!k_scale_packed_host.empty())
+                        {
+                            args.k_scale_packed_ptr = static_cast<const int32_t*>(
+                                k_scale_packed_buf.GetDeviceBuffer());
+                            args.v_scale_packed_ptr = static_cast<const int32_t*>(
+                                v_scale_packed_buf.GetDeviceBuffer());
+                            args.nhead_stride_k_scale_packed = k_scale_packed_size_per_head;
+                            args.nhead_stride_v_scale_packed = v_scale_packed_size_per_head;
+                            args.batch_stride_k_scale_packed =
+                                nhead_k * k_scale_packed_size_per_head;
+                            args.batch_stride_v_scale_packed =
+                                nhead_k * v_scale_packed_size_per_head;
+                        }
                     }
                 }
 

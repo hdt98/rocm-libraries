@@ -414,6 +414,14 @@ struct fmha_fwd_args
 
     ck_tile::index_t block_scale_size_q;
     ck_tile::index_t block_scale_size_kv;
+
+    // Packed K/V scale for dwordx4 OPSEL (SA3)
+    const int32_t* k_scale_packed_ptr          = nullptr;
+    const int32_t* v_scale_packed_ptr          = nullptr;
+    ck_tile::index_t nhead_stride_k_scale_packed = 0;
+    ck_tile::index_t nhead_stride_v_scale_packed = 0;
+    ck_tile::index_t batch_stride_k_scale_packed = 0;
+    ck_tile::index_t batch_stride_v_scale_packed = 0;
 };
 
 struct fmha_fwd_pagedkv_args
@@ -876,6 +884,13 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
         kargs.nhead_stride_delta_s   = args.nhead_stride_delta_s;
         kargs.batch_stride_delta_s   = args.batch_stride_delta_s;
         kargs.q_block_stride_delta_s = args.q_block_stride_delta_s;
+
+        kargs.k_scale_packed_ptr          = args.k_scale_packed_ptr;
+        kargs.v_scale_packed_ptr          = args.v_scale_packed_ptr;
+        kargs.nhead_stride_k_scale_packed = args.nhead_stride_k_scale_packed;
+        kargs.nhead_stride_v_scale_packed = args.nhead_stride_v_scale_packed;
+        kargs.batch_stride_k_scale_packed = args.batch_stride_k_scale_packed;
+        kargs.batch_stride_v_scale_packed = args.batch_stride_v_scale_packed;
     }
 
     if constexpr(FmhaKernel::kIsGroupMode)
