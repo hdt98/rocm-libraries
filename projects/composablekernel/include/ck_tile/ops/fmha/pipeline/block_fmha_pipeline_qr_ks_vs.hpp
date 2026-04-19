@@ -203,8 +203,10 @@ struct BlockFmhaPipelineQRKSVS
                    k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
                const VScaleDramBlockWindowTmp&
                    v_scale_dram_block_window_tmp, // N1*(K1/kVScaleGranularity) tile
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
+        (void)block_mask_row_ptr;
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
                 std::is_same_v<KDataType, remove_cvref_t<typename KDramBlockWindowTmp::DataType>> &&
@@ -791,18 +793,20 @@ struct BlockFmhaPipelineQRKSVS
 
             block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
             // l{j}, Oacc{j}
-            // Conditional rescaling: skip o_acc rescale when correction factor
-            // exp2(acc_scale_log2) is negligible (< exp2(-8) ≈ 0.004, below BF16
-            // precision). Adapted from FlashAttention-4 (Tri Dao, 2025).
+            // Conditional rescaling: skip o_acc rescale when the correction factor
+            // is negligible. exp2(-8) = 0.004, below BF16 minimum representable
+            // precision, so rescaling by less than this is a no-op at output precision.
+            // Adapted from FlashAttention-4 (Tri Dao, 2025).
             // Eliminates 70-90% of rescale operations in practice.
             static constexpr SMPLComputeDataType kRescaleThreshold =
                 type_convert<SMPLComputeDataType>(8.0f);
 
-            // Per-row P correction factor: 1.0 for rescale rows,
-            // exp2(m_j - m_{j-1}) for skip rows (to convert P from m_j to m_{j-1} frame)
             auto p_row_correction = make_static_distributed_tensor<SMPLComputeDataType>(
                 m.get_tile_distribution());
             set_tile(p_row_correction, type_convert<SMPLComputeDataType>(1.0f));
+            auto needs_p_correction = make_static_distributed_tensor<bool>(
+                m.get_tile_distribution());
+            set_tile(needs_p_correction, false);
 
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
@@ -843,10 +847,14 @@ struct BlockFmhaPipelineQRKSVS
                 }
                 else
                 {
+                    // Keep o_acc in m_old's frame (skip rescale).
+                    // P was computed in m_new's frame, so correct it by
+                    // exp2(m_new - m_old) before the PV GEMM (applied below).
                     const auto correction = exp2(-acc_scale_log2);
                     l(i_idx) = l[i_idx] + rowsum_p[i_idx] * correction;
                     m(i_idx) = m_old[i_idx];
                     p_row_correction(i_idx) = correction;
+                    needs_p_correction(i_idx) = true;
                 }
 #else
                 const auto diff = m_old[i_idx] - get_validated_m(m[i_idx]);
@@ -865,21 +873,25 @@ struct BlockFmhaPipelineQRKSVS
                 }
                 else
                 {
+                    // Keep o_acc in m_old's frame (skip rescale).
+                    // P was computed in m_new's frame, so correct it by
+                    // exp(m_new - m_old) before the PV GEMM (applied below).
                     const auto correction = exp(-diff);
                     l(i_idx) = l[i_idx] + rowsum_p[i_idx] * correction;
                     m(i_idx) = m_old[i_idx];
                     p_row_correction(i_idx) = correction;
+                    needs_p_correction(i_idx) = true;
                 }
 #endif
             });
 
-            // Apply per-row P correction for skip rows: convert P from
+            // Apply per-row P correction for skip-rescale rows: convert P from
             // m_j frame to m_{j-1} frame before the P*V GEMM.
             sweep_tile_span(p_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
-                const auto corr = p_row_correction[i_idx];
-                if(corr != type_convert<SMPLComputeDataType>(1.0f))
+                if(needs_p_correction[i_idx])
                 {
+                    const auto corr = p_row_correction[i_idx];
                     sweep_tile_span(p_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         p_compute(i_j_idx) *= corr;
@@ -1158,7 +1170,8 @@ struct BlockFmhaPipelineQRKSVS
                const BlockIndices& block_indices,
                void* smem_ptr,
                DropoutType& dropout,
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -1188,7 +1201,8 @@ struct BlockFmhaPipelineQRKSVS
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
                           make_null_tile_window(make_tuple()),
-                          sink_v);
+                          sink_v,
+                          block_mask_row_ptr);
     }
 };
 
