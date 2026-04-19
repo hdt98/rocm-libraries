@@ -4,18 +4,6 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
-
-#ifndef CK_TILE_FMHA_FWD_SW_EXP2
-#define CK_TILE_FMHA_FWD_SW_EXP2 0
-#endif
-
-#if CK_TILE_FMHA_FWD_SW_EXP2
-#include "ck_tile/core/numeric/software_exp2.hpp"
-#define CK_TILE_EXP2(x) ck_tile::exp2_fma(x)
-#else
-#define CK_TILE_EXP2(x) exp2(x)
-#endif
-
 #include "ck_tile/ops/fmha/block/block_attention_bias_enum.hpp"
 #include "ck_tile/ops/fmha/block/block_dropout.hpp"
 #include "ck_tile/ops/fmha/block/cast_tile_mx.hpp"
@@ -779,17 +767,17 @@ struct BlockFmhaPipelineQRKSVS
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        p_compute(i_j_idx) = CK_TILE_EXP2(s[i_j_idx] - validated_m);
+                        p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = CK_TILE_EXP2(s[i_j_idx] - validated_m);
+                            p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
                         }
                         else
                         {
-                            p_compute(i_j_idx) = CK_TILE_EXP2(scale_s * s[i_j_idx] - row_max);
+                            p_compute(i_j_idx) = exp2(scale_s * s[i_j_idx] - row_max);
                         }
                     }
 #else
@@ -846,7 +834,7 @@ struct BlockFmhaPipelineQRKSVS
 
                 if(need_rescale)
                 {
-                    const auto tmp = CK_TILE_EXP2(acc_scale_log2);
+                    const auto tmp = exp2(acc_scale_log2);
                     l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
@@ -855,7 +843,7 @@ struct BlockFmhaPipelineQRKSVS
                 }
                 else
                 {
-                    const auto correction = CK_TILE_EXP2(-acc_scale_log2);
+                    const auto correction = exp2(-acc_scale_log2);
                     l(i_idx) = l[i_idx] + rowsum_p[i_idx] * correction;
                     m(i_idx) = m_old[i_idx];
                     p_row_correction(i_idx) = correction;
