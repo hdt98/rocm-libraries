@@ -12,4 +12,3 @@ CMakeUserPresets.json
 
 # claude tmp files
 .nfs*
-build_fix/
