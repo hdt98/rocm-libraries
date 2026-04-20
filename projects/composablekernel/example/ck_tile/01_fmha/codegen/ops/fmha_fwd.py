@@ -856,7 +856,7 @@ class CompatibilityRuleFactory:
 
 
 class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
-    _AVAILABLE_PIPELINES = frozenset({"qr", "qr_async", "qs"})
+    _AVAILABLE_PIPELINES = frozenset({"qr", "qr_async", "qs", "qr_async_trload_v3"})
 
     @classmethod
     def get_rules(cls) -> List[CompatibilityRule]:
@@ -868,7 +868,7 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
             # FIX: too confusing that it has to know about mx types
             if problem_ctx.dtype not in ("fp32", "mxfp8", "mxfp4"):
                 # TODO: update if >=gfx11 archs get qr_async and qr_async_trload support
-                if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and (
+                if kernel_ctx.pipeline.tag in cls._AVAILABLE_PIPELINES and kernel_ctx.pipeline.tag != "qr_async_trload_v3" and (
                     (
                         (problem_ctx.hdim, problem_ctx.hdim_v) == (128, 128)
                         and kernel_ctx.tile.F_bn0 != 128
@@ -888,14 +888,27 @@ class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
                     return False
             return True
 
+        def check_v3_tile_pipeline(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            # only qr_async_trload_v3 use km0=256 & 8-warps
+            is_v3_dedicated_tile = (
+                kernel_ctx.tile.F_bm0 == 256
+                and (kernel_ctx.tile.F_rm0 * kernel_ctx.tile.F_rn0 * kernel_ctx.tile.F_rk0) == 8
+                and (kernel_ctx.tile.F_rm1 * kernel_ctx.tile.F_rn1 * kernel_ctx.tile.F_rk1) == 8
+            )  # fmt: skip
+            is_v3_pipeline = kernel_ctx.pipeline.tag == "qr_async_trload_v3"
+            return is_v3_dedicated_tile == is_v3_pipeline
+
         rules.append(check_hdim_tile)
+        rules.append(check_v3_tile_pipeline)
         return rules
 
 
 class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
     _AVAILABLE_PIPELINES = (
         CompatibilityRuleFactoryGfx9._AVAILABLE_PIPELINES
-        | frozenset({"qr_async_trload", "qr_async_trload_v3"})
+        | frozenset({"qr_async_trload"})
     )
 
     @classmethod
@@ -915,15 +928,7 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
                 )
             ):
                 return False
-
-            # only qr_async_trload_v3 use km0=256 & 8-warps
-            is_v3_dedicated_tile = (
-                kernel_ctx.tile.F_bm0 == 256
-                and (kernel_ctx.tile.F_rm0 * kernel_ctx.tile.F_rn0 * kernel_ctx.tile.F_rk0) == 8
-                and (kernel_ctx.tile.F_rm1 * kernel_ctx.tile.F_rn1 * kernel_ctx.tile.F_rk1) == 8
-            )  # fmt: skip
-            is_v3_pipeline = kernel_ctx.pipeline.tag == "qr_async_trload_v3"
-            return is_v3_dedicated_tile == is_v3_pipeline
+            return True
 
         rules.extend([check_tile_pipeline])
         return rules
@@ -979,7 +984,8 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                               FmhaFwdTileSize( 32,  32, 128, 128,  32, 128,  1, 1, 1,  1, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                               FmhaFwdTileSize( 64, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  16, 16, 32,  16, 16, 16,  -1, CppConstraint('get_num_blocks(64) <= num_cus')),
                               FmhaFwdTileSize(128,  64,  32, 128,  16, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-                              FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
+                              FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
+                              FmhaFwdTileSize(256,  32, 128, 128,  32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
               # (160, 160) : [FmhaFwdTileSize(128, 128 , 32, 160,  32, 160,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
                 (192, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 (192, 192) : [FmhaFwdTileSize(128, 128,  32, 192,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
@@ -1048,6 +1054,10 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                         pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     if receipt == 1 and bias != "bias":
                         pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip # TODO: cover arbitraty hdim# fmt: skip
+            if (hdim, hdim_v) == (128, 128):
+                for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
+                    pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
+                        F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
         elif dtype in cls._DT_FP8BF16 or dtype in cls._DT_FP8FP32:
             # no need lse/dropout kernels
             for logits, qscale, mask, bias, sink in itertools.product(
@@ -1085,13 +1095,7 @@ class KernelComponentFactoryGfx950(
     @classmethod
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
         result = KernelComponentFactoryGfx9.get_hdim_tile_size_dict(dtype)
-        if dtype in cls._DT_FP16_BF16:
-            # # add tile for qr_async_trload_v3 (bf16/fp16 V3 not ready)
-            # if (128, 128) in result.keys():
-            #     result[(128, 128)].append(
-            #         FmhaFwdTileSize(256, 32, 128, 128, 32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1))  # fmt: skip
-            pass
-        elif dtype in cls._DT_MXFP8:
+        if dtype in cls._DT_MXFP8:
             return {
                 #                             bm0, bn0, bk0, bn1, bk1,
                 (128, 128) : [FmhaFwdTileSize(128, 128,  64, 128,  64, 128,  4, 1, 1,  4, 1, 1,  32, 32,  64,  32, 32,  64,  -1)],
@@ -1136,12 +1140,6 @@ class KernelComponentFactoryGfx950(
                 ):
                     pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "t", sink))  # fmt: skip
                     pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "f", "f", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "t", sink))  # fmt: skip
-
-            # # qr_async_trload_v3 bf16/fp16 not ready
-            # if (hdim, hdim_v) == (128, 128):
-            #     for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
-            #         pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
-            #             F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
         elif dtype in cls._DT_FP8BF16:
             # qr_async_trload_v3 only supports (generic) causal mask
             for logits, qscale, mask in itertools.product(
