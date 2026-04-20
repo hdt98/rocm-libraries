@@ -3983,7 +3983,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                       << " strategy" << std::endl;
                         hipblaslt_cout << "  Problem: " << M[0] << "x" << N[0] << "x" << K[0]
                                       << ", CUs: " << num_CUs
-                                      << ", Target WGs/split: " << arg.target_wgs_per_split
+                                      << ", Splits: " << arg.num_splits
                                       << std::endl;
                         hipblaslt_cout << "  Splitting into " << subProblems.size()
                                       << " sub-problems:" << std::endl;
@@ -4142,9 +4142,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // Timed iterations - with optional fused dispatch
                         auto start_time = std::chrono::high_resolution_clock::now();
 
-                        // If fused_kernel is enabled, try fused dispatch first
                         bool used_fused_dispatch = false;
-                        if(arg.fused_kernel)
+                        if(false) // fused kernel removed
                         {
                             hipblaslt_cout << "\n*** Attempting fused kernel dispatch ***\n" << std::endl;
 
@@ -4242,7 +4241,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         // ===================================================================
 
                         bool used_stream_parallel = false;
-                        if(!used_fused_dispatch && arg.stream_parallel && subProblems.size() > 1)
+                        if(false) // stream-parallel removed
                         {
                             hipblaslt_cout << "\n=== Stream-Parallel Multi-MacroTile ===" << std::endl;
 
@@ -5072,7 +5071,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             auto start_time = std::chrono::high_resolution_clock::now();
             auto end_time = start_time;
 
-            if(arg.stream_parallel && subProblems.size() > 1)
+            if(false) // stream-parallel removed
             {
                 // === OPT 2 + 3: Stream-parallel with CU-mask partitioning + separate workspace ===
                 hipblaslt_cout << "\n=== Stream-Parallel Execution ===" << std::endl;

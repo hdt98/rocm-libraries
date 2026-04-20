@@ -187,12 +187,9 @@ struct Arguments
     bool multi_macrotile;
 
     // Multi-MacroTile options
-    int32_t split_strategy;      // 0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d
-    int32_t num_splits;           // Manual override for number of splits (0=auto)
-    int32_t target_wgs_per_split; // Target workgroups per split for optimization
-    bool fused_kernel;            // Use fused kernel dispatch instead of sequential launches
+    int32_t split_strategy;      // 17=M-split (Origami), 18=N-split (Origami)
+    int32_t num_splits;           // Number of sub-problems (default 2)
     bool l2_cache_hints;          // Enable L2 cache persistence hints for shared matrices
-    bool stream_parallel;         // Use stream-parallel execution for concurrent sub-problem execution
 
     /*************************************************************************
      *                     End Of Arguments                                  *
@@ -294,8 +291,7 @@ struct Arguments
     OPER(tensile_solution_selection_method) SEP \
     OPER(multi_macrotile) SEP        \
     OPER(split_strategy) SEP         \
-    OPER(num_splits) SEP             \
-    OPER(target_wgs_per_split) SEP
+    OPER(num_splits) SEP
 
     // clang-format on
 

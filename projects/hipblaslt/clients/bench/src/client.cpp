@@ -619,41 +619,20 @@ try
 
         ("multi_macrotile",
         value<bool>(&arg.multi_macrotile)->default_value(false),
-        "Split the GEMM matrix and solve with multiple kernels using different MacroTiles")
+        "Enable Origami-based multi-MacroTile split search. Splits GEMM into sub-problems, "
+        "empirically tests multiple split ratios, and picks the fastest.")
 
         ("split_strategy",
-        value<int32_t>(&arg.split_strategy)->default_value(0),
-        "Splitting strategy:\n"
-        "  0=auto, 1=workgroup, 2=memory, 3=m_only, 4=n_only, 5=2d,\n"
-        "  6=macrotile_align (non-uniform, MacroTile-aligned),\n"
-        "  7=power_of_2 (non-uniform, power-of-2 biased),\n"
-        "  8=cu_balanced (non-uniform, CU-balanced for stream-parallel),\n"
-        "  9=performance (non-uniform, performance-based),\n"
-        "  10=adaptive_power_of_2 (non-uniform, power-of-2 with balance check),\n"
-        "  15=cache_optimized_m (non-uniform, M-split optimized for L2 cache),\n"
-        "  16=cache_optimized_n (non-uniform, N-split optimized for L2 cache),\n"
-        "  17=origami_optimized_m (non-uniform, M-split optimized via Origami solution queries),\n"
-        "  18=origami_optimized_n (non-uniform, N-split optimized via Origami solution queries)")
+        value<int32_t>(&arg.split_strategy)->default_value(17),
+        "Split dimension: 17=M-split (default), 18=N-split")
 
         ("num_splits",
-        value<int32_t>(&arg.num_splits)->default_value(0),
-        "Number of splits (0=auto, 2-16=manual). Auto-selection recommended. Only used with --multi_macrotile")
-
-        ("target_wgs_per_split",
-        value<int32_t>(&arg.target_wgs_per_split)->default_value(256),
-        "Target workgroups per split for alignment optimization")
-
-        ("fused_kernel",
-        value<bool>(&arg.fused_kernel)->default_value(false),
-        "Use fused kernel dispatch to eliminate sequential launch overhead (experimental)")
+        value<int32_t>(&arg.num_splits)->default_value(2),
+        "Number of sub-problems (default 2). Only used with --multi_macrotile")
 
         ("l2_cache_hints",
         value<bool>(&arg.l2_cache_hints)->default_value(true),
-        "Enable L2 cache persistence hints for shared matrices in multi-MacroTile (reduces redundant memory reads)")
-
-        ("stream_parallel",
-        value<bool>(&arg.stream_parallel)->default_value(false),
-        "Use stream-parallel execution for concurrent sub-problem execution (high performance gain)")
+        "Enable L2 cache persistence hints for shared matrices in multi-MacroTile")
 
         ("help,h", "produces this help message")
 
