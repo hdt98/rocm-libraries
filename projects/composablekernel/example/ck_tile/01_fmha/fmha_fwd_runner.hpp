@@ -2196,9 +2196,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
             // Apply block sparsity mask to S for CPU reference validation
             if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
             {
-                ck_tile::index_t num_kv_blocks =
-                    (real_seqlen_k + block_mask_config.block_size_kv - 1) /
-                    block_mask_config.block_size_kv;
                 for(ck_tile::index_t h = 0; h < nhead; h++)
                 {
                     for(ck_tile::index_t qi = 0; qi < real_seqlen_q; qi++)

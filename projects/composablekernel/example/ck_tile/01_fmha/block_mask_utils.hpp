@@ -168,8 +168,8 @@ inline std::vector<int32_t> generate_checkerboard_block_mask(ck_tile::index_t nu
 // Main entry point: generate block mask based on config
 inline ck_tile::HostTensor<int32_t>
 generate_block_mask(const BlockMaskConfig& config,
-                    ck_tile::index_t batch,
-                    ck_tile::index_t nhead,
+                    ck_tile::index_t /*batch*/,
+                    ck_tile::index_t /*nhead*/,
                     ck_tile::index_t max_seqlen_q,
                     ck_tile::index_t max_seqlen_k,
                     uint32_t seed = 42)
@@ -185,6 +185,9 @@ generate_block_mask(const BlockMaskConfig& config,
 
     switch(config.pattern)
     {
+    case BlockMaskPattern::None:
+        single_mask.assign(num_q_blocks * num_kv_blocks, 1); // all active
+        break;
     case BlockMaskPattern::Random:
         single_mask =
             generate_random_block_mask(num_q_blocks, num_kv_blocks, config.ratio, seed);
@@ -204,7 +207,6 @@ generate_block_mask(const BlockMaskConfig& config,
         std::cerr << "File-based block mask not yet implemented" << std::endl;
         single_mask.assign(num_q_blocks * num_kv_blocks, 1); // fallback: all active
         break;
-    default: single_mask.assign(num_q_blocks * num_kv_blocks, 1); break;
     }
 
     // Create host tensor [num_q_blocks, num_kv_blocks]
