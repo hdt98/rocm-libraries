@@ -388,11 +388,11 @@ namespace
             return rocisa::DataType::Int8;
         case HIP_R_32I:
             return rocisa::DataType::Int32;
-        case HIP_R_6F_E2M3_EXT:
+        case HIP_R_6F_E2M3:
             return rocisa::DataType::Float6;
-        case HIP_R_6F_E3M2_EXT:
+        case HIP_R_6F_E3M2:
             return rocisa::DataType::BFloat6;
-        case HIP_R_4F_E2M1_EXT:
+        case HIP_R_4F_E2M1:
             return rocisa::DataType::Float4;
         case HIP_C_32F:
             return rocisa::DataType::ComplexFloat;
@@ -429,11 +429,11 @@ namespace
         case rocisa::DataType::Int32:
             return HIP_R_32I;
         case rocisa::DataType::Float6:
-            return static_cast<hipDataType>(HIP_R_6F_E2M3_EXT);
+            return static_cast<hipDataType>(HIP_R_6F_E2M3);
         case rocisa::DataType::BFloat6:
-            return static_cast<hipDataType>(HIP_R_6F_E3M2_EXT);
+            return static_cast<hipDataType>(HIP_R_6F_E3M2);
         case rocisa::DataType::Float4:
-            return static_cast<hipDataType>(HIP_R_4F_E2M1_EXT);
+            return static_cast<hipDataType>(HIP_R_4F_E2M1);
         case rocisa::DataType::ComplexFloat:
             return HIP_C_32F;
         case rocisa::DataType::ComplexDouble:

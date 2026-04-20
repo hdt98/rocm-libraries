@@ -941,16 +941,16 @@ try
     if(isBlockScaling(arg.scaleA))
     {
         if(arg.a_type != HIP_R_8F_E4M3 && arg.a_type != HIP_R_8F_E5M2
-           && arg.a_type != HIP_R_4F_E2M1_EXT && arg.a_type != HIP_R_6F_E2M3_EXT
-           && arg.a_type != HIP_R_6F_E3M2_EXT)
+           && arg.a_type != HIP_R_4F_E2M1 && arg.a_type != HIP_R_6F_E2M3
+           && arg.a_type != HIP_R_6F_E3M2)
             throw std::invalid_argument("Invalid a_type for block scaling format: "s
                                         + hip_datatype_to_string(arg.a_type));
     }
     if(isBlockScaling(arg.scaleB))
     {
         if(arg.b_type != HIP_R_8F_E4M3 && arg.b_type != HIP_R_8F_E5M2
-           && arg.b_type != HIP_R_4F_E2M1_EXT && arg.b_type != HIP_R_6F_E2M3_EXT
-           && arg.b_type != HIP_R_6F_E3M2_EXT)
+           && arg.b_type != HIP_R_4F_E2M1 && arg.b_type != HIP_R_6F_E2M3
+           && arg.b_type != HIP_R_6F_E3M2)
             throw std::invalid_argument("Invalid b_type for block scaling format: "s
                                         + hip_datatype_to_string(arg.b_type));
     }

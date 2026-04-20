@@ -248,12 +248,6 @@ inline rocisa::DataType hipDataType_to_tensile_type(hipDataType type)
         return rocisa::DataType::BFloat6;
     case HIP_R_4F_E2M1:
         return rocisa::DataType::Float4;
-    case HIP_R_4F_E2M1_EXT:
-        return rocisa::DataType::Float4;
-    case HIP_R_6F_E2M3_EXT:
-        return rocisa::DataType::Float6;
-    case HIP_R_6F_E3M2_EXT:
-        return rocisa::DataType::BFloat6;
     case HIP_C_32F:
         return rocisa::DataType::ComplexFloat;
     case HIP_C_64F:
