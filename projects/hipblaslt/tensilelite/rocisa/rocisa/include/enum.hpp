@@ -57,12 +57,8 @@ namespace rocisa
         Float6,
         BFloat6,
         Float4,
-<<<<<<< HEAD
-        MXScale,
-=======
         E8,
         E5M3,
->>>>>>> origin/develop
         Count,
         None = Count
     };
@@ -168,15 +164,10 @@ namespace rocisa
             return "BFloat6";
         case DataType::Float4:
             return "Float4";
-<<<<<<< HEAD
-        case DataType::MXScale:
-            return "MXScale";
-=======
         case DataType::E8:
             return "E8";
         case DataType::E5M3:
             return "E5M3";
->>>>>>> origin/develop
         default:
             return "Invalid";
         }
@@ -235,19 +226,6 @@ namespace rocisa
         INST_F6         = 42,
         INST_BF6        = 43,
         INST_F4         = 44,
-<<<<<<< HEAD
-        INST_F8_F6      = 45,
-        INST_F6_F8      = 46,
-        INST_F8_F4      = 47,
-        INST_F4_F8      = 48,
-        INST_F6_B6      = 49,
-        INST_B6_F6      = 50,
-        INST_F6_F4      = 51,
-        INST_F4_F6      = 52,
-        INST_B6_F4      = 53,
-        INST_F4_B6      = 55,
-        INST_NOTYPE     = 56
-=======
         INST_F8_F4      = 45,
         INST_F4_F8      = 46,
         INST_F6_F4      = 47,
@@ -271,7 +249,6 @@ namespace rocisa
         INST_E5M3       = 65,
         INST_TDM        = 66,
         INST_NOTYPE     = 67
->>>>>>> origin/develop
     };
 
     enum class SelectBit : int

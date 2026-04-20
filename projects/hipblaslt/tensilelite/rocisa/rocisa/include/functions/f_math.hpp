@@ -910,43 +910,6 @@ namespace rocisa
                                const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
                                const std::string&                        comment    = "");
 
-<<<<<<< HEAD
-    // Multiply by bpe (bytes per element)
-    // Handles fractional bpe values like 0.5, 0.75 for sub-byte data types
-    // product vgpr, operand vgpr, bpe
-    std::shared_ptr<Module>
-        vectorMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
-                          const std::shared_ptr<RegisterContainer>& operand,
-                          double                                    bpe,
-                          const std::string&                        comment = "");
-
-    // Multiply by bpe for 64-bit
-    // product vgpr, operand vgpr, bpe, tmpVgpr for 0.75 case
-    std::shared_ptr<Module>
-        vectorMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
-                            const std::shared_ptr<RegisterContainer>& operand,
-                            double                                    bpe,
-                            const std::optional<ContinuousRegister>&  tmpVgprRes = std::nullopt,
-                            const std::string&                        comment    = "");
-
-    // Scalar multiply by bpe (bytes per element)
-    // Handles fractional bpe values like 0.5, 0.75 for sub-byte data types
-    // product sgpr, operand sgpr, bpe
-    std::shared_ptr<Module>
-        scalarMultiplyBpe(const std::shared_ptr<RegisterContainer>& product,
-                          const std::shared_ptr<RegisterContainer>& operand,
-                          double                                    bpe,
-                          const std::string&                        comment = "");
-
-    // Scalar multiply by bpe for 64-bit
-    // product sgpr, operand sgpr, bpe, tmpSgpr for 0.75 case
-    std::shared_ptr<Module>
-        scalarMultiply64Bpe(const std::shared_ptr<RegisterContainer>& product,
-                            const std::shared_ptr<RegisterContainer>& operand,
-                            double                                    bpe,
-                            const std::optional<ContinuousRegister>&  tmpSgprRes = std::nullopt,
-                            const std::string&                        comment    = "");
-=======
     std::shared_ptr<Module>
         vectorAddMultiplyBpe(int dst,
                             int src0,
@@ -1089,5 +1052,4 @@ namespace rocisa
         }
         return module;
     }
->>>>>>> origin/develop
 } // namespace rocisa

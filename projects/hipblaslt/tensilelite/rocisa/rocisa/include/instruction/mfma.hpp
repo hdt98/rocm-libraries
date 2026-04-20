@@ -158,22 +158,6 @@ namespace rocisa
             case InstType::INST_F8_BF8:
                 return (variant[2] >= f8f6f4_k) ? "f8f6f4" : "fp8_bf8";
             case InstType::INST_BF8_F8:
-<<<<<<< HEAD
-                return variant[2] > 32 ? "f8f6f4" : "bf8_fp8";
-            case InstType::INST_F6:
-            case InstType::INST_BF6:
-            case InstType::INST_F4:
-            case InstType::INST_F8_F6:
-            case InstType::INST_F6_F8:
-            case InstType::INST_F8_F4:
-            case InstType::INST_F4_F8:
-            case InstType::INST_F6_B6:
-            case InstType::INST_B6_F6:
-            case InstType::INST_F6_F4:
-            case InstType::INST_F4_F6:
-            case InstType::INST_B6_F4:
-            case InstType::INST_F4_B6:
-=======
                 return (variant[2] >= f8f6f4_k) ? "f8f6f4" : "bf8_fp8";
             case InstType::INST_F6:
             case InstType::INST_BF6:
@@ -198,7 +182,6 @@ namespace rocisa
             case InstType::INST_F6_B8:
             case InstType::INST_B8_B6:
             case InstType::INST_B6_B8:
->>>>>>> origin/develop
                 return "f8f6f4";
             default:
                 std::string msg("Type not found");
@@ -246,12 +229,8 @@ namespace rocisa
             std::string negStr
                 = !neg ? "" : (getAsmCaps()["HasWMMA_V1"] ? " neg_lo:[1,1,1]" : " neg_lo:[1,1]");
             std::string inputPermuteStr = "";
-<<<<<<< HEAD
-            if(getAsmCaps()["HasMFMA_f8f6f4"] && variant[2] > 32)
-=======
             std::string scaleStr        = "";
             if(getAsmCaps()["HasMFMA_f8f6f4"])
->>>>>>> origin/develop
             {
                 switch(instType)
                 {
@@ -438,17 +417,17 @@ namespace rocisa
 
         MXMFMAInstruction(InstType                                  instType,
                           InstType                                  accType,
-                          InstType                                  mxScaleAType,
-                          InstType                                  mxScaleBType,
                           const std::vector<int>&                   variant,
                           const std::shared_ptr<RegisterContainer>& acc,
                           const std::shared_ptr<RegisterContainer>& a,
                           const std::shared_ptr<RegisterContainer>& b,
-                          const std::shared_ptr<RegisterContainer>& acc2,
-                          const std::shared_ptr<RegisterContainer>& mxsa,
-                          const std::shared_ptr<RegisterContainer>& mxsb,
-                          int                                       block,
-                          const std::string&                        comment = "")
+                          const std::shared_ptr<RegisterContainer>& acc2         = nullptr,
+                          const std::shared_ptr<RegisterContainer>& mxsa         = nullptr,
+                          const std::shared_ptr<RegisterContainer>& mxsb         = nullptr,
+                          InstType                                  mxScaleAType = InstType::INST_F32,
+                          InstType                                  mxScaleBType = InstType::INST_F32,
+                          int                                       block        = 0,
+                          const std::string&                        comment      = "")
             : Instruction(instType, comment)
             , accType(accType)
             , mxScaleAType(mxScaleAType)
@@ -457,7 +436,7 @@ namespace rocisa
             , acc(acc)
             , a(a)
             , b(b)
-            , acc2(acc2)
+            , acc2(acc2 ? acc2 : acc)
             , mxsa(mxsa)
             , mxsb(mxsb)
             , block(block)
@@ -493,19 +472,75 @@ namespace rocisa
 
         std::vector<InstructionInput> getParams() const override
         {
+            if(getAsmCaps()["HasMFMA"])
+                return {acc, a, b, acc2, mxsa, mxsb};
             return {acc, a, b, acc2, mxsa, mxsb, block};
         }
 
         std::string preStr() const override
         {
-            std::string variantStr = std::to_string(variant[0])
-                                     + "x" + std::to_string(variant[1])
-                                     + "x" + std::to_string(variant[2]);
-            std::string blkStr = (block == 16) ? "16" : "";
-            return "v_wmma_scale" + blkStr + "_f32_" + variantStr + "_" + typeConvert();
+            std::string variantStr = std::to_string(variant[0]) + "x"
+                                     + std::to_string(variant[1]) + "x"
+                                     + std::to_string(variant[2]);
+            if(getAsmCaps()["HasMFMA"])
+            {
+                return "v_mfma_scale_f32_" + variantStr + "_f8f6f4";
+            }
+            else
+            {
+                std::string blkStr = (block == 16) ? "16" : "";
+                return "v_wmma_scale" + blkStr + "_f32_" + variantStr + "_" + typeConvert();
+            }
         }
 
-        std::string getArgStr() const
+        std::string mfmaInputPermuteStr() const
+        {
+            if(getAsmCaps()["HasMFMA_f8f6f4"] && variant[2] > 32)
+            {
+                switch(instType)
+                {
+                case InstType::INST_F8:
+                    return " cbsz:0 blgp:0";
+                case InstType::INST_BF8:
+                    return " cbsz:1 blgp:1";
+                case InstType::INST_F8_BF8:
+                    return " cbsz:0 blgp:1";
+                case InstType::INST_BF8_F8:
+                    return " cbsz:1 blgp:0";
+                case InstType::INST_F6:
+                    return " cbsz:2 blgp:2";
+                case InstType::INST_BF6:
+                    return " cbsz:3 blgp:3";
+                case InstType::INST_F4:
+                    return " cbsz:4 blgp:4";
+                case InstType::INST_F8_F6:
+                    return " cbsz:0 blgp:2";
+                case InstType::INST_F6_F8:
+                    return " cbsz:2 blgp:0";
+                case InstType::INST_F8_F4:
+                    return " cbsz:0 blgp:4";
+                case InstType::INST_F4_F8:
+                    return " cbsz:4 blgp:0";
+                case InstType::INST_F6_B6:
+                    return " cbsz:2 blgp:3";
+                case InstType::INST_B6_F6:
+                    return " cbsz:3 blgp:2";
+                case InstType::INST_F6_F4:
+                    return " cbsz:2 blgp:4";
+                case InstType::INST_F4_F6:
+                    return " cbsz:4 blgp:2";
+                case InstType::INST_B6_F4:
+                    return " cbsz:3 blgp:4";
+                case InstType::INST_F4_B6:
+                    return " cbsz:4 blgp:3";
+                default:
+                    break;
+                }
+            }
+            return "";
+        }
+
+        std::string wmmaInputPermuteStr() const
         {
             constexpr size_t f4_t = 32;
             std::string inputPermuteStr = "";
@@ -617,8 +652,25 @@ namespace rocisa
                 break;
             }
 
-            return acc->toString() + ", " + a->toString() + ", " + b->toString() + ", "
-                   + acc2->toString() + ", " + mxsa->toString() + ", " + mxsb->toString() + inputPermuteStr;
+            return inputPermuteStr;
+        }
+
+        std::string getArgStr() const
+        {
+            if(getAsmCaps()["HasMFMA"])
+            {
+                std::string mxsaStr = mxsa ? mxsa->toString() : "";
+                std::string mxsbStr = mxsb ? mxsb->toString() : "";
+                return acc->toString() + ", " + a->toString() + ", " + b->toString() + ", "
+                       + acc2->toString() + ", " + mxsaStr + ", " + mxsbStr
+                       + mfmaInputPermuteStr();
+            }
+            else
+            {
+                return acc->toString() + ", " + a->toString() + ", " + b->toString() + ", "
+                       + acc2->toString() + ", " + mxsa->toString() + ", " + mxsb->toString()
+                       + wmmaInputPermuteStr();
+            }
         }
 
         std::string toString() const override
@@ -627,6 +679,14 @@ namespace rocisa
             std::string kStr       = newInstStr + " " + getArgStr();
             setMsb(kStr, {a, b, acc2}, acc);
             return formatWithComment(kStr);
+        }
+
+        int getIssueLatency() const override
+        {
+            auto dataType                  = instTypeToDataType(instType);
+            auto [issueLatency, miLatency] = getMFMAIssueLatency<false>(
+                dataType, variant[0], variant.size() > 3 ? variant[3] : 1);
+            return issueLatency;
         }
     };
 
@@ -757,140 +817,6 @@ namespace rocisa
             auto dataType = instTypeToDataType(instType);
             auto [issueLatency, miLatency]
                 = getMFMAIssueLatency<true>(dataType, variant[0], variant[3]);
-            return issueLatency;
-        }
-    };
-
-    struct MXMFMAInstruction : public Instruction
-    {
-        InstType                           accType;
-        std::vector<int>                   variant;
-        std::shared_ptr<RegisterContainer> acc;
-        std::shared_ptr<RegisterContainer> a;
-        std::shared_ptr<RegisterContainer> b;
-        std::shared_ptr<RegisterContainer> acc2;
-        std::shared_ptr<RegisterContainer> mxsa;
-        std::shared_ptr<RegisterContainer> mxsb;
-
-        MXMFMAInstruction(InstType                                  instType,
-                          InstType                                  accType,
-                          const std::vector<int>&                   variant,
-                          const std::shared_ptr<RegisterContainer>& acc,
-                          const std::shared_ptr<RegisterContainer>& a,
-                          const std::shared_ptr<RegisterContainer>& b,
-                          const std::shared_ptr<RegisterContainer>& acc2    = nullptr,
-                          const std::shared_ptr<RegisterContainer>& mxsa    = nullptr,
-                          const std::shared_ptr<RegisterContainer>& mxsb    = nullptr,
-                          const std::string&                        comment = "")
-            : Instruction(instType, comment)
-            , accType(accType)
-            , variant(variant)
-            , acc(acc)
-            , a(a)
-            , b(b)
-            , acc2(acc2 ? acc2 : acc)
-            , mxsa(mxsa)
-            , mxsb(mxsb)
-        {
-        }
-
-        MXMFMAInstruction(const MXMFMAInstruction& other)
-            : Instruction(other.instType, other.comment)
-            , accType(other.accType)
-            , variant(other.variant)
-            , acc(other.acc ? other.acc->clone2() : nullptr)
-            , a(other.a ? other.a->clone2() : nullptr)
-            , b(other.b ? other.b->clone2() : nullptr)
-            , acc2(other.acc2 ? other.acc2->clone2() : nullptr)
-            , mxsa(other.mxsa ? other.mxsa->clone2() : nullptr)
-            , mxsb(other.mxsb ? other.mxsb->clone2() : nullptr)
-        {
-        }
-
-        std::shared_ptr<Item> clone() const override
-        {
-            return std::make_shared<MXMFMAInstruction>(*this);
-        }
-
-        std::vector<InstructionInput> getParams() const override
-        {
-            return {acc, a, b, acc2, mxsa, mxsb};
-        }
-
-        std::string preStr() const override
-        {
-            std::string variantStr = std::to_string(variant[0]) + "x" + std::to_string(variant[1])
-                                     + "x" + std::to_string(variant[2]);
-            return "v_mfma_scale_f32_" + variantStr + "_f8f6f4";
-        }
-
-        std::string inputPermuteStr() const
-        {
-            if(getAsmCaps()["HasMFMA_f8f6f4"] && variant[2] > 32)
-            {
-                switch(instType)
-                {
-                case InstType::INST_F8:
-                    return " cbsz:0 blgp:0";
-                case InstType::INST_BF8:
-                    return " cbsz:1 blgp:1";
-                case InstType::INST_F8_BF8:
-                    return " cbsz:0 blgp:1";
-                case InstType::INST_BF8_F8:
-                    return " cbsz:1 blgp:0";
-                case InstType::INST_F6:
-                    return " cbsz:2 blgp:2";
-                case InstType::INST_BF6:
-                    return " cbsz:3 blgp:3";
-                case InstType::INST_F4:
-                    return " cbsz:4 blgp:4";
-                case InstType::INST_F8_F6:
-                    return " cbsz:0 blgp:2";
-                case InstType::INST_F6_F8:
-                    return " cbsz:2 blgp:0";
-                case InstType::INST_F8_F4:
-                    return " cbsz:0 blgp:4";
-                case InstType::INST_F4_F8:
-                    return " cbsz:4 blgp:0";
-                case InstType::INST_F6_B6:
-                    return " cbsz:2 blgp:3";
-                case InstType::INST_B6_F6:
-                    return " cbsz:3 blgp:2";
-                case InstType::INST_F6_F4:
-                    return " cbsz:2 blgp:4";
-                case InstType::INST_F4_F6:
-                    return " cbsz:4 blgp:2";
-                case InstType::INST_B6_F4:
-                    return " cbsz:3 blgp:4";
-                case InstType::INST_F4_B6:
-                    return " cbsz:4 blgp:3";
-                default:
-                    break;
-                }
-            }
-            return "";
-        }
-
-        std::string getArgStr() const
-        {
-            std::string mxsaStr = mxsa ? mxsa->toString() : "";
-            std::string mxsbStr = mxsb ? mxsb->toString() : "";
-            return acc->toString() + ", " + a->toString() + ", " + b->toString() + ", "
-                   + acc2->toString() + ", " + mxsaStr + ", " + mxsbStr + inputPermuteStr();
-        }
-
-        std::string toString() const override
-        {
-            auto        newInstStr = preStr();
-            std::string kStr       = newInstStr + " " + getArgStr();
-            return formatWithComment(kStr);
-        }
-
-        int getIssueLatency() const override
-        {
-            auto dataType                  = instTypeToDataType(instType);
-            auto [issueLatency, miLatency] = getMFMAIssueLatency<false>(
-                dataType, variant[0], variant.size() > 3 ? variant[3] : 1);
             return issueLatency;
         }
     };

@@ -1271,27 +1271,6 @@ namespace rocisa
         }
     };
 
-    struct FlatLoadB192 : public FLATReadInstruction
-    {
-        FlatLoadB192(const std::shared_ptr<RegisterContainer>& dst,
-                     const std::shared_ptr<RegisterContainer>& vaddr,
-                     std::optional<FLATModifiers>              flat    = std::nullopt,
-                     const std::string&                        comment = "")
-            : FLATReadInstruction(InstType::INST_B192, dst, vaddr, flat, comment)
-        {
-        }
-
-        FlatLoadB192(const FlatLoadB192& other)
-            : FLATReadInstruction(other)
-        {
-        }
-
-        std::shared_ptr<Item> clone() const override
-        {
-            return std::make_shared<FlatLoadB192>(*this);
-        }
-    };
-
     struct BufferStoreB8 : public MUBUFStoreInstruction
     {
         BufferStoreB8(const std::shared_ptr<RegisterContainer>& src,
@@ -2070,10 +2049,6 @@ namespace rocisa
         }
     };
 
-<<<<<<< HEAD
-    // Hack unofficial compound instruction: 192-bit DS load (128 + 64)
-=======
->>>>>>> origin/develop
     struct DSLoadB192 : public DSLoadInstruction
     {
         DSLoadB192(const std::shared_ptr<RegisterContainer>& dst,
@@ -2102,11 +2077,6 @@ namespace rocisa
             return 3;
         }
 
-<<<<<<< HEAD
-        int getIssueLatency() const override
-        {
-            return issueLatency();
-=======
         std::string getArgStr2(bool upper = false) const
         {
             auto dstCopy = RegisterContainer(*dynamic_cast<RegisterContainer*>(dst.get()));
@@ -2116,78 +2086,55 @@ namespace rocisa
                 int idx                       = dstCopy.regName->offsets.size() - 1;
                 dstCopy.regName->offsets[idx] = dstCopy.regName->offsets[idx] + regNum;
                 dstCopy.regNum = 2;
-            } else {
+            }
+            else
+            {
                 dstCopy.regNum = 4;
             }
             return dstCopy.toString() + ", " + srcs->toString();
->>>>>>> origin/develop
+        }
+
+        int getIssueLatency() const override
+        {
+            return issueLatency();
         }
 
         std::string toString() const override
         {
-<<<<<<< HEAD
-            // Compound instruction: ds_load_b128 + ds_load_b64
-            auto        isaVersion  = rocIsa::getInstance().getKernel().isaVersion;
-            std::string loadInst128 = isaVersion[0] < 11 ? "ds_read_b128" : "ds_load_b128";
-            std::string loadInst64  = isaVersion[0] < 11 ? "ds_read_b64" : "ds_load_b64";
-
-            auto dstReg = std::dynamic_pointer_cast<RegisterContainer>(dst);
-            if(!dstReg)
-                throw std::runtime_error("DSLoadB192: dst must be RegisterContainer");
-
-            // First 4 dwords
-            auto dst128      = dstReg->clone2();
-            dst128->regNum   = 4;
-            std::string kStr = loadInst128 + " " + dst128->toString() + ", " + srcs->toString();
-            if(ds)
-                kStr += ds->toString();
-            kStr = formatWithComment(kStr);
-
-            // Upper 2 dwords at offset +16
-            auto dst64        = dstReg->clone2();
-            dst64->regIdx     = dstReg->regIdx + 4;
-            dst64->regNum     = 2;
-            std::string kStr2 = loadInst64 + " " + dst64->toString() + ", " + srcs->toString();
-            DSModifiers ds2;
-            if(ds)
-                ds2 = *ds;
-            ds2.offset += 16;
-            kStr2 += ds2.toString();
-            kStr2 = formatWithComment(kStr2);
-
-=======
-            std::string instStr = "ds_load_b128";
-            if(kernel().isaVersion[0] < 11)
-            {
-                instStr = "ds_read_b128";
-            }
+            // Prepare first instruction
+            std::string instStr = kernel().isaVersion[0] < 11 ?
+                "ds_read_b128":
+                "ds_load_b128";
             std::string kStr = instStr + " " + getArgStr2();
             if(ds)
                 kStr += ds->toString();
 
-            instStr = "ds_load_b64";
-            if(kernel().isaVersion[0] < 11)
-            {
-                instStr = "ds_read_b64";
-            }
+            // Prepare second instruction
+            instStr = kernel().isaVersion[0] < 11 ?
+                "ds_read_b64":
+                "ds_load_b64";
             std::string kStr2 = instStr + " " + getArgStr2(true);
             auto dsCopy = ds ? std::make_shared<DSModifiers>(*ds) : std::make_shared<DSModifiers>();
             dsCopy->offset += 16;
             kStr2 += dsCopy->toString();
+
+            // Format both instructions
             kStr = formatWithComment(kStr);
             kStr2 = formatWithComment(kStr2);
-            // compute 2 different dst vgpr msb
+
             auto dstCopyPtr = std::make_shared<RegisterContainer>(*dynamic_cast<RegisterContainer*>(dst.get()));
-            int idx = dstCopyPtr->regName->offsets.size() - 1;
-            int regNum = 4;
+
+            int const idx = dstCopyPtr->regName->offsets.size() - 1;
+            int const regNum = 4;
             dstCopyPtr->regNum = regNum;
             dstCopyPtr->setMsb();
             setMsb(kStr, {srcs}, dstCopyPtr);
+
             dstCopyPtr->regName->offsets[idx] = dstCopyPtr->regName->offsets[idx] + regNum;
             dstCopyPtr->regNum = 2;
             dstCopyPtr->setMsb();
             setMsb(kStr2, {srcs}, dstCopyPtr);
->>>>>>> origin/develop
+
             return kStr + kStr2;
         }
     };
@@ -2502,10 +2449,7 @@ namespace rocisa
         }
     };
 
-<<<<<<< HEAD
-    // Hack unofficial compound instruction: 192-bit DS store (128 + 64)
-=======
->>>>>>> origin/develop
+
     struct DSStoreB192 : public DSStoreInstruction
     {
         DSStoreB192(const std::shared_ptr<RegisterContainer>& dstAddr,
@@ -2531,14 +2475,6 @@ namespace rocisa
 
         static int issueLatency()
         {
-<<<<<<< HEAD
-            return 10;
-        }
-
-        int getIssueLatency() const override
-        {
-            return issueLatency();
-=======
             return 8;
         }
 
@@ -2551,70 +2487,44 @@ namespace rocisa
                 int idx                       = srcCopy.regName->offsets.size() - 1;
                 srcCopy.regName->offsets[idx] = srcCopy.regName->offsets[idx] + regNum;
                 srcCopy.regNum = 2;
-            } else {
+            }
+            else
+            {
                 srcCopy.regNum = 4;
             }
             return dstAddr->toString() + ", " + srcCopy.toString();
->>>>>>> origin/develop
+        }
+
+        int getIssueLatency() const override
+        {
+            return issueLatency();
         }
 
         std::string toString() const override
         {
-<<<<<<< HEAD
-            // Compound instruction: ds_store_b128 + ds_store_b64
-            auto        isaVersion   = rocIsa::getInstance().getKernel().isaVersion;
-            std::string storeInst128 = isaVersion[0] < 11 ? "ds_write_b128" : "ds_store_b128";
-            std::string storeInst64  = isaVersion[0] < 11 ? "ds_write_b64" : "ds_store_b64";
-
-            auto srcReg = std::dynamic_pointer_cast<RegisterContainer>(src0);
-            if(!srcReg)
-                throw std::runtime_error("DSStoreB192: src0 must be RegisterContainer");
-
-            // First 4 dwords
-            auto src128      = srcReg->clone2();
-            src128->regNum   = 4;
-            std::string kStr = storeInst128 + " " + dstAddr->toString() + ", " + src128->toString();
-            if(ds)
-                kStr += ds->toString();
-            kStr = formatWithComment(kStr);
-
-            // Upper 2 dwords at offset +16
-            auto src64        = srcReg->clone2();
-            src64->regIdx     = srcReg->regIdx + 4;
-            src64->regNum     = 2;
-            std::string kStr2 = storeInst64 + " " + dstAddr->toString() + ", " + src64->toString();
-            DSModifiers ds2;
-            if(ds)
-                ds2 = *ds;
-            ds2.offset += 16;
-            kStr2 += ds2.toString();
-            kStr2 = formatWithComment(kStr2);
-
-=======
-            std::string instStr = "ds_store_b128";
-            if(kernel().isaVersion[0] < 11)
-            {
-                instStr = "ds_write_b128";
-            }
+            // Prepare first instruction
+            std::string instStr = kernel().isaVersion[0] < 11 ?
+                "ds_write_b128" :
+                "ds_store_b128";
             std::string kStr = instStr + " " + getArgStr2();
             if(ds)
                 kStr += ds->toString();
 
-            instStr = "ds_store_b64";
-            if(kernel().isaVersion[0] < 11)
-            {
-                instStr = "ds_write_b64";
-            }
+            // Prepare second instruction
+            instStr = kernel().isaVersion[0] < 11 ?
+                "ds_write_b64" :
+                "ds_store_b64";
             std::string kStr2 = instStr + " " + getArgStr2(true);
             auto dsCopy = ds ? std::make_shared<DSModifiers>(*ds) : std::make_shared<DSModifiers>();
             dsCopy->offset += 16;
             kStr2 += dsCopy->toString();
+            // Format both instructions
             kStr = formatWithComment(kStr);
             kStr2 = formatWithComment(kStr2);
-            // compute 2 different src vgpr msb
+
             auto srcCopyPtr = std::make_shared<RegisterContainer>(*dynamic_cast<RegisterContainer*>(src0.get()));
             int idx = srcCopyPtr->regName->offsets.size() - 1;
-            int regNum = 4;
+            int const regNum = 4;
             srcCopyPtr->regNum = regNum;
             srcCopyPtr->setMsb();
             setMsb(kStr, {dstAddr, srcCopyPtr}, nullptr);
@@ -2622,7 +2532,7 @@ namespace rocisa
             srcCopyPtr->regNum = 2;
             srcCopyPtr->setMsb();
             setMsb(kStr2, {dstAddr, srcCopyPtr}, nullptr);
->>>>>>> origin/develop
+
             return kStr + kStr2;
         }
     };
