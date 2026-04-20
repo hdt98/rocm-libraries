@@ -32,8 +32,7 @@ TEST_F(TestHeuristicPluginResourceManagerAdditional, ConstructorWithNullPluginMa
 {
     // Null plugin manager is accepted during static destruction scenarios
     // The constructor should not throw - it just skips initialization
-    EXPECT_NO_THROW(
-        { auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); });
+    EXPECT_NO_THROW({ auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); });
 
     // Verify the resource manager works with null manager
     auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr);

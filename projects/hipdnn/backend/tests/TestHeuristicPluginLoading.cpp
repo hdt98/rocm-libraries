@@ -85,9 +85,15 @@ protected:
         _pluginPtr = std::make_unique<TestableHeuristicPlugin>(std::move(lib));
     }
 
-    void TearDown() override { _pluginPtr.reset(); }
+    void TearDown() override
+    {
+        _pluginPtr.reset();
+    }
 
-    TestableHeuristicPlugin& plugin() { return *_pluginPtr; }
+    TestableHeuristicPlugin& plugin()
+    {
+        return *_pluginPtr;
+    }
 
 private:
     std::unique_ptr<TestableHeuristicPlugin> _pluginPtr;
@@ -270,8 +276,7 @@ TEST_F(TestHeuristicPluginLoading, LoadIncompletePluginThrowsException)
 {
     const auto pluginPath = getTestPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
 
-    ASSERT_TRUE(std::filesystem::exists(pluginPath))
-        << "Test plugin not found: " << pluginPath;
+    ASSERT_TRUE(std::filesystem::exists(pluginPath)) << "Test plugin not found: " << pluginPath;
 
     SharedLibrary lib(pluginPath);
 
@@ -347,8 +352,7 @@ TEST_F(TestHeuristicPluginLoading, LoadPluginWithoutOptionalSymbolsSucceeds)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
 
-    ASSERT_TRUE(std::filesystem::exists(pluginPath))
-        << "Test plugin not found: " << pluginPath;
+    ASSERT_TRUE(std::filesystem::exists(pluginPath)) << "Test plugin not found: " << pluginPath;
 
     SharedLibrary lib(pluginPath);
 

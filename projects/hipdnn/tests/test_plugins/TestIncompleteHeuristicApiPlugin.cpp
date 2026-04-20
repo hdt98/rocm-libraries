@@ -84,8 +84,9 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
-    hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* devicePropsSerialized)
+hipdnnPluginStatus_t
+    hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
+                                             const hipdnnPluginConstData_t* devicePropsSerialized)
 {
     (void)handle;
     (void)devicePropsSerialized;
@@ -94,8 +95,9 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
 
 // ========== Policy Descriptor Lifecycle (Partial) ==========
 
-hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorCreate(
-    hipdnnHeuristicHandle_t handle, hipdnnHeuristicPolicyDescriptor_t* out_descriptor)
+hipdnnPluginStatus_t
+    hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t handle,
+                                          hipdnnHeuristicPolicyDescriptor_t* out_descriptor)
 {
     (void)handle;
     if(out_descriptor == nullptr)
@@ -126,8 +128,9 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(hipdnnHeuristicPolicyDesc
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
-    hipdnnHeuristicPolicyDescriptor_t descriptor, const hipdnnPluginConstData_t* serialized_graph)
+hipdnnPluginStatus_t
+    hipdnnHeuristicPolicySetSerializedGraph(hipdnnHeuristicPolicyDescriptor_t descriptor,
+                                            const hipdnnPluginConstData_t* serialized_graph)
 {
     (void)descriptor;
     (void)serialized_graph;

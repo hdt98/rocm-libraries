@@ -11,8 +11,8 @@
 #include <vector>
 
 // NOLINTNEXTLINE
-thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::
-    s_lastError[HIPDNN_HEURISTIC_PLUGIN_ERROR_STRING_MAX_LENGTH]
+thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError
+    [HIPDNN_HEURISTIC_PLUGIN_ERROR_STRING_MAX_LENGTH]
     = "";
 
 namespace
@@ -54,8 +54,8 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
 {
     if(version == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "version pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "version pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *version = HIPDNN_HEURISTIC_API_VERSION;
@@ -66,8 +66,8 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPolicyId(int64_t* policy_id)
 {
     if(policy_id == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "policy_id pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "policy_id pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *policy_id = TEST_POLICY_ID;
@@ -78,8 +78,8 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
 {
     if(policy_name == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "policy_name pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "policy_name pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *policy_name = POLICY_NAME;
@@ -90,8 +90,8 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
 {
     if(version == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "version pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "version pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *version = PLUGIN_VERSION;
@@ -124,8 +124,8 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* out_ha
 {
     if(out_handle == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "out_handle pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "out_handle pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -138,8 +138,8 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle
 {
     if(handle == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "handle is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "handle is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -148,13 +148,14 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
-    hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* devicePropsSerialized)
+hipdnnPluginStatus_t
+    hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
+                                             const hipdnnPluginConstData_t* devicePropsSerialized)
 {
     if(handle == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "handle is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "handle is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(devicePropsSerialized == nullptr)
@@ -171,19 +172,20 @@ hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
 
 // ========== Policy Descriptor Lifecycle ==========
 
-hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorCreate(
-    hipdnnHeuristicHandle_t handle, hipdnnHeuristicPolicyDescriptor_t* out_descriptor)
+hipdnnPluginStatus_t
+    hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t handle,
+                                          hipdnnHeuristicPolicyDescriptor_t* out_descriptor)
 {
     if(handle == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "handle is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "handle is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(out_descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "out_descriptor pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "out_descriptor pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -197,8 +199,8 @@ hipdnnPluginStatus_t
 {
     if(descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "descriptor is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "descriptor is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -215,14 +217,14 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(hipdnnHeuristicPolicyDesc
 {
     if(descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "descriptor is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "descriptor is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(engine_ids == nullptr && engine_id_count > 0)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "engine_ids is null but count > 0");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "engine_ids is null but count > 0");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -231,19 +233,20 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(hipdnnHeuristicPolicyDesc
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
-    hipdnnHeuristicPolicyDescriptor_t descriptor, const hipdnnPluginConstData_t* serialized_graph)
+hipdnnPluginStatus_t
+    hipdnnHeuristicPolicySetSerializedGraph(hipdnnHeuristicPolicyDescriptor_t descriptor,
+                                            const hipdnnPluginConstData_t* serialized_graph)
 {
     if(descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "descriptor is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "descriptor is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(serialized_graph == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "serialized_graph pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "serialized_graph pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -256,18 +259,18 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
 // ========== Selection Execution ==========
 
 hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t descriptor,
-                                                    int32_t* applied)
+                                                   int32_t* applied)
 {
     if(descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "descriptor is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "descriptor is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(applied == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "applied pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "applied pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -287,14 +290,14 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
 {
     if(descriptor == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "descriptor is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "descriptor is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     if(count == nullptr)
     {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-            HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "count pointer is null");
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "count pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
 
@@ -308,7 +311,8 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
     }
 
     // Retrieve mode: copy IDs
-    const uint32_t numToCopy = std::min(*count, static_cast<uint32_t>(impl->sortedEngineIds.size()));
+    const uint32_t numToCopy
+        = std::min(*count, static_cast<uint32_t>(impl->sortedEngineIds.size()));
     std::memcpy(engine_ids, impl->sortedEngineIds.data(), numToCopy * sizeof(int64_t));
     *count = numToCopy;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
