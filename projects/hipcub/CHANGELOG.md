@@ -1,6 +1,6 @@
 # Changelog for hipCUB
 
-Full documentation for hipCUB is available at [https://rocm.docs.amd.com/projects/hipCUB/en/latest/](https://rocm.docs.amd.com/projects/hipCUB/en/latest/).
+The most recent documentation for hipCUB is available at [https://rocm.docs.amd.com/projects/hipCUB/en/latest/](https://rocm.docs.amd.com/projects/hipCUB/en/latest/).
 
 ## hipCUB-4.3.0 for ROCm 7.12
 
