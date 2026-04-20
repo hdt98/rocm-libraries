@@ -243,3 +243,207 @@ Time analysis:
 **Win rate**: 91% (30/33 cases)  
 **Different MacroTiles**: 67% of cases (22/33)  
 **Safety**: 3 losses, all < 3.4%
+
+---
+
+## Reproducing All Results
+
+All commands assume you are in the build directory:
+```bash
+cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
+```
+
+### Baseline (single kernel) command pattern
+```bash
+./clients/hipblaslt-bench -m <M> -n <N> -k <K> --precision f16_r --device 7 --api_method c -i 100 -j 100
+```
+
+### Multi-MacroTile S17 command pattern
+```bash
+./clients/hipblaslt-bench -m <M> -n <N> -k <K> --precision f16_r --device 7 --api_method c -i 100 -j 100 \
+  --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints
+```
+
+Add `--print_kernel_info` to see per-subproblem MacroTile selection.
+
+### Per-Problem Commands
+
+#### K Scaling (M=N=10240)
+
+```bash
+# 10240x10240x4096: +7.0%, DIFF MT [6144,4096]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x5120: +9.3%, DIFF MT [6144,4096]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 5120 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 5120 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x6144: +15.7%, DIFF MT [4096,6144]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 6144 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 6144 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x7168: +17.6%, DIFF MT [4096,6144]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 7168 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 7168 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x8192: +19.8%, DIFF MT [4096,6144]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x10240: +19.9%, DIFF MT [6144,4096]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 10240 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 10240 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x16384: +34.6%, DIFF MT [4096,6144]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x10240x32768: +35.6%, DIFF MT [6144,4096]
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+```
+
+#### Square Matrix Scaling (K=8192)
+
+```bash
+# 10752x10752x8192: +0.8%, DIFF MT [7424,3328]
+./clients/hipblaslt-bench -m 10752 -n 10752 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10752 -n 10752 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 11264x11264x8192: +8.1%, same MT [5632,5632]
+./clients/hipblaslt-bench -m 11264 -n 11264 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 11264 -n 11264 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 11776x11776x8192: +22.8%, DIFF MT [3456,8320]
+./clients/hipblaslt-bench -m 11776 -n 11776 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 11776 -n 11776 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 12288x12288x8192: +33.7%, DIFF MT [2048,10240]
+./clients/hipblaslt-bench -m 12288 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 12288 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 12800x12800x8192: -2.2%, same MT [5120,7680]
+./clients/hipblaslt-bench -m 12800 -n 12800 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 12800 -n 12800 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 13312x13312x8192: -3.0%, DIFF MT [2048,11264]
+./clients/hipblaslt-bench -m 13312 -n 13312 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 13312 -n 13312 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 13824x13824x8192: +47.2%, same MT [6912,6912]
+./clients/hipblaslt-bench -m 13824 -n 13824 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 13824 -n 13824 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 14336x14336x8192: +42.5%, DIFF MT [2048,12288]
+./clients/hipblaslt-bench -m 14336 -n 14336 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 14336 -n 14336 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 14848x14848x8192: +52.1%, same MT [7424,7424]
+./clients/hipblaslt-bench -m 14848 -n 14848 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 14848 -n 14848 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 15360x15360x8192: +60.8%, DIFF MT [10752,4608] *** BEST GAIN ***
+./clients/hipblaslt-bench -m 15360 -n 15360 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 15360 -n 15360 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 16384x16384x8192: +48.4%, same MT [6528,9856]
+./clients/hipblaslt-bench -m 16384 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 16384 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+```
+
+#### Additional K Values
+
+```bash
+# 15360x15360x4096: +59.5%, DIFF MT [10752,4608]
+./clients/hipblaslt-bench -m 15360 -n 15360 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 15360 -n 15360 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 14336x14336x4096: +37.8%, DIFF MT [2048,12288]
+./clients/hipblaslt-bench -m 14336 -n 14336 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 14336 -n 14336 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 16384x16384x16384: +36.7%, same MT [4864,11520]
+./clients/hipblaslt-bench -m 16384 -n 16384 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 16384 -n 16384 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 12288x12288x12288: +39.2%, DIFF MT [2048,10240]
+./clients/hipblaslt-bench -m 12288 -n 12288 -k 12288 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 12288 -n 12288 -k 12288 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+```
+
+#### Rectangular Matrices (K=8192)
+
+```bash
+# 12288x6144x8192: +16.3%, DIFF MT [2048,10240]
+./clients/hipblaslt-bench -m 12288 -n 6144 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 12288 -n 6144 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 6144x12288x8192: +10.1%, same MT [2432,3712]
+./clients/hipblaslt-bench -m 6144 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 6144 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 16384x8192x8192: +31.4%, DIFF MT [4864,11520]
+./clients/hipblaslt-bench -m 16384 -n 8192 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 16384 -n 8192 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 8192x16384x8192: +30.7%, DIFF MT [4864,3328]
+./clients/hipblaslt-bench -m 8192 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 8192 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 20480x10240x8192: +47.7%, same MT [14336,6144]
+./clients/hipblaslt-bench -m 20480 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 20480 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x20480x8192: +44.2%, same MT [7168,3072]
+./clients/hipblaslt-bench -m 10240 -n 20480 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 20480 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 12288x10240x8192: +43.0%, same MT [6144,6144]
+./clients/hipblaslt-bench -m 12288 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 12288 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x12288x8192: +41.5%, same MT [5120,5120]
+./clients/hipblaslt-bench -m 10240 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 10240x5120x8192: +5.9%, DIFF MT [3072,7168]
+./clients/hipblaslt-bench -m 10240 -n 5120 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 10240 -n 5120 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+
+# 5120x10240x8192: -3.4%, DIFF MT [2048,3072] (LOSS)
+./clients/hipblaslt-bench -m 5120 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
+./clients/hipblaslt-bench -m 5120 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
+```
+
+### Batch Script to Reproduce All Results
+
+```bash
+#!/bin/bash
+cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
+BENCH="./clients/hipblaslt-bench"
+C="--precision f16_r --device 7 --api_method c -i 100 -j 100"
+MT="--multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info"
+
+for DIMS in \
+  10240,10240,4096 10240,10240,5120 10240,10240,6144 10240,10240,7168 \
+  10240,10240,8192 10240,10240,10240 10240,10240,16384 10240,10240,32768 \
+  10752,10752,8192 11264,11264,8192 11776,11776,8192 12288,12288,8192 \
+  12800,12800,8192 13312,13312,8192 13824,13824,8192 14336,14336,8192 \
+  14848,14848,8192 15360,15360,8192 16384,16384,8192 \
+  15360,15360,4096 14336,14336,4096 16384,16384,16384 12288,12288,12288 \
+  12288,6144,8192 6144,12288,8192 16384,8192,8192 8192,16384,8192 \
+  20480,10240,8192 10240,20480,8192 12288,10240,8192 10240,12288,8192 \
+  10240,5120,8192 5120,10240,8192; do
+
+  M=$(echo $DIMS | cut -d, -f1)
+  N=$(echo $DIMS | cut -d, -f2)
+  K=$(echo $DIMS | cut -d, -f3)
+  echo "=== ${M}x${N}x${K} ==="
+  echo "Baseline:"
+  $BENCH -m $M -n $N -k $K $C
+  echo "Multi-MT S17:"
+  $BENCH -m $M -n $N -k $K $C $MT
+  echo ""
+done
+```
