@@ -40,9 +40,9 @@
 ROCSOLVER_BEGIN_NAMESPACE
 
 // -----------------------------------------------
-// Note the recursive routine pass in a row_offset
-// to adjust the info value, so no need for the
-// iinfo[] array
+// Note that the recursive routine passes in a
+// row_offset to adjust the info value, so the
+// iinfo[] array is not required.
 // -----------------------------------------------
 static bool constexpr use_recursion_potrf = true;
 static bool constexpr use_iinfo = !use_recursion_potrf;
