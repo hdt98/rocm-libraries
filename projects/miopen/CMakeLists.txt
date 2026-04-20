@@ -93,6 +93,28 @@ if(MIOPEN_ENABLE_SQLITE)
 endif()
 find_package(BZip2 REQUIRED)
 find_package(nlohmann_json 3.9.1 REQUIRED)
+
+# Workaround: TheRock's prebuilt nlohmann_json artifact may be missing the
+# natvis file (a Visual Studio debug visualizer) referenced by
+# INTERFACE_SOURCES.  Drop it from the imported target only if the file
+# doesn't exist on disk.  Once the artifact is fixed upstream, the file
+# will be present and the property is left untouched.
+if(TARGET nlohmann_json::nlohmann_json)
+    get_target_property(_njson_srcs nlohmann_json::nlohmann_json INTERFACE_SOURCES)
+    if(_njson_srcs)
+        set(_njson_filtered "${_njson_srcs}")
+        foreach(_src IN LISTS _njson_srcs)
+            string(GENEX_STRIP "${_src}" _src_plain)
+            if(_src_plain MATCHES "\\.natvis$" AND NOT EXISTS "${_src_plain}")
+                message(STATUS "nlohmann_json: dropping missing natvis entry: ${_src_plain}")
+                list(REMOVE_ITEM _njson_filtered "${_src}")
+            endif()
+        endforeach()
+        set_property(TARGET nlohmann_json::nlohmann_json
+                     PROPERTY INTERFACE_SOURCES "${_njson_filtered}")
+    endif()
+endif()
+
 if(MIOPEN_ENABLE_SQLITE_KERN_CACHE AND NOT MIOPEN_ENABLE_SQLITE)
     message(FATAL_ERROR "MIOPEN_ENABLE_SQLITE_KERN_CACHE requires MIOPEN_ENABLE_SQLITE")
 endif()
