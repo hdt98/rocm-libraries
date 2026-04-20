@@ -3182,12 +3182,13 @@ Multi-MacroTile is a **production-ready feature** with three rounds of optimizat
 
 ### Performance Evolution
 
-| Version | Best Gain | Worst Case | Win Rate | Avg Gain (wins) |
-|---------|----------|------------|----------|-----------------|
-| Initial (uniform S3) | +25.3% | -24.8% | ~40% | +6.1% |
-| Round 1 (Opts 1-8) | +26.0% | -1.5% | ~55% | +8.5% |
-| Round 2 (S17 fixed-ratio) | +28.1% | -1.5% | 68% | +12.2% |
-| **Round 3 (S17 exhaustive pow2)** | **+37.4%** | **-1.8%** | **85%** | **+14.7%** |
+| Version | Best Gain | Worst Case | Win Rate | Avg Gain (wins) | Problems |
+|---------|----------|------------|----------|-----------------|----------|
+| Initial (uniform S3) | +25.3% | -24.8% | ~40% | +6.1% | 20 |
+| Round 1 (Opts 1-8) | +26.0% | -1.5% | ~55% | +8.5% | 20 |
+| Round 2 (S17 fixed-ratio) | +28.1% | -1.5% | 68% | +12.2% | 25 |
+| Round 3 (S17 exhaustive pow2) | +37.4% | -1.8% | 85% | +14.7% | 20 |
+| **Broad sweep (46 problems)** | **+64.8%** | **-11.8%** | **82%** | **+28.7%** | **46** |
 
 ### What Makes It Work
 
@@ -3198,14 +3199,15 @@ Multi-MacroTile is a **production-ready feature** with three rounds of optimizat
 ✅ **Auto-disable** for small problems prevents all historical regressions  
 ✅ **Pre-created layouts** (Opt 1) eliminate per-iteration overhead  
 
-### Best Use Cases
+### Best Use Cases (46-Problem Broad Sweep)
 
-| Category | Expected Gain | Example |
+| Category | Expected Gain | Examples |
 |----------|--------------|---------|
-| Square 10K with large K | **+16% to +37%** | 10240x10240xK (K≥4096) |
-| Rectangular 2:1 ratio | +13% to +29% | 12288x6144, 5120x10240 |
-| "Dead zone" dimensions | +18% to +24% | 15360x15360, 11776x11776 |
-| Already-optimal baselines | -1.8% to +2% | 12288x12288, 16384x16384 |
+| "Performance valley" dims | **+32% to +65%** | 15360x15360 (+65%), 14848x14848 (+55%), 13824x13824 (+52%) |
+| Large rectangular | **+27% to +49%** | 20480x10240 (+49%), 16384x8192 (+32%), 10240x20480 (+44%) |
+| Square 10K with large K | **+8% to +37%** | 10240x10240xK for any K≥4096 |
+| Near-square large | **+18% to +46%** | 12288x10240 (+46%), 10240x12288 (+41%) |
+| Already-efficient baselines | -12% to +3% | 11520 (-8%), 12800 (-1%), 11264 (+3%) |
 
 ### Recommended Command
 

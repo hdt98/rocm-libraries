@@ -90,11 +90,17 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     std::vector<OrigamiCandidate> candidates;
     int mt = std::max(macrotile_size, 1);
 
+    // Minimum sub-problem size: must be at least 2048 and at least 15% of total
+    // to avoid pathological kernel selections for tiny sub-problems
+    int64_t min_sub = std::max((int64_t)2048, total_size * 15 / 100);
+    min_sub = (min_sub / mt) * mt;
+    min_sub = std::max(min_sub, (int64_t)mt);
+
     auto add = [&](int64_t s1, const std::string& label) {
-        s1 = std::max(s1, (int64_t)mt);
-        s1 = std::min(s1, total_size - (int64_t)mt);
+        s1 = std::max(s1, min_sub);
+        s1 = std::min(s1, total_size - min_sub);
         int64_t s2 = total_size - s1;
-        if (s2 >= mt && s1 >= mt)
+        if (s2 >= min_sub && s1 >= min_sub)
             candidates.push_back({{s1, s2}, label});
     };
 
@@ -107,11 +113,11 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
             "asym-" + std::to_string((int)(r*100)) + "/" + std::to_string(100-(int)(r*100)));
 
     // Exhaustive power-of-2: every split where s1 is a power of 2
-    // This catches [8192,2048] for 10240, [8192,4096] for 12288, etc.
-    for (int64_t p = 1024; p < total_size; p *= 2)
+    // Starting from 2048 (1024 is too small for good kernel efficiency)
+    for (int64_t p = 2048; p < total_size; p *= 2)
     {
         int64_t rem = total_size - p;
-        if (rem >= mt && p >= mt)
+        if (rem >= min_sub && p >= min_sub)
             add(p, "pow2-" + std::to_string(p/1024) + "k");
     }
 
