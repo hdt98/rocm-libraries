@@ -90,36 +90,32 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     std::vector<OrigamiCandidate> candidates;
     int mt = std::max(macrotile_size, 1);
 
-    auto make_split = [&](double ratio, const std::string& label) {
-        int64_t s1 = (int64_t)(total_size * ratio);
-        s1 = (s1 / mt) * mt;
+    auto add = [&](int64_t s1, const std::string& label) {
         s1 = std::max(s1, (int64_t)mt);
         s1 = std::min(s1, total_size - (int64_t)mt);
         int64_t s2 = total_size - s1;
-        if (s2 >= mt)
+        if (s2 >= mt && s1 >= mt)
             candidates.push_back({{s1, s2}, label});
     };
 
-    make_split(0.50, "uniform-50/50");
-    make_split(0.60, "asym-60/40");
-    make_split(0.40, "asym-40/60");
-    make_split(0.70, "asym-70/30");
-    make_split(0.30, "asym-30/70");
+    // Uniform
+    add((total_size / 2 / mt) * mt, "uniform-50/50");
 
-    // Power-of-2 biased: find largest pow2 <= total/2, remainder gets the rest
+    // Ratio-based (covers non-pow2 sweet spots like 6144 = 3*2048)
+    for (double r : {0.60, 0.40, 0.70, 0.30})
+        add(((int64_t)(total_size * r) / mt) * mt,
+            "asym-" + std::to_string((int)(r*100)) + "/" + std::to_string(100-(int)(r*100)));
+
+    // Exhaustive power-of-2: every split where s1 is a power of 2
+    // This catches [8192,2048] for 10240, [8192,4096] for 12288, etc.
+    for (int64_t p = 1024; p < total_size; p *= 2)
     {
-        int64_t target = total_size / 2;
-        int64_t pow2 = 1;
-        while (pow2 * 2 <= target) pow2 *= 2;
-        // Use next pow2 if closer
-        int64_t s1 = (target - pow2 > pow2 / 4) ? pow2 * 2 : pow2;
-        s1 = std::min(s1, total_size - (int64_t)mt);
-        int64_t s2 = total_size - s1;
-        if (s1 >= mt && s2 >= mt)
-            candidates.push_back({{s1, s2}, "pow2-biased"});
+        int64_t rem = total_size - p;
+        if (rem >= mt && p >= mt)
+            add(p, "pow2-" + std::to_string(p/1024) + "k");
     }
 
-    // Deduplicate: remove candidates with identical split sizes
+    // Deduplicate by s1 value
     std::vector<OrigamiCandidate> unique;
     for (auto& c : candidates) {
         bool dup = false;

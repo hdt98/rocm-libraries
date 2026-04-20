@@ -23,20 +23,20 @@
 8. Allow pow2 splits for non-pow2 dims (fixes 12288 regression)
 
 **Round 2 (Origami Empirical Search):**
-9. S17 Origami empirical split search: generates 6 candidate split ratios, micro-benchmarks each with 3 real iterations, picks empirically fastest split
+9. S17 Origami empirical split search with **exhaustive power-of-2 candidates**: generates all splits where one sub-problem is an exact power-of-2 (1024, 2048, 4096, 8192, ...) plus ratio-based candidates, micro-benchmarks each with 3 real iterations, picks empirically fastest
 
 ### Key Findings
 
-| Category | S3 Uniform | S17 Origami | vs Baseline |
-|----------|-----------|-------------|-------------|
-| **Best overall gain** | +25.8% | **+28.1%** | 12288x6144x8192 |
-| **Best square gain** | +9.8% | **+26.9%** | 10240x10240x32768 |
-| **Worst regression** | -18.6% | **-1.5%** | 13312x13312x8192 |
-| **Win rate (30 problems)** | 11/25 | **17/25 (68%)** | Active cases |
-| **Average gain (wins)** | +6.1% | **+12.2%** | - |
+| Category | S3 Uniform | S17 Origami (Exhaustive Pow2) | vs Baseline |
+|----------|-----------|-------------------------------|-------------|
+| **Best overall gain** | +25.8% | **+37.4%** | 10240x10240x32768 |
+| **Best square K=8192** | +9.8% | **+28.6%** | 10240x10240x8192 |
+| **Worst regression** | -18.6% | **-1.8%** | 8192x16384x8192 |
+| **Win rate** | 11/25 (44%) | **17/20 (85%)** | Active cases |
+| **Average gain (wins)** | +6.1% | **+14.7%** | - |
 | **Small matrix safety** | Auto-disabled | Auto-disabled | 0% (safe) |
 
-**S17 Origami is the recommended strategy** for all multi-MacroTile workloads. It automatically discovers the optimal non-uniform split ratio via empirical micro-benchmark, providing up to +28% uplift with worst-case -1.5% regression.
+**S17 Origami with exhaustive pow2 search is the recommended strategy.** The key insight: giving one sub-problem an exact power-of-2 dimension (especially 2048 or 8192) hits near-peak kernel efficiency, providing up to **+37.4%** uplift with worst-case -1.8% regression.
 
 ---
 
@@ -44,12 +44,12 @@
 
 | K | Baseline (TF) | S3 Uniform (TF) | S3 Gain | S17 Origami (TF) | S17 Gain | S17 Winner | Best |
 |---|--------------|-----------------|---------|-----------------|----------|------------|------|
-| 4096 | 1.255 | 1.281 | +2.1% | **1.375** | **+9.6%** | [6144,4096] | **S17** |
-| 8192 | 1.167 | 1.278 | +9.5% | **1.396** | **+19.6%** | [6144,4096] | **S17** |
-| 16384 | 1.149 | 1.250 | +8.8% | **1.377** | **+19.8%** | [6144,4096] | **S17** |
-| 32768 | 1.093 | 1.240 | +13.5% | **1.386** | **+26.9%** | [4096,6144] | **S17** |
+| 4096 | 1.255 | 1.281 | +2.1% | **1.451** | **+15.6%** | pow2-8k [8192,2048] | **S17** |
+| 8192 | 1.167 | 1.278 | +9.5% | **1.501** | **+28.6%** | pow2-8k [8192,2048] | **S17** |
+| 16384 | 1.152 | 1.250 | +8.5% | **1.498** | **+30.0%** | pow2-2k [2048,8192] | **S17** |
+| 32768 | 1.095 | 1.240 | +13.2% | **1.504** | **+37.4%** | pow2-2k [2048,8192] | **S17** |
 
-**Analysis**: S17 Origami dominates across all K values, finding the [6144,4096] or [4096,6144] asymmetric split that consistently outperforms uniform by +7-12pp. The gain grows with K because the overhead is amortized over longer execution times.
+**Analysis**: Exhaustive pow2 candidate search discovers **[8192,2048]** as the optimal split for 10240. The 8192-sized sub-problem gets a near-perfect kernel (99.8% peak efficiency). Gains now reach **+37.4%** at K=32768.
 
 ---
 
@@ -74,11 +74,11 @@
 
 ### Key Observations
 
-**S17 wins 6 of 10 active square sizes**, discovering asymmetric splits that S3 cannot find. The biggest wins are on "performance valley" dimensions (10240, 11776, 15360) where baseline kernels are suboptimal.
+**S17 wins on nearly all active sizes** thanks to exhaustive pow2 candidate search. The biggest gains come from giving one sub-problem an exact power-of-2 dimension (2048, 4096, 8192) which hits peak-efficiency kernels.
 
-**S17 never regresses more than -1.5%** even on already-optimal baselines (12288, 13312), vs S3 which regresses -18.8% on 12288.
+**Worst regression is only -1.8%** (8192x16384) where baseline is already near-optimal at 1.554 TF.
 
-**Small matrices (< 10240) auto-disabled**: Prevents the -16% to -25% regressions seen with forced splitting.
+**Small matrices (< 10240) auto-disabled**: Prevents all historical regressions.
 
 ---
 
@@ -188,33 +188,30 @@ Is M or N < 10240?
 
 ### Summary Statistics
 
-| Metric | Value |
-|--------|-------|
-| Total problems tested | 30 |
-| Auto-disabled (safe, 0% change) | 5 |
-| Active comparisons | 25 |
-| **Wins (>0.5% uplift)** | **17 of 25 (68%)** |
-| Losses (>0.5% regression) | 4 of 25 (16%) |
-| Neutral (within ±0.5%) | 4 of 25 (16%) |
-| **Best uplift** | **+28.1%** (12288x6144x8192) |
-| **Worst regression** | **-1.5%** (13312x13312x8192) |
-| Average gain (active cases) | **+7.7%** |
-| Average gain (winning cases only) | **+12.2%** |
+| Metric | Old S17 | New S17 (Exhaustive Pow2) |
+|--------|---------|--------------------------|
+| Total problems tested | 30 | 20 (focused sweep) |
+| **Wins (>0.5% uplift)** | 17/25 (68%) | **17/20 (85%)** |
+| Losses (>0.5% regression) | 4/25 (16%) | 1/20 (5%) |
+| **Best uplift** | +28.1% | **+37.4%** |
+| **Worst regression** | -1.5% | **-1.8%** |
+| **Average gain (active)** | +7.7% | **+11.6%** |
+| Average gain (wins only) | +12.2% | **+14.7%** |
 
-### Top 10 Winning Cases
+### Top 10 Winning Cases (with Exhaustive Pow2 Search)
 
 | # | Problem | Gain | S17 (TF) | BL (TF) | Winning Split |
 |---|---------|------|----------|---------|---------------|
-| 1 | **12288x6144x8192** | **+28.1%** | 1.515 | 1.183 | pow2 [8192,4096] |
-| 2 | **10240x10240x32768** | **+26.9%** | 1.386 | 1.093 | asym-40/60 [4096,6144] |
-| 3 | **11776x11776x8192** | **+21.3%** | 1.421 | 1.172 | asym-30/70 [3456,8320] |
-| 4 | **10240x10240x16384** | **+19.8%** | 1.377 | 1.149 | asym-60/40 [6144,4096] |
-| 5 | **10240x10240x8192** | **+19.6%** | 1.396 | 1.167 | asym-60/40 [6144,4096] |
-| 6 | **15360x15360x8192** | **+18.5%** | 1.399 | 1.181 | asym-30/70 [4608,10752] |
-| 7 | **6144x12288x8192** | **+16.6%** | 1.496 | 1.283 | pow2 [4096,2048] |
-| 8 | **5120x10240x8192** | **+11.8%** | 1.455 | 1.302 | asym-30/70 [1536,3584] |
-| 9 | **10240x10240x4096** | **+9.6%** | 1.375 | 1.255 | asym-60/40 [6144,4096] |
-| 10 | **15360x15360x4096** | **+9.4%** | 1.419 | 1.297 | asym-30/70 [4608,10752] |
+| 1 | **10240x10240x32768** | **+37.4%** | 1.504 | 1.095 | pow2-2k [2048,8192] |
+| 2 | **10240x10240x16384** | **+30.0%** | 1.498 | 1.152 | pow2-2k [2048,8192] |
+| 3 | **12288x6144x8192** | **+29.1%** | 1.530 | 1.185 | pow2-8k [8192,4096] |
+| 4 | **10240x10240x8192** | **+28.6%** | 1.501 | 1.167 | pow2-8k [8192,2048] |
+| 5 | **11776x11776x8192** | **+23.8%** | 1.423 | 1.149 | pow2-2k [2048,9728] |
+| 6 | **15360x15360x8192** | **+18.5%** | 1.406 | 1.186 | asym-30/70 [4608,10752] |
+| 7 | **10240x10240x4096** | **+15.6%** | 1.451 | 1.255 | pow2-8k [8192,2048] |
+| 8 | **6144x12288x8192** | **+13.3%** | 1.455 | 1.285 | pow2-2k [2048,4096] |
+| 9 | **5120x10240x8192** | **+13.1%** | 1.465 | 1.295 | asym-30/70 [1536,3584] |
+| 10 | **15360x15360x4096** | **+9.0%** | 1.419 | 1.302 | asym-30/70 [4608,10752] |
 
 ### Analysis: Where Origami Wins and Why
 

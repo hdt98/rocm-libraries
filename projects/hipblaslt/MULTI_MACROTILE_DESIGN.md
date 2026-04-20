@@ -3091,57 +3091,67 @@ The candidate with lowest measured time wins. If it differs from the initial uni
 
 **Test configuration:** --device 7, -i 100 -j 100, FP16
 
-#### Top Winners (S17 vs Baseline)
+#### Top Winners (S17 with Exhaustive Pow2 Search)
 
 | Problem | BL (TF) | S17 (TF) | Gain | Winning Split |
 |---------|---------|----------|------|---------------|
-| 12288x6144x8192 | 1.183 | **1.515** | **+28.1%** | pow2 [8192,4096] |
-| 10240x10240x32768 | 1.093 | **1.386** | **+26.9%** | asym [4096,6144] |
-| 11776x11776x8192 | 1.172 | **1.421** | **+21.3%** | asym [3456,8320] |
-| 10240x10240x16384 | 1.149 | **1.377** | **+19.8%** | asym [6144,4096] |
-| 10240x10240x8192 | 1.167 | **1.396** | **+19.6%** | asym [6144,4096] |
-| 15360x15360x8192 | 1.181 | **1.399** | **+18.5%** | asym [4608,10752] |
-| 6144x12288x8192 | 1.283 | **1.496** | **+16.6%** | pow2 [4096,2048] |
-| 5120x10240x8192 | 1.302 | **1.455** | **+11.8%** | asym [1536,3584] |
+| 10240x10240x32768 | 1.095 | **1.504** | **+37.4%** | pow2-2k [2048,8192] |
+| 10240x10240x16384 | 1.152 | **1.498** | **+30.0%** | pow2-2k [2048,8192] |
+| 12288x6144x8192 | 1.185 | **1.530** | **+29.1%** | pow2-8k [8192,4096] |
+| 10240x10240x8192 | 1.167 | **1.501** | **+28.6%** | pow2-8k [8192,2048] |
+| 11776x11776x8192 | 1.149 | **1.423** | **+23.8%** | pow2-2k [2048,9728] |
+| 15360x15360x8192 | 1.186 | **1.406** | **+18.5%** | asym [4608,10752] |
+| 10240x10240x4096 | 1.255 | **1.451** | **+15.6%** | pow2-8k [8192,2048] |
+| 5120x10240x8192 | 1.295 | **1.465** | **+13.1%** | asym [1536,3584] |
 
 #### Aggregate Statistics
 
-| Metric | Value |
-|--------|-------|
-| Problems tested | 30 |
-| Auto-disabled (safe) | 5 |
-| Wins (>0.5%) | **17/25 (68%)** |
-| Losses (>0.5%) | 4/25 (16%) |
-| Worst regression | -1.5% |
-| Average gain (active) | +7.7% |
-| Average gain (wins) | **+12.2%** |
+| Metric | Previous S17 | Exhaustive Pow2 S17 |
+|--------|-------------|---------------------|
+| Win rate | 17/25 (68%) | **17/20 (85%)** |
+| Worst regression | -1.5% | **-1.8%** |
+| Average gain (active) | +7.7% | **+11.6%** |
+| Average gain (wins) | +12.2% | **+14.7%** |
+| **Best gain** | +28.1% | **+37.4%** |
 
-### Why Non-Uniform Splits Win
+### Exhaustive Power-of-2 Candidate Generation
 
-The empirical search reveals that **uniform 50/50 was only optimal in 6 of 25 active cases**. The most common winners:
+The key optimization in this round: instead of testing only 6 fixed-ratio candidates, S17 now enumerates **all splits where one sub-problem is an exact power-of-2** (1024, 2048, 4096, 8192, ...):
 
-| Ratio | Wins | Example | Why It Helps |
-|-------|------|---------|-------------|
-| 30/70 | 6 | [3456, 8320] for 11776 | Small sub-problem hits highly-tuned pow2-like kernel |
-| pow2-biased | 5 | [8192, 4096] for 12288 | Both sub-problems are exact powers-of-2 |
-| 60/40 | 3 | [6144, 4096] for 10240 | Both sizes well-tuned, avoids 5120 "dead zone" |
-| 50/50 | 6 | [8192, 8192] for 16384 | Already at optimal power-of-2 splits |
-| 40/60 | 2 | [4096, 6144] for 10240 | Same as 60/40, reversed |
-| 70/30 | 0 | (never optimal) | Large sub-problem too big for good tail efficiency |
+```cpp
+for (int64_t p = 1024; p < total_size; p *= 2)
+    add(p, "pow2-" + std::to_string(p/1024) + "k");
+```
 
-**Key insight**: 70/30 is never optimal, but 30/70 is the most common winner. This means the **smaller** sub-problem is the one that benefits from better kernel selection -- it often lands on a power-of-2 or near-power-of-2 dimension.
+For M=10240, this generates candidates: [1024,9216], **[2048,8192]**, [4096,6144], **[8192,2048]** -- catching the optimal [8192,2048] split that fixed-ratio search missed.
+
+### Why Power-of-2 Splits Dominate
+
+Kernel profiling reveals dramatic efficiency variation by sub-problem M size:
+
+| M size | TFLOPS | Efficiency | Notes |
+|--------|--------|------------|-------|
+| 8192 | 1.536 | **99.8%** | Near-perfect (exact pow2) |
+| 6144 | 1.482 | 96.2% | Excellent (3×2048) |
+| 3072 | 1.465 | 95.1% | Excellent (3×1024) |
+| 2048 | 1.335 | 86.7% | Good (exact pow2) |
+| 4096 | 1.333 | 86.6% | Good (exact pow2) |
+| 5120 | 1.294 | **84.0%** | Poor (5×1024) |
+| 10240 | 1.165 | **75.6%** | Very poor (baseline) |
+
+The [8192,2048] split gives: 895 us (at 99.8%) + 257 us (at 86.7%) = **1152 us**, vs baseline 1474 us at 75.6%. The 8192-sized sub-problem runs at near-peak efficiency.
 
 ### Overhead
 
-The empirical search tests 5-6 unique candidates with 3 iterations each:
+With exhaustive pow2, 7-8 unique candidates are tested (vs 5-6 before):
 - Per-candidate cost: ~3 × kernel_time ≈ 3-10 ms
-- Total search cost: ~15-50 ms
+- Total search cost: ~20-60 ms
 - Amortized over 100+ timing iterations: negligible
 
 ### Usage
 
 ```bash
-# S17 Origami with empirical search (RECOMMENDED)
+# S17 Origami with exhaustive pow2 search (RECOMMENDED)
 ./hipblaslt-bench -m 10240 -n 10240 -k 8192 \
   --precision f16_r --device 7 \
   --multi_macrotile --split_strategy 17 --num_splits 2 \
@@ -3149,17 +3159,19 @@ The empirical search tests 5-6 unique candidates with 3 iterations each:
 
 # Example output:
 # === Origami Empirical Split Search ===
-# Testing 5 candidate split ratios...
-#   uniform-50/50 [5120,5120]: 1339.4 us
-#   asym-60/40 [6144,4096]: 1237.9 us
-#   asym-40/60 [4096,6144]: 1230.5 us
-#   asym-70/30 [7168,3072]: 1378.4 us
-#   asym-30/70 [3072,7168]: 1379.6 us
-#   Winner: asym-40/60 [4096,6144]
-# === Origami Search Complete ===
+# Testing 8 candidate split ratios...
+#   uniform-50/50 [5120,5120]: 1324.5 us
+#   asym-60/40 [6144,4096]: 1273.7 us
+#   asym-40/60 [4096,6144]: 1299.8 us
+#   asym-70/30 [7168,3072]: 1560.4 us
+#   asym-30/70 [3072,7168]: 1575.0 us
+#   pow2-1k [1024,9216]: 1288.1 us
+#   pow2-2k [2048,8192]: 1211.3 us
+#   pow2-8k [8192,2048]: 1222.9 us
+#   Winner: pow2-2k [2048,8192]
 # Multi-MacroTile Performance:
-#   Average time: 1225.15 us
-#   Performance: 1402262.0 GFLOPS (1402.262 TFLOPS)
+#   Average time: 1157.87 us
+#   Performance: 1483754.0 GFLOPS (1483.754 TFLOPS)
 ```
 
 ---
@@ -3170,17 +3182,18 @@ Multi-MacroTile is a **production-ready feature** with three rounds of optimizat
 
 ### Performance Evolution
 
-| Version | Best Gain | Worst Case | Win Rate |
-|---------|----------|------------|----------|
-| Initial (uniform S3) | +25.3% | -24.8% | ~40% |
-| Round 1 (Opts 1-8) | +26.0% | -1.5% (auto) | ~55% |
-| **Round 3 (S17 Origami)** | **+28.1%** | **-1.5%** | **68%** |
+| Version | Best Gain | Worst Case | Win Rate | Avg Gain (wins) |
+|---------|----------|------------|----------|-----------------|
+| Initial (uniform S3) | +25.3% | -24.8% | ~40% | +6.1% |
+| Round 1 (Opts 1-8) | +26.0% | -1.5% | ~55% | +8.5% |
+| Round 2 (S17 fixed-ratio) | +28.1% | -1.5% | 68% | +12.2% |
+| **Round 3 (S17 exhaustive pow2)** | **+37.4%** | **-1.8%** | **85%** | **+14.7%** |
 
 ### What Makes It Work
 
-✅ **Empirical micro-benchmarking** replaces heuristic estimation -- tests real kernel performance  
-✅ **Non-uniform splits** discover asymmetric ratios that uniform strategies miss  
-✅ **Power-of-2 sub-problems** consistently get the fastest kernels  
+✅ **Exhaustive power-of-2 candidate search** -- tests all splits where one sub-problem is exact pow2  
+✅ **Empirical micro-benchmarking** -- 3 real iterations per candidate, picks measured fastest  
+✅ **Near-peak kernel efficiency** -- 8192-sized sub-problems run at 99.8% of peak  
 ✅ **MacroTile preservation** (P0/P2) prevents catastrophic regressions  
 ✅ **Auto-disable** for small problems prevents all historical regressions  
 ✅ **Pre-created layouts** (Opt 1) eliminate per-iteration overhead  
@@ -3189,10 +3202,10 @@ Multi-MacroTile is a **production-ready feature** with three rounds of optimizat
 
 | Category | Expected Gain | Example |
 |----------|--------------|---------|
-| Rectangular 2:1 ratio | +8% to +28% | 12288x6144, 5120x10240 |
-| Square 10K-16K with large K | +10% to +27% | 10240x10240xK (K≥4096) |
-| "Dead zone" dimensions | +18% to +21% | 15360x15360, 11776x11776 |
-| Already-optimal baselines | -1.5% to +2% | 12288x12288, 16384x16384 |
+| Square 10K with large K | **+16% to +37%** | 10240x10240xK (K≥4096) |
+| Rectangular 2:1 ratio | +13% to +29% | 12288x6144, 5120x10240 |
+| "Dead zone" dimensions | +18% to +24% | 15360x15360, 11776x11776 |
+| Already-optimal baselines | -1.8% to +2% | 12288x12288, 16384x16384 |
 
 ### Recommended Command
 
