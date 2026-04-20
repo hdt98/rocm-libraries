@@ -18,6 +18,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 ### Removed
 ### Optimized
 
+* Improved the performance of POTRF by using a recursive algorithm
 * Improved the performance of POTF2 and downstream functions such as POTRF.
 
 ### Resolved issues
