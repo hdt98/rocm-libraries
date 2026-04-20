@@ -39,8 +39,6 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-#include <iostream>
-
 // -----------------------------------------------
 // Note the recursive routine pass in a row_offset
 // to adjust the info value, so no need for the
@@ -70,9 +68,10 @@ ROCSOLVER_KERNEL void chk_positive(INFO* iinfo, INFO* info, I j, I batch_count)
 // Method to determine configuration for potrf block size depending on n
 // and the type
 template <typename T, typename I>
-static inline I potrf_get_block_size(const I n)
+static inline I potrf_get_block_size(I const n)
 {
-    return std::max(I(POTF2_MAX_SMALL_SIZE(T)), I(POTRF_POTF2_SWITCHSIZE(T)));
+    I const nb = std::max(I(POTF2_MAX_SMALL_SIZE(T)), I(POTRF_POTF2_SWITCHSIZE(T)));
+    return std::min(n, nb);
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I>
@@ -282,7 +281,6 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
     }
 
     // constants for rocblas functions calls
-    T t_one = 1;
     S s_one = 1;
     S s_minone = -1;
 
@@ -453,7 +451,7 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
 // This is the recursive formulation of the Cholesky factorization
 //
 // There is early termination of recursion if the matrix is sufficiently small
-// and witch to classic blocked version
+// and switch to classic blocked version
 // ---------------------------------------------------------------
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
@@ -476,7 +474,6 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                                                   const I row_offset_in)
 {
     // constants for rocblas functions calls
-    T t_one = 1;
     S s_one = 1;
     S s_minone = -1;
 
