@@ -7,7 +7,11 @@
 
 namespace ck_tile {
 
-template <typename Problem_, typename BlockPolicy_>
+template <typename Problem_,
+          typename BlockPolicy_,
+          index_t MXdlPack_,
+          index_t NXdlPack_,
+          index_t KXdlPack_>
 struct BlockMXGemmASmemBRegCReg
 {
     using Problem            = remove_cvref_t<Problem_>;
@@ -33,9 +37,9 @@ struct BlockMXGemmASmemBRegCReg
     static constexpr index_t NIterPerWarp = NPerBlock / (NWarp * WarpGemm::kN);
     static constexpr index_t KIterPerWarp = KPerBlock / WarpGemm::kK;
 
-    static constexpr index_t MXdlPack      = Problem::MXdlPack;
-    static constexpr index_t NXdlPack      = Problem::NXdlPack;
-    static constexpr index_t KXdlPack      = Problem::KXdlPack;
+    static constexpr index_t MXdlPack      = MXdlPack_;
+    static constexpr index_t NXdlPack      = NXdlPack_;
+    static constexpr index_t KXdlPack      = KXdlPack_;
     static constexpr index_t APackedSize   = numeric_traits<ADataType>::PackedSize;
     static constexpr index_t DsReadPreload = 4;
     static constexpr index_t m_preload     = (MIterPerWarp * KIterPerWarp >= DsReadPreload)

@@ -71,7 +71,7 @@ struct MXGemmPipelineAgBgCrPolicy : UniversalGemmPipelineAgBgCrPolicy
                                                                       typename Problem::CDataType,
                                                                       BlockWarps,
                                                                       WarpGemm>;
-        return BlockMXGemmASmemBRegCReg<Problem, BlockGemmPolicy>{};
+        return BlockMXGemmASmemBRegCReg<Problem, BlockGemmPolicy, MXdlPack, NXdlPack, KXdlPack>{};
     }
 
     CK_TILE_DEVICE static constexpr auto MakeMX_ABytesDramTileDistribution()
