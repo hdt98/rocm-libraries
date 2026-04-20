@@ -4,8 +4,9 @@
  *
  * Copyright (C) 2025 Advanced Micro Devices, Inc.
  *
- * Origami-based split search: generates candidate split configurations and
- * exposes them for empirical micro-benchmarking in the timing path.
+ * Origami-based split search: generates candidate split configurations,
+ * scores them using Origami's compute_total_latency analytical model,
+ * and exposes them for empirical micro-benchmarking in the timing path.
  *
  *******************************************************************************/
 
@@ -13,15 +14,20 @@
 
 #include <hipblaslt/hipblaslt.h>
 #include <hipblaslt/hipblaslt-ext.hpp>
+#include <origami/gemm.hpp>
+#include <origami/hardware.hpp>
+#include <origami/types.hpp>
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <regex>
+#include <iostream>
 
 struct OrigamiCandidate
 {
     std::vector<int64_t> split_sizes;
     std::string label;
+    double origami_total_latency; // sum of compute_total_latency for all sub-problems (cycles)
 };
 
 inline std::vector<OrigamiCandidate>& getOrigamiCandidates()
@@ -44,6 +50,87 @@ inline bool parseMacroTileFromName(const std::string& name,
         return true;
     }
     return false;
+}
+
+// Convert hipDataType to origami::data_type_t
+inline origami::data_type_t hipToOrigamiDtype(hipDataType dt)
+{
+    switch (dt)
+    {
+    case HIP_R_16F:  return origami::data_type_t::Half;
+    case HIP_R_16BF: return origami::data_type_t::BFloat16;
+    case HIP_R_32F:  return origami::data_type_t::Float;
+    case HIP_R_8F_E4M3_FNUZ: return origami::data_type_t::Float8_fnuz;
+    case HIP_R_8F_E5M2_FNUZ: return origami::data_type_t::BFloat8_fnuz;
+    case HIP_R_8F_E4M3: return origami::data_type_t::Float8;
+    case HIP_R_8F_E5M2: return origami::data_type_t::BFloat8;
+    default: return origami::data_type_t::Half;
+    }
+}
+
+// Compute Origami total latency for a sub-problem given its dimensions and
+// the MacroTile selected by the heuristic.
+inline double computeOrigamiLatency(
+    int64_t M, int64_t N, int64_t K,
+    size_t mt_m, size_t mt_n, size_t mt_k,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    int device_id)
+{
+    try
+    {
+        origami::problem_t problem;
+        problem.size = {(size_t)M, (size_t)N, (size_t)K};
+        problem.batch = 1;
+        problem.a_transpose = (transA == HIPBLAS_OP_T) ? origami::transpose_t::T : origami::transpose_t::N;
+        problem.b_transpose = (transB == HIPBLAS_OP_T) ? origami::transpose_t::T : origami::transpose_t::N;
+        problem.a_dtype = hipToOrigamiDtype(a_type);
+        problem.b_dtype = hipToOrigamiDtype(b_type);
+        problem.c_dtype = hipToOrigamiDtype(c_type);
+        problem.d_dtype = hipToOrigamiDtype(d_type);
+        problem.mi_dtype = origami::data_type_t::Float; // f32 compute
+
+        origami::config_t config;
+        config.mt = {mt_m, mt_n, mt_k};
+        config.mi = {16, 16, 1};
+        config.occupancy = 1;
+
+        auto hardware = origami::hardware_t::get_hardware_for_device(device_id);
+
+        return origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
+    }
+    catch (...)
+    {
+        return -1.0; // signal failure
+    }
+}
+
+// Query the heuristic for a sub-problem and get its MacroTile + Origami latency
+inline double querySubProblemLatency(
+    hipblasLtHandle_t handle,
+    int64_t M, int64_t N, int64_t K,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    hipblasComputeType_t compute_type,
+    int device_id)
+{
+    std::vector<hipblasLtMatmulHeuristicResult_t> algos;
+    hipblaslt_ext::getAllAlgos(handle, hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
+                               transA, transB, a_type, b_type, c_type, d_type,
+                               compute_type, algos);
+    if (algos.empty() || algos[0].state != HIPBLAS_STATUS_SUCCESS)
+        return -1.0;
+
+    std::string sol_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, algos[0].algo);
+    size_t mt_m, mt_n, mt_k;
+    if (!parseMacroTileFromName(sol_name, mt_m, mt_n, mt_k))
+        return -1.0;
+
+    return computeOrigamiLatency(M, N, K, mt_m, mt_n, mt_k,
+                                  transA, transB, a_type, b_type, c_type, d_type,
+                                  device_id);
 }
 
 // Check whether splitting preserves the baseline MacroTile (within 75%).
@@ -82,13 +169,23 @@ inline bool isMacroTilePreserved(
     return sp_m >= bl_m * 0.75 && sp_n >= bl_n * 0.75;
 }
 
-// Generate candidate split configurations for empirical testing.
-// brute_force=false: ratio-based + exhaustive power-of-2 (~7-8 candidates)
-// brute_force=true:  every multiple of 16 from min_sub to total-min_sub
+// Generate + score candidate split configurations.
+// Each candidate is scored using Origami compute_total_latency:
+//   total_latency = latency(sub0) + latency(sub1)
+// Candidates are sorted by total_latency (best first).
 inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     int64_t total_size,
     int macrotile_size,
-    bool brute_force = false)
+    bool brute_force,
+    hipblasLtHandle_t handle,
+    int64_t other_dim,
+    int64_t K,
+    bool is_m_split,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    hipblasComputeType_t compute_type,
+    int device_id)
 {
     std::vector<OrigamiCandidate> candidates;
     int mt = std::max(macrotile_size, 1);
@@ -102,12 +199,11 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
         s1 = std::min(s1, total_size - min_sub);
         int64_t s2 = total_size - s1;
         if (s2 >= min_sub && s1 >= min_sub)
-            candidates.push_back({{s1, s2}, label});
+            candidates.push_back({{s1, s2}, label, 0.0});
     };
 
     if (brute_force)
     {
-        // Enumerate every multiple of 16 in [min_sub, total_size - min_sub]
         const int64_t step = 16;
         int64_t lo = (min_sub + step - 1) / step * step;
         int64_t hi = total_size - min_sub;
@@ -140,13 +236,59 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
         if (!dup)
             unique.push_back(c);
     }
+
+    // Score each candidate using Origami compute_total_latency
+    // total_latency = latency(sub0) + latency(sub1) (sequential execution)
+    for (auto& cand : unique)
+    {
+        double total = 0.0;
+        bool valid = true;
+        for (size_t i = 0; i < cand.split_sizes.size(); i++)
+        {
+            int64_t sub_m = is_m_split ? cand.split_sizes[i] : (is_m_split ? total_size : other_dim);
+            int64_t sub_n = is_m_split ? other_dim : cand.split_sizes[i];
+            if (is_m_split)
+                sub_m = cand.split_sizes[i];
+            else
+                sub_n = cand.split_sizes[i];
+
+            int64_t M_sub = is_m_split ? sub_m : other_dim;
+            int64_t N_sub = is_m_split ? other_dim : sub_n;
+
+            double lat = querySubProblemLatency(handle, M_sub, N_sub, K,
+                                                 transA, transB, a_type, b_type,
+                                                 c_type, d_type, compute_type,
+                                                 device_id);
+            if (lat <= 0)
+            {
+                valid = false;
+                break;
+            }
+            total += lat;
+        }
+        cand.origami_total_latency = valid ? total : 1e18;
+    }
+
+    // Sort by Origami total latency (best first)
+    std::sort(unique.begin(), unique.end(),
+              [](const OrigamiCandidate& a, const OrigamiCandidate& b) {
+                  return a.origami_total_latency < b.origami_total_latency;
+              });
+
+    // Print Origami ranking
+    std::cout << "Origami Analytical Ranking (" << unique.size() << " candidates):" << std::endl;
+    for (size_t i = 0; i < std::min(unique.size(), (size_t)5); i++)
+    {
+        std::cout << "  #" << (i+1) << " " << unique[i].label
+                  << " [" << unique[i].split_sizes[0] << "," << unique[i].split_sizes[1] << "]"
+                  << " latency=" << std::fixed << std::setprecision(0) << unique[i].origami_total_latency
+                  << " cycles" << std::endl;
+    }
+
     return unique;
 }
 
 // Entry point called by splitGemmProblem for S17/S18/S19/S20.
-// Returns the default (first candidate) split sizes; the real selection
-// happens via empirical micro-benchmark in testing_matmul.hpp.
-// brute_force=true (S19/S20): enumerate every multiple of 16.
 inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasLtHandle_t handle,
     int64_t total_size,
@@ -168,7 +310,22 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
                                transA, transB, a_type, b_type, c_type, d_type, compute_type))
         return {};
 
-    auto cands = generateOrigamiCandidates(total_size, macrotile_size, brute_force);
+    // Get device ID for Origami hardware lookup
+    int device_id = 0;
+    hipGetDevice(&device_id);
+
+    // Also compute baseline Origami latency for comparison
+    double bl_latency = querySubProblemLatency(handle, M, N, K,
+                                                transA, transB, a_type, b_type,
+                                                c_type, d_type, compute_type, device_id);
+    if (bl_latency > 0)
+        std::cout << "Origami baseline latency: " << std::fixed << std::setprecision(0)
+                  << bl_latency << " cycles" << std::endl;
+
+    auto cands = generateOrigamiCandidates(total_size, macrotile_size, brute_force,
+                                            handle, other_dim, K, is_m_split,
+                                            transA, transB, a_type, b_type, c_type, d_type,
+                                            compute_type, device_id);
     getOrigamiCandidates() = cands;
 
     if (!cands.empty())

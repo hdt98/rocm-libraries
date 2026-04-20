@@ -10,6 +10,7 @@ target_include_directories(hipblaslt-clients-common
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../tensilelite/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../tensilelite>
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/library/src/amd_detail/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/origami/include>
     PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/../../tensilelite"
 )
@@ -27,6 +28,7 @@ target_link_libraries(hipblaslt-clients-common
     PRIVATE
         hip::device
         tensilelite::tensilelite-host
+        origami
 )
 
 if(HIPBLASLT_ENABLE_ROCROLLER)
