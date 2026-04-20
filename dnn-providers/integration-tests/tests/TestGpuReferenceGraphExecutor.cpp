@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <hip/hip_runtime.h>
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <unordered_map>
 #include <vector>
@@ -22,7 +22,7 @@
 namespace
 {
 
-using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_integration_tests::test_utils;
 using hipdnn_integration_tests::gpu_graph_executor::GpuReferenceGraphExecutor;
 
