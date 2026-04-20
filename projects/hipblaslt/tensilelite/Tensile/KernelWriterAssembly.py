@@ -10034,9 +10034,9 @@ class KernelWriterAssembly(KernelWriter):
       if self.states.inTailLoop and not kernel["1LDSBuffer"]:
         ldsAddrSgprName = comp.getLdsAddrSgprName("tdmAGroup0")
         clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
-        imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+        imod.middle.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
                          comment="Reset TDM LDS swap bit for tail loop"))
-      imod.add(comp.issueLoad("tdmAGroup0", "tdmAGroup1", None, None))
+      imod.middle.add(comp.issueLoad("tdmAGroup0", "tdmAGroup1", None, None))
       return imod
 
     if tc == "MXSA" and kernel["enableTDMA"]:
@@ -10061,9 +10061,9 @@ class KernelWriterAssembly(KernelWriter):
         if self.states.inTailLoop and not kernel["1LDSBuffer"]:
           ldsAddrSgprName = comp.getLdsAddrSgprName("tdmBGroup0")
           clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
-          imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+          imod.middle.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
                            comment="Reset TDM LDS swap bit for tail loop"))
-        imod.add(comp.issueLoad("tdmBGroup0", "tdmBGroup1", None, None))
+        imod.middle.add(comp.issueLoad("tdmBGroup0", "tdmBGroup1", None, None))
       return imod
 
     if tc == "MXSB" and kernel["enableTDMB"]:
@@ -10075,9 +10075,9 @@ class KernelWriterAssembly(KernelWriter):
         if self.states.inTailLoop and not kernel["1LDSBuffer"]:
           ldsAddrSgprName = comp.getLdsAddrSgprName("tdmMXSBGroup0")
           clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
-          imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+          imod.middle.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
                            comment="Reset TDM LDS swap bit for tail loop"))
-        imod.add(comp.issueLoad("tdmMXSBGroup0", "tdmMXSBGroup1", None, None))
+        imod.middle.add(comp.issueLoad("tdmMXSBGroup0", "tdmMXSBGroup1", None, None))
       return imod
 
     # sizeK % LOCAL_DEPTHU
