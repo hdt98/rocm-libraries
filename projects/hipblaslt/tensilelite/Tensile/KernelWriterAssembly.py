@@ -428,9 +428,15 @@ class KernelWriterAssembly(KernelWriter):
       elif tChar == "B":
         localReadWidth = (self.states.lrvwUnrollB * tP["bpeDS"]) / bpr
       elif tChar == "MXSA":
-        localReadWidth = (self.states.lrvwUnrollMXSA * tP["bpeDS"]) / bpr
+        if kernel["ISA"][:2] == (9, 5):
+          localReadWidth = (self.states.lrvwUnrollMXSA * tP["bpeDS"]) / bpr
+        else:
+          localReadWidth = (self.states.lrvwUnrollMXSA * kernel["VectorWidthA"] * tP["bpeDS"]) / bpr
       elif tChar == "MXSB":
-        localReadWidth = (self.states.lrvwUnrollMXSB * tP["bpeDS"]) / bpr
+        if kernel["ISA"][:2] == (9, 5):
+          localReadWidth = (self.states.lrvwUnrollMXSB * tP["bpeDS"]) / bpr
+        else:
+          localReadWidth = (self.states.lrvwUnrollMXSB * kernel["VectorWidthB"] * tP["bpeDS"]) / bpr
       elif tChar == "Metadata":
         localReadWidth = (self.states.lrvwUnrollMetadata * tP["bpeDS"]) / bpr
       else:
