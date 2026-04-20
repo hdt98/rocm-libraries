@@ -35,7 +35,7 @@ void HeuristicPlugin::resolveSymbols()
         {                                                                                       \
             throw HipdnnException(                                                              \
                 HIPDNN_STATUS_PLUGIN_ERROR,                                                     \
-                std::string("❌ HEURISTIC PLUGIN ABI INCOMPLETE ❌\n")                          \
+                std::string("ERROR: HEURISTIC PLUGIN ABI INCOMPLETE\n")                         \
                     + "Plugin: " + _lib.libraryPath().string() + "\n"                           \
                     + "Missing required symbol: " symbolName "\n"                               \
                     + "This plugin does not implement the complete heuristic plugin C ABI.\n"   \

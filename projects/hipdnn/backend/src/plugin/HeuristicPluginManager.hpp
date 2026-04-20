@@ -49,7 +49,7 @@ protected:
         if(Version{plugin.apiVersion()}.major != HIPDNN_HEURISTIC_API_VERSION_MAJOR)
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                                  "❌ HEURISTIC PLUGIN ABI VALIDATION FAILED ❌\n"
+                                  "ERROR: HEURISTIC PLUGIN ABI VALIDATION FAILED\n"
                                   "Plugin API major version ("
                                       + std::string(plugin.apiVersion())
                                       + ") does not match expected heuristic API major version ("
@@ -64,7 +64,7 @@ protected:
         if(_policyIds.find(policyId) != _policyIds.end())
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                                  "❌ HEURISTIC PLUGIN VALIDATION FAILED ❌\n"
+                                  "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
                                   "Policy ID "
                                       + std::to_string(policyId)
                                       + " already exists in the list of loaded heuristic plugins.\n"
@@ -82,7 +82,7 @@ protected:
             {
                 throw HipdnnException(
                     HIPDNN_STATUS_PLUGIN_ERROR,
-                    "❌ HEURISTIC PLUGIN VALIDATION FAILED ❌\n"
+                    "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
                     "Policy ID mismatch: GetPolicyId() returned "
                         + std::to_string(policyId) + " but engineNameToId(\"" + policyName
                         + "\") = " + std::to_string(expectedId)
