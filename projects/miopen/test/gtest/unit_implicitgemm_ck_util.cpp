@@ -145,6 +145,7 @@ struct CPU_UnitTestImplicitGemmCKUtil_NONE : CKArgParsingTest<StubbedCKArgs, Stu
 {
 };
 
+// cppcheck-suppress syntaxError
 TEST_P(CPU_UnitTestImplicitGemmCKUtil_NONE, TestParsing)
 {
 #if MIOPEN_USE_COMPOSABLEKERNEL
