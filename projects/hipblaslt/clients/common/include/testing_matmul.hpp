@@ -2125,62 +2125,10 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         hipblaslt_seedrand();
 
-<<<<<<< HEAD
-        if(isBlockScaling(arg.scaleA))
-        {
-#if !HIPBLASLT_ENABLE_MXDATAGENERATOR
-            hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
-            return;
-#else
-=======
         size_t scaleA_row = ((transA == HIPBLAS_OP_T) ? blockSize(arg.scaleA) : 1);
         size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
         if(isBlockScaling(arg.scaleA))
         {
-#ifdef HIPBLASLT_USE_ROCROLLER
->>>>>>> origin/develop
-            if(arg.initialization != hipblaslt_initialization::hpl
-               && arg.initialization != hipblaslt_initialization::trig_float
-               && arg.initialization != hipblaslt_initialization::uniform_01)
-            {
-                hipblaslt_cout << "Initialization of microscaling data only allows hpl, trig_float "
-                                  "or uniform_01, not "
-                               << hipblaslt_initialization2string(arg.initialization) << std::endl;
-                return;
-            }
-            if(arg.algo_method == 1)
-            {
-                hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
-                return;
-            }
-            // For MX format, use mxDataGenerator to generate input data
-            // (consists of data part and scale part)
-            // TODO: mxDataGenerator can only generate data on CPU. Using
-            //       GPU to generate data might be more efficient and avoid
-            //       unnecessary hipMemCpy when CPU verification is not needed.
-
-            // preTile for A: {tileK, tileM} - swap from preTileSizeForScaleA which returns {tileM, tileK}
-            auto preTileATmp = preTileSizeForScaleA(arg.scaleA);
-            auto preTileA = (preTileATmp.size() == 2) ? std::vector<size_t>{preTileATmp[1], preTileATmp[0]} : std::vector<size_t>{};
-            refA.emplace_back(generateMXInput(TiA,
-                                              hA[i].buf(),
-                                              hScaleA[i].buf(),
-                                              A_row[i],
-                                              A_col[i],
-                                              lda[i],
-                                              transA == HIPBLAS_OP_T,
-                                              preSwizzleSizeForScale(arg.scaleA),
-                                              preTileA,
-                                              blockSize(arg.scaleA),
-                                              1,
-                                              true,
-                                              hipblaslt_initialization2string(arg.initialization)));
-            // Copy data and scale to device buffers
-            CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
-            CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
-<<<<<<< HEAD
-=======
-#else
             hipblaslt_init_device(ABC_dims::A,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),
@@ -2202,8 +2150,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleA),
                                   stride_a[i] / scaleA_row / scaleA_col,
                                   num_batches[i]);
->>>>>>> origin/develop
-#endif
         }
         else
         {
@@ -2224,54 +2170,6 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
-<<<<<<< HEAD
-#if !HIPBLASLT_ENABLE_MXDATAGENERATOR
-            hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
-            return;
-#else
-=======
-#ifdef HIPBLASLT_USE_ROCROLLER
->>>>>>> origin/develop
-            if(arg.initialization != hipblaslt_initialization::hpl
-               && arg.initialization != hipblaslt_initialization::trig_float
-               && arg.initialization != hipblaslt_initialization::uniform_01)
-            {
-                hipblaslt_cout << "Initialization of microscaling data only allows hpl, trig_float "
-                                  "or uniform_01, not "
-                               << hipblaslt_initialization2string(arg.initialization) << std::endl;
-                return;
-            }
-            if(arg.algo_method == 1)
-            {
-                hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
-                return;
-            }
-            // For MX format, use mxDataGenerator to generate
-            // input data (consists of data part and scale part)
-            // TODO: mxDataGenerator can only generate data on CPU. Using
-            //       GPU to generate data might be more efficient and avoid
-            //       unnecessary hipMemCpy when CPU verification is not needed.
-            // preTile for B: {tileK, tileN}
-            auto preTileB = preTileSizeForScaleB(arg.scaleB);
-            refB.emplace_back(generateMXInput(TiB,
-                                              hB[i].buf(),
-                                              hScaleB[i].buf(),
-                                              B_row[i],
-                                              B_col[i],
-                                              ldb[i],
-                                              transB == HIPBLAS_OP_T,
-                                              preSwizzleSizeForScale(arg.scaleB),
-                                              preTileB,
-                                              1,
-                                              blockSize(arg.scaleB),
-                                              false,
-                                              hipblaslt_initialization2string(arg.initialization)));
-            // Copy data and scale to device buffers
-            CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
-            CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
-<<<<<<< HEAD
-=======
-#else
             hipblaslt_init_device(ABC_dims::B,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),
@@ -2293,8 +2191,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleB),
                                   stride_b[i] / scaleB_row / scaleB_col,
                                   num_batches[i]);
->>>>>>> origin/develop
-#endif
         }
         else
         {
@@ -2325,12 +2221,6 @@ void testing_matmul_with_bias(const Arguments& arg,
         CHECK_HIP_ERROR(broadcast(dA[i], block_count));
         CHECK_HIP_ERROR(broadcast(dB[i], block_count));
         CHECK_HIP_ERROR(broadcast(dC[i], block_count));
-#ifndef HIPBLASLT_USE_ROCROLLER
-        if(isBlockScaling(arg.scaleA))
-            CHECK_HIP_ERROR(broadcast(dScaleA[i], block_count));
-        if(isBlockScaling(arg.scaleB))
-            CHECK_HIP_ERROR(broadcast(dScaleB[i], block_count));
-#endif
 
         if(arg.unit_check || arg.norm_check || arg.allclose_check || do_swizzle_a || do_swizzle_b)
         {
@@ -2354,18 +2244,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                                         do_swizzle_b,
                                         stream));
             CHECK_HIP_ERROR(synchronize(hC[i], dC[i], 0, 0, 0, 0, 1, false, stream));
-#ifndef HIPBLASLT_USE_ROCROLLER
-            if(isBlockScaling(arg.scaleA))
-            {
-                CHECK_HIP_ERROR(synchronize(hScaleA[i], dScaleA[i], 0, 0, 0, 0, 1, false, stream));
-                refA.emplace_back(mx_type_to_f32(TiA, scaleDataType(arg.scaleA), hA[i], hScaleA[i], A_row[i], A_col[i], scaleA_row, scaleA_col));
-            }
-            if(isBlockScaling(arg.scaleB))
-            {
-                CHECK_HIP_ERROR(synchronize(hScaleB[i], dScaleB[i], 0, 0, 0, 0, 1, false, stream));
-                refB.emplace_back(mx_type_to_f32(TiB, scaleDataType(arg.scaleB), hB[i], hScaleB[i], B_row[i], B_col[i], scaleB_row, scaleB_col));
-            }
-#endif
 
             if(arg.dump_matrix)
             {
