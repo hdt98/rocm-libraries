@@ -17,8 +17,6 @@ thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError
 
 namespace
 {
-// Simple test policy ID (hash of "TestGoodHeuristicPolicy")
-constexpr int64_t TEST_POLICY_ID = 0x1234567890ABCDEF;
 // NOLINTBEGIN(readability-identifier-naming)
 const char* POLICY_NAME = "TestGoodHeuristicPolicy";
 const char* PLUGIN_VERSION = "1.0.0";
@@ -59,18 +57,6 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *version = HIPDNN_HEURISTIC_API_VERSION;
-    return HIPDNN_PLUGIN_STATUS_SUCCESS;
-}
-
-hipdnnPluginStatus_t hipdnnHeuristicGetPolicyId(int64_t* policy_id)
-{
-    if(policy_id == nullptr)
-    {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                                "policy_id pointer is null");
-        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
-    }
-    *policy_id = TEST_POLICY_ID;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 

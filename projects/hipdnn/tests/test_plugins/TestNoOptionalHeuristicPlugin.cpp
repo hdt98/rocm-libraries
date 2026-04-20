@@ -12,10 +12,9 @@
  * Used to test optional symbol handling via tryAssignSymbol().
  *
  * Missing optional symbols:
- * - hipdnnHeuristicGetPolicyName (optional)
  * - hipdnnHeuristicSetLogLevel (optional)
  *
- * This tests the code paths where _funcGetPolicyName and _funcSetLogLevel are nullptr.
+ * This tests the code paths where _funcSetLogLevel is nullptr.
  */
 
 // NOLINTNEXTLINE
@@ -25,8 +24,9 @@ thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError
 
 namespace
 {
-// NOLINTNEXTLINE(bugprone-narrowing-conversions,clang-diagnostic-sign-conversion)
-constexpr int64_t TEST_POLICY_ID = static_cast<int64_t>(0xFEDCBA9876543210ULL);
+// NOLINTBEGIN(readability-identifier-naming)
+const char* POLICY_NAME = "TestNoOptionalHeuristicPolicy";
+// NOLINTEND(readability-identifier-naming)
 } // anonymous namespace
 
 // NOLINTBEGIN(readability-identifier-naming)
@@ -46,19 +46,17 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicGetPolicyId(int64_t* policy_id)
+hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
 {
-    if(policy_id == nullptr)
+    if(policy_name == nullptr)
     {
         hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                                "policy_id pointer is null");
+                                                                "policy_name pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
-    *policy_id = TEST_POLICY_ID;
+    *policy_name = POLICY_NAME;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
-
-// hipdnnHeuristicGetPolicyName - OPTIONAL, NOT IMPLEMENTED
 
 hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
 {

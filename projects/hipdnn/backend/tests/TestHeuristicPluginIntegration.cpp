@@ -35,7 +35,7 @@ std::filesystem::path getTestPluginPath(const char* pluginName)
 }
 } // namespace
 
-class TestHeuristicPluginIntegration : public ::testing::Test
+class IntegrationHeuristicPlugin : public ::testing::Test
 {
 protected:
     void SetUp() override
@@ -55,7 +55,7 @@ protected:
 
 // ========== Complete Workflow Tests ==========
 
-TEST_F(TestHeuristicPluginIntegration, CompleteHandleLifecycleWithGoodPlugin)
+TEST_F(IntegrationHeuristicPlugin, CompleteHandleLifecycleWithGoodPlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -84,7 +84,7 @@ TEST_F(TestHeuristicPluginIntegration, CompleteHandleLifecycleWithGoodPlugin)
     EXPECT_FALSE(plugin->version().empty());
 }
 
-TEST_F(TestHeuristicPluginIntegration, CompletePolicyDescriptorLifecycle)
+TEST_F(IntegrationHeuristicPlugin, CompletePolicyDescriptorLifecycle)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -106,7 +106,7 @@ TEST_F(TestHeuristicPluginIntegration, CompletePolicyDescriptorLifecycle)
     EXPECT_NO_THROW(plugin->destroyPolicyDescriptor(desc));
 }
 
-TEST_F(TestHeuristicPluginIntegration, SetEngineIdsOnPolicyDescriptor)
+TEST_F(IntegrationHeuristicPlugin, SetEngineIdsOnPolicyDescriptor)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -130,7 +130,7 @@ TEST_F(TestHeuristicPluginIntegration, SetEngineIdsOnPolicyDescriptor)
     plugin->destroyPolicyDescriptor(desc);
 }
 
-TEST_F(TestHeuristicPluginIntegration, SetSerializedGraphOnPolicyDescriptor)
+TEST_F(IntegrationHeuristicPlugin, SetSerializedGraphOnPolicyDescriptor)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -158,7 +158,7 @@ TEST_F(TestHeuristicPluginIntegration, SetSerializedGraphOnPolicyDescriptor)
     plugin->destroyPolicyDescriptor(desc);
 }
 
-TEST_F(TestHeuristicPluginIntegration, FinalizeAndGetSortedEngineIds)
+TEST_F(IntegrationHeuristicPlugin, FinalizeAndGetSortedEngineIds)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -189,7 +189,7 @@ TEST_F(TestHeuristicPluginIntegration, FinalizeAndGetSortedEngineIds)
     plugin->destroyPolicyDescriptor(desc);
 }
 
-TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesOnHandle)
+TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnHandle)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -219,7 +219,7 @@ TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesOnHandle)
     EXPECT_NO_THROW(plugin->setDeviceProperties(handle, &devicePropsData));
 }
 
-TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesOnAllHandles)
+TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnAllHandles)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -239,7 +239,7 @@ TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesOnAllHandles)
     EXPECT_NO_THROW(rm->setDevicePropertiesOnAllHandles(&devicePropsData));
 }
 
-TEST_F(TestHeuristicPluginIntegration, CompleteWorkflowWithDevicePropertiesAndFinalize)
+TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinalize)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -292,7 +292,7 @@ TEST_F(TestHeuristicPluginIntegration, CompleteWorkflowWithDevicePropertiesAndFi
 
 // ========== Plugin Metadata Coverage ==========
 
-TEST_F(TestHeuristicPluginIntegration, GetPolicyNameFromLoadedPlugin)
+TEST_F(IntegrationHeuristicPlugin, GetPolicyNameFromLoadedPlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -313,7 +313,7 @@ TEST_F(TestHeuristicPluginIntegration, GetPolicyNameFromLoadedPlugin)
     }
 }
 
-TEST_F(TestHeuristicPluginIntegration, GetPluginVersionFromLoadedPlugin)
+TEST_F(IntegrationHeuristicPlugin, GetPluginVersionFromLoadedPlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -328,7 +328,7 @@ TEST_F(TestHeuristicPluginIntegration, GetPluginVersionFromLoadedPlugin)
     EXPECT_FALSE(pluginVersion.empty());
 }
 
-TEST_F(TestHeuristicPluginIntegration, GetApiVersionFromLoadedPlugin)
+TEST_F(IntegrationHeuristicPlugin, GetApiVersionFromLoadedPlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -344,7 +344,7 @@ TEST_F(TestHeuristicPluginIntegration, GetApiVersionFromLoadedPlugin)
     EXPECT_NE(apiVersion.find("1."), std::string_view::npos); // Should be version 1.x
 }
 
-TEST_F(TestHeuristicPluginIntegration, GetPluginTypeFromLoadedPlugin)
+TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -362,7 +362,7 @@ TEST_F(TestHeuristicPluginIntegration, GetPluginTypeFromLoadedPlugin)
 
 // ========== Resource Manager Enumeration Coverage ==========
 
-TEST_F(TestHeuristicPluginIntegration, GetLoadedPluginFilesReturnsCorrectCount)
+TEST_F(IntegrationHeuristicPlugin, GetLoadedPluginFilesReturnsCorrectCount)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -376,7 +376,7 @@ TEST_F(TestHeuristicPluginIntegration, GetLoadedPluginFilesReturnsCorrectCount)
     EXPECT_GT(numPlugins, 0u);
 }
 
-TEST_F(TestHeuristicPluginIntegration, ToStringContainsPluginInformation)
+TEST_F(IntegrationHeuristicPlugin, ToStringContainsPluginInformation)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -389,7 +389,7 @@ TEST_F(TestHeuristicPluginIntegration, ToStringContainsPluginInformation)
 
 // ========== Multiple Descriptors Per Handle ==========
 
-TEST_F(TestHeuristicPluginIntegration, MultipleDescriptorsFromSameHandle)
+TEST_F(IntegrationHeuristicPlugin, MultipleDescriptorsFromSameHandle)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -426,7 +426,7 @@ TEST_F(TestHeuristicPluginIntegration, MultipleDescriptorsFromSameHandle)
 
 // ========== Error Path: Device Properties Exceptions ==========
 
-TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesHandlesPluginFailures)
+TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesHandlesPluginFailures)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -442,7 +442,7 @@ TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesHandlesPluginFailures)
 
 // ========== Error Path: Missing Optional Functions ==========
 
-TEST_F(TestHeuristicPluginIntegration, PolicyNameReturnsEmptyWhenOptionalFunctionMissing)
+TEST_F(IntegrationHeuristicPlugin, PolicyNameReturnsEmptyWhenOptionalFunctionMissing)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -464,7 +464,7 @@ TEST_F(TestHeuristicPluginIntegration, PolicyNameReturnsEmptyWhenOptionalFunctio
     }
 }
 
-TEST_F(TestHeuristicPluginIntegration, SetPluginLogLevelHandlesMissingOptionalFunction)
+TEST_F(IntegrationHeuristicPlugin, SetPluginLogLevelHandlesMissingOptionalFunction)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -478,7 +478,7 @@ TEST_F(TestHeuristicPluginIntegration, SetPluginLogLevelHandlesMissingOptionalFu
 
 // ========== Error Path: Empty Engine IDs ==========
 
-TEST_F(TestHeuristicPluginIntegration, FinalizeWithEmptyEngineIdsSucceeds)
+TEST_F(IntegrationHeuristicPlugin, FinalizeWithEmptyEngineIdsSucceeds)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -507,7 +507,7 @@ TEST_F(TestHeuristicPluginIntegration, FinalizeWithEmptyEngineIdsSucceeds)
 
 // ========== Error Path: Multiple Policy Lookups (Same Handle/Plugin Reuse) ==========
 
-TEST_F(TestHeuristicPluginIntegration, MultipleGetHandleCallsReturnSameHandle)
+TEST_F(IntegrationHeuristicPlugin, MultipleGetHandleCallsReturnSameHandle)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -525,7 +525,7 @@ TEST_F(TestHeuristicPluginIntegration, MultipleGetHandleCallsReturnSameHandle)
     EXPECT_NE(handle1, nullptr);
 }
 
-TEST_F(TestHeuristicPluginIntegration, MultipleGetPluginCallsReturnSamePlugin)
+TEST_F(IntegrationHeuristicPlugin, MultipleGetPluginCallsReturnSamePlugin)
 {
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
@@ -545,7 +545,7 @@ TEST_F(TestHeuristicPluginIntegration, MultipleGetPluginCallsReturnSamePlugin)
 
 // ========== Error Path: No plugins loaded scenario ==========
 
-TEST_F(TestHeuristicPluginIntegration, SetDevicePropertiesWithNoPluginsLoaded)
+TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesWithNoPluginsLoaded)
 {
     // Create RM with no plugins
     HeuristicPluginResourceManager::setHeuristicPluginPaths({}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
@@ -613,7 +613,7 @@ protected:
 private:
     std::unique_ptr<TestableHeuristicPlugin> _pluginPtr;
 };
-TEST_F(TestHeuristicPluginIntegration, LoadGoodPluginSucceeds)
+TEST_F(IntegrationHeuristicPlugin, LoadGoodPluginSucceeds)
 {
     const auto pluginPath = getTestPluginPath(TEST_GOOD_HEURISTIC_PLUGIN_NAME);
 
@@ -635,7 +635,8 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {
     const auto policyId = plugin().policyId();
-    EXPECT_EQ(policyId, 0x1234567890ABCDEF); // TEST_POLICY_ID from plugin
+    const auto expectedId = hipdnn_data_sdk::utilities::engineNameToId("TestGoodHeuristicPolicy");
+    EXPECT_EQ(policyId, expectedId);
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyName)
 {
@@ -769,7 +770,7 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCompleteWorkflow)
     plugin().destroyPolicyDescriptor(desc);
     plugin().destroyHandle(handle);
 }
-TEST_F(TestHeuristicPluginIntegration, LoadIncompletePluginThrowsException)
+TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
 {
     const auto pluginPath = getTestPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
 
@@ -796,7 +797,7 @@ TEST_F(TestHeuristicPluginIntegration, LoadIncompletePluginThrowsException)
         },
         HipdnnException);
 }
-TEST_F(TestHeuristicPluginIntegration, IncompletePluginExceptionContainsSymbolName)
+TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionContainsSymbolName)
 {
     const auto pluginPath = getTestPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);
@@ -810,18 +811,20 @@ TEST_F(TestHeuristicPluginIntegration, IncompletePluginExceptionContainsSymbolNa
             catch(const HipdnnException& e)
             {
                 const std::string errorMsg(e.what());
-                // Should mention one of the missing symbols
+                // Should mention one of the missing required symbols
+                const bool hasPolicyNameError
+                    = errorMsg.find("hipdnnHeuristicGetPolicyName") != std::string::npos;
                 const bool hasFinalizeError
                     = errorMsg.find("hipdnnHeuristicPolicyFinalize") != std::string::npos;
                 const bool hasGetSortedError
                     = errorMsg.find("hipdnnHeuristicPolicyGetSortedEngineIds") != std::string::npos;
-                EXPECT_TRUE(hasFinalizeError || hasGetSortedError);
+                EXPECT_TRUE(hasPolicyNameError || hasFinalizeError || hasGetSortedError);
                 throw;
             }
         },
         HipdnnException);
 }
-TEST_F(TestHeuristicPluginIntegration, IncompletePluginExceptionHasPluginErrorStatus)
+TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionHasPluginErrorStatus)
 {
     const auto pluginPath = getTestPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);
@@ -840,7 +843,7 @@ TEST_F(TestHeuristicPluginIntegration, IncompletePluginExceptionHasPluginErrorSt
         },
         HipdnnException);
 }
-TEST_F(TestHeuristicPluginIntegration, LoadPluginWithoutOptionalSymbolsSucceeds)
+TEST_F(IntegrationHeuristicPlugin, LoadPluginWithoutOptionalSymbolsSucceeds)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
 
@@ -852,17 +855,18 @@ TEST_F(TestHeuristicPluginIntegration, LoadPluginWithoutOptionalSymbolsSucceeds)
     // NOLINTNEXTLINE(misc-const-correctness)
     ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
 }
-TEST_F(TestHeuristicPluginIntegration, PluginWithoutOptionalPolicyNameReturnsEmpty)
+TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalPolicyNameHasName)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);
     const TestableHeuristicPlugin plugin(std::move(lib));
 
-    // Plugin doesn't implement hipdnnHeuristicGetPolicyName
+    // GetPolicyName is now required
     const auto name = plugin.policyName();
-    EXPECT_TRUE(name.empty());
+    EXPECT_FALSE(name.empty());
+    EXPECT_EQ(name, "TestNoOptionalHeuristicPolicy");
 }
-TEST_F(TestHeuristicPluginIntegration, PluginWithoutOptionalSetLogLevelSucceeds)
+TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalSetLogLevelSucceeds)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);
@@ -873,7 +877,7 @@ TEST_F(TestHeuristicPluginIntegration, PluginWithoutOptionalSetLogLevelSucceeds)
     const auto status = plugin.setLogLevel(HIPDNN_SEV_INFO);
     EXPECT_EQ(status, HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
-TEST_F(TestHeuristicPluginIntegration, PluginWithoutOptionalCanStillExecuteWorkflow)
+TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalCanStillExecuteWorkflow)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);
@@ -900,15 +904,16 @@ TEST_F(TestHeuristicPluginIntegration, PluginWithoutOptionalCanStillExecuteWorkf
 }
 TEST_F(TestHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
 {
-    // First call
+    // First call - ID is computed from policy name
     const auto id1 = plugin().policyId();
-    EXPECT_EQ(id1, 0x1234567890ABCDEF);
+    const auto expectedId = hipdnn_data_sdk::utilities::engineNameToId("TestGoodHeuristicPolicy");
+    EXPECT_EQ(id1, expectedId);
 
     // Second call should return cached value
     const auto id2 = plugin().policyId();
     EXPECT_EQ(id2, id1);
 }
-TEST_F(TestHeuristicPluginIntegration, GetSortedEngineIdsReturnsEmptyWhenNoEngines)
+TEST_F(IntegrationHeuristicPlugin, GetSortedEngineIdsReturnsEmptyWhenNoEngines)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
     SharedLibrary lib(pluginPath);

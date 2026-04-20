@@ -127,7 +127,6 @@ private:
 
     // Module metadata function pointers
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcGetPolicyId)(int64_t*);
     hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
     hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
     hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnHeuristicLoggingCallback_t);

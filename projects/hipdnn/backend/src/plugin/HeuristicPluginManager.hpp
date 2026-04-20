@@ -71,24 +71,15 @@ protected:
                                       + "Each heuristic plugin must have a unique policy ID.");
         }
 
-        // Validate policy ID ↔ policy name consistency (RFC 0007 §11, §5.3.1)
-        // If GetPolicyName is provided, engineNameToId(name) MUST equal GetPolicyId()
+        // Validate policy name is provided (required for all heuristic plugins)
         auto policyNameView = plugin.policyName();
-        if(!policyNameView.empty())
+        if(policyNameView.empty())
         {
-            const std::string policyName(policyNameView);
-            const int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(policyName);
-            if(expectedId != policyId)
-            {
-                throw HipdnnException(
-                    HIPDNN_STATUS_PLUGIN_ERROR,
-                    "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
-                    "Policy ID mismatch: GetPolicyId() returned "
-                        + std::to_string(policyId) + " but engineNameToId(\"" + policyName
-                        + "\") = " + std::to_string(expectedId)
-                        + "\nPlugin must return consistent ID and name (RFC 0007 §11, §5.3.1).\n"
-                        + "Either fix the policy ID to match the hash, or fix the policy name.");
-            }
+            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                                  "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
+                                  "Policy name is required but was not provided.\n"
+                                  "Plugin must implement hipdnnHeuristicGetPolicyName() and return a "
+                                  "non-empty policy name.");
         }
     }
 

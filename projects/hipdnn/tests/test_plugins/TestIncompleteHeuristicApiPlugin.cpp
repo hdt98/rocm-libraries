@@ -9,6 +9,7 @@
  * in HeuristicPlugin::resolveSymbols().
  *
  * Missing symbols:
+ * - hipdnnHeuristicGetPolicyName (required)
  * - hipdnnHeuristicPolicyFinalize (required)
  * - hipdnnHeuristicPolicyGetSortedEngineIds (required)
  *
@@ -28,16 +29,6 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
     *version = HIPDNN_HEURISTIC_API_VERSION;
-    return HIPDNN_PLUGIN_STATUS_SUCCESS;
-}
-
-hipdnnPluginStatus_t hipdnnHeuristicGetPolicyId(int64_t* policy_id)
-{
-    if(policy_id == nullptr)
-    {
-        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
-    }
-    *policy_id = 0x999;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
@@ -138,6 +129,7 @@ hipdnnPluginStatus_t
 }
 
 // ========== MISSING REQUIRED SYMBOLS ==========
+// hipdnnHeuristicGetPolicyName - NOT IMPLEMENTED
 // hipdnnHeuristicPolicyFinalize - NOT IMPLEMENTED
 // hipdnnHeuristicPolicyGetSortedEngineIds - NOT IMPLEMENTED
 
