@@ -451,7 +451,7 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
 // This is the recursive formulation of the Cholesky factorization
 //
 // There is early termination of recursion if the matrix is sufficiently small
-// and switch to classic blocked version
+// and switches to the classic blocked version
 // ---------------------------------------------------------------
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
