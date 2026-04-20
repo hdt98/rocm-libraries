@@ -436,6 +436,9 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                index_t nblock_stride_kv_block_descale = 0,
                index_t nhead_stride_kv_block_descale  = 0) const
     {
+        // TODO: implement block-sparsity skip in this pipeline; parameter is wired through
+        // the dispatch layer but the prefill main loop does not yet honor it.
+        (void)block_mask_row_ptr;
         // KV_BLOCKSCALE requires page_block_size >= kN0 to ensure
         // all tokens in a main loop iteration belong to the same page
         if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::KV_BLOCKSCALE)

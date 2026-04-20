@@ -356,12 +356,18 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
 
         do
         {
-            // Block sparsity: skip fully-masked KV blocks
+            // Block sparsity: skip fully-masked KV blocks.
+            // The previous iteration left a K async load in flight (initial setup or the
+            // prefetch at the bottom of the non-skip path). Decode uses a single LDS buffer
+            // for K, so we must drain that stale vmem before re-issuing the K prefetch for
+            // the next block; otherwise iter i+2 would race on the K LDS slot.
             if(block_mask_row_ptr != nullptr &&
                block_mask_row_ptr[kv_block_idx_base_decode + i_total_loops] == 0)
             {
                 move_tile_window(k_dram_window, {kN0, 0});
                 move_tile_window(v_dram_window, {kN0, 0});
+                block_sync_lds_direct_load<0>();
+                async_load_tile(k_lds_write_window, k_dram_window);
                 continue;
             }
 

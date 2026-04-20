@@ -351,7 +351,6 @@ struct fmha_fwd_args
     ck_tile::index_t block_scale_size_kv;
 
     const int32_t* block_mask_ptr = nullptr;
-    ck_tile::index_t block_mask_stride = 0;
     ck_tile::index_t stride_block_mask = 0;
     ck_tile::index_t nhead_stride_block_mask = 0;
     ck_tile::index_t batch_stride_block_mask = 0;
@@ -810,6 +809,17 @@ auto fmha_fwd_create_kargs_and_grids(fmha_fwd_args args)
                                              args.head_start);
         }
     }();
+
+    kargs.block_mask_ptr          = args.block_mask_ptr;
+    kargs.stride_block_mask       = args.stride_block_mask;
+    kargs.nhead_stride_block_mask = args.nhead_stride_block_mask;
+    kargs.batch_stride_block_mask = args.batch_stride_block_mask;
+
+    // Block mask is consumed by the pipeline at kernel tile granularity (kM0 x kN0).
+    // The runner currently generates the mask at fmha_fwd_runner::kBlockMaskBlockSize.
+    // Verify alignment when block sparsity is in use.
+    assert(args.block_mask_ptr == nullptr ||
+           (FmhaKernel::FmhaPipeline::kM0 == 128 && FmhaKernel::FmhaPipeline::kN0 == 128));
 
     if constexpr(FmhaKernel::kIsGroupMode)
     {

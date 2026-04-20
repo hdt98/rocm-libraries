@@ -728,12 +728,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                    : std::array<ck_tile::index_t, 2>{batch, nhead})
             : std::array<ck_tile::index_t, 2>{1, 1});
 
-    // Block mask generation
+    // Block mask generation.
+    // Block mask granularity must match the dispatched kernel's kM0 / kN0. All FA4 forward
+    // kernels currently dispatched here use 128x128 tiles; fmha_fwd_create_kargs_and_grids
+    // asserts this constraint at runtime when block_mask_ptr is non-null.
+    constexpr ck_tile::index_t kBlockMaskBlockSize = 128;
     auto block_mask_config = ck_tile::parse_block_mask_config(block_mask_str);
-    // block sizes will be set from kernel shape; use default kN0=128 for generation
-    // The actual kN0 used by the kernel determines block granularity
-    block_mask_config.block_size_q  = 128; // kM0 (typical)
-    block_mask_config.block_size_kv = 128; // kN0 (typical)
+    block_mask_config.block_size_q  = kBlockMaskBlockSize;
+    block_mask_config.block_size_kv = kBlockMaskBlockSize;
     auto block_mask_host = (block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
         ? ck_tile::generate_block_mask(
               block_mask_config, batch, nhead, max_seqlen_q, max_seqlen_k, next_seed())

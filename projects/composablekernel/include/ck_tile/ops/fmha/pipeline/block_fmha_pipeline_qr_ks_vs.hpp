@@ -1287,7 +1287,8 @@ struct BlockFmhaPipelineQRKSVS
                    k_scale_dram_block_window_tmp, // N0*(K0/kQKScaleGranularity) tile
                const VScaleDramBlockWindowTmp&
                    v_scale_dram_block_window_tmp, // N1*(K1/kVScaleGranularity) tile
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           q_element_func,
@@ -1320,7 +1321,8 @@ struct BlockFmhaPipelineQRKSVS
                           sink_v,
                           kQKHeaddim / kK0,
                           kK0,
-                          kN1);
+                          kN1,
+                          block_mask_row_ptr);
     }
 
     template <typename QDramBlockWindowTmp,
@@ -1412,7 +1414,8 @@ struct BlockFmhaPipelineQRKSVS
                const BlockIndices& block_indices,
                void* smem_ptr,
                DropoutType& dropout,
-               const float sink_v) const
+               const float sink_v,
+               const int32_t* block_mask_row_ptr = nullptr) const
     {
         return operator()(q_dram_block_window_tmp,
                           k_dram_block_window_tmp,
@@ -1431,7 +1434,8 @@ struct BlockFmhaPipelineQRKSVS
                           sink_v,
                           kQKHeaddim / kK0,
                           kK0,
-                          kN1);
+                          kN1,
+                          block_mask_row_ptr);
     }
 };
 

@@ -1906,12 +1906,28 @@ struct FmhaFwdKernel
             }();
 
             BlockIndices block_indices{i_batch, i_nhead, i_nhead_k};
+
+            const int32_t* block_mask_row_ptr = nullptr;
+            if(kargs.block_mask_ptr != nullptr)
+            {
+                const index_t q_block_idx = i_tile_m;
+                block_mask_row_ptr = kargs.block_mask_ptr +
+                    static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
+                    static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
+                    static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
+            }
+
             constexpr bool kPassHdimTailArgs = [] {
                 if constexpr(ck_tile::is_detected<has_hdim_tail_args, FmhaPipeline>::value)
                     return static_cast<bool>(FmhaPipeline::kUseHdimTailArgs);
                 else
                     return false;
             }();
+            // Pipeline operator() expects (..., sink_v, block_mask_row_ptr) for the qr_ks_vs
+            // and qr_ks_vs_async variants; the kPassHdimTailArgs path also injects valid
+            // fragment counts ahead of block_mask_row_ptr. Callers below pass everything up
+            // to (and including) `dropout`; this lambda owns the trailing argument layout so
+            // the order stays consistent with the pipeline signatures.
             auto invoke_fmha_pipeline = [&](auto&&... args) -> decltype(auto) {
                 if constexpr(kPassHdimTailArgs)
                 {
@@ -1928,23 +1944,16 @@ struct FmhaFwdKernel
                                           sink_value,
                                           valid_k0_loops,
                                           valid_last_k0_length,
-                                          valid_n1_length);
+                                          valid_n1_length,
+                                          block_mask_row_ptr);
                 }
                 else
                 {
-                    return FmhaPipeline{}(static_cast<decltype(args)&&>(args)..., sink_value);
+                    return FmhaPipeline{}(static_cast<decltype(args)&&>(args)...,
+                                          sink_value,
+                                          block_mask_row_ptr);
                 }
             };
-
-            const int32_t* block_mask_row_ptr = nullptr;
-            if(kargs.block_mask_ptr != nullptr)
-            {
-                const index_t q_block_idx = i_tile_m;
-                block_mask_row_ptr = kargs.block_mask_ptr +
-                    static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
-                    static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
-                    static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
-            }
 
             auto o_acc_tile = [&, i_nhead_ = i_nhead, i_nhead_k_ = i_nhead_k]() {
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERTENSOR)
@@ -1992,8 +2001,7 @@ struct FmhaFwdKernel
                                                 1,
                                                 make_null_tile_window(make_tuple()),
                                                 make_null_tile_window(make_tuple()),
-                                                make_null_tile_window(make_tuple()),
-                                                block_mask_row_ptr);
+                                                make_null_tile_window(make_tuple()));
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
                 {
@@ -2046,8 +2054,7 @@ struct FmhaFwdKernel
                         kargs.block_scale_size_kv,
                         make_null_tile_window(make_tuple()),
                         make_null_tile_window(make_tuple()),
-                        make_null_tile_window(make_tuple()),
-                        block_mask_row_ptr);
+                        make_null_tile_window(make_tuple()));
                 }
                 else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::MX)
                 {
@@ -2179,8 +2186,7 @@ struct FmhaFwdKernel
                                                 1,
                                                 q_scale_dram_window,
                                                 k_scale_dram_window,
-                                                v_scale_dram_window,
-                                                block_mask_row_ptr);
+                                                v_scale_dram_window);
                 }
                 else
                 {
@@ -2197,8 +2203,7 @@ struct FmhaFwdKernel
                                                 variant_params,
                                                 block_indices,
                                                 smem_ptr,
-                                                dropout,
-                                                block_mask_row_ptr);
+                                                dropout);
                 }
             }();
 
