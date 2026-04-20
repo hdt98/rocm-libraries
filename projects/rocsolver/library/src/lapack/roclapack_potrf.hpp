@@ -42,10 +42,22 @@ ROCSOLVER_BEGIN_NAMESPACE
 // -----------------------------------------------
 // Note that the recursive routine passes in a
 // row_offset to adjust the info value, so the
-// iinfo[] array is not required.
+// iinfo[] array may not be required.
 // -----------------------------------------------
-static bool constexpr use_recursion_potrf = true;
-static bool constexpr use_iinfo = !use_recursion_potrf;
+
+// --------------------------------------------------------
+// heuristic to determine whether to use recursive routine
+// TODO: need further fine tuning
+// --------------------------------------------------------
+template <typename T, typename I>
+inline static bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
+{
+    bool const is_use_recursion = ((sizeof(T) == 16) && (n >= 1024))
+        || ((sizeof(T) == 4) && (n >= 1024))
+        || ((sizeof(T) == 8) && (n > 1024) && (uplo == rocblas_fill_upper));
+
+    return is_use_recursion;
+};
 
 template <typename I>
 static inline I split_n(I const n)
@@ -67,6 +79,7 @@ ROCSOLVER_KERNEL void chk_positive(INFO* iinfo, INFO* info, I j, I batch_count)
 
 // Method to determine configuration for potrf block size depending on n
 // and the type
+// TODO: may need fine tuning
 template <typename T, typename I>
 static inline I potrf_get_block_size(I const n)
 {
@@ -88,6 +101,9 @@ void rocsolver_potrf_getMemorySize(const I n,
                                    size_t* p_size_iinfo,
                                    bool* optim_mem)
 {
+    bool const use_recursion_potrf = use_recursion<T>(uplo, n);
+    bool const use_iinfo = !use_recursion_potrf;
+
     *p_size_scalars = 0;
     *p_size_work1 = 0;
     *p_size_work2 = 0;
@@ -259,7 +275,8 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
                                              T* pivots,
                                              INFO* iinfo,
                                              bool optim_mem,
-                                             const I row_offset_in = 0)
+                                             const I row_offset_in = 0,
+                                             bool const use_iinfo = true)
 {
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
@@ -484,6 +501,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         // -------------------
         // terminate recursion
         // -------------------
+        bool use_iinfo = false;
         auto const istat = rocsolver_potrf_template_body<BATCHED, STRIDED, T, I, INFO, S, U>(
             handle, uplo, n,
 
@@ -493,7 +511,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
             scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
 
-            row_offset_in);
+            row_offset_in, use_iinfo = false);
 
         return istat;
     }
@@ -770,6 +788,9 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     {
         return rocblas_status_success;
     }
+
+    bool const use_recursion_potrf = use_recursion<T>(uplo, n);
+    bool const use_iinfo = !use_recursion_potrf;
 
     // everything must be executed with scalars on the host
     rocblas_pointer_mode old_mode;
