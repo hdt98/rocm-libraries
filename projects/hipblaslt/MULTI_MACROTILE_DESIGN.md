@@ -1,8 +1,8 @@
 # Multi-MacroTile Design and Implementation
 
 **hipBLASLt Feature Documentation**  
-**Version:** 1.0  
-**Date:** 2026-04-16  
+**Version:** 2.0  
+**Date:** 2026-04-20 (Updated with exhaustive pow2 Origami search)  
 
 ---
 

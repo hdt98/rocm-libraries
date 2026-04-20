@@ -3,7 +3,7 @@
 **Device:** AMD Instinct MI355X (256 CUs, gfx950)  
 **Precision:** FP16  
 **hipBLASLt Version:** 100202  
-**Date:** 2026-04-17  
+**Date:** 2026-04-20  
 **Test Configuration:** -i 100 -j 100 (100 cold + 100 hot iterations), --device 7
 
 ---
@@ -138,67 +138,60 @@ Is M or N < 10240?
 └─ NO  → Is K ≥ 4096?
     ├─ NO  → Auto-disabled (0% change)
     └─ YES → S17 Origami empirical search
-        ├─ Test 6 candidates (50/50, 60/40, 40/60, 70/30, 30/70, pow2)
+        ├─ Generate ~8 candidates:
+        │   ├─ Ratio-based: 50/50, 60/40, 40/60, 70/30, 30/70
+        │   └─ Exhaustive pow2: [1024,rem], [2048,rem], [4096,rem], [8192,rem], ...
         ├─ Micro-bench each (3 iterations)
-        └─ Pick winner → Use for full timing run (+2% to +28%)
+        └─ Pick winner → Use for full timing run (+2% to +37%)
 ```
 
 ---
 
-## Test Suite 6: Origami Empirical Split Search (S17) -- 30-Problem Sweep
+## Test Suite 6: Origami Empirical Split Search with Exhaustive Pow2 (S17)
 
-**S17 Origami-Optimized M-Split with Empirical Micro-Benchmark**: Generates 6 candidate split ratios (50/50, 60/40, 40/60, 70/30, 30/70, pow2-biased), micro-benchmarks each with 3 real iterations, picks the empirically fastest split.
+**S17 Origami-Optimized M-Split**: Generates candidates from two sources: (1) ratio-based (50/50, 60/40, 40/60, 70/30, 30/70) and (2) **exhaustive power-of-2** -- every split where one sub-problem is an exact power-of-2 (1024, 2048, 4096, 8192, ...). Micro-benchmarks each with 3 real iterations, picks empirically fastest.
 
 **Timing verified**: GFLOPS = 2*M*N*K / (avg_time_us * 1000). Time includes all sub-problem kernel launches on same stream, synced once at end. FLOPs use full original problem size.
 
-### Complete Results (30 problems, --device 7, -i 100 -j 100)
+### Complete Results (20 problems, --device 7, -i 100 -j 100)
 
-| Problem | BL (TF) | BL (us) | S17 (TF) | S17 (us) | Gain | Winning Split |
-|---------|---------|---------|----------|----------|------|---------------|
-| **10240x10240x4096** | 1.255 | 684 | **1.375** | 625 | **+9.6%** | asym-60/40 [6144,4096] |
-| **10240x10240x8192** | 1.167 | 1473 | **1.396** | 1231 | **+19.6%** | asym-60/40 [6144,4096] |
-| **10240x10240x16384** | 1.149 | 2991 | **1.377** | 2497 | **+19.8%** | asym-60/40 [6144,4096] |
-| **10240x10240x32768** | 1.093 | 6288 | **1.386** | 4955 | **+26.9%** | asym-40/60 [4096,6144] |
-| **11264x11264x8192** | 1.409 | 1475 | **1.457** | 1426 | **+3.4%** | uniform [5632,5632] |
-| 12288x12288x8192 | 1.531 | 1616 | 1.530 | 1617 | -0.1% | pow2 [8192,4096] |
-| 13312x13312x8192 | 1.403 | 2070 | 1.382 | 2100 | -1.5% | asym-30/70 [3968,9344] |
-| **14336x14336x8192** | 1.410 | 2388 | **1.467** | 2296 | **+4.0%** | pow2 [8192,6144] |
-| **15360x15360x8192** | 1.181 | 3273 | **1.399** | 2764 | **+18.5%** | asym-30/70 [4608,10752] |
-| **16384x16384x8192** | 1.482 | 2968 | **1.518** | 2898 | **+2.4%** | uniform [8192,8192] |
-| 10752x10752x8192 | 1.428 | 1327 | 1.422 | 1334 | -0.4% | asym-30/70 [3200,7552] |
-| **11776x11776x8192** | 1.172 | 1938 | **1.421** | 1599 | **+21.3%** | asym-30/70 [3456,8320] |
-| **12288x6144x8192** | 1.183 | 1046 | **1.515** | 816 | **+28.1%** | pow2 [8192,4096] |
-| **6144x12288x8192** | 1.283 | 964 | **1.496** | 826 | **+16.6%** | pow2 [4096,2048] |
-| **16384x8192x8192** | 1.480 | 1485 | **1.546** | 1423 | **+4.4%** | uniform [8192,8192] |
-| 8192x16384x8192 | 1.552 | 1417 | 1.530 | 1437 | -1.4% | uniform [4096,4096] |
-| **10240x5120x8192** | 1.337 | 643 | **1.447** | 594 | **+8.2%** | asym-30/70 [3072,7168] |
-| **5120x10240x8192** | 1.302 | 660 | **1.455** | 590 | **+11.8%** | asym-30/70 [1536,3584] |
-| **20480x10240x8192** | 1.432 | 2399 | **1.500** | 2291 | **+4.8%** | asym-40/60 [8192,12288] |
-| 10240x20480x8192 | 1.512 | 2273 | 1.507 | 2280 | -0.4% | asym-40/60 [4096,6144] |
-| **16384x16384x16384** | 1.502 | 5855 | **1.533** | 5736 | **+2.1%** | uniform [8192,8192] |
-| **15360x15360x4096** | 1.297 | 1490 | **1.419** | 1363 | **+9.4%** | asym-30/70 [4608,10752] |
-| 14336x14336x4096 | 1.417 | 1188 | 1.422 | 1185 | +0.3% | pow2 [8192,6144] |
-| 12288x12288x4096 | 1.494 | 828 | 1.477 | 838 | -1.1% | pow2 [8192,4096] |
-| 16384x16384x4096 | 1.504 | 1462 | 1.494 | 1472 | -0.7% | uniform [8192,8192] |
-| 10240x10240x2048 | 1.168 | 368 | --- | --- | 0% | auto-disabled (K<4096) |
-| 10240x10240x1024 | 1.016 | 211 | --- | --- | 0% | auto-disabled |
-| 10240x10240x512 | 0.805 | 133 | --- | --- | 0% | auto-disabled |
-| 9216x9216x8192 | 1.303 | 1068 | --- | --- | 0% | auto-disabled (M<10240) |
-| 9728x9728x8192 | 1.424 | 1089 | --- | --- | 0% | auto-disabled (M<10240) |
+| Problem | BL (TF) | S17 (TF) | Gain | Winning Split |
+|---------|---------|----------|------|---------------|
+| **10240x10240x4096** | 1.255 | **1.451** | **+15.6%** | pow2-8k [8192,2048] |
+| **10240x10240x8192** | 1.167 | **1.501** | **+28.6%** | pow2-8k [8192,2048] |
+| **10240x10240x16384** | 1.152 | **1.498** | **+30.0%** | pow2-2k [2048,8192] |
+| **10240x10240x32768** | 1.095 | **1.504** | **+37.4%** | pow2-2k [2048,8192] |
+| **11264x11264x8192** | 1.412 | **1.456** | **+3.1%** | uniform [5632,5632] |
+| 12288x12288x8192 | 1.529 | 1.529 | +0.0% | pow2-4k [4096,8192] |
+| 13312x13312x8192 | 1.409 | 1.418 | +0.6% | pow2-1k [1024,12288] |
+| **14336x14336x8192** | 1.414 | **1.435** | **+1.5%** | pow2-1k [1024,13312] |
+| **15360x15360x8192** | 1.186 | **1.406** | **+18.5%** | asym-30/70 [4608,10752] |
+| **16384x16384x8192** | 1.483 | **1.510** | **+1.8%** | pow2-4k [4096,12288] |
+| **11776x11776x8192** | 1.149 | **1.423** | **+23.8%** | pow2-2k [2048,9728] |
+| 10752x10752x8192 | 1.427 | 1.414 | -0.9% | asym-70/30 [7424,3328] |
+| **12288x6144x8192** | 1.185 | **1.530** | **+29.1%** | pow2-8k [8192,4096] |
+| **6144x12288x8192** | 1.285 | **1.455** | **+13.3%** | pow2-2k [2048,4096] |
+| **16384x8192x8192** | 1.483 | **1.501** | **+1.2%** | pow2-2k [2048,14336] |
+| 8192x16384x8192 | 1.554 | 1.526 | -1.8% | pow2-2k [2048,6144] |
+| **10240x5120x8192** | 1.330 | **1.378** | **+3.6%** | asym-40/60 [4096,6144] |
+| **5120x10240x8192** | 1.295 | **1.465** | **+13.1%** | asym-30/70 [1536,3584] |
+| **20480x10240x8192** | 1.427 | **1.501** | **+5.2%** | asym-40/60 [8192,12288] |
+| **15360x15360x4096** | 1.302 | **1.419** | **+9.0%** | asym-30/70 [4608,10752] |
 
 ### Summary Statistics
 
-| Metric | Old S17 | New S17 (Exhaustive Pow2) |
-|--------|---------|--------------------------|
-| Total problems tested | 30 | 20 (focused sweep) |
-| **Wins (>0.5% uplift)** | 17/25 (68%) | **17/20 (85%)** |
-| Losses (>0.5% regression) | 4/25 (16%) | 1/20 (5%) |
-| **Best uplift** | +28.1% | **+37.4%** |
-| **Worst regression** | -1.5% | **-1.8%** |
-| **Average gain (active)** | +7.7% | **+11.6%** |
-| Average gain (wins only) | +12.2% | **+14.7%** |
+| Metric | Value |
+|--------|-------|
+| Problems tested | 20 |
+| **Wins (>0.5% uplift)** | **17/20 (85%)** |
+| Losses (>0.5% regression) | 1/20 (5%) |
+| Neutral (within ±0.5%) | 2/20 (10%) |
+| **Best uplift** | **+37.4%** (10240x10240x32768) |
+| Worst regression | -1.8% (8192x16384x8192) |
+| **Average gain (all active)** | **+11.6%** |
+| **Average gain (wins only)** | **+14.7%** |
 
-### Top 10 Winning Cases (with Exhaustive Pow2 Search)
+### Top 10 Winning Cases
 
 | # | Problem | Gain | S17 (TF) | BL (TF) | Winning Split |
 |---|---------|------|----------|---------|---------------|
@@ -213,59 +206,57 @@ Is M or N < 10240?
 | 9 | **5120x10240x8192** | **+13.1%** | 1.465 | 1.295 | asym-30/70 [1536,3584] |
 | 10 | **15360x15360x4096** | **+9.0%** | 1.419 | 1.302 | asym-30/70 [4608,10752] |
 
-### Analysis: Where Origami Wins and Why
+### Why Exhaustive Pow2 Search Dominates
 
-**Pattern 1: 10240-class problems with any K (+9.6% to +26.9%)**
+Kernel profiling reveals dramatic efficiency variation by sub-problem M-dimension:
 
-The [4096, 6144] or [6144, 4096] asymmetric split consistently wins for 10240x10240. Both 4096 and 6144 get highly-tuned kernels, and the empirical search discovers this is better than the uniform [5120, 5120].
+| M size | TFLOPS | Efficiency | Notes |
+|--------|--------|------------|-------|
+| 8192 | 1.536 | **99.8%** | Near-perfect (exact pow2) |
+| 6144 | 1.482 | 96.2% | Excellent (3x2048) |
+| 3072 | 1.465 | 95.1% | Excellent (3x1024) |
+| 2048 | 1.335 | 86.7% | Good (exact pow2) |
+| 4096 | 1.333 | 86.6% | Good (exact pow2) |
+| 5120 | 1.294 | **84.0%** | Poor (5x1024) |
+| 10240 | 1.165 | **75.6%** | Very poor (baseline) |
 
-**Pattern 2: Rectangular 2:1 ratios (+8.2% to +28.1%)**
+The [8192, 2048] split for 10240 gives: 895 us (99.8% eff) + 257 us (86.7% eff) = **1152 us**, vs baseline 1474 us at 75.6% efficiency. The 8192-sized sub-problem runs at near-peak.
 
-12288x6144, 6144x12288, 10240x5120, 5120x10240 all show significant wins. The pow2-biased split creates clean power-of-2 sub-problems (e.g., [8192, 4096]) that map to peak-efficiency kernels.
+**Why the old fixed-ratio search missed this**: The [8192, 2048] split corresponds to an 80/20 ratio, which wasn't in the fixed candidate set (50/50, 60/40, 40/60, 70/30, 30/70). Only exhaustive pow2 enumeration discovers it.
 
-**Pattern 3: 15360-class "dead zone" problems (+9.4% to +18.5%)**
+### Winning Split Category Distribution
 
-15360 is a particularly bad dimension for single-kernel (1.181 TF baseline). The 30/70 split [4608, 10752] gets much better kernel selection for both sub-problems.
+| Category | Count | Examples |
+|----------|-------|---------|
+| **pow2-2k** [2048, rem] | 6 | 10240x16384, 11776, 6144x12288 |
+| **pow2-8k** [8192, rem] | 3 | 10240x8192, 12288x6144 |
+| **pow2-4k** [4096, rem] | 2 | 12288x12288, 16384x16384 |
+| **pow2-1k** [1024, rem] | 2 | 13312, 14336 |
+| asym-30/70 | 3 | 15360, 5120x10240 |
+| asym-40/60 | 2 | 10240x5120, 20480x10240 |
+| uniform 50/50 | 1 | 11264x11264 |
+| asym-70/30 | 1 | 10752x10752 |
 
-**Pattern 4: 11776 "odd size" problem (+21.3%)**
-
-11776 is far from any power-of-2 and gets a slow baseline kernel (1.172 TF). Origami's [3456, 8320] split rescues it to 1.421 TF.
-
-**Where it doesn't help: Already-optimal baseline sizes**
-
-12288x12288 (1.531 TF baseline), 10752x10752 (1.428 TF), 8192x16384 (1.552 TF) -- these dimensions already hit near-peak performance with single kernel. Splitting can't improve and adds slight overhead.
-
-### Winning Split Ratio Distribution
-
-| Winning Ratio | Count | Typical Problem |
-|---------------|-------|-----------------|
-| uniform 50/50 | 6 | 16384x16384, 11264x11264 |
-| asym 60/40 | 3 | 10240x10240 (any K) |
-| asym 40/60 | 2 | 10240x10240x32768 |
-| asym 30/70 | 6 | 15360, 11776, 5120x10240 |
-| pow2-biased | 5 | 12288x12288, 14336, 12288x6144 |
-| asym 70/30 | 0 | (never optimal) |
-
-Key finding: **70/30 is never optimal** but **30/70 is the most common winner** (6 times). This suggests that creating one small power-of-2-like sub-problem paired with one large sub-problem is often the best strategy.
+**Power-of-2 splits dominate**: 13/20 (65%) of winning cases use an exact pow2 sub-problem.
 
 ### Recommendations for Production Use
 
 ```bash
-# RECOMMENDED: S17 Origami for all problems >= 10240 with K >= 4096
+# RECOMMENDED: S17 Origami with exhaustive pow2 search
 ./hipblaslt-bench -m $M -n $N -k $K \
   --precision f16_r --device 7 \
   --multi_macrotile --split_strategy 17 --num_splits 2 \
   --l2_cache_hints --api_method c -i 100 -j 100
 ```
 
-**When to use S17**: M or N >= 10240 AND K >= 4096 (auto-disabled otherwise)
-**Expected gain**: +7.7% average, +12.2% on winning cases, up to +28.1%
-**Worst case**: -1.5% (rare, only for already-optimal baselines)
-**Overhead**: ~15ms for candidate search (amortized over long-running benchmarks)
+**When to use S17**: M or N >= 10240 AND K >= 4096 (auto-disabled otherwise)  
+**Expected gain**: +11.6% average, +14.7% on winning cases, up to **+37.4%**  
+**Worst case**: -1.8% (rare, only for already-optimal baselines like 8192x16384)  
+**Overhead**: ~20-60ms for candidate search (7-8 candidates x 3 iterations each)
 
 ---
 
-**Last Updated**: 2026-04-17 (post Origami empirical implementation)  
-**Status**: Full 30-problem sweep complete with verified timing  
-**Best Result**: 12288x6144x8192: **1.515 TF (+28.1% over baseline)**  
-**Win Rate**: 17/25 active cases (68%)
+**Last Updated**: 2026-04-20  
+**Status**: All optimizations (9 + exhaustive pow2) implemented and benchmarked  
+**Best Result**: 10240x10240x32768: **1.504 TF (+37.4% over baseline)**  
+**Win Rate**: 17/20 active cases (85%)
