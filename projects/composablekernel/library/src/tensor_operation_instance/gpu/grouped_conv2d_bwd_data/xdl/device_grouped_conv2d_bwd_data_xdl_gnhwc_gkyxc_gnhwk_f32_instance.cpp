@@ -41,60 +41,6 @@ void add_device_grouped_conv2d_bwd_data_xdl_gnhwk_gkyxc_gnhwc_f32_instances(
                                                              Empty_Tuple,
                                                              GNHWC,
                                                              ConvBwdDataFilter1x1Stride1Pad0>{});
-    // 3. Default
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_instances<2,
-                                                       GNHWK,
-                                                       GKYXC,
-                                                       Empty_Tuple,
-                                                       GNHWC,
-                                                       ConvBwdDataDefault>{});
-    // 4. Filter1x1Stride1Pad0
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_instances<2,
-                                                       GNHWK,
-                                                       GKYXC,
-                                                       Empty_Tuple,
-                                                       GNHWC,
-                                                       ConvBwdDataFilter1x1Stride1Pad0>{});
-    // 5. Default — noshuffle epilogue
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_noshuffle_instances<2,
-                                                                  GNHWK,
-                                                                  GKYXC,
-                                                                  Empty_Tuple,
-                                                                  GNHWC,
-                                                                  ConvBwdDataDefault>{});
-    // 6. Filter1x1Stride1Pad0 — noshuffle epilogue
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_noshuffle_instances<2,
-                                                                  GNHWK,
-                                                                  GKYXC,
-                                                                  Empty_Tuple,
-                                                                  GNHWC,
-                                                                  ConvBwdDataFilter1x1Stride1Pad0>{});
-    // 7. Default — nongrouped_match instances
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_nongrouped_match_instances<2,
-                                                                         GNHWK,
-                                                                         GKYXC,
-                                                                         Empty_Tuple,
-                                                                         GNHWC,
-                                                                         ConvBwdDataDefault>{});
-    // 8. Filter1x1Stride1Pad0 — nongrouped_match instances
-    add_device_operation_instances(
-        instances,
-        device_grouped_conv_bwd_data_xdl_f32_nongrouped_match_instances<2,
-                                                                         GNHWK,
-                                                                         GKYXC,
-                                                                         Empty_Tuple,
-                                                                         GNHWC,
-                                                                         ConvBwdDataFilter1x1Stride1Pad0>{});
 }
 
 } // namespace instance
