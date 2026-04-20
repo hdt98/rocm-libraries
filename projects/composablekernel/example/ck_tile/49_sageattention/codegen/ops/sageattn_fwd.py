@@ -813,12 +813,12 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
         # forces alignment=1 when padding is enabled, but packed types need alignment >= PackedSize.
         if dtype in cls._DT_I4FP8BF16:
             for p in pipelines:
-                assert (
-                    p.F_dpad == "f"
-                ), f"int4 dtype '{dtype}' requires pad_d=false, got '{p.F_dpad}'"
-                assert (
-                    p.F_dvpad == "f"
-                ), f"int4 dtype '{dtype}' requires pad_dv=false, got '{p.F_dvpad}'"
+                assert p.F_dpad == "f", (
+                    f"int4 dtype '{dtype}' requires pad_d=false, got '{p.F_dpad}'"
+                )
+                assert p.F_dvpad == "f", (
+                    f"int4 dtype '{dtype}' requires pad_dv=false, got '{p.F_dvpad}'"
+                )
 
         return pipelines
 
@@ -928,9 +928,9 @@ def get_fwd_blobs(
                 if hdim not in optdim_list:
                     continue
             for tile, next_tile in zip(tiles, tiles[1:]):
-                assert (
-                    next_tile.F_bm0 >= tile.F_bm0
-                ), "Tiles must be ordered by increasing bm0"
+                assert next_tile.F_bm0 >= tile.F_bm0, (
+                    "Tiles must be ordered by increasing bm0"
+                )
 
             for tile, pipeline in itertools.product(
                 tiles, factory.get_pipelines(dtype, hdim, hdim_v, receipt, mask_impl)

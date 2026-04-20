@@ -911,11 +911,10 @@ struct SageAttnFwdKernel
             else if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERWARP ||
                               QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
-                using SageShape = typename SageAttnPipeline::BlockSageAttnShape;
-                constexpr index_t kWarpSize       = get_warp_size();
-                constexpr index_t kGemm0MPerWarp =
-                    SageShape::Gemm0WarpTile::at(number<0>{});
-                constexpr index_t kNumWarps = SageShape::NumWarps;
+                using SageShape                  = typename SageAttnPipeline::BlockSageAttnShape;
+                constexpr index_t kWarpSize      = get_warp_size();
+                constexpr index_t kGemm0MPerWarp = SageShape::Gemm0WarpTile::at(number<0>{});
+                constexpr index_t kNumWarps      = SageShape::NumWarps;
 
                 static_assert(kWarpSize == 64, "kWarpSize must be 64");
                 static_assert(SageAttnPipeline::kM0 == kGemm0MPerWarp * kNumWarps,
@@ -952,17 +951,15 @@ struct SageAttnFwdKernel
                 // last scale block for this seqlen_q (e.g. seqlen_q=129, S=32 ⇒ ceil(129/32)=5
                 // blocks, indices 0..4; row 128 → 128/32=4, padding rows → min(raw_idx, 4)).
                 constexpr index_t kBlockSq = PipelineProblem::kBlockScaleSizeQ;
-                const index_t wave_id      = __builtin_amdgcn_readfirstlane(threadIdx.x / kWarpSize);
+                const index_t wave_id = __builtin_amdgcn_readfirstlane(threadIdx.x / kWarpSize);
                 const index_t q_row_raw =
                     i_m0 + wave_id * kGemm0MPerWarp + threadIdx.x % kGemm0MPerWarp;
-                const index_t q_scale_idx_raw =
-                    ck_tile::integer_divide_floor(q_row_raw, kBlockSq);
+                const index_t q_scale_idx_raw = ck_tile::integer_divide_floor(q_row_raw, kBlockSq);
                 const index_t max_q_scale_idx =
-                    kargs.seqlen_q > 0
-                        ? ck_tile::integer_divide_ceil(kargs.seqlen_q, kBlockSq) - 1
-                        : 0;
-                const index_t q_scale_idx = q_scale_idx_raw < max_q_scale_idx ? q_scale_idx_raw
-                                                                              : max_q_scale_idx;
+                    kargs.seqlen_q > 0 ? ck_tile::integer_divide_ceil(kargs.seqlen_q, kBlockSq) - 1
+                                       : 0;
+                const index_t q_scale_idx =
+                    q_scale_idx_raw < max_q_scale_idx ? q_scale_idx_raw : max_q_scale_idx;
                 const float q_descale = q_descale_ptr[q_scale_idx];
 
                 return SageAttnPipeline{}(q_dram_window,

@@ -23,8 +23,8 @@ struct BlockSageAttentionPipelineQRKSVSAsync
     using SaccDataType        = remove_cvref_t<typename Problem::SaccDataType>;
     using SMPLComputeDataType = remove_cvref_t<typename Problem::SMPLComputeDataType>;
     using PDataType           = remove_cvref_t<typename Problem::PDataType>;
-    // fp16/bf16 example configs use P=V=fp16/bf16 (qscale=no). Quantized Sage paths use fp8 P/V; FP8
-    // softmax shift, v_descale, and PV-gemm LDS layout assume fp8_t for those cases.
+    // fp16/bf16 example configs use P=V=fp16/bf16 (qscale=no). Quantized Sage paths use fp8 P/V;
+    // FP8 softmax shift, v_descale, and PV-gemm LDS layout assume fp8_t for those cases.
     static_assert(std::is_same_v<PDataType, VDataType>,
                   "SageAttention pipeline requires PDataType == VDataType for the PV gemm");
     static_assert(std::is_same_v<QDataType, half_t> || std::is_same_v<QDataType, bf16_t> ||
@@ -33,10 +33,10 @@ struct BlockSageAttentionPipelineQRKSVSAsync
     static_assert(std::is_same_v<QDataType, half_t> || std::is_same_v<QDataType, bf16_t> ||
                       std::is_same_v<VDataType, fp8_t>,
                   "SageAttention pipeline requires VDataType = fp8_t");
-    using OaccDataType        = remove_cvref_t<typename Problem::OaccDataType>;
-    using ODataType           = remove_cvref_t<typename Problem::ODataType>;
-    using AttentionVariant    = remove_cvref_t<typename Problem::AttentionVariant>;
-    using FmhaMask            = remove_cvref_t<typename Problem::FmhaMask>;
+    using OaccDataType     = remove_cvref_t<typename Problem::OaccDataType>;
+    using ODataType        = remove_cvref_t<typename Problem::ODataType>;
+    using AttentionVariant = remove_cvref_t<typename Problem::AttentionVariant>;
+    using FmhaMask         = remove_cvref_t<typename Problem::FmhaMask>;
 
     using BlockSageAttnShape         = remove_cvref_t<typename Problem::BlockSageAttnShape>;
     using VLayout                    = remove_cvref_t<typename BlockSageAttnShape::VLayout>;
@@ -311,11 +311,11 @@ struct BlockSageAttentionPipelineQRKSVSAsync
 
         static_assert(1 <= k0_loops);
         static_assert(1 <= k1_loops);
-        constexpr index_t kGemm0MPerWarp =
-            BlockSageAttnShape::Gemm0WarpTile::at(number<0>{});
+        constexpr index_t kGemm0MPerWarp = BlockSageAttnShape::Gemm0WarpTile::at(number<0>{});
         static_assert(kGemm0MPerWarp == 32);
         constexpr index_t kWarpSz = get_warp_size();
-        // sub_warp_idx is 0 or 1, indicating which half of the warp (used for PERTHREAD K-scale indexing)
+        // sub_warp_idx is 0 or 1, indicating which half of the warp (used for PERTHREAD K-scale
+        // indexing)
         index_t sub_warp_idx = (threadIdx.x % kWarpSz) / kGemm0MPerWarp;
         // main loop
         do
@@ -417,25 +417,34 @@ struct BlockSageAttentionPipelineQRKSVSAsync
             if constexpr(QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
                 // PERTHREAD: kBlockScaleSizeK=16
-                // The s_acc tile distribution is determined by WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution,
-                // which guarantees each thread processes exactly 16 consecutive elements in the K dimension.
-                // This distribution is inherent to the MFMA 32x32x16 instruction with kKIter=2 and TransposedC layout.
-                // Therefore, col_offset >> 4 correctly maps thread-local elements to K scale indices.
+                // The s_acc tile distribution is determined by
+                // WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution, which guarantees
+                // each thread processes exactly 16 consecutive elements in the K dimension. This
+                // distribution is inherent to the MFMA 32x32x16 instruction with kKIter=2 and
+                // TransposedC layout. Therefore, col_offset >> 4 correctly maps thread-local
+                // elements to K scale indices.
                 static_assert(Problem::kBlockScaleSizeK == 16,
                               "PERTHREAD: kBlockScaleSizeK must be 16");
 
-                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB + TransposedC
-                // This ensures the distribution has 16 consecutive K elements per thread
+                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB +
+                // TransposedC This ensures the distribution has 16 consecutive K elements per
+                // thread
                 using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
-                constexpr auto WarpGemmCfg = BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                constexpr auto WarpGemmCfg =
+                    BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
                 using WarpGemm0Type = remove_cvref_t<decltype(WarpGemmCfg.template at<0>())>;
-                using ExpectedWarpGemmI8 = WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
-                using ExpectedWarpGemmFp8 = WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
-                static_assert(std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
-                              std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
-                              "PERTHREAD requires WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for 16 consecutive K elements");
+                using ExpectedWarpGemmI8 =
+                    WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
+                using ExpectedWarpGemmFp8 =
+                    WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
+                static_assert(
+                    std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
+                        std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
+                    "PERTHREAD requires "
+                    "WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for "
+                    "16 consecutive K elements");
 
-                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
+                constexpr auto s_acc_spans               = decltype(s_acc)::get_distributed_spans();
                 float combined_scales_reg[kNumKScalesPT] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPT; i++)
@@ -458,18 +467,25 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                 // Distribution: thread_i and thread_(i+32) interleave to cover K dimension
                 // In each thread's view, every 32 idx1 steps correspond to 64 global K elements
 
-                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB + TransposedC
-                // This ensures each thread has 16 consecutive elements, and warp-level grouping is correct
+                // Validate the WarpGemm type matches the expected MFMA instruction with SwizzleB +
+                // TransposedC This ensures each thread has 16 consecutive elements, and warp-level
+                // grouping is correct
                 using BlockGemm0 = remove_cvref_t<decltype(gemm_0)>;
-                constexpr auto WarpGemmCfg = BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
+                constexpr auto WarpGemmCfg =
+                    BlockGemm0::Policy::template GetWarpGemmMWarpNWarp<Problem>();
                 using WarpGemm0Type = remove_cvref_t<decltype(WarpGemmCfg.template at<0>())>;
-                using ExpectedWarpGemmI8 = WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
-                using ExpectedWarpGemmFp8 = WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
-                static_assert(std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
-                              std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
-                              "PERWARP requires WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for correct K element grouping");
+                using ExpectedWarpGemmI8 =
+                    WarpGemmMfmaI8I8I32M32N32K32SwizzleBTransposedCDistribution<4>;
+                using ExpectedWarpGemmFp8 =
+                    WarpGemmMfmaFp8Fp8F32M32N32K32SwizzleBTransposedCDistribution<4>;
+                static_assert(
+                    std::is_same_v<WarpGemm0Type, ExpectedWarpGemmI8> ||
+                        std::is_same_v<WarpGemm0Type, ExpectedWarpGemmFp8>,
+                    "PERWARP requires "
+                    "WarpGemmMfma[I8I8I32|Fp8Fp8F32]M32N32K32SwizzleBTransposedCDistribution for "
+                    "correct K element grouping");
 
-                constexpr auto s_acc_spans = decltype(s_acc)::get_distributed_spans();
+                constexpr auto s_acc_spans               = decltype(s_acc)::get_distributed_spans();
                 float combined_scales_reg[kNumKScalesPW] = {};
 #pragma unroll
                 for(index_t i = 0; i < kNumKScalesPW; i++)
@@ -479,8 +495,9 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                     sweep_tile_span(s_acc_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         // col_offset counts columns in distributed view
-                        // When N0=64: each thread has 32 elements; when N0=128: each thread has 64 elements
-                        // Divide by 32 (>>5) to map to K scale groups (kBlockScaleSizeK=64)
+                        // When N0=64: each thread has 32 elements; when N0=128: each thread has 64
+                        // elements Divide by 32 (>>5) to map to K scale groups
+                        // (kBlockScaleSizeK=64)
                         const index_t scale_idx = col_offset >> 5;
                         s_acc(i_j_idx) *= combined_scales_reg[scale_idx];
                         col_offset++;
@@ -825,10 +842,10 @@ struct BlockSageAttentionPipelineQRKSVSAsync
                const AttentionVariantParams& variant_params,
                const BlockIndices& block_indices,
                void* smem_ptr,
-               const float* q_descale_ptr                  = nullptr,
-               const float* k_descale_ptr                  = nullptr,
-               const float* v_descale_ptr                  = nullptr,
-               [[maybe_unused]] float q_descale_value      = 1.0f) const
+               const float* q_descale_ptr             = nullptr,
+               const float* k_descale_ptr             = nullptr,
+               const float* v_descale_ptr             = nullptr,
+               [[maybe_unused]] float q_descale_value = 1.0f) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},

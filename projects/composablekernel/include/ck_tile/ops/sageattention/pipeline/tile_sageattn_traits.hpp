@@ -31,8 +31,8 @@ struct TileSageAttnTraits
     /// (BLOCKSCALE / no_scale / pertensor). K: PERWARP 64, BLOCKSCALE 128, else 128.
     static constexpr index_t kBlockScaleSizeQ =
         QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERTHREAD ? 4
-        : QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERWARP  ? 32
-                                                                    : 128;
+        : QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERWARP ? 32
+                                                                   : 128;
     static constexpr index_t kBlockScaleSizeK =
         QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERTHREAD ? 16
         : QScaleEnum_ == BlockSageAttentionQuantScaleEnum::PERWARP ? 64
