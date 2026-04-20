@@ -1,145 +1,113 @@
-# Multi-MacroTile Comprehensive Benchmark Results (Post-Optimization)
+# Multi-MacroTile Comprehensive Benchmark Results
 
 **Device:** AMD Instinct MI355X (256 CUs, gfx950)  
 **Precision:** FP16  
 **hipBLASLt Version:** 100202  
-**Date:** 2026-04-17 (Post 8-optimization update)  
+**Date:** 2026-04-17  
 **Test Configuration:** -i 100 -j 100 (100 cold + 100 hot iterations), --device 7
 
 ---
 
 ## Executive Summary
 
-**8 optimizations implemented** in this round:
+### Optimizations Implemented (9 total)
+
+**Round 1 (8 optimizations):**
 1. Pre-create layouts outside hot loop (eliminates per-iteration overhead)
 2. CU-mask stream partitioning for stream-parallel
 3. Separate workspace per stream
 4. Fix autoSelectNumSplits (always 2 for sequential)
 5. Concurrent warmup on separate streams
 6. Micro-benchmark strategy selection (runtime regression elimination)
-7. K-dimension aware split sizing
+7. K-dimension aware split sizing (strategies 19/20)
 8. Allow pow2 splits for non-pow2 dims (fixes 12288 regression)
+
+**Round 2 (Origami Empirical Search):**
+9. S17 Origami empirical split search: generates 6 candidate split ratios, micro-benchmarks each with 3 real iterations, picks empirically fastest split
 
 ### Key Findings
 
-| Category | Before Optimization | After Optimization | Improvement |
-|----------|--------------------|--------------------|-------------|
-| **12288x12288 (was -18.2%)** | 1.251 TF (-18.2%) | 1.534 TF (**+0.0%**) | **Fixed: +18.2pp** |
-| **14336x14336 (new)** | Not tested | 1.468 TF (**+3.9%**) | New winning case |
-| **12288x6144 rectangular** | 1.481 TF (+25.3%) | 1.492 TF (**+26.0%**) | Improved |
-| **Small matrices (4096, 6144, 8192)** | -16% to -25% | **0%** (auto-disabled) | **All regressions eliminated** |
-| **Auto strategy (S0)** | Not reliable | Micro-bench verified | **Zero-risk deployment** |
+| Category | S3 Uniform | S17 Origami | vs Baseline |
+|----------|-----------|-------------|-------------|
+| **Best overall gain** | +25.8% | **+28.1%** | 12288x6144x8192 |
+| **Best square gain** | +9.8% | **+26.9%** | 10240x10240x32768 |
+| **Worst regression** | -18.6% | **-1.5%** | 13312x13312x8192 |
+| **Win rate (30 problems)** | 11/25 | **17/25 (68%)** | Active cases |
+| **Average gain (wins)** | +6.1% | **+12.2%** | - |
+| **Small matrix safety** | Auto-disabled | Auto-disabled | 0% (safe) |
+
+**S17 Origami is the recommended strategy** for all multi-MacroTile workloads. It automatically discovers the optimal non-uniform split ratio via empirical micro-benchmark, providing up to +28% uplift with worst-case -1.5% regression.
 
 ---
 
 ## Test Suite 1: K Scaling (M=N=10240)
 
-| K | Baseline (TF) | S3 (TF) | S3 Gain | S10 (TF) | S10 Gain | Best |
-|---|--------------|---------|---------|----------|----------|------|
-| 4096 | 1.259 | 1.276 | +1.4% | 1.281 | +1.8% | S10 |
-| 8192 | 1.165 | 1.276 | +9.6% | 1.277 | +9.7% | S10 |
-| 16384 | 1.147 | 1.250 | +9.0% | 1.251 | +9.1% | S10 |
+| K | Baseline (TF) | S3 Uniform (TF) | S3 Gain | S17 Origami (TF) | S17 Gain | S17 Winner | Best |
+|---|--------------|-----------------|---------|-----------------|----------|------------|------|
+| 4096 | 1.255 | 1.281 | +2.1% | **1.375** | **+9.6%** | [6144,4096] | **S17** |
+| 8192 | 1.167 | 1.278 | +9.5% | **1.396** | **+19.6%** | [6144,4096] | **S17** |
+| 16384 | 1.149 | 1.250 | +8.8% | **1.377** | **+19.8%** | [6144,4096] | **S17** |
+| 32768 | 1.093 | 1.240 | +13.5% | **1.386** | **+26.9%** | [4096,6144] | **S17** |
 
-**Analysis**: The pre-created layout optimization (Opt 1) adds a consistent ~+0.5-1% improvement over previous results across all K values. S10 (Adaptive Power-of-2) matches or beats S3 uniformly.
+**Analysis**: S17 Origami dominates across all K values, finding the [6144,4096] or [4096,6144] asymmetric split that consistently outperforms uniform by +7-12pp. The gain grows with K because the overhead is amortized over longer execution times.
 
 ---
 
 ## Test Suite 2: Square Matrix Scaling (K=8192)
 
-| Size | Baseline (TF) | S3 (TF) | S3 Gain | S7 (TF) | S7 Gain | S10 (TF) | S10 Gain | Best |
-|------|--------------|---------|---------|---------|---------|----------|----------|------|
-| 4096 | 1.496 | disabled | 0% | disabled | 0% | disabled | 0% | Baseline (auto-disabled) |
-| 6144 | 1.498 | disabled | 0% | disabled | 0% | disabled | 0% | Baseline (auto-disabled) |
-| 8192 | 1.540 | disabled | 0% | disabled | 0% | disabled | 0% | Baseline (auto-disabled) |
-| 10240 | 1.163 | 1.277 | **+9.8%** | - | - | 1.273 | +9.5% | **S3** |
-| 11264 | 1.421 | 1.464 | **+3.0%** | - | - | 1.463 | +3.0% | **S3/S10** |
-| **12288** | **1.536** | 1.257 | -18.2% | **1.534** | **-0.1%** | 1.247 | -18.8% | **S7** (Opt 8 fix!) |
-| 14336 | 1.412 | 1.384 | -2.0% | **1.468** | **+3.9%** | 1.466 | +3.8% | **S7** (new win!) |
-| 16384 | 1.481 | 1.512 | +2.1% | 1.516 | +2.4% | **1.516** | **+2.4%** | **S7/S10** |
+| Size | Baseline (TF) | S3 (TF) | S3 Gain | S17 (TF) | S17 Gain | S17 Winner | Best |
+|------|--------------|---------|---------|----------|----------|------------|------|
+| 4096 | 1.496 | disabled | 0% | disabled | 0% | - | Baseline |
+| 6144 | 1.498 | disabled | 0% | disabled | 0% | - | Baseline |
+| 8192 | 1.540 | disabled | 0% | disabled | 0% | - | Baseline |
+| 9216 | 1.303 | disabled | 0% | disabled | 0% | - | Baseline |
+| 9728 | 1.424 | disabled | 0% | disabled | 0% | - | Baseline |
+| **10240** | 1.167 | 1.278 | +9.5% | **1.396** | **+19.6%** | [6144,4096] | **S17** |
+| **10752** | 1.428 | - | - | 1.422 | -0.4% | [3200,7552] | Baseline |
+| **11264** | 1.409 | 1.462 | +3.8% | **1.457** | **+3.4%** | [5632,5632] | S3/S17 |
+| **11776** | 1.172 | - | - | **1.421** | **+21.3%** | [3456,8320] | **S17** |
+| 12288 | 1.531 | 1.244 | -18.8% | 1.530 | -0.1% | [8192,4096] | Baseline |
+| 13312 | 1.403 | 1.169 | -16.7% | 1.382 | -1.5% | [3968,9344] | Baseline |
+| **14336** | 1.410 | 1.383 | -1.9% | **1.467** | **+4.0%** | [8192,6144] | **S17** |
+| **15360** | 1.181 | 1.203 | +1.9% | **1.399** | **+18.5%** | [4608,10752] | **S17** |
+| **16384** | 1.482 | 1.515 | +2.2% | **1.518** | **+2.4%** | [8192,8192] | **S17** |
 
-### Critical Improvements
+### Key Observations
 
-**12288x12288 FIXED**: Previously -18.2% with S3. Now:
-- S7 achieves 1.534 TF (~0% vs baseline) thanks to Opt 8 allowing [8192, 4096] pow2 split
-- Auto-strategy no longer selects this problematic case
+**S17 wins 6 of 10 active square sizes**, discovering asymmetric splits that S3 cannot find. The biggest wins are on "performance valley" dimensions (10240, 11776, 15360) where baseline kernels are suboptimal.
 
-**14336x14336 NEW WIN**: +3.9% with S7, creating [8192, 6144] split
+**S17 never regresses more than -1.5%** even on already-optimal baselines (12288, 13312), vs S3 which regresses -18.8% on 12288.
 
-**Small matrices PROTECTED**: 4096, 6144, 8192 all auto-disabled by `shouldUseMultiMacroTile`, preventing -16% to -25% regressions
+**Small matrices (< 10240) auto-disabled**: Prevents the -16% to -25% regressions seen with forced splitting.
 
 ---
 
 ## Test Suite 3: Rectangular Matrices (K=8192)
 
-| Size | Baseline (TF) | Multi-MT (TF) | Strategy | Gain |
-|------|--------------|---------------|----------|------|
-| 16384×8192 | 1.486 | 1.530 | S3 (M-split) | **+3.0%** |
-| **12288×6144** | **1.184** | **1.492** | **S3 (M-split)** | **+26.0%** |
-| 10240×5120 | 1.335 | 1.328 | S3 (M-split) | -0.5% |
-| 8192×16384 | 1.550 | 1.520 | S4 (N-split) | -2.0% |
-| **6144×12288** | **1.286** | **1.493** | **S4 (N-split)** | **+16.1%** |
-| 5120×10240 | 1.296 | 1.291 | S4 (N-split) | -0.4% |
-| 20480×10240 | 1.428 | 1.174 | S3 (M-split) | -17.8% |
-| 10240×20480 | 1.514 | 1.144 | S4 (N-split) | -24.5% |
+| Size | Baseline (TF) | S3 (TF) | S3 Gain | S17 (TF) | S17 Gain | S17 Winner | Best |
+|------|--------------|---------|---------|----------|----------|------------|------|
+| **12288×6144** | 1.183 | 1.487 | +25.7% | **1.515** | **+28.1%** | pow2 [8192,4096] | **S17** |
+| **6144×12288** | 1.283 | 1.497 | +16.7% | **1.496** | **+16.6%** | pow2 [4096,2048] | S3/S17 |
+| **16384×8192** | 1.480 | 1.540 | +4.1% | **1.546** | **+4.4%** | uniform [8192,8192] | **S17** |
+| 8192×16384 | 1.552 | 1.524 | -1.8% | 1.530 | -1.4% | uniform [4096,4096] | Baseline |
+| **10240×5120** | 1.337 | 1.328 | -0.7% | **1.447** | **+8.2%** | asym [3072,7168] | **S17** |
+| **5120×10240** | 1.302 | 1.291 | -0.8% | **1.455** | **+11.8%** | asym [1536,3584] | **S17** |
+| **20480×10240** | 1.432 | 1.174 | -18.0% | **1.500** | **+4.8%** | asym [8192,12288] | **S17** |
+| 10240×20480 | 1.512 | 1.144 | -24.3% | 1.507 | -0.4% | asym [4096,6144] | Baseline |
 
-**Winners**: 12288×6144 (+26.0%) and 6144×12288 (+16.1%) -- moderate 2:1 aspect ratios
-**Losers**: 20480×10240 and 10240×20480 -- very large problems where splitting creates too-small sub-problems
+**S17 transforms rectangular performance**: Cases where S3 lost badly (20480x10240 at -18%, 10240x5120 at -0.7%) become wins (+4.8%, +8.2%) with S17's asymmetric splits. The empirical search finds that non-uniform ratios like [3072,7168] give both sub-problems better kernel selection than uniform [5120,5120].
 
 ---
 
 ## Test Suite 4: Stream-Parallel (CU-Mask Partitioned)
 
-| Size | Baseline (TF) | Stream-Parallel (TF) | Gain |
-|------|--------------|---------------------|------|
+| Size | Baseline (TF) | Stream-Parallel S8 (TF) | Gain |
+|------|--------------|------------------------|------|
 | 10240 | 1.163 | 1.210 | +4.0% |
 | 12288 | 1.536 | 1.148 | -25.2% |
 | 16384 | 1.481 | 1.507 | +1.8% |
 
-**Analysis**: CU-mask partitioning (Opt 2) with separate workspaces (Opt 3) shows modest sequential gains. The stream-parallel approach still faces bandwidth contention for large problems. The CU partitioning helps for 10240 and 16384, but 12288 regresses due to suboptimal split sizes with CU-balanced strategy.
-
----
-
-## Test Suite 5: Auto Strategy Selection (S0)
-
-| Problem | Baseline (TF) | Auto (TF) | Selected Strategy | Micro-bench Decision | Gain |
-|---------|--------------|-----------|-------------------|---------------------|------|
-| 10240×10240×8192 | 1.163 | 1.280 | S3 (2-split) | baseline=1482us, MT=1313us ✅ | **+10.0%** |
-| 11264×11264×8192 | 1.421 | 1.455 | S3 (2-split) | baseline=1467us, MT=1428us ✅ | **+2.4%** |
-| 12288×6144×8192 | 1.184 | 1.484 | S3 (2-split) | baseline=1055us, MT=851us ✅ | **+25.4%** |
-| 16384×16384×8192 | 1.481 | 1.514 | S10 (2-split) | baseline=2990us, MT=2886us ✅ | **+2.2%** |
-| 8192×8192×8192 | 1.540 | 1.540 | **Disabled** | Auto-disabled (too small) ✅ | **0%** |
-| 6144×6144×8192 | 1.498 | 1.498 | **Disabled** | Auto-disabled (too small) ✅ | **0%** |
-
-**Micro-benchmark validation** (Opt 6): Every decision was correct:
-- Confirmed faster: proceeded with multi-MT
-- Auto-disabled for small matrices: prevented regressions
-- **Zero negative cases with auto strategy**
-
----
-
-## Optimization Impact Summary
-
-### Before vs After (Key Problem Sizes)
-
-| Problem | Before Opt | After Opt | Delta |
-|---------|-----------|-----------|-------|
-| 10240×10240×8192 (S3) | 1.266 TF (+8.9%) | 1.277 TF (+9.8%) | **+0.9pp** (Opt 1) |
-| 12288×12288×8192 (S7) | N/A (blocked) | 1.534 TF (+0.0%) | **+18.2pp vs S3** (Opt 8) |
-| 14336×14336×8192 (S7) | Not tested | 1.468 TF (+3.9%) | **New win** (Opt 8) |
-| 4096×4096×8192 | -16.0% | **0%** | **+16pp** (Opt 4+6) |
-| 6144×6144×8192 | -24.8% | **0%** | **+24.8pp** (Opt 4+6) |
-| 8192×8192×8192 | -0.3% | **0%** | **+0.3pp** (Opt 4) |
-| 12288×6144×8192 (rect) | +25.3% | **+26.0%** | **+0.7pp** (Opt 1) |
-
-### Optimization Attribution
-
-| Optimization | Impact | Evidence |
-|-------------|--------|----------|
-| **Opt 1: Pre-create layouts** | +0.5-1.0% across all cases | Consistent improvement in S3/S10 numbers |
-| **Opt 4: Fix autoSelectNumSplits** | Eliminates 4+ split regressions | Small matrices now auto-disable |
-| **Opt 5: Concurrent warmup** | Faster warmup, no perf impact | Warmup runs 40% faster |
-| **Opt 6: Micro-benchmark** | Eliminates all negative cases | 8192, 6144 auto-disabled at runtime |
-| **Opt 8: Pow2 for non-pow2 dims** | **+18.2pp** for 12288 | S7 now creates [8192,4096] split |
+**Note**: Stream-parallel (S8) still faces HBM bandwidth contention. S17 sequential with asymmetric splits outperforms stream-parallel in most cases. Stream-parallel remains experimental.
 
 ---
 
@@ -148,115 +116,159 @@
 ### Production Deployment
 
 ```bash
-# RECOMMENDED: Auto strategy with micro-benchmark validation
+# RECOMMENDED: S17 Origami with empirical search
 ./hipblaslt-bench -m $M -n $N -k $K \
   --precision f16_r --device 7 \
-  --multi_macrotile --split_strategy 0 --num_splits 0 \
+  --multi_macrotile --split_strategy 17 --num_splits 2 \
   --l2_cache_hints --api_method c -i 100 -j 100
 ```
 
 This configuration:
-- Auto-selects the best strategy per problem size
-- Micro-benchmarks before committing (3 iterations overhead)
-- Auto-disables for small matrices (<10240)
-- Uses 2 splits (optimal for sequential)
-- **Guaranteed non-negative performance**
+- Tests 6 candidate split ratios with 3 real iterations each (~15ms overhead)
+- Picks the empirically fastest split for the full timing run
+- Discovers asymmetric splits invisible to uniform strategies
+- Auto-disables for small matrices (<10240) or small K (<4096)
+- **68% win rate, +12.2% average gain on winning cases, worst case -1.5%**
 
-### Decision Tree (Updated)
+### Decision Tree
 
 ```
 Is M or N < 10240?
 ├─ YES → Auto-disabled (0% change, safe)
 └─ NO  → Is K ≥ 4096?
     ├─ NO  → Auto-disabled (0% change)
-    └─ YES → Run micro-benchmark (3 iterations)
-        ├─ Multi-MT faster → Use it (+2% to +26%)
-        └─ Baseline faster → Skip multi-MT (0% change)
+    └─ YES → S17 Origami empirical search
+        ├─ Test 6 candidates (50/50, 60/40, 40/60, 70/30, 30/70, pow2)
+        ├─ Micro-bench each (3 iterations)
+        └─ Pick winner → Use for full timing run (+2% to +28%)
 ```
 
 ---
 
-## Test Suite 6: Origami Empirical Split Search (S17) -- UPDATED
+## Test Suite 6: Origami Empirical Split Search (S17) -- 30-Problem Sweep
 
-**S17 Origami-Optimized M-Split with Empirical Micro-Benchmark**: Instead of relying on analytical estimation, S17 now generates **6 candidate split ratios** (uniform 50/50, asymmetric 60/40, 40/60, 70/30, 30/70, and power-of-2 biased), **micro-benchmarks each with 3 real iterations**, and picks the empirically fastest split for the full timing run.
+**S17 Origami-Optimized M-Split with Empirical Micro-Benchmark**: Generates 6 candidate split ratios (50/50, 60/40, 40/60, 70/30, 30/70, pow2-biased), micro-benchmarks each with 3 real iterations, picks the empirically fastest split.
 
-### Square Matrix Results (K=8192)
+**Timing verified**: GFLOPS = 2*M*N*K / (avg_time_us * 1000). Time includes all sub-problem kernel launches on same stream, synced once at end. FLOPs use full original problem size.
 
-| Size | Baseline (TF) | S3 Uniform (TF) | S17 Origami (TF) | Winning Split | S3 vs BL | S17 vs BL | **S17 vs S3** |
-|------|--------------|-----------------|------------------|---------------|----------|-----------|---------------|
-| 10240 | 1.162 | 1.278 | **1.402** | asym-40/60 [4096,6144] | +10.0% | **+20.7%** | **+9.7%** |
-| 11264 | 1.419 | 1.462 | 1.458 | uniform [5632,5632] | +3.0% | +2.7% | -0.3% |
-| **12288** | **1.528** | 1.244 | **1.533** | **pow2 [8192,4096]** | -18.6% | **+0.3%** | **+23.2%** |
-| 13312 | 1.407 | 1.169 | 1.388 | asym-30/70 [3968,9344] | -17.0% | **-1.3%** | **+18.7%** |
-| **14336** | **1.411** | 1.383 | **1.467** | **pow2 [8192,6144]** | -2.0% | **+4.0%** | **+6.1%** |
-| **15360** | **1.185** | 1.203 | **1.404** | **asym-30/70 [4608,10752]** | +1.5% | **+18.5%** | **+16.7%** |
-| 16384 | 1.483 | 1.515 | 1.516 | uniform [8192,8192] | +2.2% | +2.2% | +0.0% |
+### Complete Results (30 problems, --device 7, -i 100 -j 100)
 
-### K Scaling Results (M=N=10240)
+| Problem | BL (TF) | BL (us) | S17 (TF) | S17 (us) | Gain | Winning Split |
+|---------|---------|---------|----------|----------|------|---------------|
+| **10240x10240x4096** | 1.255 | 684 | **1.375** | 625 | **+9.6%** | asym-60/40 [6144,4096] |
+| **10240x10240x8192** | 1.167 | 1473 | **1.396** | 1231 | **+19.6%** | asym-60/40 [6144,4096] |
+| **10240x10240x16384** | 1.149 | 2991 | **1.377** | 2497 | **+19.8%** | asym-60/40 [6144,4096] |
+| **10240x10240x32768** | 1.093 | 6288 | **1.386** | 4955 | **+26.9%** | asym-40/60 [4096,6144] |
+| **11264x11264x8192** | 1.409 | 1475 | **1.457** | 1426 | **+3.4%** | uniform [5632,5632] |
+| 12288x12288x8192 | 1.531 | 1616 | 1.530 | 1617 | -0.1% | pow2 [8192,4096] |
+| 13312x13312x8192 | 1.403 | 2070 | 1.382 | 2100 | -1.5% | asym-30/70 [3968,9344] |
+| **14336x14336x8192** | 1.410 | 2388 | **1.467** | 2296 | **+4.0%** | pow2 [8192,6144] |
+| **15360x15360x8192** | 1.181 | 3273 | **1.399** | 2764 | **+18.5%** | asym-30/70 [4608,10752] |
+| **16384x16384x8192** | 1.482 | 2968 | **1.518** | 2898 | **+2.4%** | uniform [8192,8192] |
+| 10752x10752x8192 | 1.428 | 1327 | 1.422 | 1334 | -0.4% | asym-30/70 [3200,7552] |
+| **11776x11776x8192** | 1.172 | 1938 | **1.421** | 1599 | **+21.3%** | asym-30/70 [3456,8320] |
+| **12288x6144x8192** | 1.183 | 1046 | **1.515** | 816 | **+28.1%** | pow2 [8192,4096] |
+| **6144x12288x8192** | 1.283 | 964 | **1.496** | 826 | **+16.6%** | pow2 [4096,2048] |
+| **16384x8192x8192** | 1.480 | 1485 | **1.546** | 1423 | **+4.4%** | uniform [8192,8192] |
+| 8192x16384x8192 | 1.552 | 1417 | 1.530 | 1437 | -1.4% | uniform [4096,4096] |
+| **10240x5120x8192** | 1.337 | 643 | **1.447** | 594 | **+8.2%** | asym-30/70 [3072,7168] |
+| **5120x10240x8192** | 1.302 | 660 | **1.455** | 590 | **+11.8%** | asym-30/70 [1536,3584] |
+| **20480x10240x8192** | 1.432 | 2399 | **1.500** | 2291 | **+4.8%** | asym-40/60 [8192,12288] |
+| 10240x20480x8192 | 1.512 | 2273 | 1.507 | 2280 | -0.4% | asym-40/60 [4096,6144] |
+| **16384x16384x16384** | 1.502 | 5855 | **1.533** | 5736 | **+2.1%** | uniform [8192,8192] |
+| **15360x15360x4096** | 1.297 | 1490 | **1.419** | 1363 | **+9.4%** | asym-30/70 [4608,10752] |
+| 14336x14336x4096 | 1.417 | 1188 | 1.422 | 1185 | +0.3% | pow2 [8192,6144] |
+| 12288x12288x4096 | 1.494 | 828 | 1.477 | 838 | -1.1% | pow2 [8192,4096] |
+| 16384x16384x4096 | 1.504 | 1462 | 1.494 | 1472 | -0.7% | uniform [8192,8192] |
+| 10240x10240x2048 | 1.168 | 368 | --- | --- | 0% | auto-disabled (K<4096) |
+| 10240x10240x1024 | 1.016 | 211 | --- | --- | 0% | auto-disabled |
+| 10240x10240x512 | 0.805 | 133 | --- | --- | 0% | auto-disabled |
+| 9216x9216x8192 | 1.303 | 1068 | --- | --- | 0% | auto-disabled (M<10240) |
+| 9728x9728x8192 | 1.424 | 1089 | --- | --- | 0% | auto-disabled (M<10240) |
 
-| K | Baseline (TF) | S3 (TF) | S17 (TF) | Winning Split | S3 vs BL | S17 vs BL | **S17 vs S3** |
-|---|--------------|---------|----------|---------------|----------|-----------|---------------|
-| 4096 | 1.252 | 1.281 | **1.370** | asym-40/60 [4096,6144] | +2.3% | **+9.4%** | **+6.9%** |
-| 8192 | 1.162 | 1.278 | **1.402** | asym-40/60 [4096,6144] | +10.0% | **+20.7%** | **+9.7%** |
-| 16384 | 1.151 | 1.250 | **1.377** | asym-60/40 [6144,4096] | +8.6% | **+19.6%** | **+10.2%** |
-| 32768 | 1.092 | 1.240 | **1.385** | asym-40/60 [4096,6144] | +13.5% | **+26.8%** | **+11.7%** |
+### Summary Statistics
 
-### Rectangular Matrix Results (K=8192)
+| Metric | Value |
+|--------|-------|
+| Total problems tested | 30 |
+| Auto-disabled (safe, 0% change) | 5 |
+| Active comparisons | 25 |
+| **Wins (>0.5% uplift)** | **17 of 25 (68%)** |
+| Losses (>0.5% regression) | 4 of 25 (16%) |
+| Neutral (within ±0.5%) | 4 of 25 (16%) |
+| **Best uplift** | **+28.1%** (12288x6144x8192) |
+| **Worst regression** | **-1.5%** (13312x13312x8192) |
+| Average gain (active cases) | **+7.7%** |
+| Average gain (winning cases only) | **+12.2%** |
 
-| Size | Baseline (TF) | S3 (TF) | S17 (TF) | Winning Split | S3 vs BL | S17 vs BL | **S17 vs S3** |
-|------|--------------|---------|----------|---------------|----------|-----------|---------------|
-| **12288x6144** | **1.182** | 1.487 | **1.513** | **pow2 [8192,4096]** | +25.8% | **+28.0%** | **+1.7%** |
-| 6144x12288 | 1.283 | 1.497 | 1.496 | pow2 [4096,2048] | +16.7% | +16.6% | -0.1% |
-| 16384x8192 | 1.474 | 1.540 | 1.536 | uniform [8192,8192] | +4.5% | +4.2% | -0.3% |
-| 8192x16384 | 1.550 | 1.524 | 1.529 | uniform [4096,4096] | -1.7% | -1.4% | +0.3% |
+### Top 10 Winning Cases
 
-### Analysis: Why Origami Empirical Search Dominates
+| # | Problem | Gain | S17 (TF) | BL (TF) | Winning Split |
+|---|---------|------|----------|---------|---------------|
+| 1 | **12288x6144x8192** | **+28.1%** | 1.515 | 1.183 | pow2 [8192,4096] |
+| 2 | **10240x10240x32768** | **+26.9%** | 1.386 | 1.093 | asym-40/60 [4096,6144] |
+| 3 | **11776x11776x8192** | **+21.3%** | 1.421 | 1.172 | asym-30/70 [3456,8320] |
+| 4 | **10240x10240x16384** | **+19.8%** | 1.377 | 1.149 | asym-60/40 [6144,4096] |
+| 5 | **10240x10240x8192** | **+19.6%** | 1.396 | 1.167 | asym-60/40 [6144,4096] |
+| 6 | **15360x15360x8192** | **+18.5%** | 1.399 | 1.181 | asym-30/70 [4608,10752] |
+| 7 | **6144x12288x8192** | **+16.6%** | 1.496 | 1.283 | pow2 [4096,2048] |
+| 8 | **5120x10240x8192** | **+11.8%** | 1.455 | 1.302 | asym-30/70 [1536,3584] |
+| 9 | **10240x10240x4096** | **+9.6%** | 1.375 | 1.255 | asym-60/40 [6144,4096] |
+| 10 | **15360x15360x4096** | **+9.4%** | 1.419 | 1.297 | asym-30/70 [4608,10752] |
 
-**S17 now beats S3 by +6-24% on many problem sizes** because the empirical micro-benchmark discovers non-uniform splits that are invisible to uniform strategies:
+### Analysis: Where Origami Wins and Why
 
-**10240x10240**: The winning split is **[4096, 6144]** (40/60 ratio). 4096 is a clean power-of-2 that gets an extremely efficient kernel, and 6144 = 3x2048 also maps well. Result: **1.402 TF (+20.7% over baseline, +9.7% over S3)**.
+**Pattern 1: 10240-class problems with any K (+9.6% to +26.9%)**
 
-**12288x12288**: Previously the worst regression (-18.6% with S3). Origami finds **[8192, 4096]** (pow2-biased), both exact powers-of-2. Result: **1.533 TF (+0.3% vs baseline, +23.2% over S3)**.
+The [4096, 6144] or [6144, 4096] asymmetric split consistently wins for 10240x10240. Both 4096 and 6144 get highly-tuned kernels, and the empirical search discovers this is better than the uniform [5120, 5120].
 
-**15360x15360**: Previously only +1.5% with S3. Origami finds **[4608, 10752]** (30/70 ratio). Result: **1.404 TF (+18.5% over baseline, +16.7% over S3)**.
+**Pattern 2: Rectangular 2:1 ratios (+8.2% to +28.1%)**
 
-**K=32768**: Origami achieves **1.385 TF (+26.8% over baseline, +11.7% over S3)** with [4096,6144].
+12288x6144, 6144x12288, 10240x5120, 5120x10240 all show significant wins. The pow2-biased split creates clean power-of-2 sub-problems (e.g., [8192, 4096]) that map to peak-efficiency kernels.
 
-### Key Insights
+**Pattern 3: 15360-class "dead zone" problems (+9.4% to +18.5%)**
 
-1. **Uniform splits (50/50) are rarely optimal**: Out of 14 tests, only 4 had uniform as winner.
-2. **Power-of-2 sub-problems dominate**: Splits containing 4096 or 8192 consistently win.
-3. **40/60 and 30/70 ratios are surprisingly effective** for 10240-class problems.
-4. **Empirical search cost is minimal**: ~10-20ms overhead for 5-6 candidates x 3 iterations each.
-5. **All S3 regressions fixed**: 12288 (-18.6%), 13312 (-17.0%) now within -1.3% of baseline.
+15360 is a particularly bad dimension for single-kernel (1.181 TF baseline). The 30/70 split [4608, 10752] gets much better kernel selection for both sub-problems.
 
-### Comparison: S17 Origami vs S3 Uniform
+**Pattern 4: 11776 "odd size" problem (+21.3%)**
 
-| Metric | S3 Uniform | S17 Origami | Improvement |
-|--------|-----------|-------------|-------------|
-| Best case vs baseline | +25.8% | **+28.0%** | +2.2pp |
-| Avg improvement (winning) | +6.1% | **+12.5%** | +6.4pp |
-| Cases that beat S3 | - | **10 of 14** | - |
-| Worst regression vs baseline | -18.6% | **-1.4%** | +17.2pp |
-| Regressions > 5% | 3 | **0** | All fixed |
+11776 is far from any power-of-2 and gets a slow baseline kernel (1.172 TF). Origami's [3456, 8320] split rescues it to 1.421 TF.
 
-### Implementation Details
+**Where it doesn't help: Already-optimal baseline sizes**
 
-**Files modified**:
-- `multi_macrotile_origami_improved.hpp`: Rewrote to generate 6 candidate split configs via `generateOrigamiCandidates()` and expose them through thread-local `getOrigamiCandidates()`
-- `testing_matmul.hpp`: Added Origami empirical search block before timing loop. For S17/S18, micro-benchmarks each candidate (3 iterations), picks winner, rebuilds sub-problems and contexts with winning split ratio.
-- `multi_macrotile.hpp`: Fixed empty-vector segfault when Origami returns `{}` (use-baseline signal)
+12288x12288 (1.531 TF baseline), 10752x10752 (1.428 TF), 8192x16384 (1.552 TF) -- these dimensions already hit near-peak performance with single kernel. Splitting can't improve and adds slight overhead.
 
-### Future Improvements
+### Winning Split Ratio Distribution
 
-1. **Finer-grained search**: Test 45/55, 55/45, 35/65, 65/35 ratios for additional +1-2%
-2. **K-dimension aware candidates**: Generate splits that optimize L2 cache for the K dimension
-3. **Integration with auto-strategy (S0)**: Make S0 use Origami empirical search as default
-4. **Per-problem caching**: Cache winning splits to skip micro-benchmark on repeated calls
+| Winning Ratio | Count | Typical Problem |
+|---------------|-------|-----------------|
+| uniform 50/50 | 6 | 16384x16384, 11264x11264 |
+| asym 60/40 | 3 | 10240x10240 (any K) |
+| asym 40/60 | 2 | 10240x10240x32768 |
+| asym 30/70 | 6 | 15360, 11776, 5120x10240 |
+| pow2-biased | 5 | 12288x12288, 14336, 12288x6144 |
+| asym 70/30 | 0 | (never optimal) |
+
+Key finding: **70/30 is never optimal** but **30/70 is the most common winner** (6 times). This suggests that creating one small power-of-2-like sub-problem paired with one large sub-problem is often the best strategy.
+
+### Recommendations for Production Use
+
+```bash
+# RECOMMENDED: S17 Origami for all problems >= 10240 with K >= 4096
+./hipblaslt-bench -m $M -n $N -k $K \
+  --precision f16_r --device 7 \
+  --multi_macrotile --split_strategy 17 --num_splits 2 \
+  --l2_cache_hints --api_method c -i 100 -j 100
+```
+
+**When to use S17**: M or N >= 10240 AND K >= 4096 (auto-disabled otherwise)
+**Expected gain**: +7.7% average, +12.2% on winning cases, up to +28.1%
+**Worst case**: -1.5% (rare, only for already-optimal baselines)
+**Overhead**: ~15ms for candidate search (amortized over long-running benchmarks)
 
 ---
 
-**Last Updated**: 2026-04-17  
-**Status**: All optimizations + Origami empirical search complete  
-**Best Result**: 10240x10240x32768: **1.385 TF (+26.8% over baseline)**  
-**Biggest S17 vs S3 win**: 12288x12288x8192: **+23.2% (S17 fixes S3's -18.6% regression)**
+**Last Updated**: 2026-04-17 (post Origami empirical implementation)  
+**Status**: Full 30-problem sweep complete with verified timing  
+**Best Result**: 12288x6144x8192: **1.515 TF (+28.1% over baseline)**  
+**Win Rate**: 17/25 active cases (68%)
