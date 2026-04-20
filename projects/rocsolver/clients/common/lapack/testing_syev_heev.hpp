@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,20 +36,20 @@
 #include "common/misc/rocsolver_test.hpp"
 #include "common/misc/rocsolver_timer.hpp"
 
-template <bool STRIDED, typename T, typename S, typename U>
+template <bool STRIDED, typename I, typename T, typename S, typename U>
 void syev_heev_checkBadArgs(const rocblas_handle handle,
                             const rocblas_evect evect,
                             const rocblas_fill uplo,
-                            const rocblas_int n,
+                            const I n,
                             T dA,
-                            const rocblas_int lda,
+                            const I lda,
                             const rocblas_stride stA,
                             S dD,
                             const rocblas_stride stD,
                             S dE,
                             const rocblas_stride stE,
                             U dinfo,
-                            const rocblas_int bc)
+                            const I bc)
 {
     // handle
     EXPECT_ROCBLAS_STATUS(rocsolver_syev_heev(STRIDED, nullptr, evect, uplo, n, dA, lda, stA, dD,
@@ -96,7 +96,7 @@ void syev_heev_checkBadArgs(const rocblas_handle handle,
                               rocblas_status_success);
 }
 
-template <bool BATCHED, bool STRIDED, typename T>
+template <bool BATCHED, bool STRIDED, typename T, typename I>
 void testing_syev_heev_bad_arg()
 {
     using S = decltype(std::real(T{}));
@@ -105,12 +105,12 @@ void testing_syev_heev_bad_arg()
     rocblas_local_handle handle;
     rocblas_evect evect = rocblas_evect_none;
     rocblas_fill uplo = rocblas_fill_lower;
-    rocblas_int n = 1;
-    rocblas_int lda = 1;
+    I n = 1;
+    I lda = 1;
     rocblas_stride stA = 1;
     rocblas_stride stD = 1;
     rocblas_stride stE = 1;
-    rocblas_int bc = 1;
+    I bc = 1;
 
     if(BATCHED)
     {
@@ -125,8 +125,8 @@ void testing_syev_heev_bad_arg()
         CHECK_HIP_ERROR(dinfo.memcheck());
 
         // check bad arguments
-        syev_heev_checkBadArgs<STRIDED>(handle, evect, uplo, n, dA.data(), lda, stA, dD.data(), stD,
-                                        dE.data(), stE, dinfo.data(), bc);
+        syev_heev_checkBadArgs<STRIDED, I>(handle, evect, uplo, n, dA.data(), lda, stA, dD.data(),
+                                           stD, dE.data(), stE, dinfo.data(), bc);
     }
     else
     {
@@ -141,18 +141,18 @@ void testing_syev_heev_bad_arg()
         CHECK_HIP_ERROR(dinfo.memcheck());
 
         // check bad arguments
-        syev_heev_checkBadArgs<STRIDED>(handle, evect, uplo, n, dA.data(), lda, stA, dD.data(), stD,
-                                        dE.data(), stE, dinfo.data(), bc);
+        syev_heev_checkBadArgs<STRIDED, I>(handle, evect, uplo, n, dA.data(), lda, stA, dD.data(),
+                                           stD, dE.data(), stE, dinfo.data(), bc);
     }
 }
 
-template <bool CPU, bool GPU, typename T, typename Td, typename Th>
+template <bool CPU, bool GPU, typename T, typename I, typename Td, typename Th>
 void syev_heev_initData(const rocblas_handle handle,
                         const rocblas_evect evect,
-                        const rocblas_int n,
+                        const I n,
                         Td& dA,
-                        const rocblas_int lda,
-                        const rocblas_int bc,
+                        const I lda,
+                        const I bc,
                         Th& hA,
                         std::vector<T>& A,
                         bool test = true)
@@ -162,11 +162,11 @@ void syev_heev_initData(const rocblas_handle handle,
         rocblas_init<T>(hA, true);
 
         // scale A to avoid singularities
-        for(rocblas_int b = 0; b < bc; ++b)
+        for(I b = 0; b < bc; ++b)
         {
-            for(rocblas_int i = 0; i < n; i++)
+            for(I i = 0; i < n; i++)
             {
-                for(rocblas_int j = 0; j < n; j++)
+                for(I j = 0; j < n; j++)
                 {
                     if(i == j)
                         hA[b][i + j * lda] = std::real(hA[b][i + j * lda]) + 400;
@@ -178,9 +178,9 @@ void syev_heev_initData(const rocblas_handle handle,
             // make copy of original data to test vectors if required
             if(test && evect == rocblas_evect_original)
             {
-                for(rocblas_int i = 0; i < n; i++)
+                for(I i = 0; i < n; i++)
                 {
-                    for(rocblas_int j = 0; j < n; j++)
+                    for(I j = 0; j < n; j++)
                         A[b * lda * n + i + j * lda] = hA[b][i + j * lda];
                 }
             }
@@ -194,20 +194,20 @@ void syev_heev_initData(const rocblas_handle handle,
     }
 }
 
-template <bool STRIDED, typename T, typename Sd, typename Td, typename Id, typename Sh, typename Th, typename Ih>
+template <bool STRIDED, typename T, typename I, typename Sd, typename Td, typename Id, typename Sh, typename Th, typename Ih>
 void syev_heev_getError(const rocblas_handle handle,
                         const rocblas_evect evect,
                         const rocblas_fill uplo,
-                        const rocblas_int n,
+                        const I n,
                         Td& dA,
-                        const rocblas_int lda,
+                        const I lda,
                         const rocblas_stride stA,
                         Sd& dD,
                         const rocblas_stride stD,
                         Sd& dE,
                         const rocblas_stride stE,
                         Id& dinfo,
-                        const rocblas_int bc,
+                        const I bc,
                         Th& hA,
                         Th& hAres,
                         Sh& hD,
@@ -239,13 +239,13 @@ void syev_heev_getError(const rocblas_handle handle,
         CHECK_HIP_ERROR(hAres.transfer_from(dA));
 
     // CPU lapack
-    for(rocblas_int b = 0; b < bc; ++b)
+    for(I b = 0; b < bc; ++b)
         cpu_syev_heev(evect, uplo, n, hA[b], lda, hD[b], work.data(), lwork, hE.data(), sizeE,
                       hinfo[b]);
 
     // Check info for non-convergence
     *max_err = 0;
-    for(rocblas_int b = 0; b < bc; ++b)
+    for(I b = 0; b < bc; ++b)
     {
         EXPECT_EQ(hinfo[b][0], hinfoRes[b][0]) << "where b = " << b;
         if(hinfo[b][0] != hinfoRes[b][0])
@@ -258,7 +258,7 @@ void syev_heev_getError(const rocblas_handle handle,
 
     double err = 0;
 
-    for(rocblas_int b = 0; b < bc; ++b)
+    for(I b = 0; b < bc; ++b)
     {
         if(evect != rocblas_evect_original)
         {
@@ -280,7 +280,7 @@ void syev_heev_getError(const rocblas_handle handle,
                 // eigenvalues
                 T alpha;
                 T beta = 0;
-                for(int j = 0; j < n; j++)
+                for(I j = 0; j < n; j++)
                 {
                     alpha = T(1) / hDres[b][j];
                     cpu_symv_hemv(uplo, n, alpha, A.data() + b * lda * n, lda, hAres[b] + j * lda,
@@ -296,20 +296,20 @@ void syev_heev_getError(const rocblas_handle handle,
     }
 }
 
-template <bool STRIDED, typename T, typename Sd, typename Td, typename Id, typename Sh, typename Th, typename Ih>
+template <bool STRIDED, typename T, typename I, typename Sd, typename Td, typename Id, typename Sh, typename Th, typename Ih>
 void syev_heev_getPerfData(const rocblas_handle handle,
                            const rocblas_evect evect,
                            const rocblas_fill uplo,
-                           const rocblas_int n,
+                           const I n,
                            Td& dA,
-                           const rocblas_int lda,
+                           const I lda,
                            const rocblas_stride stA,
                            Sd& dD,
                            const rocblas_stride stD,
                            Sd& dE,
                            const rocblas_stride stE,
                            Id& dinfo,
-                           const rocblas_int bc,
+                           const I bc,
                            Th& hA,
                            Sh& hD,
                            Ih& hinfo,
@@ -335,7 +335,7 @@ void syev_heev_getPerfData(const rocblas_handle handle,
 
         // cpu-lapack performance (only if not in perf mode)
         *cpu_time_used = get_time_us_no_sync();
-        for(rocblas_int b = 0; b < bc; ++b)
+        for(I b = 0; b < bc; ++b)
             cpu_syev_heev(evect, uplo, n, hA[b], lda, hD[b], work.data(), lwork, hE.data(), sizeE,
                           hinfo[b]);
         *cpu_time_used = get_time_us_no_sync() - *cpu_time_used;
@@ -379,7 +379,7 @@ void syev_heev_getPerfData(const rocblas_handle handle,
     *gpu_time_used = timer.get_combined();
 }
 
-template <bool BATCHED, bool STRIDED, typename T>
+template <bool BATCHED, bool STRIDED, typename T, typename I>
 void testing_syev_heev(Arguments& argus)
 {
     using S = decltype(std::real(T{}));
@@ -388,15 +388,15 @@ void testing_syev_heev(Arguments& argus)
     rocblas_local_handle handle;
     char evectC = argus.get<char>("evect");
     char uploC = argus.get<char>("uplo");
-    rocblas_int n = argus.get<rocblas_int>("n");
-    rocblas_int lda = argus.get<rocblas_int>("lda", n);
+    I n = argus.get<rocblas_int>("n");
+    I lda = argus.get<rocblas_int>("lda", n);
     rocblas_stride stA = argus.get<rocblas_stride>("strideA", lda * n);
     rocblas_stride stD = argus.get<rocblas_stride>("strideD", n);
     rocblas_stride stE = argus.get<rocblas_stride>("strideE", n);
 
     rocblas_evect evect = char2rocblas_evect(evectC);
     rocblas_fill uplo = char2rocblas_fill(uploC);
-    rocblas_int bc = argus.batch_count;
+    I bc = argus.batch_count;
     rocblas_int hot_calls = argus.iters;
 
     if(argus.alg_mode == 1)
@@ -526,18 +526,18 @@ void testing_syev_heev(Arguments& argus)
         // check computations
         if(argus.unit_check || argus.norm_check)
         {
-            syev_heev_getError<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE, stE,
-                                           dinfo, bc, hA, hAres, hD, hDres, hinfo, hinfoRes,
-                                           &max_error);
+            syev_heev_getError<STRIDED, T, I>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
+                                              stE, dinfo, bc, hA, hAres, hD, hDres, hinfo, hinfoRes,
+                                              &max_error);
         }
 
         // collect performance data
         if(argus.timing && hot_calls > 0)
         {
-            syev_heev_getPerfData<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
-                                              stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,
-                                              &cpu_time_used, hot_calls, argus.profile,
-                                              argus.profile_kernels, argus.perf);
+            syev_heev_getPerfData<STRIDED, T, I>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
+                                                 stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,
+                                                 &cpu_time_used, hot_calls, argus.profile,
+                                                 argus.profile_kernels, argus.perf);
         }
     }
 
@@ -566,18 +566,18 @@ void testing_syev_heev(Arguments& argus)
         // check computations
         if(argus.unit_check || argus.norm_check)
         {
-            syev_heev_getError<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE, stE,
-                                           dinfo, bc, hA, hAres, hD, hDres, hinfo, hinfoRes,
-                                           &max_error);
+            syev_heev_getError<STRIDED, T, I>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
+                                              stE, dinfo, bc, hA, hAres, hD, hDres, hinfo, hinfoRes,
+                                              &max_error);
         }
 
         // collect performance data
         if(argus.timing && hot_calls > 0)
         {
-            syev_heev_getPerfData<STRIDED, T>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
-                                              stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,
-                                              &cpu_time_used, hot_calls, argus.profile,
-                                              argus.profile_kernels, argus.perf);
+            syev_heev_getPerfData<STRIDED, T, I>(handle, evect, uplo, n, dA, lda, stA, dD, stD, dE,
+                                                 stE, dinfo, bc, hA, hD, hinfo, &gpu_time_used,
+                                                 &cpu_time_used, hot_calls, argus.profile,
+                                                 argus.profile_kernels, argus.perf);
         }
     }
 
@@ -637,4 +637,8 @@ void testing_syev_heev(Arguments& argus)
 #define EXTERN_TESTING_SYEV_HEEV(...) \
     extern template void testing_syev_heev<__VA_ARGS__>(Arguments&);
 
-INSTANTIATE(EXTERN_TESTING_SYEV_HEEV, FOREACH_MATRIX_DATA_LAYOUT, FOREACH_SCALAR_TYPE, APPLY_STAMP)
+INSTANTIATE(EXTERN_TESTING_SYEV_HEEV,
+            FOREACH_MATRIX_DATA_LAYOUT,
+            FOREACH_SCALAR_TYPE,
+            FOREACH_INT_TYPE,
+            APPLY_STAMP)
