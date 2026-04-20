@@ -185,14 +185,14 @@ OpTensorLeadingOnes::GetSolution([[maybe_unused]] const ExecutionContext& contex
                             static_cast<int>(cstrides[0]),
                             static_cast<int>(cstrides[1]),
                             work_per_wg,
+                            static_cast<int>(num_wg_orig),
+                            bitmap,
                             miopen_alpha0,
                             miopen_alpha1,
                             miopen_beta,
                             static_cast<int64_t>(params.Aoffset),
                             static_cast<int64_t>(params.Boffset),
-                            static_cast<int64_t>(params.Coffset),
-                            static_cast<int>(num_wg_orig),
-                            bitmap);
+                            static_cast<int64_t>(params.Coffset));
                 }
                 else
                 { // OpTensorLeadingOnesGeneric
@@ -215,11 +215,11 @@ OpTensorLeadingOnes::GetSolution([[maybe_unused]] const ExecutionContext& contex
                             miopen_alpha1,
                             miopen_beta,
                             work_per_wg,
+                            static_cast<int>(num_wg_orig),
+                            bitmap,
                             static_cast<int64_t>(params.Aoffset),
                             static_cast<int64_t>(params.Boffset),
-                            static_cast<int64_t>(params.Coffset),
-                            static_cast<int>(num_wg_orig),
-                            bitmap);
+                            static_cast<int64_t>(params.Coffset));
                 }
             });
         };
