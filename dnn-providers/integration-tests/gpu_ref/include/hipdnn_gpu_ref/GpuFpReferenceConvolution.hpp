@@ -98,93 +98,6 @@ public:
         y.memory().markDeviceModified();
     }
 
-    // Raw device-pointer overload. Operates directly on device buffers without
-    // requiring a TensorBase wrapper.
-    template <class XDataType,
-              class WDataType = XDataType,
-              class YDataType = XDataType,
-              class ComputeDataType = double>
-    static void fprop(const void* xPtr,
-                      const void* wPtr,
-                      void* yPtr,
-                      const std::vector<int64_t>& xDims,
-                      const std::vector<int64_t>& wDims,
-                      const std::vector<int64_t>& yDims,
-                      const std::vector<int64_t>& xStrides,
-                      const std::vector<int64_t>& wStrides,
-                      const std::vector<int64_t>& yStrides,
-                      const std::vector<int64_t>& convStrides,
-                      const std::vector<int64_t>& dilations,
-                      const std::vector<int64_t>& prePadding,
-                      const std::vector<int64_t>& postPadding,
-                      double alpha = 1.0,
-                      double beta = 0.0,
-                      bool useTf32 = false)
-    {
-        validateInput(xDims, wDims, yDims, convStrides, dilations, prePadding, postPadding);
-
-        const auto nDims = xDims.size();
-        auto defines
-            = detail::buildConvDefines<XDataType, WDataType, YDataType, ComputeDataType>(useTf32);
-
-        // Only prePadding is passed to the kernel. Post-padding is implicitly
-        // handled by the output tensor dimensions and the kernel's bounds checks.
-        if(nDims == 3)
-        {
-            launchFprop1d(xPtr,
-                          wPtr,
-                          yPtr,
-                          xDims,
-                          wDims,
-                          yDims,
-                          xStrides,
-                          wStrides,
-                          yStrides,
-                          convStrides,
-                          dilations,
-                          prePadding,
-                          defines,
-                          alpha,
-                          beta);
-        }
-        else if(nDims == 4)
-        {
-            launchFprop2d(xPtr,
-                          wPtr,
-                          yPtr,
-                          xDims,
-                          wDims,
-                          yDims,
-                          xStrides,
-                          wStrides,
-                          yStrides,
-                          convStrides,
-                          dilations,
-                          prePadding,
-                          defines,
-                          alpha,
-                          beta);
-        }
-        else // nDims == 5, guaranteed by validateInput
-        {
-            launchFprop3d(xPtr,
-                          wPtr,
-                          yPtr,
-                          xDims,
-                          wDims,
-                          yDims,
-                          xStrides,
-                          wStrides,
-                          yStrides,
-                          convStrides,
-                          dilations,
-                          prePadding,
-                          defines,
-                          alpha,
-                          beta);
-        }
-    }
-
     // --- Backward data gradient (dgrad) ---
     // gradX and w are non-const because MigratableMemory::deviceData() triggers
     // lazy host-to-device synchronization, which mutates internal state.
@@ -410,6 +323,93 @@ public:
     }
 
 private:
+    // --- Raw device-pointer fprop (implementation detail) ---
+
+    template <class XDataType,
+              class WDataType = XDataType,
+              class YDataType = XDataType,
+              class ComputeDataType = double>
+    static void fprop(const void* xPtr,
+                      const void* wPtr,
+                      void* yPtr,
+                      const std::vector<int64_t>& xDims,
+                      const std::vector<int64_t>& wDims,
+                      const std::vector<int64_t>& yDims,
+                      const std::vector<int64_t>& xStrides,
+                      const std::vector<int64_t>& wStrides,
+                      const std::vector<int64_t>& yStrides,
+                      const std::vector<int64_t>& convStrides,
+                      const std::vector<int64_t>& dilations,
+                      const std::vector<int64_t>& prePadding,
+                      const std::vector<int64_t>& postPadding,
+                      double alpha = 1.0,
+                      double beta = 0.0,
+                      bool useTf32 = false)
+    {
+        validateInput(xDims, wDims, yDims, convStrides, dilations, prePadding, postPadding);
+
+        const auto nDims = xDims.size();
+        auto defines
+            = detail::buildConvDefines<XDataType, WDataType, YDataType, ComputeDataType>(useTf32);
+
+        // Only prePadding is passed to the kernel. Post-padding is implicitly
+        // handled by the output tensor dimensions and the kernel's bounds checks.
+        if(nDims == 3)
+        {
+            launchFprop1d(xPtr,
+                          wPtr,
+                          yPtr,
+                          xDims,
+                          wDims,
+                          yDims,
+                          xStrides,
+                          wStrides,
+                          yStrides,
+                          convStrides,
+                          dilations,
+                          prePadding,
+                          defines,
+                          alpha,
+                          beta);
+        }
+        else if(nDims == 4)
+        {
+            launchFprop2d(xPtr,
+                          wPtr,
+                          yPtr,
+                          xDims,
+                          wDims,
+                          yDims,
+                          xStrides,
+                          wStrides,
+                          yStrides,
+                          convStrides,
+                          dilations,
+                          prePadding,
+                          defines,
+                          alpha,
+                          beta);
+        }
+        else // nDims == 5, guaranteed by validateInput
+        {
+            launchFprop3d(xPtr,
+                          wPtr,
+                          yPtr,
+                          xDims,
+                          wDims,
+                          yDims,
+                          xStrides,
+                          wStrides,
+                          yStrides,
+                          convStrides,
+                          dilations,
+                          prePadding,
+                          defines,
+                          alpha,
+                          beta);
+        }
+    }
+
     // --- Validation ---
 
     static void validateInput(const std::vector<int64_t>& xDims,
