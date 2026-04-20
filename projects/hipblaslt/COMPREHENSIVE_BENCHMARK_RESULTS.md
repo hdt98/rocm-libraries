@@ -148,3 +148,277 @@ Dimensions where baseline exceeds ~1.15 TF (11520, 12800, 14080) see slight regr
 **Expected gain**: +22.9% average, up to +64.8%  
 **Overhead**: ~20-60 ms for candidate search (~7 candidates x 3 iterations each)  
 **Safety**: Problems below thresholds are auto-disabled (0% impact)
+
+---
+
+## Detailed Kernel Information
+
+For each problem size: the baseline MacroTile selected by the heuristic, the Origami split, and the MacroTile selected for each sub-problem. This shows exactly *how* multi-MacroTile changes kernel selection.
+
+#### 10240x10240x4096
+
+**Baseline**: 1.094 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.180 TF (+7.9%), Split: asym-40/60 [4096,6144]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4096x10240x4096 | 0 | `MT256x208x64` |
+| [1] | 6144x10240x4096 | 4096 | `MT256x208x64` |
+
+Baseline uses MT256x240 but sub-problems get MT256x208 -- a smaller N-tile that runs faster for these M-sizes because it has better CU utilization (fewer tail workgroups).
+
+---
+
+#### 10240x10240x8192
+
+**Baseline**: 0.967 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.209 TF (+25.0%), Split: asym-60/40 [6144,4096]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 6144x10240x8192 | 0 | `MT256x208x64` |
+| [1] | 4096x10240x8192 | 6144 | `MT256x208x64` |
+
+---
+
+#### 10240x10240x16384
+
+**Baseline**: 0.920 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.178 TF (+28.0%), Split: asym-40/60 [4096,6144]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4096x10240x16384 | 0 | `MT256x208x64` |
+| [1] | 6144x10240x16384 | 4096 | `MT256x208x64` |
+
+---
+
+#### 10240x10240x32768
+
+**Baseline**: 0.859 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.176 TF (+36.9%), Split: asym-40/60 [4096,6144]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4096x10240x32768 | 0 | `MT256x208x64` |
+| [1] | 6144x10240x32768 | 4096 | `MT256x208x64` |
+
+---
+
+#### 11264x11264x8192
+
+**Baseline**: 1.250 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.289 TF (+3.1%), Split: uniform [5632,5632]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 5632x11264x8192 | 0 | `MT256x256x64` |
+| [1] | 5632x11264x8192 | 5632 | `MT256x256x64` |
+
+Same MT for baseline and sub-problems. Gain comes from better WG distribution across CUs.
+
+---
+
+#### 11776x11776x8192
+
+**Baseline**: 0.987 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.197 TF (+21.3%), Split: asym-70/30 [8192,3584]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 8192x11776x8192 | 0 | `MT256x224x64` |
+| [1] | 3584x11776x8192 | 8192 | `MT256x224x64` |
+
+Splits get MT256x224 (different from baseline MT256x240). The 8192-wide sub-problem is a pow2 that maps perfectly to this tile.
+
+---
+
+#### 12288x12288x8192
+
+**Baseline**: 0.890 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.182 TF (+32.8%), Split: pow2-2k [2048,10240]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 2048x12288x8192 | 0 | `MT256x240x64` |
+| [1] | 10240x12288x8192 | 2048 | `MT256x240x64` |
+
+Baseline uses MT256x256 but sub-problems get MT256x240 which is significantly faster for these shapes.
+
+---
+
+#### 13824x13824x8192
+
+**Baseline**: 0.791 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.201 TF (+51.8%), Split: uniform [6912,6912]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 6912x13824x8192 | 0 | `MT256x256x64` |
+| [1] | 6912x13824x8192 | 6912 | `MT256x256x64` |
+
+Same MT -- the gain comes entirely from better WG distribution. 13824 is a "dead zone" dimension.
+
+---
+
+#### 14336x14336x8192
+
+**Baseline**: 0.809 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.135 TF (+40.3%), Split: pow2-2k [2048,12288]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 2048x14336x8192 | 0 | `MT256x224x64` |
+| [1] | 12288x14336x8192 | 2048 | `MT256x224x64` |
+
+Sub-problems get MT256x224 instead of baseline MT256x256. This different tile is better tuned for these sub-problem sizes.
+
+---
+
+#### 14848x14848x8192
+
+**Baseline**: 0.799 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.236 TF (+54.7%), Split: uniform [7424,7424]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 7424x14848x8192 | 0 | `MT256x256x64` |
+| [1] | 7424x14848x8192 | 7424 | `MT256x256x64` |
+
+Same MT, gain from WG distribution. Another "dead zone" dimension.
+
+---
+
+#### 15360x15360x8192
+
+**Baseline**: 0.679 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.119 TF (+64.8%), Split: asym-30/70 [4608,10752]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4608x15360x8192 | 0 | `MT256x240x64` |
+| [1] | 10752x15360x8192 | 4608 | `MT256x240x64` |
+
+Same MT -- the massive +64.8% gain comes purely from CU utilization improvement. 15360 is the worst "dead zone" found (only 44% of peak).
+
+---
+
+#### 16384x16384x8192
+
+**Baseline**: 0.839 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.222 TF (+45.6%), Split: asym-30/70 [4864,11520]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4864x16384x8192 | 0 | `MT256x256x64` |
+| [1] | 11520x16384x8192 | 4864 | `MT256x256x64` |
+
+---
+
+#### 12288x6144x8192
+
+**Baseline**: 1.041 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.197 TF (+15.0%), Split: pow2-2k [2048,10240]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 2048x6144x8192 | 0 | `MT256x192x64` |
+| [1] | 10240x6144x8192 | 2048 | `MT256x192x64` |
+
+Sub-problems get MT256x192 (smaller N-tile), well-suited for the N=6144 dimension.
+
+---
+
+#### 6144x12288x8192
+
+**Baseline**: 1.046 TF, MacroTile: `MT256x240x64`
+
+**Multi-MT (S17)**: 1.160 TF (+10.9%), Split: asym-40/60 [2432,3712]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 2432x12288x8192 | 0 | `MT256x192x64` |
+| [1] | 3712x12288x8192 | 2432 | `MT256x192x64` |
+
+---
+
+#### 20480x10240x8192
+
+**Baseline**: 0.830 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.238 TF (+49.2%), Split: asym-30/70 [6144,14336]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 6144x10240x8192 | 0 | `MT256x240x64` |
+| [1] | 14336x10240x8192 | 6144 | `MT256x240x64` |
+
+Sub-problems get MT256x240 instead of baseline MT256x256, which is faster for this N=10240 shape.
+
+---
+
+#### 12288x10240x8192
+
+**Baseline**: 0.884 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.291 TF (+46.0%), Split: uniform [6144,6144]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 6144x10240x8192 | 0 | `MT256x256x64` |
+| [1] | 6144x10240x8192 | 6144 | `MT256x256x64` |
+
+---
+
+#### 10240x12288x8192
+
+**Baseline**: 0.891 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.260 TF (+41.4%), Split: uniform [5120,5120]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 5120x12288x8192 | 0 | `MT256x256x64` |
+| [1] | 5120x12288x8192 | 5120 | `MT256x256x64` |
+
+---
+
+#### 16384x16384x16384
+
+**Baseline**: 0.857 TF, MacroTile: `MT256x256x64`
+
+**Multi-MT (S17)**: 1.218 TF (+42.1%), Split: asym-30/70 [4864,11520]
+
+| Sub | Dims | M-offset | MacroTile |
+|-----|------|----------|-----------|
+| [0] | 4864x16384x16384 | 0 | `MT256x256x64` |
+| [1] | 11520x16384x16384 | 4864 | `MT256x256x64` |
+
+---
+
+### MacroTile Change Pattern Summary
+
+| Baseline MT | Sub-problem MT | Occurrence | Typical Gain |
+|------------|----------------|------------|-------------|
+| MT256x240x64 | **MT256x208x64** | 10240xNxK problems | +8% to +37% |
+| MT256x256x64 | **MT256x256x64** (same) | 13K-16K square | +32% to +55% |
+| MT256x256x64 | **MT256x224x64** | 11776, 14336 | +21% to +40% |
+| MT256x256x64 | **MT256x240x64** | 12288, 20480x10240 | +33% to +49% |
+| MT256x240x64 | **MT256x192x64** | rectangular (N=6144) | +11% to +15% |
+
+**Key insight**: Multi-MacroTile gains come from two mechanisms:
+1. **MT change** (10240-class): sub-problems get a different, more efficient MacroTile (MT256x208 instead of MT256x240)
+2. **WG redistribution** (13K-16K "dead zones"): same MT but better workgroup distribution across CUs, avoiding tail effects
