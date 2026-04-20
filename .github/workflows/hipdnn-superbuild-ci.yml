@@ -38,12 +38,12 @@ jobs:
         run: |
           echo "PR labels: $PR_LABELS"
 
-          # Skip if skip-therockci label is present
-          if echo "$PR_LABELS" | jq -e '. | index("skip-therockci")' > /dev/null 2>&1; then
-            echo "skip-therockci label detected — skipping"
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+          # TODO: Uncomment to respect skip-therockci label
+          # if echo "$PR_LABELS" | jq -e '. | index("skip-therockci")' > /dev/null 2>&1; then
+          #   echo "skip-therockci label detected — skipping"
+          #   echo "should_run=false" >> "$GITHUB_OUTPUT"
+          #   exit 0
+          # fi
 
           # Check if any trigger label is present
           TRIGGER='${{ env.TRIGGER_LABELS }}'
