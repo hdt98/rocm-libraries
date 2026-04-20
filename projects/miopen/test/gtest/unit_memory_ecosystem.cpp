@@ -10,13 +10,13 @@
 
 #include "miopen/memory_ecosystem.hpp"
 
-namespace
-{
+namespace {
 
-inline std::ostream& operator <<(std::ostream& os, const MemoryEcosystemInfo& info)
+inline std::ostream& operator<<(std::ostream& os, const MemoryEcosystemInfo& info)
 {
-    return os << "adapter_" << (info.adapter_index < 0 ? "NA" : std::to_string(info.adapter_index)) << "_dv_" << info.dedicated_vram
-              << "_sr_" << info.shared_ram << "_dr_" << info.dedicated_ram;
+    return os << "adapter_" << (info.adapter_index < 0 ? "NA" : std::to_string(info.adapter_index))
+              << "_dv_" << info.dedicated_vram << "_sr_" << info.shared_ram << "_dr_"
+              << info.dedicated_ram;
 }
 
 struct MemEcoGenericTestCase
@@ -24,14 +24,14 @@ struct MemEcoGenericTestCase
     MemoryEcosystemInfo info;
     std::vector<size_t> vram_blocks;
     std::vector<size_t> cpu_blocks;
-    bool                able;
+    bool able;
 
     struct NameGenerator
     {
         std::string operator()(const auto& _param)
         {
             const MemEcoGenericTestCase& param = _param.param;
-            const auto& _info = param.info;
+            const auto& _info                  = param.info;
             std::stringstream ss;
 
             ss << _info;
@@ -59,14 +59,14 @@ struct MemEcoSystemTestCase
     MemoryEcosystemInfo info;
     std::vector<size_t> vram_dedicated_percents;
     std::vector<size_t> vram_shared_percents;
-    size_t              cpu_percent;   // % of shared mem
+    size_t cpu_percent; // % of shared mem
 
     struct NameGenerator
     {
         std::string operator()(const auto& _param)
         {
             const MemEcoSystemTestCase& param = _param.param;
-            const auto& _info = param.info;
+            const auto& _info                 = param.info;
             std::stringstream ss;
 
             ss << _info;
@@ -94,25 +94,26 @@ bool False()
 #ifndef _WIN32
     return false;
 #else
-// Does nothing in linux; expect always true
+    // Does nothing in linux; expect always true
     return true;
 #endif
 }
-}
+} // namespace
 
-struct GPU_MemoryEcosystemGeneric_None
-    : public ::testing::TestWithParam<MemEcoGenericTestCase>
+struct GPU_MemoryEcosystemGeneric_None : public ::testing::TestWithParam<MemEcoGenericTestCase>
 {
-MemoryEcosystemInfo tmp_info;
+    MemoryEcosystemInfo tmp_info;
 
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
-        return MemoryEcosystem::AbleToAllocate(testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
+        return MemoryEcosystem::AbleToAllocate(
+            testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
     }
 
     static auto NotAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
-        return !MemoryEcosystem::AbleToAllocate(testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
+        return !MemoryEcosystem::AbleToAllocate(
+            testcase.info, testcase.vram_blocks, testcase.cpu_blocks);
     }
 };
 
@@ -155,10 +156,9 @@ INSTANTIATE_TEST_SUITE_P(Full,
                          testing::ValuesIn(GenericCases()),
                          MemEcoGenericTestCase::NameGenerator{});
 
-struct GPU_MemoryEcosystemSystem_None
-    : public ::testing::TestWithParam<MemEcoSystemTestCase>
+struct GPU_MemoryEcosystemSystem_None : public ::testing::TestWithParam<MemEcoSystemTestCase>
 {
-MemoryEcosystemInfo tmp_info;
+    MemoryEcosystemInfo tmp_info;
 
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
@@ -177,18 +177,16 @@ inline std::vector<MemEcoSystemTestCase> SystemCases()
 
     if(info.dedicated_vram == size_t{0})
     {
-        return {
-            {info, {0}, {0}, 0}
-        };
+        return {{info, {0}, {0}, 0}};
     }
 
     std::vector<MemEcoSystemTestCase> system_cases = {
-        {info, {50, 50}, {50, 50}, 0},    // should always be able
-        {info, {50, 50}, {50, 50}, 10},   // should always be unable
-        {info, {101}, {0}, 0},            // always able if SVRAM > DVRAM
-        {info, {101}, {0}, 10},           // may be able if SVRAM > DVRAM
-        {info, {0}, {101}, 0},            // always able if DVRAM > SVRAM
-        {info, {0}, {101}, 10},           // may be able if DVRAM > SVRAM
+        {info, {50, 50}, {50, 50}, 0},  // should always be able
+        {info, {50, 50}, {50, 50}, 10}, // should always be unable
+        {info, {101}, {0}, 0},          // always able if SVRAM > DVRAM
+        {info, {101}, {0}, 10},         // may be able if SVRAM > DVRAM
+        {info, {0}, {101}, 0},          // always able if DVRAM > SVRAM
+        {info, {0}, {101}, 10},         // may be able if DVRAM > SVRAM
     };
 
     // for(auto case : cases)
@@ -199,7 +197,7 @@ inline std::vector<MemEcoSystemTestCase> SystemCases()
 TEST_P(GPU_MemoryEcosystemSystem_None, SystemAbleToAllocate)
 {
     const auto& test_case = this->GetParam();
-    const auto& info = test_case.info;
+    const auto& info      = test_case.info;
 
     if(test_case.info.dedicated_vram == 0)
         GTEST_SKIP() << "Detailed VRAM config not available.";
@@ -213,7 +211,7 @@ TEST_P(GPU_MemoryEcosystemSystem_None, SystemAbleToAllocate)
     // 2a. gpu block->dedicated if available,
     // 2b. gpu block->shared
     //
-    // All blocks are unmoveable for the duration of the test. 
+    // All blocks are unmoveable for the duration of the test.
     // If any block cannot fit, MemoryEcosystem shall return 'unable'.
 
     auto PerCent = [](size_t pct, size_t bytes) -> size_t {
@@ -221,7 +219,7 @@ TEST_P(GPU_MemoryEcosystemSystem_None, SystemAbleToAllocate)
     };
 
     MemEcoGenericTestCase gen_case;
-    bool                  able = true;
+    bool able = true;
 
     gen_case.cpu_blocks.push_back(PerCent(test_case.cpu_percent, info.shared_ram) + 1);
     ASSERT_GE(info.shared_ram, gen_case.cpu_blocks[0]) << "CPU block cannot exceed shared mem";

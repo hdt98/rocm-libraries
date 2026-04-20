@@ -55,7 +55,10 @@ protected:
             this->GetParam();
 
         cfsb::SetUpImpl(conv_config, tensor_layout);
-        if(cfsb::test_skipped) { return; }
+        if(cfsb::test_skipped)
+        {
+            return;
+        }
 
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         std::fill(

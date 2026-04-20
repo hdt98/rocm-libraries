@@ -379,14 +379,17 @@ protected:
         conv_desc = conv_config.GetConv();
         miopen::TensorDescriptor output_desc =
             conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<T>{});
-            
+
         output = tensor<T>{tensor_layout, output_desc.GetLengths()};
 
         MemoryEcosystem::SkipTestIfUnableToAllocate(
             {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
             {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
             test_skipped);
-        if(test_skipped) { return; }
+        if(test_skipped)
+        {
+            return;
+        }
 
         input.generate(GenData<T>{});
         weights.generate(GenWeights<T>{});

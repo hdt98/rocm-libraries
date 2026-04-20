@@ -97,7 +97,7 @@ protected:
         UnitTestConvSolverParams params;
         std::tie(params, std::ignore, std::ignore) = GetParam();
         this->SetUpImpl(params);
-   }
+    }
 };
 
 } // namespace unit_tests

@@ -508,15 +508,23 @@ protected:
             {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
             {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
             test_skipped);
-        if(test_skipped) { return; }
+        if(test_skipped)
+        {
+            return;
+        }
 
-        MemoryEcosystemInfo info {0, 3900000000ULL, 5800000000ULL, 6000000000ULL};
-        if(!MemoryEcosystem::AbleToAllocate(info, 
-            {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
-            {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()}
-        )) { test_skipped = true; GTEST_SKIP() << "(SPOOF) unable to allocate in 16GB"; }
+        MemoryEcosystemInfo info{0, 3900000000ULL, 5800000000ULL, 6000000000ULL};
+        if(!MemoryEcosystem::AbleToAllocate(
+               info,
+               {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
+               {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()}))
+        {
+            test_skipped = true;
+            GTEST_SKIP() << "(SPOOF) unable to allocate in 16GB";
+        }
 
-        if(test_skipped) return;
+        if(test_skipped)
+            return;
 
         auto gen_value = [](auto...) {
             return prng::gen_A_to_B(static_cast<T>(-3.0), static_cast<T>(3.0));

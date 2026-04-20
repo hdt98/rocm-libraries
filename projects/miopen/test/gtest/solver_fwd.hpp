@@ -104,13 +104,21 @@ protected:
         }
 
         this->SetUpImpl(conv_config, miopenTensorNCHW);
-        if(this->test_skipped) { MIOPEN_LOG_E("skipped!"); return; }
+        if(this->test_skipped)
+        {
+            MIOPEN_LOG_E("skipped!");
+            return;
+        }
     }
 
 private:
     void Verify()
     {
-        if(this->test_skipped) { MIOPEN_LOG_E("skipped!"); return; }
+        if(this->test_skipped)
+        {
+            MIOPEN_LOG_E("skipped!");
+            return;
+        }
 
         this->TearDownConv();
         this->ThresholdChecks();

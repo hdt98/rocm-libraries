@@ -52,12 +52,15 @@ struct ConvBiasActivInferTest : public ::testing::TestWithParam<std::tuple<miope
 protected:
     void SetUp() override
     {
-        
+
         std::tie(activ_mode, conv_config, tensor_layout, activ_alpha, activ_beta, activ_gamma) =
-        this->GetParam();
-        
+            this->GetParam();
+
         cfsb::SetUpImpl(conv_config, tensor_layout);
-        if(cfsb::test_skipped) { return; }
+        if(cfsb::test_skipped)
+        {
+            return;
+        }
 
         activ_desc = {activ_mode, activ_alpha, activ_beta, activ_gamma};
         int dim    = cfsb::output.desc.GetNumDims() - 2;
@@ -86,7 +89,10 @@ protected:
     }
     void TearDown() override
     {
-        if(cfsb::test_skipped) { return; }
+        if(cfsb::test_skipped)
+        {
+            return;
+        }
 
         conv_stats stats;
         cfsb::TearDownConv();

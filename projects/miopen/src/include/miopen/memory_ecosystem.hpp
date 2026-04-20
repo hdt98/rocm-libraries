@@ -16,38 +16,38 @@
 // This addresses a Windows-specific issue on low-memory APUs. MemoryEcosystem does not do
 // anything in linux yet. Linux support will be added if/when it is needed.
 
-namespace
+namespace {
+inline float GiB(size_t bytes)
 {
-    inline float GiB(size_t bytes)
-    {
-        return 0.1 * static_cast<float>((bytes * 10) / 1024 / 1024 / 1024);
-    }
+    return 0.1 * static_cast<float>((bytes * 10) / 1024 / 1024 / 1024);
 }
+} // namespace
 
 struct MemoryEcosystemInfo
 {
     MemoryEcosystemInfo() {}
 #ifdef _WIN32
-    MemoryEcosystemInfo(const DXGI_ADAPTER_DESC1& desc) :
-        adapter_index(0),
-        dedicated_vram(desc.DedicatedVideoMemory),
-        shared_ram(desc.SharedSystemMemory),
-        dedicated_ram(desc.DedicatedSystemMemory)
-    {}
+    MemoryEcosystemInfo(const DXGI_ADAPTER_DESC1& desc)
+        : adapter_index(0),
+          dedicated_vram(desc.DedicatedVideoMemory),
+          shared_ram(desc.SharedSystemMemory),
+          dedicated_ram(desc.DedicatedSystemMemory)
+    {
+    }
 #endif
-    MemoryEcosystemInfo(int adapter, size_t ded_vram, size_t shared, size_t ded_ram) :
-        adapter_index(adapter),
-        dedicated_vram(ded_vram),
-        shared_ram(shared),
-        dedicated_ram(ded_ram)
-    {}
+    MemoryEcosystemInfo(int adapter, size_t ded_vram, size_t shared, size_t ded_ram)
+        : adapter_index(adapter),
+          dedicated_vram(ded_vram),
+          shared_ram(shared),
+          dedicated_ram(ded_ram)
+    {
+    }
 
     std::string Description()
     {
         std::ostringstream oss;
-        oss << "Adapter " << adapter_index <<
-                " with " << GiB(dedicated_vram) << " GiB dedicated and " <<
-                GiB(shared_ram) << " GiB shared";
+        oss << "Adapter " << adapter_index << " with " << GiB(dedicated_vram)
+            << " GiB dedicated and " << GiB(shared_ram) << " GiB shared";
         return oss.str();
     }
 
@@ -71,7 +71,7 @@ struct MemoryEcosystem
 #else
         IDXGIFactory4* pFactory;
         HRESULT hr = CreateDXGIFactory1(__uuidof(IDXGIFactory4), (void**)&pFactory);
-        if (!SUCCEEDED(hr))
+        if(!SUCCEEDED(hr))
         {
             MIOPEN_LOG_E("Unable to create DXGI factory. Error Code: " << hr);
             return MemoryEcosystemInfo{};
@@ -100,14 +100,16 @@ struct MemoryEcosystem
 #endif
     }
 
-    static bool AbleToAllocate(const MemoryEcosystemInfo& info, const std::vector<size_t>& vram_blocks, const size_t reserved_bytes = 0)
+    static bool AbleToAllocate(const MemoryEcosystemInfo& info,
+                               const std::vector<size_t>& vram_blocks,
+                               const size_t reserved_bytes = 0)
     {
         if(reserved_bytes > info.shared_ram)
             return false;
 
         const auto free_shared_vram = info.shared_ram - reserved_bytes;
-        size_t used_ded = 0;
-        size_t used_shared = 0;
+        size_t used_ded             = 0;
+        size_t used_shared          = 0;
 
         for(auto block : vram_blocks)
         {
@@ -128,7 +130,8 @@ struct MemoryEcosystem
         return true;
     }
 
-    static bool AbleToAllocate(const std::vector<size_t>& vram_blocks, const size_t reserved_bytes = 0)
+    static bool AbleToAllocate(const std::vector<size_t>& vram_blocks,
+                               const size_t reserved_bytes = 0)
     {
 #ifndef _WIN32
         return true;
@@ -139,14 +142,15 @@ struct MemoryEcosystem
     }
 
     static bool AbleToAllocate(const MemoryEcosystemInfo& info,
-        const std::vector<size_t>& vram_blocks,
-        const std::vector<size_t> cpu_blocks)
+                               const std::vector<size_t>& vram_blocks,
+                               const std::vector<size_t> cpu_blocks)
     {
         auto reserved = std::accumulate(cpu_blocks.begin(), cpu_blocks.end(), 0);
         return AbleToAllocate(info, vram_blocks, reserved);
     }
 
-    static bool AbleToAllocate(const std::vector<size_t>& vram_blocks, const std::vector<size_t> cpu_blocks)
+    static bool AbleToAllocate(const std::vector<size_t>& vram_blocks,
+                               const std::vector<size_t> cpu_blocks)
     {
 #ifndef _WIN32
         return true;
@@ -156,7 +160,9 @@ struct MemoryEcosystem
 #endif
     }
 
-    static void SkipTestIfUnableToAllocate(const std::vector<size_t>& gpu_bufs, const std::vector<size_t>& cpu_bufs, bool& skip_flag)
+    static void SkipTestIfUnableToAllocate(const std::vector<size_t>& gpu_bufs,
+                                           const std::vector<size_t>& cpu_bufs,
+                                           bool& skip_flag)
     {
         if(!AbleToAllocate(gpu_bufs, cpu_bufs))
         {
