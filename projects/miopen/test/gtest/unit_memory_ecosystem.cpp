@@ -102,8 +102,6 @@ bool False()
 
 struct GPU_MemoryEcosystemGeneric_None : public ::testing::TestWithParam<MemEcoGenericTestCase>
 {
-    MemoryEcosystemInfo tmp_info;
-
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
         return MemoryEcosystem::AbleToAllocate(
@@ -139,7 +137,7 @@ inline std::vector<MemEcoGenericTestCase> GenericCases()
 
 TEST_P(GPU_MemoryEcosystemGeneric_None, GenericAbleToAllocate)
 {
-    auto test_case = this->GetParam();
+    const auto& test_case = this->GetParam();
 
     if(test_case.able)
     {
@@ -158,8 +156,6 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 struct GPU_MemoryEcosystemSystem_None : public ::testing::TestWithParam<MemEcoSystemTestCase>
 {
-    MemoryEcosystemInfo tmp_info;
-
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
         return MemoryEcosystem::AbleToAllocate(testcase.vram_blocks, testcase.cpu_blocks);
@@ -188,8 +184,6 @@ inline std::vector<MemEcoSystemTestCase> SystemCases()
         {info, {0}, {101}, 0},          // always able if DVRAM > SVRAM
         {info, {0}, {101}, 10},         // may be able if DVRAM > SVRAM
     };
-
-    // for(auto case : cases)
 
     return system_cases;
 }

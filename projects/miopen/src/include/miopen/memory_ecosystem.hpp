@@ -59,11 +59,6 @@ struct MemoryEcosystemInfo
 
 struct MemoryEcosystem
 {
-    static float GiB(size_t bytes)
-    {
-        return 0.1 * static_cast<float>((bytes * 10) / 1024 / 1024 / 1024);
-    }
-
     static MemoryEcosystemInfo GetMemoryEcosystemInfo(int adapter_index = 0)
     {
 #ifndef _WIN32
