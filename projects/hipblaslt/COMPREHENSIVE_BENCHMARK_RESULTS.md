@@ -16,10 +16,11 @@
 | **Wins (>0.5%)** | **30 / 33 (91%)** |
 | Losses (>0.5%) | 3 / 33 (9%) |
 | **Different MacroTiles per sub-problem** | **22 / 33 (67%)** |
-| **Best gain** | **+60.8%** (15360x15360x8192) |
+| **Best verified gain** | **+50.2%** (16384x16384x8192) |
 | Worst loss | -3.4% (5120x10240x8192) |
-| **Average gain (all)** | **+27.6%** |
-| **Average gain (wins)** | **+30.7%** |
+| **Average gain (all, verified)** | **~+25%** |
+
+**Note on measurement stability**: Results verified with -i 200 -j 200 (200 cold + 200 hot iterations). Large problems (13K-16K) show significant run-to-run variance with only 100 iterations. Key verified gains at 200 iterations: 15360 +33%, 14848 +34%, 16384 +50%, 10240 +20%.
 
 **Per-subproblem kernel selection is confirmed working.** In 22 of 33 cases, each sub-problem gets a **different MacroTile**, enabling true multi-MacroTile execution where each sub-problem runs with its optimal kernel.
 
@@ -239,10 +240,11 @@ Time analysis:
 ```
 
 **When to use**: M or N >= 10240 AND K >= 4096  
-**Expected gain**: +27.6% average, up to +60.8%  
+**Expected gain**: ~+25% average, up to +50% (verified with -i 200 -j 200)  
 **Win rate**: 91% (30/33 cases)  
 **Different MacroTiles**: 67% of cases (22/33)  
-**Safety**: 3 losses, all < 3.4%
+**Safety**: 3 losses, all < 3.4%  
+**Recommended iterations**: -i 200 -j 200 for stable measurements (large problems are noisy at 100 iters)
 
 ---
 
