@@ -22,6 +22,9 @@ namespace {
 using hipGetDeviceProperties_fn = hipError_t (*)(hipDeviceProp_t*, int);
 using hipDeviceGetAttribute_fn  = hipError_t (*)(int*, hipDeviceAttribute_t, int);
 using hipGetErrorString_fn      = const char* (*)(hipError_t);
+using hipGetProcAddress_fn =
+    hipError_t (*)(const char* symbol, void** pfn, int hipVersion, uint64_t flags,
+                   hipDriverProcAddressQueryResult* symbolStatus);
 
 #if defined(_WIN32)
 using dl_handle_t = HMODULE;
@@ -147,6 +150,23 @@ std::vector<std::string> hip_library_candidates() {
   return out;
 }
 
+void* bootstrap_get_proc_address(dl_handle_t mod) {
+#if defined(_WIN32)
+  return reinterpret_cast<void*>(GetProcAddress(mod, "hipGetProcAddress"));
+#else
+  dlerror();
+  return dlsym(mod, "hipGetProcAddress");
+#endif
+}
+
+void* hip_get_proc_address_only(hipGetProcAddress_fn get_proc, const char* name) {
+  if(!get_proc) return nullptr;
+  void* pfn = nullptr;
+  if(get_proc(name, &pfn, static_cast<int>(HIP_VERSION), 0u, nullptr) != hipSuccess || !pfn)
+    return nullptr;
+  return pfn;
+}
+
 bool try_open_and_resolve() {
   if(g_get_props && g_get_error_string) return true;
 
@@ -155,10 +175,6 @@ bool try_open_and_resolve() {
 #if defined(_WIN32)
     g_hip_lib = LoadLibraryA(path.c_str());
     if(!g_hip_lib) continue;
-    g_get_props =
-        reinterpret_cast<hipGetDeviceProperties_fn>(GetProcAddress(g_hip_lib, "hipGetDeviceProperties"));
-    g_get_error_string =
-        reinterpret_cast<hipGetErrorString_fn>(GetProcAddress(g_hip_lib, "hipGetErrorString"));
 #else
     dlerror();
     g_hip_lib = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
@@ -166,24 +182,38 @@ bool try_open_and_resolve() {
       if(const char* err = dlerror()) last_open_error.assign(err);
       continue;
     }
-    dlerror();
-    g_get_props =
-        reinterpret_cast<hipGetDeviceProperties_fn>(dlsym(g_hip_lib, "hipGetDeviceProperties"));
-    g_get_error_string =
-        reinterpret_cast<hipGetErrorString_fn>(dlsym(g_hip_lib, "hipGetErrorString"));
 #endif
+    hipGetProcAddress_fn hip_get_proc_address =
+        reinterpret_cast<hipGetProcAddress_fn>(bootstrap_get_proc_address(g_hip_lib));
+    if(!hip_get_proc_address) {
+#if defined(_WIN32)
+      if(g_hip_lib) {
+        FreeLibrary(g_hip_lib);
+        g_hip_lib = nullptr;
+      }
+#else
+      if(g_hip_lib) {
+        dlclose(g_hip_lib);
+        g_hip_lib = nullptr;
+      }
+#endif
+      last_open_error = "hipGetProcAddress not found in HIP library";
+      continue;
+    }
+    g_get_props = reinterpret_cast<hipGetDeviceProperties_fn>(
+        hip_get_proc_address_only(hip_get_proc_address, "hipGetDeviceProperties"));
+    g_get_error_string = reinterpret_cast<hipGetErrorString_fn>(
+        hip_get_proc_address_only(hip_get_proc_address, "hipGetErrorString"));
     if(g_get_props && g_get_error_string) {
       g_load_error.clear();
-#if defined(_WIN32)
       g_get_device_attribute = reinterpret_cast<hipDeviceGetAttribute_fn>(
-          GetProcAddress(g_hip_lib, "hipDeviceGetAttribute"));
-#else
-      dlerror();
-      g_get_device_attribute = reinterpret_cast<hipDeviceGetAttribute_fn>(
-          dlsym(g_hip_lib, "hipDeviceGetAttribute"));
-#endif
+          hip_get_proc_address_only(hip_get_proc_address, "hipDeviceGetAttribute"));
       return true;
     }
+    last_open_error = "required HIP symbols could not be resolved via hipGetProcAddress";
+    g_get_props            = nullptr;
+    g_get_device_attribute = nullptr;
+    g_get_error_string     = nullptr;
 #if defined(_WIN32)
     if(g_hip_lib) {
       FreeLibrary(g_hip_lib);
