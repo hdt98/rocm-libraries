@@ -217,7 +217,13 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
         // ----------------------
         // use specialized kernel
         // ----------------------
-        potf2_run_small<T>(handle, uplo, n, A, shiftA, lda, strideA, info, batch_count, row_offset);
+        auto const istat = potf2_run_small<T>(handle, uplo, n, A, shiftA, lda, strideA, info,
+                                              batch_count, row_offset);
+        if(istat != rocblas_status_success)
+        {
+            rocblas_set_pointer_mode(handle, old_mode);
+            return istat;
+        }
     }
     else
     {
@@ -231,9 +237,14 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
             for(I j = 0; j < n; ++j)
             {
                 // Compute U(J,J) and test for non-positive-definiteness.
-                rocblasCall_dot<COMPLEX, T>(handle, j, A, shiftA + idx2D(0, j, lda), 1, strideA, A,
-                                            shiftA + idx2D(0, j, lda), 1, strideA, batch_count,
-                                            pivots, work);
+                auto const istat_dot = rocblasCall_dot<COMPLEX, T>(
+                    handle, j, A, shiftA + idx2D(0, j, lda), 1, strideA, A,
+                    shiftA + idx2D(0, j, lda), 1, strideA, batch_count, pivots, work);
+                if(istat_dot != rocblas_status_success)
+                {
+                    rocblas_set_pointer_mode(handle, old_mode);
+                    return (istat_dot);
+                }
 
                 ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0,
                                         stream, A, shiftA, strideA, idx2D(j, j, lda), j, pivots,
@@ -243,21 +254,46 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
                 if(j < n - 1)
                 {
                     if(COMPLEX)
-                        rocsolver_lacgv_template<T>(handle, j, A, shiftA + idx2D(0, j, lda), (I)1,
-                                                    strideA, batch_count);
+                    {
+                        auto const istat_lacgv = rocsolver_lacgv_template<T>(
+                            handle, j, A, shiftA + idx2D(0, j, lda), (I)1, strideA, batch_count);
+                        if(istat_lacgv != rocblas_status_success)
+                        {
+                            rocblas_set_pointer_mode(handle, old_mode);
+                            return istat_lacgv;
+                        }
+                    }
 
-                    rocblasCall_gemv<T>(handle, rocblas_operation_transpose, j, n - j - 1, scalars,
-                                        0, A, shiftA + idx2D(0, j + 1, lda), lda, strideA, A,
-                                        shiftA + idx2D(0, j, lda), 1, strideA, scalars + 2, 0, A,
-                                        shiftA + idx2D(j, j + 1, lda), lda, strideA, batch_count,
-                                        nullptr);
+                    auto const istat_gemv = rocblasCall_gemv<T>(
+                        handle, rocblas_operation_transpose, j, n - j - 1, scalars, 0, A,
+                        shiftA + idx2D(0, j + 1, lda), lda, strideA, A, shiftA + idx2D(0, j, lda),
+                        1, strideA, scalars + 2, 0, A, shiftA + idx2D(j, j + 1, lda), lda, strideA,
+                        batch_count, nullptr);
+                    if(istat_gemv != rocblas_status_success)
+                    {
+                        rocblas_set_pointer_mode(handle, old_mode);
+                        return istat_gemv;
+                    }
 
                     if(COMPLEX)
-                        rocsolver_lacgv_template<T>(handle, j, A, shiftA + idx2D(0, j, lda), (I)1,
-                                                    strideA, batch_count);
+                    {
+                        auto const istat_lacgv = rocsolver_lacgv_template<T>(
+                            handle, j, A, shiftA + idx2D(0, j, lda), (I)1, strideA, batch_count);
+                        if(istat_lacgv != rocblas_status_success)
+                        {
+                            rocblas_set_pointer_mode(handle, old_mode);
+                            return istat_lacgv;
+                        }
+                    }
 
-                    rocblasCall_scal<T>(handle, n - j - 1, pivots, 1, A,
-                                        shiftA + idx2D(j, j + 1, lda), lda, strideA, batch_count);
+                    auto const istat_scal = rocblasCall_scal<T>(handle, n - j - 1, pivots, 1, A,
+                                                                shiftA + idx2D(j, j + 1, lda), lda,
+                                                                strideA, batch_count);
+                    if(istat_scal != rocblas_status_success)
+                    {
+                        rocblas_set_pointer_mode(handle, old_mode);
+                        return istat_scal;
+                    }
                 }
             }
         }
@@ -267,9 +303,14 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
             for(I j = 0; j < n; ++j)
             {
                 // Compute L(J,J) and test for non-positive-definiteness.
-                rocblasCall_dot<COMPLEX, T>(handle, j, A, shiftA + idx2D(j, 0, lda), lda, strideA,
-                                            A, shiftA + idx2D(j, 0, lda), lda, strideA, batch_count,
-                                            pivots, work);
+                auto const istat_dot = rocblasCall_dot<COMPLEX, T>(
+                    handle, j, A, shiftA + idx2D(j, 0, lda), lda, strideA, A,
+                    shiftA + idx2D(j, 0, lda), lda, strideA, batch_count, pivots, work);
+                if(istat_dot != rocblas_status_success)
+                {
+                    rocblas_set_pointer_mode(handle, old_mode);
+                    return istat_dot;
+                }
 
                 ROCSOLVER_LAUNCH_KERNEL((sqrtDiagOnward<T, I>), dim3(batch_count), dim3(1), 0,
                                         stream, A, shiftA, strideA, idx2D(j, j, lda), j, pivots,
@@ -279,21 +320,46 @@ rocblas_status rocsolver_potf2_template(rocblas_handle handle,
                 if(j < n - 1)
                 {
                     if(COMPLEX)
-                        rocsolver_lacgv_template<T>(handle, j, A, shiftA + idx2D(j, 0, lda), lda,
-                                                    strideA, batch_count);
+                    {
+                        auto const istat_lacgv = rocsolver_lacgv_template<T>(
+                            handle, j, A, shiftA + idx2D(j, 0, lda), lda, strideA, batch_count);
+                        if(istat_lacgv != rocblas_status_success)
+                        {
+                            rocblas_set_pointer_mode(handle, old_mode);
+                            return istat_lacgv;
+                        }
+                    }
 
-                    rocblasCall_gemv<T>(handle, rocblas_operation_none, n - j - 1, j, scalars, 0, A,
-                                        shiftA + idx2D(j + 1, 0, lda), lda, strideA, A,
-                                        shiftA + idx2D(j, 0, lda), lda, strideA, scalars + 2, 0, A,
-                                        shiftA + idx2D(j + 1, j, lda), 1, strideA, batch_count,
-                                        nullptr);
+                    auto const istat_gemv = rocblasCall_gemv<T>(
+                        handle, rocblas_operation_none, n - j - 1, j, scalars, 0, A,
+                        shiftA + idx2D(j + 1, 0, lda), lda, strideA, A, shiftA + idx2D(j, 0, lda),
+                        lda, strideA, scalars + 2, 0, A, shiftA + idx2D(j + 1, j, lda), 1, strideA,
+                        batch_count, nullptr);
+                    if(istat_gemv != rocblas_status_success)
+                    {
+                        rocblas_set_pointer_mode(handle, old_mode);
+                        return istat_gemv;
+                    }
 
                     if(COMPLEX)
-                        rocsolver_lacgv_template<T>(handle, j, A, shiftA + idx2D(j, 0, lda), lda,
-                                                    strideA, batch_count);
+                    {
+                        auto const istat_lacgv = rocsolver_lacgv_template<T>(
+                            handle, j, A, shiftA + idx2D(j, 0, lda), lda, strideA, batch_count);
+                        if(istat_lacgv != rocblas_status_success)
+                        {
+                            rocblas_set_pointer_mode(handle, old_mode);
+                            return istat_lacgv;
+                        }
+                    }
 
-                    rocblasCall_scal<T>(handle, n - j - 1, pivots, 1, A,
-                                        shiftA + idx2D(j + 1, j, lda), (I)1, strideA, batch_count);
+                    auto const istat_scal = rocblasCall_scal<T>(handle, n - j - 1, pivots, 1, A,
+                                                                shiftA + idx2D(j + 1, j, lda), (I)1,
+                                                                strideA, batch_count);
+                    if(istat_scal != rocblas_status_success)
+                    {
+                        rocblas_set_pointer_mode(handle, old_mode);
+                        return istat_scal;
+                    }
                 }
             }
         }
