@@ -50,12 +50,9 @@
 #include <Tensile/DataTypes_Float6.hpp>
 #include <Tensile/DataTypes_BFloat6.hpp>
 #include <Tensile/DataTypes_Float4.hpp>
-<<<<<<< HEAD
 #include <Tensile/DataTypes_MXScale.hpp>
-=======
 #include <Tensile/DataTypes_E8.hpp>
 #include <Tensile/DataTypes_E5M3.hpp>
->>>>>>> origin/develop
 
 namespace rocisa
 {
@@ -140,13 +137,10 @@ namespace TensileLite
         
         /// Number of elements packed.
         constexpr static size_t Packing = T_Packing;
-<<<<<<< HEAD
         /// Bytes per segment.
         /// TODO: this needs to be enhanced as the value would be
         ///       0 for MX data type, FP4: ElementSize=1 byte, Packing=2.
         constexpr static size_t SegmentSize = ElementSize / Packing;
-=======
->>>>>>> origin/develop
 
         constexpr static bool IsComplex  = T_IsComplex;
         constexpr static bool IsIntegral = T_IsIntegral;
@@ -244,11 +238,7 @@ namespace TensileLite
     };
 
     template <>
-<<<<<<< HEAD
     struct TypeInfo<Int8> : public BaseTypeInfo<Int8, rocisa::DataType::Int8, 1, false, true>
-=======
-    struct TypeInfo<Int8> : public BaseTypeInfo<int8_t, rocisa::DataType::Int8, 1, false, true>
->>>>>>> origin/develop
     {
     };
 
@@ -311,7 +301,6 @@ namespace TensileLite
     {
     };
 
-<<<<<<< HEAD
 #ifdef _WIN32
     template <>
     struct TypeInfo<Float6> : public BaseTypeInfo<Float6, rocisa::DataType::Float6, 1, false, false>
@@ -342,28 +331,8 @@ namespace TensileLite
     template <>
     struct TypeInfo<MXScale>
         : public BaseTypeInfo<MXScale, rocisa::DataType::MXScale, 1, false, false>
-=======
-#ifdef TENSILE_USE_FP6
-    template <>
-    struct TypeInfo<Float6x16>
-        : public BaseTypeInfo<Float6x16, rocisa::DataType::Float6, 16, false, false>
     {
     };
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
-    template <>
-    struct TypeInfo<BFloat6x16>
-        : public BaseTypeInfo<BFloat6x16, rocisa::DataType::BFloat6, 16, false, false>
-    {
-    };
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
-    template <>
-    struct TypeInfo<Float4x2>
-        : public BaseTypeInfo<Float4x2, rocisa::DataType::Float4, 2, false, false>
-    {
-    };
-#endif // #ifdef TENSILE_USE_FP4
 
     template <>
     struct TypeInfo<E8>
@@ -374,7 +343,6 @@ namespace TensileLite
     template <>
     struct TypeInfo<E5M3>
         : public BaseTypeInfo<E5M3, rocisa::DataType::E5M3, 1, false, false>
->>>>>>> origin/develop
     {
     };
 
