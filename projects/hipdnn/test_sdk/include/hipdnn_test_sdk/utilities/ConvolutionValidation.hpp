@@ -113,8 +113,8 @@ void validateConvolutionParams(const hipdnn_data_sdk::utilities::TensorBase<T1>&
                                const std::vector<int64_t>& prePadding,
                                const std::vector<int64_t>& postPadding)
 {
-    validateConvolutionParams(x.dims(), w.dims(), y.dims(),
-                              strides, dilations, prePadding, postPadding);
+    validateConvolutionParams(
+        x.dims(), w.dims(), y.dims(), strides, dilations, prePadding, postPadding);
 }
 
 } // namespace hipdnn_test_sdk::utilities

@@ -7,12 +7,12 @@
 #include <unordered_map>
 #include <vector>
 
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/detail/GpuConvolutionFwdSignatureKey.hpp"
 
-using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_integration_tests::test_utils;
 using namespace hipdnn_integration_tests::gpu_graph_executor::detail;
 
@@ -103,7 +103,7 @@ TEST(TestGpuConvolutionFwdSignatureKey, CreateFromNodeAndTensorMap)
                                            {1, 1},
                                            DataType::FLOAT);
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(
         graphBuilder.GetBufferPointer(), graphBuilder.GetSize());
 
     const GpuConvolutionFwdSignatureKey keyFromNode(

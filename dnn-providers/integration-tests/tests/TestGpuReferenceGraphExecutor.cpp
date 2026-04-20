@@ -5,7 +5,6 @@
 
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <hip/hip_runtime.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
@@ -159,6 +158,16 @@ flatbuffers::FlatBufferBuilder createBatchnormInferenceGraph()
     return builder;
 }
 
+inline size_t elementCount(const std::vector<int64_t>& dims)
+{
+    size_t count = 1;
+    for(auto d : dims)
+    {
+        count *= static_cast<size_t>(d);
+    }
+    return count;
+}
+
 template <typename T, typename ComputeT = float>
 void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
                              const std::vector<int64_t>& wDims,
@@ -191,54 +200,57 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
                                            dilation,
                                            dataType);
 
-    // Compute element counts
-    size_t xCount = 1;
-    for(auto d : xDims)
-    {
-        xCount *= static_cast<size_t>(d);
-    }
-    size_t wCount = 1;
-    for(auto d : wDims)
-    {
-        wCount *= static_cast<size_t>(d);
-    }
-    size_t yCount = 1;
-    for(auto d : yDims)
-    {
-        yCount *= static_cast<size_t>(d);
-    }
+    auto xCount = elementCount(xDims);
+    auto wCount = elementCount(wDims);
+    auto yCount = elementCount(yDims);
 
-    // Allocate and fill input data
-    std::vector<T> xData(xCount);
-    std::vector<T> wData(wCount);
-    std::vector<T> gpuYData(yCount);
-
-    for(size_t i = 0; i < xCount; ++i)
-    {
-        xData[i] = T(static_cast<float>(i + 1));
-    }
-    for(size_t i = 0; i < wCount; ++i)
-    {
-        wData[i] = T(1.0f);
-    }
-
-    // Run GPU graph executor
-    std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = xData.data();
-    variantPack[W_UID] = wData.data();
-    variantPack[Y_UID] = gpuYData.data();
-
-    GpuReferenceGraphExecutor gpuExecutor;
-    gpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), variantPack);
-
-    // Run CPU reference for comparison
+    // Prepare CPU tensors and fill with deterministic data
     hipdnn_data_sdk::utilities::Tensor<T> cpuX(xDims, xStrides);
     hipdnn_data_sdk::utilities::Tensor<T> cpuW(wDims, wStrides);
     hipdnn_data_sdk::utilities::Tensor<T> cpuY(yDims, yStrides);
 
-    std::memcpy(cpuX.rawHostData(), xData.data(), xCount * sizeof(T));
-    std::memcpy(cpuW.rawHostData(), wData.data(), wCount * sizeof(T));
+    for(size_t i = 0; i < xCount; ++i)
+    {
+        static_cast<T*>(cpuX.rawHostData())[i] = T(static_cast<float>(i + 1));
+    }
+    for(size_t i = 0; i < wCount; ++i)
+    {
+        static_cast<T*>(cpuW.rawHostData())[i] = T(1.0f);
+    }
 
+    // Allocate device buffers and copy inputs to GPU
+    void* dX = nullptr;
+    void* dW = nullptr;
+    void* dY = nullptr;
+    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(T)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(T)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(T)), hipSuccess);
+    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(T)), hipSuccess);
+
+    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
+    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
+
+    // Run GPU graph executor with device pointers
+    std::unordered_map<int64_t, void*> variantPack;
+    variantPack[X_UID] = dX;
+    variantPack[W_UID] = dW;
+    variantPack[Y_UID] = dY;
+
+    GpuReferenceGraphExecutor gpuExecutor;
+    gpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), variantPack);
+
+    // Copy GPU result back to host
+    std::vector<T> gpuYData(yCount);
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost),
+              hipSuccess);
+
+    static_cast<void>(hipFree(dX));
+    static_cast<void>(hipFree(dW));
+    static_cast<void>(hipFree(dY));
+
+    // Run CPU reference for comparison
     hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(
         cpuX, cpuW, cpuY, convStride, dilation, padding, padding);
 
@@ -246,9 +258,8 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     const auto* cpuResult = static_cast<const T*>(cpuY.rawHostData());
     for(size_t i = 0; i < yCount; ++i)
     {
-        auto gpuVal = static_cast<float>(gpuYData[i]);
-        auto cpuVal = static_cast<float>(cpuResult[i]);
-        EXPECT_NEAR(gpuVal, cpuVal, tolerance) << "Mismatch at index " << i;
+        EXPECT_NEAR(static_cast<float>(gpuYData[i]), static_cast<float>(cpuResult[i]), tolerance)
+            << "Mismatch at index " << i;
     }
 }
 

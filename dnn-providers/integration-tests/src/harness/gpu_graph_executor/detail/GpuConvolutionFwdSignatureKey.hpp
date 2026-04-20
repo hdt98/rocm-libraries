@@ -6,8 +6,8 @@
 #include <functional>
 #include <ostream>
 
-#include <hipdnn_data_sdk/data_objects/data_types_generated.h>
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/data_types_generated.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 
 #include "GpuConvolutionFwdPlan.hpp"
 
@@ -16,18 +16,18 @@ namespace hipdnn_integration_tests::gpu_graph_executor::detail
 
 struct GpuConvolutionFwdSignatureKey
 {
-    const hipdnn_data_sdk::data_objects::NodeAttributes nodeType{
-        hipdnn_data_sdk::data_objects::NodeAttributes::ConvolutionFwdAttributes};
-    hipdnn_data_sdk::data_objects::DataType xDataType;
-    hipdnn_data_sdk::data_objects::DataType wDataType;
-    hipdnn_data_sdk::data_objects::DataType outputDataType;
-    hipdnn_data_sdk::data_objects::DataType computeDataType;
+    const hipdnn_flatbuffers_sdk::data_objects::NodeAttributes nodeType{
+        hipdnn_flatbuffers_sdk::data_objects::NodeAttributes::ConvolutionFwdAttributes};
+    hipdnn_flatbuffers_sdk::data_objects::DataType xDataType;
+    hipdnn_flatbuffers_sdk::data_objects::DataType wDataType;
+    hipdnn_flatbuffers_sdk::data_objects::DataType outputDataType;
+    hipdnn_flatbuffers_sdk::data_objects::DataType computeDataType;
 
     GpuConvolutionFwdSignatureKey() = default;
-    constexpr GpuConvolutionFwdSignatureKey(hipdnn_data_sdk::data_objects::DataType x,
-                                            hipdnn_data_sdk::data_objects::DataType w,
-                                            hipdnn_data_sdk::data_objects::DataType output,
-                                            hipdnn_data_sdk::data_objects::DataType compute)
+    constexpr GpuConvolutionFwdSignatureKey(hipdnn_flatbuffers_sdk::data_objects::DataType x,
+                                            hipdnn_flatbuffers_sdk::data_objects::DataType w,
+                                            hipdnn_flatbuffers_sdk::data_objects::DataType output,
+                                            hipdnn_flatbuffers_sdk::data_objects::DataType compute)
         : xDataType(x)
         , wDataType(w)
         , outputDataType(output)
@@ -36,10 +36,11 @@ struct GpuConvolutionFwdSignatureKey
     }
 
     GpuConvolutionFwdSignatureKey(
-        const hipdnn_data_sdk::data_objects::Node& node,
-        const std::unordered_map<int64_t, const hipdnn_data_sdk::data_objects::TensorAttributes*>&
+        const hipdnn_flatbuffers_sdk::data_objects::Node& node,
+        const std::unordered_map<int64_t,
+                                 const hipdnn_flatbuffers_sdk::data_objects::TensorAttributes*>&
             tensorMap,
-        const hipdnn_data_sdk::data_objects::DataType computeType)
+        const hipdnn_flatbuffers_sdk::data_objects::DataType computeType)
     {
         const auto* nodeAttributes = node.attributes_as_ConvolutionFwdAttributes();
         if(nodeAttributes == nullptr)
@@ -95,34 +96,34 @@ struct GpuConvolutionFwdSignatureKey
             map;
 
         // X, W, Y, Compute
-        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
-                       hipdnn_data_sdk::data_objects::DataType::HALF,
-                       hipdnn_data_sdk::data_objects::DataType::HALF,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::HALF,
-                       hipdnn_data_sdk::data_objects::DataType::HALF,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
-        addPlanBuilder<hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_data_sdk::data_objects::DataType::BFLOAT16,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT,
-                       hipdnn_data_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::HALF,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT>(map);
+        addPlanBuilder<hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::BFLOAT16,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT,
+                       hipdnn_flatbuffers_sdk::data_objects::DataType::FLOAT>(map);
 
         return map;
     }
 
-    template <hipdnn_data_sdk::data_objects::DataType XDataTypeEnum,
-              hipdnn_data_sdk::data_objects::DataType WDataTypeEnum,
-              hipdnn_data_sdk::data_objects::DataType OutputDataTypeEnum,
-              hipdnn_data_sdk::data_objects::DataType ComputeDataTypeEnum>
+    template <hipdnn_flatbuffers_sdk::data_objects::DataType XDataTypeEnum,
+              hipdnn_flatbuffers_sdk::data_objects::DataType WDataTypeEnum,
+              hipdnn_flatbuffers_sdk::data_objects::DataType OutputDataTypeEnum,
+              hipdnn_flatbuffers_sdk::data_objects::DataType ComputeDataTypeEnum>
     static void addPlanBuilder(std::unordered_map<GpuConvolutionFwdSignatureKey,
                                                   std::unique_ptr<IGpuGraphNodePlanBuilder>,
                                                   GpuConvolutionFwdSignatureKey>& map)

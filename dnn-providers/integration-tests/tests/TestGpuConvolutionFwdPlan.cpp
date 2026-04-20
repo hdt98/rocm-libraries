@@ -4,20 +4,25 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <cstring>
+#include <stdexcept>
 #include <unordered_map>
 #include <vector>
 
 #include <hip/hip_runtime.h>
-#include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
+#include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
+#include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/detail/GpuConvolutionFwdPlan.hpp"
+#include "harness/gpu_graph_executor/detail/GpuConvolutionFwdSignatureKey.hpp"
+#include "harness/gpu_graph_executor/detail/GpuPlanBuilderRegistry.hpp"
 
-using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
+using namespace hipdnn_data_sdk::types;
 using namespace hipdnn_integration_tests::test_utils;
 using namespace hipdnn_integration_tests::gpu_graph_executor::detail;
 
@@ -45,7 +50,7 @@ TEST(TestGpuConvolutionFwdPlanBuilder, PlanConstruction)
                                            {1, 1},
                                            DataType::FLOAT);
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(
         graphBuilder.GetBufferPointer(), graphBuilder.GetSize());
 
     const GpuConvolutionFwdPlanBuilder<DataType::FLOAT,
@@ -86,7 +91,7 @@ TEST(TestGpuConvolutionFwdPlanBuilder, IsApplicable)
                                            {1, 1},
                                            DataType::FLOAT);
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(
         graphBuilder.GetBufferPointer(), graphBuilder.GetSize());
 
     const GpuConvolutionFwdPlanBuilder<DataType::FLOAT,
@@ -112,25 +117,41 @@ TEST(TestGpuConvolutionFwdPlanBuilder, IsApplicable)
     EXPECT_FALSE(floatPlanBuilder.isApplicable(graphWrap.getNode(0), tensorMapCopy));
 }
 
-TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
-{
-    SKIP_IF_NO_DEVICES();
+// ============================================================================
+// Templated helper for plan execution vs CPU reference
+// ============================================================================
 
+namespace
+{
+
+inline size_t elementCount(const std::vector<int64_t>& dims)
+{
+    size_t count = 1;
+    for(auto d : dims)
+    {
+        count *= static_cast<size_t>(d);
+    }
+    return count;
+}
+
+template <typename XType, typename WType, typename YType, typename ComputeType>
+void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
+                            const std::vector<int64_t>& wDims,
+                            const std::vector<int64_t>& yDims,
+                            const std::vector<int64_t>& padding,
+                            const std::vector<int64_t>& stride,
+                            const std::vector<int64_t>& dilation,
+                            DataType xEnum,
+                            DataType yEnum,
+                            float tolerance)
+{
     constexpr int64_t X_UID = 1;
     constexpr int64_t W_UID = 2;
     constexpr int64_t Y_UID = 3;
 
-    const std::vector<int64_t> xDims = {1, 1, 4, 4};
-    const std::vector<int64_t> wDims = {1, 1, 3, 3};
-    const std::vector<int64_t> yDims = {1, 1, 2, 2};
-
     auto xStrides = computePackedStrides(xDims);
     auto wStrides = computePackedStrides(wDims);
     auto yStrides = computePackedStrides(yDims);
-
-    const std::vector<int64_t> stride = {1, 1};
-    const std::vector<int64_t> dilation = {1, 1};
-    const std::vector<int64_t> padding = {0, 0};
 
     auto graphBuilder = createConvFwdGraph(X_UID,
                                            W_UID,
@@ -144,9 +165,10 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
                                            padding,
                                            stride,
                                            dilation,
-                                           DataType::FLOAT);
+                                           xEnum,
+                                           yEnum);
 
-    auto graphWrap = hipdnn_data_sdk::flatbuffer_utilities::GraphWrapper(
+    auto graphWrap = hipdnn_flatbuffers_sdk::flatbuffer_utilities::GraphWrapper(
         graphBuilder.GetBufferPointer(), graphBuilder.GetSize());
 
     const auto* nodeAttributes = graphWrap.getNode(0).attributes_as_ConvolutionFwdAttributes();
@@ -161,53 +183,36 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
                                    dilation,
                                    ConvMode::CROSS_CORRELATION);
 
-    GpuConvolutionFwdPlan<float, float, float, float> patient(std::move(params));
+    GpuConvolutionFwdPlan<XType, WType, YType, ComputeType> patient(std::move(params));
 
-    // Compute element counts
-    size_t xCount = 1;
-    for(auto d : xDims)
-    {
-        xCount *= static_cast<size_t>(d);
-    }
-    size_t wCount = 1;
-    for(auto d : wDims)
-    {
-        wCount *= static_cast<size_t>(d);
-    }
-    size_t yCount = 1;
-    for(auto d : yDims)
-    {
-        yCount *= static_cast<size_t>(d);
-    }
+    auto xCount = elementCount(xDims);
+    auto wCount = elementCount(wDims);
+    auto yCount = elementCount(yDims);
 
-    // Prepare host input data
-    std::vector<float> xData(xCount);
-    std::vector<float> wData(wCount);
+    // Prepare CPU tensors and fill with random data
+    hipdnn_data_sdk::utilities::Tensor<XType> cpuX(xDims, xStrides);
+    hipdnn_data_sdk::utilities::Tensor<WType> cpuW(wDims, wStrides);
+    hipdnn_data_sdk::utilities::Tensor<YType> cpuY(yDims, yStrides);
 
-    for(size_t i = 0; i < xCount; ++i)
-    {
-        xData[i] = static_cast<float>(i + 1);
-    }
-    for(size_t i = 0; i < wCount; ++i)
-    {
-        wData[i] = 1.0f;
-    }
+    constexpr unsigned int SEED = 42;
+    cpuX.fillWithRandomValues(static_cast<XType>(-1), static_cast<XType>(1), SEED);
+    cpuW.fillWithRandomValues(static_cast<WType>(-1), static_cast<WType>(1), SEED + 1);
 
-    // Allocate device buffers and copy inputs to device
+    // Allocate device buffers and copy inputs
     void* dX = nullptr;
     void* dW = nullptr;
     void* dY = nullptr;
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(float)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(float)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(float)), hipSuccess);
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(float)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(XType)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(WType)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(YType)), hipSuccess);
+    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(YType)), hipSuccess);
 
-    ASSERT_EQ(
-        hipMemcpy(dX, xData.data(), xCount * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
-    ASSERT_EQ(
-        hipMemcpy(dW, wData.data(), wCount * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
+    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
+              hipSuccess);
+    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
+              hipSuccess);
 
-    // Execute the plan with device pointers
+    // Execute
     std::unordered_map<int64_t, void*> variantPack;
     variantPack[X_UID] = dX;
     variantPack[W_UID] = dW;
@@ -215,30 +220,184 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
 
     patient.execute(variantPack);
 
-    // Copy GPU result back to host
-    std::vector<float> gpuYData(yCount);
-    ASSERT_EQ(
-        hipMemcpy(gpuYData.data(), dY, yCount * sizeof(float), hipMemcpyDeviceToHost), hipSuccess);
+    // Copy result back
+    std::vector<YType> gpuYData(yCount);
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(YType), hipMemcpyDeviceToHost),
+              hipSuccess);
 
     static_cast<void>(hipFree(dX));
     static_cast<void>(hipFree(dW));
     static_cast<void>(hipFree(dY));
 
-    // Run CPU reference for comparison
-    hipdnn_data_sdk::utilities::Tensor<float> cpuX(xDims, xStrides);
-    hipdnn_data_sdk::utilities::Tensor<float> cpuW(wDims, wStrides);
-    hipdnn_data_sdk::utilities::Tensor<float> cpuY(yDims, yStrides);
-
-    std::memcpy(cpuX.rawHostData(), xData.data(), xCount * sizeof(float));
-    std::memcpy(cpuW.rawHostData(), wData.data(), wCount * sizeof(float));
-
-    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<float, float, float, float>(
+    // CPU reference
+    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<XType, WType, YType, ComputeType>(
         cpuX, cpuW, cpuY, stride, dilation, padding, padding);
 
-    // Compare GPU plan output against CPU reference
-    const auto* cpuResult = static_cast<const float*>(cpuY.rawHostData());
+    // Compare
+    const auto* cpuResult = static_cast<const YType*>(cpuY.rawHostData());
     for(size_t i = 0; i < yCount; ++i)
     {
-        EXPECT_NEAR(gpuYData[i], cpuResult[i], 1e-5) << "Mismatch at index " << i;
+        EXPECT_NEAR(static_cast<float>(gpuYData[i]), static_cast<float>(cpuResult[i]), tolerance)
+            << "Mismatch at index " << i;
     }
+}
+
+} // anonymous namespace
+
+// ============================================================================
+// FP32 plan execution tests
+// ============================================================================
+
+TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runPlanExecuteVsCpuRef<float, float, float, float>({1, 1, 4, 4},
+                                                       {1, 1, 3, 3},
+                                                       {1, 1, 2, 2},
+                                                       {0, 0},
+                                                       {1, 1},
+                                                       {1, 1},
+                                                       DataType::FLOAT,
+                                                       DataType::FLOAT,
+                                                       1e-5f);
+}
+
+TEST(TestGpuConvolutionFwdPlan, ExecutePlanMultiChannel)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runPlanExecuteVsCpuRef<float, float, float, float>(
+        {1, 3, 8, 8}, // x: batch=1, channels=3, 8x8
+        {6, 3, 3, 3}, // w: 6 output filters, 3 input channels, 3x3
+        {1, 6, 8, 8}, // y: with pad=1 output is same spatial size
+        {1, 1}, // padding
+        {1, 1}, // stride
+        {1, 1}, // dilation
+        DataType::FLOAT,
+        DataType::FLOAT,
+        1e-5f);
+}
+
+TEST(TestGpuConvolutionFwdPlan, ExecutePlanStride2)
+{
+    SKIP_IF_NO_DEVICES();
+
+    runPlanExecuteVsCpuRef<float, float, float, float>(
+        {1, 1, 8, 8}, // x
+        {2, 1, 3, 3}, // w: 2 output filters
+        {1, 2, 3, 3}, // y: stride-2 downsample => (8-3)/2+1 = 3
+        {0, 0}, // padding
+        {2, 2}, // stride
+        {1, 1}, // dilation
+        DataType::FLOAT,
+        DataType::FLOAT,
+        1e-5f);
+}
+
+// ============================================================================
+// FP16 plan execution tests (Signatures #2 and #4)
+// ============================================================================
+
+TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16)
+{
+    SKIP_IF_NO_DEVICES();
+
+    const std::vector<int64_t> wDims = {1, 1, 3, 3};
+    auto tolerance
+        = hipdnn_test_sdk::utilities::conv::calculateConvFpropTolerance<half, half, double>(
+            -1.0, 1.0, -1.0, 1.0, wDims);
+
+    // Signature #2: half/half/half/float
+    runPlanExecuteVsCpuRef<half, half, half, float>({1, 1, 4, 4},
+                                                    wDims,
+                                                    {1, 1, 2, 2},
+                                                    {0, 0},
+                                                    {1, 1},
+                                                    {1, 1},
+                                                    DataType::HALF,
+                                                    DataType::HALF,
+                                                    tolerance);
+}
+
+TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16ToFp32)
+{
+    SKIP_IF_NO_DEVICES();
+
+    const std::vector<int64_t> wDims = {1, 1, 3, 3};
+    auto tolerance
+        = hipdnn_test_sdk::utilities::conv::calculateConvFpropTolerance<float, half, double>(
+            -1.0, 1.0, -1.0, 1.0, wDims);
+
+    // Signature #4: half/half/float/float (mixed output)
+    runPlanExecuteVsCpuRef<half, half, float, float>({1, 1, 4, 4},
+                                                     wDims,
+                                                     {1, 1, 2, 2},
+                                                     {0, 0},
+                                                     {1, 1},
+                                                     {1, 1},
+                                                     DataType::HALF,
+                                                     DataType::FLOAT,
+                                                     tolerance);
+}
+
+// ============================================================================
+// BF16 plan execution tests (Signatures #3 and #5)
+// ============================================================================
+
+TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanBfp16)
+{
+    SKIP_IF_NO_DEVICES();
+
+    const std::vector<int64_t> wDims = {1, 1, 3, 3};
+    auto tolerance
+        = hipdnn_test_sdk::utilities::conv::calculateConvFpropTolerance<bfloat16, bfloat16, double>(
+            -1.0, 1.0, -1.0, 1.0, wDims);
+
+    // Signature #3: bfloat16/bfloat16/bfloat16/float
+    runPlanExecuteVsCpuRef<bfloat16, bfloat16, bfloat16, float>({1, 1, 4, 4},
+                                                                wDims,
+                                                                {1, 1, 2, 2},
+                                                                {0, 0},
+                                                                {1, 1},
+                                                                {1, 1},
+                                                                DataType::BFLOAT16,
+                                                                DataType::BFLOAT16,
+                                                                tolerance);
+}
+
+TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanBfp16ToFp32)
+{
+    SKIP_IF_NO_DEVICES();
+
+    const std::vector<int64_t> wDims = {1, 1, 3, 3};
+    auto tolerance
+        = hipdnn_test_sdk::utilities::conv::calculateConvFpropTolerance<float, bfloat16, double>(
+            -1.0, 1.0, -1.0, 1.0, wDims);
+
+    // Signature #5: bfloat16/bfloat16/float/float (mixed output)
+    runPlanExecuteVsCpuRef<bfloat16, bfloat16, float, float>({1, 1, 4, 4},
+                                                             wDims,
+                                                             {1, 1, 2, 2},
+                                                             {0, 0},
+                                                             {1, 1},
+                                                             {1, 1},
+                                                             DataType::BFLOAT16,
+                                                             DataType::FLOAT,
+                                                             tolerance);
+}
+
+// ============================================================================
+// Rejection test — unregistered signature
+// ============================================================================
+
+TEST(TestGpuConvolutionFwdPlanBuilder, UnregisteredSignatureThrows)
+{
+    GpuPlanBuilderRegistry registry;
+
+    // INT8 is not in the registered signatures for convolution fwd
+    const GpuConvolutionFwdSignatureKey unregisteredKey{
+        DataType::INT8, DataType::INT8, DataType::INT8, DataType::FLOAT};
+
+    EXPECT_THROW(registry.getPlanBuilder(unregisteredKey), std::runtime_error);
 }

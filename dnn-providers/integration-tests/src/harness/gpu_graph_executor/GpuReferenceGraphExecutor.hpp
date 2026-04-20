@@ -59,7 +59,7 @@ private:
                 auto tensor = hipdnn_test_sdk::detail::createTensorFromAttribute(*attr);
                 virtualTensors.push_back(std::move(tensor));
 
-                updatedVariantPack[id] = virtualTensors.back()->rawHostData();
+                updatedVariantPack[id] = virtualTensors.back()->rawDeviceData();
             }
         }
         return updatedVariantPack;

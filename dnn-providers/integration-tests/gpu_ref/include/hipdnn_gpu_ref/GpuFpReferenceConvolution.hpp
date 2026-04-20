@@ -78,23 +78,22 @@ public:
                       double beta = 0.0,
                       bool useTf32 = false)
     {
-        fprop<XDataType, WDataType, YDataType, ComputeDataType>(
-            x.memory().deviceData(),
-            w.memory().deviceData(),
-            y.memory().deviceData(),
-            x.dims(),
-            w.dims(),
-            y.dims(),
-            x.strides(),
-            w.strides(),
-            y.strides(),
-            convStrides,
-            dilations,
-            prePadding,
-            postPadding,
-            alpha,
-            beta,
-            useTf32);
+        fprop<XDataType, WDataType, YDataType, ComputeDataType>(x.memory().deviceData(),
+                                                                w.memory().deviceData(),
+                                                                y.memory().deviceData(),
+                                                                x.dims(),
+                                                                w.dims(),
+                                                                y.dims(),
+                                                                x.strides(),
+                                                                w.strides(),
+                                                                y.strides(),
+                                                                convStrides,
+                                                                dilations,
+                                                                prePadding,
+                                                                postPadding,
+                                                                alpha,
+                                                                beta,
+                                                                useTf32);
         y.memory().markDeviceModified();
     }
 

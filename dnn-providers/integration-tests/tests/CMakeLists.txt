@@ -42,6 +42,7 @@ add_executable(hipdnn_gpu_ref_tests
     gpu_ref/TestGpuFpReferenceValidation.cpp
     gpu_ref/TestGpuRefHipError.cpp
     gpu_ref/TestGpuRefKernelCompiler.cpp
+    gpu_ref/TestShallowGpuTensor.cpp
 )
 
 target_link_libraries(hipdnn_gpu_ref_tests

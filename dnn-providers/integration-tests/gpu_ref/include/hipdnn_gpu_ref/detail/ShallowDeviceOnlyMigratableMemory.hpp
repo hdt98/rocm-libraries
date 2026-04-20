@@ -29,8 +29,7 @@ public:
         other._count = 0;
     }
 
-    ShallowDeviceOnlyMigratableMemory&
-        operator=(ShallowDeviceOnlyMigratableMemory&& other) noexcept
+    ShallowDeviceOnlyMigratableMemory& operator=(ShallowDeviceOnlyMigratableMemory&& other) noexcept
     {
         if(this != &other)
         {
@@ -43,8 +42,7 @@ public:
     }
 
     ShallowDeviceOnlyMigratableMemory(const ShallowDeviceOnlyMigratableMemory&) = delete;
-    ShallowDeviceOnlyMigratableMemory&
-        operator=(const ShallowDeviceOnlyMigratableMemory&) = delete;
+    ShallowDeviceOnlyMigratableMemory& operator=(const ShallowDeviceOnlyMigratableMemory&) = delete;
 
     T* hostData() override
     {
