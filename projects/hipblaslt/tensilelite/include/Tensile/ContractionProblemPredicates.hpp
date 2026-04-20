@@ -1476,22 +1476,11 @@ namespace TensileLite
 
                 virtual bool operator()(ContractionProblemGemm const& problem) const override
                 {
-<<<<<<< HEAD
-                    auto ret = problem.a().dataType() == value[0]
-                            && problem.b().dataType() == value[1]
-                            && problem.c().dataType() == value[2]
-                            && problem.d().dataType() == value[3];
-
-                    return ret &&
-                        validateComputeType(problem.computeInputTypeA(), true) &&
-                        validateComputeType(problem.computeInputTypeB(), false);
-=======
                     return problem.a().dataType() == value[0] && problem.b().dataType() == value[1]
                            && problem.c().dataType() == value[2]
                            && problem.d().dataType() == value[3]
                            && problem.computeInputTypeA() == value[4]
                            && problem.computeInputTypeB() == value[5];
->>>>>>> origin/develop
                 }
 
                 virtual std::string toString() const override
@@ -2919,78 +2908,6 @@ namespace TensileLite
                 {
                     return debugEvalCmp(
                         problem, stream, "prob", problem.swizzleTensorB(), "==", "sol", value);
-                }
-            };
-
-	    struct MXBlockACheck : public Predicate_CRTP<MXBlockACheck, ContractionProblemGemm>
-            {
-                enum
-                {
-                    HasIndex = false,
-                    HasValue = true
-                };
-                int value;
-
-                MXBlockACheck() = default;
-                MXBlockACheck(int value)
-                    : value(value)
-                {
-                }
-
-                static std::string Type()
-                {
-                    return "MXBlockA";
-                }
-
-                virtual bool operator()(ContractionProblemGemm const& problem) const override
-                {
-                    return (problem.mxBlockA() == value);
-                }
-
-                virtual bool debugEval(ContractionProblemGemm const& problem,
-                                       std::ostream&                 stream) const override
-                {
-                    bool rv = (*this)(problem);
-
-                    stream << *this << ": prob: " << problem.mxBlockA()
-                           << ", Is sol support: " << value << std::endl;
-                    return rv;
-                }
-            };
-
-	    struct MXBlockBCheck : public Predicate_CRTP<MXBlockBCheck, ContractionProblemGemm>
-            {
-                enum
-                {
-                    HasIndex = false,
-                    HasValue = true
-                };
-                int value;
-
-                MXBlockBCheck() = default;
-                MXBlockBCheck(int value)
-                    : value(value)
-                {
-                }
-
-                static std::string Type()
-                {
-                    return "MXBlockB";
-                }
-
-                virtual bool operator()(ContractionProblemGemm const& problem) const override
-                {
-                    return (problem.mxBlockB() == value);
-                }
-
-                virtual bool debugEval(ContractionProblemGemm const& problem,
-                                       std::ostream&                 stream) const override
-                {
-                    bool rv = (*this)(problem);
-
-                    stream << *this << ": prob: " << problem.mxBlockB()
-                           << ", Is sol support: " << value << std::endl;
-                    return rv;
                 }
             };
 
