@@ -3,6 +3,8 @@
 #ifndef GUARD_MEMORY_ECOSYSTEM_HPP
 #define GUARD_MEMORY_ECOSYSTEM_HPP
 
+#include <gtest/gtest.h>
+
 #ifdef _WIN32
 #include <dxgi1_4.h>
 #endif
@@ -10,8 +12,6 @@
 #include <functional>
 #include <iostream>
 #include <vector>
-
-#include <gtest/gtest.h>
 
 // This addresses a Windows-specific issue on low-memory APUs. MemoryEcosystem does not do
 // anything in linux yet. Linux support will be added if/when it is needed.
