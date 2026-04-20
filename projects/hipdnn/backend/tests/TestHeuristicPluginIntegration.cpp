@@ -13,10 +13,14 @@
  */
 
 #include "HipdnnException.hpp"
+#include "PlatformUtils.hpp"
 #include "heuristics/DeviceProperties.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
+#include "plugin/SharedLibrary.hpp"
+
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 
 #include <gtest/gtest.h>
 
@@ -30,8 +34,11 @@ namespace
 
 std::filesystem::path getTestPluginPath(const char* pluginName)
 {
-    const auto buildDir = std::filesystem::current_path();
-    return buildDir / "lib" / "test_plugins" / "custom" / (std::string("lib") + pluginName + ".so");
+    // Get the directory containing the test binary, then navigate to test plugins directory
+    // Test binary is in build/bin/, plugins are in build/lib/test_plugins/custom/
+    const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
+    const auto pluginDir  = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
+    return pluginDir / hipdnn_data_sdk::utilities::getLibraryName(pluginName);
 }
 } // namespace
 
@@ -627,7 +634,6 @@ TEST_F(IntegrationHeuristicPlugin, LoadGoodPluginSucceeds)
 
     // Load the plugin
     SharedLibrary lib(pluginPath);
-    // NOLINTNEXTLINE(misc-const-correctness)
     ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
@@ -856,7 +862,6 @@ TEST_F(IntegrationHeuristicPlugin, LoadPluginWithoutOptionalSymbolsSucceeds)
     SharedLibrary lib(pluginPath);
 
     // Should load successfully despite missing optional symbols
-    // NOLINTNEXTLINE(misc-const-correctness)
     ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
 }
 TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalPolicyNameHasName)
