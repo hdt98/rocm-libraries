@@ -1,4 +1,4 @@
-// Copyright (C) 2021 - 2024 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2021 - 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -508,6 +508,7 @@ const auto adhoc_nondefault_layout_real_tokens = {
     "real_forward_len_7_14_76_double_ip_batch_202_istride_3588_78_1_R_ostride_1794_39_1_HI_idist_150696_odist_75348_ioffset_0_0_ooffset_0_0",
     "real_forward_len_2_14_46_single_ip_batch_499_istride_2050_50_1_R_ostride_1025_25_1_HI_idist_71750_odist_35875_ioffset_0_0_ooffset_0_0",
     "real_forward_len_26_52_double_op_batch_3899_istride_240_4_R_ostride_224_7_HI_idist_15600_odist_8960_ioffset_0_0_ooffset_0_0",
+    "real_forward_len_160_72_72_single_op_batch_20_istride_5328_74_1_R_ostride_2664_37_1_HI_idist_852480_odist_426240_ioffset_0_0_ooffset_0_0",
     // clang-format on
 };
 
