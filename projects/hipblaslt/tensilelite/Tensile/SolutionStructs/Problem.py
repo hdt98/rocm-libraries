@@ -34,7 +34,7 @@ from Tensile.Common.Constants import INDEX_CHARS
 from Tensile.Common.DataType import DataType
 from Tensile.Common.Utilities import assignParameterWithDefault, printWarning, print2, printExit
 
-from .Utilities import getRealDataTypeA, getRealDataTypeB
+
 
 class ProblemSizeRange:
 
@@ -498,11 +498,6 @@ _defaultProblemType = {
     "SupportUserArgs": True,
     "SwizzleTensorA": False,
     "SwizzleTensorB": False,
-<<<<<<< HEAD
-    # MX Block
-    "MXBlockA": 0,
-    "MXBlockB": 0,
-=======
     "isMixMode": False,  # True means this is a mix-mode problem, i.e. Float8BFloat6 or BFloat6Float8
     "MetadataLayout": 0,
     # MX Block
@@ -510,7 +505,6 @@ _defaultProblemType = {
     "MXBlockB": 0,
     "DataTypeMXSA": "E8",
     "DataTypeMXSB": "E8",
->>>>>>> origin/develop
 }
 
 # The supported typed GEMM, each entry is (Ti, To, Tc).
@@ -520,80 +514,6 @@ _defaultProblemType = {
 # Cinternal: basically should == ComputeDataType
 # This is used in _checkIfSupportedGEMMType()
 _validGEMMTypes = [
-<<<<<<< HEAD
-    ("H", "H", "H", "H"),
-    ("S", "S", "S", "S"),
-    ("D", "D", "D", "D"),
-    ("C", "C", "C", "C"),
-    ("Z", "Z", "Z", "Z"),
-    ("H", "H", "H", "S"),
-    ("H", "H", "S", "S"),
-    ("B", "B", "B", "S"),
-    ("B", "B", "S", "S"),
-    ("B", "B", "H", "S"),
-    ("I8", "I8", "I", "I"),
-    ("4xi8", "4xi8", "I", "I"),
-    ("I8", "I8", "I8", "I"),
-    ("I8", "I8", "I", "S"),
-    ("I8", "I8", "I8", "S"),
-    ("I8", "I8", "H", "S"),
-    ("I8", "I8", "B", "S"),
-    ("F8", "F8", "S", "S"),
-    ("B8", "B8", "S", "S"),
-    ("F8", "B8", "S", "S"),
-    ("B8", "F8", "S", "S"),
-    ("F8", "F8", "H", "S"),
-    ("B8", "B8", "H", "S"),
-    ("F8", "B8", "H", "S"),
-    ("B8", "F8", "H", "S"),
-    ("B8", "B8", "B", "S"),
-    ("H", "H", "F8", "S"),
-    ("F8", "F8", "B", "S"),
-    ("F8", "B8", "B", "S"),
-    ("B8", "F8", "B", "S"),  # in/out are both R8
-    ("F8", "F8", "F8", "S"),
-    ("B8", "B8", "B8", "S"),
-    ("F8", "B8", "B8", "S"),
-    ("B8", "F8", "B8", "S"),
-    ("F8", "F8", "B8", "S"),
-    ("B8", "B8", "F8", "S"),
-    ("F8", "B8", "F8", "S"),
-    ("B8", "F8", "F8", "S"),  # F8 NANOO
-    ("F8N", "F8N", "S", "S"),
-    ("B8N", "B8N", "S", "S"),
-    ("F8N", "B8N", "S", "S"),
-    ("B8N", "F8N", "S", "S"),
-    ("F8N", "F8N", "H", "S"),
-    ("B8N", "B8N", "H", "S"),
-    ("F8N", "B8N", "H", "S"),
-    ("B8N", "F8N", "H", "S"),
-    ("B8N", "B8N", "B", "S"),
-    ("H", "H", "F8N", "S"),
-    ("F8N", "F8N", "B", "S"),
-    ("F8N", "B8N", "B", "S"),
-    ("B8N", "F8N", "B", "S"),  # in/out are both R8
-    ("F8N", "F8N", "F8N", "S"),
-    ("B8N", "B8N", "B8N", "S"),
-    ("F8N", "B8N", "B8N", "S"),
-    ("B8N", "F8N", "B8N", "S"),
-    ("F8N", "F8N", "B8N", "S"),
-    ("B8N", "B8N", "F8N", "S"),
-    ("F8N", "B8N", "F8N", "S"),
-    ("B8N", "F8N", "F8N", "S"),
-    ("F6", "F6", "S", "S"),
-    ("B6", "B6", "S", "S"),
-    ("F6", "B6", "S", "S"),
-    ("B6", "F6", "S", "S"),
-    ("F8", "F6", "S", "S"),
-    ("F6", "F8", "S", "S"),
-    ("F8", "F4", "S", "S"),
-    ("F4", "F8", "S", "S"),
-    ("F6", "F4", "S", "S"),
-    ("F4", "F6", "S", "S"),
-    ("B6", "F4", "S", "S"),
-    ("F4", "B6", "S", "S"),
-    ("F4", "F4", "S", "S"),
-=======
     ("H", "H", "H"),
     ("S", "S", "S"),
     ("D", "D", "D"),
@@ -707,7 +627,6 @@ _validMXGEMMTypes = [
 
 _validMXGEMMBlock = [
     16, 32
->>>>>>> origin/develop
 ]
 
 
@@ -715,71 +634,6 @@ _validMXGEMMBlock = [
 # *_TiToTc_BH*.yaml where Ti, To, and Tc are the data types of A/B, C/D, and computation, respectively.
 # The name of the library logic files for non-HPA (HPA=F) types is: *_TiB*.yaml.
 _HPATypes = [
-<<<<<<< HEAD
-    ("H", "H", "S", "S"),
-    ("H", "H", "H", "S"),
-    ("B", "B", "B", "S"),
-    ("B", "B", "S", "S"),
-    ("B", "B", "H", "S"),
-    ("I8", "I8", "I", "I"),
-    ("4xi8", "4xi8", "I", "I"),
-    ("I8", "I8", "I", "S"),
-    ("I8", "I8", "I8", "S"),
-    ("I8", "I8", "H", "S"),
-    ("I8", "I8", "B", "S"),
-    ("F8", "F8", "S", "S"),
-    ("B8", "B8", "S", "S"),
-    ("F8", "B8", "S", "S"),
-    ("B8", "F8", "S", "S"),
-    ("F8", "F8", "H", "S"),
-    ("B8", "B8", "H", "S"),
-    ("F8", "B8", "H", "S"),
-    ("B8", "F8", "H", "S"),
-    ("H", "H", "F8", "S"),
-    ("F8", "F8", "B", "S"),
-    ("F8", "B8", "B", "S"),  # in/out are both R8
-    ("F8", "F8", "F8", "S"),
-    ("B8", "B8", "B8", "S"),
-    ("F8", "B8", "B8", "S"),
-    ("B8", "F8", "B8", "S"),
-    ("F8", "F8", "B8", "S"),
-    ("B8", "B8", "F8", "S"),
-    ("F8", "B8", "F8", "S"),
-    ("B8", "F8", "F8", "S"),
-    ("F8N", "F8N", "S", "S"),
-    ("B8N", "B8N", "S", "S"),
-    ("F8N", "B8N", "S", "S"),
-    ("B8N", "F8N", "S", "S"),
-    ("F8N", "F8N", "H", "S"),
-    ("B8N", "B8N", "H", "S"),
-    ("F8N", "B8N", "H", "S"),
-    ("B8N", "F8N", "H", "S"),
-    ("H", "H", "F8N", "S"),
-    ("F8N", "F8N", "B", "S"),
-
-    ("F8N", "B8N", "B", "S"),  # in/out are both R8
-    ("F8N", "F8N", "F8N", "S"),
-    ("B8N", "B8N", "B8N", "S"),
-    ("F8N", "B8N", "B8N", "S"),
-    ("B8N", "F8N", "B8N", "S"),
-    ("F8N", "F8N", "B8N", "S"),
-    ("B8N", "B8N", "F8N", "S"),
-    ("F8N", "B8N", "F8N", "S"),
-    ("B8N", "F8N", "F8N", "S"),
-    ("F6", "F6", "S", "S"),
-    ("B6", "B6", "S", "S"),
-    ("F6", "B6", "S", "S"),
-    ("B6", "F6", "S", "S"),
-    ("F8", "F6", "S", "S"),
-    ("F6", "F8", "S", "S"),
-    ("F8", "F4", "S", "S"),
-    ("F4", "F8", "S", "S"),
-    ("F6", "F4", "S", "S"),
-    ("F4", "F6", "S", "S"),
-    ("B6", "F4", "S", "S"),
-    ("F4", "B6", "S", "S"),
-    ("F4", "F4", "S", "S"),
-=======
     ("H", "S", "S"),
     ("H", "H", "S"),
     ("B", "B", "S"),
@@ -832,7 +686,6 @@ _HPATypes = [
     ("F4", "S", "S"),
     ("F6", "S", "S"),
     ("B6", "S", "S"),
->>>>>>> origin/develop
 ]
 
 def problemTypeToEnum(problemType):
@@ -935,11 +788,7 @@ class ProblemType(Mapping):
     else:
       self["DataTypeB"] = self["MacDataTypeB"]
     self["DataTypeB"] = getRealDataTypeB(self["DataTypeB"])
-<<<<<<< HEAD
 
-=======
-    
->>>>>>> origin/develop
     if "DestDataType" in config:
       self["DestDataType"] = DataType(config["DestDataType"])
     else:
@@ -1120,18 +969,13 @@ class ProblemType(Mapping):
   #   See the discussion in ValidParameters.py for validGEMMTypes
   ################################################################################
   def _checkIfSupportedGEMMType(self):
-<<<<<<< HEAD
-    inTypeA = self["MacDataTypeA"]
-    inTypeB = self["MacDataTypeB"]
-=======
     # Here we use "DataType" instead of "MacDataTypeA(B)" for validation. It is totally fine cause we passed "MacDataTypeA(B)" into Client side.
     # Ex: MacDataTypeA: b6, MacDataTypeB: f4 -> we can either choose "DataType: f4" or "DataType: b6"
     inType = self["DataType"]
->>>>>>> origin/develop
     outType = self["DestDataType"]
     computeType = self["ComputeDataType"]
 
-    gemmType = ( inTypeA.toChar(), inTypeB.toChar(), outType.toChar(), computeType.toChar() )
+    gemmType = ( inType.toChar(), outType.toChar(), computeType.toChar() )
     if gemmType not in _validGEMMTypes:
       raise Exception("This typed-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet."%(gemmType[0], gemmType[1], gemmType[2]))
 
@@ -1361,27 +1205,18 @@ class ProblemType(Mapping):
     macTypeStr = self["MacDataTypeA"].toChar()
     if self["MacDataTypeA"] != self["MacDataTypeB"]:
       macTypeStr = self["MacDataTypeA"].toChar() + self["MacDataTypeB"].toChar()
-<<<<<<< HEAD
-
-    if self["MacDataTypeA"] != self["DataTypeA"] or self["MacDataTypeB"] != self["DataTypeB"]:
-      name.append(self["DataTypeA"].toChar() + self["DataTypeB"].toChar())
-=======
     if self["MacDataTypeA"] != self["DataTypeA"] or self["MacDataTypeB"] != self["DataTypeB"]:
       name.append(self["DataTypeA"].toChar() + self["DataTypeB"].toChar())
     name.append(macTypeStr) # Type of A/B, split Type of A/B when A!=B
->>>>>>> origin/develop
 
     # Special condition for some newly supported kernels:
     #   HHS, HSS, BSS and I8II kernels, use a clearer naming _TiToTc_
     # TODO: Distinguish all kernels by _TiToTc_ to be more consistent with rocblas
-    dataTypeStr = macTypeStr
-    gemmType = (self["MacDataTypeA"].toChar(), self["MacDataTypeB"].toChar(), self["DestDataType"].toChar(), self["ComputeDataType"].toChar() )
+    gemmType = (self["DataType"].toChar(),self["DestDataType"].toChar(),self["ComputeDataType"].toChar() )
     if gemmType in _HPATypes:
-      dataTypeStr += self["DestDataType"].toChar()
-      dataTypeStr += self["ComputeDataType"].toChar()
-    name.append(dataTypeStr)
+      name[-1] += "".join([self["DestDataType"].toChar(), self["ComputeDataType"].toChar()])
 
-    if not self["F32XdlMathOp"].isSingle() and self["MacDataTypeA"].isSingle():
+    if not self["F32XdlMathOp"].isSingle() and self["DataType"].isSingle():
       name.append("".join(["M", self["F32XdlMathOp"].toChar()]))
 
     if self["MXBlockA"]:
@@ -1395,12 +1230,6 @@ class ProblemType(Mapping):
 
     if self["SwizzleTensorB"]:
       name.append("STB")
-
-    if self["MXBlockA"]:
-      name.append(f'MXA{self["MXBlockA"]}')
-
-    if self["MXBlockB"]:
-      name.append(f'MXB{self["MXBlockB"]}')
 
     # Other
     other = ""
