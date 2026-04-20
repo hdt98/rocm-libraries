@@ -202,8 +202,9 @@ public:
         }
         else
         {
-            throw std::invalid_argument("Unsupported number of dimensions: "
-                                        + std::to_string(nDims));
+            throw std::invalid_argument(
+                "GPU kernels support 1D/2D/3D convolutions (tensor rank 3/4/5), got rank "
+                + std::to_string(nDims));
         }
 
         gradX.memory().markDeviceModified();
@@ -314,8 +315,9 @@ public:
         }
         else
         {
-            throw std::invalid_argument("Unsupported number of dimensions: "
-                                        + std::to_string(nDims));
+            throw std::invalid_argument(
+                "GPU kernels support 1D/2D/3D convolutions (tensor rank 3/4/5), got rank "
+                + std::to_string(nDims));
         }
 
         gradW.memory().markDeviceModified();
@@ -389,7 +391,7 @@ private:
                           alpha,
                           beta);
         }
-        else // nDims == 5, guaranteed by validateInput
+        else if(nDims == 5)
         {
             launchFprop3d(xPtr,
                           wPtr,
@@ -406,6 +408,12 @@ private:
                           defines,
                           alpha,
                           beta);
+        }
+        else
+        {
+            throw std::invalid_argument(
+                "GPU kernels support 1D/2D/3D convolutions (tensor rank 3/4/5), got rank "
+                + std::to_string(nDims));
         }
     }
 

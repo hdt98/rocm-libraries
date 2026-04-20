@@ -202,15 +202,24 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     void* dX = nullptr;
     void* dW = nullptr;
     void* dY = nullptr;
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(XType)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(WType)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(YType)), hipSuccess);
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(YType)), hipSuccess);
+    auto freeDeviceBuffers = [&]()
+    {
+        static_cast<void>(hipFree(dX));
+        static_cast<void>(hipFree(dW));
+        static_cast<void>(hipFree(dY));
+    };
+
+    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(XType)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(WType)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
 
     ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
     ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
 
     // Execute
     std::unordered_map<int64_t, void*> variantPack;
@@ -223,11 +232,10 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     // Copy result back
     std::vector<YType> gpuYData(yCount);
     ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(YType), hipMemcpyDeviceToHost),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
 
-    static_cast<void>(hipFree(dX));
-    static_cast<void>(hipFree(dW));
-    static_cast<void>(hipFree(dY));
+    freeDeviceBuffers();
 
     // CPU reference
     hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<XType, WType, YType, ComputeType>(

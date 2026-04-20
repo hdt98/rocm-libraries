@@ -222,15 +222,24 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     void* dX = nullptr;
     void* dW = nullptr;
     void* dY = nullptr;
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(T)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(T)), hipSuccess);
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(T)), hipSuccess);
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(T)), hipSuccess);
+    auto freeDeviceBuffers = [&]()
+    {
+        static_cast<void>(hipFree(dX));
+        static_cast<void>(hipFree(dW));
+        static_cast<void>(hipFree(dY));
+    };
+
+    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
 
     ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
     ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
 
     // Run GPU graph executor with device pointers
     std::unordered_map<int64_t, void*> variantPack;
@@ -244,11 +253,10 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     // Copy GPU result back to host
     std::vector<T> gpuYData(yCount);
     ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost),
-              hipSuccess);
+              hipSuccess)
+        << (freeDeviceBuffers(), "");
 
-    static_cast<void>(hipFree(dX));
-    static_cast<void>(hipFree(dW));
-    static_cast<void>(hipFree(dY));
+    freeDeviceBuffers();
 
     // Run CPU reference for comparison
     hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(
