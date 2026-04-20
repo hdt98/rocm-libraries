@@ -301,10 +301,11 @@
 #define POTRF_POTF2_SWITCHSIZE(T) ((sizeof(T) == 4) ? 256 : 128)
 #endif
 
-/*! \brief Determines the size at which the recursion switch to original solver
+/*! \brief Determines the size at which rocSOLVER switches from the recursive
+    algorithm to the original solver.
     \details
-    Recursion may have more software overhead for small problems. 
-    This variable will indicate when to switch out of recursive algorithm.  */
+    Recursion may have more software overhead for small problems. This variable
+    indicates when to switch from the recursive algorithm. */
 #ifndef POTRF_RECURSION_SWITCH_SIZE
 #define POTRF_RECURSION_SWITCH_SIZE(T) (512)
 #endif
