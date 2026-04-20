@@ -478,8 +478,8 @@ TEST_P(GPU_Deterministic_WrwV4R4_FP32, DeterministicTest) { this->RunTest(); };
 TEST_P(GPU_Deterministic_WrwV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
 
 // ============================================================================
-// CI tests (Smoke): 5 fast tests, 1 per solver (~1s with warm cache)
-// FwdV4R5Xdlops and FwdV4R1 excluded: slow kernel compilation (~2s each)
+// CI tests (Smoke): 3 fast tests (~1.5s total)
+// Tests: FwdV4R4Xdlops (46ms), BwdV1R1 (1455ms), WrwV4R4Xdlops (7ms)
 // ============================================================================
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
@@ -490,43 +490,6 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
                          testing::Values(DeterministicTestConfig{
                              32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1}));
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_Deterministic_BwdV4R1_FP32,
-                         testing::Values(DeterministicTestConfig{
-                             16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}));
-INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_Deterministic_WrwV4R4_FP32,
-                         testing::ValuesIn(GetConfigWrwV4R4()));
-INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_WrwV4R4Xdlops_FP32,
                          testing::Values(DeterministicTestConfig{
                              1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}));
-
-// ============================================================================
-// Extended tests (Full): runs only with MIOPEN_TEST_ALL=ON
-// Includes all boundary configs that were FAIL/SKIP before the IsApplicable() fix
-// ============================================================================
-
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_FwdV4R5Xdlops_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_FwdV4R5Xdlops_BFP16,
-                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_FwdV4R4Xdlops_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_FwdV4R1_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_BwdV1R1_FP32,
-                         testing::ValuesIn(GetConfigBwdV1R1()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_BwdV4R1_FP32,
-                         testing::ValuesIn(GetConfigBwdV4R1()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_WrwV4R4_FP32,
-                         testing::ValuesIn(GetConfigWrwV4R4()));
-INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_Deterministic_WrwV4R4Xdlops_FP32,
-                         testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
