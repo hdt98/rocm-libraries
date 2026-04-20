@@ -266,11 +266,7 @@ def validateMIParameters(
                 solution, printSolutionRejectionReason, f"Invalid WMMA configuration: {solution}"
             )
     else:
-<<<<<<< HEAD
-        if not (miDataTypeKey in validSMFMA and mi4 in validSMFMA[miDataTypeKey]):
-=======
-        if hasSMFMA and not (miDataType.toChar() in validSMFMA and mi4 in validSMFMA[miDataType.toChar()]):
->>>>>>> origin/develop
+        if hasSMFMA and not (miDataTypeKey in validSMFMA and mi4 in validSMFMA[miDataTypeKey]):
             return not reject(
                 solution, printSolutionRejectionReason, f"Invalid SMFMA configuration: {solution}"
             )
