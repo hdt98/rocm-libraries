@@ -75,11 +75,12 @@ protected:
         auto policyNameView = plugin.policyName();
         if(policyNameView.empty())
         {
-            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                                  "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
-                                  "Policy name is required but was not provided.\n"
-                                  "Plugin must implement hipdnnHeuristicGetPolicyName() and return a "
-                                  "non-empty policy name.");
+            throw HipdnnException(
+                HIPDNN_STATUS_PLUGIN_ERROR,
+                "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
+                "Policy name is required but was not provided.\n"
+                "Plugin must implement hipdnnHeuristicGetPolicyName() and return a "
+                "non-empty policy name.");
         }
     }
 
