@@ -23,6 +23,7 @@
  * Incremented when backward-incompatible changes are made to the API.
  * Plugins must match this major version to be loaded.
  */
+// NOLINTBEGIN(modernize-macro-to-enum)
 #define HIPDNN_HEURISTIC_API_VERSION_MAJOR 1
 
 /**
@@ -40,6 +41,7 @@
  * Does not affect compatibility.
  */
 #define HIPDNN_HEURISTIC_API_VERSION_PATCH 0
+// NOLINTEND(modernize-macro-to-enum)
 
 /**
  * @brief Full version string in semantic versioning format

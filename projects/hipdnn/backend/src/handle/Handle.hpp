@@ -30,7 +30,8 @@ public:
 private:
     hipStream_t _stream = nullptr;
     std::shared_ptr<hipdnn_backend::plugin::EnginePluginResourceManager> _pluginResourceManager;
-    std::shared_ptr<hipdnn_backend::plugin::HeuristicPluginResourceManager> _heuristicPluginResourceManager;
+    std::shared_ptr<hipdnn_backend::plugin::HeuristicPluginResourceManager>
+        _heuristicPluginResourceManager;
 };
 
 template <>

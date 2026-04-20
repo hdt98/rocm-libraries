@@ -34,7 +34,6 @@ public:
     // Virtual destructor for polymorphic class
     ~HeuristicPlugin() override = default;
 
-
     // Module metadata (called before handle creation)
     std::string_view apiVersion() const override;
     std::string_view name() const override; // Override to return policy name
@@ -45,7 +44,10 @@ public:
     std::string_view pluginVersion() const;
 
     // Plugin type - heuristic plugins return UNSPECIFIED (they don't have their own type yet)
-    static hipdnnPluginType_t getPluginType() { return HIPDNN_PLUGIN_TYPE_UNSPECIFIED; }
+    static hipdnnPluginType_t getPluginType()
+    {
+        return HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
+    }
 
     // Logging setup (called at module load time)
     // 3-parameter version for heuristic-specific callback
@@ -125,7 +127,6 @@ private:
 
     // Module metadata function pointers
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcGetPolicyId)(int64_t*);
     hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
     hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
     hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnHeuristicLoggingCallback_t);

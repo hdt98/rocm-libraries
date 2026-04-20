@@ -67,8 +67,8 @@ extern "C" {
  * @param[in] message The log message content
  */
 typedef void (*hipdnnHeuristicLoggingCallback_t)(hipdnnSeverity_t severity,
-                                                  const char* component_prefix,
-                                                  const char* message);
+                                                 const char* component_prefix,
+                                                 const char* message);
 
 /**
  * @brief Opaque handle for a heuristic plugin session.
@@ -114,35 +114,19 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
     hipdnnHeuristicGetApiVersion(const char** version);
 
 /**
- * @brief Retrieves the stable policy ID for this heuristic plugin.
- *
- * Returns the int64_t policy identifier that MUST equal engineNameToId(canonical_utf8_name)
- * for the plugin's documented policy name. The host matches this value against the resolved
- * orderedPolicyIds after hashing user-supplied policy name strings.
- *
- * @param[out] policy_id Pointer to receive the policy ID.
- *
- * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
- */
-HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicGetPolicyId(int64_t* policy_id);
-
-/**
- * @brief Retrieves the canonical policy name (optional).
+ * @brief Retrieves the canonical policy name.
  *
  * Returns the NUL-terminated UTF-8 canonical name that users reference in configuration
  * (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"). Used for
- * logging and enumeration.
+ * logging, enumeration, and policy ID computation.
  *
- * IMPORTANT: If this function is exported, the host validates at load time that
- * engineNameToId(policy_name) == hipdnnHeuristicGetPolicyId() and REJECTS the module
- * on mismatch. This catches mistaken or overlapping well-known implementations early.
+ * The policy ID is computed from this name via engineNameToId(policy_name). Plugins should
+ * choose a unique, descriptive name for their heuristic policy.
  *
  * @param[out] policy_name Pointer to receive the policy name string (NUL-terminated).
  *                         The pointer remains valid for the plugin's lifetime.
  *
- * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
- *         HIPDNN_PLUGIN_STATUS_INVALID_VALUE if not implemented.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicGetPolicyName(const char** policy_name);
@@ -272,8 +256,8 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
  *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if buffer is malformed or incompatible.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
-                                             const hipdnnPluginConstData_t* device_props_serialized);
+    hipdnnHeuristicHandleSetDeviceProperties(
+        hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* device_props_serialized);
 
 /** @} */ // End of HeuristicPluginHandleLifecycle group
 

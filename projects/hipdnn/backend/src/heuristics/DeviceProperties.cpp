@@ -37,19 +37,23 @@ DeviceProperties queryDeviceProperties()
     err = hipGetDeviceProperties(&hipProps, device);
     if(err != hipSuccess)
     {
-        HIPDNN_BACKEND_LOG_WARN("hipGetDeviceProperties failed: {}. Using partial device properties.",
-                                hipGetErrorString(err));
+        HIPDNN_BACKEND_LOG_WARN(
+            "hipGetDeviceProperties failed: {}. Using partial device properties.",
+            hipGetErrorString(err));
         return out;
     }
 
     out.multiProcessorCount = hipProps.multiProcessorCount;
-    out.totalGlobalMem      = hipProps.totalGlobalMem;
+    out.totalGlobalMem = hipProps.totalGlobalMem;
+    out.architectureName = hipProps.gcnArchName;
 
     HIPDNN_BACKEND_LOG_DEBUG(
-        "Queried device properties: deviceId={}, multiProcessorCount={}, totalGlobalMem={} bytes",
+        "Queried device properties: deviceId={}, multiProcessorCount={}, totalGlobalMem={} bytes, "
+        "architectureName={}",
         out.deviceId,
         out.multiProcessorCount,
-        out.totalGlobalMem);
+        out.totalGlobalMem,
+        out.architectureName);
 
     return out;
 }
@@ -58,18 +62,18 @@ std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& props)
 {
     flatbuffers::FlatBufferBuilder builder(256);
 
+    // Create architecture name string
+    auto archNameOffset = builder.CreateString(props.architectureName);
+
     // Build the DeviceProperties table
     auto devicePropsOffset = hipdnn_data_sdk::data_objects::CreateDeviceProperties(
-        builder,
-        props.deviceId,
-        props.multiProcessorCount,
-        props.totalGlobalMem);
+        builder, props.deviceId, props.multiProcessorCount, props.totalGlobalMem, archNameOffset);
 
     builder.Finish(devicePropsOffset, "HDDP"); // File identifier for versioning
 
     // Copy to vector
-    uint8_t* buf       = builder.GetBufferPointer();
-    const size_t size  = builder.GetSize();
+    uint8_t* buf = builder.GetBufferPointer();
+    const size_t size = builder.GetSize();
     return {buf, buf + size};
 }
 
@@ -78,9 +82,7 @@ DeviceProperties deserializeDeviceProperties(const uint8_t* buffer, size_t size)
     THROW_IF_FALSE(buffer != nullptr,
                    HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                    "Device properties buffer cannot be null");
-    THROW_IF_FALSE(size > 0,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "Device properties buffer size must be > 0");
+    THROW_IF_FALSE(size > 0, HIPDNN_STATUS_BAD_PARAM, "Device properties buffer size must be > 0");
 
     // Verify the buffer
     flatbuffers::Verifier verifier(buffer, size);
@@ -100,9 +102,13 @@ DeviceProperties deserializeDeviceProperties(const uint8_t* buffer, size_t size)
 
     // Extract fields
     DeviceProperties props;
-    props.deviceId            = devicePropsFB->device_id();
+    props.deviceId = devicePropsFB->device_id();
     props.multiProcessorCount = devicePropsFB->multi_processor_count();
-    props.totalGlobalMem      = devicePropsFB->total_global_mem();
+    props.totalGlobalMem = devicePropsFB->total_global_mem();
+    if(devicePropsFB->architecture_name() != nullptr)
+    {
+        props.architectureName = devicePropsFB->architecture_name()->str();
+    }
 
     return props;
 }

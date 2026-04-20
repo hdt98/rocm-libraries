@@ -29,7 +29,7 @@ public:
     MOCK_METHOD(std::vector<HeuristicPolicyInfo>, getHeuristicPolicyInfos, (), (const, override));
     MOCK_METHOD(void,
                 getLoadedHeuristicPluginFiles,
-                (size_t* numPlugins, char** pluginPaths, size_t* maxStringLen),
+                (size_t * numPlugins, char** pluginPaths, size_t* maxStringLen),
                 (const, override));
     MOCK_METHOD(std::string, toString, (), (const, override));
 };

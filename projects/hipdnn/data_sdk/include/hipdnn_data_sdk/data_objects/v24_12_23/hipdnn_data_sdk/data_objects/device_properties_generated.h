@@ -28,6 +28,7 @@ struct DevicePropertiesT : public ::flatbuffers::NativeTable {
   int32_t device_id = -1;
   int32_t multi_processor_count = 0;
   uint64_t total_global_mem = 0;
+  std::string architecture_name{};
 };
 
 /// @brief Device properties for heuristic plugin selection.
@@ -46,7 +47,8 @@ struct DeviceProperties FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_DEVICE_ID = 4,
     VT_MULTI_PROCESSOR_COUNT = 6,
-    VT_TOTAL_GLOBAL_MEM = 8
+    VT_TOTAL_GLOBAL_MEM = 8,
+    VT_ARCHITECTURE_NAME = 10
   };
   /// Device ID from hipGetDevice
   int32_t device_id() const {
@@ -69,11 +71,20 @@ struct DeviceProperties FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   bool mutate_total_global_mem(uint64_t _total_global_mem = 0) {
     return SetField<uint64_t>(VT_TOTAL_GLOBAL_MEM, _total_global_mem, 0);
   }
+  /// GPU architecture name (e.g., "gfx90a", "gfx942")
+  const ::flatbuffers::String *architecture_name() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_ARCHITECTURE_NAME);
+  }
+  ::flatbuffers::String *mutable_architecture_name() {
+    return GetPointer<::flatbuffers::String *>(VT_ARCHITECTURE_NAME);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int32_t>(verifier, VT_DEVICE_ID, 4) &&
            VerifyField<int32_t>(verifier, VT_MULTI_PROCESSOR_COUNT, 4) &&
            VerifyField<uint64_t>(verifier, VT_TOTAL_GLOBAL_MEM, 8) &&
+           VerifyOffset(verifier, VT_ARCHITECTURE_NAME) &&
+           verifier.VerifyString(architecture_name()) &&
            verifier.EndTable();
   }
   DevicePropertiesT *UnPack(const ::flatbuffers::resolver_function_t *_resolver = nullptr) const;
@@ -94,6 +105,9 @@ struct DevicePropertiesBuilder {
   void add_total_global_mem(uint64_t total_global_mem) {
     fbb_.AddElement<uint64_t>(DeviceProperties::VT_TOTAL_GLOBAL_MEM, total_global_mem, 0);
   }
+  void add_architecture_name(::flatbuffers::Offset<::flatbuffers::String> architecture_name) {
+    fbb_.AddOffset(DeviceProperties::VT_ARCHITECTURE_NAME, architecture_name);
+  }
   explicit DevicePropertiesBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -109,12 +123,29 @@ inline ::flatbuffers::Offset<DeviceProperties> CreateDeviceProperties(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     int32_t device_id = -1,
     int32_t multi_processor_count = 0,
-    uint64_t total_global_mem = 0) {
+    uint64_t total_global_mem = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> architecture_name = 0) {
   DevicePropertiesBuilder builder_(_fbb);
   builder_.add_total_global_mem(total_global_mem);
+  builder_.add_architecture_name(architecture_name);
   builder_.add_multi_processor_count(multi_processor_count);
   builder_.add_device_id(device_id);
   return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<DeviceProperties> CreateDevicePropertiesDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t device_id = -1,
+    int32_t multi_processor_count = 0,
+    uint64_t total_global_mem = 0,
+    const char *architecture_name = nullptr) {
+  auto architecture_name__ = architecture_name ? _fbb.CreateString(architecture_name) : 0;
+  return hipdnn_data_sdk::data_objects::CreateDeviceProperties(
+      _fbb,
+      device_id,
+      multi_processor_count,
+      total_global_mem,
+      architecture_name__);
 }
 
 ::flatbuffers::Offset<DeviceProperties> CreateDeviceProperties(::flatbuffers::FlatBufferBuilder &_fbb, const DevicePropertiesT *_o, const ::flatbuffers::rehasher_function_t *_rehasher = nullptr);
@@ -124,7 +155,8 @@ inline bool operator==(const DevicePropertiesT &lhs, const DevicePropertiesT &rh
   return
       (lhs.device_id == rhs.device_id) &&
       (lhs.multi_processor_count == rhs.multi_processor_count) &&
-      (lhs.total_global_mem == rhs.total_global_mem);
+      (lhs.total_global_mem == rhs.total_global_mem) &&
+      (lhs.architecture_name == rhs.architecture_name);
 }
 
 inline bool operator!=(const DevicePropertiesT &lhs, const DevicePropertiesT &rhs) {
@@ -144,6 +176,7 @@ inline void DeviceProperties::UnPackTo(DevicePropertiesT *_o, const ::flatbuffer
   { auto _e = device_id(); _o->device_id = _e; }
   { auto _e = multi_processor_count(); _o->multi_processor_count = _e; }
   { auto _e = total_global_mem(); _o->total_global_mem = _e; }
+  { auto _e = architecture_name(); if (_e) _o->architecture_name = _e->str(); }
 }
 
 inline ::flatbuffers::Offset<DeviceProperties> DeviceProperties::Pack(::flatbuffers::FlatBufferBuilder &_fbb, const DevicePropertiesT* _o, const ::flatbuffers::rehasher_function_t *_rehasher) {
@@ -157,11 +190,13 @@ inline ::flatbuffers::Offset<DeviceProperties> CreateDeviceProperties(::flatbuff
   auto _device_id = _o->device_id;
   auto _multi_processor_count = _o->multi_processor_count;
   auto _total_global_mem = _o->total_global_mem;
+  auto _architecture_name = _o->architecture_name.empty() ? 0 : _fbb.CreateString(_o->architecture_name);
   return hipdnn_data_sdk::data_objects::CreateDeviceProperties(
       _fbb,
       _device_id,
       _multi_processor_count,
-      _total_global_mem);
+      _total_global_mem,
+      _architecture_name);
 }
 
 inline const hipdnn_data_sdk::data_objects::DeviceProperties *GetDeviceProperties(const void *buf) {

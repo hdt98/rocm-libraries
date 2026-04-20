@@ -14,9 +14,10 @@
 #include "utilities/EngineOrdering.hpp"
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
-#include <hipdnn_data_sdk/utilities/EngineOrdering.hpp>
 
 #include <gtest/gtest.h>
+
+#include <algorithm>
 
 using namespace hipdnn_backend;
 using namespace hipdnn_data_sdk::utilities;
@@ -61,7 +62,7 @@ TEST_F(TestStaticOrderingPolicy, MIOpenEngineHasHighestPriority)
     };
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     // MIOpen should be first
     EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
@@ -76,7 +77,7 @@ TEST_F(TestStaticOrderingPolicy, MIOpenDeterministicHasLowestPriority)
     };
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     // MIOpenDeterministic should be last
     EXPECT_EQ(sorted.back(), engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"));
@@ -92,7 +93,7 @@ TEST_F(TestStaticOrderingPolicy, OtherEnginesAreMiddlePriority)
     };
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     // Order should be: MIOpen, CustomEngine1, CustomEngine2, MIOpenDeterministic
     EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
@@ -113,7 +114,7 @@ TEST_F(TestStaticOrderingPolicy, StableWithinSamePriority)
     };
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     // Should preserve order
     EXPECT_EQ(sorted[0], engines[0]);
@@ -124,7 +125,7 @@ TEST_F(TestStaticOrderingPolicy, StableWithinSamePriority)
 TEST_F(TestStaticOrderingPolicy, EmptyListRemainsEmpty)
 {
     std::vector<int64_t> engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(engines);
+    utilities::sortEngineIds(engines);
 
     EXPECT_TRUE(engines.empty());
 }
@@ -134,16 +135,16 @@ TEST_F(TestStaticOrderingPolicy, SingleEngineUnchanged)
     const std::vector<int64_t> engines = {engineNameToId("MIOPEN_ENGINE")};
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     EXPECT_EQ(sorted, engines);
 }
 
 // ========== Consistency Tests ==========
 
-TEST_F(TestStaticOrderingPolicy, BackendAndDataSdkSortingMatch)
+TEST_F(TestStaticOrderingPolicy, BackendSortingIsIdempotent)
 {
-    // Verify that backend utilities::sortEngineIds delegates to data_sdk
+    // Verify that backend utilities::sortEngineIds is idempotent
     const std::vector<int64_t> engines = {
         engineNameToId("MIOPEN_ENGINE_DETERMINISTIC"),
         engineNameToId("CustomEngine"),
@@ -153,10 +154,10 @@ TEST_F(TestStaticOrderingPolicy, BackendAndDataSdkSortingMatch)
     std::vector<int64_t> backendSorted = engines;
     utilities::sortEngineIds(backendSorted);
 
-    std::vector<int64_t> dataSdkSorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(dataSdkSorted);
+    std::vector<int64_t> sortedAgain = backendSorted;
+    utilities::sortEngineIds(sortedAgain);
 
-    EXPECT_EQ(backendSorted, dataSdkSorted) << "Backend and data_sdk sorting should match";
+    EXPECT_EQ(backendSorted, sortedAgain);
 }
 
 // ========== Policy-Specific Tests ==========
@@ -170,17 +171,11 @@ TEST_F(TestStaticOrderingPolicy, PolicyNeverDeclines)
     auto policyInfos = heurRm->getHeuristicPolicyInfos();
 
     // Find StaticOrdering
-    bool found = false;
-    for(const auto& info : policyInfos)
-    {
-        if(info.policyName.find("StaticOrdering") != std::string::npos)
-        {
-            found = true;
-            break;
-        }
-    }
+    const bool found = std::any_of(policyInfos.begin(), policyInfos.end(), [](const auto& info) {
+        return info.policyName.find("StaticOrdering") != std::string::npos;
+    });
 
-    EXPECT_TRUE(found) << "StaticOrdering policy should be loaded";
+    EXPECT_TRUE(found);
 
     // The policy's design guarantees it never declines
     // This is enforced by always returning `applied = 1` from finalize()
@@ -214,7 +209,7 @@ TEST_F(TestStaticOrderingPolicy, ComplexMixedEngineList)
     };
 
     std::vector<int64_t> sorted = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted);
+    utilities::sortEngineIds(sorted);
 
     // First should be MIOpen
     EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
@@ -240,12 +235,12 @@ TEST_F(TestStaticOrderingPolicy, SortingIsIdempotent)
     };
 
     std::vector<int64_t> sorted1 = engines;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted1);
+    utilities::sortEngineIds(sorted1);
 
     std::vector<int64_t> sorted2 = sorted1;
-    hipdnn_data_sdk::utilities::sortEngineIds(sorted2);
+    utilities::sortEngineIds(sorted2);
 
-    EXPECT_EQ(sorted1, sorted2) << "Sorting should be idempotent";
+    EXPECT_EQ(sorted1, sorted2);
 }
 
 // ========== Negative Tests ==========
@@ -262,7 +257,7 @@ TEST_F(TestStaticOrderingPolicy, UnknownEngineIdsHandledGracefully)
     std::vector<int64_t> sorted = engines;
 
     // Should not crash
-    EXPECT_NO_THROW(hipdnn_data_sdk::utilities::sortEngineIds(sorted));
+    EXPECT_NO_THROW(utilities::sortEngineIds(sorted));
 
     // MIOpen should still be first
     EXPECT_EQ(sorted[0], engineNameToId("MIOPEN_ENGINE"));
