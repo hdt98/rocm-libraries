@@ -113,10 +113,13 @@ def config_path(build_dir: Path) -> Path:
     return build_dir / CONFIG_FILENAME
 
 
-def save_config(build_dir: Path, gpu: str, components: list[str]) -> None:
+def save_config(build_dir: Path, gpu: str, components: list[str],
+                therock_dir: Path = None) -> None:
     """Save current settings to the build directory for later commands."""
     build_dir.mkdir(parents=True, exist_ok=True)
     data = {"gpu": gpu, "components": components}
+    if therock_dir is not None:
+        data["therock_dir"] = str(therock_dir)
     config_path(build_dir).write_text(json.dumps(data, indent=2))
 
 
@@ -233,6 +236,30 @@ def get_msvc_env() -> dict:
     path = env.get("Path", env.get("PATH", ""))
     if not path.startswith(".;"):
         env["Path"] = ".;" + path
+
+    return env
+
+
+def get_build_env(therock_dir: Path) -> dict:
+    """Build an environment dict for cmake/ninja with MSVC and venv Python.
+
+    Ensures the TheRock venv's Python (which has pyyaml and other deps from
+    requirements.txt) is on PATH so cmake's find_package(Python3) finds it
+    instead of the system Python.
+    """
+    env = get_msvc_env()
+    if env is None:
+        env = dict(os.environ)
+
+    venv_dir = therock_dir / ".venv"
+    if sys.platform == "win32":
+        venv_bin = str(venv_dir / "Scripts")
+    else:
+        venv_bin = str(venv_dir / "bin")
+
+    path = env.get("Path", env.get("PATH", ""))
+    if venv_bin not in path:
+        env["Path"] = venv_bin + ";" + path
 
     return env
 
@@ -411,7 +438,7 @@ def do_configure(args: argparse.Namespace) -> None:
     components = args.components if args.components else list(ALL_COMPONENTS)
 
     python = setup_python(therock_dir)
-    msvc_env = get_msvc_env()
+    build_env = get_build_env(therock_dir)
 
     print("==========================================")
     print("Configuring TheRock build")
@@ -428,7 +455,7 @@ def do_configure(args: argparse.Namespace) -> None:
     remove_prebuilt_markers(build_dir, components)
 
     # Save config
-    save_config(build_dir, gpu, components)
+    save_config(build_dir, gpu, components, therock_dir)
 
     # Build cmake args
     cmake_args = [
@@ -444,7 +471,7 @@ def do_configure(args: argparse.Namespace) -> None:
         cmake_args.append(f"-DTHEROCK_ENABLE_{flag}=ON")
 
     print("Running cmake...")
-    run_cmd(cmake_args, cwd=therock_dir, env=msvc_env)
+    run_cmd(cmake_args, cwd=therock_dir, env=build_env)
 
     print()
     print("==========================================")
@@ -459,12 +486,14 @@ def do_build(args: argparse.Namespace) -> None:
     """Build configured components with ninja."""
     build_dir = args.build_dir
     components = args.components
-    msvc_env = get_msvc_env()
 
     # Load saved config if no components specified
+    cfg = load_config(build_dir)
     if not components:
-        cfg = load_config(build_dir)
         components = cfg.get("components", [])
+
+    therock_dir = args.therock_dir or (Path(cfg["therock_dir"]) if "therock_dir" in cfg else None)
+    build_env = get_build_env(therock_dir) if therock_dir else get_msvc_env()
 
     if not components:
         print("ERROR: No components specified and no saved config found.")
@@ -484,7 +513,7 @@ def do_build(args: argparse.Namespace) -> None:
     ninja_cmd = ["ninja", "-C", str(build_dir)]
     if args.jobs:
         ninja_cmd.extend(["-j", str(args.jobs)])
-    run_cmd(ninja_cmd + targets, env=msvc_env)
+    run_cmd(ninja_cmd + targets, env=build_env)
 
     print()
     print("Build complete!")
@@ -495,12 +524,14 @@ def do_rebuild(args: argparse.Namespace) -> None:
     """Expunge and rebuild components."""
     build_dir = args.build_dir
     components = args.components
-    msvc_env = get_msvc_env()
 
     # Load saved config if no components specified
+    cfg = load_config(build_dir)
     if not components:
-        cfg = load_config(build_dir)
         components = cfg.get("components", [])
+
+    therock_dir = args.therock_dir or (Path(cfg["therock_dir"]) if "therock_dir" in cfg else None)
+    build_env = get_build_env(therock_dir) if therock_dir else get_msvc_env()
 
     if not components:
         print("ERROR: No components specified and no saved config found.")
@@ -523,11 +554,11 @@ def do_rebuild(args: argparse.Namespace) -> None:
         ninja_cmd.extend(["-j", str(args.jobs)])
 
     print(f"Expunging: {' '.join(expunge_targets)}")
-    run_cmd(ninja_cmd + expunge_targets, env=msvc_env)
+    run_cmd(ninja_cmd + expunge_targets, env=build_env)
 
     print()
     print(f"Building: {' '.join(targets)}")
-    run_cmd(ninja_cmd + targets, env=msvc_env)
+    run_cmd(ninja_cmd + targets, env=build_env)
 
     print()
     print("Rebuild complete!")
