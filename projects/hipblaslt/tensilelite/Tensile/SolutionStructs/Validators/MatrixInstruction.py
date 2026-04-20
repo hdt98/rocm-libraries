@@ -200,13 +200,15 @@ def validateMIParameters(
         else ptype["F32XdlMathOp"]
     )
 
-    if not solution.get("EnableF32XdlMathOp", False):
-      # For MFMA validation, use MacDataTypeA + MacDataTypeB combination as key
-      macDataTypeA = ptype.get("MacDataTypeA", miDataType)
-      macDataTypeB = ptype.get("MacDataTypeB", miDataType)
-      miDataTypeKey = macDataTypeA.toChar() + macDataTypeB.toChar()
+    # For MFMA validation, determine the key based on MAC data types
+    macDataTypeA = ptype.get("MacDataTypeA", miDataType)
+    macDataTypeB = ptype.get("MacDataTypeB", miDataType)
+
+    # If both MAC types are the same, use single character key; otherwise use combined key
+    if macDataTypeA == macDataTypeB:
+      miDataTypeKey = macDataTypeA.toChar()
     else:
-      miDataTypeKey = miDataType.toChar() + miDataType.toChar()
+      miDataTypeKey = macDataTypeA.toChar() + macDataTypeB.toChar()
 
     mi4 = solution[MI_KEY]
     miEnabled = solution[MI_ENABLED_KEY]
