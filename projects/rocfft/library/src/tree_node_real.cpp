@@ -1,4 +1,4 @@
-// Copyright (C) 2021 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2021 - 2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -958,6 +958,37 @@ void Real2DEvenNode::AssignParams_internal_TR_pair()
 void Real3DEvenNode::BuildTree_internal(SchemeTreeVec& child_scheme_trees)
 {
     Build_solution();
+
+    // The solution map's tuned tree may not match the decomposition
+    // Build_solution picks for these strides (e.g. a REAL_2D_SINGLE_SBCC
+    // entry reused with non-unit strides that force INPLACE_SBCC). In
+    // that case drop the tuned tree and fall back to the default build;
+    // ProcessNode's SanityCheck already handles the resulting kernel
+    // mismatch by retrying without solution kernels.
+    if(!child_scheme_trees.empty())
+    {
+        size_t expectedChildren = 0;
+        switch(solution)
+        {
+        case REAL_2D_SINGLE_SBCC:
+            // BuildTree_internal_2D_SINGLE_CC doesn't consume the tuned
+            // tree at all, so any size here is fine to drop.
+            expectedChildren = 2;
+            break;
+        case INPLACE_SBCC:
+        case SBCR:
+            expectedChildren = 3;
+            break;
+        case TR_PAIRS:
+            expectedChildren = 6;
+            break;
+        default:
+            break;
+        }
+
+        if(child_scheme_trees.size() != expectedChildren)
+            child_scheme_trees.clear();
+    }
 
     switch(solution)
     {
