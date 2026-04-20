@@ -1,0 +1,206 @@
+# Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+#
+# Lightweight CI for hipDNN + providers using the rocm-libraries superbuild
+# and pre-built ROCm wheels (no TheRock source build required).
+
+name: hipDNN Superbuild CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    paths:
+      - 'projects/hipdnn/**'
+      - 'dnn-providers/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  # Labels that trigger this workflow. Extend this list to gate on additional labels.
+  TRIGGER_LABELS: '["project: hipdnn"]'
+
+jobs:
+  gate:
+    name: Check Labels
+    runs-on: ubuntu-24.04
+    outputs:
+      should_run: ${{ steps.check.outputs.should_run }}
+    steps:
+      - name: Evaluate PR labels
+        id: check
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          echo "PR labels: $PR_LABELS"
+
+          # Skip if skip-therockci label is present
+          if echo "$PR_LABELS" | jq -e '. | index("skip-therockci")' > /dev/null 2>&1; then
+            echo "skip-therockci label detected — skipping"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Check if any trigger label is present
+          TRIGGER='${{ env.TRIGGER_LABELS }}'
+          MATCH=$(echo "$PR_LABELS" | jq -e --argjson trigger "$TRIGGER" \
+            '[.[] | select(. as $l | $trigger | index($l))] | length > 0')
+
+          if [ "$MATCH" = "true" ]; then
+            echo "Trigger label found"
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No trigger label found"
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows:
+    name: Windows Superbuild
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
+    runs-on: azure-windows-scale-rocm
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: B:\build
+      VENV_PATH: B:\rocm_wheels
+      GPU_TARGET: gfx1151
+    steps:
+      - name: Configure git longpaths
+        run: git config --global core.longpaths true
+
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Configure MSVC
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+
+      - name: Install build tools
+        run: |
+          choco source disable -n=chocolatey
+          choco source add -n=internal -s http://10.0.167.96:8081/repository/choco-group/ --priority=1
+          choco install --no-progress -y ccache
+          choco install --no-progress -y ninja --version 1.12.1
+
+      - name: Install ROCm wheels
+        shell: pwsh
+        run: |
+          Write-Host "Creating Python virtual environment at $env:VENV_PATH"
+          python -m venv $env:VENV_PATH
+          & "$env:VENV_PATH\Scripts\Activate.ps1"
+
+          Write-Host "Installing ROCm wheels from nightlies (target: $env:GPU_TARGET)"
+          pip install --index-url "https://rocm.nightlies.amd.com/v2/$env:GPU_TARGET/" "rocm[libraries,devel]"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to install ROCm wheels" }
+
+          Write-Host "Initializing ROCm SDK"
+          rocm-sdk init
+          if ($LASTEXITCODE -ne 0) { throw "Failed to initialize ROCm SDK" }
+
+          $RocmSdkPath = "$env:VENV_PATH\Lib\site-packages\_rocm_sdk_devel" -replace '\\', '/'
+          Write-Host "ROCM_SDK_PATH=$RocmSdkPath"
+          echo "ROCM_SDK_PATH=$RocmSdkPath" >> $env:GITHUB_ENV
+
+      - name: Configure superbuild
+        run: |
+          cmake --preset hipdnn-providers \
+            -DCMAKE_HIP_COMPILER_ROCM_ROOT="$ROCM_SDK_PATH" \
+            -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
+            -DGPU_TARGETS="$GPU_TARGET"
+
+      - name: Build
+        run: cmake --build build
+
+      # TODO: Enable unit tests when ready (no GPU required for unit tests)
+      # - name: Run unit tests
+      #   run: |
+      #     cmake --build build --target hipdnn-unit-check
+      #     cmake --build build --target miopen-provider-unit-check
+      #     cmake --build build --target hipblaslt-provider-unit-check
+
+  build-linux:
+    name: Linux Superbuild
+    needs: gate
+    if: needs.gate.outputs.should_run == 'true'
+    runs-on: ubuntu-24.04
+    env:
+      VENV_PATH: ${{ github.workspace }}/rocm_wheels
+      GPU_TARGET: gfx942-all
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+
+      - name: Install ROCm wheels
+        run: |
+          echo "Creating Python virtual environment at $VENV_PATH"
+          python -m venv "$VENV_PATH"
+          source "$VENV_PATH/bin/activate"
+
+          echo "Installing ROCm wheels from nightlies (target: $GPU_TARGET)"
+          pip install --index-url "https://rocm.nightlies.amd.com/v2/$GPU_TARGET/" "rocm[libraries,devel]"
+
+          echo "Initializing ROCm SDK"
+          rocm-sdk init
+
+          SITE_PACKAGES=$("$VENV_PATH/bin/python" -c "import site; print(site.getsitepackages()[0])")
+          ROCM_SDK_PATH="$SITE_PACKAGES/_rocm_sdk_devel"
+          echo "ROCM_SDK_PATH=$ROCM_SDK_PATH"
+          echo "ROCM_SDK_PATH=$ROCM_SDK_PATH" >> "$GITHUB_ENV"
+
+      - name: Configure superbuild
+        run: |
+          cmake --preset hipdnn-providers \
+            -DCMAKE_HIP_COMPILER_ROCM_ROOT="$ROCM_SDK_PATH" \
+            -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
+            -DGPU_TARGETS="$GPU_TARGET"
+
+      - name: Build
+        run: cmake --build build
+
+      # TODO: Enable unit tests when ready (no GPU required for unit tests)
+      # - name: Run unit tests
+      #   run: |
+      #     cmake --build build --target hipdnn-unit-check
+      #     cmake --build build --target miopen-provider-unit-check
+      #     cmake --build build --target hipblaslt-provider-unit-check
+
+  summary:
+    name: hipDNN Superbuild Summary
+    if: always()
+    needs:
+      - gate
+      - build-windows
+      - build-linux
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report results
+        run: |
+          echo '${{ toJson(needs) }}'
+          FAILED_JOBS="$(echo '${{ toJson(needs) }}' \
+            | jq --raw-output \
+            'map_values(select(.result!="success" and .result!="skipped")) | keys | join(",")' \
+          )"
+          if [[ "${FAILED_JOBS}" != "" ]]; then
+            echo "Failed jobs: ${FAILED_JOBS}"
+            exit 1
+          fi
