@@ -501,7 +501,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         // -------------------
         // terminate recursion
         // -------------------
-        bool use_iinfo = false;
+        bool const use_iinfo = false;
         auto const istat = rocsolver_potrf_template_body<BATCHED, STRIDED, T, I, INFO, S, U>(
             handle, uplo, n,
 
@@ -511,7 +511,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
             scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
 
-            row_offset_in, use_iinfo = false);
+            row_offset_in, use_iinfo);
 
         return istat;
     }
@@ -790,7 +790,6 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     }
 
     bool const use_recursion_potrf = use_recursion<T>(uplo, n);
-    bool const use_iinfo = !use_recursion_potrf;
 
     // everything must be executed with scalars on the host
     rocblas_pointer_mode old_mode;
