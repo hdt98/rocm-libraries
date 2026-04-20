@@ -394,13 +394,10 @@ namespace
             return rocisa::DataType::BFloat6;
         case HIP_R_4F_E2M1_EXT:
             return rocisa::DataType::Float4;
-<<<<<<< HEAD
         case HIP_C_32F:
             return rocisa::DataType::ComplexFloat;
         case HIP_C_64F:
             return rocisa::DataType::ComplexDouble;
-=======
->>>>>>> origin/develop
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -437,13 +434,10 @@ namespace
             return static_cast<hipDataType>(HIP_R_6F_E3M2_EXT);
         case rocisa::DataType::Float4:
             return static_cast<hipDataType>(HIP_R_4F_E2M1_EXT);
-<<<<<<< HEAD
         case rocisa::DataType::ComplexFloat:
             return HIP_C_32F;
         case rocisa::DataType::ComplexDouble:
             return HIP_C_64F;
-=======
->>>>>>> origin/develop
         default:
             throw std::runtime_error("Unsupported type.");
         }
@@ -483,8 +477,6 @@ namespace
         roc2TensileComputeInputTypeA(const rocisa::DataType&       typeA,
                                      const rocisa::DataType&       typeB,
                                      const rocblaslt_compute_type& typeCompute)
-<<<<<<< HEAD
-=======
     {
         switch(typeCompute)
         {
@@ -505,51 +497,6 @@ namespace
         case rocblaslt_compute_f32_fast_bf8:
             return rocisa::DataType::BFloat8;
         case rocblaslt_compute_f32_fast_f8bf8:
-            return rocisa::DataType::Float8;
-        case rocblaslt_compute_f32_fast_bf8f8:
-            return rocisa::DataType::BFloat8;
-        default:;
-        }
-
-        if(typeA == rocisa::DataType::Float8 || typeA == rocisa::DataType::BFloat8 || typeA == rocisa::DataType::Float8_fnuz || typeA == rocisa::DataType::BFloat8_fnuz || typeA == rocisa::DataType::Float6 || typeA == rocisa::DataType::BFloat6 || typeA == rocisa::DataType::Float4) return typeA;
-        return TensileLite::DataTypeInfo::Get(typeA).elementSize
-                       <= TensileLite::DataTypeInfo::Get(typeB).elementSize
-                   ? typeA
-                   : typeB;
-    }
-
-    inline const rocisa::DataType
-        roc2TensileComputeInputTypeB(const rocisa::DataType&  typeA,
-                                    const rocisa::DataType&  typeB,
-                                    const rocblaslt_compute_type& typeCompute)
->>>>>>> origin/develop
-    {
-        switch(typeCompute)
-        {
-        case rocblaslt_compute_f32_fast_f16:
-            return rocisa::DataType::Half;
-        case rocblaslt_compute_f32_fast_bf16:
-            return rocisa::DataType::BFloat16;
-        case rocblaslt_compute_f32_fast_f8_fnuz:
-            return rocisa::DataType::Float8_fnuz;
-        case rocblaslt_compute_f32_fast_bf8_fnuz:
-            return rocisa::DataType::BFloat8_fnuz;
-        case rocblaslt_compute_f32_fast_f8bf8_fnuz:
-<<<<<<< HEAD
-            return rocisa::DataType::Float8_fnuz;
-        case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-            return rocisa::DataType::BFloat8_fnuz;
-=======
-            return rocisa::DataType::BFloat8_fnuz;
-        case rocblaslt_compute_f32_fast_bf8f8_fnuz:
-            return rocisa::DataType::Float8_fnuz;
->>>>>>> origin/develop
-        case rocblaslt_compute_f32_fast_f8:
-            return rocisa::DataType::Float8;
-        case rocblaslt_compute_f32_fast_bf8:
-            return rocisa::DataType::BFloat8;
-        case rocblaslt_compute_f32_fast_f8bf8:
-<<<<<<< HEAD
             return rocisa::DataType::Float8;
         case rocblaslt_compute_f32_fast_bf8f8:
             return rocisa::DataType::BFloat8;
@@ -573,6 +520,9 @@ namespace
         {
             return rocisa::DataType::BFloat8;
         }
+
+        if(typeA == rocisa::DataType::Float8 || typeA == rocisa::DataType::BFloat8 || typeA == rocisa::DataType::Float8_fnuz || typeA == rocisa::DataType::BFloat8_fnuz || typeA == rocisa::DataType::Float6 || typeA == rocisa::DataType::BFloat6 || typeA == rocisa::DataType::Float4) return typeA;
+        
 
         return TensileLite::DataTypeInfo::Get(typeA).elementSize
                        <= TensileLite::DataTypeInfo::Get(typeB).elementSize
@@ -628,15 +578,9 @@ namespace
             return rocisa::DataType::Float8;
         }
 
-=======
-            return rocisa::DataType::BFloat8;
-        case rocblaslt_compute_f32_fast_bf8f8:
-            return rocisa::DataType::Float8;
-        default:;
-        }
-
         if(typeB == rocisa::DataType::Float8 || typeB == rocisa::DataType::BFloat8 || typeB == rocisa::DataType::Float8_fnuz || typeB == rocisa::DataType::BFloat8_fnuz ||typeB == rocisa::DataType::Float6 || typeB == rocisa::DataType::BFloat6 || typeB == rocisa::DataType::Float4) return typeB;
->>>>>>> origin/develop
+        
+
         return TensileLite::DataTypeInfo::Get(typeA).elementSize
                        <= TensileLite::DataTypeInfo::Get(typeB).elementSize
                    ? typeA
