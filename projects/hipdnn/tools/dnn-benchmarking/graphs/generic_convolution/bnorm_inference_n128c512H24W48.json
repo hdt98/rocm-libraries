@@ -1,0 +1,133 @@
+{
+    "compute_data_type": "float",
+    "io_data_type": "bfloat16",
+    "intermediate_data_type": "float",
+    "tensors": [
+        {
+            "uid": 1,
+            "name": "input_x",
+            "dims": [
+                128,
+                512,
+                24,
+                48
+            ],
+            "strides": [
+                589824,
+                1,
+                24576,
+                512
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 2,
+            "name": "mean",
+            "dims": [
+                1,
+                512,
+                1,
+                1
+            ],
+            "strides": [
+                512,
+                1,
+                1,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 3,
+            "name": "inv_variance",
+            "dims": [
+                1,
+                512,
+                1,
+                1
+            ],
+            "strides": [
+                512,
+                1,
+                1,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 4,
+            "name": "scale",
+            "dims": [
+                1,
+                512,
+                1,
+                1
+            ],
+            "strides": [
+                512,
+                1,
+                1,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 5,
+            "name": "bias",
+            "dims": [
+                1,
+                512,
+                1,
+                1
+            ],
+            "strides": [
+                512,
+                1,
+                1,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 6,
+            "name": "output_y",
+            "dims": [
+                128,
+                512,
+                24,
+                48
+            ],
+            "strides": [
+                589824,
+                1,
+                24576,
+                512
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        }
+    ],
+    "nodes": [
+        {
+            "name": "batchnorm_inference_node",
+            "type": "BatchnormInferenceAttributes",
+            "compute_data_type": "float",
+            "inputs": {
+                "x_tensor_uid": 1,
+                "mean_tensor_uid": 2,
+                "inv_variance_tensor_uid": 3,
+                "scale_tensor_uid": 4,
+                "bias_tensor_uid": 5
+            },
+            "outputs": {
+                "y_tensor_uid": 6
+            }
+        }
+    ],
+    "name": "fremont_shapes_bnorm_inference_n128c512H24W48"
+}

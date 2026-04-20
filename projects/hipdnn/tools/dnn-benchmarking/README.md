@@ -19,6 +19,21 @@ This tool loads serialized hipDNN graphs, executes them via the MIOpen plugin, a
 
 ## Installation
 
+### Quick Setup (ROCm/AMD GPUs)
+
+Run the provided setup script from the `dnn-benchmarking` directory:
+
+```bash
+bash setup.sh
+source .venv/bin/activate
+```
+
+This script handles everything automatically:
+1. Creates a `.venv` virtual environment
+2. Installs ROCm-compatible dependencies (`requirements-rocm.txt`) and the package with dev extras
+3. Builds hipDNN (if `build/lib/cmake/hipdnn_frontend/hipdnn_frontendConfig.cmake` is not found)
+4. Installs the hipDNN Python bindings from the hipDNN source tree
+
 ### For ROCm/AMD GPUs (hipDNN benchmarking)
 
 ```bash

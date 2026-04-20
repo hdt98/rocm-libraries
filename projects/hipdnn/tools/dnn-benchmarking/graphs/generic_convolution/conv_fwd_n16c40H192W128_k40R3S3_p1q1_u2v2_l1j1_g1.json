@@ -1,0 +1,95 @@
+{
+    "compute_data_type": "float",
+    "io_data_type": "bfloat16",
+    "intermediate_data_type": "float",
+    "tensors": [
+        {
+            "uid": 0,
+            "name": "output_y",
+            "dims": [
+                16,
+                40,
+                96,
+                64
+            ],
+            "strides": [
+                245760,
+                1,
+                2560,
+                40
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 1,
+            "name": "input_x",
+            "dims": [
+                16,
+                40,
+                192,
+                128
+            ],
+            "strides": [
+                983040,
+                1,
+                5120,
+                40
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 2,
+            "name": "weight_w",
+            "dims": [
+                40,
+                40,
+                3,
+                3
+            ],
+            "strides": [
+                360,
+                9,
+                3,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        }
+    ],
+    "nodes": [
+        {
+            "name": "conv_node",
+            "type": "ConvolutionFwdAttributes",
+            "compute_data_type": "unset",
+            "inputs": {
+                "x_tensor_uid": 1,
+                "w_tensor_uid": 2
+            },
+            "outputs": {
+                "y_tensor_uid": 0
+            },
+            "parameters": {
+                "conv_mode": "CROSS_CORRELATION",
+                "pre_padding": [
+                    1,
+                    1
+                ],
+                "post_padding": [
+                    1,
+                    1
+                ],
+                "stride": [
+                    2,
+                    2
+                ],
+                "dilation": [
+                    1,
+                    1
+                ]
+            }
+        }
+    ],
+    "name": "fremont_shapes_conv_fwd_n16c40H192W128_k40R3S3_p1q1_u2v2_l1j1_g1"
+}

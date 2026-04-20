@@ -1,0 +1,95 @@
+{
+    "compute_data_type": "float",
+    "io_data_type": "bfloat16",
+    "intermediate_data_type": "float",
+    "tensors": [
+        {
+            "uid": 0,
+            "name": "output_dx",
+            "dims": [
+                128,
+                384,
+                48,
+                32
+            ],
+            "strides": [
+                589824,
+                1,
+                12288,
+                384
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 1,
+            "name": "input_dy",
+            "dims": [
+                128,
+                384,
+                48,
+                32
+            ],
+            "strides": [
+                589824,
+                1,
+                12288,
+                384
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        },
+        {
+            "uid": 2,
+            "name": "weight_w",
+            "dims": [
+                384,
+                64,
+                3,
+                3
+            ],
+            "strides": [
+                576,
+                9,
+                3,
+                1
+            ],
+            "data_type": "bfloat16",
+            "virtual": false
+        }
+    ],
+    "nodes": [
+        {
+            "name": "conv_node",
+            "type": "ConvolutionDgradAttributes",
+            "compute_data_type": "unset",
+            "inputs": {
+                "dy_tensor_uid": 1,
+                "w_tensor_uid": 2
+            },
+            "outputs": {
+                "dx_tensor_uid": 0
+            },
+            "parameters": {
+                "conv_mode": "CROSS_CORRELATION",
+                "pre_padding": [
+                    1,
+                    1
+                ],
+                "post_padding": [
+                    1,
+                    1
+                ],
+                "stride": [
+                    1,
+                    1
+                ],
+                "dilation": [
+                    1,
+                    1
+                ]
+            }
+        }
+    ],
+    "name": "fremont_shapes_conv_dgrad_n128c384H48W32_k384R3S3_p1q1_u1v1_l1j1_g6"
+}
