@@ -1756,28 +1756,6 @@ namespace
         tensileProblem.setParams().setBiasEnum(
             tensileUseBias(prob.epilogue) ? biasType : rocisa::DataType::None);
 
-<<<<<<< HEAD
-	// NOTE: for MX data types, Tensile sets useScaleAB field in yaml to be empty.
-	if((prob.scaleA == nullptr && prob.scaleB == nullptr) or
-		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
-		prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT)
-	{
-	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
-	    assert( prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 or
-		    prob.scaleBType == RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
-	    tensileProblem.setUseScaleAB("");
-	}
-	else
-	{
-	    // Currently A & B must both be MX data types or non-MX data types. Mixing is not supported.
-	    assert( prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0 and
-		    prob.scaleBType != RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT);
-	    tensileProblem.setUseScaleAB(
-		    (prob.scaleAType == RocblasltContractionProblem::ScalingFormat::Vector)
-			? "Vector"
-			: "Scalar");
-	}
-=======
         switch(prob.scaleAType)
         {
         case RocblasltContractionProblem::ScalingFormat::None:
@@ -1785,6 +1763,8 @@ namespace
         case RocblasltContractionProblem::ScalingFormat::Vector:
             break;
         case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT:
+	    // Block_32_UE8M0_32_8_EXT (commit fe9a04d) is pre-swizzled scale data in `32x8` tile
             tensileProblem.setMXScaleA(rocisa::DataType::E8, 32);
             break;
         case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
@@ -1811,6 +1791,8 @@ namespace
         case RocblasltContractionProblem::ScalingFormat::Vector:
             break;
         case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+        case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT:
+	    // Block_32_UE8M0_32_8_EXT (commit fe9a04d) is pre-swizzled scale data in `32x8` tile
             tensileProblem.setMXScaleB(rocisa::DataType::E8, 32);
             break;
         case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
@@ -1840,7 +1822,6 @@ namespace
             tensileProblem.setUseScaleAB("Scalar");
         else
             tensileProblem.setUseScaleAB("");
->>>>>>> origin/develop
 
         tensileProblem.setUseScaleCD(prob.scaleC != nullptr || prob.scaleD != nullptr);
         tensileProblem.setUseScaleAlphaVec(prob.scaleAlphaVec != nullptr);
