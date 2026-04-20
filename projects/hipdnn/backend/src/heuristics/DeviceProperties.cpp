@@ -45,12 +45,15 @@ DeviceProperties queryDeviceProperties()
 
     out.multiProcessorCount = hipProps.multiProcessorCount;
     out.totalGlobalMem = hipProps.totalGlobalMem;
+    out.architectureName = hipProps.gcnArchName;
 
     HIPDNN_BACKEND_LOG_DEBUG(
-        "Queried device properties: deviceId={}, multiProcessorCount={}, totalGlobalMem={} bytes",
+        "Queried device properties: deviceId={}, multiProcessorCount={}, totalGlobalMem={} bytes, "
+        "architectureName={}",
         out.deviceId,
         out.multiProcessorCount,
-        out.totalGlobalMem);
+        out.totalGlobalMem,
+        out.architectureName);
 
     return out;
 }
@@ -59,9 +62,16 @@ std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& props)
 {
     flatbuffers::FlatBufferBuilder builder(256);
 
+    // Create architecture name string
+    auto archNameOffset = builder.CreateString(props.architectureName);
+
     // Build the DeviceProperties table
     auto devicePropsOffset = hipdnn_data_sdk::data_objects::CreateDeviceProperties(
-        builder, props.deviceId, props.multiProcessorCount, props.totalGlobalMem);
+        builder,
+        props.deviceId,
+        props.multiProcessorCount,
+        props.totalGlobalMem,
+        archNameOffset);
 
     builder.Finish(devicePropsOffset, "HDDP"); // File identifier for versioning
 
@@ -99,6 +109,10 @@ DeviceProperties deserializeDeviceProperties(const uint8_t* buffer, size_t size)
     props.deviceId = devicePropsFB->device_id();
     props.multiProcessorCount = devicePropsFB->multi_processor_count();
     props.totalGlobalMem = devicePropsFB->total_global_mem();
+    if(devicePropsFB->architecture_name() != nullptr)
+    {
+        props.architectureName = devicePropsFB->architecture_name()->str();
+    }
 
     return props;
 }

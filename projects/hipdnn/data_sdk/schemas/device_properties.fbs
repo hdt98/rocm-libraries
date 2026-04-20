@@ -23,8 +23,10 @@ table DeviceProperties {
     /// Total global memory in bytes
     total_global_mem: ulong = 0;
 
+    /// GPU architecture name (e.g., "gfx90a", "gfx942")
+    architecture_name: string;
+
     // Future optional fields (additive evolution):
-    // architecture_name: string;
     // wavefront_size: int;
     // max_threads_per_block: int;
     // warp_size: int;

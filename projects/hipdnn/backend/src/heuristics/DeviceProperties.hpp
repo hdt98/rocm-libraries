@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <hipdnn_plugin_sdk/PluginApiDataTypes.h>
@@ -26,9 +27,9 @@ struct DeviceProperties
     int deviceId = -1; ///< Device ID from hipGetDevice
     int multiProcessorCount = 0; ///< Number of multiprocessors (compute units)
     size_t totalGlobalMem = 0; ///< Total global memory in bytes
+    std::string architectureName; ///< GPU architecture name (e.g., "gfx90a", "gfx942")
 
     // Future optional fields can be added here and to the FlatBuffer schema
-    // Example: std::string architectureName;
     // Example: int wavefrontSize = 0;
 };
 

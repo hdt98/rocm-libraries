@@ -208,6 +208,7 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnHandle)
     props.deviceId = 0;
     props.multiProcessorCount = 120;
     props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024; // 16 GB
+    props.architectureName = "gfx90a";
 
     // Serialize
     auto serialized = serializeDeviceProperties(props);
@@ -229,6 +230,7 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnAllHandles)
     props.deviceId = 0;
     props.multiProcessorCount = 120;
     props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
+    props.architectureName = "gfx90a";
 
     auto serialized = serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
@@ -258,6 +260,7 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     props.deviceId = 0;
     props.multiProcessorCount = 120;
     props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
+    props.architectureName = "gfx90a";
 
     auto serialized = serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
@@ -557,6 +560,7 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesWithNoPluginsLoaded)
     props.deviceId = 0;
     props.multiProcessorCount = 120;
     props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
+    props.architectureName = "gfx90a";
 
     auto serialized = heuristics::serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
