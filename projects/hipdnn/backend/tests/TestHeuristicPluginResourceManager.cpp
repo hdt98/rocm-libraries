@@ -303,3 +303,173 @@ TEST_F(TestHeuristicPluginResourceManager, MultipleDestructionsSucceed)
 
     SUCCEED();
 }
+
+// ========== Constructor Null Pointer Tests ==========
+
+TEST_F(TestHeuristicPluginResourceManager, ConstructorWithNullPluginManagerAccepted)
+{
+    // Null plugin manager is accepted during static destruction scenarios
+    // The constructor should not throw - it just skips initialization
+    EXPECT_NO_THROW({ auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr); });
+
+    // Verify the resource manager works with null manager
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(nullptr);
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(1), nullptr);
+    EXPECT_EQ(rm->getPluginForPolicyId(1), nullptr);
+}
+
+// ========== Policy Info Caching Tests ==========
+
+TEST_F(TestHeuristicPluginResourceManager, PolicyInfosAreCachedAcrossMultipleCalls)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    // Multiple calls should use cache
+    const auto infos1 = rm->getHeuristicPolicyInfos();
+    const auto infos2 = rm->getHeuristicPolicyInfos();
+    const auto infos3 = rm->getHeuristicPolicyInfos();
+
+    // All should return same result
+    EXPECT_EQ(infos1.size(), infos2.size());
+    EXPECT_EQ(infos2.size(), infos3.size());
+}
+
+// ========== ToString with Plugin Data Tests ==========
+
+TEST_F(TestHeuristicPluginResourceManager, ToStringFormatContainsKeyElements)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    const std::string str = rm->toString();
+
+    // Should contain the class name
+    EXPECT_NE(str.find("HeuristicPluginResourceManager"), std::string::npos);
+
+    // Should contain braces for structure
+    EXPECT_NE(str.find('{'), std::string::npos);
+    EXPECT_NE(str.find('}'), std::string::npos);
+}
+
+// ========== Additional Configuration Tests ==========
+
+TEST_F(TestHeuristicPluginResourceManager, SetPluginPathsWithEmptyVectorSucceeds)
+{
+    const std::vector<std::filesystem::path> emptyPaths;
+
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setHeuristicPluginPaths(
+        emptyPaths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+}
+
+TEST_F(TestHeuristicPluginResourceManager, SetPluginPathsWithAdditiveMode)
+{
+    const std::vector<std::filesystem::path> paths = {"/test/path1", "/test/path2"};
+
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setHeuristicPluginPaths(
+        paths, HIPDNN_PLUGIN_LOADING_ADDITIVE));
+}
+
+TEST_F(TestHeuristicPluginResourceManager, SetPluginLogLevelWithDebugLevel)
+{
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setPluginLogLevel(HIPDNN_SEV_INFO));
+}
+
+TEST_F(TestHeuristicPluginResourceManager, SetPluginLogLevelWithErrorLevel)
+{
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setPluginLogLevel(HIPDNN_SEV_ERROR));
+}
+
+// ========== GetLoadedPluginFiles Edge Cases ==========
+
+TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesWithNonNullPathsSucceeds)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    size_t numPlugins = 0;
+    std::array<char*, 10> paths{};
+
+    // Query with paths array (not yet implemented, should not crash)
+    EXPECT_NO_THROW(rm->getLoadedHeuristicPluginFiles(&numPlugins, paths.data(), nullptr));
+}
+
+TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesQueriesCountOnly)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    size_t numPlugins = 999; // Should be overwritten
+
+    rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, nullptr);
+
+    EXPECT_EQ(numPlugins, 0u); // No plugins loaded
+}
+
+// ========== Device Properties Error Handling ==========
+
+TEST_F(TestHeuristicPluginResourceManager, SetDevicePropertiesWithValidDataSucceeds)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    const std::array<uint8_t, 4> fakeData = {1, 2, 3, 4};
+    hipdnnPluginConstData_t deviceProps;
+    deviceProps.ptr = fakeData.data();
+    deviceProps.size = fakeData.size();
+
+    // Should not throw when plugins loaded or not
+    EXPECT_NO_THROW(rm->setDevicePropertiesOnAllHandles(&deviceProps));
+}
+
+// ========== Multiple Static Configuration Changes ==========
+
+TEST_F(TestHeuristicPluginResourceManager, MultipleUnloadingModeChangesSucceed)
+{
+    EXPECT_NO_THROW(
+        HeuristicPluginResourceManager::setPluginUnloadingMode(HIPDNN_PLUGIN_UNLOAD_LAZY));
+
+    EXPECT_NO_THROW(
+        HeuristicPluginResourceManager::setPluginUnloadingMode(HIPDNN_PLUGIN_UNLOAD_EAGER));
+
+    EXPECT_NO_THROW(
+        HeuristicPluginResourceManager::setPluginUnloadingMode(HIPDNN_PLUGIN_UNLOAD_LAZY));
+}
+
+TEST_F(TestHeuristicPluginResourceManager, MultiplePathConfigurationsSucceed)
+{
+    const std::vector<std::filesystem::path> paths1 = {"/test/path1"};
+    const std::vector<std::filesystem::path> paths2 = {"/test/path2", "/test/path3"};
+
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setHeuristicPluginPaths(
+        paths1, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+
+    EXPECT_NO_THROW(HeuristicPluginResourceManager::setHeuristicPluginPaths(
+        paths2, HIPDNN_PLUGIN_LOADING_ADDITIVE));
+}
+
+// ========== Policy Lookup with Multiple Plugins ==========
+
+TEST_F(TestHeuristicPluginResourceManager, GetHandleForMultiplePolicyIdsAllReturnNull)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    // Try multiple non-existent policy IDs
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(1), nullptr);
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(100), nullptr);
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(0x123456), nullptr);
+    EXPECT_EQ(rm->getHeuristicHandleForPolicyId(-1), nullptr);
+}
+
+TEST_F(TestHeuristicPluginResourceManager, GetPluginForMultiplePolicyIdsAllReturnNull)
+{
+    auto pm = std::make_shared<HeuristicPluginManager>();
+    auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
+
+    // Try multiple non-existent policy IDs
+    EXPECT_EQ(rm->getPluginForPolicyId(1), nullptr);
+    EXPECT_EQ(rm->getPluginForPolicyId(100), nullptr);
+    EXPECT_EQ(rm->getPluginForPolicyId(0x123456), nullptr);
+    EXPECT_EQ(rm->getPluginForPolicyId(-1), nullptr);
+}
