@@ -1041,14 +1041,17 @@ class StreamK(Component):
     def setFlagValue(self, writer, src, soffset, comment=""):
         module = Module("Buffer Store Flag Value")
         tmpSgprBuffer = writer.sgprPool.checkOutAligned(4, 4, preventOverflow=False)
+        tmpVgprOff = writer.vgprPool.checkOut(1, "vaddr_off")
+        module.add(VMovB32(dst=vgpr(tmpVgprOff), src=0, comment="zero vaddr offset"))
         module.add(SMovB64(dst=sgpr(tmpSgprBuffer, 2), src=sgpr("AddressFlags", 2)))
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+2), src="BufferOOB"))
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+3), src="Srd127_96"))
         module.add(self.shiftSrd(writer, tmpSgprBuffer))
-        module.add(BufferStoreB32(src=src, vaddr=vgpr("off", isOff=True), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
-                                  mubuf=MUBUFModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
+        module.add(BufferStoreB32(src=src, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
+                                  mubuf=MUBUFModifiers(offen=True, glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
                                   comment=comment))
-        module.add(SWaitCnt(vscnt=0, comment="wait for data store")) #TODO: See if this wait is necessery
+        module.add(SWaitCnt(vscnt=0, comment="wait for data store"))
+        writer.vgprPool.checkIn(tmpVgprOff)
         writer.sgprPool.checkIn(tmpSgprBuffer)
 
         return module
