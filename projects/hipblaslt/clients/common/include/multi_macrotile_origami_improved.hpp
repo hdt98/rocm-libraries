@@ -4,85 +4,87 @@
  *
  * Copyright (C) 2025 Advanced Micro Devices, Inc.
  *
- * IMPROVED VERSION WITH EMPIRICAL MICRO-BENCHMARK OPTIMIZATION
+ * Origami-based split search: generates candidate split configurations and
+ * exposes them for empirical micro-benchmarking in the timing path.
+ *
  *******************************************************************************/
 
 #pragma once
 
-#ifndef MULTI_MACROTILE_ORIGAMI_IMPROVED_HPP
-#define MULTI_MACROTILE_ORIGAMI_IMPROVED_HPP
-#endif
+#include <hipblaslt/hipblaslt.h>
+#include <hipblaslt/hipblaslt-ext.hpp>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <regex>
 
-#include "multi_macrotile_origami.hpp"
-
-namespace OrigamiConstants {
-    constexpr double MACROTILE_MISMATCH_THRESHOLD = 0.75;
-    constexpr int    MICRO_BENCH_ITERS = 3;
-}
-
-// Structure to hold one candidate split configuration for empirical testing
 struct OrigamiCandidate
 {
     std::vector<int64_t> split_sizes;
     std::string label;
 };
 
-/**
- * @brief Check if a split should be enabled based on MacroTile preservation
- */
-inline bool shouldEnableMultiMacroTileSplit(
-    hipblasLtHandle_t handle,
-    int64_t M, int64_t N, int64_t K,
-    int num_splits,
-    bool is_m_split,
-    hipblasOperation_t transA,
-    hipblasOperation_t transB,
-    hipDataType a_type,
-    hipDataType b_type,
-    hipDataType c_type,
-    hipDataType d_type,
-    hipblasComputeType_t compute_type)
+inline std::vector<OrigamiCandidate>& getOrigamiCandidates()
 {
-    using namespace OrigamiConstants;
-
-    auto baseline_sols = queryAllSolutionsForSubProblem(handle, M, N, K, transA, transB,
-                                                         a_type, b_type, c_type, d_type, compute_type);
-    if (baseline_sols.empty())
-        return false;
-
-    size_t baseline_mt_m, baseline_mt_n, baseline_mt_k;
-    if (!parseMacroTileFromSolutionName(baseline_sols[0].solution_name, baseline_mt_m, baseline_mt_n, baseline_mt_k))
-        return false;
-
-    int64_t M_split = is_m_split ? (M / num_splits) : M;
-    int64_t N_split = is_m_split ? N : (N / num_splits);
-
-    auto split_sols = queryAllSolutionsForSubProblem(handle, M_split, N_split, K, transA, transB,
-                                                      a_type, b_type, c_type, d_type, compute_type);
-    if (split_sols.empty())
-        return false;
-
-    size_t split_mt_m, split_mt_n, split_mt_k;
-    if (!parseMacroTileFromSolutionName(split_sols[0].solution_name, split_mt_m, split_mt_n, split_mt_k))
-        return false;
-
-    bool mt_m_ok = split_mt_m >= baseline_mt_m * MACROTILE_MISMATCH_THRESHOLD;
-    bool mt_n_ok = split_mt_n >= baseline_mt_n * MACROTILE_MISMATCH_THRESHOLD;
-
-    return mt_m_ok && mt_n_ok;
+    static thread_local std::vector<OrigamiCandidate> candidates;
+    return candidates;
 }
 
-/**
- * @brief Generate multiple candidate split configurations for empirical testing.
- *
- * Returns a vector of candidates including:
- *   - Uniform 50/50
- *   - Asymmetric 60/40 and 40/60
- *   - Asymmetric 70/30 and 30/70
- *   - Power-of-2 biased
- *
- * All splits are aligned to the MacroTile boundary.
- */
+// Parse MacroTile dimensions from a Tensile solution name (e.g. "...MT256x96x16...")
+inline bool parseMacroTileFromName(const std::string& name,
+                                   size_t& mt_m, size_t& mt_n, size_t& mt_k)
+{
+    std::regex re("MT(\\d+)x(\\d+)x(\\d+)");
+    std::smatch m;
+    if (std::regex_search(name, m, re) && m.size() == 4)
+    {
+        mt_m = std::stoull(m[1].str());
+        mt_n = std::stoull(m[2].str());
+        mt_k = std::stoull(m[3].str());
+        return true;
+    }
+    return false;
+}
+
+// Check whether splitting preserves the baseline MacroTile (within 75%).
+inline bool isMacroTilePreserved(
+    hipblasLtHandle_t handle,
+    int64_t M, int64_t N, int64_t K,
+    int num_splits, bool is_m_split,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    hipblasComputeType_t compute_type)
+{
+    auto query = [&](int64_t m, int64_t n) -> std::string {
+        std::vector<hipblasLtMatmulHeuristicResult_t> algos;
+        hipblaslt_ext::getAllAlgos(handle, hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
+                                   transA, transB, a_type, b_type, c_type, d_type,
+                                   compute_type, algos);
+        if (!algos.empty() && algos[0].state == HIPBLAS_STATUS_SUCCESS)
+            return hipblaslt_ext::getSolutionNameFromAlgo(handle, algos[0].algo);
+        return "";
+    };
+
+    std::string bl_name = query(M, N);
+    size_t bl_m, bl_n, bl_k;
+    if (!parseMacroTileFromName(bl_name, bl_m, bl_n, bl_k))
+        return false;
+
+    int64_t Ms = is_m_split ? (M / num_splits) : M;
+    int64_t Ns = is_m_split ? N : (N / num_splits);
+
+    std::string sp_name = query(Ms, Ns);
+    size_t sp_m, sp_n, sp_k;
+    if (!parseMacroTileFromName(sp_name, sp_m, sp_n, sp_k))
+        return false;
+
+    return sp_m >= bl_m * 0.75 && sp_n >= bl_n * 0.75;
+}
+
+// Generate candidate split configurations for empirical testing.
+// Candidates include ratio-based + exhaustive power-of-2 splits.
+// Minimum sub-problem size enforced to avoid pathological tiny splits.
 inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     int64_t total_size,
     int macrotile_size)
@@ -90,8 +92,6 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     std::vector<OrigamiCandidate> candidates;
     int mt = std::max(macrotile_size, 1);
 
-    // Minimum sub-problem size: must be at least 2048 and at least 15% of total
-    // to avoid pathological kernel selections for tiny sub-problems
     int64_t min_sub = std::max((int64_t)2048, total_size * 15 / 100);
     min_sub = (min_sub / mt) * mt;
     min_sub = std::max(min_sub, (int64_t)mt);
@@ -104,16 +104,12 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
             candidates.push_back({{s1, s2}, label});
     };
 
-    // Uniform
     add((total_size / 2 / mt) * mt, "uniform-50/50");
 
-    // Ratio-based (covers non-pow2 sweet spots like 6144 = 3*2048)
     for (double r : {0.60, 0.40, 0.70, 0.30})
         add(((int64_t)(total_size * r) / mt) * mt,
             "asym-" + std::to_string((int)(r*100)) + "/" + std::to_string(100-(int)(r*100)));
 
-    // Exhaustive power-of-2: every split where s1 is a power of 2
-    // Starting from 2048 (1024 is too small for good kernel efficiency)
     for (int64_t p = 2048; p < total_size; p *= 2)
     {
         int64_t rem = total_size - p;
@@ -121,39 +117,22 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
             add(p, "pow2-" + std::to_string(p/1024) + "k");
     }
 
-    // Deduplicate by s1 value
+    // Deduplicate by s1
     std::vector<OrigamiCandidate> unique;
-    for (auto& c : candidates) {
+    for (auto& c : candidates)
+    {
         bool dup = false;
-        for (auto& u : unique) {
-            if (u.split_sizes[0] == c.split_sizes[0])
-                { dup = true; break; }
-        }
-        if (!dup) unique.push_back(c);
+        for (auto& u : unique)
+            if (u.split_sizes[0] == c.split_sizes[0]) { dup = true; break; }
+        if (!dup)
+            unique.push_back(c);
     }
-
     return unique;
 }
 
-/**
- * @brief Origami with empirical micro-benchmark.
- *
- * Instead of estimation, returns multiple candidate splits.
- * The calling code (testing_matmul.hpp) will micro-benchmark each
- * candidate and pick the winner.
- *
- * Returns the uniform split as default. The candidates are stored
- * in a global for the timing path to access.
- */
-
-// Thread-local storage for candidate splits generated by Origami
-// The timing path reads this to run the empirical micro-benchmark.
-inline std::vector<OrigamiCandidate>& getOrigamiCandidates()
-{
-    static thread_local std::vector<OrigamiCandidate> candidates;
-    return candidates;
-}
-
+// Entry point called by splitGemmProblem for S17/S18.
+// Returns the default (uniform) split sizes; the real selection happens via
+// empirical micro-benchmark in testing_matmul.hpp using getOrigamiCandidates().
 inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasLtHandle_t handle,
     int64_t total_size,
@@ -162,32 +141,22 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     int64_t other_dim,
     int64_t K,
     bool is_m_split,
-    hipblasOperation_t transA,
-    hipblasOperation_t transB,
-    hipDataType a_type,
-    hipDataType b_type,
-    hipDataType c_type,
-    hipDataType d_type,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
     hipblasComputeType_t compute_type)
 {
     int64_t M = is_m_split ? total_size : other_dim;
     int64_t N = is_m_split ? other_dim : total_size;
 
-    // P2: MacroTile preservation check
-    if (!shouldEnableMultiMacroTileSplit(handle, M, N, K, num_splits, is_m_split,
-                                         transA, transB, a_type, b_type, c_type, d_type, compute_type))
+    if (!isMacroTilePreserved(handle, M, N, K, num_splits, is_m_split,
+                               transA, transB, a_type, b_type, c_type, d_type, compute_type))
         return {};
 
-    // Generate candidate split configurations for empirical testing
-    auto candidates = generateOrigamiCandidates(total_size, macrotile_size);
+    auto cands = generateOrigamiCandidates(total_size, macrotile_size);
+    getOrigamiCandidates() = cands;
 
-    // Store candidates for the timing path to micro-benchmark
-    getOrigamiCandidates() = candidates;
-
-    // Return the first candidate (uniform) as the default split.
-    // The timing path will override this if a better candidate is found.
-    if (!candidates.empty())
-        return candidates[0].split_sizes;
-
+    if (!cands.empty())
+        return cands[0].split_sizes;
     return {};
 }

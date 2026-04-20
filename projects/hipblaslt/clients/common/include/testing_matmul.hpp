@@ -40,11 +40,7 @@
 #include "hipblaslt_vector.hpp"
 #include "mxDataGen.hpp"
 #include "multi_macrotile.hpp"
-#include "multi_macrotile_origami_improved.hpp"  // Enable improved Origami optimization
-// Fused host header only needed for host code, not device
-#if !defined(__HIP_DEVICE_COMPILE__) && !defined(__HIPCC_RTC__)
-#include "multi_macrotile_fused_host.hpp"
-#endif
+#include "multi_macrotile_origami_improved.hpp"
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -3973,14 +3969,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                             transA, transB,
                             arg.a_type, arg.b_type, arg.c_type,
                             arg.d_type, arg.aux_type, arg.bias_type,
-                            arg.split_strategy,
-                            arg.num_splits,
-                            arg.target_wgs_per_split,
-                            estimated_mt_m,
-                            estimated_mt_n,
-                            num_CUs,
-                            arg.user_allocated_workspace,  // Available memory
-                            workspace_size);                // Workspace needed
+                            arg.split_strategy, arg.num_splits,
+                            estimated_mt_m, estimated_mt_n,
+                            handle, arg.compute_type);
 
                         // Print splitting information
                         const char* strategy_names[] = {
@@ -4224,14 +4215,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                     if(alpha_in[0]) alpha_f = *reinterpret_cast<const float*>(alpha_in[0]);
                                     if(h_beta.size() > 0) beta_f = *reinterpret_cast<const float*>(&h_beta[0]);
 
-                                    hipError_t err = executeFusedMultiMacrotileBatchLaunch(
-                                        subProblems, algorithms, handle,
-                                        dA[0].buf(), dB[0].buf(), dC[0].buf(), (*dDp)[0].buf(),
-                                        alpha_f, beta_f,
-                                        lda[0], ldb[0], ldc[0], ldd[0],
-                                        transA, transB,
-                                        arg.a_type, arg.b_type, arg.c_type, arg.d_type,
-                                        *dWorkspace, workspace_size, stream, device_id);
+                                    hipError_t err = hipErrorNotSupported;
 
                                     if(err != hipSuccess && iter == 0)
                                     {
@@ -4695,16 +4679,10 @@ void testing_matmul_with_bias(const Arguments& arg,
             int num_CUs = deviceProps.multiProcessorCount;
 
             // Automatic strategy selection if strategy is 0 (Auto)
-            int actual_strategy = arg.split_strategy;
-            if (actual_strategy == 0)
-            {
-                size_t elem_size = getDataTypeSize(arg.b_type);
-                actual_strategy = autoSelectStrategy(M[0], N[0], K[0], elem_size);
-                hipblaslt_cout << "Auto-selected strategy: " << actual_strategy << std::endl;
-            }
+            int actual_strategy = (arg.split_strategy == 0) ? 17 : arg.split_strategy;
 
             // Check if multi-MacroTile should be used for this problem
-            if (!shouldUseMultiMacroTile(M[0], N[0], K[0], actual_strategy))
+            if (!shouldUseMultiMacroTile(M[0], N[0], K[0]))
             {
                 hipblaslt_cout << "Multi-MacroTile disabled for this problem size (would hurt performance)" << std::endl;
                 hipblaslt_cout << "Falling back to baseline single-kernel execution" << std::endl;
@@ -4714,12 +4692,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
 
             // Automatic num_splits selection if num_splits is 0 (Auto)
-            int actual_num_splits = arg.num_splits;
-            if (actual_num_splits == 0)
-            {
-                actual_num_splits = autoSelectNumSplits(M[0], N[0], K[0], num_CUs, arg.stream_parallel);
-                hipblaslt_cout << "Auto-selected num_splits: " << actual_num_splits << std::endl;
-            }
+            int actual_num_splits = (arg.num_splits > 0) ? arg.num_splits : 2;
 
             // Estimate MacroTile size from algorithm (if available)
             int macrotile_m = 128;  // Common default
@@ -4732,17 +4705,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                 transA, transB,
                 arg.a_type, arg.b_type, arg.c_type, arg.d_type,
                 Taux, Tbias,
-                actual_strategy,
-                actual_num_splits,
-                256,  // target_wgs
-                macrotile_m,
-                macrotile_n,
-                num_CUs,
-                512ULL * 1024 * 1024,  // available_memory
-                workspace_size,
-                handle,  // Pass handle for Origami optimization
-                arg.compute_type  // Pass compute type for Origami
-            );
+                actual_strategy, actual_num_splits,
+                macrotile_m, macrotile_n,
+                handle, arg.compute_type);
 
             const char* strategy_names[] = {
                 "Auto", "Workgroup", "Memory", "M-only", "N-only", "2D",
@@ -4874,10 +4839,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                             transA, transB,
                             arg.a_type, arg.b_type, arg.c_type, arg.d_type,
                             Taux, Tbias,
-                            is_m_split ? 3 : 4, // Use uniform M or N split
+                            is_m_split ? 17 : 18,
                             (int)cand.split_sizes.size(),
-                            256, macrotile_m, macrotile_n, num_CUs,
-                            512ULL * 1024 * 1024, workspace_size);
+                            macrotile_m, macrotile_n,
+                            handle, arg.compute_type);
 
                         // Override the uniform split sizes with our candidate sizes
                         if(cand_subs.size() == cand.split_sizes.size())
