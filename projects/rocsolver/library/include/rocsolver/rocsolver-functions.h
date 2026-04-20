@@ -17785,6 +17785,32 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dsyev_batched(rocblas_handle handle,
                                                         const rocblas_stride strideE,
                                                         rocblas_int* info,
                                                         const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ssyev_batched_64(rocblas_handle handle,
+                                                           const rocblas_evect evect,
+                                                           const rocblas_fill uplo,
+                                                           const int64_t n,
+                                                           float* const A[],
+                                                           const int64_t lda,
+                                                           float* D,
+                                                           const rocblas_stride strideD,
+                                                           float* E,
+                                                           const rocblas_stride strideE,
+                                                           rocblas_int* info,
+                                                           const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dsyev_batched_64(rocblas_handle handle,
+                                                           const rocblas_evect evect,
+                                                           const rocblas_fill uplo,
+                                                           const int64_t n,
+                                                           double* const A[],
+                                                           const int64_t lda,
+                                                           double* D,
+                                                           const rocblas_stride strideD,
+                                                           double* E,
+                                                           const rocblas_stride strideE,
+                                                           rocblas_int* info,
+                                                           const int64_t batch_count);
 //! @}
 
 /*! @{
@@ -17869,6 +17895,32 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zheev_batched(rocblas_handle handle,
                                                         const rocblas_stride strideE,
                                                         rocblas_int* info,
                                                         const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_cheev_batched_64(rocblas_handle handle,
+                                                           const rocblas_evect evect,
+                                                           const rocblas_fill uplo,
+                                                           const int64_t n,
+                                                           rocblas_float_complex* const A[],
+                                                           const int64_t lda,
+                                                           float* D,
+                                                           const rocblas_stride strideD,
+                                                           float* E,
+                                                           const rocblas_stride strideE,
+                                                           rocblas_int* info,
+                                                           const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zheev_batched_64(rocblas_handle handle,
+                                                           const rocblas_evect evect,
+                                                           const rocblas_fill uplo,
+                                                           const int64_t n,
+                                                           rocblas_double_complex* const A[],
+                                                           const int64_t lda,
+                                                           double* D,
+                                                           const rocblas_stride strideD,
+                                                           double* E,
+                                                           const rocblas_stride strideE,
+                                                           rocblas_int* info,
+                                                           const int64_t batch_count);
 //! @}
 
 /*! @{
@@ -17959,6 +18011,35 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_dsyev_strided_batched(rocblas_handle h
                                                                 const rocblas_stride strideE,
                                                                 rocblas_int* info,
                                                                 const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_ssyev_strided_batched_64(rocblas_handle handle,
+                                                                   const rocblas_evect evect,
+                                                                   const rocblas_fill uplo,
+                                                                   const int64_t n,
+                                                                   float* A,
+                                                                   const int64_t lda,
+                                                                   const rocblas_stride strideA,
+                                                                   float* D,
+                                                                   const rocblas_stride strideD,
+                                                                   float* E,
+                                                                   const rocblas_stride strideE,
+                                                                   rocblas_int* info,
+                                                                   const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_dsyev_strided_batched_64(rocblas_handle handle,
+                                                                   const rocblas_evect evect,
+                                                                   const rocblas_fill uplo,
+                                                                   const int64_t n,
+                                                                   double* A,
+                                                                   const int64_t lda,
+                                                                   const rocblas_stride strideA,
+                                                                   double* D,
+                                                                   const rocblas_stride strideD,
+                                                                   double* E,
+                                                                   const rocblas_stride strideE,
+                                                                   rocblas_int* info,
+                                                                   const int64_t batch_count);
+
 //! @}
 
 /*! @{
@@ -18049,6 +18130,34 @@ ROCSOLVER_EXPORT rocblas_status rocsolver_zheev_strided_batched(rocblas_handle h
                                                                 const rocblas_stride strideE,
                                                                 rocblas_int* info,
                                                                 const rocblas_int batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_cheev_strided_batched_64(rocblas_handle handle,
+                                                                   const rocblas_evect evect,
+                                                                   const rocblas_fill uplo,
+                                                                   const int64_t n,
+                                                                   rocblas_float_complex* A,
+                                                                   const int64_t lda,
+                                                                   const rocblas_stride strideA,
+                                                                   float* D,
+                                                                   const rocblas_stride strideD,
+                                                                   float* E,
+                                                                   const rocblas_stride strideE,
+                                                                   rocblas_int* info,
+                                                                   const int64_t batch_count);
+
+ROCSOLVER_EXPORT rocblas_status rocsolver_zheev_strided_batched_64(rocblas_handle handle,
+                                                                   const rocblas_evect evect,
+                                                                   const rocblas_fill uplo,
+                                                                   const int64_t n,
+                                                                   rocblas_double_complex* A,
+                                                                   const int64_t lda,
+                                                                   const rocblas_stride strideA,
+                                                                   double* D,
+                                                                   const rocblas_stride strideD,
+                                                                   double* E,
+                                                                   const rocblas_stride strideE,
+                                                                   rocblas_int* info,
+                                                                   const int64_t batch_count);
 //! @}
 
 /*! @{

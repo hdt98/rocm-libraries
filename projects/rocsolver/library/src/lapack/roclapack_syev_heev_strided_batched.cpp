@@ -1,5 +1,5 @@
 /* **************************************************************************
- * Copyright (C) 2021-2024 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2021-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,20 +29,20 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename S, typename W>
+template <typename T, typename S, typename W, typename I>
 rocblas_status rocsolver_syev_heev_strided_batched_impl(rocblas_handle handle,
                                                         const rocblas_evect evect,
                                                         const rocblas_fill uplo,
-                                                        const rocblas_int n,
+                                                        const I n,
                                                         W A,
-                                                        const rocblas_int lda,
+                                                        const I lda,
                                                         const rocblas_stride strideA,
                                                         S* D,
                                                         const rocblas_stride strideD,
                                                         S* E,
                                                         const rocblas_stride strideE,
                                                         rocblas_int* info,
-                                                        const rocblas_int batch_count)
+                                                        const I batch_count)
 {
     const char* name = (!rocblas_is_complex<T> ? "syev_strided_batched" : "heev_strided_batched");
     ROCSOLVER_ENTER_TOP(name, "--evect", evect, "--uplo", uplo, "-n", n, "--lda", lda, "--strideA",
@@ -59,7 +59,7 @@ rocblas_status rocsolver_syev_heev_strided_batched_impl(rocblas_handle handle,
         return st;
 
     // working with unshifted arrays
-    rocblas_int shiftA = 0;
+    rocblas_stride shiftA = 0;
 
     // memory workspace sizes:
     // size for constants in rocblas calls
@@ -182,6 +182,78 @@ rocblas_status rocsolver_zheev_strided_batched(rocblas_handle handle,
                                                const rocblas_stride strideE,
                                                rocblas_int* info,
                                                const rocblas_int batch_count)
+{
+    return rocsolver::rocsolver_syev_heev_strided_batched_impl<rocblas_double_complex>(
+        handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+}
+
+rocblas_status rocsolver_ssyev_strided_batched_64(rocblas_handle handle,
+                                                  const rocblas_evect evect,
+                                                  const rocblas_fill uplo,
+                                                  const int64_t n,
+                                                  float* A,
+                                                  const int64_t lda,
+                                                  const rocblas_stride strideA,
+                                                  float* D,
+                                                  const rocblas_stride strideD,
+                                                  float* E,
+                                                  const rocblas_stride strideE,
+                                                  rocblas_int* info,
+                                                  const int64_t batch_count)
+{
+    return rocsolver::rocsolver_syev_heev_strided_batched_impl<float>(
+        handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+}
+
+rocblas_status rocsolver_dsyev_strided_batched_64(rocblas_handle handle,
+                                                  const rocblas_evect evect,
+                                                  const rocblas_fill uplo,
+                                                  const int64_t n,
+                                                  double* A,
+                                                  const int64_t lda,
+                                                  const rocblas_stride strideA,
+                                                  double* D,
+                                                  const rocblas_stride strideD,
+                                                  double* E,
+                                                  const rocblas_stride strideE,
+                                                  rocblas_int* info,
+                                                  const int64_t batch_count)
+{
+    return rocsolver::rocsolver_syev_heev_strided_batched_impl<double>(
+        handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+}
+
+rocblas_status rocsolver_cheev_strided_batched_64(rocblas_handle handle,
+                                                  const rocblas_evect evect,
+                                                  const rocblas_fill uplo,
+                                                  const int64_t n,
+                                                  rocblas_float_complex* A,
+                                                  const int64_t lda,
+                                                  const rocblas_stride strideA,
+                                                  float* D,
+                                                  const rocblas_stride strideD,
+                                                  float* E,
+                                                  const rocblas_stride strideE,
+                                                  rocblas_int* info,
+                                                  const int64_t batch_count)
+{
+    return rocsolver::rocsolver_syev_heev_strided_batched_impl<rocblas_float_complex>(
+        handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+}
+
+rocblas_status rocsolver_zheev_strided_batched_64(rocblas_handle handle,
+                                                  const rocblas_evect evect,
+                                                  const rocblas_fill uplo,
+                                                  const int64_t n,
+                                                  rocblas_double_complex* A,
+                                                  const int64_t lda,
+                                                  const rocblas_stride strideA,
+                                                  double* D,
+                                                  const rocblas_stride strideD,
+                                                  double* E,
+                                                  const rocblas_stride strideE,
+                                                  rocblas_int* info,
+                                                  const int64_t batch_count)
 {
     return rocsolver::rocsolver_syev_heev_strided_batched_impl<rocblas_double_complex>(
         handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
