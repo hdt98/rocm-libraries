@@ -42,9 +42,9 @@ TEST(TestGpuConvolutionFwdPlanBuilder, PlanConstruction)
                                            xDims,
                                            wDims,
                                            yDims,
-                                           computePackedStrides(xDims),
-                                           computePackedStrides(wDims),
-                                           computePackedStrides(yDims),
+                                           generateStrides(xDims),
+                                           generateStrides(wDims),
+                                           generateStrides(yDims),
                                            {0, 0},
                                            {1, 1},
                                            {1, 1},
@@ -83,9 +83,9 @@ TEST(TestGpuConvolutionFwdPlanBuilder, IsApplicable)
                                            xDims,
                                            wDims,
                                            yDims,
-                                           computePackedStrides(xDims),
-                                           computePackedStrides(wDims),
-                                           computePackedStrides(yDims),
+                                           generateStrides(xDims),
+                                           generateStrides(wDims),
+                                           generateStrides(yDims),
                                            {0, 0},
                                            {1, 1},
                                            {1, 1},
@@ -149,9 +149,9 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     constexpr int64_t W_UID = 2;
     constexpr int64_t Y_UID = 3;
 
-    auto xStrides = computePackedStrides(xDims);
-    auto wStrides = computePackedStrides(wDims);
-    auto yStrides = computePackedStrides(yDims);
+    auto xStrides = generateStrides(xDims);
+    auto wStrides = generateStrides(wDims);
+    auto yStrides = generateStrides(yDims);
 
     auto graphBuilder = createConvFwdGraph(X_UID,
                                            W_UID,

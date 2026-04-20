@@ -182,9 +182,9 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     constexpr int64_t W_UID = 11;
     constexpr int64_t Y_UID = 12;
 
-    auto xStrides = computePackedStrides(xDims);
-    auto wStrides = computePackedStrides(wDims);
-    auto yStrides = computePackedStrides(yDims);
+    auto xStrides = generateStrides(xDims);
+    auto wStrides = generateStrides(wDims);
+    auto yStrides = generateStrides(yDims);
 
     auto graphBuilder = createConvFwdGraph(X_UID,
                                            W_UID,
