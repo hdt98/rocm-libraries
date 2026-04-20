@@ -4907,26 +4907,24 @@ void testing_matmul_with_bias(const Arguments& arg,
             auto start_time = std::chrono::high_resolution_clock::now();
             auto end_time = start_time;
 
+            // Sequential execution using pre-created contexts
+            for(int iter = 0; iter < timing_iters; iter++)
             {
-                // Sequential execution using pre-created contexts
-                for(int iter = 0; iter < timing_iters; iter++)
+                for(size_t sp = 0; sp < subProblems.size(); sp++)
                 {
-                    for(size_t sp = 0; sp < subProblems.size(); sp++)
-                    {
-                        if(!spCtxs[sp].valid) continue;
-                        auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                       &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                       ctx.D_ptr, ctx.matD,
-                                       &ctx.algo, *dWorkspace, workspace_size, stream);
-                    }
+                    if(!spCtxs[sp].valid) continue;
+                    auto& ctx = spCtxs[sp];
+                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
+                                    ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                    &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                    ctx.D_ptr, ctx.matD,
+                                    &ctx.algo, *dWorkspace, workspace_size, stream);
                 }
-
-                CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                end_time = std::chrono::high_resolution_clock::now();
             }
 
+            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+            end_time = std::chrono::high_resolution_clock::now();
+            
             // Cleanup pre-created layouts
             for(size_t sp = 0; sp < spCtxs.size(); sp++)
             {
