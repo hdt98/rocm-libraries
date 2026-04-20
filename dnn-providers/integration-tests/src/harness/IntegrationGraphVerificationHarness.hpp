@@ -145,7 +145,7 @@ protected:
         initializeBundle(graph, cpuBundle, seed);
 
         ASSERT_NO_FATAL_FAILURE(executeGpuGraph(getSharedHandle(), graph, gpuBundle));
-        executeReferenceGraph(graph, cpuBundle);
+        ASSERT_NO_FATAL_FAILURE(executeReferenceGraph(graph, cpuBundle));
 
         ASSERT_GE(outputTensorIds.size(), 1)
             << "At least one output tensor id must be specified for "

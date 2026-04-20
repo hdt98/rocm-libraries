@@ -169,7 +169,9 @@ public:
         if(envVal != nullptr)
         {
             std::string val(envVal);
-            std::transform(val.begin(), val.end(), val.begin(), ::tolower);
+            std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            });
             if(val == "gpu")
             {
                 return ReferenceExecutorType::GPU;

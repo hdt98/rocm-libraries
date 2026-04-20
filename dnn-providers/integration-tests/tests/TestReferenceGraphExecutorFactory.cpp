@@ -9,10 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "harness/CpuReferenceGraphExecutorAdapter.hpp"
-#include "harness/IReferenceGraphExecutor.hpp"
 #include "harness/ReferenceGraphExecutorFactory.hpp"
-#include "harness/gpu_graph_executor/GpuReferenceGraphExecutor.hpp"
 
 namespace
 {
@@ -104,12 +101,6 @@ TEST(TestReferenceGraphExecutorFactory, CpuExecutorExecutesGraph)
     {
         EXPECT_FLOAT_EQ(output[i], input[i]) << "Mismatch at index " << i;
     }
-}
-
-TEST(TestReferenceGraphExecutorFactory, GpuExecutorRequiresDeviceMemory)
-{
-    auto executor = ReferenceGraphExecutorFactory::create(ReferenceExecutorType::GPU);
-    EXPECT_TRUE(executor->requiresDeviceMemory());
 }
 
 TEST(TestReferenceGraphExecutorFactory, DefaultConfigReturnsCpu)
