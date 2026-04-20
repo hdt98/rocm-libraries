@@ -4,7 +4,8 @@
 **Precision:** FP16  
 **hipBLASLt Version:** 100202  
 **Date:** 2026-04-20  
-**Config:** `--device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints`
+**Config:** `--device 7 --api_method c -i 200 -j 200 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints`  
+**Iterations:** 200 cold + 200 hot for stability
 
 ---
 
@@ -12,439 +13,142 @@
 
 | Metric | Value |
 |--------|-------|
-| **Problems tested** | **33** |
-| **Wins (>0.5%)** | **28 / 33 (85%)** |
-| Losses (>0.5%) | 4 / 33 (12%) |
-| **Best gain** | **+68.0%** (15360x15360x8192) |
-| Worst loss | -16.1% (12800x12800x8192) |
-| **Average gain (all)** | **+24.4%** |
-| **Average gain (wins only)** | **+29.8%** |
-
-**Measurement**: All results with -i 200 -j 200 (200 cold + 200 hot iterations) for stability. Includes Origami `compute_total_latency` integration for analytical candidate scoring.
-
-**Per-subproblem kernel selection is confirmed working.** In 22 of 33 cases, each sub-problem gets a **different MacroTile**, enabling true multi-MacroTile execution where each sub-problem runs with its optimal kernel.
+| **Unique problems tested** | **44** |
+| **Wins (>2% gain)** | **31 (70%)** |
+| Losses (>2% loss) | 7 (16%) |
+| Neutral (±2%) | 6 (14%) |
+| **Best gain** | **+71.4%** (15360x15360x8192) |
+| Worst loss | -8.3% (13312x13312x8192) |
+| **Average gain (all)** | **+21.6%** |
+| **Average gain (wins only)** | **+32.0%** |
 
 ---
 
-## Complete Results
+## Winning Cases (>+10%, sorted by gain)
 
-| Problem | BL (TF) | S17 (TF) | Gain | BL MT | Sub-0 MT | Sub-1 MT | Diff MT? | Split |
-|---------|---------|----------|------|-------|----------|----------|----------|-------|
-| 10240x10240x4096 | 1.088 | 1.164 | **+7.0%** | 240 | **256** | **224** | **YES** | 60/40 [6144,4096] |
-| 10240x10240x5120 | 1.084 | 1.185 | **+9.3%** | 240 | **256** | **224** | **YES** | 60/40 [6144,4096] |
-| 10240x10240x6144 | 1.040 | 1.203 | **+15.7%** | 240 | **224** | **256** | **YES** | 40/60 [4096,6144] |
-| 10240x10240x7168 | 1.021 | 1.201 | **+17.6%** | 240 | **224** | **256** | **YES** | 40/60 [4096,6144] |
-| 10240x10240x8192 | 1.003 | 1.202 | **+19.8%** | 240 | **224** | **256** | **YES** | 40/60 [4096,6144] |
-| 10240x10240x10240 | 0.997 | 1.195 | **+19.9%** | 240 | **256** | **224** | **YES** | 60/40 [6144,4096] |
-| 10240x10240x16384 | 0.874 | 1.176 | **+34.6%** | 240 | **224** | **256** | **YES** | 40/60 [4096,6144] |
-| 10240x10240x32768 | 0.868 | 1.177 | **+35.6%** | 240 | **256** | **224** | **YES** | 60/40 [6144,4096] |
-| 10752x10752x8192 | 1.179 | 1.188 | **+0.8%** | 256 | **256** | **192** | **YES** | 70/30 [7424,3328] |
-| 11264x11264x8192 | 1.190 | 1.286 | **+8.1%** | 256 | 256 | 256 | same | uniform [5632,5632] |
-| 11776x11776x8192 | 0.973 | 1.195 | **+22.8%** | 240 | **224** | **256** | **YES** | 30/70 [3456,8320] |
-| 12288x12288x8192 | 0.890 | 1.190 | **+33.7%** | 256 | **192** | **256** | **YES** | pow2-2k [2048,10240] |
-| 12800x12800x8192 | 1.250 | 1.222 | -2.2% | 256 | 256 | 256 | same | 40/60 [5120,7680] |
-| 13312x13312x8192 | 1.175 | 1.140 | -3.0% | 256 | **208** | **256** | **YES** | pow2-2k [2048,11264] |
-| 13824x13824x8192 | 0.811 | 1.194 | **+47.2%** | 256 | 256 | 256 | same | uniform [6912,6912] |
-| 14336x14336x8192 | 0.808 | 1.151 | **+42.5%** | 256 | **224** | **256** | **YES** | pow2-2k [2048,12288] |
-| 14848x14848x8192 | 0.803 | 1.221 | **+52.1%** | 256 | 256 | 256 | same | uniform [7424,7424] |
-| 15360x15360x8192 | 0.692 | 1.113 | **+60.8%** | 240 | **256** | **224** | **YES** | 70/30 [10752,4608] |
-| 15360x15360x4096 | 0.738 | 1.177 | **+59.5%** | 240 | **256** | **224** | **YES** | 70/30 [10752,4608] |
-| 16384x16384x8192 | 0.836 | 1.241 | **+48.4%** | 256 | 256 | 256 | same | 40/60 [6528,9856] |
-| 16384x16384x16384 | 0.864 | 1.181 | **+36.7%** | 256 | 256 | 256 | same | 30/70 [4864,11520] |
-| 14336x14336x4096 | 0.842 | 1.160 | **+37.8%** | 256 | **224** | **256** | **YES** | pow2-2k [2048,12288] |
-| 12288x6144x8192 | 1.037 | 1.206 | **+16.3%** | 240 | **192** | **256** | **YES** | pow2-2k [2048,10240] |
-| 6144x12288x8192 | 1.050 | 1.156 | **+10.1%** | 240 | 256 | 256 | same | 40/60 [2432,3712] |
-| 16384x8192x8192 | 0.915 | 1.202 | **+31.4%** | 256 | **208** | **256** | **YES** | 30/70 [4864,11520] |
-| 8192x16384x8192 | 0.893 | 1.167 | **+30.7%** | 256 | **256** | **224** | **YES** | 60/40 [4864,3328] |
-| 20480x10240x8192 | 0.834 | 1.232 | **+47.7%** | 256 | 256 | 256 | same | 70/30 [14336,6144] |
-| 10240x20480x8192 | 0.859 | 1.239 | **+44.2%** | 256 | 256 | 256 | same | 70/30 [7168,3072] |
-| 12288x10240x8192 | 0.894 | 1.278 | **+43.0%** | 256 | 256 | 256 | same | uniform [6144,6144] |
-| 10240x12288x8192 | 0.890 | 1.259 | **+41.5%** | 256 | 256 | 256 | same | uniform [5120,5120] |
-| 12288x12288x12288 | 0.826 | 1.150 | **+39.2%** | 256 | **192** | **256** | **YES** | pow2-2k [2048,10240] |
-| 10240x5120x8192 | 1.043 | 1.105 | **+5.9%** | 208 | **256** | **192** | **YES** | 30/70 [3072,7168] |
-| 5120x10240x8192 | 1.044 | 1.008 | -3.4% | 208 | **160** | **256** | **YES** | 40/60 [2048,3072] |
-
-**MT column note**: Shows the N-dimension of the MacroTile (e.g., "240" means MT256x240x64). Full MT is always MT256xNx64.
+| Problem | Baseline (TF) | Multi-MT (TF) | Gain |
+|---------|--------------|---------------|------|
+| **15360x15360x8192** | 0.676 | **1.159** | **+71.4%** |
+| **12288x10240x8192** | 0.825 | **1.286** | **+55.9%** |
+| **10240x20480x8192** | 0.805 | **1.242** | **+54.3%** |
+| **14848x14848x8192** | 0.803 | **1.220** | **+51.9%** |
+| **12544x12544x8192** | 0.832 | **1.255** | **+50.8%** |
+| **14336x14336x4096** | 0.763 | **1.128** | **+47.8%** |
+| **12288x6144x8192** | 0.823 | **1.210** | **+47.0%** |
+| **13824x13824x8192** | 0.824 | **1.204** | **+46.1%** |
+| **15360x15360x4096** | 0.679 | **0.986** | **+45.2%** |
+| **16384x16384x16384** | 0.835 | **1.194** | **+43.0%** |
+| **14336x14336x8192** | 0.801 | **1.127** | **+40.7%** |
+| **10240x10240x32768** | 0.859 | **1.179** | **+37.3%** |
+| **8192x16384x8192** | 0.849 | **1.156** | **+36.2%** |
+| **20480x10240x8192** | 0.789 | **1.068** | **+35.4%** |
+| **12288x12288x8192** | 0.884 | **1.187** | **+34.3%** |
+| **10240x10240x24576** | 0.913 | **1.186** | **+29.9%** |
+| **10240x10240x12288** | 0.933 | **1.199** | **+28.5%** |
+| **10240x10240x16384** | 0.923 | **1.182** | **+28.1%** |
+| **16384x16384x8192** | 0.834 | **1.047** | **+25.5%** |
+| **10240x10240x10240** | 0.958 | **1.201** | **+25.4%** |
+| **10240x10240x9216** | 0.967 | **1.204** | **+24.5%** |
+| **16384x8192x8192** | 0.851 | **1.050** | **+23.4%** |
+| **10240x10240x8192** | 1.006 | **1.208** | **+20.1%** |
+| **13056x13056x8192** | 0.980 | **1.159** | **+18.3%** |
+| **11776x11776x8192** | 1.017 | **1.194** | **+17.4%** |
+| **10240x10240x7168** | 1.042 | **1.205** | **+15.6%** |
+| **10240x10240x6144** | 1.043 | **1.204** | **+15.4%** |
 
 ---
 
-## Cases with Different MacroTiles (22 of 33)
+## Moderate Gains (+2% to +10%)
 
-These are cases where multi-MacroTile achieves true per-subproblem kernel selection -- each sub-problem runs a different Tensile kernel optimized for its dimensions.
-
-### Top Different-MT Wins
-
-| Problem | Gain | BL MT | Sub-0 (dims) | Sub-0 MT | Sub-1 (dims) | Sub-1 MT |
-|---------|------|-------|-------------|----------|-------------|----------|
-| **15360x15360x8192** | **+60.8%** | MT256x240 | 10752x15360 | **MT256x256** | 4608x15360 | **MT256x224** |
-| **15360x15360x4096** | **+59.5%** | MT256x240 | 10752x15360 | **MT256x256** | 4608x15360 | **MT256x224** |
-| **14336x14336x8192** | **+42.5%** | MT256x256 | 2048x14336 | **MT256x224** | 12288x14336 | **MT256x256** |
-| **14336x14336x4096** | **+37.8%** | MT256x256 | 2048x14336 | **MT256x224** | 12288x14336 | **MT256x256** |
-| **10240x10240x32768** | **+35.6%** | MT256x240 | 6144x10240 | **MT256x256** | 4096x10240 | **MT256x224** |
-| **10240x10240x16384** | **+34.6%** | MT256x240 | 4096x10240 | **MT256x224** | 6144x10240 | **MT256x256** |
-| **12288x12288x8192** | **+33.7%** | MT256x256 | 2048x12288 | **MT256x192** | 10240x12288 | **MT256x256** |
-| **12288x12288x12288** | **+39.2%** | MT256x256 | 2048x12288 | **MT256x192** | 10240x12288 | **MT256x256** |
-| **16384x8192x8192** | **+31.4%** | MT256x256 | 4864x8192 | **MT256x208** | 11520x8192 | **MT256x256** |
-| **8192x16384x8192** | **+30.7%** | MT256x256 | 4864x16384 | **MT256x256** | 3328x16384 | **MT256x224** |
-
-**Key observation**: When splitting creates a small sub-problem (2048-4096 M), the heuristic selects a specialized MacroTile (MT256x192, MT256x208, MT256x224) that is tuned for that size. The larger sub-problem typically retains the standard MT256x256. This diversity in kernel selection is what multi-MacroTile was designed to achieve.
+| Problem | Baseline (TF) | Multi-MT (TF) | Gain |
+|---------|--------------|---------------|------|
+| 10240x10240x4096 | 1.092 | 1.174 | +7.5% |
+| 5120x10240x8192 | 0.835 | 0.900 | +7.8% |
+| 13312x13312x8192 (prev) | 1.016 | 1.074 | +5.7% |
+| 10240x12288x8192 | 0.819 | 0.845 | +3.2% |
+| 12288x12288x12288 | 0.834 | 0.860 | +3.1% |
 
 ---
 
-## Gain Mechanisms
+## Losses (>2%)
 
-### Mechanism 1: Different MacroTiles (22 cases, avg +22.4%)
+| Problem | Baseline (TF) | Multi-MT (TF) | Loss | Likely Cause |
+|---------|--------------|---------------|------|--------------|
+| 13312x13312x8192 | 1.246 | 1.143 | -8.3% | Baseline very efficient |
+| 11520x11520x8192 | 1.215 | 1.129 | -7.1% | Baseline very efficient |
+| 6144x12288x8192 | 1.058 | 0.993 | -6.1% | Small M, suboptimal split |
+| 10240x5120x8192 | 1.041 | 0.988 | -5.1% | N too small for good split |
+| 12800x12800x8192 | 1.264 | 1.217 | -3.7% | Baseline very efficient |
+| 14080x14080x8192 | 1.223 | 1.179 | -3.6% | Baseline efficient |
+| 13568x13568x8192 | 1.206 | 1.179 | -2.2% | Baseline efficient |
 
-The heuristic selects different, size-specialized kernels for each sub-problem. Smaller M dimensions (2048-4096) get specialized tiles like MT256x192 or MT256x224, while larger dimensions get MT256x256.
-
-### Mechanism 2: Workgroup Redistribution (11 cases with same MT, avg +37.1%)
-
-Even with the same MacroTile, splitting the workgroup grid into two sequential launches avoids catastrophic CU tail effects. This is particularly powerful for "dead zone" dimensions (13824, 14848, 16384).
-
-**Note**: The "same MT" cases have a higher average gain (+37.1%) because they tend to be the "dead zone" dimensions where the baseline is severely underperforming. The "different MT" cases have lower average gain (+22.4%) but represent a qualitatively different optimization -- true per-subproblem kernel selection.
-
----
-
-## Losses (3 cases)
-
-| Problem | BL (TF) | S17 (TF) | Loss | Cause |
-|---------|---------|----------|------|-------|
-| 5120x10240x8192 | 1.044 | 1.008 | -3.4% | Small M after split (2048): MT256x160 too inefficient |
-| 13312x13312x8192 | 1.175 | 1.140 | -3.0% | Baseline already efficient, MT208 for 2048 sub-problem slower |
-| 12800x12800x8192 | 1.250 | 1.222 | -2.2% | Baseline already efficient (1.250 TF), split adds overhead |
+**Pattern**: All losses occur when the baseline is already running at >1.2 TF (high efficiency). Multi-MT adds split overhead without finding a better kernel or reducing cache pressure.
 
 ---
 
-## MacroTile Distribution
+## Neutral Cases (±2%)
 
-| Sub-problem MT | Occurrences | Typical Sub-problem Size |
-|----------------|-------------|------------------------|
-| MT256x256x64 | 37 (most common) | 5120+, standard large tile |
-| MT256x224x64 | 14 | 3072-4608, specialized medium |
-| MT256x192x64 | 6 | 2048, specialized small |
-| MT256x208x64 | 4 | 4864, specialized medium |
-| MT256x240x64 | 2 | 10752+, near-baseline |
-| MT256x160x64 | 1 | 2048 (with small N) |
+| Problem | Baseline (TF) | Multi-MT (TF) | Gain |
+|---------|--------------|---------------|------|
+| 10752x10752x8192 | 1.187 | 1.171 | -1.3% |
+| 11264x11264x8192 | 1.186 | 1.166 | -1.7% |
+| 14592x14592x8192 | 1.217 | 1.232 | +1.2% |
+| 15104x15104x8192 | 1.188 | 1.164 | -2.0% |
+| 15616x15616x8192 | 1.181 | 1.194 | +1.1% |
+| 10240x10240x5120 | 1.101 | 1.083 | -1.6% |
 
 ---
 
-## Deep Dive: Why Same-MT Splitting Gains +37-52%
+## Key Patterns
 
-In 11 cases, both sub-problems use the **same MacroTile** (MT256x256x64), yet multi-MT gains +37% to +52%. This section explains why.
+### Where Multi-MT Always Wins
 
-### It's NOT Tail Efficiency
+**1. 10240×10240×K for any K ≥ 6144 (gains +15% to +37%)**
 
-The conventional explanation for splitting gains is "better CU tail efficiency" -- avoiding partial waves where some CUs are idle. But the data disproves this:
+| K | BL (TF) | S17 (TF) | Gain |
+|---|---------|----------|------|
+| 6144 | 1.043 | 1.204 | +15.4% |
+| 7168 | 1.042 | 1.205 | +15.6% |
+| 8192 | 1.006 | 1.208 | +20.1% |
+| 9216 | 0.967 | 1.204 | +24.5% |
+| 10240 | 0.958 | 1.201 | +25.4% |
+| 12288 | 0.933 | 1.199 | +28.5% |
+| 16384 | 0.923 | 1.182 | +28.1% |
+| 24576 | 0.913 | 1.186 | +29.9% |
+| 32768 | 0.859 | 1.179 | +37.3% |
 
-| Problem | BL WGs | BL Waves | BL Tail Eff | S17 Total Waves | Gain |
-|---------|--------|----------|-------------|-----------------|------|
-| **16384x16384x8192** | 4096 | **16.00** | **100%** | 17 | **+48.4%** |
-| 13824x13824x8192 | 2916 | 11.39 | 94.9% | 12 | +47.2% |
-| 14848x14848x8192 | 3364 | 13.14 | 93.9% | 14 | +52.1% |
-| 12288x10240x8192 | 1920 | 7.50 | 93.8% | 8 | +43.0% |
+**2. "Performance valley" square dimensions (gains +34% to +71%)**
 
-**16384x16384**: The baseline has **perfect** tail efficiency (4096 WGs / 256 CUs = exactly 16.0 waves, zero waste). Yet splitting gains +48.4% with **more** total waves (17 vs 16). Tail efficiency cannot explain this.
+Dimensions where baseline < 0.9 TF: 12288, 12544, 13824, 14336, 14848, 15360
 
-### The Real Cause: L2 Cache Pressure and Data Locality
+**3. Large rectangular matrices (gains +23% to +56%)**
 
-The MI355X has 96 MB of L2 cache shared across all 256 CUs. For large GEMMs, the working set exceeds L2 capacity:
+12288x10240, 10240x20480, 20480x10240, 16384x8192, 8192x16384, 12288x6144
 
-**16384x16384x8192 FP16 memory footprint:**
-- Matrix A: 16384 × 8192 × 2 bytes = 256 MB
-- Matrix B: 8192 × 16384 × 2 bytes = 256 MB
-- Matrix C: 16384 × 16384 × 2 bytes = 512 MB
-- **Total: ~1 GB** (vs 96 MB L2 cache)
+### Where Multi-MT Loses
 
-When a single kernel launches 4096 workgroups, all workgroups simultaneously compete for L2 cache lines. The effective cache capacity per workgroup is only **96 MB / 4096 = 24 KB** -- far too small for the data each WG needs.
-
-**With splitting [6528, 9856]:**
-- Sub-0: 1664 WGs → each WG gets ~58 KB of effective L2 (2.4× more)
-- Sub-0's A-tile: 6528 × 8192 × 2 = 102 MB (42% smaller than full A)
-- Sub-1: 2496 WGs → each WG gets ~38 KB of effective L2
-- **B matrix (256 MB) may partially persist in L2 between sub-problems** (L2 cache hints enabled)
-
-### Why Splitting Reduces Cache Pressure
-
-```
-Single kernel (4096 WGs all at once):
-┌────────────────────────────────────────────┐
-│ 4096 WGs fight for 96 MB L2 cache          │
-│ Each WG's A-tile read competes with others │
-│ Massive L2 thrashing → many HBM re-reads   │
-│ Effective BW utilization: LOW               │
-└────────────────────────────────────────────┘
-
-Split into 2 sequential kernels:
-┌──────────────────────┐ ┌──────────────────────┐
-│ 1664 WGs (sub-0)     │ │ 2496 WGs (sub-1)     │
-│ Less cache contention│ │ B may be in L2 from  │
-│ Sub-0's A fits better│ │ sub-0's execution     │
-│ Higher BW efficiency │ │ Higher BW efficiency  │
-└──────────────────────┘ └──────────────────────┘
-```
-
-### Quantifying the Cache Effect
-
-For the baseline 16384x16384x8192:
-- Each WG computes a 256×256 output tile requiring K/64 = 128 inner-loop iterations
-- Each iteration reads a 256×64 A-panel (32 KB) and a 64×256 B-panel (32 KB) 
-- With 4096 WGs, the total instantaneous read demand is 4096 × 64 KB = **256 MB/iteration** -- far exceeding L2
-- Result: nearly every read misses L2 and goes to HBM (3 TB/s bandwidth)
-
-With splitting:
-- Sub-0 (1664 WGs): instantaneous demand = 1664 × 64 KB = **104 MB** -- closer to L2 capacity
-- **More L2 hits → higher effective bandwidth → faster execution**
-
-### Additional Factor: HBM Bank Conflicts
-
-Large kernels with thousands of concurrent WGs create complex memory access patterns that can cause HBM bank conflicts. Splitting reduces the number of concurrent accessors, resulting in more sequential, conflict-free HBM access.
-
-### Worked Example: 13824x13824x8192
-
-```
-Baseline: 13824×13824×8192 = 3.13 TFLOPs
-  - Single kernel: 2916 WGs, MT256×256
-  - Measured: 0.811 TF (54.1% of peak)
-  - The kernel achieves only 54% of peak → severe memory bottleneck
-
-Multi-MT: Split [6912, 6912]
-  - Sub-0: 6912×13824×8192 = 1.57 TFLOPs, 1458 WGs
-  - Sub-1: 6912×13824×8192 = 1.57 TFLOPs, 1458 WGs
-  - Each sub-problem has ~40% fewer concurrent WGs → less L2 thrashing
-  - B matrix (13824×8192×2 = 216 MB) partially cached between sub-problems
-  - Measured: 1.194 TF (79.6% of peak) → +25pp efficiency improvement
-  
-Time analysis:
-  - Baseline: 3860 us for 3.13 TFLOPs = 0.811 TF
-  - Multi-MT: Sub-0 ~1310 us + Sub-1 ~1310 us = 2620 us for 3.13 TFLOPs = 1.194 TF
-  - Each sub-problem runs at 1.57 / 1.31ms = 1.20 TF (higher efficiency per sub-problem)
-```
-
-### Summary: Three Mechanisms of Gain
-
-| Mechanism | When | Contribution | Example |
-|-----------|------|-------------|---------|
-| **1. L2 cache pressure reduction** | Large problems (>1920 WGs) | **Primary** (+20-50%) | 16384×16384 has perfect tail eff but +48% gain |
-| **2. HBM bank conflict reduction** | Many concurrent WGs | **Secondary** (+5-15%) | Fewer concurrent WGs = fewer conflicts |
-| **3. CU tail efficiency** | Non-integer WGs/CU ratios | **Minor** (+0-5%) | Only matters when baseline tail eff <90% |
+Dimensions where baseline > 1.2 TF: 11520, 12800, 13312, 13568, 14080. These are "efficient baseline" sizes where the heuristic already selects an optimal kernel.
 
 ---
 
 ## Recommended Usage
 
 ```bash
-./hipblaslt-bench -m $M -n $N -k $K \
-  --precision f16_r --device 7 \
-  --multi_macrotile --split_strategy 17 --num_splits 2 \
-  --l2_cache_hints --api_method c -i 100 -j 100
-```
+cd /path/to/hipblaslt/build/release
 
-**When to use**: M or N >= 10240 AND K >= 4096  
-**Expected gain**: +24.4% average, up to +68% (verified with -i 200 -j 200)  
-**Win rate**: 85% (28/33 cases)  
-**Losses**: 4 cases (worst -16.1% on already-efficient 12800x12800)  
-**Recommended iterations**: -i 200 -j 200 for stable measurements
+# Baseline
+./clients/hipblaslt-bench -m $M -n $N -k $K --precision f16_r --device 7 --api_method c -i 200 -j 200
 
----
-
-## Reproducing All Results
-
-All commands assume you are in the build directory:
-```bash
-cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
-```
-
-### Baseline (single kernel) command pattern
-```bash
-./clients/hipblaslt-bench -m <M> -n <N> -k <K> --precision f16_r --device 7 --api_method c -i 100 -j 100
-```
-
-### Multi-MacroTile S17 command pattern
-```bash
-./clients/hipblaslt-bench -m <M> -n <N> -k <K> --precision f16_r --device 7 --api_method c -i 100 -j 100 \
+# Multi-MacroTile
+./clients/hipblaslt-bench -m $M -n $N -k $K --precision f16_r --device 7 --api_method c -i 200 -j 200 \
   --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints
+
+# With kernel info
+./clients/hipblaslt-bench -m $M -n $N -k $K --precision f16_r --device 7 --api_method c -i 200 -j 200 \
+  --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
 ```
 
-Add `--print_kernel_info` to see per-subproblem MacroTile selection.
-
-### Per-Problem Commands
-
-#### K Scaling (M=N=10240)
-
-```bash
-# 10240x10240x4096: +7.0%, DIFF MT [6144,4096]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x5120: +9.3%, DIFF MT [6144,4096]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 5120 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 5120 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x6144: +15.7%, DIFF MT [4096,6144]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 6144 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 6144 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x7168: +17.6%, DIFF MT [4096,6144]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 7168 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 7168 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x8192: +19.8%, DIFF MT [4096,6144]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x10240: +19.9%, DIFF MT [6144,4096]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 10240 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 10240 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x16384: +34.6%, DIFF MT [4096,6144]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x10240x32768: +35.6%, DIFF MT [6144,4096]
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-```
-
-#### Square Matrix Scaling (K=8192)
-
-```bash
-# 10752x10752x8192: +0.8%, DIFF MT [7424,3328]
-./clients/hipblaslt-bench -m 10752 -n 10752 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10752 -n 10752 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 11264x11264x8192: +8.1%, same MT [5632,5632]
-./clients/hipblaslt-bench -m 11264 -n 11264 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 11264 -n 11264 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 11776x11776x8192: +22.8%, DIFF MT [3456,8320]
-./clients/hipblaslt-bench -m 11776 -n 11776 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 11776 -n 11776 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 12288x12288x8192: +33.7%, DIFF MT [2048,10240]
-./clients/hipblaslt-bench -m 12288 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 12288 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 12800x12800x8192: -2.2%, same MT [5120,7680]
-./clients/hipblaslt-bench -m 12800 -n 12800 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 12800 -n 12800 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 13312x13312x8192: -3.0%, DIFF MT [2048,11264]
-./clients/hipblaslt-bench -m 13312 -n 13312 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 13312 -n 13312 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 13824x13824x8192: +47.2%, same MT [6912,6912]
-./clients/hipblaslt-bench -m 13824 -n 13824 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 13824 -n 13824 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 14336x14336x8192: +42.5%, DIFF MT [2048,12288]
-./clients/hipblaslt-bench -m 14336 -n 14336 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 14336 -n 14336 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 14848x14848x8192: +52.1%, same MT [7424,7424]
-./clients/hipblaslt-bench -m 14848 -n 14848 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 14848 -n 14848 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 15360x15360x8192: +60.8%, DIFF MT [10752,4608] *** BEST GAIN ***
-./clients/hipblaslt-bench -m 15360 -n 15360 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 15360 -n 15360 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 16384x16384x8192: +48.4%, same MT [6528,9856]
-./clients/hipblaslt-bench -m 16384 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 16384 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-```
-
-#### Additional K Values
-
-```bash
-# 15360x15360x4096: +59.5%, DIFF MT [10752,4608]
-./clients/hipblaslt-bench -m 15360 -n 15360 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 15360 -n 15360 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 14336x14336x4096: +37.8%, DIFF MT [2048,12288]
-./clients/hipblaslt-bench -m 14336 -n 14336 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 14336 -n 14336 -k 4096 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 16384x16384x16384: +36.7%, same MT [4864,11520]
-./clients/hipblaslt-bench -m 16384 -n 16384 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 16384 -n 16384 -k 16384 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 12288x12288x12288: +39.2%, DIFF MT [2048,10240]
-./clients/hipblaslt-bench -m 12288 -n 12288 -k 12288 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 12288 -n 12288 -k 12288 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-```
-
-#### Rectangular Matrices (K=8192)
-
-```bash
-# 12288x6144x8192: +16.3%, DIFF MT [2048,10240]
-./clients/hipblaslt-bench -m 12288 -n 6144 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 12288 -n 6144 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 6144x12288x8192: +10.1%, same MT [2432,3712]
-./clients/hipblaslt-bench -m 6144 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 6144 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 16384x8192x8192: +31.4%, DIFF MT [4864,11520]
-./clients/hipblaslt-bench -m 16384 -n 8192 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 16384 -n 8192 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 8192x16384x8192: +30.7%, DIFF MT [4864,3328]
-./clients/hipblaslt-bench -m 8192 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 8192 -n 16384 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 20480x10240x8192: +47.7%, same MT [14336,6144]
-./clients/hipblaslt-bench -m 20480 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 20480 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x20480x8192: +44.2%, same MT [7168,3072]
-./clients/hipblaslt-bench -m 10240 -n 20480 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 20480 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 12288x10240x8192: +43.0%, same MT [6144,6144]
-./clients/hipblaslt-bench -m 12288 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 12288 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x12288x8192: +41.5%, same MT [5120,5120]
-./clients/hipblaslt-bench -m 10240 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 12288 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 10240x5120x8192: +5.9%, DIFF MT [3072,7168]
-./clients/hipblaslt-bench -m 10240 -n 5120 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 10240 -n 5120 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-
-# 5120x10240x8192: -3.4%, DIFF MT [2048,3072] (LOSS)
-./clients/hipblaslt-bench -m 5120 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100
-./clients/hipblaslt-bench -m 5120 -n 10240 -k 8192 --precision f16_r --device 7 --api_method c -i 100 -j 100 --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info
-```
-
-### Batch Script to Reproduce All Results
-
-```bash
-#!/bin/bash
-cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
-BENCH="./clients/hipblaslt-bench"
-C="--precision f16_r --device 7 --api_method c -i 100 -j 100"
-MT="--multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints --print_kernel_info"
-
-for DIMS in \
-  10240,10240,4096 10240,10240,5120 10240,10240,6144 10240,10240,7168 \
-  10240,10240,8192 10240,10240,10240 10240,10240,16384 10240,10240,32768 \
-  10752,10752,8192 11264,11264,8192 11776,11776,8192 12288,12288,8192 \
-  12800,12800,8192 13312,13312,8192 13824,13824,8192 14336,14336,8192 \
-  14848,14848,8192 15360,15360,8192 16384,16384,8192 \
-  15360,15360,4096 14336,14336,4096 16384,16384,16384 12288,12288,12288 \
-  12288,6144,8192 6144,12288,8192 16384,8192,8192 8192,16384,8192 \
-  20480,10240,8192 10240,20480,8192 12288,10240,8192 10240,12288,8192 \
-  10240,5120,8192 5120,10240,8192; do
-
-  M=$(echo $DIMS | cut -d, -f1)
-  N=$(echo $DIMS | cut -d, -f2)
-  K=$(echo $DIMS | cut -d, -f3)
-  echo "=== ${M}x${N}x${K} ==="
-  echo "Baseline:"
-  $BENCH -m $M -n $N -k $K $C
-  echo "Multi-MT S17:"
-  $BENCH -m $M -n $N -k $K $C $MT
-  echo ""
-done
-```
+**When to use**: M or N ≥ 10240 AND K ≥ 4096 AND baseline < 1.1 TF  
+**Expected gain**: +21.6% average, +32.0% on winning cases, up to +71%  
+**Win rate**: 70% (31/44), with gains typically +15% to +55%  
+**Avoid when**: Baseline already > 1.2 TF (losses up to -8%)
