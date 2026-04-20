@@ -14,6 +14,7 @@
  * - Policy ID/name consistency
  */
 
+#include "PlatformUtils.hpp"
 #include "descriptors/EngineHeuristicDescriptor.hpp"
 #include "descriptors/GraphDescriptor.hpp"
 #include "handle/Handle.hpp"
@@ -36,10 +37,10 @@ namespace
 // Tests binaries are in build/bin/, plugins are in build/lib/hipdnn_plugins/heuristics/
 std::filesystem::path getTestPluginDirectory()
 {
-    // Get the directory of the test binary (build/bin/)
-    const std::filesystem::path binDir = std::filesystem::current_path() / "bin";
-    // Navigate to build/lib/hipdnn_plugins/heuristics/
-    return binDir.parent_path() / "lib" / "hipdnn_plugins" / "heuristics";
+    // Get the directory containing the test binary, then navigate to heuristic plugins directory
+    // Test binary is in build/bin/, plugins are in build/lib/hipdnn_plugins/heuristics/
+    const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
+    return testBinDir.parent_path() / "lib" / "hipdnn_plugins" / "heuristics";
 }
 } // anonymous namespace
 

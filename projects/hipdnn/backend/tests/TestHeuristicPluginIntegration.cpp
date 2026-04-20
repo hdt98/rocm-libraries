@@ -634,6 +634,7 @@ TEST_F(IntegrationHeuristicPlugin, LoadGoodPluginSucceeds)
 
     // Load the plugin
     SharedLibrary lib(pluginPath);
+    // NOLINTNEXTLINE(misc-const-correctness)
     ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
@@ -862,6 +863,7 @@ TEST_F(IntegrationHeuristicPlugin, LoadPluginWithoutOptionalSymbolsSucceeds)
     SharedLibrary lib(pluginPath);
 
     // Should load successfully despite missing optional symbols
+    // NOLINTNEXTLINE(misc-const-correctness)
     ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
 }
 TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalPolicyNameHasName)
