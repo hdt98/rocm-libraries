@@ -12,37 +12,6 @@
 
 namespace ck_tile {
 
-template <typename ADataType_,
-          typename BDataType_,
-          typename CDataType_,
-          typename BlockGemmShape_,
-          typename Traits_,
-          GemmPipelineScheduler Scheduler_ = GemmPipelineScheduler::Intrawave,
-          typename AElementWise_           = ck_tile::element_wise::PassThrough,
-          typename BElementWise_           = ck_tile::element_wise::PassThrough,
-          typename ComputeDataType_        = ADataType_,
-          bool FixedVectorSize_            = false,
-          index_t VectorSizeA_             = 1,
-          index_t VectorSizeB_             = 1>
-struct MXGemmPipelineProblem : UniversalGemmPipelineProblem<ADataType_,
-                                                            BDataType_,
-                                                            CDataType_,
-                                                            BlockGemmShape_,
-                                                            Traits_,
-                                                            Scheduler_,
-                                                            AElementWise_,
-                                                            BElementWise_,
-                                                            ComputeDataType_,
-                                                            FixedVectorSize_,
-                                                            VectorSizeA_,
-                                                            VectorSizeB_>
-{
-    static constexpr int ScaleGranularityK = 32;
-    static constexpr int MXdlPack          = 2;
-    static constexpr int NXdlPack          = 2;
-    static constexpr int KXdlPack          = 2;
-};
-
 template <typename GemmConfig>
 struct MXEpilogueTraits
 {
@@ -123,10 +92,10 @@ struct MXGemmPreshufflePipelineAGmemBGmemCRegV1
     static constexpr index_t MPerBlockPerIter = kMPerBlock / MIterPerWarp;
     static constexpr index_t KPerBlockPerIter = kKPerBlock / KIterPerWarp;
 
-    static constexpr index_t MXdlPack          = Problem::MXdlPack;
-    static constexpr index_t NXdlPack          = Problem::NXdlPack;
-    static constexpr index_t KXdlPack          = Problem::KXdlPack;
-    static constexpr index_t ScaleGranularityK = Problem::ScaleGranularityK;
+    static constexpr index_t ScaleGranularityK = 32;
+    static constexpr index_t MXdlPack          = 2;
+    static constexpr index_t NXdlPack          = 2;
+    static constexpr index_t KXdlPack          = 2;
 
     static constexpr index_t AK1 = 16 * APackedSize / sizeof(ADataType);
     static constexpr index_t BK1 = 16 * BPackedSize / sizeof(BDataType);

@@ -50,18 +50,19 @@ float mx_gemm_calc(const MXGemmHostArgs<ScaleM, ScaleN>& args, const ck_tile::st
     static_assert(sizeof(ComputeDataType) >= sizeof(BDataType),
                   "mixed_prec_gemm requires ADataType is a wider type than BDataType");
 
-    using MXPipelineProblem = ck_tile::MXGemmPipelineProblem<ADataType,
-                                                             BDataType,
-                                                             AccDataType,
-                                                             GemmShape,
-                                                             MXGemmTraits,
-                                                             GemmConfig::Scheduler,
-                                                             ck_tile::element_wise::PassThrough,
-                                                             ck_tile::element_wise::PassThrough,
-                                                             ADataType,
-                                                             false,
-                                                             1,
-                                                             1>;
+    using MXPipelineProblem =
+        ck_tile::UniversalGemmPipelineProblem<ADataType,
+                                              BDataType,
+                                              AccDataType,
+                                              GemmShape,
+                                              MXGemmTraits,
+                                              GemmConfig::Scheduler,
+                                              ck_tile::element_wise::PassThrough,
+                                              ck_tile::element_wise::PassThrough,
+                                              ADataType,
+                                              false,
+                                              1,
+                                              1>;
 
     // Use the MX GEMM Preshuffle pipeline or
     // the new MX comp_async pipeline with MX scaling support
