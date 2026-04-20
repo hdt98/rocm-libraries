@@ -3,11 +3,8 @@
 
 #pragma once
 
-#include <cstring>
-
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_data_sdk/flatbuffer_utilities/FlatbufferTypeHelpers.hpp>
-#include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_gpu_ref/GpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/FlatbufferDatatypeMapping.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/detail/PlanUtils.hpp>
@@ -62,32 +59,22 @@ public:
 
     void execute(const std::unordered_map<int64_t, void*>& variantPack) override
     {
-        hipdnn_data_sdk::utilities::Tensor<XDataType> xTensor(_params.xTensor.dims,
-                                                              _params.xTensor.strides);
-        hipdnn_data_sdk::utilities::Tensor<WDataType> wTensor(_params.wTensor.dims,
-                                                              _params.wTensor.strides);
-        hipdnn_data_sdk::utilities::Tensor<OutputDataType> yTensor(_params.yTensor.dims,
-                                                                   _params.yTensor.strides);
-
-        std::memcpy(xTensor.rawHostData(),
-                    variantPack.at(_params.xTensor.uid),
-                    xTensor.elementSpace() * sizeof(XDataType));
-        std::memcpy(wTensor.rawHostData(),
-                    variantPack.at(_params.wTensor.uid),
-                    wTensor.elementSpace() * sizeof(WDataType));
+        hipdnn_gpu_ref::ShallowGpuTensor<XDataType> xTensor(
+            variantPack.at(_params.xTensor.uid), _params.xTensor.dims, _params.xTensor.strides);
+        hipdnn_gpu_ref::ShallowGpuTensor<WDataType> wTensor(
+            variantPack.at(_params.wTensor.uid), _params.wTensor.dims, _params.wTensor.strides);
+        hipdnn_gpu_ref::ShallowGpuTensor<OutputDataType> yTensor(
+            variantPack.at(_params.yTensor.uid), _params.yTensor.dims, _params.yTensor.strides);
 
         hipdnn_gpu_ref::GpuFpReferenceConvolution::
-            fprop<XDataType, WDataType, OutputDataType, ComputeDataType>(xTensor,
-                                                                         wTensor,
-                                                                         yTensor,
-                                                                         _params.stride,
-                                                                         _params.dilation,
-                                                                         _params.prePadding,
-                                                                         _params.postPadding);
-
-        std::memcpy(variantPack.at(_params.yTensor.uid),
-                    yTensor.rawHostData(),
-                    yTensor.elementSpace() * sizeof(OutputDataType));
+            fprop<XDataType, WDataType, OutputDataType, ComputeDataType>(
+                xTensor,
+                wTensor,
+                yTensor,
+                _params.stride,
+                _params.dilation,
+                _params.prePadding,
+                _params.postPadding);
     }
 
 private:

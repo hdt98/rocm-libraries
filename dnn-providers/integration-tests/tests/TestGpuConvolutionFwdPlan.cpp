@@ -9,81 +9,17 @@
 #include <vector>
 
 #include <hip/hip_runtime.h>
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
 #include <hipdnn_data_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
+#include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/detail/GpuConvolutionFwdPlan.hpp"
 
-namespace
-{
-
 using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_integration_tests::test_utils;
 using namespace hipdnn_integration_tests::gpu_graph_executor::detail;
-
-std::vector<int64_t> computePackedStrides(const std::vector<int64_t>& dims)
-{
-    std::vector<int64_t> strides(dims.size());
-    int64_t stride = 1;
-    for(auto i = static_cast<int>(dims.size()) - 1; i >= 0; --i)
-    {
-        strides[static_cast<size_t>(i)] = stride;
-        stride *= dims[static_cast<size_t>(i)];
-    }
-    return strides;
-}
-
-flatbuffers::FlatBufferBuilder createConvFwdGraph(int64_t xUid,
-                                                  int64_t wUid,
-                                                  int64_t yUid,
-                                                  const std::vector<int64_t>& xDims,
-                                                  const std::vector<int64_t>& wDims,
-                                                  const std::vector<int64_t>& yDims,
-                                                  const std::vector<int64_t>& xStrides,
-                                                  const std::vector<int64_t>& wStrides,
-                                                  const std::vector<int64_t>& yStrides,
-                                                  const std::vector<int64_t>& padding,
-                                                  const std::vector<int64_t>& convStride,
-                                                  const std::vector<int64_t>& dilation,
-                                                  DataType dataType)
-{
-    flatbuffers::FlatBufferBuilder builder;
-
-    std::vector<flatbuffers::Offset<TensorAttributes>> tensors;
-    tensors.push_back(
-        CreateTensorAttributesDirect(builder, xUid, "x", dataType, &xStrides, &xDims));
-    tensors.push_back(
-        CreateTensorAttributesDirect(builder, wUid, "w", dataType, &wStrides, &wDims));
-    tensors.push_back(
-        CreateTensorAttributesDirect(builder, yUid, "y", dataType, &yStrides, &yDims));
-
-    auto convAttrs = CreateConvolutionFwdAttributesDirect(builder,
-                                                          xUid,
-                                                          wUid,
-                                                          yUid,
-                                                          &padding,
-                                                          &padding,
-                                                          &convStride,
-                                                          &dilation,
-                                                          ConvMode::CROSS_CORRELATION);
-
-    std::vector<flatbuffers::Offset<Node>> nodes;
-    nodes.push_back(CreateNodeDirect(builder,
-                                     "conv_fwd_node",
-                                     DataType::FLOAT,
-                                     NodeAttributes::ConvolutionFwdAttributes,
-                                     convAttrs.Union()));
-
-    auto graph = CreateGraphDirect(
-        builder, "ConvFwdTestGraph", dataType, dataType, DataType::FLOAT, &tensors, &nodes);
-
-    builder.Finish(graph);
-    return builder;
-}
-
-} // namespace
 
 TEST(TestGpuConvolutionFwdPlanBuilder, PlanConstruction)
 {
@@ -244,10 +180,9 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
         yCount *= static_cast<size_t>(d);
     }
 
-    // Allocate and fill input data
+    // Prepare host input data
     std::vector<float> xData(xCount);
     std::vector<float> wData(wCount);
-    std::vector<float> gpuYData(yCount, 0.0f);
 
     for(size_t i = 0; i < xCount; ++i)
     {
@@ -258,13 +193,36 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlan)
         wData[i] = 1.0f;
     }
 
-    // Execute the plan
+    // Allocate device buffers and copy inputs to device
+    void* dX = nullptr;
+    void* dW = nullptr;
+    void* dY = nullptr;
+    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(float)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(float)), hipSuccess);
+    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(float)), hipSuccess);
+    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(float)), hipSuccess);
+
+    ASSERT_EQ(
+        hipMemcpy(dX, xData.data(), xCount * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
+    ASSERT_EQ(
+        hipMemcpy(dW, wData.data(), wCount * sizeof(float), hipMemcpyHostToDevice), hipSuccess);
+
+    // Execute the plan with device pointers
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = xData.data();
-    variantPack[W_UID] = wData.data();
-    variantPack[Y_UID] = gpuYData.data();
+    variantPack[X_UID] = dX;
+    variantPack[W_UID] = dW;
+    variantPack[Y_UID] = dY;
 
     patient.execute(variantPack);
+
+    // Copy GPU result back to host
+    std::vector<float> gpuYData(yCount);
+    ASSERT_EQ(
+        hipMemcpy(gpuYData.data(), dY, yCount * sizeof(float), hipMemcpyDeviceToHost), hipSuccess);
+
+    static_cast<void>(hipFree(dX));
+    static_cast<void>(hipFree(dW));
+    static_cast<void>(hipFree(dY));
 
     // Run CPU reference for comparison
     hipdnn_data_sdk::utilities::Tensor<float> cpuX(xDims, xStrides);

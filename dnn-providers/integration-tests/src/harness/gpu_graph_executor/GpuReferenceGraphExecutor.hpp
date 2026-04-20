@@ -57,7 +57,6 @@ private:
                 auto tensor = hipdnn_test_sdk::detail::createTensorFromAttribute(*attr);
                 virtualTensors.push_back(std::move(tensor));
 
-                // TODO: Switch to rawDeviceData() when real GPU plans are added
                 updatedVariantPack[id] = virtualTensors.back()->rawHostData();
             }
         }
