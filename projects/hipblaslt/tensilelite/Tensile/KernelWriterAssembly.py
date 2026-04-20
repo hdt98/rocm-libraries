@@ -10031,6 +10031,11 @@ class KernelWriterAssembly(KernelWriter):
       comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
       if "TensorLoadToLds" in self.states.setMemTokenInsts:
         comp.setMemToken(self.states.setMemTokenInsts["TensorLoadToLds"])
+      if self.states.inTailLoop and not kernel["1LDSBuffer"]:
+        ldsAddrSgprName = comp.getLdsAddrSgprName("tdmAGroup0")
+        clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
+        imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+                         comment="Reset TDM LDS swap bit for tail loop"))
       imod.add(comp.issueLoad("tdmAGroup0", "tdmAGroup1", None, None))
       return imod
 
@@ -10039,6 +10044,11 @@ class KernelWriterAssembly(KernelWriter):
       if "TensorLoadToLds" in self.states.setMemTokenInsts:
         comp.setMemToken(self.states.setMemTokenInsts["TensorLoadToLds"])
       if kernel["ProblemType"]["MXBlockA"]:
+        if self.states.inTailLoop and not kernel["1LDSBuffer"]:
+          ldsAddrSgprName = comp.getLdsAddrSgprName("tdmMXSAGroup0")
+          clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
+          imod.middle.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+                                  comment="Reset TDM LDS swap bit for tail loop"))
         imod.middle.add(comp.issueLoad("tdmMXSAGroup0", "tdmMXSAGroup1", None, None))
       return imod
 
@@ -10048,6 +10058,11 @@ class KernelWriterAssembly(KernelWriter):
         comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
         if "TensorLoadToLds" in self.states.setMemTokenInsts:
           comp.setMemToken(self.states.setMemTokenInsts["TensorLoadToLds"])
+        if self.states.inTailLoop and not kernel["1LDSBuffer"]:
+          ldsAddrSgprName = comp.getLdsAddrSgprName("tdmBGroup0")
+          clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
+          imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+                           comment="Reset TDM LDS swap bit for tail loop"))
         imod.add(comp.issueLoad("tdmBGroup0", "tdmBGroup1", None, None))
       return imod
 
@@ -10057,6 +10072,11 @@ class KernelWriterAssembly(KernelWriter):
         comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
         if "TensorLoadToLds" in self.states.setMemTokenInsts:
           comp.setMemToken(self.states.setMemTokenInsts["TensorLoadToLds"])
+        if self.states.inTailLoop and not kernel["1LDSBuffer"]:
+          ldsAddrSgprName = comp.getLdsAddrSgprName("tdmMXSBGroup0")
+          clearMask = ~kernel["LdsOffsetA_Blk"] & 0xFFFFFFFF
+          imod.add(SAndB32(dst=sgpr(ldsAddrSgprName), src0=sgpr(ldsAddrSgprName), src1=hex(clearMask),
+                           comment="Reset TDM LDS swap bit for tail loop"))
         imod.add(comp.issueLoad("tdmMXSBGroup0", "tdmMXSBGroup1", None, None))
       return imod
 
