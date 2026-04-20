@@ -18,11 +18,12 @@
 #include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
-#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
 #include <nlohmann/json.hpp>
 #include <vector>
 
+#include "harness/IReferenceGraphExecutor.hpp"
+#include "harness/ReferenceGraphExecutorFactory.hpp"
 #include "harness/SharedHandle.hpp"
 #include "harness/TestConfig.hpp"
 
@@ -144,7 +145,7 @@ protected:
         initializeBundle(graph, cpuBundle, seed);
 
         ASSERT_NO_FATAL_FAILURE(executeGpuGraph(getSharedHandle(), graph, gpuBundle));
-        executeCpuGraph(graph, cpuBundle);
+        executeReferenceGraph(graph, cpuBundle);
 
         ASSERT_GE(outputTensorIds.size(), 1)
             << "At least one output tensor id must be specified for "
@@ -159,6 +160,8 @@ protected:
             registerValidator();
         }
 
+        const bool referenceUsesDevice = getReferenceExecutor().requiresDeviceMemory();
+
         for(const auto& tensorId : outputTensorIds)
         {
             auto& cpuTensor = cpuBundle.tensors.at(tensorId);
@@ -169,6 +172,13 @@ protected:
             // the tensor that the data there is now valid so that it knows to copy from device to
             // host when requested by the validation step.
             gpuTensor->markDeviceModified();
+
+            // GPU reference executor writes to device memory — mark reference
+            // tensors so host access triggers device-to-host sync
+            if(referenceUsesDevice)
+            {
+                cpuTensor->markDeviceModified();
+            }
 
             if(_tensorIdToValidatorMap.find(tensorId) == _tensorIdToValidatorMap.end())
             {
@@ -331,15 +341,29 @@ protected:
         ASSERT_EQ(result.code, hipdnn_frontend::ErrorCode::OK) << result.err_msg;
     }
 
-    void executeCpuGraph(hipdnn_frontend::graph::Graph& graph,
-                         hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
+    void executeReferenceGraph(hipdnn_frontend::graph::Graph& graph,
+                               hipdnn_test_sdk::utilities::GraphTensorBundle& bundle)
     {
         auto [serializedGraph, serErr] = graph.to_binary();
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
-        hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor().execute(
-            serializedGraph.data(), serializedGraph.size(), bundle.toHostVariantPack());
+        auto& executor = getReferenceExecutor();
+        auto variantPack = executor.requiresDeviceMemory() ? bundle.toDeviceVariantPack()
+                                                           : bundle.toHostVariantPack();
+
+        executor.execute(serializedGraph.data(), serializedGraph.size(), variantPack);
     }
+
+    IReferenceGraphExecutor& getReferenceExecutor()
+    {
+        if(!_referenceExecutor)
+        {
+            _referenceExecutor = ReferenceGraphExecutorFactory::createFromConfig();
+        }
+        return *_referenceExecutor;
+    }
+
+    std::unique_ptr<IReferenceGraphExecutor> _referenceExecutor;
 
     std::string getOutputTensorName(int64_t tensorId)
     {

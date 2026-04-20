@@ -11,6 +11,9 @@
 namespace hipdnn_integration_tests::gpu_graph_executor::detail
 {
 
+// Implementations don't access `this`, but the methods must remain non-static
+// because they are virtual overrides.
+// NOLINTBEGIN(readability-convert-member-functions-to-static)
 class IGpuGraphNodePlanBuilder
 {
 public:
@@ -28,5 +31,6 @@ public:
                       const hipdnn_flatbuffers_sdk::data_objects::Node& node) const
         = 0;
 };
+// NOLINTEND(readability-convert-member-functions-to-static)
 
 } // namespace hipdnn_integration_tests::gpu_graph_executor::detail

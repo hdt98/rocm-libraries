@@ -100,6 +100,10 @@ int main(int argc, char** argv) noexcept
             .help("FAIL instead of SKIP when no engine supports a graph");
         parser.add_argument("--tc", "--test-config")
             .help("Path to a TOML configuration file for per-test tolerance overrides.");
+        parser.add_argument("--reference-executor")
+            .default_value(std::string("cpu"))
+            .help("Reference executor for validation: 'cpu' (default) or 'gpu'. "
+                  "Can also be set via HIPDNN_TEST_REFERENCE_EXECUTOR env var.");
 
         std::vector<std::string> remainingArgs;
         try
@@ -136,6 +140,26 @@ int main(int argc, char** argv) noexcept
             }
         }
 
+        // Parse --reference-executor argument
+        std::optional<hipdnn_integration_tests::ReferenceExecutorType> refExecType;
+        if(parser.is_used("--reference-executor"))
+        {
+            auto val = parser.get<std::string>("--reference-executor");
+            if(val == "gpu")
+            {
+                refExecType = hipdnn_integration_tests::ReferenceExecutorType::GPU;
+            }
+            else if(val == "cpu")
+            {
+                refExecType = hipdnn_integration_tests::ReferenceExecutorType::CPU;
+            }
+            else
+            {
+                std::cerr << "Error: --reference-executor must be 'cpu' or 'gpu'\n";
+                return 1;
+            }
+        }
+
         // Parse --test-article argument and load explicit plugin if provided
         std::optional<std::filesystem::path> articlePath;
         if(parser.is_used("--test-article"))
@@ -166,7 +190,8 @@ int main(int argc, char** argv) noexcept
         hipdnn_integration_tests::TestConfig::initialize(std::move(articlePath),
                                                          std::move(engineName),
                                                          failOnUnsupported,
-                                                         std::move(configPath));
+                                                         std::move(configPath),
+                                                         refExecType);
 
         // Reconstruct argc/argv for GTest from remaining (unknown) args.
         // argv[0] (program name) must be first — GTest requires it.
