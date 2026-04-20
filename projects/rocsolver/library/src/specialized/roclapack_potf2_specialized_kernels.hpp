@@ -37,10 +37,6 @@
 #include <algorithm>
 #include <cmath>
 
-#define ASSERT(x) \
-    {             \
-    }
-
 ROCSOLVER_BEGIN_NAMESPACE
 
 /**
@@ -73,8 +69,6 @@ ROCSOLVER_KERNEL void potf2_kernel_small(const bool is_upper,
 
     // get batch index
     auto const bid = hipBlockIdx_z;
-    ASSERT(AA != nullptr);
-    ASSERT(info != nullptr);
 
     T* const A = load_ptr_batch(AA, bid, shiftA, strideA);
     INFO* const info_bid = info + bid;
@@ -392,4 +386,3 @@ rocblas_status potf2_run_small(rocblas_handle handle,
         const I batch_count, const I row_offset)
 
 ROCSOLVER_END_NAMESPACE
-#undef ASSERT
