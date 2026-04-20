@@ -73,6 +73,25 @@ except ImportError:
     from yaml import SafeDumper as yamlDumper
     printWarning("CSafeDumper not installed. Fallback to SafeDumper.")
 
+# Custom YAML loader that preserves int type for 0 and 1 (doesn't auto-convert to bool)
+# This allows type validation to catch int-vs-bool mismatches in YAML files.
+class StrictTypeLoader(yamlLoader):
+    """YAML loader that does NOT auto-convert 0/1 to False/True.
+
+    Standard YAML parsers treat 0 and 1 as booleans, but we want to preserve
+    the actual type written in the YAML to catch type mismatches during validation.
+    """
+    pass
+
+# Remove the implicit bool resolver for integers
+# By default, YAML treats various forms as bool (yes/no, true/false, on/off, 0/1)
+# We remove the rule that treats plain scalars matching bool patterns as booleans
+# This forces explicit 'true'/'false' for booleans and preserves 0/1 as integers
+StrictTypeLoader.yaml_implicit_resolvers = {
+    k: [r for r in v if r[0] != 'tag:yaml.org,2002:bool']
+    for k, v in yamlLoader.yaml_implicit_resolvers.items()
+}
+
 try:
     import msgpack
     _msgpack_available = True
@@ -202,7 +221,7 @@ def read(filename, customizedLoader=False):
 def readYAML(filename):
     """Reads and returns YAML data from file."""
     with open(filename, "r") as f:
-        data = yaml.load(f, yamlLoader)
+        data = yaml.load(f, StrictTypeLoader)
     return data
 
 
@@ -374,7 +393,7 @@ def parseLibraryLogicData(
                 .format(srcFile, data["MinimumRequiredVersion"], __version__) )
 
     # unpack problemType
-    problemType = ProblemType(data["ProblemType"], printIndexAssignmentInfo)
+    problemType = ProblemType(data["ProblemType"], printIndexAssignmentInfo, srcFile=srcFile)
 
     # unpack solution
     def solutionStateToSolution(solutionState, assembler, isaInfoMap) -> Solution:

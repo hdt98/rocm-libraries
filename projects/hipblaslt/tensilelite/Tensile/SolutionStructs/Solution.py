@@ -42,7 +42,7 @@ from Tensile.Common.GlobalParameters import defaultSolution, \
                                             defaultInternalSupportParams
 from Tensile.Common.ValidParameters import validParameters
 from Tensile.SolutionStructs.Naming import getSolutionNameFull
-from Tensile.SolutionStructs.Problem import ProblemType
+from Tensile.SolutionStructs.Problem import ProblemType, _defaultProblemType
 from Tensile.Toolchain.Component import Assembler
 from Tensile.Components.CustomSchedule import hasCustomSchedule
 
@@ -74,16 +74,34 @@ def _getExpectedTypes(validParams):
 # Pre-compute once at import time so the per-Solution cost is a dict lookup.
 _expectedParamTypes = _getExpectedTypes(validParameters)
 
+# Pre-compute expected types for ProblemType parameters from _defaultProblemType
+# Note: For _defaultProblemType, the values are defaults (not lists of allowed values),
+# so we just take type(defaultValue) directly.
+_expectedProblemTypeParamTypes = {
+    key: {type(value)} for key, value in _defaultProblemType.items()
+}
+
 # Parameters to skip during type validation because YAML serialization
 # inherently produces a different type (e.g. [9, 0, 10] -> list) and the
 # conversion to the canonical type happens downstream in the pipeline.
-_skipTypeCheck = {"ISA"}
+# Also skip DataType* parameters as they are converted from strings/ints to DataType objects.
+_skipTypeCheck = {
+    "ISA",
+    "DataType", "DataTypeA", "DataTypeB", "DataTypeC", "DataTypeD", "DataTypeE",
+    "MacDataTypeA", "MacDataTypeB",
+    "DataTypeAmaxD", "DataTypeAmaxC", "DataTypeAmaxA", "DataTypeAmaxB",
+    "DataTypeMXSA", "DataTypeMXSB",
+    "DestDataType", "ComputeDataType",
+    "F32XdlMathOp",  # Also converted to DataType
+}
 
 
 # Module-level collector that accumulates type mismatches across all Solution
 # instances during a build.  Key is (param_name, actual_type_name,
 # expected_type_str); value is a dict with 'count', 'values' (set of unique
 # repr(value)), and 'files' (set of source file paths).
+# NOTE: Due to multiprocessing in TensileCreateLibrary, this collector won't
+# aggregate across worker processes. Warnings are printed immediately instead.
 _typeMismatchCollector = {}
 
 
@@ -139,6 +157,50 @@ def validateParameterTypes(state, srcFile=""):
         entry["files"].add(srcFile)
 
 
+def validateProblemTypeParameterTypes(state, srcFile=""):
+  """Validate that every ProblemType parameter has the correct Python type.
+
+  Similar to validateParameterTypes, but checks ProblemType parameters
+  against the types implied by ``_defaultProblemType``.  A ``bool`` where
+  ``int`` is expected (or vice versa) is the most common error.
+
+  Due to multiprocessing, warnings are printed immediately rather than
+  collected for a summary at the end.
+
+  Args:
+      state: The ProblemType state dict (parameter name -> value).
+      srcFile: The YAML source file path, included in warning messages.
+  """
+  import sys
+
+  for key, value in state.items():
+    if key not in _expectedProblemTypeParamTypes or key in _skipTypeCheck:
+      continue
+    expectedTypes = _expectedProblemTypeParamTypes[key]
+    actualType = type(value)
+    # Use type() not isinstance() so that bool and int are distinguished
+    if actualType not in expectedTypes:
+      expectedStr = " or ".join(sorted(t.__name__ for t in expectedTypes))
+      collectorKey = (key, actualType.__name__, expectedStr)
+      if collectorKey not in _typeMismatchCollector:
+        _typeMismatchCollector[collectorKey] = {
+          "count": 0,
+          "values": set(),
+          "files": set(),
+        }
+        # Print warning immediately on first occurrence
+        file_info = f" in {srcFile}" if srcFile else ""
+        print(f"\nTensile::WARNING: ProblemType parameter '{key}' has type {actualType.__name__} but expected {expectedStr}{file_info}.", file=sys.stderr)
+        print(f"                  Example value: {repr(value)}", file=sys.stderr)
+        print(f"                  This may indicate incorrect YAML formatting.", file=sys.stderr)
+        print(f"                  To fix: Use 'true'/'false' for booleans, not 0/1.\n", file=sys.stderr)
+      entry = _typeMismatchCollector[collectorKey]
+      entry["count"] += 1
+      entry["values"].add(repr(value))
+      if srcFile:
+        entry["files"].add(srcFile)
+
+
 def printTypeMismatchSummary():
   """Print a summary of all collected type mismatches to stderr.
 
@@ -146,6 +208,10 @@ def printTypeMismatchSummary():
   returns 0.  Otherwise it emits a WARNING block to stderr with one line
   per unique (parameter, actual_type) combination showing the count,
   observed values, and expected type.
+
+  NOTE: Due to multiprocessing in TensileCreateLibrary, the collector in the
+  main process may not see all mismatches from worker processes. Warnings are
+  also printed immediately during validation for this reason.
 
   Returns:
       int: The total number of individual mismatches (0 if clean).

@@ -735,11 +735,17 @@ class ProblemType(Mapping):
   def FromDefaultConfig(printIndexAssignmentInfo: bool):
     return ProblemType(_defaultProblemType, printIndexAssignmentInfo)
 
-  def __init__(self, config, printIndexAssignmentInfo: bool):
+  def __init__(self, config, printIndexAssignmentInfo: bool, srcFile: str = ""):
     self.state = {}
 
     for key in _defaultProblemType:
       assignParameterWithDefault(self.state, key, config, _defaultProblemType)
+
+    # Validate parameter types against the _defaultProblemType registry.
+    # Import here to avoid circular dependency issues at module level.
+    from .Solution import validateProblemTypeParameterTypes
+    # Pass the source file for tracking
+    validateProblemTypeParameterTypes(self.state, srcFile=srcFile)
 
     # adjusting all data types
     if "DataType" in config:
