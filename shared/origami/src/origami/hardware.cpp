@@ -99,13 +99,13 @@ hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties,
 
 hardware_t hardware_t::get_hardware_for_device(int deviceId) {
   hipDeviceProp_t prop;
-  hipError_t e = hipGetDeviceProperties(&prop, deviceId);
-  if (e) { throw std::runtime_error(hipGetErrorString(e)); }
+  hipError_t e = hip_get_device_properties(&prop, deviceId);
+  if (e) { throw std::runtime_error(hip_get_error_string(e)); }
 
   size_t num_xcds = 0;
 #if HIP_VERSION_MAJOR >= 7
   int queried_xccs = 0;
-  if (hipDeviceGetAttribute(&queried_xccs, hipDeviceAttributeNumberOfXccs, deviceId) == hipSuccess
+  if (hip_get_device_attribute(&queried_xccs, hipDeviceAttributeNumberOfXccs, deviceId) == hipSuccess
       && queried_xccs > 0) {
     num_xcds = static_cast<size_t>(queried_xccs);
   }

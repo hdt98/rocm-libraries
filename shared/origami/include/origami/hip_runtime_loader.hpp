@@ -37,6 +37,7 @@ namespace origami {
 bool hip_runtime_available();
 
 hipError_t hip_get_device_properties(hipDeviceProp_t* prop, int deviceId);
+hipError_t hip_get_device_attribute(int* value, hipDeviceAttribute_t attr, int deviceId);
 const char* hip_get_error_string(hipError_t err);
 
 }  // namespace origami
