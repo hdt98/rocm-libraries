@@ -73,18 +73,6 @@ namespace rocisa
             return "F8B8N";
         case rocisa::DataType::BFloat8Float8_fnuz:
             return "B8F8N";
-<<<<<<< HEAD
-        case rocisa::DataType::Float6:
-            return "F6";
-        case rocisa::DataType::BFloat6:
-            return "B6";
-        case rocisa::DataType::Float4:
-            return "F4";
-        case rocisa::DataType::MXScale:
-            return "MX";
-        case rocisa::DataType::Count:
-            return "Invalid";
-=======
 #ifdef TENSILE_USE_FP6
         case rocisa::DataType::Float6:
             return "F6";
@@ -109,13 +97,14 @@ namespace rocisa
         case rocisa::DataType::Float4:
             return "F4";
 #endif
+        case rocisa::DataType::MXScale:
+            return "MX";
         case rocisa::DataType::E8:
             return "E8";
         case rocisa::DataType::E5M3:
             return "E5M3";
         case rocisa::DataType::Count:
         ;
->>>>>>> origin/develop
         }
         return "Invalid";
     }
@@ -162,7 +151,6 @@ namespace rocisa
             return TensileLite::TypeInfo<Float8BFloat8_fnuz>::ElementSize;
         case rocisa::DataType::BFloat8Float8_fnuz:
             return TensileLite::TypeInfo<BFloat8Float8_fnuz>::ElementSize;
-<<<<<<< HEAD
 #ifdef _WIN32
         case rocisa::DataType::Float6:
             return TensileLite::TypeInfo<TensileLite::Float6>::ElementSize;
@@ -171,25 +159,13 @@ namespace rocisa
         case rocisa::DataType::Float4:
             return TensileLite::TypeInfo<TensileLite::Float4>::ElementSize;
 #else // _WIN32
-        case rocisa::DataType::Float6:
-            return TensileLite::TypeInfo<TensileLite::Float6x32>::ElementSize;
-        case rocisa::DataType::BFloat6:
-            return TensileLite::TypeInfo<TensileLite::BFloat6x32>::ElementSize;
-        case rocisa::DataType::Float4:
-            return TensileLite::TypeInfo<TensileLite::Float4x2>::ElementSize;
-#endif // _WIN32
-        case rocisa::DataType::MXScale:
-            return TensileLite::TypeInfo<TensileLite::MXScale>::ElementSize;
-        case rocisa::DataType::Count:
-            return 1;
-=======
 #ifdef TENSILE_USE_FP6
         case rocisa::DataType::Float6:
-            return TensileLite::TypeInfo<TensileLite::Float6x16>::ElementSize;
+            return TensileLite::TypeInfo<TensileLite::Float6x32>::ElementSize;
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
         case rocisa::DataType::BFloat6:
-            return TensileLite::TypeInfo<TensileLite::BFloat6x16>::ElementSize;
+            return TensileLite::TypeInfo<TensileLite::BFloat6x32>::ElementSize;
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
         case rocisa::DataType::Float4:
@@ -197,23 +173,25 @@ namespace rocisa
 #endif // #ifdef TENSILE_USE_FP4
 #ifndef TENSILE_USE_FP6
         case rocisa::DataType::Float6:
-            return 12.f / 16.f; // same as TypeInfo<Float6x16>, 16 x 6-bit in 12 bytes
+            return 24.f / 32.f; // same as TypeInfo<Float6x32>, 32 x 6-bit in 24 bytes
 #endif
 #ifndef TENSILE_USE_BF6
         case rocisa::DataType::BFloat6:
-            return 12.f / 16.f;
+            return 24.f / 32.f;
 #endif
 #ifndef TENSILE_USE_FP4
         case rocisa::DataType::Float4:
             return 0.5f; // TypeInfo<Float4x2>: 2 x fp4 in 1 byte
 #endif
+#endif // _WIN32
         case rocisa::DataType::E8:
             return TensileLite::TypeInfo<TensileLite::E8>::ElementSize;
         case rocisa::DataType::E5M3:
             return TensileLite::TypeInfo<TensileLite::E5M3>::ElementSize;
+        case rocisa::DataType::MXScale:
+            return TensileLite::TypeInfo<TensileLite::MXScale>::ElementSize;
         case rocisa::DataType::Count:
         ;
->>>>>>> origin/develop
         }
         return 1;
     }
@@ -331,27 +309,21 @@ namespace TensileLite
         registerTypeInfo<BFloat8Float8>();
         registerTypeInfo<Float8BFloat8_fnuz>();
         registerTypeInfo<BFloat8Float8_fnuz>();
-<<<<<<< HEAD
 #ifdef _WIN32
         registerTypeInfo<Float6>();
         registerTypeInfo<BFloat6>();
         registerTypeInfo<Float4>();
 #else // _WIN32
-        registerTypeInfo<Float6x32>();
-        registerTypeInfo<BFloat6x32>();
-        registerTypeInfo<Float4x2>();
-#endif // _WIN32
-        registerTypeInfo<MXScale>();
-=======
 #ifdef TENSILE_USE_FP6
-        registerTypeInfo<Float6x16>();
+        registerTypeInfo<Float6x32>();
 #endif // #ifdef TENSILE_USE_FP6
 #ifdef TENSILE_USE_BF6
-        registerTypeInfo<BFloat6x16>();
+        registerTypeInfo<BFloat6x32>();
 #endif // #ifdef TENSILE_USE_BF6
 #ifdef TENSILE_USE_FP4
         registerTypeInfo<Float4x2>();
 #endif // #ifdef TENSILE_USE_FP4
+        registerTypeInfo<MXScale>();
         registerTypeInfo<E8>();
         registerTypeInfo<E5M3>();
 
@@ -388,7 +360,6 @@ namespace TensileLite
 #ifndef TENSILE_USE_FP4
         addIfMissing(rocisa::DataType::Float4, "F4", 0.5f, 2);
 #endif
->>>>>>> origin/develop
     }
 
     void DataTypeInfo::registerAllTypeInfoOnce()
