@@ -37,7 +37,7 @@ std::filesystem::path getTestPluginPath(const char* pluginName)
     // Get the directory containing the test binary, then navigate to test plugins directory
     // Test binary is in build/bin/, plugins are in build/lib/test_plugins/custom/
     const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
-    const auto pluginDir  = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
+    const auto pluginDir = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
     return pluginDir / hipdnn_data_sdk::utilities::getLibraryName(pluginName);
 }
 } // namespace
