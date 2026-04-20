@@ -146,7 +146,6 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
             // clang-format off
         return {
             // g   n     C     K      img       filter   pad    stride  dilation
-              {32, 256, 1024, 2048, {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {1,  64,  1024, 2048, {14, 14},   {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {1,  256, 192,  192,  {28, 28},   {3, 3}, {1, 1}, {1, 1}, {1, 1}},
               {8,  256, 192,  192,  {28, 28},   {3, 3}, {1, 1}, {1, 1}, {1, 1}},
@@ -158,6 +157,7 @@ struct GroupConvTestConfig<2u> : GroupConvTestConfigBase
               {1,  6,   448,  896,  {118, 182}, {3, 3}, {0, 0}, {2, 2}, {1, 1}},
               {4,  256, 192,  192,  {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {8,  256, 384,  384,  {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
+              {32, 256, 1024, 2048, {28, 28},   {1, 1}, {1, 1}, {2, 2}, {1, 1}},
               {1,  6,   448,  896,  {118, 182}, {1, 1}, {0, 0}, {2, 2}, {1, 1}},
               {4,  16,  224,  224,  {469, 724}, {3, 3}, {1, 1}, {2, 2}, {1, 1}},
         };
@@ -387,9 +387,7 @@ protected:
             {input.GetDataByteSize(), weights.GetDataByteSize(), output.GetDataByteSize()},
             test_skipped);
         if(test_skipped)
-        {
             return;
-        }
 
         input.generate(GenData<T>{});
         weights.generate(GenWeights<T>{});

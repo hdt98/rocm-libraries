@@ -22,7 +22,7 @@ permissions:
 jobs:
   test_component:
     name: 'Test ${{ fromJSON(inputs.component).job_name }} (shard ${{ matrix.shard }} of ${{ fromJSON(inputs.component).total_shards }})'
-    runs-on: 'windows-strix-halo-gpu-rocm-8gb'
+    runs-on: ${{ inputs.test_runs_on }}
     timeout-minutes: 210
     container:
       image: ${{ inputs.platform == 'linux' && 'ghcr.io/rocm/no_rocm_image_ubuntu24_04@sha256:4150afe4759d14822f0e3f8930e1124f26e11f68b5c7b91ec9a02b20b1ebbb98' || null }}
@@ -39,7 +39,7 @@ jobs:
       matrix:
         # The shard array is based on "total_shards" from "fetch_test_configurations.py"
         # The test executable will shard based on the array. (ex: [1, 2, 3, 4] = four test shards)
-        shard: [ 1 ]
+        shard: ${{ fromJSON(inputs.component).shard_arr }}
     defaults:
       run:
         shell: bash
@@ -98,10 +98,10 @@ jobs:
           python ./build_tools/print_driver_gpu_info.py
 
       - name: Test
-        timeout-minutes: 600
+        timeout-minutes: ${{ fromJSON(inputs.component).timeout_minutes }}
         env:
-          SHARD_INDEX: 1
-          TOTAL_SHARDS: 1
+          SHARD_INDEX: ${{ matrix.shard }}
+          TOTAL_SHARDS: ${{ fromJSON(inputs.component).total_shards }}
           TEST_TYPE: ${{ fromJSON(inputs.component).test_type }}
         run: |
           # Create logs directory
