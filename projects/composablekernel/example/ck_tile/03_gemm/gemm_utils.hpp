@@ -123,11 +123,11 @@ struct GemmConfigComputeV3_1 : public GemmConfigBase
 template <typename PrecType>
 struct GemmConfigComputeV3_2 : public GemmConfigBase
 {
-    static constexpr ck_tile::index_t M_Tile = 128;
-    static constexpr ck_tile::index_t N_Tile = 128;
+    static constexpr ck_tile::index_t M_Tile = 256;
+    static constexpr ck_tile::index_t N_Tile = 256;
     static constexpr ck_tile::index_t K_Tile = 128 / sizeof(prec_storage_type<PrecType>);
 
-    static constexpr ck_tile::index_t M_Warp = 2;
+    static constexpr ck_tile::index_t M_Warp = 4;
     static constexpr ck_tile::index_t N_Warp = 2;
     static constexpr ck_tile::index_t K_Warp = 1;
 
@@ -435,7 +435,7 @@ template <>
 struct PipelineTypeTraits<ck_tile::GemmPipeline::COMPUTE_V3>
 {
     template <typename PipelineProblem>
-    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompV3<PipelineProblem>;
+    using GemmPipeline = ck_tile::GemmPipelineAgBgCrCompAsyncEightWaves<PipelineProblem>;
     template <typename PipelineProblem>
     using UniversalGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<PipelineProblem>;
 };

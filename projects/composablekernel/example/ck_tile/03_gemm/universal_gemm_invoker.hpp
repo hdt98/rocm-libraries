@@ -64,8 +64,31 @@ struct UniversalInvoker
         using GemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
 
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
+        // using GemmEpilogue = ck_tile::CShuffleEpilogue<
+        //     ck_tile::CShuffleEpilogueProblem<ADataType,
+        //                                      BDataType,
+        //                                      DsDataType,
+        //                                      AccDataType,
+        //                                      CDataType,
+        //                                      DsLayout,
+        //                                      ELayout,
+        //                                      CDEElementWise,
+        //                                      TilePartitioner::MPerBlock,
+        //                                      TilePartitioner::NPerBlock,
+        //                                      GemmConfig::M_Warp,
+        //                                      GemmConfig::N_Warp,
+        //                                      GemmConfig::M_Warp_Tile,
+        //                                      GemmConfig::N_Warp_Tile,
+        //                                      GemmConfig::K_Warp_Tile,
+        //                                      UniversalGemmProblem::TransposeC,
+        //                                      GemmConfig::NumWaveGroups,
+        //                                      false, /*FixedVectorSize_*/
+        //                                      1,     /*VectorSizeC_*/
+        //                                      1,     /*BlockedXDLN_PerWarp_*/
+        //                                      GemmConfig::DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
+
+        using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<
+            ck_tile::DefaultGemm2DEpilogueProblem<ADataType,
                                              BDataType,
                                              DsDataType,
                                              AccDataType,
@@ -75,17 +98,14 @@ struct UniversalInvoker
                                              CDEElementWise,
                                              TilePartitioner::MPerBlock,
                                              TilePartitioner::NPerBlock,
-                                             GemmConfig::M_Warp,
-                                             GemmConfig::N_Warp,
+                                             false,
+                                             false,
+                                            //  GemmConfig::M_Warp,
+                                            //  GemmConfig::N_Warp,
                                              GemmConfig::M_Warp_Tile,
                                              GemmConfig::N_Warp_Tile,
                                              GemmConfig::K_Warp_Tile,
-                                             UniversalGemmProblem::TransposeC,
-                                             GemmConfig::NumWaveGroups,
-                                             false, /*FixedVectorSize_*/
-                                             1,     /*VectorSizeC_*/
-                                             1,     /*BlockedXDLN_PerWarp_*/
-                                             GemmConfig::DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
+                                             UniversalGemmProblem::TransposeC>>;
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
@@ -207,8 +227,31 @@ struct UniversalInvoker
         using GemmPipeline = typename PipelineTypeTraits<
             GemmConfig::Pipeline>::template GemmPipeline<UniversalGemmProblem>;
 
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
+        // using GemmEpilogue = ck_tile::CShuffleEpilogue<
+        //     ck_tile::CShuffleEpilogueProblem<ADataType,
+        //                                      BDataType,
+        //                                      DsDataType,
+        //                                      AccDataType,
+        //                                      CDataType,
+        //                                      DsLayout,
+        //                                      ELayout,
+        //                                      CDEElementWise,
+        //                                      TilePartitioner::MPerBlock,
+        //                                      TilePartitioner::NPerBlock,
+        //                                      GemmConfig::M_Warp,
+        //                                      GemmConfig::N_Warp,
+        //                                      GemmConfig::M_Warp_Tile,
+        //                                      GemmConfig::N_Warp_Tile,
+        //                                      GemmConfig::K_Warp_Tile,
+        //                                      UniversalGemmProblem::TransposeC,
+        //                                      GemmConfig::NumWaveGroups,
+        //                                      false, /*FixedVectorSize_*/
+        //                                      1,     /*VectorSizeC_*/
+        //                                      1,     /*BlockedXDLN_PerWarp_*/
+        //                                      GemmConfig::DoubleSmemBuffer>>;
+
+        using GemmEpilogue = ck_tile::DefaultGemm2DEpilogue<
+            ck_tile::DefaultGemm2DEpilogueProblem<ADataType,
                                              BDataType,
                                              DsDataType,
                                              AccDataType,
@@ -218,17 +261,15 @@ struct UniversalInvoker
                                              CDEElementWise,
                                              TilePartitioner::MPerBlock,
                                              TilePartitioner::NPerBlock,
-                                             GemmConfig::M_Warp,
-                                             GemmConfig::N_Warp,
+                                             false,
+                                             false,
+                                            //  GemmConfig::M_Warp,
+                                            //  GemmConfig::N_Warp,
                                              GemmConfig::M_Warp_Tile,
                                              GemmConfig::N_Warp_Tile,
                                              GemmConfig::K_Warp_Tile,
-                                             UniversalGemmProblem::TransposeC,
-                                             GemmConfig::NumWaveGroups,
-                                             false, /*FixedVectorSize_*/
-                                             1,     /*VectorSizeC_*/
-                                             1,     /*BlockedXDLN_PerWarp_*/
-                                             GemmConfig::DoubleSmemBuffer>>;
+                                             UniversalGemmProblem::TransposeC>>;
+
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
