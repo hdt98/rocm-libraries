@@ -202,8 +202,7 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     void* dX = nullptr;
     void* dW = nullptr;
     void* dY = nullptr;
-    auto freeDeviceBuffers = [&]()
-    {
+    auto freeDeviceBuffers = [&]() {
         static_cast<void>(hipFree(dX));
         static_cast<void>(hipFree(dW));
         static_cast<void>(hipFree(dY));

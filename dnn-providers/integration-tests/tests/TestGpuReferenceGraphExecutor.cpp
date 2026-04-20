@@ -222,8 +222,7 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     void* dX = nullptr;
     void* dW = nullptr;
     void* dY = nullptr;
-    auto freeDeviceBuffers = [&]()
-    {
+    auto freeDeviceBuffers = [&]() {
         static_cast<void>(hipFree(dX));
         static_cast<void>(hipFree(dW));
         static_cast<void>(hipFree(dY));
@@ -252,8 +251,7 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
 
     // Copy GPU result back to host
     std::vector<T> gpuYData(yCount);
-    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost),
-              hipSuccess)
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost), hipSuccess)
         << (freeDeviceBuffers(), "");
 
     freeDeviceBuffers();
