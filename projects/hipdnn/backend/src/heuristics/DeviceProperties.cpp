@@ -67,11 +67,7 @@ std::vector<uint8_t> serializeDeviceProperties(const DeviceProperties& props)
 
     // Build the DeviceProperties table
     auto devicePropsOffset = hipdnn_data_sdk::data_objects::CreateDeviceProperties(
-        builder,
-        props.deviceId,
-        props.multiProcessorCount,
-        props.totalGlobalMem,
-        archNameOffset);
+        builder, props.deviceId, props.multiProcessorCount, props.totalGlobalMem, archNameOffset);
 
     builder.Finish(devicePropsOffset, "HDDP"); // File identifier for versioning
 
