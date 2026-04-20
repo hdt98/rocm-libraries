@@ -88,16 +88,6 @@ struct MemEcoSystemTestCase
         }
     };
 };
-
-bool False()
-{
-#ifndef _WIN32
-    return false;
-#else
-    // Does nothing in linux; expect always true
-    return true;
-#endif
-}
 } // namespace
 
 struct GPU_MemoryEcosystemGeneric_NONE : public ::testing::TestWithParam<MemEcoGenericTestCase>
@@ -120,18 +110,18 @@ inline std::vector<MemEcoGenericTestCase> GenericCases()
     return {
         {{0, 8, 8, 16}, {3, 3}, {0}, true},
         {{0, 8, 8, 16}, {3, 3}, {2}, true},
-        {{0, 8, 8, 16}, {9}, {0}, False()},
+        {{0, 8, 8, 16}, {9}, {0}, false},
         {{0, 12, 8, 12}, {9}, {0}, true},
         {{0, 8, 8, 16}, {5, 5}, {3}, true},
         {{0, 8, 8, 16}, {5, 3, 2}, {4}, true},
-        {{0, 8, 8, 16}, {5, 5}, {4}, False()},
+        {{0, 8, 8, 16}, {5, 5}, {4}, false},
         {{0, 8, 8, 16}, {4, 1, 4, 1, 4}, {0}, true},
-        {{0, 8, 8, 16}, {4, 1, 4, 1, 4}, {3}, False()},
-        {{0, 12, 4, 16}, {4, 1, 4, 1, 4}, {3}, False()},
+        {{0, 8, 8, 16}, {4, 1, 4, 1, 4}, {3}, false},
+        {{0, 12, 4, 16}, {4, 1, 4, 1, 4}, {3}, false},
         {{0, 12, 8, 12}, {4, 1, 4, 1, 4}, {3}, true},
-        {{0, 8, 8, 16}, {4, 5, 2, 4}, {0}, False()},
+        {{0, 8, 8, 16}, {4, 5, 2, 4}, {0}, false},
         {{0, 8, 8, 16}, {5, 4, 2, 4}, {0}, true},
-        {{0, 8, 8, 16}, {5, 4, 2, 4}, {1}, False()},
+        {{0, 8, 8, 16}, {5, 4, 2, 4}, {1}, false},
     };
 };
 
@@ -154,7 +144,7 @@ INSTANTIATE_TEST_SUITE_P(Full,
                          testing::ValuesIn(GenericCases()),
                          MemEcoGenericTestCase::NameGenerator{});
 
-struct GPU_MemoryEcosystemGeneric_NONE : public ::testing::TestWithParam<MemEcoSystemTestCase>
+struct GPU_MemoryEcosystemSystem_NONE : public ::testing::TestWithParam<MemEcoSystemTestCase>
 {
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
