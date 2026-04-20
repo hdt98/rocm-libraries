@@ -688,58 +688,34 @@ namespace TensileLite
         calcArithmeticIntensity();
     }
 	
-    void ContractionProblemGemm::setMXScaleA(int mxBlockA, std::vector<size_t> saStride)
-    {
-        m_mxBlockA = mxBlockA;
-
-<<<<<<< HEAD
-=======
     void ContractionProblemGemm::setMXScaleA(rocisa::DataType mxTypeA, int mxBlockA, std::vector<size_t> saStride)
     {
         m_mxBlockA = mxBlockA;
         m_mxTypeA = mxTypeA;
 
->>>>>>> origin/develop
         if (mxBlockA)
         {
             std::vector<size_t> saSizes = m_tensors[ContractionProblemGemm::TENSOR::A].sizes();
             saSizes[m_boundIndices[0].a] = saSizes[m_boundIndices[0].a] / mxBlockA;
-<<<<<<< HEAD
-            TensorDescriptor mxsa("mxScaleA", rocisa::DataType::MXScale, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
-=======
             TensorDescriptor mxsa("mx-a", mxTypeA, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
->>>>>>> origin/develop
             m_tensors[ContractionProblemGemm::TENSOR::MXSA] = mxsa;
         }
     }
 
-<<<<<<< HEAD
-    void ContractionProblemGemm::setMXScaleB(int mxBlockB, std::vector<size_t> sbStride)
-    {
-        m_mxBlockB = mxBlockB;
-=======
     void ContractionProblemGemm::setMXScaleB(rocisa::DataType mxTypeB, int mxBlockB, std::vector<size_t> sbStride)
     {
         m_mxBlockB = mxBlockB;
         m_mxTypeB = mxTypeB;
->>>>>>> origin/develop
 
         if (mxBlockB)
         {
             std::vector<size_t> sbSizes = m_tensors[ContractionProblemGemm::TENSOR::B].sizes();
             sbSizes[m_boundIndices[0].b] = sbSizes[m_boundIndices[0].b] / mxBlockB;
-<<<<<<< HEAD
-            TensorDescriptor mxsb("mxScaleB", rocisa::DataType::MXScale, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
-            m_tensors[ContractionProblemGemm::TENSOR::MXSB] = mxsb;
-        }
-    }
-=======
             TensorDescriptor mxsb("mx-b", mxTypeB, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
             m_tensors[ContractionProblemGemm::TENSOR::MXSB] = mxsb;
         }
     }
 
->>>>>>> origin/develop
     size_t ContractionProblemGemm::toAPos(size_t idx) const
     {
         if(idx >= d().dimensions())
@@ -1249,15 +1225,9 @@ namespace TensileLite
         auto infoB = DataTypeInfo::Get(b().dataType());
         auto infoC = DataTypeInfo::Get(c().dataType());
         double gbyte
-<<<<<<< HEAD
             = ((aSize * infoA.elementSize / infoA.packing) +
                (bSize * infoB.elementSize / infoB.packing) +
                (cSize * infoC.elementSize / infoC.packing))
-=======
-            = (multiplyElementSize(aSize, a().elementBytes()) +
-               multiplyElementSize(bSize, b().elementBytes()) +
-               multiplyElementSize(cSize, c().elementBytes()))
->>>>>>> origin/develop
               * 1e-9;
 
         m_arithmeticIntensity = gflop / gbyte;
@@ -1469,11 +1439,7 @@ namespace TensileLite
         rocisa::DataType               typeAlpha,
         rocisa::DataType               typeBeta,
         rocisa::DataType               typeComputeInputA,
-<<<<<<< HEAD
 		rocisa::DataType               typeComputeInputB,
-=======
-        rocisa::DataType               typeComputeInputB,
->>>>>>> origin/develop
         rocisa::DataType               typeCompute,
         double                         alpha,
         double                         beta,
@@ -1689,15 +1655,9 @@ namespace TensileLite
                                          void*                _ws,
                                          void*                _Synchronizer,
                                          unsigned char const* _metadata,
-<<<<<<< HEAD
-										 void const*          _mxsa,
-                                         void const*          _mxsb,
-                                         void const*          _compressed)
-=======
                                          void const*          _compressed,
                                          void const*          _mxsa,
                                          void const*          _mxsb)
->>>>>>> origin/develop
         : a(_a)
         , b(_b)
         , c(_c)
