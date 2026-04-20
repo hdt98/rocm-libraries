@@ -221,7 +221,8 @@ public:
                       double alpha = 1.0,
                       double beta = 0.0)
     {
-        validateInput(gradX, w, gradY, convStrides, dilations, prePadding, postPadding);
+        validateInput(
+            gradX.dims(), w.dims(), gradY.dims(), convStrides, dilations, prePadding, postPadding);
 
         const auto nDims = gradX.dims().size();
         auto defines
@@ -332,7 +333,8 @@ public:
                       double alpha = 1.0,
                       double beta = 0.0)
     {
-        validateInput(x, gradW, gradY, convStrides, dilations, prePadding, postPadding);
+        validateInput(
+            x.dims(), gradW.dims(), gradY.dims(), convStrides, dilations, prePadding, postPadding);
 
         const auto nDims = x.dims().size();
         auto defines
