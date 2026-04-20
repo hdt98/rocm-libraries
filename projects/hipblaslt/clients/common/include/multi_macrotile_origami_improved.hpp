@@ -83,11 +83,12 @@ inline bool isMacroTilePreserved(
 }
 
 // Generate candidate split configurations for empirical testing.
-// Candidates include ratio-based + exhaustive power-of-2 splits.
-// Minimum sub-problem size enforced to avoid pathological tiny splits.
+// brute_force=false: ratio-based + exhaustive power-of-2 (~7-8 candidates)
+// brute_force=true:  every multiple of 16 from min_sub to total-min_sub
 inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     int64_t total_size,
-    int macrotile_size)
+    int macrotile_size,
+    bool brute_force = false)
 {
     std::vector<OrigamiCandidate> candidates;
     int mt = std::max(macrotile_size, 1);
@@ -104,17 +105,29 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
             candidates.push_back({{s1, s2}, label});
     };
 
-    add((total_size / 2 / mt) * mt, "uniform-50/50");
-
-    for (double r : {0.60, 0.40, 0.70, 0.30})
-        add(((int64_t)(total_size * r) / mt) * mt,
-            "asym-" + std::to_string((int)(r*100)) + "/" + std::to_string(100-(int)(r*100)));
-
-    for (int64_t p = 2048; p < total_size; p *= 2)
+    if (brute_force)
     {
-        int64_t rem = total_size - p;
-        if (rem >= min_sub && p >= min_sub)
-            add(p, "pow2-" + std::to_string(p/1024) + "k");
+        // Enumerate every multiple of 16 in [min_sub, total_size - min_sub]
+        const int64_t step = 16;
+        int64_t lo = (min_sub + step - 1) / step * step;
+        int64_t hi = total_size - min_sub;
+        for (int64_t s1 = lo; s1 <= hi; s1 += step)
+            add(s1, "bf-" + std::to_string(s1));
+    }
+    else
+    {
+        add((total_size / 2 / mt) * mt, "uniform-50/50");
+
+        for (double r : {0.60, 0.40, 0.70, 0.30})
+            add(((int64_t)(total_size * r) / mt) * mt,
+                "asym-" + std::to_string((int)(r*100)) + "/" + std::to_string(100-(int)(r*100)));
+
+        for (int64_t p = 2048; p < total_size; p *= 2)
+        {
+            int64_t rem = total_size - p;
+            if (rem >= min_sub && p >= min_sub)
+                add(p, "pow2-" + std::to_string(p/1024) + "k");
+        }
     }
 
     // Deduplicate by s1
@@ -130,9 +143,10 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     return unique;
 }
 
-// Entry point called by splitGemmProblem for S17/S18.
-// Returns the default (uniform) split sizes; the real selection happens via
-// empirical micro-benchmark in testing_matmul.hpp using getOrigamiCandidates().
+// Entry point called by splitGemmProblem for S17/S18/S19/S20.
+// Returns the default (first candidate) split sizes; the real selection
+// happens via empirical micro-benchmark in testing_matmul.hpp.
+// brute_force=true (S19/S20): enumerate every multiple of 16.
 inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasLtHandle_t handle,
     int64_t total_size,
@@ -144,7 +158,8 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasOperation_t transA, hipblasOperation_t transB,
     hipDataType a_type, hipDataType b_type,
     hipDataType c_type, hipDataType d_type,
-    hipblasComputeType_t compute_type)
+    hipblasComputeType_t compute_type,
+    bool brute_force)
 {
     int64_t M = is_m_split ? total_size : other_dim;
     int64_t N = is_m_split ? other_dim : total_size;
@@ -153,7 +168,7 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
                                transA, transB, a_type, b_type, c_type, d_type, compute_type))
         return {};
 
-    auto cands = generateOrigamiCandidates(total_size, macrotile_size);
+    auto cands = generateOrigamiCandidates(total_size, macrotile_size, brute_force);
     getOrigamiCandidates() = cands;
 
     if (!cands.empty())

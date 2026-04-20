@@ -624,7 +624,10 @@ try
 
         ("split_strategy",
         value<int32_t>(&arg.split_strategy)->default_value(17),
-        "Split dimension: 17=M-split (default), 18=N-split")
+        "Split strategy:\n"
+        "  17=Origami M-split (default), 18=Origami N-split\n"
+        "  19=Brute-force M-split (test every multiple of 16)\n"
+        "  20=Brute-force N-split (test every multiple of 16)")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(2),

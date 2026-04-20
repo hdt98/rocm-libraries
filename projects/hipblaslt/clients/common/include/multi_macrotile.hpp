@@ -25,7 +25,8 @@ std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipblasOperation_t transA, hipblasOperation_t transB,
     hipDataType a_type, hipDataType b_type,
     hipDataType c_type, hipDataType d_type,
-    hipblasComputeType_t compute_type);
+    hipblasComputeType_t compute_type,
+    bool brute_force = false);
 
 // ── Sub-problem descriptor ──────────────────────────────────────────────────
 
@@ -45,9 +46,11 @@ struct GemmSubProblem
 struct SubProblemContext
 {
     hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    hipblasLtMatmulDesc_t   matmul_desc; // per-subproblem descriptor for correct kernel selection
     hipblasLtMatmulAlgo_t   algo;
     void *A_ptr, *B_ptr, *C_ptr, *D_ptr;
     bool valid;
+    bool owns_matmul_desc; // true if we created matmul_desc and need to destroy it
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -137,13 +140,12 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         return subs;
     };
 
-    bool is_m_split = (split_strategy != 18);
+    bool is_m_split = (split_strategy != 18 && split_strategy != 20);
+    bool brute_force = (split_strategy == 19 || split_strategy == 20);
 
-    // Determine num_splits (always 2 for Origami sequential)
     if (num_splits <= 0) num_splits = 2;
     num_splits = std::min(num_splits, 16);
 
-    // Ask Origami for split sizes
     std::vector<int64_t> split_sizes;
     if (handle)
     {
@@ -153,7 +155,8 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
 
         split_sizes = computeOrigamiOptimizedSplitsWithHandle(
             handle, dim, num_splits, mt, other, K, is_m_split,
-            transA, transB, a_type, b_type, c_type, d_type, compute_type);
+            transA, transB, a_type, b_type, c_type, d_type, compute_type,
+            brute_force);
     }
 
     if (split_sizes.empty())

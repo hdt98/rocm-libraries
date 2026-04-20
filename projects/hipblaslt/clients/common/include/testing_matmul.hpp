@@ -4023,12 +4023,30 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
                             hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
 
+                            // Create per-subproblem matmul descriptor for correct heuristic selection
+                            hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
+                            ctx.owns_matmul_desc = true;
+
                             hipblasLtMatmulHeuristicResult_t heur_tmp;
                             int ret_tmp = 0;
-                            hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
+                            hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
                             ctx.valid = (ret_tmp > 0);
                             if(ctx.valid)
+                            {
                                 ctx.algo = heur_tmp.algo;
+                                // Debug: print per-subproblem heuristic result
+                                try {
+                                    auto sol_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                                    int* si = (int*)heur_tmp.algo.data;
+                                    hipblaslt_cout << "  Sub[" << sp << "] " << sub.m_size << "x" << sub.n_size
+                                                  << " lda=" << lda[0] << " → sol=" << *si
+                                                  << " (" << sol_name.substr(sol_name.find("MT"), 15) << ")" << std::endl;
+                                } catch(...) {}
+                            }
 
                             ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
                             ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
@@ -4048,7 +4066,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 {
                                     if(!spCtxs[sp].valid) continue;
                                     auto& ctx = spCtxs[sp];
-                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                                    ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                                    &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
                                                    &ctx.algo, *dWorkspace, workspace_size,
@@ -4322,7 +4340,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                                     void* sub_workspace = static_cast<char*>(ws_base) + sp * per_stream_ws_size;
 
-                                    hipblasLtMatmul(handle, matmul[0][0],
+                                    hipblasLtMatmul(handle, ctx.matmul_desc,
                                                    alpha_in[0], ctx.A_ptr, ctx.matA,
                                                    ctx.B_ptr, ctx.matB,
                                                    &(h_beta[0]), ctx.C_ptr, ctx.matC,
@@ -4388,7 +4406,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 {
                                     if(!spCtxs[sp].valid) continue;
                                     auto& ctx = spCtxs[sp];
-                                    hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                                    ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                                    &(h_beta[0]), ctx.C_ptr, ctx.matC,
                                                    ctx.D_ptr, ctx.matD,
@@ -4757,13 +4775,28 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
                 hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
 
+                hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
+                hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
+                hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
+                hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
+                hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
+                ctx.owns_matmul_desc = true;
+
                 hipblasLtMatmulHeuristicResult_t heur_tmp;
                 int ret_tmp = 0;
-                hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
+                hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &heur_tmp, &ret_tmp);
                 ctx.valid = (ret_tmp > 0);
                 if(ctx.valid)
                 {
                     ctx.algo = heur_tmp.algo;
+                    // Debug per-subproblem kernel
+                    try {
+                        auto sn = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                        int* si = (int*)heur_tmp.algo.data;
+                        auto mt_pos = sn.find("MT");
+                        hipblaslt_cout << "  Kernel[" << sp << "] " << sub.m_size << "x" << sub.n_size << "x" << sub.k_size
+                                      << " → sol=" << *si << " " << sn.substr(mt_pos, mt_pos != std::string::npos ? 15 : 0) << std::endl;
+                    } catch(...) {}
                     if(arg.print_kernel_info)
                     {
                         try {
@@ -4796,7 +4829,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                        ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                        &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
                                        &ctx.algo, *dWorkspace, workspace_size,
@@ -4815,7 +4848,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             // === ORIGAMI EMPIRICAL MICRO-BENCHMARK ===
             // For S17/S18, test multiple candidate split ratios with actual execution
             // and re-split using the winning ratio
-            if((actual_strategy == 17 || actual_strategy == 18) && subProblems.size() > 1)
+            if((actual_strategy == 17 || actual_strategy == 18 || actual_strategy == 19 || actual_strategy == 20) && subProblems.size() > 1)
             {
                 auto& candidates = getOrigamiCandidates();
                 if(candidates.size() > 1)
@@ -4823,7 +4856,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     hipblaslt_cout << "\n=== Origami Empirical Split Search ===" << std::endl;
                     hipblaslt_cout << "Testing " << candidates.size() << " candidate split ratios..." << std::endl;
 
-                    bool is_m_split = (actual_strategy == 17);
+                    bool is_m_split = (actual_strategy == 17 || actual_strategy == 19);
                     double best_time_us = 1e18;
                     int best_idx = 0;
 
@@ -4888,8 +4921,14 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, rB, cB, ldb[0]);
                             hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
                             hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+                            hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
+                            ctx.owns_matmul_desc = true;
                             hipblasLtMatmulHeuristicResult_t h; int r = 0;
-                            hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
+                            hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
                             ctx.valid = (r > 0);
                             if(ctx.valid) ctx.algo = h.algo; else all_valid = false;
                             ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
@@ -4913,7 +4952,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                             for(auto& ctx : cand_ctxs)
                             {
                                 if(!ctx.valid) continue;
-                                hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                                hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                                ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                                &(h_beta[0]), ctx.C_ptr, ctx.matC,
                                                ctx.D_ptr, ctx.matD,
@@ -4994,10 +5033,25 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, rB, cB, ldb[0]);
                             hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
                             hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
+                            hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
+                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
+                            ctx.owns_matmul_desc = true;
                             hipblasLtMatmulHeuristicResult_t h; int r = 0;
-                            hipblasLtMatmulAlgoGetHeuristic(handle, matmul[0][0], ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
+                            hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
                             ctx.valid = (r > 0);
-                            if(ctx.valid) ctx.algo = h.algo;
+                            if(ctx.valid) {
+                                ctx.algo = h.algo;
+                                try {
+                                    auto sn = hipblaslt_ext::getSolutionNameFromAlgo(handle, h.algo);
+                                    int* si = (int*)h.algo.data;
+                                    auto p = sn.find("MT");
+                                    hipblaslt_cout << "  Rebuilt[" << sp << "] " << sub.m_size << "x" << sub.n_size
+                                                  << " → sol=" << *si << " " << sn.substr(p, p!=std::string::npos?15:0) << std::endl;
+                                } catch(...) {}
+                            }
                             ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
                             ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
                             ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
@@ -5024,7 +5078,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                        ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                        &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
                                        &ctx.algo, *dWorkspace, workspace_size, stream);
@@ -5130,7 +5184,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         auto& ctx = spCtxs[sp];
                         void* sub_ws = static_cast<char*>(ws_base) + sp * per_stream_ws;
 
-                        hipblasLtMatmul(handle, matmul[0][0],
+                        hipblasLtMatmul(handle, ctx.matmul_desc,
                                        alpha_in[0], ctx.A_ptr, ctx.matA,
                                        ctx.B_ptr, ctx.matB,
                                        &(h_beta[0]), ctx.C_ptr, ctx.matC,
@@ -5159,7 +5213,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, matmul[0][0], alpha_in[0],
+                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
                                        ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
                                        &(h_beta[0]), ctx.C_ptr, ctx.matC,
                                        ctx.D_ptr, ctx.matD,
