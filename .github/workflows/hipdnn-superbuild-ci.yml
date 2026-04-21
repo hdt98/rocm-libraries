@@ -136,7 +136,7 @@ jobs:
     if: needs.gate.outputs.should_run == 'true'
     runs-on: ubuntu-24.04
     env:
-      VENV_PATH: ${{ github.workspace }}/rocm_wheels
+      VENV_PATH: ${{ runner.temp }}/rocm_wheels
       GPU_TARGET: gfx94X-dcgpu
     steps:
       - name: Checkout repository
