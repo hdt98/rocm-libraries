@@ -3954,7 +3954,7 @@ class KernelWriterAssembly(KernelWriter):
 
       # Using offsets so GRO holds a byte offset not an element offset
       # So scale here before comparison:
-      module.add(scalarMultiplyBpe(scalarGro, scalarGro, tP["bpeGR"]))
+      module.add(scalarMultiplyBpe(scalarGro, scalarGro, float(tP["bpeGR"])))
 
       if kernel["DirectToLds%s"%tc] and kernel["UseInstOffsetForGRO"]:
         # add room for instruction offset
