@@ -517,6 +517,8 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
 
     constexpr index_t packed_size =
         numeric_traits<remove_cvref_t<typename BottomTensorView_::DataType>>::PackedSize;
+    static_assert(vecLoadSize % packed_size == 0,
+                  "vecLoadSize must be divisible by packed_size");
     using DataVec = array<typename BottomTensorView_::DataType, vecLoadSize / packed_size>;
     static_for<0, num_of_access, 1>{}([&](auto iAccess) {
         out_tensor.get_thread_buffer().template set_as<DataVec>(

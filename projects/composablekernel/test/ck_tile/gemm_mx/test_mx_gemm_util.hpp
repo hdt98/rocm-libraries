@@ -103,7 +103,8 @@ class TestMxGemmUtil : public ::testing::Test
             ck_tile::get_default_stride(K, N, 0, is_row_major(BLayout{}));
         const ck_tile::index_t stride_C =
             ck_tile::get_default_stride(M, N, 0, is_row_major(CLayout{}));
-        // Scales are always row-major [M, K/32] and [N, K/32], independent of A/B layout
+        // Scales use fixed layouts independent of A/B layout:
+        // scale A is row-major [M, K/32], and scale B is column-major [K/32, N].
         const ck_tile::index_t stride_scale_a = scale_k_size;
         const ck_tile::index_t stride_scale_b = scale_k_size;
 
