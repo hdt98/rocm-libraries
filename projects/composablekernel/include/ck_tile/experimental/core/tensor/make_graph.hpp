@@ -274,18 +274,26 @@ constexpr detail::TransformGraph applyBindings(const detail::TransformGraph& gra
 
 /** @brief Create a transform graph from a descriptor and transform bindings.
  *
- *  Combines make_transform_graph(desc) + applyTransforms into a single call.
- *  All bindings are applied as a single batch (not sequentially), so lower()
- *  indices always refer to the original descriptor's dimensions.
+ *  Builds one layer of transforms on top of a descriptor's base Embed.
+ *  All bindings are applied as a single batch — lower() indices always
+ *  refer to the descriptor's upper dims, never to another binding's output.
  *
- *  @param desc      Tensor descriptor (creates the base Embed)
- *  @param bindings  Transform bindings (variadic)
- *  @return TransformGraph with base Embed + all bindings applied
+ *  Index flow:
+ *    Base Embed:  lower = [0] (memory offset)
+ *                 upper = [0, 1, 2, ...] (descriptor dims)
+ *    Bindings:    lower() references the Embed's upper indices
+ *                 upper() defines the result graph's upper indices
+ *    Result:      lower = [0] (memory offset)
+ *                 upper = [0, 1, ...] (as defined by bindings' upper())
  *
- *  Example:
+ *  To add a second layer on top of this graph's outputs, use
+ *  apply_transforms() on the result.
+ *
+ *  Example (desc has 3 dims: [0]=K/8, [1]=M, [2]=K%8):
  *    constexpr auto g = make_transform_graph(desc,
- *        transform(make_pass_through(M),  upper(0), lower(1)),
- *        transform(make_merge({K/8, 8}),  upper(1), lower(0, 2)));
+ *        transform(make_pass_through(M), lower(1),    upper(0)),
+ *        transform(make_merge(K/8, 8),   lower(0, 2), upper(1)));
+ *    // Result: lower=[0] (offset), upper=[0]=M, [1]=K
  */
 template <typename... Bindings>
 constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc,
@@ -367,6 +375,33 @@ constexpr detail::TransformGraph make_transform_graph(TransformBinding first, Bi
         g = detail::applyBindings(g, arr);
     }
     return g;
+}
+
+/** @brief Apply transform bindings to an existing graph (adds a new layer).
+ *
+ *  Bindings are applied as a single batch. lower() indices refer to the
+ *  input graph's upper dims — NOT to the original descriptor's dims.
+ *
+ *  Index flow:
+ *    Input graph: lower = [0] (memory offset)
+ *                 upper = [0, 1] (e.g., M, K from a previous layer)
+ *    Bindings:    lower() references the input graph's upper indices
+ *                 upper() defines the result graph's upper indices
+ *    Result:      lower = [0] (memory offset, unchanged)
+ *                 upper = [0, 1, ...] (as defined by bindings' upper())
+ *
+ *  Example (input graph has upper=[0]=M, [1]=K):
+ *    constexpr auto g2 = apply_transforms(g,
+ *        transform(make_xor(M, K), lower(0, 1), upper(0, 1)));
+ *    // Result: lower=[0] (offset), upper=[0]=M_xored, [1]=K_xored
+ */
+template <typename... Bindings>
+constexpr detail::TransformGraph apply_transforms(const detail::TransformGraph& graph,
+                                                  Bindings... bindings)
+{
+    constexpr index_t N = sizeof...(Bindings);
+    static_array<TransformBinding, N> arr{bindings...};
+    return detail::applyBindings(graph, arr);
 }
 
 } // namespace ck_tile

@@ -23,20 +23,35 @@
 
 namespace ck_tile {
 
-/** @brief Create a DimIds array with -1 padding for unused slots.
+/** @brief Create a right-sized array of dimension values from variadic arguments.
  *
- *  Convenience helper for specifying dimension index arrays in applyTransforms().
- *  Unused slots are set to -1 (sentinel value).
+ *  Eliminates static_array<index_t, N>{...} boilerplate at call sites for
+ *  make_merge, make_unmerge, make_embed, and make_tensor_descriptor.
  *
- *  @param is  Dimension indices (variadic)
- *  @return DimIds array with values at front, -1 for remaining slots
+ *  @param vs  Dimension values (variadic, convertible to index_t)
+ *  @return static_array<index_t, sizeof...(vs)>
  *
- *  Example: dims(0, 2) -> DimIds{0, 2, -1, -1, -1}
+ *  Example: dims(8, 128, 8) -> static_array<index_t, 3>{8, 128, 8}
  */
 template <typename... Ts>
-constexpr DimIds dims(Ts... is)
+constexpr static_array<index_t, sizeof...(Ts)> dims(Ts... vs)
 {
-    static_assert(sizeof...(Ts) <= MAX_TENSOR_DIMS, "dims: too many indices (max MAX_TENSOR_DIMS)");
+    return {static_cast<index_t>(vs)...};
+}
+
+/** @brief Create a DimIds routing array with -1 sentinel padding.
+ *
+ *  Produces a 64-element DimIds array for slot routing in transform graphs.
+ *  Unused slots are set to -1 (sentinel). Called by upper() and lower().
+ *
+ *  @param is  Dimension indices (variadic)
+ *  @return DimIds{is..., -1, -1, ...}
+ */
+template <typename... Ts>
+constexpr DimIds dim_ids(Ts... is)
+{
+    static_assert(sizeof...(Ts) <= MAX_TENSOR_DIMS,
+                  "dim_ids: too many indices (max MAX_TENSOR_DIMS)");
     DimIds result{};
     for(auto& x : result.elems)
     {
@@ -116,6 +131,14 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
     return t;
 }
 
+/// Variadic overload: make_merge(K_DIV8, K_MOD8) instead of make_merge(dims(K_DIV8, K_MOD8))
+template <typename... Ts, typename = typename std::enable_if<(sizeof...(Ts) >= 2)>::type>
+constexpr CoordinateTransform make_merge(Ts... component_lengths)
+{
+    return make_merge(
+        static_array<index_t, sizeof...(Ts)>{static_cast<index_t>(component_lengths)...});
+}
+
 /** @brief Create an UNMERGE transform (split 1 memory dim into N user-facing dims).
  *
  *  During graph traversal (user → memory), the unmerge transform receives
@@ -162,6 +185,14 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
 
     Impl::writeSchema(t, d);
     return t;
+}
+
+/// Variadic overload: make_unmerge(3, 4, 5) instead of make_unmerge(dims(3, 4, 5))
+template <typename... Ts, typename = typename std::enable_if<(sizeof...(Ts) >= 2)>::type>
+constexpr CoordinateTransform make_unmerge(Ts... component_lengths)
+{
+    return make_unmerge(
+        static_array<index_t, sizeof...(Ts)>{static_cast<index_t>(component_lengths)...});
 }
 
 /** @brief Create an EMBED transform (linear combination with strides).
@@ -276,7 +307,7 @@ constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 
 /** @brief Specify upper (user-side) dimension indices for a transform binding.
  *
- *  Alias for dims(). Documents that these are the dimensions on the user side
+ *  Alias for dim_ids(). Documents that these are the dimensions on the user side
  *  (top of the transform stack) that this transform creates.
  *
  *  @param ids  Dimension indices (variadic)
@@ -287,12 +318,12 @@ constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 template <typename... Ts>
 constexpr DimIds upper(Ts... ids)
 {
-    return dims(ids...);
+    return dim_ids(ids...);
 }
 
 /** @brief Specify lower (memory-side) dimension indices for a transform binding.
  *
- *  Alias for dims(). Documents that these are the dimensions on the memory side
+ *  Alias for dim_ids(). Documents that these are the dimensions on the memory side
  *  (bottom of the transform stack) that this transform replaces.
  *
  *  @param ids  Dimension indices (variadic)
@@ -303,43 +334,46 @@ constexpr DimIds upper(Ts... ids)
 template <typename... Ts>
 constexpr DimIds lower(Ts... ids)
 {
-    return dims(ids...);
+    return dim_ids(ids...);
 }
 
-/** @brief Bundles a transform with its upper/lower dimension routing.
+/** @brief Bundles a transform with its lower/upper dimension routing.
  *
  *  Structural NTTP — pure aggregate with defaulted ==.
  *  Created by the transform() factory. Used by make_transform_graph().
  *
- *  Fields (upper before lower, consistent with struct field ordering):
+ *  Field order follows the bottom-up construction direction:
  *    - xform: the coordinate transform to apply
- *    - upper_dims: which user-facing dims this transform creates
- *    - lower_dims: which lower dims this transform replaces
+ *    - lower_dims: which existing dims this transform replaces (from below)
+ *    - upper_dims: which user-facing dims this transform creates (above)
  */
 struct TransformBinding
 {
     CoordinateTransform xform{};
-    DimIds upper_dims{};
     DimIds lower_dims{};
+    DimIds upper_dims{};
 
     constexpr bool operator==(const TransformBinding&) const = default;
 };
 
-/** @brief Bind a transform to its upper and lower dimension routing.
+/** @brief Bind a transform to its lower and upper dimension routing.
+ *
+ *  Parameter order follows data flow during bottom-up construction:
+ *  lower (what you're replacing) → upper (what you're creating).
  *
  *  @param xform       The coordinate transform
- *  @param upper_dims  Upper (user-side) dimension indices this transform creates
- *  @param lower_dims  Lower (memory-side) dimension indices this transform replaces
+ *  @param lower_dims  Lower (memory-side) dims this transform replaces
+ *  @param upper_dims  Upper (user-side) dims this transform creates
  *  @return TransformBinding bundling all three
  *
  *  Example:
- *    transform(make_pass_through(128), upper(0), lower(1))
- *    transform(make_merge({8, 8}),     upper(1), lower(0, 2))
+ *    transform(make_pass_through(128), lower(1), upper(0))
+ *    transform(make_merge(dims(8, 8)), lower(0, 2), upper(1))
  */
 constexpr TransformBinding
-transform(CoordinateTransform xform, DimIds upper_dims, DimIds lower_dims)
+transform(CoordinateTransform xform, DimIds lower_dims, DimIds upper_dims)
 {
-    return {xform, upper_dims, lower_dims};
+    return {xform, lower_dims, upper_dims};
 }
 
 } // namespace ck_tile

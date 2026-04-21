@@ -75,11 +75,11 @@
  *            make_pass_through(128),                  //   [0] PassThrough
  *            make_merge(static_array<index_t, 2>{8, 8})}, // [1] Merge
  *        static_array<DimIds, 2>{                     // input_dims:
- *            dims(1),                                 //   PT replaces old index 1
- *            dims(0, 2)},                             //   Merge replaces old 0 & 2
+ *            dim_ids(1),                                 //   PT replaces old index 1
+ *            dim_ids(0, 2)},                             //   Merge replaces old 0 & 2
  *        static_array<DimIds, 2>{                     // output_dims:
- *            dims(0),                                 //   PT becomes new dim 0
- *            dims(1)});                               //   Merge becomes new dim 1
+ *            dim_ids(0),                                 //   PT becomes new dim 0
+ *            dim_ids(1)});                               //   Merge becomes new dim 1
  *
  *  input_dims and output_dims are arrays of DIMENSION INDICES:
  *
@@ -87,11 +87,11 @@
  *                    Tells which old dims this transform REPLACES.
  *                    The transform's outputs get wired to those old slots.
  *
- *      input_dims[0] = dims(1)   --> PassThrough replaces old index 1 (M).
+ *      input_dims[0] = dim_ids(1)   --> PassThrough replaces old index 1 (M).
  *                                    Old index 1 lives at slot[2].
  *                                    So PassThrough writes to slot[2].
  *
- *      input_dims[1] = dims(0,2) --> Merge replaces old indices 0 and 2
+ *      input_dims[1] = dim_ids(0,2) --> Merge replaces old indices 0 and 2
  *                                    (K/8 and K_mod8).
  *                                    Old index 0 = slot[1], index 2 = slot[3].
  *                                    So Merge writes to slot[1] and slot[3].
@@ -100,12 +100,12 @@
  *                     Tells which new user-facing dim this transform CREATES.
  *                     A fresh slot is allocated; the user's coordinate enters there.
  *
- *      output_dims[0] = dims(0) --> PassThrough creates new dim index 0.
+ *      output_dims[0] = dim_ids(0) --> PassThrough creates new dim index 0.
  *                                   Allocate fresh slot[4].
  *                                   The user's 1st coordinate (M) enters slot[4].
  *                                   PassThrough reads from slot[4].
  *
- *      output_dims[1] = dims(1) --> Merge creates new dim index 1.
+ *      output_dims[1] = dim_ids(1) --> Merge creates new dim index 1.
  *                                   Allocate fresh slot[5].
  *                                   The user's 2nd coordinate (K) enters slot[5].
  *                                   Merge reads from slot[5].

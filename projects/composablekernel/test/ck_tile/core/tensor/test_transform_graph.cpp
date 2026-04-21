@@ -21,11 +21,12 @@
 #include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp" // TensorDescriptor,
                                                                   // make_tensor_descriptor
 #include "ck_tile/experimental/core/tensor/make_graph.hpp"        // detail::make_transform_graph,
-                                                                  // detail::applyTransforms,
+                                                                  // apply_transforms,
                                                                   // detail::isGraphBijective
 #include "ck_tile/experimental/core/tensor/make_transform.hpp"    // make_pass_through, make_merge,
                                                                   // make_unmerge, make_right_pad,
-                                                                  // dims
+                                                                  // dims, dim_ids,
+                                                                  // transform, upper, lower
 #include "ck_tile/experimental/core/tensor/magic_division.hpp"    // computeMagicDiv, doMagicDiv
 
 namespace {
@@ -47,7 +48,7 @@ manual_strided_offset(index_t i0, index_t i1, index_t i2, index_t s0, index_t s1
 // ============================================================================
 
 // Packed 2D descriptor
-constexpr auto desc_packed_2d = make_tensor_descriptor(static_array<index_t, 2>{4, 8});
+constexpr auto desc_packed_2d = make_tensor_descriptor(dims(4, 8));
 static_assert(desc_packed_2d.ndim == 2);
 static_assert(desc_packed_2d.lengths[0] == 4);
 static_assert(desc_packed_2d.lengths[1] == 8);
@@ -63,17 +64,16 @@ constexpr index_t S0     = (M + 1) * 8; // = 1032 (padded stride)
 constexpr index_t S1     = 8;
 constexpr index_t S2     = 1;
 
-constexpr auto desc_strided_3d = make_tensor_descriptor(static_array<index_t, 3>{K_DIV8, M, K_MOD8},
-                                                        static_array<index_t, 3>{S0, S1, S2});
+constexpr auto desc_strided_3d = make_tensor_descriptor(dims(K_DIV8, M, K_MOD8), dims(S0, S1, S2));
 static_assert(desc_strided_3d.ndim == 3);
 static_assert(desc_strided_3d.element_space_size == 8248);
 
 // Descriptor equality (NTTP deduplication)
-constexpr auto desc_a = make_tensor_descriptor(static_array<index_t, 2>{4, 8});
-constexpr auto desc_b = make_tensor_descriptor(static_array<index_t, 2>{4, 8});
+constexpr auto desc_a = make_tensor_descriptor(dims(4, 8));
+constexpr auto desc_b = make_tensor_descriptor(dims(4, 8));
 static_assert(desc_a == desc_b, "Identical descriptors should be equal");
 
-constexpr auto desc_c = make_tensor_descriptor(static_array<index_t, 2>{8, 4});
+constexpr auto desc_c = make_tensor_descriptor(dims(8, 4));
 static_assert(!(desc_a == desc_c), "Different descriptors should not be equal");
 
 // ============================================================================
@@ -112,12 +112,10 @@ constexpr index_t DIM_K_MOD8 = 2;
 
 constexpr auto gemm_lds_base = detail::make_transform_graph(desc_strided_3d);
 
-constexpr auto gemm_lds = detail::applyTransforms(
+constexpr auto gemm_lds = apply_transforms(
     gemm_lds_base,
-    static_array<CoordinateTransform, 2>{make_pass_through(M),
-                                         make_merge(static_array<index_t, 2>{K_DIV8, K_MOD8})},
-    static_array<DimIds, 2>{dims(DIM_M), dims(DIM_K_DIV8, DIM_K_MOD8)},
-    static_array<DimIds, 2>{dims(0), dims(1)});
+    transform(make_pass_through(M), lower(DIM_M), upper(0)),
+    transform(make_merge(K_DIV8, K_MOD8), lower(DIM_K_DIV8, DIM_K_MOD8), upper(1)));
 
 static_assert(gemm_lds.ndim_upper == 2, "gemm_lds: 2 upper dims (M, K)");
 static_assert(gemm_lds.ndim_lower == 1, "gemm_lds: 1 lower dim (offset)");
@@ -138,15 +136,12 @@ static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}
 // Test 4: Padded dimension (exercises Pad transform)
 // ============================================================================
 
-constexpr auto desc_pad_base =
-    make_tensor_descriptor(static_array<index_t, 2>{10, 20}, static_array<index_t, 2>{20, 1});
-constexpr auto padded_base = detail::make_transform_graph(desc_pad_base);
+constexpr auto desc_pad_base = make_tensor_descriptor(dims(10, 20), dims(20, 1));
+constexpr auto padded_base   = detail::make_transform_graph(desc_pad_base);
 
-constexpr auto padded = detail::applyTransforms(
-    padded_base,
-    static_array<CoordinateTransform, 2>{make_right_pad(10, 6), make_pass_through(20)},
-    static_array<DimIds, 2>{dims(0), dims(1)},
-    static_array<DimIds, 2>{dims(0), dims(1)});
+constexpr auto padded = apply_transforms(padded_base,
+                                         transform(make_right_pad(10, 6), lower(0), upper(0)),
+                                         transform(make_pass_through(20), lower(1), upper(1)));
 
 static_assert(padded.ndim_upper == 2);
 static_assert(detail::calculateOffset<padded>(static_array<index_t, 2>{0, 0}) == 0);
@@ -156,22 +151,16 @@ static_assert(detail::calculateOffset<padded>(static_array<index_t, 2>{5, 10}) =
 // Test 5: Roundtrip — Unmerge then Merge back
 // ============================================================================
 
-constexpr auto desc_flat = make_tensor_descriptor(static_array<index_t, 1>{32});
+constexpr auto desc_flat = make_tensor_descriptor(dims(32));
 constexpr auto flat_base = detail::make_transform_graph(desc_flat);
 
-constexpr auto unmerged = detail::applyTransforms(
-    flat_base,
-    static_array<CoordinateTransform, 1>{make_unmerge(static_array<index_t, 2>{4, 8})},
-    static_array<DimIds, 1>{dims(0)},
-    static_array<DimIds, 1>{dims(0, 1)});
+constexpr auto unmerged =
+    apply_transforms(flat_base, transform(make_unmerge(4, 8), lower(0), upper(0, 1)));
 
 static_assert(unmerged.ndim_upper == 2);
 
-constexpr auto roundtrip = detail::applyTransforms(
-    unmerged,
-    static_array<CoordinateTransform, 1>{make_merge(static_array<index_t, 2>{4, 8})},
-    static_array<DimIds, 1>{dims(0, 1)},
-    static_array<DimIds, 1>{dims(0)});
+constexpr auto roundtrip =
+    apply_transforms(unmerged, transform(make_merge(4, 8), lower(0, 1), upper(0)));
 
 static_assert(roundtrip.ndim_upper == 1);
 static_assert(detail::calculateOffset<roundtrip>(static_array<index_t, 1>{0}) == 0);
@@ -221,7 +210,7 @@ static_assert(detail::isGraphBijective<strided_3d>(), "Strided 3D graph is bijec
 // ============================================================================
 
 // 1D packed descriptor (loop body never executes — boundary case)
-constexpr auto desc_1d = make_tensor_descriptor(static_array<index_t, 1>{16});
+constexpr auto desc_1d = make_tensor_descriptor(dims(16));
 static_assert(desc_1d.ndim == 1);
 static_assert(desc_1d.lengths[0] == 16);
 static_assert(desc_1d.strides[0] == 1);
@@ -230,7 +219,7 @@ static_assert(desc_1d.lengths[1] == 0, "unused slots must be zero for NTTP dedup
 static_assert(desc_1d.strides[1] == 0);
 
 // 6D packed descriptor (MAX_TENSOR_DIMS boundary)
-constexpr auto desc_6d = make_tensor_descriptor(static_array<index_t, 6>{2, 3, 4, 5, 6, 7});
+constexpr auto desc_6d = make_tensor_descriptor(dims(2, 3, 4, 5, 6, 7));
 static_assert(desc_6d.ndim == 6);
 static_assert(desc_6d.strides[5] == 1);
 static_assert(desc_6d.strides[4] == 7);
@@ -241,13 +230,12 @@ static_assert(desc_6d.strides[0] == 2520);
 static_assert(desc_6d.element_space_size == 2 * 3 * 4 * 5 * 6 * 7);
 
 // Single-element tensor (all lengths = 1)
-constexpr auto desc_scalar = make_tensor_descriptor(static_array<index_t, 2>{1, 1});
+constexpr auto desc_scalar = make_tensor_descriptor(dims(1, 1));
 static_assert(desc_scalar.element_space_size == 1);
 
 // Strided element_space_size manual verification
 // lengths={4, 8}, strides={16, 1}: ess = 1 + 3*16 + 7*1 = 56
-constexpr auto desc_strided_2d =
-    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{16, 1});
+constexpr auto desc_strided_2d = make_tensor_descriptor(dims(4, 8), dims(16, 1));
 static_assert(desc_strided_2d.element_space_size == 56);
 
 // ============================================================================
@@ -273,15 +261,12 @@ static_assert(detail::reverseCalculateOffset<unmerged>(31)[1] == 7);
 // Test 10: Left and both-sides padding
 // ============================================================================
 
-constexpr auto desc_pad_lr_base = make_tensor_descriptor(static_array<index_t, 1>{10});
+constexpr auto desc_pad_lr_base = make_tensor_descriptor(dims(10));
 constexpr auto pad_lr_base      = detail::make_transform_graph(desc_pad_lr_base);
 
 // Pad with left_pad=2, right_pad=4: padded length = 10 + 2 + 4 = 16
 constexpr auto padded_lr =
-    detail::applyTransforms(pad_lr_base,
-                            static_array<CoordinateTransform, 1>{make_pad(10, 2, 4)},
-                            static_array<DimIds, 1>{dims(0)},
-                            static_array<DimIds, 1>{dims(0)});
+    apply_transforms(pad_lr_base, transform(make_pad(10, 2, 4), lower(0), upper(0)));
 
 // User index 2 maps to base index 0 (2 - left_pad = 0)
 static_assert(detail::calculateOffset<padded_lr>(static_array<index_t, 1>{2}) == 0);
@@ -301,20 +286,17 @@ static_assert(detail::reverseCalculateOffset<padded_lr>(9)[0] == 11,
 // ============================================================================
 
 // Overlapping strides: stride[0]=1 < stride[1]*length[1] = 1*8 = 8
-constexpr auto desc_non_bij =
-    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{1, 1});
+constexpr auto desc_non_bij  = make_tensor_descriptor(dims(4, 8), dims(1, 1));
 constexpr auto graph_non_bij = detail::make_transform_graph(desc_non_bij);
 static_assert(!detail::isGraphBijective<graph_non_bij>(), "Overlapping strides => not bijective");
 
 // Boundary: exactly packed (stride[0]=8 == stride[1]*length[1]) => bijective
-constexpr auto desc_exact =
-    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{8, 1});
+constexpr auto desc_exact  = make_tensor_descriptor(dims(4, 8), dims(8, 1));
 constexpr auto graph_exact = detail::make_transform_graph(desc_exact);
 static_assert(detail::isGraphBijective<graph_exact>(), "Exactly packed is bijective");
 
 // Gapped strides (stride[0]=10 > 8) => bijective (with gaps)
-constexpr auto desc_gapped =
-    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{10, 1});
+constexpr auto desc_gapped  = make_tensor_descriptor(dims(4, 8), dims(10, 1));
 constexpr auto graph_gapped = detail::make_transform_graph(desc_gapped);
 static_assert(detail::isGraphBijective<graph_gapped>(), "Gapped strides are bijective");
 
@@ -340,7 +322,7 @@ constexpr index_t pt_v[] = {5};
 static_assert(TransformImpl<TransformType::PASS_THROUGH>::isValidUpper(pt, pt_v));
 
 // Embed: checks [0, length) per dimension
-constexpr auto emb = make_embed(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{8, 1});
+constexpr auto emb              = make_embed(dims(4, 8), dims(8, 1));
 constexpr index_t emb_valid[]   = {3, 7, 0, 0, 0};
 constexpr index_t emb_oob_neg[] = {-1, 0, 0, 0, 0};
 constexpr index_t emb_oob_hi[]  = {4, 0, 0, 0, 0};
@@ -349,14 +331,14 @@ static_assert(!TransformImpl<TransformType::EMBED>::isValidUpper(emb, emb_oob_ne
 static_assert(!TransformImpl<TransformType::EMBED>::isValidUpper(emb, emb_oob_hi));
 
 // Merge: checks [0, product_of_lengths)
-constexpr auto mrg            = make_merge(static_array<index_t, 2>{4, 8});
+constexpr auto mrg            = make_merge(4, 8);
 constexpr index_t mrg_valid[] = {31, 0, 0, 0, 0};
 constexpr index_t mrg_oob[]   = {32, 0, 0, 0, 0};
 static_assert(TransformImpl<TransformType::MERGE>::isValidUpper(mrg, mrg_valid));
 static_assert(!TransformImpl<TransformType::MERGE>::isValidUpper(mrg, mrg_oob));
 
 // Unmerge: checks [0, length) per component
-constexpr auto umrg            = make_unmerge(static_array<index_t, 2>{4, 8});
+constexpr auto umrg            = make_unmerge(4, 8);
 constexpr index_t umrg_valid[] = {3, 7, 0, 0, 0};
 constexpr index_t umrg_oob[]   = {4, 0, 0, 0, 0};
 static_assert(TransformImpl<TransformType::UNMERGE>::isValidUpper(umrg, umrg_valid));
@@ -384,14 +366,11 @@ static_assert(TransformImpl<TransformType::PAD>::isValidUpper(pd_skip, pd_left),
 // Test 14: 3-way merge
 // ============================================================================
 
-constexpr auto desc_flat_60 = make_tensor_descriptor(static_array<index_t, 1>{60});
+constexpr auto desc_flat_60 = make_tensor_descriptor(dims(60));
 constexpr auto flat_60      = detail::make_transform_graph(desc_flat_60);
 
-constexpr auto unmerged_3 = detail::applyTransforms(
-    flat_60,
-    static_array<CoordinateTransform, 1>{make_unmerge(static_array<index_t, 3>{3, 4, 5})},
-    static_array<DimIds, 1>{dims(0)},
-    static_array<DimIds, 1>{dims(0, 1, 2)});
+constexpr auto unmerged_3 =
+    apply_transforms(flat_60, transform(make_unmerge(3, 4, 5), lower(0), upper(0, 1, 2)));
 
 // {1, 2, 3} -> 1*20 + 2*5 + 3*1 = 33
 static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 3>{1, 2, 3}) == 33);
@@ -399,26 +378,23 @@ static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 3>{1, 2,
 static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 3>{2, 3, 4}) == 59);
 
 // Merge back to 1D and verify roundtrip
-constexpr auto remerged_3 = detail::applyTransforms(
-    unmerged_3,
-    static_array<CoordinateTransform, 1>{make_merge(static_array<index_t, 3>{3, 4, 5})},
-    static_array<DimIds, 1>{dims(0, 1, 2)},
-    static_array<DimIds, 1>{dims(0)});
+constexpr auto remerged_3 =
+    apply_transforms(unmerged_3, transform(make_merge(3, 4, 5), lower(0, 1, 2), upper(0)));
 
 static_assert(detail::calculateOffset<remerged_3>(static_array<index_t, 1>{33}) == 33);
 static_assert(detail::calculateOffset<remerged_3>(static_array<index_t, 1>{59}) == 59);
 static_assert(detail::calculateOffset<remerged_3>(static_array<index_t, 1>{0}) == 0);
 
 // ============================================================================
-// Test 15: dims() helper — sentinel padding
+// Test 15: dim_ids() helper — sentinel padding
 // ============================================================================
 
-constexpr auto d0 = dims(3);
+constexpr auto d0 = dim_ids(3);
 static_assert(d0[0] == 3);
 static_assert(d0[1] == -1);
 static_assert(d0[2] == -1);
 
-constexpr auto d2 = dims(0, 2);
+constexpr auto d2 = dim_ids(0, 2);
 static_assert(d2[0] == 0);
 static_assert(d2[1] == 2);
 static_assert(d2[2] == -1);
@@ -475,14 +451,10 @@ static_assert(xor_schema.length_0 == 4);
 static_assert(xor_schema.length_1 == 8);
 
 // XOR traversal: apply to a 2D graph
-constexpr auto desc_xor_base =
-    make_tensor_descriptor(static_array<index_t, 2>{4, 8}, static_array<index_t, 2>{8, 1});
-constexpr auto xor_base = detail::make_transform_graph(desc_xor_base);
+constexpr auto desc_xor_base = make_tensor_descriptor(dims(4, 8), dims(8, 1));
+constexpr auto xor_base      = detail::make_transform_graph(desc_xor_base);
 constexpr auto xor_graph =
-    detail::applyTransforms(xor_base,
-                            static_array<CoordinateTransform, 1>{make_xor(4, 8)},
-                            static_array<DimIds, 1>{dims(0, 1)},
-                            static_array<DimIds, 1>{dims(0, 1)});
+    apply_transforms(xor_base, transform(make_xor(4, 8), lower(0, 1), upper(0, 1)));
 
 // XOR(row=2, col=5): lower[0]=2, lower[1]=5^(2%8)=5^2=7
 // offset = 2*8 + 7 = 23
@@ -505,12 +477,10 @@ static_assert(detail::reverseCalculateOffset<xor_graph>(23)[1] == 5);
 // ============================================================================
 
 // Same GEMM LDS descriptor as Test 3, but using the new binding API
-constexpr auto gemm_lds_new =
-    make_transform_graph(desc_strided_3d,
-                         transform(make_pass_through(M), upper(0), lower(DIM_M)),
-                         transform(make_merge(static_array<index_t, 2>{K_DIV8, K_MOD8}),
-                                   upper(1),
-                                   lower(DIM_K_DIV8, DIM_K_MOD8)));
+constexpr auto gemm_lds_new = make_transform_graph(
+    desc_strided_3d,
+    transform(make_pass_through(M), lower(DIM_M), upper(0)),
+    transform(make_merge(K_DIV8, K_MOD8), lower(DIM_K_DIV8, DIM_K_MOD8), upper(1)));
 
 // Must produce identical offsets to the old API (Test 3)
 static_assert(gemm_lds_new.ndim_upper == 2);
@@ -535,8 +505,8 @@ static_assert(detail::calculateOffset<gemm_lds_new>(static_array<index_t, 2>{64,
 
 constexpr auto padded_new =
     make_transform_graph(desc_pad_base,
-                         transform(make_right_pad(10, 6), upper(0), lower(0)),
-                         transform(make_pass_through(20), upper(1), lower(1)));
+                         transform(make_right_pad(10, 6), lower(0), upper(0)),
+                         transform(make_pass_through(20), lower(1), upper(1)));
 
 static_assert(padded_new.ndim_upper == 2);
 static_assert(detail::calculateOffset<padded_new>(static_array<index_t, 2>{0, 0}) == 0);
@@ -550,30 +520,27 @@ static_assert(detail::calculateOffset<padded_new>(static_array<index_t, 2>{5, 10
 // Test 22: TransformBinding struct
 // ============================================================================
 
-constexpr auto binding = transform(make_pass_through(128), upper(0), lower(1));
+constexpr auto binding = transform(make_pass_through(128), lower(1), upper(0));
 static_assert(binding.xform.type == TransformType::PASS_THROUGH);
 static_assert(binding.upper_dims[0] == 0);
 static_assert(binding.upper_dims[1] == -1);
 static_assert(binding.lower_dims[0] == 1);
 static_assert(binding.lower_dims[1] == -1);
 
-// upper() and lower() are aliases for dims()
-static_assert(upper(0, 2) == dims(0, 2));
-static_assert(lower(1) == dims(1));
+// upper() and lower() are aliases for dim_ids()
+static_assert(upper(0, 2) == dim_ids(0, 2));
+static_assert(lower(1) == dim_ids(1));
 
 // ============================================================================
 // Test 23: MAX_TENSOR_DIMS (5-way merge/unmerge)
 // ============================================================================
 
-constexpr auto desc_flat_720 = make_tensor_descriptor(static_array<index_t, 1>{720});
+constexpr auto desc_flat_720 = make_tensor_descriptor(dims(720));
 constexpr auto flat_720      = detail::make_transform_graph(desc_flat_720);
 
 // 5-way unmerge: 720 = 2 * 3 * 4 * 5 * 6
-constexpr auto unmerged_5 = detail::applyTransforms(
-    flat_720,
-    static_array<CoordinateTransform, 1>{make_unmerge(static_array<index_t, 5>{2, 3, 4, 5, 6})},
-    static_array<DimIds, 1>{dims(0)},
-    static_array<DimIds, 1>{dims(0, 1, 2, 3, 4)});
+constexpr auto unmerged_5 = apply_transforms(
+    flat_720, transform(make_unmerge(2, 3, 4, 5, 6), lower(0), upper(0, 1, 2, 3, 4)));
 
 static_assert(unmerged_5.ndim_upper == 5);
 // {1, 2, 3, 4, 5} -> 1*360 + 2*120 + 3*30 + 4*6 + 5*1 = 360+240+90+24+5 = 719
@@ -581,11 +548,8 @@ static_assert(detail::calculateOffset<unmerged_5>(static_array<index_t, 5>{1, 2,
 static_assert(detail::calculateOffset<unmerged_5>(static_array<index_t, 5>{0, 0, 0, 0, 0}) == 0);
 
 // 5-way merge back: roundtrip
-constexpr auto remerged_5 = detail::applyTransforms(
-    unmerged_5,
-    static_array<CoordinateTransform, 1>{make_merge(static_array<index_t, 5>{2, 3, 4, 5, 6})},
-    static_array<DimIds, 1>{dims(0, 1, 2, 3, 4)},
-    static_array<DimIds, 1>{dims(0)});
+constexpr auto remerged_5 = apply_transforms(
+    unmerged_5, transform(make_merge(2, 3, 4, 5, 6), lower(0, 1, 2, 3, 4), upper(0)));
 
 static_assert(remerged_5.ndim_upper == 1);
 static_assert(detail::calculateOffset<remerged_5>(static_array<index_t, 1>{0}) == 0);
@@ -618,8 +582,7 @@ static_assert(desc_64d.strides[63] == 1);
 static_assert(desc_64d.strides[62] == 2);
 
 // A more practical high-dim test: 10 dimensions
-constexpr auto desc_10d =
-    make_tensor_descriptor(static_array<index_t, 10>{2, 2, 2, 2, 2, 2, 2, 2, 2, 2});
+constexpr auto desc_10d = make_tensor_descriptor(dims(2, 2, 2, 2, 2, 2, 2, 2, 2, 2));
 static_assert(desc_10d.ndim == 10);
 static_assert(desc_10d.element_space_size == 1024);
 static_assert(desc_10d.strides[0] == 512);
@@ -630,8 +593,7 @@ static_assert(desc_10d.strides[9] == 1);
 // ============================================================================
 
 constexpr auto desc_5d_strided = make_tensor_descriptor(
-    static_array<index_t, 5>{4, 8, 16, 32, 64},
-    static_array<index_t, 5>{16384 * 2, 16384, 1024, 32, 1}); // padded strides
+    dims(4, 8, 16, 32, 64), dims(16384 * 2, 16384, 1024, 32, 1)); // padded strides
 
 static_assert(desc_5d_strided.ndim == 5);
 // element_space_size = 1 + 3*32768 + 7*16384 + 15*1024 + 31*32 + 63*1
