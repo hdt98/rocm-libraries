@@ -212,10 +212,8 @@ struct BlockFmhaPipelineQRKSVS
                const float sink_v,
                const index_t valid_k0_loops,
                const index_t valid_last_k0_length,
-               const index_t valid_n1_length,
-               const int32_t* block_mask_row_ptr = nullptr) const
+               const index_t valid_n1_length) const
     {
-        (void)block_mask_row_ptr;
         static_assert(
             std::is_same_v<QDataType, remove_cvref_t<typename QDramBlockWindowTmp::DataType>> &&
                 std::is_same_v<KDataType, remove_cvref_t<typename KDramBlockWindowTmp::DataType>> &&
@@ -1376,8 +1374,7 @@ struct BlockFmhaPipelineQRKSVS
                const float sink_v,
                const index_t valid_k0_loops,
                const index_t valid_last_k0_length,
-               const index_t valid_n1_length,
-               const int32_t* block_mask_row_ptr = nullptr) const
+               const index_t valid_n1_length) const
     {
         return operator()(q_dram_block_window_tmp,
                           identity{},
@@ -1410,8 +1407,7 @@ struct BlockFmhaPipelineQRKSVS
                           sink_v,
                           valid_k0_loops,
                           valid_last_k0_length,
-                          valid_n1_length,
-                          block_mask_row_ptr);
+                          valid_n1_length);
     }
 
     template <typename QDramBlockWindowTmp,
