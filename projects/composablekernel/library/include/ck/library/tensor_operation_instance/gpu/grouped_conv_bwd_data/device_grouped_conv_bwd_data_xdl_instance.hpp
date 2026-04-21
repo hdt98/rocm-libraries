@@ -335,7 +335,8 @@ using device_grouped_conv_bwd_data_xdl_bf16_instances = std::tuple<
 
 // bf16_bf16_f32_bf16 — noshuffle epilogue (CDEBlockTransferScalarPerVector_NPerBlock = 1)
 // Same tile shapes as bf16_instances but with ScalarPerVector=1, enabling the no-shuffle fast path
-// (VGPR → Global direct write, 0 LDS barriers) instead of CShuffle (VGPR → LDS → Global, 8 barriers).
+// (VGPR → Global direct write, 0 LDS barriers) instead of CShuffle (VGPR → LDS → Global, 8
+// barriers).
 template <index_t NDimSpatial,
           typename ALayout,
           typename BLayout,
@@ -551,10 +552,10 @@ using device_grouped_conv_bwd_data_xdl_f32_noshuffle_instances =
         // clang-format on
         >;
 
-// bf16 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl instances.
-// The key difference from bf16_instances: BBlockTransfer uses S<4, BlockSize/4, 1> thread cluster
-// and S<2, 0, 1> arrange order, which gives full thread utilization for B-matrix loads.
-// These are optimal when opt3 flat descriptor path is active (G=1, 2D convolutions).
+// bf16 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl
+// instances. The key difference from bf16_instances: BBlockTransfer uses S<4, BlockSize/4, 1>
+// thread cluster and S<2, 0, 1> arrange order, which gives full thread utilization for B-matrix
+// loads. These are optimal when opt3 flat descriptor path is active (G=1, 2D convolutions).
 template <index_t NDimSpatial,
           typename ALayout,
           typename BLayout,
@@ -583,7 +584,8 @@ using device_grouped_conv_bwd_data_xdl_bf16_nongrouped_match_instances = std::tu
     // clang-format on
     >;
 
-// f16 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl instances.
+// f16 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl
+// instances.
 template <index_t NDimSpatial,
           typename ALayout,
           typename BLayout,
@@ -608,8 +610,8 @@ using device_grouped_conv_bwd_data_xdl_f16_nongrouped_match_instances = std::tup
     // clang-format on
     >;
 
-// f32 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl instances.
-// F32 uses K1=4, KPerBlock=16, and smaller scalar-per-vector values.
+// f32 — BBlockTransfer parameters matching the non-grouped DeviceConvNdBwdDataNwcKxcNwk_Xdl
+// instances. F32 uses K1=4, KPerBlock=16, and smaller scalar-per-vector values.
 template <index_t NDimSpatial,
           typename ALayout,
           typename BLayout,

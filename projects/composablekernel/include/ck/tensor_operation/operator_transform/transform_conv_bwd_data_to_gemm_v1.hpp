@@ -1646,13 +1646,12 @@ struct TransformConvBwdDataToGemm_v1
 
             const auto wei_k_ydot_ytilde_xdot_xtilde_c_grid_desc = transform_tensor_descriptor(
                 wei_k_y_x_c_grid_desc,
-                make_tuple(
-                    make_pass_through_transform(K_),
-                    make_embed_transform(make_tuple(YDot_, YTilde_),
-                                         make_tuple(ConvStrideH_ / GcdStrideDilationH_, I1)),
-                    make_embed_transform(make_tuple(XDot_, XTilde_),
-                                         make_tuple(ConvStrideW_ / GcdStrideDilationW_, I1)),
-                    make_pass_through_transform(C_)),
+                make_tuple(make_pass_through_transform(K_),
+                           make_embed_transform(make_tuple(YDot_, YTilde_),
+                                                make_tuple(ConvStrideH_ / GcdStrideDilationH_, I1)),
+                           make_embed_transform(make_tuple(XDot_, XTilde_),
+                                                make_tuple(ConvStrideW_ / GcdStrideDilationW_, I1)),
+                           make_pass_through_transform(C_)),
                 make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
                 make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3, 4>{}, Sequence<5>{}));
 
@@ -1692,12 +1691,12 @@ struct TransformConvBwdDataToGemm_v1
         }
     }
 
-    template <typename CLayout_                   = CLayout,
-              typename std::enable_if<NDimSpatial == 2 &&
-                                          (is_same_v<CLayout_, tensor_layout::convolution::GNHWC> ||
-                                           is_same_v<CLayout_, tensor_layout::convolution::NHWGC> ||
-                                           is_same_v<CLayout_, tensor_layout::convolution::G_NHW_C>),
-                                      bool>::type = false>
+    template <typename CLayout_ = CLayout,
+              typename std::enable_if<
+                  NDimSpatial == 2 && (is_same_v<CLayout_, tensor_layout::convolution::GNHWC> ||
+                                       is_same_v<CLayout_, tensor_layout::convolution::NHWGC> ||
+                                       is_same_v<CLayout_, tensor_layout::convolution::G_NHW_C>),
+                  bool>::type = false>
     __host__ __device__ auto MakeCDescriptor_M_N_Packed() const
     {
         const auto in_n_hi_wi_c_grid_desc =

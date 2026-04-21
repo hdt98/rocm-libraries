@@ -613,8 +613,8 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                                const EGridDesc_MBlock_MPerBlock_NBlock_NPerBlock&
                                    e_grid_desc_mblock_mperblock_nblock_nperblock,
                                const Block2ETileMap& block_2_etile_map,
-                               const index_t k_batch = 1,
-                               const index_t k_idx   = 0,
+                               const index_t k_batch                              = 1,
+                               const index_t k_idx                                = 0,
                                const EGridDesc_M_N_Direct& e_grid_desc_m_n_direct = {})
     {
         const auto a_grid_buf = make_dynamic_buffer<AddressSpaceEnum::Global>(
@@ -816,13 +816,12 @@ struct GridwiseGemmMultipleD_xdl_cshuffle
                 {
                     return transform_tensor_descriptor(
                         e_grid_desc_mblock_mperblock_nblock_nperblock,
-                        make_tuple(
-                            make_merge_transform(make_tuple(
-                                e_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I0),
-                                Number<MPerBlock>{})),
-                            make_merge_transform(make_tuple(
-                                e_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I2),
-                                Number<NPerBlock>{}))),
+                        make_tuple(make_merge_transform(make_tuple(
+                                       e_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I0),
+                                       Number<MPerBlock>{})),
+                                   make_merge_transform(make_tuple(
+                                       e_grid_desc_mblock_mperblock_nblock_nperblock.GetLength(I2),
+                                       Number<NPerBlock>{}))),
                         make_tuple(Sequence<0, 1>{}, Sequence<2, 3>{}),
                         make_tuple(Sequence<0>{}, Sequence<1>{}));
                 }

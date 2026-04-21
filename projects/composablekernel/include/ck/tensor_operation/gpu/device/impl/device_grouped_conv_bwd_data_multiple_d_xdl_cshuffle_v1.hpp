@@ -508,42 +508,42 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
     // Uses simpler epilogue and address computation, matching the non-grouped kernel.
     // Requires AK1 == BK1 (true for all backward data convolution instances).
     template <index_t NXdlPerWave_>
-    using NonGroupedGridwiseGemmBase = GridwiseGemm_k0mk1_k0nk1_mn_xdlops_v2r3<
-        BlockSize,
-        ABDataType,
-        AccDataType,
-        EDataType,
-        InMemoryDataOperationEnum::Set,
-        AElementwiseOp,
-        BElementwiseOp,
-        CDEElementwiseOp,
-        MPerBlock,
-        NPerBlock,
-        KPerBlock / AK1,
-        MPerXDL,
-        NPerXDL,
-        AK1,
-        MXdlPerWave,
-        NXdlPerWave_,
-        ABlockTransferThreadClusterLengths_AK0_M_AK1,
-        ABlockTransferThreadClusterArrangeOrder,
-        ABlockTransferSrcAccessOrder,
-        ABlockTransferSrcVectorDim,
-        ABlockTransferSrcScalarPerVector,
-        ABlockTransferDstScalarPerVector_AK1,
-        false,
-        ABlockLdsExtraM,
-        BBlockTransferThreadClusterLengths_BK0_N_BK1,
-        BBlockTransferThreadClusterArrangeOrder,
-        BBlockTransferSrcAccessOrder,
-        BBlockTransferSrcVectorDim,
-        BBlockTransferSrcScalarPerVector,
-        BBlockTransferDstScalarPerVector_BK1,
-        false,
-        BBlockLdsExtraN,
-        Sequence<2, 3, 0, 1, 7, 5, 4, 6>,
-        7,
-        1>;
+    using NonGroupedGridwiseGemmBase =
+        GridwiseGemm_k0mk1_k0nk1_mn_xdlops_v2r3<BlockSize,
+                                                ABDataType,
+                                                AccDataType,
+                                                EDataType,
+                                                InMemoryDataOperationEnum::Set,
+                                                AElementwiseOp,
+                                                BElementwiseOp,
+                                                CDEElementwiseOp,
+                                                MPerBlock,
+                                                NPerBlock,
+                                                KPerBlock / AK1,
+                                                MPerXDL,
+                                                NPerXDL,
+                                                AK1,
+                                                MXdlPerWave,
+                                                NXdlPerWave_,
+                                                ABlockTransferThreadClusterLengths_AK0_M_AK1,
+                                                ABlockTransferThreadClusterArrangeOrder,
+                                                ABlockTransferSrcAccessOrder,
+                                                ABlockTransferSrcVectorDim,
+                                                ABlockTransferSrcScalarPerVector,
+                                                ABlockTransferDstScalarPerVector_AK1,
+                                                false,
+                                                ABlockLdsExtraM,
+                                                BBlockTransferThreadClusterLengths_BK0_N_BK1,
+                                                BBlockTransferThreadClusterArrangeOrder,
+                                                BBlockTransferSrcAccessOrder,
+                                                BBlockTransferSrcVectorDim,
+                                                BBlockTransferSrcScalarPerVector,
+                                                BBlockTransferDstScalarPerVector_BK1,
+                                                false,
+                                                BBlockLdsExtraN,
+                                                Sequence<2, 3, 0, 1, 7, 5, 4, 6>,
+                                                7,
+                                                1>;
     using NonGroupedGridwiseGemm64 = NonGroupedGridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
 
     // Flat descriptor type aliases for group_count=1 fast path.
@@ -1473,72 +1473,66 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 bool used_flat_desc = false;
                 if constexpr(NDimSpatial == 2 && !CTranspose)
                 {
-                    if(arg.num_group_ == 1 &&
-                       !arg.flat_a_container_.empty())
+                    if(arg.num_group_ == 1 && !arg.flat_a_container_.empty())
                     {
-                        used_flat_desc = true;
-                        const index_t flat_idx = gemm_set_id;
-                        const auto& flat_a = arg.flat_a_container_[flat_idx];
-                        const auto& flat_b = arg.flat_b_container_[flat_idx];
-                        const auto& flat_c = arg.flat_c_container_[flat_idx];
+                        used_flat_desc          = true;
+                        const index_t flat_idx  = gemm_set_id;
+                        const auto& flat_a      = arg.flat_a_container_[flat_idx];
+                        const auto& flat_b      = arg.flat_b_container_[flat_idx];
+                        const auto& flat_c      = arg.flat_c_container_[flat_idx];
                         const index_t padded_K0 = flat_a.GetLength(I0);
                         const bool flat_desc_has_main_loop =
-                            NonGroupedGridwiseGemm64::CalculateHasMainKBlockLoop(
-                                padded_K0 * AK1);
+                            NonGroupedGridwiseGemm64::CalculateHasMainKBlockLoop(padded_K0 * AK1);
                         const index_t flat_grid_size =
                             NonGroupedGridwiseGemm64::Block2CTileMap::CalculateGridSize(
                                 flat_c.GetLength(I0), flat_c.GetLength(I1));
                         if(flat_desc_has_main_loop)
                         {
-                            const auto kernel =
-                                kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
-                                                         ABDataType,
-                                                         EDataType,
-                                                         FlatAGridDesc_K0_M_K1,
-                                                         FlatBGridDesc_K0_N_K1,
-                                                         FlatCGridDesc_M_N,
-                                                         true>;
-                            ave_time += launch_and_time_kernel_with_preprocess(
-                                stream_config,
-                                clear_workspace,
-                                kernel,
-                                dim3(flat_grid_size),
-                                dim3(BlockSize),
-                                0,
-                                p_a_grid,
-                                p_b_grid,
-                                p_e_grid,
-                                flat_a,
-                                flat_b,
-                                flat_c);
+                            const auto kernel = kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
+                                                                        ABDataType,
+                                                                        EDataType,
+                                                                        FlatAGridDesc_K0_M_K1,
+                                                                        FlatBGridDesc_K0_N_K1,
+                                                                        FlatCGridDesc_M_N,
+                                                                        true>;
+                            ave_time += launch_and_time_kernel_with_preprocess(stream_config,
+                                                                               clear_workspace,
+                                                                               kernel,
+                                                                               dim3(flat_grid_size),
+                                                                               dim3(BlockSize),
+                                                                               0,
+                                                                               p_a_grid,
+                                                                               p_b_grid,
+                                                                               p_e_grid,
+                                                                               flat_a,
+                                                                               flat_b,
+                                                                               flat_c);
                         }
                         else
                         {
-                            const auto kernel =
-                                kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
-                                                         ABDataType,
-                                                         EDataType,
-                                                         FlatAGridDesc_K0_M_K1,
-                                                         FlatBGridDesc_K0_N_K1,
-                                                         FlatCGridDesc_M_N,
-                                                         false>;
-                            ave_time += launch_and_time_kernel_with_preprocess(
-                                stream_config,
-                                clear_workspace,
-                                kernel,
-                                dim3(flat_grid_size),
-                                dim3(BlockSize),
-                                0,
-                                p_a_grid,
-                                p_b_grid,
-                                p_e_grid,
-                                flat_a,
-                                flat_b,
-                                flat_c);
+                            const auto kernel = kernel_gemm_xdlops_v2r3<NonGroupedGridwiseGemm64,
+                                                                        ABDataType,
+                                                                        EDataType,
+                                                                        FlatAGridDesc_K0_M_K1,
+                                                                        FlatBGridDesc_K0_N_K1,
+                                                                        FlatCGridDesc_M_N,
+                                                                        false>;
+                            ave_time += launch_and_time_kernel_with_preprocess(stream_config,
+                                                                               clear_workspace,
+                                                                               kernel,
+                                                                               dim3(flat_grid_size),
+                                                                               dim3(BlockSize),
+                                                                               0,
+                                                                               p_a_grid,
+                                                                               p_b_grid,
+                                                                               p_e_grid,
+                                                                               flat_a,
+                                                                               flat_b,
+                                                                               flat_c);
                         }
                     }
                 }
-                
+
                 if(!used_flat_desc)
                 {
                     if(has_loop_in_all_gemm)
