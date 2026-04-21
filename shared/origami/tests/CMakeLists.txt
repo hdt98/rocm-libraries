@@ -23,11 +23,11 @@ target_sources(
                           "${CMAKE_CURRENT_SOURCE_DIR}/test_formocast.cpp"
 )
 
-target_include_directories(origami-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" /opt/rocm/include)
+target_include_directories(origami-tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${_ORIGAMI_HIP_INCLUDE}")
 
 target_link_libraries(origami-tests PRIVATE roc::origami Catch2::Catch2WithMain)
 
-add_compile_definitions(__HIP_PLATFORM_AMD__)
+target_compile_definitions(origami-tests PRIVATE __HIP_PLATFORM_AMD__=1)
 
 include(CTest)
 include(Catch)
