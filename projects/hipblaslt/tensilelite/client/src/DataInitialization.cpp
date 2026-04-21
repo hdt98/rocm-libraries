@@ -761,22 +761,14 @@ namespace TensileLite
                                   size_t                  totalElements,
                                   hipMemcpyKind           kind)
         {
-            auto const info = DataTypeInfo::Get(descriptor.dataType());
             HIP_CHECK_EXC(
                 hipMemcpy(dst,
                           src,
-<<<<<<< HEAD
-                          totalElements * info.elementSize / info.packing,
-                          kind));
-            ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
-            dPadding           *= descriptor.elementBytes();
-=======
                           multiplyElementSize(totalElements,
                                               DataTypeInfo::Get(descriptor.dataType()).elementSize),
                           kind));
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
             dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
->>>>>>> origin/develop
             void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
             TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind);
             return dstOffset;
@@ -795,12 +787,8 @@ namespace TensileLite
             const size_t    numElementsToCopy
                 = (customPadding == -1) ? descriptor.totalAllocatedElements()
                                         : (descriptor.totalAllocatedElements() + customPadding);
-<<<<<<< HEAD
-            uint8_t* dstOffset = (uint8_t*)dst + dPadding * descriptor.elementBytes();
-=======
             uint8_t* dstOffset
                 = (uint8_t*)dst + multiplyElementSize(dPadding, descriptor.elementBytes());
->>>>>>> origin/develop
             HIP_CHECK_EXC(
                 hipMemcpy(dstOffset,
                           src,
@@ -1235,13 +1223,8 @@ namespace TensileLite
                     else if(m_curBoundsCheck == BoundsCheckMode::GuardPageFront
                             || m_curBoundsCheck == BoundsCheckMode::GuardPageBack)
                     {
-<<<<<<< HEAD
                         float  dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
                         size_t roundUpSize  = divideElementSize(pageSize, dataTypeSize);
-=======
-                        float        dataTypeSize = DataTypeInfo::Get(p->first).elementSize;
-                        unsigned int roundUpSize  = divideElementSize(pageSize, dataTypeSize);
->>>>>>> origin/develop
                         p->second.maxElements
                             = RoundUpToMultiple<size_t>(p->second.maxElements, roundUpSize);
                         // No bias page guard
