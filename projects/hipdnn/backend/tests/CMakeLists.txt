@@ -202,13 +202,12 @@ install(TARGETS ${TEST_NO_API_VERSION_PLUGIN_NAME} LIBRARY DESTINATION ${HIPDNN_
 )
 
 # Add dependencies on heuristic test plugins (built in tests/test_plugins/)
-# Note: These targets will be created when tests/ is processed, dependencies resolved at build time
-if(TARGET ${TEST_GOOD_HEURISTIC_PLUGIN_NAME})
-    add_dependencies(hipdnn_backend_tests
-        ${TEST_GOOD_HEURISTIC_PLUGIN_NAME}
-        ${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME}
-        ${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME}
-    )
-endif()
+# Note: These targets are forward references - they will be created when tests/test_plugins/
+# is processed later. CMake resolves these dependencies at build time.
+add_dependencies(hipdnn_backend_tests
+    ${TEST_GOOD_HEURISTIC_PLUGIN_NAME}
+    ${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME}
+    ${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME}
+)
 
 add_unit_test_target(hipdnn_backend_tests ${CMAKE_CURRENT_BINARY_DIR})
