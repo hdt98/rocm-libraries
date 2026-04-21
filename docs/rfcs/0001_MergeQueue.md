@@ -149,15 +149,17 @@ There is no per-project file. Removing the entry (and your queue from other entr
 
 ### 4.4 PR lifecycle
 
-1. An authorized user (PR author or any user with write/maintain/admin on the repo, per [§4.6](#46-permissions)) comments `/merge`.
-2. The command handler validates eligibility (see [§4.6](#46-permissions)), computes the queue set from the PR's changed paths, applies a `mq:queued` label and one `mq:<queue>` label per queue, and posts a single status comment with a hidden JSON metadata marker.
-3. A processor runs every 3 minutes. For each queue, it picks the head PR (oldest `enqueued_at`). If a PR is at the head of *every* queue it belongs to, the processor labels it `mq:active`, merges `develop` into the PR branch, and waits one cycle for CI to run against the freshly-merged tip.
-4. On the next cycle:
+Three GitHub Actions workflows share responsibility for driving the queue. The command handler and status watcher are event-driven; the processor is scheduled.
+
+1. An authorized user (PR author or any user with write/maintain/admin on the repo, per [§4.6](#46-permissions)) comments `/merge` on a PR.
+2. **Command handler** — triggered by the `issue_comment` event. Validates eligibility (see [§4.6](#46-permissions)), computes the queue set from the PR's changed paths, applies `mq:queued` and one `mq:<queue>` label per queue, and posts a single status comment with a hidden JSON metadata marker (`enqueued_at`, queue list). This is the only step that assigns queue membership labels; nothing else writes them.
+3. **Processor** — runs every 3 minutes via cron. For each queue it fetches all PRs carrying that queue's `mq:<queue>` label and sorts them by `enqueued_at` (FIFO). A PR that sits at the head of *every* queue it belongs to is *ready*: the processor replaces its `mq:queued` label with `mq:active`, merges `develop` into the PR branch, and waits one cycle for CI to run against the freshly-merged tip.
+4. On the next processor cycle:
    - **CI green** → squash-merge.
    - **CI still pending** → PR keeps `mq:active`, stays at the head, and is retried each cycle until checks settle.
    - **CI red** → eject with a comment naming the failure; the author re-enqueues with `/merge` after fixing.
-   - **New commits pushed by a non-bot user while queued** → eject (the queue's "what we tested" guarantee no longer holds).
-5. `/dequeue` removes a PR. The PR author or any write-access user can dequeue.
+5. **Status watcher** — triggered by any `push` event on a PR that carries any `mq:*` label. If the pusher is not the bot account, the PR is ejected immediately — the base tip the queue tested no longer matches what will be merged.
+6. `/dequeue` is handled by the command handler (same `issue_comment` trigger). The PR author or any write-access user can dequeue at any time.
 
 Labels:
 
@@ -169,7 +171,7 @@ Labels:
 
 - 3-minute processor cron. Single concurrency group; no overlap, no cancellation.
 - One PR processed per queue per cycle. No batching.
-- The processor commits as `github-actions[bot]` so its merge of `develop` into the PR branch does not trigger the new-commit ejector in step 4.
+- The processor commits as `github-actions[bot]`. The status watcher (step 5 in [§4.4](#44-pr-lifecycle)) exempts bot pushes when checking for new commits, so the processor's own `develop`-merge does not trigger an eject.
 
 ### 4.6 Permissions
 
@@ -179,18 +181,17 @@ Labels:
 
 ### 4.7 Processing model
 
-Queue state is stored entirely in PR metadata — labels and a hidden JSON comment posted by the command handler at enqueue time — with no external database. The processor reconstructs the full queue picture on every cycle by scanning all open PRs with `mq:queued` or `mq:active` labels.
+Queue state is stored entirely in PR metadata — labels and a hidden JSON comment posted by the command handler at enqueue time — with no external database. The processor reconstructs the full queue picture on every cycle by issuing one label-filtered API search per queue.
 
 **Per-cycle algorithm.**
 
 ```
 process_cycle():
-    # 1. Discover: rebuild all queue state from PR metadata.
-    pulls   = list_open_prs(base="develop", labels_any=["mq:queued", "mq:active"])
+    # 1. Discover: rebuild each queue by searching for its membership label.
     members = {q: [] for q in ALL_QUEUES}
-    for pr in pulls:
-        meta = parse_metadata_comment(pr)            # enqueued_at, queues
-        for q in meta.queues:
+    for q in ALL_QUEUES:
+        for pr in search_prs(label=f"mq:{q}"):       # one API call per queue
+            meta = parse_metadata_comment(pr)         # enqueued_at, queues
             members[q].append((meta.enqueued_at, pr))
 
     # 2. Build queues: each queue is a FIFO sorted by enqueue time.
