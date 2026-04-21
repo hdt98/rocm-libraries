@@ -412,8 +412,7 @@ struct BlockFmhaPipelineQRKSVSAsync
         {
             float k_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
             {
                 // K and V share the same seqlen_k position within a block
                 const index_t kv_idx = (kv_load_start + i_total_loops * kN0) / block_scale_size_kv;
@@ -468,8 +467,7 @@ struct BlockFmhaPipelineQRKSVSAsync
             // dequant
             auto s_acc_element_func_ = [&s_acc_element_func, k_descale]() {
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
                 {
                     return s_acc_element_func * k_descale;
                 }
@@ -784,8 +782,7 @@ struct BlockFmhaPipelineQRKSVSAsync
 
             float v_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
             {
                 // K and V share the same seqlen_k position within a block
                 const index_t kv_idx = (kv_load_start + i_total_loops * kN0) / block_scale_size_kv;
@@ -797,8 +794,7 @@ struct BlockFmhaPipelineQRKSVSAsync
 
             auto& o_acc_ = [&o_acc0, &o_acc]() -> auto& {
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
                 {
                     return o_acc0;
                 }
@@ -888,8 +884,7 @@ struct BlockFmhaPipelineQRKSVSAsync
             }
 
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                         QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                         QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
             {
                 tile_elementwise_inout(
                     [&v_descale](auto& o, auto& o0) { o += o0 * v_descale; }, o_acc, o_acc0);

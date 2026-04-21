@@ -250,6 +250,12 @@ struct FmhaFwdKernel
 
     struct FmhaFwdGroupPerBlockKargs : FmhaFwdCommonPerBlockKargs
     {
+        // Cumulative per-batch tile-start indices into the packed Q/K/V descale
+        // tensors. Required because PERBLOCK descale slots are per-tile, not
+        // per-token, so token-based offsets (query_start * stride_descale)
+        // would over-index for any seqlen not a multiple of the tile size.
+        const int32_t* block_scale_seqstart_q_ptr = nullptr;
+        const int32_t* block_scale_seqstart_k_ptr = nullptr;
     };
 
     struct FmhaFwdCommonLSEKargs
@@ -334,8 +340,7 @@ struct FmhaFwdKernel
                                  FmhaFwdBatchBlockScaleKargs,
                                  std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
                                                     FmhaFwdBatchMXKargs,
-                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                                                                       QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE,
+                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
                                                                        FmhaFwdBatchPerBlockKargs,
                                                                        FmhaFwdEmptyKargs<3>>>>>,
           std::conditional_t<kHasDropout, FmhaFwdBatchModeDropoutKargs, FmhaFwdEmptyKargs<4>>,
@@ -368,8 +373,7 @@ struct FmhaFwdKernel
                                  FmhaFwdGroupBlockScaleKargs,
                                  std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
                                                     FmhaFwdGroupMXKargs,
-                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                                                                       QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE,
+                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
                                                                        FmhaFwdGroupPerBlockKargs,
                                                                        FmhaFwdEmptyKargs<3>>>>>,
           std::conditional_t<kHasDropout, FmhaFwdCommonDropoutKargs, FmhaFwdEmptyKargs<4>>,
@@ -563,8 +567,7 @@ struct FmhaFwdKernel
             kargs.batch_stride_k_descale = batch_stride_k_descale;
             kargs.batch_stride_v_descale = batch_stride_v_descale;
         }
-        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                          QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
         {
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
@@ -1033,8 +1036,7 @@ struct FmhaFwdKernel
 
             kargs.seqstart_v_scale_ptr = reinterpret_cast<const int32_t*>(seqstart_v_scale_ptr);
         }
-        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                          QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+        else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
         {
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
@@ -1047,6 +1049,11 @@ struct FmhaFwdKernel
             kargs.nhead_stride_q_descale = nhead_stride_q_descale;
             kargs.nhead_stride_k_descale = nhead_stride_k_descale;
             kargs.nhead_stride_v_descale = nhead_stride_v_descale;
+
+            kargs.block_scale_seqstart_q_ptr =
+                reinterpret_cast<const int32_t*>(block_scale_seqstart_q_ptr);
+            kargs.block_scale_seqstart_k_ptr =
+                reinterpret_cast<const int32_t*>(block_scale_seqstart_k_ptr);
         }
         if constexpr(kHasDropout)
         {
@@ -1553,12 +1560,15 @@ struct FmhaFwdKernel
                     batch_offset_k_descale = key_start * kargs.stride_k_descale;
                     batch_offset_v_descale = kargs.seqstart_v_scale_ptr[i_batch];
                 }
-                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                                  QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
                 {
-                    batch_offset_q_descale = query_start * kargs.stride_q_descale;
-                    batch_offset_k_descale = key_start * kargs.stride_k_descale;
-                    batch_offset_v_descale = key_start * kargs.stride_v_descale;
+                    // Descale slots are packed per-tile; use the cumulative
+                    // tile-start array prepared by the host (mirrors BLOCKSCALE).
+                    const long_index_t bquery_start = kargs.block_scale_seqstart_q_ptr[i_batch];
+                    const long_index_t bkey_start   = kargs.block_scale_seqstart_k_ptr[i_batch];
+                    batch_offset_q_descale          = bquery_start;
+                    batch_offset_k_descale          = bkey_start;
+                    batch_offset_v_descale          = bkey_start;
                 }
                 batch_offset_o = query_start * kargs.stride_o;
 
@@ -1629,8 +1639,7 @@ struct FmhaFwdKernel
                 }
                 if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE ||
                              QScaleEnum == BlockAttentionQuantScaleEnum::MX ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                             QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                             QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
                 {
                     batch_offset_q_descale =
                         static_cast<long_index_t>(i_batch) * kargs.batch_stride_q_descale;
@@ -2228,8 +2237,7 @@ struct FmhaFwdKernel
                                                 k_scale_dram_window,
                                                 v_scale_dram_window);
                 }
-                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK ||
-                                  QScaleEnum == BlockAttentionQuantScaleEnum::ROWWISE)
+                else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK)
                 {
                     const float* q_descale_ptr =
                         reinterpret_cast<const float*>(kargs.q_descale_ptr) +
@@ -2255,7 +2263,7 @@ struct FmhaFwdKernel
 
                     float scale_p =
                         ck_tile::type_convert<float>(ck_tile::numeric<PDataType>::max());
-                    float scale_o = v_descale_ptr[0] / scale_p; // initial v_descale for first tile
+                    float scale_o = 1.0f / scale_p;
 
                     auto o_acc_element_func = [&]() {
                         if constexpr(std::is_same_v<ODataType, ck_tile::fp8_t>)

@@ -605,8 +605,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 max_seqlen_k = real_seqlen_k;
             }
             if(qscale.type == quant_scale_enum::blockscale ||
-               qscale.type == quant_scale_enum::perblock ||
-               qscale.type == quant_scale_enum::rowwise)
+               qscale.type == quant_scale_enum::perblock)
             {
                 i_block_scale_q += ck_tile::integer_divide_ceil(real_seqlen_q, block_scale_size_q_);
                 i_block_scale_k +=
@@ -767,8 +766,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         v_descale_host = ck_tile::HostTensor<VScaleDataType>(
             std::array<ck_tile::index_t, 3>{shape_batch, nhead_k, num_block_scale_kv});
     }
-    else if(qscale.type == quant_scale_enum::perblock ||
-            qscale.type == quant_scale_enum::rowwise)
+    else if(qscale.type == quant_scale_enum::perblock)
     {
         // Per-block: one descale per tile (block_scale_size_q_ for Q, block_scale_size_kv_ for K/V)
         q_descale_host = ck_tile::HostTensor<QScaleDataType>(
@@ -943,8 +941,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         ck_tile::FillUniformDistribution<float>{max_descale_v * 0.8f, max_descale_v, next_seed()}(
             v_descale_host);
     }
-    else if(qscale.type == quant_scale_enum::perblock ||
-            qscale.type == quant_scale_enum::rowwise)
+    else if(qscale.type == quant_scale_enum::perblock)
     {
         float q_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<QDataType>::max());
         float k_dtype_max = ck_tile::type_convert<float>(ck_tile::numeric<KDataType>::max());
@@ -1408,8 +1405,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         args.batch_stride_v_descale = (nhead_k * hdim_v * shape_seqlen_v_scale);
                     }
                 }
-                else if(qscale.type == quant_scale_enum::perblock ||
-                        qscale.type == quant_scale_enum::rowwise)
+                else if(qscale.type == quant_scale_enum::perblock)
                 {
                     args.q_descale_ptr =
                         reinterpret_cast<const float*>(q_descale_buf.GetDeviceBuffer());
@@ -1430,6 +1426,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     args.batch_stride_q_descale = batch_stride_q_descale;
                     args.batch_stride_k_descale = batch_stride_k_descale;
                     args.batch_stride_v_descale = batch_stride_v_descale;
+
+                    // In group mode the descale tensors are packed across batches by
+                    // tile (not by token), so the kernel needs the cumulative tile-start
+                    // arrays that the host already prepared above.
+                    args.block_scale_seqstart_q_ptr =
+                        (mode == mode_enum::group ? block_scale_seqstart_q_buf.GetDeviceBuffer()
+                                                  : nullptr);
+                    args.block_scale_seqstart_k_ptr =
+                        (mode == mode_enum::group ? block_scale_seqstart_k_buf.GetDeviceBuffer()
+                                                  : nullptr);
                 }
 
                 args.rand_val_ptr = randval_buf.GetDeviceBuffer();
@@ -1680,8 +1686,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     nhead_k,
                     group_size_opt.value(),
                     qscale.type == quant_scale_enum::blockscale ||
-                    qscale.type == quant_scale_enum::perblock ||
-                    qscale.type == quant_scale_enum::rowwise,
+                    qscale.type == quant_scale_enum::perblock,
                     [&](const auto& traits, auto& args, const auto& sc) {
                         return fmha_fwd(traits, args, sc);
                     });
@@ -2081,8 +2086,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                               k_offset + std::get<2>(idx) / block_scale_size_kv_);
                     });
             }
-            else if(qscale.type == quant_scale_enum::perblock ||
-                    qscale.type == quant_scale_enum::rowwise)
+            else if(qscale.type == quant_scale_enum::perblock)
             {
                 const ck_tile::index_t q_offset =
                     (mode == mode_enum::batch) ? 0 : block_scale_seqstart_q_host[wb];
@@ -2390,8 +2394,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         },
                         ck_tile::idx_identity{});
             }
-            else if(qscale.type == quant_scale_enum::perblock ||
-                    qscale.type == quant_scale_enum::rowwise)
+            else if(qscale.type == quant_scale_enum::perblock)
             {
                 const ck_tile::index_t v_offset =
                     (mode == mode_enum::batch) ? 0 : block_scale_seqstart_k_host[wb];
@@ -2467,7 +2470,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
              : qscale.type == quant_scale_enum::kv_blockscale ? "kv_blockscale"
              : qscale.type == quant_scale_enum::mx            ? "mx"
              : qscale.type == quant_scale_enum::perblock      ? "perblock"
-             : qscale.type == quant_scale_enum::rowwise       ? "rowwise"
                                                               : "unknown");
         dump_fmha_fwd_json_results(*json,
                                    data_type,
