@@ -392,7 +392,7 @@ TEST_F(IntegrationHeuristicPlugin, GetLoadedPluginFilesReturnsCorrectCount)
     size_t numPlugins = 0;
     size_t maxStringLen = 0;
 
-    rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, &maxStringLen);
+    rm->getLoadedPluginFiles(&numPlugins, nullptr, &maxStringLen);
 
     // Should have at least the test plugins
     EXPECT_GT(numPlugins, 0u);
