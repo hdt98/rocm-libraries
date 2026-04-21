@@ -13,7 +13,7 @@
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
+#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
@@ -204,11 +204,11 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(WType));
     const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(YType));
 
-    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(YType)), hipSuccess);
     ASSERT_EQ(hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
-              hipSuccess);
+    hipSuccess);
     ASSERT_EQ(hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
-              hipSuccess);
+    hipSuccess);
+    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(YType)), hipSuccess);
 
     // Execute
     std::unordered_map<int64_t, void*> variantPack;
@@ -224,9 +224,14 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
         hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(YType), hipMemcpyDeviceToHost),
         hipSuccess);
 
-    // CPU reference
-    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<XType, WType, YType, ComputeType>(
-        cpuX, cpuW, cpuY, stride, dilation, padding, padding);
+    // Run CPU reference executor with host pointers (same graph)
+    std::unordered_map<int64_t, void*> cpuVariantPack;
+    cpuVariantPack[X_UID] = cpuX.rawHostData();
+    cpuVariantPack[W_UID] = cpuW.rawHostData();
+    cpuVariantPack[Y_UID] = cpuY.rawHostData();
+
+    hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor cpuExecutor;
+    cpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), cpuVariantPack);
 
     // Compare
     const auto* cpuResult = static_cast<const YType*>(cpuY.rawHostData());

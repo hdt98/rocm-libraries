@@ -14,7 +14,7 @@
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_data_sdk/utilities/Workspace.hpp>
-#include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
+#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/GpuReferenceGraphExecutor.hpp"
@@ -25,6 +25,7 @@ namespace
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_integration_tests::test_utils;
 using hipdnn_integration_tests::gpu_graph_executor::GpuReferenceGraphExecutor;
+using hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor;
 
 // Creates a minimal pointwise graph with two FLOAT tensors (input + output).
 // The pointwise operation is RELU_FWD but the dummy plan ignores the operation.
@@ -244,11 +245,16 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     ASSERT_EQ(hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(T), hipMemcpyDeviceToHost),
               hipSuccess);
 
-    // Run CPU reference for comparison
-    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(
-        cpuX, cpuW, cpuY, convStride, dilation, padding, padding);
+    // Run CPU reference executor with host pointers (same graph)
+    std::unordered_map<int64_t, void*> cpuVariantPack;
+    cpuVariantPack[X_UID] = cpuX.rawHostData();
+    cpuVariantPack[W_UID] = cpuW.rawHostData();
+    cpuVariantPack[Y_UID] = cpuY.rawHostData();
 
-    // Compare GPU executor output against CPU reference
+    CpuReferenceGraphExecutor cpuExecutor;
+    cpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), cpuVariantPack);
+
+    // Compare GPU executor output against CPU executor output
     const auto* cpuResult = static_cast<const T*>(cpuY.rawHostData());
     for(size_t i = 0; i < yCount; ++i)
     {
