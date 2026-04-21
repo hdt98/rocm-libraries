@@ -4238,24 +4238,18 @@ class KernelWriterAssembly(KernelWriter):
               divider = 8 if tP["isM"] else 2
               module.add(SLShiftRightB32(dst=sgpr(stmp), src=size, shiftHex=hex(int(log(divider,2))), comment="(size/%u)"%divider))
               module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%u-1)"%divider))
-            elif tc == "MXSA":
-              mxBlock = kernel["ProblemType"]["MXBlockA"]
-              if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
-                module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
-                src0 = sgpr(stmp)
+            elif tc in ("MXSA", "MXSB"):
+              mxBlock = kernel["ProblemType"]["MXBlockA"] if tc == "MXSA" else kernel["ProblemType"]["MXBlockB"]
+              if mxBlock > 0:
+                if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
+                  module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
+                  src0 = sgpr(stmp)
+                else:
+                  src0 = size
+                module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
+                module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
               else:
-                src0 = size
-              module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
-              module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
-            elif tc == "MXSB":
-              mxBlock = kernel["ProblemType"]["MXBlockB"]
-              if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
-                module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
-                src0 = sgpr(stmp)
-              else:
-                src0 = size
-              module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
-              module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
+                module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
             elif tP["isSwizzled"]:
               module.addModuleAsFlatItems(self.alignTo(stmp, "SizeL", tP["swizzleK"]))
               module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=1, comment="SWZ-%s align: (sizeL-1)"%tc))
@@ -4308,7 +4302,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(self.shiftSrd(tc))
       else:
         # put limit directly into SRD:
-        module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp, tP["bpeGR"], comment="Set limit to use bytes"))
+        module.add(scalarMultiplyBpe("Srd%s+2"%tc, str(stmp), float(tP["bpeGR"]), comment="Set limit to use bytes"))
         module.add(SAddU32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("Srd%s+2"%tc), src1=prePad, comment="extend limit for pre-pad"))
 
       # Apply any high-order address components to the tileStart and eventually the SRD - batch idx for batched gemm

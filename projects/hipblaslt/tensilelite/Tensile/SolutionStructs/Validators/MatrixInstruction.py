@@ -200,12 +200,15 @@ def validateMIParameters(
         else ptype["F32XdlMathOp"]
     )
 
-    # MFMA / SMFMA tables in ValidParameters use doubled MAC chars when A and B match
-    # (e.g. "HH", "SS") and concatenation when they differ (e.g. "F8B8"). Always
-    # concatenate MacDataType toChar values — same as ProblemType naming logic.
+    # For MFMA validation, determine the key based on MAC data types
     macDataTypeA = ptype.get("MacDataTypeA", miDataType)
     macDataTypeB = ptype.get("MacDataTypeB", miDataType)
-    miDataTypeKey = macDataTypeA.toChar() + macDataTypeB.toChar()
+
+    # If both MAC types are the same, use doubled character key; otherwise use combined key
+    if macDataTypeA == macDataTypeB:
+      miDataTypeKey = macDataTypeA.toChar() + macDataTypeA.toChar()
+    else:
+      miDataTypeKey = macDataTypeA.toChar() + macDataTypeB.toChar()
 
     mi4 = solution[MI_KEY]
     miEnabled = solution[MI_ENABLED_KEY]

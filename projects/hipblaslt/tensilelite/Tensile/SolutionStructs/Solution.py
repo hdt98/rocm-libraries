@@ -2192,6 +2192,9 @@ class Solution(collections.abc.Mapping):
       state["_staggerStrideShift"] = (int)(math.ceil(math.log(state["StaggerUStride"] / (state["DepthU"] * bpeAB), 2)))
 
       def calcLdsPad(isaInfoMap: Dict[str, IsaInfo]) -> int:
+        isMX = state["ProblemType"].get("MXBlockA", 0) != 0 or state["ProblemType"].get("MXBlockB", 0) != 0
+        numBytesA = state["ProblemType"]["MacDataTypeA"].numBytes()
+        numBytesB = state["ProblemType"]["MacDataTypeB"].numBytes()
         lrvwA = state["LocalReadVectorWidthA"]
         lrvwB = state["LocalReadVectorWidthB"]
         ldsPadA = state["LdsPadA"]
@@ -2244,7 +2247,7 @@ class Solution(collections.abc.Mapping):
                   LdsStride = state["VectorWidthA"] * bpeA * state["DepthU"]
                   MinLdsBlockSizePerPadA = (state[f"GlobalReadVectorWidthA"] * bpeA) * state["WavefrontSize"]
                   isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadA
-                  ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvw
+                  ldsPadA = state["MatrixInstK"] if bpeA == 2 and not isM0PadEnough else 2 * lrvwA
                 else:
                   ldsPadA = 0
               else:
@@ -2277,7 +2280,7 @@ class Solution(collections.abc.Mapping):
                   LdsStride = state["VectorWidthB"] * bpeB * state["DepthU"]
                   MinLdsBlockSizePerPadB = (state[f"GlobalReadVectorWidthB"] * bpeB) * state["WavefrontSize"]
                   isM0PadEnough = LdsStride >= MinLdsBlockSizePerPadB
-                  ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvw
+                  ldsPadB = state["MatrixInstK"] if bpeB == 2 and not isM0PadEnough else 2 * lrvwB
                 else:
                   ldsPadB = 0
               else:
@@ -2431,7 +2434,7 @@ class Solution(collections.abc.Mapping):
             ldsNumBytesMetadata = (state["_DepthUMetadata"] + state["LdsPadMetadata"]) * state["MacroTileMetadata"]
           else:
             ldsNumBytesMetadata = state["_DepthUMetadata"] * (state["MacroTileMetadata"] + state["LdsPadMetadata"])
-          ldsNumBytesMetadata = roundUp(ldsNumBytesMetadata / bpeA) # metadata is in byte type. so divide ldsNumBytesMetadata by A,B's bpe
+          ldsNumBytesMetadata = roundUp(ldsNumBytesMetadata / bpeAB) # metadata is in byte type. so divide ldsNumBytesMetadata by A,B's bpe
           padInterval = state["LdsBlockSizePerPadMetadata"]
           if padInterval != 0:
             ldsNumBytesMetadata = int(roundUp(state["_DepthUMetadata"] * state["MacroTileMetadata"] / bpeAB) / padInterval * (padInterval + state["LdsPadMetadata"]))
