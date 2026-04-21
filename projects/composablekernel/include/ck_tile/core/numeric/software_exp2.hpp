@@ -54,13 +54,14 @@ inline __device__ float exp2_fma(float x)
 inline constexpr bool kFastExp2 = static_cast<bool>(CK_TILE_FMHA_FWD_FAST_EXP2);
 
 // Inline wrapper for FMHA forward conditional-rescale exp2 calls.
-// Dispatches to the FMA polynomial when CK_TILE_FMHA_FWD_FAST_EXP2 is enabled
-// (the whole point of the SW exp2 path), or to the hardware v_exp_f32
-// otherwise. Replaces the previous CK_TILE_EXP2 preprocessor macro with a
-// single call site that the optimizer can still inline.
+// Dispatches to the FMA polynomial only on gfx942 (MI300X), where the
+// hardware v_exp_f32 runs at 1/4 VALU throughput and the 3x FMA
+// polynomial is a net win. On gfx950 (MI350X) and other targets the
+// hardware exp2 already runs at full VALU throughput, so the polynomial
+// is more work and regresses perf — fall back to native exp2 there.
 inline __device__ float fmha_fast_exp2(float x)
 {
-#if CK_TILE_FMHA_FWD_FAST_EXP2
+#if CK_TILE_FMHA_FWD_FAST_EXP2 && defined(__gfx942__)
     return detail::exp2_fma(x);
 #else
     return exp2(x);
