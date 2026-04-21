@@ -232,6 +232,7 @@ int main(int argc, char** argv) noexcept
         if(hipdnnSetStream(handle, stream) != HIPDNN_STATUS_SUCCESS)
         {
             std::cerr << "Failed to set stream on shared handle\n";
+            static_cast<void>(hipStreamDestroy(stream));
             return 1;
         }
 
@@ -242,6 +243,7 @@ int main(int argc, char** argv) noexcept
             std::cerr << "Error: Engine '"
                       << hipdnn_integration_tests::TestConfig::get().getEngineName()
                       << "' is not loaded. Check the plugin path.\n";
+            static_cast<void>(hipStreamDestroy(stream));
             return 1;
         }
 

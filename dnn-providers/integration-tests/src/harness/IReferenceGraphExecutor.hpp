@@ -20,7 +20,8 @@ public:
 
     virtual void execute(void* graphBuffer,
                          size_t size,
-                         const std::unordered_map<int64_t, void*>& variantPack) = 0;
+                         const std::unordered_map<int64_t, void*>& variantPack)
+        = 0;
 
     /// Returns true if the executor expects device (GPU) pointers in the variant pack.
     /// When false, the executor expects host pointers.

@@ -43,7 +43,10 @@ public:
         }
     }
 
-    bool requiresDeviceMemory() const override { return true; }
+    bool requiresDeviceMemory() const override
+    {
+        return true;
+    }
 
 private:
     static std::unordered_map<int64_t, void*> populateVariantPackWithMissingVirtualTensors(

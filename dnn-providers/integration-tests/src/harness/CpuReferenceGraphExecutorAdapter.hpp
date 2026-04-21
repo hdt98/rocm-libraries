@@ -20,7 +20,10 @@ public:
         _executor.execute(graphBuffer, size, variantPack);
     }
 
-    bool requiresDeviceMemory() const override { return false; }
+    bool requiresDeviceMemory() const override
+    {
+        return false;
+    }
 
 private:
     hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor _executor;

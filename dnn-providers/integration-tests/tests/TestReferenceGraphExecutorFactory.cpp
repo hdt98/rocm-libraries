@@ -32,17 +32,16 @@ flatbuffers::FlatBufferBuilder createSimplePointwiseGraph(int64_t inputUid,
     tensors.push_back(CreateTensorAttributesDirect(
         builder, outputUid, "out_0", DataType::FLOAT, &strides, &dims));
 
-    auto pointwiseAttrs
-        = CreatePointwiseAttributes(builder,
-                                    PointwiseMode::RELU_FWD,
-                                    flatbuffers::nullopt, // relu_lower_clip
-                                    flatbuffers::nullopt, // relu_upper_clip
-                                    flatbuffers::nullopt, // relu_lower_clip_slope
-                                    flatbuffers::nullopt, // axis_tensor_uid
-                                    inputUid,
-                                    flatbuffers::nullopt, // in_1_tensor_uid
-                                    flatbuffers::nullopt, // in_2_tensor_uid
-                                    outputUid);
+    auto pointwiseAttrs = CreatePointwiseAttributes(builder,
+                                                    PointwiseMode::RELU_FWD,
+                                                    flatbuffers::nullopt, // relu_lower_clip
+                                                    flatbuffers::nullopt, // relu_upper_clip
+                                                    flatbuffers::nullopt, // relu_lower_clip_slope
+                                                    flatbuffers::nullopt, // axis_tensor_uid
+                                                    inputUid,
+                                                    flatbuffers::nullopt, // in_1_tensor_uid
+                                                    flatbuffers::nullopt, // in_2_tensor_uid
+                                                    outputUid);
 
     std::vector<flatbuffers::Offset<Node>> nodes;
     nodes.push_back(CreateNodeDirect(builder,
@@ -69,7 +68,7 @@ TEST(TestReferenceGraphExecutorFactory, CreateCpuExecutor)
     EXPECT_FALSE(executor->requiresDeviceMemory());
 }
 
-TEST(TestReferenceGraphExecutorFactory, CreateGpuExecutor)
+TEST(TestReferenceGraphExecutorFactory, CreateDeviceExecutor)
 {
     auto executor = ReferenceGraphExecutorFactory::create(ReferenceExecutorType::GPU);
     ASSERT_NE(executor, nullptr);

@@ -53,12 +53,12 @@ public:
     TestConfig& operator=(TestConfig&&) = delete;
 
     // Initialize with CLI arguments. Must be called before any get() access.
-    static void initialize(
-        std::optional<std::filesystem::path> articlePath,
-        std::optional<std::string> engineName,
-        bool failOnUnsupported = false,
-        std::optional<std::filesystem::path> configPath = std::nullopt,
-        std::optional<ReferenceExecutorType> referenceExecutorType = std::nullopt)
+    static void initialize(std::optional<std::filesystem::path> articlePath,
+                           std::optional<std::string> engineName,
+                           bool failOnUnsupported = false,
+                           std::optional<std::filesystem::path> configPath = std::nullopt,
+                           std::optional<ReferenceExecutorType> referenceExecutorType
+                           = std::nullopt)
     {
         TestConfig& instance = get();
         if(instance._initialized)
@@ -69,6 +69,27 @@ public:
         instance._engineName = std::move(engineName);
         instance._failOnUnsupported = failOnUnsupported;
         instance._referenceExecutorType = referenceExecutorType;
+
+        // If CLI didn't provide a value, check env var once at init
+        if(!instance._referenceExecutorType.has_value())
+        {
+            const char* envVal = std::getenv("HIPDNN_TEST_REFERENCE_EXECUTOR");
+            if(envVal != nullptr)
+            {
+                std::string val(envVal);
+                std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c) {
+                    return static_cast<char>(std::tolower(c));
+                });
+                if(val == "gpu")
+                {
+                    instance._referenceExecutorType = ReferenceExecutorType::GPU;
+                }
+                else
+                {
+                    instance._referenceExecutorType = ReferenceExecutorType::CPU;
+                }
+            }
+        }
 
         if(configPath.has_value())
         {
@@ -155,29 +176,12 @@ public:
         return _testSettings->findToleranceOverride(testName);
     }
 
-    // Get the reference executor type. CLI flag takes precedence,
-    // then HIPDNN_TEST_REFERENCE_EXECUTOR env var, then defaults to CPU.
+    // Get the reference executor type. Value is resolved once at init time:
+    // CLI flag > HIPDNN_TEST_REFERENCE_EXECUTOR env var > CPU default.
     ReferenceExecutorType getReferenceExecutorType() const
     {
         throwIfNotInitialized();
-        if(_referenceExecutorType.has_value())
-        {
-            return _referenceExecutorType.value();
-        }
-        // Env var fallback (case-insensitive)
-        const char* envVal = std::getenv("HIPDNN_TEST_REFERENCE_EXECUTOR");
-        if(envVal != nullptr)
-        {
-            std::string val(envVal);
-            std::transform(val.begin(), val.end(), val.begin(), [](unsigned char c) {
-                return static_cast<char>(std::tolower(c));
-            });
-            if(val == "gpu")
-            {
-                return ReferenceExecutorType::GPU;
-            }
-        }
-        return ReferenceExecutorType::CPU;
+        return _referenceExecutorType.value_or(ReferenceExecutorType::CPU);
     }
 
 private:

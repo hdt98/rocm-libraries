@@ -225,12 +225,18 @@ protected:
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
         _deferredValidators.emplace_back([this, attr, finalAtol, finalRtol]() {
-            _tensorIdToValidatorMap.insert(
+            auto [it, inserted] = _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createAllCloseValidator(
                      hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
                      finalAtol,
                      finalRtol)});
+            if(!inserted)
+            {
+                HIPDNN_PLUGIN_LOG_WARN("Duplicate validator for tensor "
+                                       << attr->get_uid() << " (" << attr->get_name()
+                                       << "); keeping first registration");
+            }
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -241,11 +247,17 @@ protected:
         // Since the graph can infer properties + Ids, we defer validator registration until right
         // before validation in verifyGraph
         _deferredValidators.emplace_back([this, attr, rmsThreshold]() {
-            _tensorIdToValidatorMap.insert(
+            auto [it, inserted] = _tensorIdToValidatorMap.insert(
                 {attr->get_uid(),
                  hipdnn_test_sdk::utilities::createRmsValidator(
                      hipdnn_test_sdk::utilities::frontendToSdkDataType(attr->get_data_type()),
                      rmsThreshold)});
+            if(!inserted)
+            {
+                HIPDNN_PLUGIN_LOG_WARN("Duplicate validator for tensor "
+                                       << attr->get_uid() << " (" << attr->get_name()
+                                       << "); keeping first registration");
+            }
             _tensorIdToNameMap.insert({attr->get_uid(), attr->get_name()});
         });
     }
@@ -276,7 +288,9 @@ protected:
     {
         for(auto& tensorPair : bundle.tensors)
         {
-            bundle.randomizeTensor(tensorPair.first, -1.0f, 1.0f, seed);
+            auto tensorSeed
+                = seed ^ static_cast<unsigned int>(std::hash<int64_t>{}(tensorPair.first));
+            bundle.randomizeTensor(tensorPair.first, -1.0f, 1.0f, tensorSeed);
         }
     }
 
