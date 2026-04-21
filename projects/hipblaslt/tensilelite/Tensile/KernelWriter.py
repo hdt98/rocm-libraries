@@ -1796,7 +1796,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # some of localReads is interleaved after waitcnt in SIA3
         if kernel["ScheduleIterAlg"] == 3 and self.states.numItersPLR and\
           (iteration < numReadsIterA or iteration < numReadsIterB or numPrefetchIter) and\
-          not kernel["ForceUnrollSubIter"]:
+          not (kernel["ForceUnrollSubIter"] or kernel["UseF32XEmulation"]):
           if ((iteration < numReadsIterA and not dataAtIterA < max(dataAtIterA,dataAtIterB)) or numPrefetchIter) and (not kernel["DirectToVgprA"]):
             localReads -= self.states.numReadsPerIterA
           if ((iteration < numReadsIterB and not dataAtIterB < max(dataAtIterA,dataAtIterB)) or numPrefetchIter) and (not kernel["DirectToVgprB"]):
@@ -1810,7 +1810,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReadsNotWaited = self.states.numReadsPerIterB//kernel["InnerUnroll"] - self.states.numReadsPerUnrollB
             if localReadsNotWaited > 0:
               localReads += localReadsNotWaited
-        elif kernel["ForceUnrollSubIter"]:
+        elif kernel["ForceUnrollSubIter"] or kernel["UseF32XEmulation"]:
           localReads = 0
 
         dscnt += localReads
