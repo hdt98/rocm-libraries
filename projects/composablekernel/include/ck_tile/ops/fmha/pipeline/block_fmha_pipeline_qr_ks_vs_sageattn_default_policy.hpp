@@ -3,11 +3,14 @@
 
 #pragma once
 
-#include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qr_ks_vs_default_policy.hpp"
+#include "ck_tile/ops/fmha/pipeline/block_fmha_pipeline_qx_ks_vs_custom_policy.hpp"
 
 namespace ck_tile {
 
-// SA3 pipeline reuses the same tiling policy as the MX pipeline.
-using BlockFmhaPipelineQRKSVSSageAttnDefaultPolicy = BlockFmhaPipelineQRKSVSDefaultPolicy;
+using BlockFmhaPipelineQRKSVSSageAttnDefaultPolicy =
+    BlockFmhaPipelineQXKSVSCustomPolicy</* QLoadOnce = */ true,
+                                        /* AsyncCopy = */ true,
+                                        /* NumPrefetchK = */ 1,
+                                        /* NumPrefetchV = */ 1>;
 
 } // namespace ck_tile

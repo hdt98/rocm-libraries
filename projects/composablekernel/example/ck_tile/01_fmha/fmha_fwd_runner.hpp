@@ -1002,9 +1002,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     // SA3 OPSEL: repack K/V scale from [batch, nhead_k, seqlen, cols] e8m0
     //   to [batch, nhead_k, num_block_pairs, 2_k_groups, 4] int32
-    constexpr ck_tile::index_t kN0_sa3       = 128;
-    constexpr ck_tile::index_t kABScaleKLane = 2;
-    constexpr ck_tile::index_t kNIterPerWarp = 4;
+    // Parameters depend on MFMA tile shape:
+    //   d<=128: 32x32x64  → kK0=64,  kCNLane=32, kABScaleKLane=2, kNIterPerWarp=4
+    //   d>128:  16x16x128 → kK0=128, kCNLane=16, kABScaleKLane=4, kNIterPerWarp=8
+    constexpr ck_tile::index_t kN0_sa3 = 128;
 
     ck_tile::index_t k_scale_packed_size_per_head = 0;
     ck_tile::index_t v_scale_packed_size_per_head = 0;
@@ -1013,12 +1014,17 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     if constexpr(is_sageattnv3)
     {
+        const ck_tile::index_t kK0_sa3 = (hdim_q <= 128) ? 64 : 128;
+        const ck_tile::index_t kCNLane_sa3 = (hdim_q <= 128) ? 32 : 16;
+        const ck_tile::index_t kABScaleKLane = kK0_sa3 / 32;
+        const ck_tile::index_t kNIterPerWarp = kN0_sa3 / kCNLane_sa3;
+
         const ck_tile::index_t num_k_blocks =
             ck_tile::integer_divide_ceil(shape_seqlen_k, kN0_sa3);
         const ck_tile::index_t num_k_pairs =
             ck_tile::integer_divide_ceil(num_k_blocks, 2);
         const ck_tile::index_t k0_loops =
-            ck_tile::integer_divide_ceil(hdim_q, 64); // kK0=64 for 32x32x64
+            ck_tile::integer_divide_ceil(hdim_q, kK0_sa3);
 
         k_scale_packed_size_per_head = num_k_pairs * kABScaleKLane * 4;
         k_scale_packed_host.resize(shape_batch * nhead_k * k_scale_packed_size_per_head, 0);
@@ -1040,8 +1046,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                 ck_tile::index_t col = ki * kABScaleKLane + kg;
                                 for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
                                 {
-                                    ck_tile::index_t row = block * kN0_sa3 + ni * 32;
-                                    uint8_t byte_val     = 0;
+                                    ck_tile::index_t row =
+                                        block * kN0_sa3 + ni * kCNLane_sa3;
+                                    uint8_t byte_val = 0;
                                     if(row < shape_seqlen_k && col < hdim_q_scale)
                                     {
                                         byte_val = ck_tile::bit_cast<uint8_t>(
@@ -1094,8 +1101,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                     v_scale_col_base + ki * kABScaleKLane + kg;
                                 for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
                                 {
-                                    // V scale N-dim = hdim_v direction
-                                    ck_tile::index_t v_row = ni * 32;
+                                    ck_tile::index_t v_row = ni * kCNLane_sa3;
                                     uint8_t byte_val       = 0;
                                     if(v_row < hdim_v &&
                                        v_col < shape_seqlen_v_scale)
@@ -1117,6 +1123,37 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 }
             }
         }
+    }
+
+    // SA3: pre-shuffle K rows for contiguous async buffer_load_dwordx4 to LDS.
+    // The async load uses warp-interleaved N in LDS but contiguous DRAM access.
+    // Pre-shuffle transposes (NumWarps, LaneGroups) → (LaneGroups, NumWarps) within
+    // each block of (LaneGroups * NumWarps) rows.
+    // Parameters depend on MFMA tile shape which varies with hdim:
+    //   d=128: 32x32x64  → kK1=64,  LanesPerK=4, LaneGroups=16, BlockRows=64
+    //   d=256: 16x16x128 → kK1=128, LanesPerK=8, LaneGroups=8,  BlockRows=32
+    if constexpr(is_sageattnv3)
+    {
+        constexpr ck_tile::index_t kPackedSize =
+            ck_tile::numeric_traits<KDataType>::PackedSize;
+        constexpr ck_tile::index_t kNumWarps_sa3 = 4;
+        constexpr ck_tile::index_t kKVector_sa3  = 16 / sizeof(KDataType);
+        ck_tile::HostTensor<KDataType> k_shuffled(k_host.get_lengths());
+        if(hdim_q <= 128)
+        {
+            constexpr ck_tile::index_t kLaneGroups = 64 / (64 / kKVector_sa3); // =16
+            ck_tile::reference::reference_sageattn_v3_k_shuffle<kLaneGroups, kNumWarps_sa3>(
+                k_host.data(), k_shuffled.data(),
+                shape_batch, nhead_k, shape_seqlen_k, hdim_q / kPackedSize);
+        }
+        else
+        {
+            constexpr ck_tile::index_t kLaneGroups = 64 / (128 / kKVector_sa3); // =8
+            ck_tile::reference::reference_sageattn_v3_k_shuffle<kLaneGroups, kNumWarps_sa3>(
+                k_host.data(), k_shuffled.data(),
+                shape_batch, nhead_k, shape_seqlen_k, hdim_q / kPackedSize);
+        }
+        std::swap(k_host, k_shuffled);
     }
 
     ck_tile::DeviceMem q_buf(q_host.get_element_space_size_in_bytes());
@@ -1879,6 +1916,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 scale_p_host = ck_tile::type_convert<float>(ck_tile::numeric<PDataType>::max());
                 scale_o_host = v_descale_host(0) / scale_p_host;
             }
+        }
+        else if constexpr(is_sageattnv3)
+        {
+            scale_p_host = p_scale_factor;
+            scale_o_host = 1.0f / p_scale_factor;
         }
 
         auto p_compute_element_func = [&]() {

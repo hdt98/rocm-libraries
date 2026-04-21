@@ -281,5 +281,57 @@ inline void reference_sageattn_v3_dequant_mxfp4(const uint8_t* hat,
     reference_dequant_mxfp4(hat, scale_bytes, out, B, H, rows, cols);
 }
 
+// -------------------------------------------------------------------------
+// K pre-shuffle for contiguous async buffer_load_dwordx4 to LDS.
+//
+// The async K load uses warp-interleaved N ordering in LDS:
+//   N_interleaved = lane_group * NumWarps + warp_id
+// but contiguous DRAM access gives:
+//   N_contiguous  = warp_id * LaneGroups + lane_group
+//
+// This function permutes K rows within each (LaneGroups * NumWarps)-row
+// block so that contiguous loads produce the correct interleaved LDS layout.
+//
+//   K_shuffled[n][k] = K_original[(n % LaneGroups) * NumWarps + n / LaneGroups][k]
+//
+// Template parameters:
+//   kLaneGroups: number of lane groups per warp (WarpSize / LanesPerK)
+//   kNumWarps:   number of warps in the block
+//
+// Data layout: K[B, H, seqlen_k, hdim_packed] where hdim_packed is in
+// packed-type units (e.g. pk_fp4_t bytes or fp16 half-words).
+// -------------------------------------------------------------------------
+template <int kLaneGroups, int kNumWarps, typename T>
+inline void reference_sageattn_v3_k_shuffle(const T* k_in,
+                                            T*       k_out,
+                                            int      B,
+                                            int      H,
+                                            int      seqlen_k,
+                                            int      hdim_packed)
+{
+    constexpr int kBlockRows = kLaneGroups * kNumWarps;
+    const int     num_blocks = seqlen_k / kBlockRows;
+
+    for(int b = 0; b < B; b++)
+    {
+        for(int h = 0; h < H; h++)
+        {
+            for(int blk = 0; blk < num_blocks; blk++)
+            {
+                const int base_row = blk * kBlockRows;
+                for(int n = 0; n < kBlockRows; n++)
+                {
+                    const int src_n = (n % kLaneGroups) * kNumWarps + n / kLaneGroups;
+                    const int dst_off =
+                        ((b * H + h) * seqlen_k + base_row + n) * hdim_packed;
+                    const int src_off =
+                        ((b * H + h) * seqlen_k + base_row + src_n) * hdim_packed;
+                    std::copy(k_in + src_off, k_in + src_off + hdim_packed, k_out + dst_off);
+                }
+            }
+        }
+    }
+}
+
 } // namespace reference
 } // namespace ck_tile
