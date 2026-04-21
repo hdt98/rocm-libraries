@@ -121,6 +121,42 @@ struct UniversalGemmKernelArgs
     PersistentAsyncInputScheduler async_input_scheduler = {};
 };
 
+template <typename TilePartitioner, index_t NumATensor, index_t NumBTensor, index_t NumDTensor>
+struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>
+{
+    StreamKKernelArgs(const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
+                      index_t max_active_wgs)
+        : UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>{host_args.as_ptr,
+                                                                      host_args.bs_ptr,
+                                                                      host_args.ds_ptr,
+                                                                      host_args.e_ptr,
+                                                                      host_args.M,
+                                                                      host_args.N,
+                                                                      host_args.K,
+                                                                      host_args.stride_As,
+                                                                      host_args.stride_Bs,
+                                                                      host_args.stride_Ds,
+                                                                      host_args.stride_E,
+                                                                      host_args.k_batch},
+          // The workspace pointer is set to nullptr because we must first
+          // instantiate the TilePartitioner to get the necessary size
+          workspace_ptr{nullptr},
+          tile_partitioner{host_args.M, host_args.N, host_args.K, max_active_wgs}
+
+    {
+    }
+    /**
+     * @brief  A pointer to a buffer in device memory for accumulating partial via reduction
+     * strategy.
+     */
+    void* workspace_ptr;
+    /**
+     * @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
+     * the C tensor.
+     */
+    TilePartitioner tile_partitioner;
+};
+
 /// @brief The Universal GEMM kernel template.
 ///
 /// @paragraph Overview Overview
@@ -281,49 +317,15 @@ struct UniversalGemmKernel
 
     static_assert(!GemmPipeline::BlockGemmShape::PermuteA, "Not implemented!");
 
-    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>
-    {
-        StreamKKernelArgs(
-            const UniversalGemmHostArgs<NumATensor, NumBTensor, NumDTensor>& host_args,
-            index_t max_active_wgs)
-            : UniversalGemmKernelArgs<NumATensor, NumBTensor, NumDTensor>{host_args.as_ptr,
-                                                                          host_args.bs_ptr,
-                                                                          host_args.ds_ptr,
-                                                                          host_args.e_ptr,
-                                                                          host_args.M,
-                                                                          host_args.N,
-                                                                          host_args.K,
-                                                                          host_args.stride_As,
-                                                                          host_args.stride_Bs,
-                                                                          host_args.stride_Ds,
-                                                                          host_args.stride_E,
-                                                                          host_args.k_batch},
-              // The workspace pointer is set to nullptr because we must first
-              // instantiate the TilePartitioner to get the necessary size
-              workspace_ptr{nullptr},
-              tile_partitioner{
-                  TilePartitioner{host_args.M, host_args.N, host_args.K, max_active_wgs}}
-
-        {
-        }
-        /**
-         * @brief  A pointer to a buffer in device memory for accumulating partial via reduction
-         * strategy.
-         */
-        void* workspace_ptr;
-        /**
-         * @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
-         * the C tensor.
-         */
-        TilePartitioner tile_partitioner;
-    };
-
     using KernelArgs = std::conditional_t<
         IsStreamK,
-        StreamKKernelArgs,
+        StreamKKernelArgs<TilePartitioner, NumATensor, NumBTensor, NumDTensor>,
         UniversalGemmKernelArgs<AsLayout::size(), BsLayout::size(), DsLayout::size()>>;
-    using Kernel     = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
-    using StreamKOps = StreamKReductionOps<TilePartitioner, GemmPipeline, StreamKKernelArgs>;
+    using Kernel = UniversalGemmKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
+    using StreamKOps =
+        StreamKReductionOps<TilePartitioner,
+                            GemmPipeline,
+                            StreamKKernelArgs<TilePartitioner, NumATensor, NumBTensor, NumDTensor>>;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
