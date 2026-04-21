@@ -377,9 +377,9 @@ TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
     const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
     ASSERT_NE(plugin, nullptr);
 
-    // Heuristic plugins report UNSPECIFIED type (no dedicated enum value)
+    // Heuristic plugins report HEURISTIC type
     const auto pluginType = plugin->type();
-    EXPECT_EQ(pluginType, HIPDNN_PLUGIN_TYPE_UNSPECIFIED);
+    EXPECT_EQ(pluginType, HIPDNN_PLUGIN_TYPE_HEURISTIC);
 }
 
 // ========== Resource Manager Enumeration Coverage ==========

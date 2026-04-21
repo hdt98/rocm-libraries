@@ -272,7 +272,7 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescript
 }
 
 hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
-    hipdnnHeuristicPolicyDescriptor_t descriptor, int64_t* engine_ids, uint32_t* count)
+    hipdnnHeuristicPolicyDescriptor_t descriptor, int64_t* engine_ids, size_t* count)
 {
     if(descriptor == nullptr)
     {
@@ -292,13 +292,12 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
     if(engine_ids == nullptr)
     {
         // Query mode: return count only
-        *count = static_cast<uint32_t>(impl->sortedEngineIds.size());
+        *count = impl->sortedEngineIds.size();
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
 
     // Retrieve mode: copy IDs
-    const uint32_t numToCopy
-        = std::min(*count, static_cast<uint32_t>(impl->sortedEngineIds.size()));
+    const size_t numToCopy = std::min(*count, impl->sortedEngineIds.size());
     std::memcpy(engine_ids, impl->sortedEngineIds.data(), numToCopy * sizeof(int64_t));
     *count = numToCopy;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;

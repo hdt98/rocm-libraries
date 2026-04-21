@@ -49,7 +49,8 @@ typedef enum
 typedef enum
 {
     HIPDNN_PLUGIN_TYPE_UNSPECIFIED = 0, // Unspecified plugin type
-    HIPDNN_PLUGIN_TYPE_ENGINE = 1, // Plugin with engines
+    HIPDNN_PLUGIN_TYPE_ENGINE = 1,      // Plugin with engines
+    HIPDNN_PLUGIN_TYPE_HEURISTIC = 2,   // Plugin with heuristic policies
 } hipdnnPluginType_t;
 
 /**

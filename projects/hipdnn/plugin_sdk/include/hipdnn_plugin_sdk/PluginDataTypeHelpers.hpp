@@ -38,6 +38,8 @@ inline const char* toString(hipdnnPluginType_t type)
         return "HIPDNN_PLUGIN_TYPE_UNSPECIFIED";
     case HIPDNN_PLUGIN_TYPE_ENGINE:
         return "HIPDNN_PLUGIN_TYPE_ENGINE";
+    case HIPDNN_PLUGIN_TYPE_HEURISTIC:
+        return "HIPDNN_PLUGIN_TYPE_HEURISTIC";
     default:
         return "HIPDNN_PLUGIN_TYPE_UNKNOWN";
     }

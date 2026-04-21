@@ -43,10 +43,10 @@ public:
     virtual std::string_view policyName() const;
     virtual std::string_view pluginVersion() const;
 
-    // Plugin type - heuristic plugins return UNSPECIFIED (they don't have their own type yet)
+    // Plugin type - heuristic plugins return HEURISTIC
     static hipdnnPluginType_t getPluginType()
     {
-        return HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
+        return HIPDNN_PLUGIN_TYPE_HEURISTIC;
     }
 
     // Logging setup (called at module load time)
@@ -117,8 +117,8 @@ private:
     bool _initialized = false;
 #endif
 
-    // Cached metadata
-    mutable int64_t _policyId = -1;
+    // Cached metadata (eagerly initialized in resolveSymbols)
+    int64_t _policyId = -1;
 
     // Module metadata function pointers
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
@@ -150,7 +150,7 @@ private:
     hipdnnPluginStatus_t (*_funcPolicyFinalize)(hipdnnHeuristicPolicyDescriptor_t, int32_t*);
     hipdnnPluginStatus_t (*_funcPolicyGetSortedEngineIds)(hipdnnHeuristicPolicyDescriptor_t,
                                                           int64_t*,
-                                                          uint32_t*);
+                                                          size_t*);
 
     friend class PluginManagerBase<HeuristicPlugin>;
 };

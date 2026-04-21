@@ -197,9 +197,16 @@ void HeuristicPluginResourceManager::setHeuristicPluginPaths(
 
     resetManagerIfNeededLocked();
 
-    gHeuristicCustomPaths.clear();
-    gHeuristicCustomPaths.insert(pluginPaths.begin(), pluginPaths.end());
     gHeuristicLoadingMode = loadingMode;
+
+    if(loadingMode == HIPDNN_PLUGIN_LOADING_ABSOLUTE)
+    {
+        gHeuristicCustomPaths = {pluginPaths.begin(), pluginPaths.end()};
+    }
+    else // HIPDNN_PLUGIN_LOADING_ADDITIVE
+    {
+        gHeuristicCustomPaths.insert(pluginPaths.begin(), pluginPaths.end());
+    }
 }
 
 std::set<std::filesystem::path> HeuristicPluginResourceManager::getHeuristicPluginPaths()

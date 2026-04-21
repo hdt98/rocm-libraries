@@ -230,7 +230,7 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescript
 hipdnnPluginStatus_t
     hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t descriptor,
                                             [[maybe_unused]] int64_t* engine_ids,
-                                            uint32_t* count)
+                                            size_t* count)
 {
     if(descriptor == nullptr)
     {

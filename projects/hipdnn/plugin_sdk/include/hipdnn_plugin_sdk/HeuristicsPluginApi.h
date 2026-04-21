@@ -394,7 +394,7 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc,
                                             int64_t* engine_ids,
-                                            uint32_t* num_engines);
+                                            size_t* num_engines);
 
 /** @} */ // End of HeuristicPolicySelection group
 
