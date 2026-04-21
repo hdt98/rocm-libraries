@@ -13,9 +13,9 @@
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
+#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/detail/GpuConvolutionFwdPlan.hpp"
@@ -204,10 +204,12 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(WType));
     const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(YType));
 
-    ASSERT_EQ(hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
-    hipSuccess);
-    ASSERT_EQ(hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
-    hipSuccess);
+    ASSERT_EQ(
+        hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
+        hipSuccess);
+    ASSERT_EQ(
+        hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
+        hipSuccess);
     ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(YType)), hipSuccess);
 
     // Execute
@@ -220,9 +222,8 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
 
     // Copy result back
     std::vector<YType> gpuYData(yCount);
-    ASSERT_EQ(
-        hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(YType), hipMemcpyDeviceToHost),
-        hipSuccess);
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(YType), hipMemcpyDeviceToHost),
+              hipSuccess);
 
     // Run CPU reference executor with host pointers (same graph)
     std::unordered_map<int64_t, void*> cpuVariantPack;
