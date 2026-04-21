@@ -113,7 +113,7 @@ jobs:
 
       - name: Configure superbuild
         run: |
-          cmake --preset hipdnn-providers \
+          cmake --preset hipdnn-providers -GNinja \
             -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET"
@@ -135,7 +135,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       VENV_PATH: ${{ github.workspace }}/rocm_wheels
-      GPU_TARGET: gfx942-all
+      GPU_TARGET: gfx94X-dcgpu
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -169,7 +169,7 @@ jobs:
 
       - name: Configure superbuild
         run: |
-          cmake --preset hipdnn-providers \
+          cmake --preset hipdnn-providers -GNinja \
             -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET"
