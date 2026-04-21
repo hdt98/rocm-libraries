@@ -32,7 +32,7 @@ size_t computeElementSpace(const std::vector<int64_t>& dims, const std::vector<i
 }
 } // namespace
 
-TEST(TestShallowGpuTensor, PackedTensorReportsCorrectShape)
+TEST(TestGpuShallowTensor, PackedTensorReportsCorrectShape)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -51,7 +51,7 @@ TEST(TestShallowGpuTensor, PackedTensorReportsCorrectShape)
     EXPECT_EQ(tensor.elementSpace(), elementSpace);
 }
 
-TEST(TestShallowGpuTensor, NonPackedTensorReportsCorrectElementSpace)
+TEST(TestGpuShallowTensor, NonPackedTensorReportsCorrectElementSpace)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -68,7 +68,7 @@ TEST(TestShallowGpuTensor, NonPackedTensorReportsCorrectElementSpace)
     EXPECT_FALSE(tensor.isPacked());
 }
 
-TEST(TestShallowGpuTensor, MemoryExposesDevicePointer)
+TEST(TestGpuShallowTensor, MemoryExposesDevicePointer)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -80,7 +80,7 @@ TEST(TestShallowGpuTensor, MemoryExposesDevicePointer)
     EXPECT_EQ(tensor.memory().location(), MemoryLocation::DEVICE);
 }
 
-TEST(TestShallowGpuTensor, HostFillOperationsThrow)
+TEST(TestGpuShallowTensor, HostFillOperationsThrow)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -95,7 +95,7 @@ TEST(TestShallowGpuTensor, HostFillOperationsThrow)
     EXPECT_THROW(tensor.fillWithData(hostData.data(), sizeof(hostData)), std::runtime_error);
 }
 
-TEST(TestShallowGpuTensor, HostMemoryAccessThrows)
+TEST(TestGpuShallowTensor, HostMemoryAccessThrows)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -109,7 +109,7 @@ TEST(TestShallowGpuTensor, HostMemoryAccessThrows)
     EXPECT_THROW(mem.markHostModified(), std::runtime_error);
 }
 
-TEST(TestShallowGpuTensor, MoveConstruction)
+TEST(TestGpuShallowTensor, MoveConstruction)
 {
     SKIP_IF_NO_DEVICES();
 
