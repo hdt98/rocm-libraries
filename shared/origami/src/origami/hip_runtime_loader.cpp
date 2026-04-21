@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 #include "origami/hip_runtime_loader.hpp"
+#include "origami/logger.hpp"
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -32,12 +34,35 @@ using dl_handle_t = HMODULE;
 using dl_handle_t = void*;
 #endif
 
+// Intentionally never dlclose'd / FreeLibrary'd after a successful load. Unloading the HIP
+// runtime while GPU state may still be live (or during static destruction) can cause crashes
+// at process exit. The OS reclaims the mapping when the process terminates.
 dl_handle_t g_hip_lib                     = nullptr;
 hipGetDeviceProperties_fn g_get_props     = nullptr;
 hipDeviceGetAttribute_fn g_get_device_attribute = nullptr;
 hipGetErrorString_fn g_get_error_string   = nullptr;
-std::string g_load_error;
-std::mutex g_mutex;
+std::once_flag g_init_flag;
+
+#if defined(_WIN32)
+constexpr const char* k_hip_runtime_load_failed_message =
+    "HIP runtime is not loaded (failed to load amdhip64.dll)";
+#else
+constexpr const char* k_hip_runtime_load_failed_message =
+    "HIP runtime is not loaded (failed to load libamdhip64.so)";
+#endif
+
+bool hip_library_loaded() {
+  return g_get_props != nullptr && g_get_error_string != nullptr;
+}
+
+/** Append @p path only if it is a bare library name or the file exists. Bare names rely on the OS loader search path. */
+void push_hip_candidate(std::vector<std::string>& out, const std::string& path) {
+  if(path.find_first_of("/\\") != std::string::npos) {
+    std::error_code ec;
+    if(!std::filesystem::exists(std::filesystem::path(path), ec)) return;
+  }
+  out.push_back(path);
+}
 
 void append_path_sep(std::string& base) {
   if(base.empty()) return;
@@ -62,7 +87,7 @@ void append_path_env_candidates(std::vector<std::string>& out, const char* env_v
     while(!dir.empty() && (dir.back() == ' ' || dir.back() == '\t')) dir.pop_back();
     if(!dir.empty()) {
       append_path_sep(dir);
-      out.push_back(dir + dll_name);
+      push_hip_candidate(out, dir + dll_name);
     }
     if(end == s.size()) break;
     start = end + 1;
@@ -83,8 +108,8 @@ void append_ld_library_path_candidates(std::vector<std::string>& out,
     while(!dir.empty() && dir.back() == '/') dir.pop_back();
     if(!dir.empty()) {
       dir += '/';
-      out.push_back(dir + lib6);
-      out.push_back(dir + lib);
+      push_hip_candidate(out, dir + lib6);
+      push_hip_candidate(out, dir + lib);
     }
     if(end == s.size()) break;
     start = end + 1;
@@ -100,12 +125,12 @@ std::vector<std::string> hip_library_candidates() {
   if(const char* hip_path = std::getenv("HIP_PATH")) {
     std::string base(hip_path);
     append_path_sep(base);
-    out.push_back(base + kDll);
+    push_hip_candidate(out, base + kDll);
   }
   if(const char* rocm = std::getenv("ROCM_PATH")) {
     std::string base(rocm);
     append_path_sep(base);
-    out.push_back(base + "bin\\" + kDll);
+    push_hip_candidate(out, base + "bin\\" + kDll);
   }
   // PATH before default install locations (parallel to LD_LIBRARY_PATH before /opt/rocm on Linux).
   append_path_env_candidates(out, std::getenv("PATH"), kDll);
@@ -113,15 +138,15 @@ std::vector<std::string> hip_library_candidates() {
   if(const char* pf = std::getenv("ProgramFiles")) {
     std::string b(pf);
     append_path_sep(b);
-    out.push_back(b + "AMD\\ROCm\\bin\\" + kDll);
-    out.push_back(b + "ROCm\\bin\\" + kDll);
+    push_hip_candidate(out, b + "AMD\\ROCm\\bin\\" + kDll);
+    push_hip_candidate(out, b + "ROCm\\bin\\" + kDll);
   }
   if(const char* pfx86 = std::getenv("ProgramFiles(x86)")) {
     std::string b(pfx86);
     append_path_sep(b);
-    out.push_back(b + "AMD\\ROCm\\bin\\" + kDll);
+    push_hip_candidate(out, b + "AMD\\ROCm\\bin\\" + kDll);
   }
-  out.push_back(kDll);
+  push_hip_candidate(out, kDll);
 #else
   constexpr const char* kSo6 = "libamdhip64.so.6";
   constexpr const char* kSo  = "libamdhip64.so";
@@ -129,23 +154,23 @@ std::vector<std::string> hip_library_candidates() {
   if(const char* rocm = std::getenv("ROCM_PATH")) {
     std::string base(rocm);
     append_path_sep(base);
-    out.push_back(base + "lib/" + kSo6);
-    out.push_back(base + "lib/" + kSo);
+    push_hip_candidate(out, base + "lib/" + kSo6);
+    push_hip_candidate(out, base + "lib/" + kSo);
   }
   if(const char* hip_path = std::getenv("HIP_PATH")) {
     std::string base(hip_path);
     append_path_sep(base);
-    out.push_back(base + "lib/" + kSo6);
-    out.push_back(base + "lib/" + kSo);
+    push_hip_candidate(out, base + "lib/" + kSo6);
+    push_hip_candidate(out, base + "lib/" + kSo);
   }
   append_ld_library_path_candidates(out, kSo6, kSo);
   {
     std::string opt("/opt/rocm/");
-    out.push_back(opt + "lib/" + kSo6);
-    out.push_back(opt + "lib/" + kSo);
+    push_hip_candidate(out, opt + "lib/" + kSo6);
+    push_hip_candidate(out, opt + "lib/" + kSo);
   }
-  out.push_back(kSo6);
-  out.push_back(kSo);
+  push_hip_candidate(out, kSo6);
+  push_hip_candidate(out, kSo);
 #endif
   return out;
 }
@@ -170,16 +195,24 @@ void* hip_get_proc_address_only(hipGetProcAddress_fn get_proc, const char* name)
 bool try_open_and_resolve() {
   if(g_get_props && g_get_error_string) return true;
 
-  std::string last_open_error;
   for(const auto& path : hip_library_candidates()) {
 #if defined(_WIN32)
     g_hip_lib = LoadLibraryA(path.c_str());
-    if(!g_hip_lib) continue;
+    if(!g_hip_lib) {
+      OLOG_WARNING("Failed to load HIP library \"" << path << "\": GetLastError="
+                   << static_cast<unsigned long>(GetLastError()));
+      continue;
+    }
 #else
     dlerror();
     g_hip_lib = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
     if(!g_hip_lib) {
-      if(const char* err = dlerror()) last_open_error.assign(err);
+      const char* err = dlerror();
+      if(err) {
+        OLOG_WARNING("Failed to load HIP library \"" << path << "\": " << err);
+      } else {
+        OLOG_WARNING("Failed to load HIP library \"" << path << "\"");
+      }
       continue;
     }
 #endif
@@ -197,7 +230,9 @@ bool try_open_and_resolve() {
         g_hip_lib = nullptr;
       }
 #endif
-      last_open_error = "hipGetProcAddress not found in HIP library";
+      OLOG_WARNING("HIP library \"" << path
+                                   << "\" loaded but hipGetProcAddress was not found (not a usable HIP "
+                                      "runtime)");
       continue;
     }
     g_get_props = reinterpret_cast<hipGetDeviceProperties_fn>(
@@ -205,12 +240,13 @@ bool try_open_and_resolve() {
     g_get_error_string = reinterpret_cast<hipGetErrorString_fn>(
         hip_get_proc_address_only(hip_get_proc_address, "hipGetErrorString"));
     if(g_get_props && g_get_error_string) {
-      g_load_error.clear();
       g_get_device_attribute = reinterpret_cast<hipDeviceGetAttribute_fn>(
           hip_get_proc_address_only(hip_get_proc_address, "hipDeviceGetAttribute"));
       return true;
     }
-    last_open_error = "required HIP symbols could not be resolved via hipGetProcAddress";
+    OLOG_WARNING("HIP library \"" << path
+                                  << "\" loaded but required HIP symbols could not be resolved via "
+                                     "hipGetProcAddress");
     g_get_props            = nullptr;
     g_get_device_attribute = nullptr;
     g_get_error_string     = nullptr;
@@ -227,56 +263,36 @@ bool try_open_and_resolve() {
 #endif
   }
 
-  g_load_error.clear();
-#if !defined(_WIN32)
-  if(const char* sym_err = dlerror()) g_load_error.assign(sym_err);
-#endif
-  if(g_load_error.empty() && !last_open_error.empty()) g_load_error = last_open_error;
-  if(g_load_error.empty())
-    g_load_error = "failed to load HIP runtime (libamdhip64 / amdhip64.dll)";
   g_get_props            = nullptr;
   g_get_device_attribute = nullptr;
   g_get_error_string     = nullptr;
+  OLOG_WARNING(k_hip_runtime_load_failed_message);
   return false;
-}
-
-void ensure_loaded_unlocked() {
-  static bool attempted = false;
-  if(attempted) return;
-  attempted = true;
-  try_open_and_resolve();
 }
 
 }  // namespace
 
 bool hip_runtime_available() {
-  std::lock_guard<std::mutex> lock(g_mutex);
-  ensure_loaded_unlocked();
-  return g_get_props != nullptr && g_get_error_string != nullptr;
+  std::call_once(g_init_flag, try_open_and_resolve);
+  return hip_library_loaded();
 }
 
 hipError_t hip_get_device_properties(hipDeviceProp_t* prop, int deviceId) {
-  std::lock_guard<std::mutex> lock(g_mutex);
-  ensure_loaded_unlocked();
-  if(!g_get_props) return hipErrorNotInitialized;
+  std::call_once(g_init_flag, try_open_and_resolve);
+  if(!hip_library_loaded()) return hipErrorNotInitialized;
   return g_get_props(prop, deviceId);
 }
 
 hipError_t hip_get_device_attribute(int* value, hipDeviceAttribute_t attr, int deviceId) {
-  std::lock_guard<std::mutex> lock(g_mutex);
-  ensure_loaded_unlocked();
-  if(!g_get_props) return hipErrorNotInitialized;
+  std::call_once(g_init_flag, try_open_and_resolve);
+  if(!hip_library_loaded()) return hipErrorNotInitialized;
   if(!g_get_device_attribute) return hipErrorNotSupported;
   return g_get_device_attribute(value, attr, deviceId);
 }
 
 const char* hip_get_error_string(hipError_t err) {
-  std::lock_guard<std::mutex> lock(g_mutex);
-  ensure_loaded_unlocked();
-  if(!g_get_error_string) {
-    if(!g_load_error.empty()) return g_load_error.c_str();
-    return "HIP runtime is not loaded";
-  }
+  std::call_once(g_init_flag, try_open_and_resolve);
+  if(!hip_library_loaded()) return k_hip_runtime_load_failed_message;
   return g_get_error_string(err);
 }
 
