@@ -100,9 +100,8 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
     for(const auto& plugin : plugins)
     {
         // Set logging callback before creating handle
-        // Use heuristicLoggingCallback which handles the 3-parameter signature
         auto logStatus
-            = plugin->setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
+            = plugin->setLoggingCallback(hipdnn_backend::logging::backendLoggingCallback);
         if(logStatus != HIPDNN_PLUGIN_STATUS_SUCCESS)
         {
             HIPDNN_BACKEND_LOG_WARN(

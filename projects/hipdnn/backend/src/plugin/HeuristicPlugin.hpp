@@ -50,11 +50,6 @@ public:
     }
 
     // Logging setup (called at module load time)
-    // 3-parameter version for heuristic-specific callback
-    hipdnnPluginStatus_t setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const;
-
-    // 2-parameter version for compatibility with PluginManagerBase
-    // This wraps the 2-param callback to provide a component prefix
     hipdnnPluginStatus_t setLoggingCallback(hipdnnCallback_t callback) const;
 
     hipdnnPluginStatus_t setLogLevel(hipdnnSeverity_t level) const;
@@ -129,7 +124,7 @@ private:
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
     hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
     hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnHeuristicLoggingCallback_t);
+    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnCallback_t);
     hipdnnPluginStatus_t (*_funcSetLogLevel)(hipdnnSeverity_t);
     void (*_funcGetLastErrorString)(const char**);
 

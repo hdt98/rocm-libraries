@@ -134,21 +134,9 @@ std::string_view HeuristicPlugin::pluginVersion() const
     return version;
 }
 
-hipdnnPluginStatus_t
-    HeuristicPlugin::setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const
+hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
 {
     return _funcSetLoggingCallback(callback);
-}
-
-// 2-parameter callback overload for PluginManagerBase compatibility
-// Uses the existing heuristicLoggingCallback which wraps 2-param to 3-param
-hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t /*callback*/) const
-{
-    // The heuristicLoggingCallback function in logging/Logging.cpp already
-    // wraps the backend's 2-param callback to the plugin's 3-param interface
-    // by combining componentPrefix and message before calling backendLoggingCallback
-    // We ignore the passed callback and use the global heuristicLoggingCallback
-    return setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
 }
 
 hipdnnPluginStatus_t HeuristicPlugin::setLogLevel(hipdnnSeverity_t level) const

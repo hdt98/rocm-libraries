@@ -57,20 +57,6 @@ extern "C" {
  */
 
 /**
- * @brief Logging callback type for heuristic plugins.
- *
- * This callback allows plugins to emit log messages with a component prefix.
- * The host provides this callback via hipdnnHeuristicSetLoggingCallback.
- *
- * @param[in] severity Log severity level (HIPDNN_SEV_INFO, HIPDNN_SEV_WARN, etc.)
- * @param[in] component_prefix Component name prefix (e.g., "[StaticOrdering] ", "[Config] ")
- * @param[in] message The log message content
- */
-typedef void (*hipdnnHeuristicLoggingCallback_t)(hipdnnSeverity_t severity,
-                                                 const char* component_prefix,
-                                                 const char* message);
-
-/**
  * @brief Opaque handle for a heuristic plugin session.
  *
  * This handle represents a long-lived session object per loaded heuristic module
@@ -151,15 +137,16 @@ HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginSta
  * The host calls this once after loading the heuristic .so, before any other operations.
  * The plugin should store the callback and use it for all internal logging.
  *
- * The callback signature allows plugins to include a component prefix (e.g., "[StaticOrdering] ")
- * which helps identify log messages from specific heuristic policies.
+ * Plugins should include component prefixes directly in the message string
+ * (e.g., "[StaticOrdering] Engine selection complete") to help identify log messages
+ * from specific heuristic policies.
  *
  * @param[in] callback The logging callback function to use.
  *
  * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
  */
 HIPDNN_HEURISTIC_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicSetLoggingCallback(hipdnnHeuristicLoggingCallback_t callback);
+    hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback);
 
 /**
  * @brief Sets the log level for the plugin (optional).
