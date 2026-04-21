@@ -114,7 +114,7 @@ jobs:
       - name: Configure superbuild
         run: |
           cmake --preset hipdnn-providers \
-            -DCMAKE_HIP_COMPILER_ROCM_ROOT="$ROCM_SDK_PATH" \
+            -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET"
 
@@ -170,7 +170,7 @@ jobs:
       - name: Configure superbuild
         run: |
           cmake --preset hipdnn-providers \
-            -DCMAKE_HIP_COMPILER_ROCM_ROOT="$ROCM_SDK_PATH" \
+            -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET"
 
