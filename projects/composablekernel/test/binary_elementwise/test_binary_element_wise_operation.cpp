@@ -228,11 +228,13 @@ TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision_regression_smal
 {
     // Before fix: alpha/beta demoted to half_t, losing precision (e.g. 0.001f -> 0.0009994f).
     // After fix:  alpha/beta stay float, computation done in float, demoted only at the end.
+    // With alpha=beta=0.001f and x0=x1=half(100), old code gives 0.200073,
+    // new code gives 0.199951 (the correctly-rounded float result).
     const float alpha = 0.001f;
-    const float beta  = 0.002f;
+    const float beta  = 0.001f;
     check_binary_op<half_t>(Bilinear(alpha, beta),
                             type_convert<half_t>(100.0f),
-                            type_convert<half_t>(200.0f),
+                            type_convert<half_t>(100.0f),
                             [=](float a, float b) { return alpha * a + beta * b; });
 }
 
@@ -856,19 +858,23 @@ TEST(BinaryElementWiseOp_Host, Multiply_half_float_half_precision_regression)
 {
     // Before fix: y = type_convert<half_t>(x0) * x1 lost precision in x0
     // After fix:  y = type_convert<half_t>(x0 * type_convert<float>(x1))
+    // x0=100.1f is NOT exactly representable in half_t (rounds to 100.125),
+    // so old code (demote x0 to half first) gives 300.5, new code gives 300.25.
     check_binary_op_default<Multiply, half_t>(
-        1000.0f, type_convert<half_t>(0.001f), [](float a, float b) { return a * b; });
+        100.1f, type_convert<half_t>(3.0f), [](float a, float b) { return a * b; });
 }
 
 TEST(BinaryElementWiseOp_Host, Bilinear_half_half_half_precision_regression)
 {
     // Before fix: computed entirely in half_t including alpha/beta
     // After fix:  promotes to float for computation
+    // alpha=0.1f as half_t is 0.0999755859375 (not exact), so old code
+    // (demote alpha/beta to half first) gives 43.28125, new code gives 43.3125.
     const float alpha = 0.1f;
-    const float beta  = 0.2f;
+    const float beta  = 0.1f;
     check_binary_op<half_t>(Bilinear(alpha, beta),
-                            type_convert<half_t>(10.0f),
-                            type_convert<half_t>(20.0f),
+                            type_convert<half_t>(333.0f),
+                            type_convert<half_t>(100.0f),
                             [=](float a, float b) { return alpha * a + beta * b; });
 }
 
@@ -1027,10 +1033,12 @@ TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision_regression_sm
 {
     // Before fix: alpha/beta demoted to half_t, losing precision.
     // After fix:  alpha/beta stay float, computation done in float, demoted only at the end.
+    // With alpha=beta=0.001f and x0=x1=half(100), old code gives 0.200073,
+    // new code gives 0.199951 (the correctly-rounded float result).
     const float alpha = 0.001f;
-    const float beta  = 0.002f;
+    const float beta  = 0.001f;
     half_t x0         = type_convert<half_t>(100.0f);
-    half_t x1         = type_convert<half_t>(200.0f);
+    half_t x1         = type_convert<half_t>(100.0f);
     half_t y          = run_bilinear_on_device<half_t>(x0, x1, Bilinear(alpha, beta));
     check_device_result(y, x0, x1, [=](float a, float b) { return alpha * a + beta * b; });
 }
@@ -1054,8 +1062,10 @@ TEST(BinaryElementWiseOp_Device, Multiply_half_float_half_precision_regression)
 {
     // Before fix: y = type_convert<half_t>(x0) * x1 lost precision in x0
     // After fix:  y = type_convert<half_t>(x0 * type_convert<float>(x1))
-    float x0  = 1000.0f;
-    half_t x1 = type_convert<half_t>(0.001f);
+    // x0=100.1f is NOT exactly representable in half_t (rounds to 100.125),
+    // so old code (demote x0 to half first) gives 300.5, new code gives 300.25.
+    float x0  = 100.1f;
+    half_t x1 = type_convert<half_t>(3.0f);
     half_t y  = run_binary_op_on_device<Multiply, half_t>(x0, x1);
     check_device_result(y, x0, x1, [](float a, float b) { return a * b; });
 }
@@ -1064,10 +1074,12 @@ TEST(BinaryElementWiseOp_Device, Bilinear_half_half_half_precision_regression)
 {
     // Before fix: computed entirely in half_t including alpha/beta
     // After fix:  promotes to float for computation
+    // alpha=0.1f as half_t is 0.0999755859375 (not exact), so old code
+    // (demote alpha/beta to half first) gives 43.28125, new code gives 43.3125.
     const float alpha = 0.1f;
-    const float beta  = 0.2f;
-    half_t x0         = type_convert<half_t>(10.0f);
-    half_t x1         = type_convert<half_t>(20.0f);
+    const float beta  = 0.1f;
+    half_t x0         = type_convert<half_t>(333.0f);
+    half_t x1         = type_convert<half_t>(100.0f);
     half_t y          = run_bilinear_on_device<half_t>(x0, x1, Bilinear(alpha, beta));
     check_device_result(y, x0, x1, [=](float a, float b) { return alpha * a + beta * b; });
 }
