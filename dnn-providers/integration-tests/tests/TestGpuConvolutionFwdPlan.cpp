@@ -11,10 +11,11 @@
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
-#include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
+#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/detail/GpuConvolutionFwdPlan.hpp"
@@ -42,9 +43,9 @@ TEST(TestGpuConvolutionFwdPlanBuilder, PlanConstruction)
                                            xDims,
                                            wDims,
                                            yDims,
-                                           computePackedStrides(xDims),
-                                           computePackedStrides(wDims),
-                                           computePackedStrides(yDims),
+                                           generateStrides(xDims),
+                                           generateStrides(wDims),
+                                           generateStrides(yDims),
                                            {0, 0},
                                            {1, 1},
                                            {1, 1},
@@ -83,9 +84,9 @@ TEST(TestGpuConvolutionFwdPlanBuilder, IsApplicable)
                                            xDims,
                                            wDims,
                                            yDims,
-                                           computePackedStrides(xDims),
-                                           computePackedStrides(wDims),
-                                           computePackedStrides(yDims),
+                                           generateStrides(xDims),
+                                           generateStrides(wDims),
+                                           generateStrides(yDims),
                                            {0, 0},
                                            {1, 1},
                                            {1, 1},
@@ -149,9 +150,9 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     constexpr int64_t W_UID = 2;
     constexpr int64_t Y_UID = 3;
 
-    auto xStrides = computePackedStrides(xDims);
-    auto wStrides = computePackedStrides(wDims);
-    auto yStrides = computePackedStrides(yDims);
+    auto xStrides = generateStrides(xDims);
+    auto wStrides = generateStrides(wDims);
+    auto yStrides = generateStrides(yDims);
 
     auto graphBuilder = createConvFwdGraph(X_UID,
                                            W_UID,
@@ -198,47 +199,40 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     cpuX.fillWithRandomValues(static_cast<XType>(-1), static_cast<XType>(1), SEED);
     cpuW.fillWithRandomValues(static_cast<WType>(-1), static_cast<WType>(1), SEED + 1);
 
-    // Allocate device buffers and copy inputs
-    void* dX = nullptr;
-    void* dW = nullptr;
-    void* dY = nullptr;
-    auto freeDeviceBuffers = [&]() {
-        static_cast<void>(hipFree(dX));
-        static_cast<void>(hipFree(dW));
-        static_cast<void>(hipFree(dY));
-    };
+    // Allocate device buffers (RAII — freed automatically)
+    const hipdnn_data_sdk::utilities::Workspace dX(xCount * sizeof(XType));
+    const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(WType));
+    const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(YType));
 
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(XType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(WType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
-
-    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(
+        hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
+        hipSuccess);
+    ASSERT_EQ(
+        hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
+        hipSuccess);
+    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(YType)), hipSuccess);
 
     // Execute
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = dX;
-    variantPack[W_UID] = dW;
-    variantPack[Y_UID] = dY;
+    variantPack[X_UID] = dX.get();
+    variantPack[W_UID] = dW.get();
+    variantPack[Y_UID] = dY.get();
 
     patient.execute(variantPack);
 
     // Copy result back
     std::vector<YType> gpuYData(yCount);
-    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(YType), hipMemcpyDeviceToHost),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(YType), hipMemcpyDeviceToHost),
+              hipSuccess);
 
-    freeDeviceBuffers();
+    // Run CPU reference executor with host pointers (same graph)
+    std::unordered_map<int64_t, void*> cpuVariantPack;
+    cpuVariantPack[X_UID] = cpuX.rawHostData();
+    cpuVariantPack[W_UID] = cpuW.rawHostData();
+    cpuVariantPack[Y_UID] = cpuY.rawHostData();
 
-    // CPU reference
-    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<XType, WType, YType, ComputeType>(
-        cpuX, cpuW, cpuY, stride, dilation, padding, padding);
+    hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor cpuExecutor;
+    cpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), cpuVariantPack);
 
     // Compare
     const auto* cpuResult = static_cast<const YType*>(cpuY.rawHostData());

@@ -13,7 +13,8 @@
 
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
-#include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
+#include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
 #include "harness/gpu_graph_executor/GpuReferenceGraphExecutor.hpp"
@@ -24,6 +25,7 @@ namespace
 using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_integration_tests::test_utils;
 using hipdnn_integration_tests::gpu_graph_executor::GpuReferenceGraphExecutor;
+using hipdnn_test_sdk::utilities::CpuReferenceGraphExecutor;
 
 // Creates a minimal pointwise graph with two FLOAT tensors (input + output).
 // The pointwise operation is RELU_FWD but the dummy plan ignores the operation.
@@ -182,9 +184,9 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
     constexpr int64_t W_UID = 11;
     constexpr int64_t Y_UID = 12;
 
-    auto xStrides = computePackedStrides(xDims);
-    auto wStrides = computePackedStrides(wDims);
-    auto yStrides = computePackedStrides(yDims);
+    auto xStrides = generateStrides(xDims);
+    auto wStrides = generateStrides(wDims);
+    auto yStrides = generateStrides(yDims);
 
     auto graphBuilder = createConvFwdGraph(X_UID,
                                            W_UID,
@@ -218,49 +220,41 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
         static_cast<T*>(cpuW.rawHostData())[i] = T(1.0f);
     }
 
-    // Allocate device buffers and copy inputs to GPU
-    void* dX = nullptr;
-    void* dW = nullptr;
-    void* dY = nullptr;
-    auto freeDeviceBuffers = [&]() {
-        static_cast<void>(hipFree(dX));
-        static_cast<void>(hipFree(dW));
-        static_cast<void>(hipFree(dY));
-    };
+    // Allocate device buffers (RAII — freed automatically)
+    const hipdnn_data_sdk::utilities::Workspace dX(xCount * sizeof(T));
+    const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(T));
+    const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(T));
 
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-
-    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(T)), hipSuccess);
+    ASSERT_EQ(hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
+    ASSERT_EQ(hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
 
     // Run GPU graph executor with device pointers
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = dX;
-    variantPack[W_UID] = dW;
-    variantPack[Y_UID] = dY;
+    variantPack[X_UID] = dX.get();
+    variantPack[W_UID] = dW.get();
+    variantPack[Y_UID] = dY.get();
 
     GpuReferenceGraphExecutor gpuExecutor;
     gpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), variantPack);
 
     // Copy GPU result back to host
     std::vector<T> gpuYData(yCount);
-    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost), hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(T), hipMemcpyDeviceToHost),
+              hipSuccess);
 
-    freeDeviceBuffers();
+    // Run CPU reference executor with host pointers (same graph)
+    std::unordered_map<int64_t, void*> cpuVariantPack;
+    cpuVariantPack[X_UID] = cpuX.rawHostData();
+    cpuVariantPack[W_UID] = cpuW.rawHostData();
+    cpuVariantPack[Y_UID] = cpuY.rawHostData();
 
-    // Run CPU reference for comparison
-    hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(
-        cpuX, cpuW, cpuY, convStride, dilation, padding, padding);
+    CpuReferenceGraphExecutor cpuExecutor;
+    cpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), cpuVariantPack);
 
-    // Compare GPU executor output against CPU reference
+    // Compare GPU executor output against CPU executor output
     const auto* cpuResult = static_cast<const T*>(cpuY.rawHostData());
     for(size_t i = 0; i < yCount; ++i)
     {

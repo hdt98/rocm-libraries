@@ -6,22 +6,14 @@
 #include <cstdint>
 #include <vector>
 
+#include <hipdnn_data_sdk/utilities/ShapeUtilities.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 
 namespace hipdnn_integration_tests::test_utils
 {
 
-inline std::vector<int64_t> computePackedStrides(const std::vector<int64_t>& dims)
-{
-    std::vector<int64_t> strides(dims.size());
-    int64_t stride = 1;
-    for(auto i = static_cast<int>(dims.size()) - 1; i >= 0; --i)
-    {
-        strides[static_cast<size_t>(i)] = stride;
-        stride *= dims[static_cast<size_t>(i)];
-    }
-    return strides;
-}
+// Use the canonical implementation from data_sdk.
+using hipdnn_data_sdk::utilities::generateStrides;
 
 // Creates a minimal graph with a ConvolutionFwd node and separate input/output data types.
 // Uses symmetric padding (prePadding == postPadding == padding).
