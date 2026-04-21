@@ -128,7 +128,11 @@ class PersistentLoopOn(PersistentLoop):
         module = Module("PersistentLoop On closePersistentLoop")
         skCloseLoopLabel = Label("SK_CloseLoop", "")
         module.add(skCloseLoopLabel)
-        if kernel["StreamK"] == 4:
+        if kernel.get("PersistentKernelLoopForever", False):
+            # Infinite loop: never exit. Termination is via process death.
+            with writer.allocTmpSgpr(3) as tmpSgprInfo:
+                module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))
+        elif kernel["StreamK"] == 4:
             # module.add(SCmpGeU32(src0=sgpr("StreamKTileIdx"), src1=sgpr("SKTiles"), comment="Check if done all StreamK tiles"))
             with writer.allocTmpSgpr(3) as tmpSgprInfo:
                 module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))

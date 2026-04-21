@@ -1215,6 +1215,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKXCCMapping"] = 0
       state["StreamKFixupTreeReduction"] = 0
       state["DebugStreamK"] = 0
+      state["PersistentKernelLoopForever"] = False
 
     computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
     state["_WorkspaceSizePerElemC"] = computeBytes

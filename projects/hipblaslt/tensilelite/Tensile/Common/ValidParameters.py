@@ -755,6 +755,11 @@ validParameters = { # we need to make sure this matches develop
     #   2 = No partials
     #   3 = Nofixup and no partials
     "DebugStreamK": [0, 1, 2, 3],
+    # Persistent-kernel debug: when True, the persistent loop never exits.
+    # Used as a co-tenant load kernel for contended-perf benchmarking.
+    # Termination is via process death (SIGKILL of host process tears down
+    # the HIP context and KFD preempts the in-flight waves).
+    "PersistentKernelLoopForever": [False, True],
     # Controls desired width (#elements) for loads from global memory -> LDS.
     # and eliminates the pointer unshift logic
     # -1 : Set GlobalReadVectorWidth =  VectorWidth

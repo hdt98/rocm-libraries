@@ -62,12 +62,16 @@
 #endif
 
 #include <chrono>
+#include <csignal>
 #include <cstddef>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
+#include <pthread.h>
 #include <sstream>
+#include <sys/prctl.h>
 
 namespace TensileLite
 {
@@ -374,6 +378,10 @@ namespace TensileLite
                 ("output-amaxD",              po::value<bool>()->default_value(false), "Output AmaxD.")
                 ("timing-instrumentation",    po::value<bool>()->default_value(false)->implicit_value(true), "Enable detailed timing instrumentation output to stderr.")
                 ("rocprof-counter",           vector_default_empty<std::string>(), "Rocprof counters.")
+                ("persistent",                po::value<bool>()->default_value(false)->implicit_value(true),
+                                              "Run in persistent mode: prctl PR_SET_PDEATHSIG, "
+                                              "launch kernel async, skip sync/validate/timing, exit on signal. "
+                                              "Used as co-tenant load for contended-perf benchmarking.")
                 ;
             // clang-format on
 
@@ -871,6 +879,26 @@ int main(int argc, const char* argv[])
 
     auto args = parse_args(argc, argv);
 
+    if(args["persistent"].as<bool>())
+    {
+        // The persistent code path lives inside the warmup launch block, so
+        // num-warmups must be >= 1. With 0 the persistent branch is never
+        // reached, the code falls through to the benchmark loop, and the
+        // first benchmark sync hangs on our infinite kernel.
+        if(args["num-warmups"].as<int>() < 1)
+        {
+            std::cerr << "ERROR: --persistent requires --num-warmups >= 1 "
+                         "(YAML: GlobalParameters.NumWarmups). Got "
+                      << args["num-warmups"].as<int>() << ".\n";
+            return 2;
+        }
+
+        // Die if our parent dies, no matter how (SIGKILL too).
+        // Limitation: only covers the immediate parent; do not invoke this client
+        // through a wrapper script if you rely on this safety net.
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+    }
+
     // Enable timing instrumentation if requested
     g_timingInstrumentationEnabled = args["timing-instrumentation"].as<bool>();
 
@@ -1147,6 +1175,19 @@ int main(int argc, const char* argv[])
                                                                             stream,
                                                                             warmupStartEvents[0],
                                                                             warmupStopEvents[0]));
+                                    }
+
+                                    if(args["persistent"].as<bool>())
+                                    {
+                                        // Block until orchestrator signals us. exit() handles HIP teardown.
+                                        sigset_t mask;
+                                        sigemptyset(&mask);
+                                        sigaddset(&mask, SIGTERM);
+                                        sigaddset(&mask, SIGINT);
+                                        pthread_sigmask(SIG_BLOCK, &mask, nullptr);
+                                        int sig;
+                                        sigwait(&mask, &sig);
+                                        std::exit(0);
                                     }
 
                                     {
