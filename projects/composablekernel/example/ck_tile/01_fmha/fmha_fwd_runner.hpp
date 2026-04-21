@@ -729,9 +729,12 @@ fwd_result fmha_fwd_run(mode_enum mode,
             : std::array<ck_tile::index_t, 2>{1, 1});
 
     // Block mask generation.
-    // Block mask granularity must match the dispatched kernel's kM0 / kN0. All FA4 forward
-    // kernels currently dispatched here use 128x128 tiles; fmha_fwd_create_kargs_and_grids
-    // asserts this constraint at runtime when block_mask_ptr is non-null.
+    // NOTE: this example only demonstrates the case where the dispatched kernel's tile sizes
+    // are [128, 128]. For stricter use of the block_mask_config interface, the specific tile
+    // sizes should be detected from the kernel instance's tile settings to be launched
+    // (i.e. derived from the current FMHA operator's API parameters), not hard-coded here.
+    // fmha_fwd_create_kargs_and_grids asserts this 128x128 constraint at runtime when
+    // block_mask_ptr is non-null.
     constexpr ck_tile::index_t kBlockMaskBlockSize = 128;
     auto block_mask_config = ck_tile::parse_block_mask_config(block_mask_str);
     block_mask_config.block_size_q  = kBlockMaskBlockSize;
@@ -742,10 +745,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
         : ck_tile::HostTensor<int32_t>({1, 1});
     if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
     {
-        ck_tile::index_t num_q_blocks = (max_seqlen_q + block_mask_config.block_size_q - 1) /
-                                        block_mask_config.block_size_q;
-        ck_tile::index_t num_kv_blocks = (max_seqlen_k + block_mask_config.block_size_kv - 1) /
-                                         block_mask_config.block_size_kv;
+        ck_tile::index_t num_q_blocks =
+            ck_tile::integer_divide_ceil(max_seqlen_q, block_mask_config.block_size_q);
+        ck_tile::index_t num_kv_blocks =
+            ck_tile::integer_divide_ceil(max_seqlen_k, block_mask_config.block_size_kv);
         ck_tile::print_block_mask_stats(block_mask_host, num_q_blocks, num_kv_blocks);
     }
 

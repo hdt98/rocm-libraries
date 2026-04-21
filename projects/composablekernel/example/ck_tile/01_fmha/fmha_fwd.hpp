@@ -350,6 +350,10 @@ struct fmha_fwd_args
     ck_tile::index_t block_scale_size_q;
     ck_tile::index_t block_scale_size_kv;
 
+    // Block mask tensor layout: [num_batches, num_head, num_q_tiles, num_kv_tiles].
+    //   - stride_block_mask:       stride for the num_q_tiles dimension (typically num_kv_tiles)
+    //   - nhead_stride_block_mask: stride for the num_head dimension
+    //   - batch_stride_block_mask: stride for the num_batches dimension
     const int32_t* block_mask_ptr = nullptr;
     ck_tile::index_t stride_block_mask = 0;
     ck_tile::index_t nhead_stride_block_mask = 0;
