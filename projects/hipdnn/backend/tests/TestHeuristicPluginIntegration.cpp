@@ -363,7 +363,7 @@ TEST_F(IntegrationHeuristicPlugin, GetApiVersionFromLoadedPlugin)
 
     const auto apiVersion = plugin->apiVersion();
     EXPECT_FALSE(apiVersion.empty());
-    EXPECT_NE(apiVersion.find("1."), std::string_view::npos); // Should be version 1.x
+    EXPECT_NE(apiVersion.find("0."), std::string_view::npos); // Should be version 0.x
 }
 
 TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
@@ -653,7 +653,7 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 {
     const auto version = plugin().apiVersion();
     EXPECT_FALSE(version.empty());
-    EXPECT_EQ(version, "1.0.0"); // HIPDNN_HEURISTIC_API_VERSION
+    EXPECT_EQ(version, "0.0.1"); // HIPDNN_HEURISTIC_API_VERSION
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {

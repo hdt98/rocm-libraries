@@ -24,7 +24,7 @@
  * Plugins must match this major version to be loaded.
  */
 // NOLINTBEGIN(modernize-macro-to-enum)
-#define HIPDNN_HEURISTIC_API_VERSION_MAJOR 1
+#define HIPDNN_HEURISTIC_API_VERSION_MAJOR 0
 
 /**
  * @brief Minor version of the heuristic plugin C ABI
@@ -40,10 +40,10 @@
  * Incremented for bug fixes and non-functional changes.
  * Does not affect compatibility.
  */
-#define HIPDNN_HEURISTIC_API_VERSION_PATCH 0
+#define HIPDNN_HEURISTIC_API_VERSION_PATCH 1
 // NOLINTEND(modernize-macro-to-enum)
 
 /**
  * @brief Full version string in semantic versioning format
  */
-#define HIPDNN_HEURISTIC_API_VERSION "1.0.0"
+#define HIPDNN_HEURISTIC_API_VERSION "0.0.1"
