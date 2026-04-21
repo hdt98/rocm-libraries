@@ -167,12 +167,13 @@ inline std::vector<MemEcoSystemTestCase> SystemCases()
     }
 
     std::vector<MemEcoSystemTestCase> system_cases = {
-        {info, {50, 50}, {50, 50}, 0},  // should always be able
-        {info, {50, 50}, {50, 50}, 10}, // should always be unable
-        {info, {101}, {0}, 0},          // always able if SVRAM > DVRAM
-        {info, {101}, {0}, 10},         // may be able if SVRAM > DVRAM
-        {info, {0}, {101}, 0},          // always able if DVRAM > SVRAM
-        {info, {0}, {101}, 10},         // may be able if DVRAM > SVRAM
+        {info, {50, 50}, {50, 50}, 0},   // should always be able
+        {info, {50, 50}, {50, 50}, 10},  // should always be unable
+        {info, {101}, {0}, 0},           // always able if SVRAM > DVRAM
+        {info, {101}, {0}, 10},          // may be able if SVRAM > DVRAM
+        {info, {0}, {101}, 0},           // always able if DVRAM > SVRAM
+        {info, {0}, {101}, 10},          // may be able if DVRAM > SVRAM
+        {info, {50, 50}, {50, 50}, 110}, // should always be unable
     };
 
     return system_cases;
@@ -184,7 +185,7 @@ TEST_P(GPU_MemoryEcosystemSystem_SYS, SystemAbleToAllocate)
     const auto& info      = test_case.info;
 
     if(test_case.info.dedicated_vram == 0)
-        GTEST_SKIP() << "Detailed VRAM config not available.";
+        GTEST_SKIP() << GTEST_REASON << "Detailed VRAM config not available.";
 
     // We cannot know the system memory config at compile-time. Thus,
     // we cannot predetermine ability to allocate. Instead, we define
@@ -203,13 +204,15 @@ TEST_P(GPU_MemoryEcosystemSystem_SYS, SystemAbleToAllocate)
     };
 
     MemEcoGenericTestCase gen_case;
-    bool able = true;
+    gen_case.able = true;
 
     gen_case.cpu_blocks.push_back(PerCent(test_case.cpu_percent, info.shared_ram) + 1);
-    ASSERT_GE(info.shared_ram, gen_case.cpu_blocks[0]) << "CPU block cannot exceed shared mem";
-    able = info.shared_ram >= gen_case.cpu_blocks[0];
+    ASSERT_GE(info.shared_ram, gen_case.cpu_blocks[0])
+        << GTEST_REASON << "CPU block cannot exceed shared mem";
 
-    if(able)
+    gen_case.able = info.shared_ram >= gen_case.cpu_blocks[0];
+
+    if(gen_case.able)
     {
         for(auto pct : test_case.vram_dedicated_percents)
             gen_case.vram_blocks.push_back(PerCent(pct, info.dedicated_vram));
@@ -230,20 +233,23 @@ TEST_P(GPU_MemoryEcosystemSystem_SYS, SystemAbleToAllocate)
             }
             else
             {
-                able = false;
+                gen_case.able = false;
                 break;
             }
         }
     }
 
-    if(able)
+    if(gen_case.able)
     {
-        EXPECT_PRED1(IsAbleToAllocate, gen_case);
+        ASSERT_PRED1(IsAbleToAllocate, gen_case);
     }
     else
     {
-        EXPECT_PRED1(NotAbleToAllocate, gen_case);
+        ASSERT_PRED1(NotAbleToAllocate, gen_case);
     }
+
+    GTEST_COUT << GTEST_ALIGN << "The system is " << (gen_case.able ? "able" : "not able")
+               << " to allocate the shapes" << std::endl;
 }
 
 INSTANTIATE_TEST_SUITE_P(Full,

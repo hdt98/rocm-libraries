@@ -39,6 +39,11 @@
 #include "../driver.hpp"
 #include "../lib_env_var.hpp"
 
+// print aligned diagnostic messages from gtests
+#define GTEST_ALIGN "             "
+#define GTEST_REASON "Reason:      "
+#define GTEST_COUT std::cerr << GTEST_ALIGN
+
 template <typename T>
 class ScopedEnvironment
 {
