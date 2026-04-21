@@ -80,6 +80,7 @@ class StrictTypeLoader(yamlLoader):
 
     Standard YAML parsers treat 0 and 1 as booleans, but we want to preserve
     the actual type written in the YAML to catch type mismatches during validation.
+    Accepts both YAML-standard (true/false) and Python-style (True/False) booleans.
     """
     pass
 
@@ -91,6 +92,15 @@ StrictTypeLoader.yaml_implicit_resolvers = {
     k: [r for r in v if r[0] != 'tag:yaml.org,2002:bool']
     for k, v in yamlLoader.yaml_implicit_resolvers.items()
 }
+
+# Add back a custom bool resolver that matches true/false/True/False but NOT 0/1
+# This regex matches: true, false, True, False (but not yes, no, on, off, 0, 1)
+import re
+StrictTypeLoader.add_implicit_resolver(
+    'tag:yaml.org,2002:bool',
+    re.compile(r'^(?:true|false|True|False)$', re.X),
+    list('tTfF')
+)
 
 try:
     import msgpack
