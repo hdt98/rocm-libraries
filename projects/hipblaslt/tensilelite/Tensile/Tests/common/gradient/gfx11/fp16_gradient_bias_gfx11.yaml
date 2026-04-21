@@ -27,13 +27,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: True
-      UseBias: True
+      UseBias: 1
       BiasSrc: "D"
       Activation: True
       ActivationType: all
@@ -96,13 +96,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: False
-      UseBias: True
+      UseBias: 1
       BiasSrc: "A"
       Activation: False
       ActivationGuard: False
@@ -164,13 +164,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: False
-      UseBias: True
+      UseBias: 1
       BiasSrc: "A"
       Activation: False
       ActivationGuard: False
@@ -235,13 +235,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 1
+      TransposeA: True
+      TransposeB: True
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: False
-      UseBias: True
+      UseBias: 1
       BiasSrc: "A"
       Activation: False
       ActivationGuard: False
@@ -304,13 +304,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: False
-      UseBias: True
+      UseBias: 1
       BiasSrc: "B"
       Activation: False
       ActivationGuard: False
@@ -373,13 +373,13 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 1
+      TransposeA: False
+      TransposeB: True
       UseBeta: True
       Batched: True
       Gradient: True
       UseE: False
-      UseBias: True
+      UseBias: 1
       BiasSrc: "B"
       Activation: False
       ActivationGuard: False

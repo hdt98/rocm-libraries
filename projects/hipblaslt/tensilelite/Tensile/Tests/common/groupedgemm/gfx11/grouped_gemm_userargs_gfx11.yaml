@@ -32,11 +32,11 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       Batched: True
-      UseBias:       True
+      UseBias:       1
       UseE:          False
       Activation:    True
       GroupedGemm:   True
@@ -85,11 +85,11 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       Batched: True
-      UseBias:       False
+      UseBias:       0
       UseE:          False
       Activation:    False
       GroupedGemm:   True
@@ -138,11 +138,11 @@ BenchmarkProblems:
       DestDataType: h
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       Batched: True
-      UseBias:       False
+      UseBias:       0
       UseE:          False
       Activation:    False
       GroupedGemm:   True

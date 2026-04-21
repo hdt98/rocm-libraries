@@ -32,8 +32,8 @@ BenchmarkProblems:
       DataType: S
       DestDataType: S
       F32XdlMathOp: X
-      TransposeA: 0
-      TransposeB: 1
+      TransposeA: False
+      TransposeB: True
       UseBeta: True
       Batched: True
     - # BenchmarkProblemSizeGroup - Standard
@@ -144,8 +144,8 @@ BenchmarkProblems:
       DataType: S
       DestDataType: S
       F32XdlMathOp: X
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       Batched: True
     - # BenchmarkProblemSizeGroup - Standard
@@ -251,8 +251,8 @@ BenchmarkProblems:
       DataType: S
       DestDataType: S
       F32XdlMathOp: X
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       Batched: True
     - # BenchmarkProblemSizeGroup - Standard
@@ -320,8 +320,8 @@ BenchmarkProblems:
       DataType: S
       DestDataType: S
       F32XdlMathOp: X
-      TransposeA: 1
-      TransposeB: 1
+      TransposeA: True
+      TransposeB: True
       UseBeta: True
       Batched: True
     - # BenchmarkProblemSizeGroup - Standard

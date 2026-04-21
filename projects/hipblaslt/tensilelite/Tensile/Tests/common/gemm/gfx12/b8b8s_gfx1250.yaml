@@ -27,8 +27,8 @@ BenchmarkProblems:
       DestDataType: B8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       SparseA: False
       Activation: False
@@ -94,8 +94,8 @@ BenchmarkProblems:
       DestDataType: B8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 0
+      TransposeA: True
+      TransposeB: False
       UseBeta: True
       SparseA: False
       Activation: False
@@ -160,8 +160,8 @@ BenchmarkProblems:
       DestDataType: B8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 1
+      TransposeA: False
+      TransposeB: True
       UseBeta: True
       SparseA: False
       Activation: False
@@ -225,8 +225,8 @@ BenchmarkProblems:
       DestDataType: B8
       ComputeDataType: S
       HighPrecisionAccumulate: True
-      TransposeA: 1
-      TransposeB: 1
+      TransposeA: True
+      TransposeB: True
       UseBeta: True
       SparseA: False
       Activation: False

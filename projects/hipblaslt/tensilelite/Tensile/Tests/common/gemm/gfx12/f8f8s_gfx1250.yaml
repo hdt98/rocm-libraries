@@ -26,8 +26,8 @@ BenchmarkProblems:
       DestDataType: f8
       ComputeDataType: s
       HighPrecisionAccumulate: True
-      TransposeA: 0
-      TransposeB: 0
+      TransposeA: False
+      TransposeB: False
       UseBeta: True
       SparseA: False
       Activation: False
