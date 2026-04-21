@@ -14,13 +14,15 @@
 
 #include "HipdnnException.hpp"
 #include "PlatformUtils.hpp"
-#include "heuristics/DeviceProperties.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 #include "plugin/SharedLibrary.hpp"
 
+#include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+
+#include <flatbuffers/flatbuffers.h>
 
 #include <gtest/gtest.h>
 
@@ -39,6 +41,16 @@ std::filesystem::path getTestPluginPath(const char* pluginName)
     const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
     const auto pluginDir = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
     return pluginDir / hipdnn_data_sdk::utilities::getLibraryName(pluginName);
+}
+
+// Helper to serialize DevicePropertiesT using FlatBuffers Pack
+std::vector<uint8_t> serializeDeviceProperties(
+    const hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT& props)
+{
+    flatbuffers::FlatBufferBuilder builder(256);
+    auto offset = hipdnn_flatbuffers_sdk::data_objects::DeviceProperties::Pack(builder, &props);
+    builder.Finish(offset, "HDDP");
+    return {builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize()};
 }
 } // namespace
 
@@ -211,11 +223,11 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnHandle)
     ASSERT_NE(handle, nullptr);
 
     // Create device properties
-    heuristics::DeviceProperties props;
-    props.deviceId = 0;
-    props.multiProcessorCount = 120;
-    props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024; // 16 GB
-    props.architectureName = "gfx90a";
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT props;
+    props.device_id = 0;
+    props.multi_processor_count = 120;
+    props.total_global_mem = 16ULL * 1024 * 1024 * 1024; // 16 GB
+    props.architecture_name = "gfx90a";
 
     // Serialize
     auto serialized = serializeDeviceProperties(props);
@@ -233,11 +245,11 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnAllHandles)
     ASSERT_NE(rm, nullptr);
 
     // Create device properties
-    heuristics::DeviceProperties props;
-    props.deviceId = 0;
-    props.multiProcessorCount = 120;
-    props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
-    props.architectureName = "gfx90a";
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT props;
+    props.device_id = 0;
+    props.multi_processor_count = 120;
+    props.total_global_mem = 16ULL * 1024 * 1024 * 1024;
+    props.architecture_name = "gfx90a";
 
     auto serialized = serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
@@ -263,11 +275,11 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     ASSERT_NE(handle, nullptr);
 
     // Set device properties on handle
-    heuristics::DeviceProperties props;
-    props.deviceId = 0;
-    props.multiProcessorCount = 120;
-    props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
-    props.architectureName = "gfx90a";
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT props;
+    props.device_id = 0;
+    props.multi_processor_count = 120;
+    props.total_global_mem = 16ULL * 1024 * 1024 * 1024;
+    props.architecture_name = "gfx90a";
 
     auto serialized = serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
@@ -563,13 +575,13 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesWithNoPluginsLoaded)
     auto rm = HeuristicPluginResourceManager::create();
     ASSERT_NE(rm, nullptr);
 
-    heuristics::DeviceProperties props;
-    props.deviceId = 0;
-    props.multiProcessorCount = 120;
-    props.totalGlobalMem = 16ULL * 1024 * 1024 * 1024;
-    props.architectureName = "gfx90a";
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT props;
+    props.device_id = 0;
+    props.multi_processor_count = 120;
+    props.total_global_mem = 16ULL * 1024 * 1024 * 1024;
+    props.architecture_name = "gfx90a";
 
-    auto serialized = heuristics::serializeDeviceProperties(props);
+    auto serialized = serializeDeviceProperties(props);
     hipdnnPluginConstData_t devicePropsData;
     devicePropsData.ptr = serialized.data();
     devicePropsData.size = serialized.size();
@@ -858,6 +870,7 @@ TEST_F(IntegrationHeuristicPlugin, LoadPluginWithoutOptionalSymbolsSucceeds)
 {
     const auto pluginPath = getTestPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
 
+    // NOLINTNEXTLINE(readability-implicit-bool-conversion)
     ASSERT_TRUE(std::filesystem::exists(pluginPath)) << "Test plugin not found: " << pluginPath;
 
     SharedLibrary lib(pluginPath);

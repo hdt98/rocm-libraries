@@ -21,6 +21,10 @@ inline const char* toString(hipdnnPluginStatus_t status)
         return "HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR";
     case HIPDNN_PLUGIN_STATUS_ALLOC_FAILED:
         return "HIPDNN_PLUGIN_STATUS_ALLOC_FAILED";
+    case HIPDNN_PLUGIN_STATUS_NOT_APPLICABLE:
+        return "HIPDNN_PLUGIN_STATUS_NOT_APPLICABLE";
+    case HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED:
+        return "HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED";
     default:
         return "HIPDNN_PLUGIN_STATUS_UNKNOWN";
     }

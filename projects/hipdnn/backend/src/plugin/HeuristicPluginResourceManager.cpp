@@ -111,7 +111,29 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         plugin->setLogLevel(level);
 
         // Create plugin handle
-        auto handle = plugin->createHandle();
+        hipdnnHeuristicHandle_t handle = nullptr;
+        try
+        {
+            handle = plugin->createHandle();
+            if(handle == nullptr)
+            {
+                HIPDNN_BACKEND_LOG_ERROR(
+                    "Plugin with policy ID {} ({}) returned null handle despite reporting success. Plugin will be unavailable.",
+                    plugin->policyId(),
+                    plugin->policyName());
+                continue;
+            }
+        }
+        catch(const HipdnnException& e)
+        {
+            HIPDNN_BACKEND_LOG_ERROR(
+                "Failed to create handle for heuristic plugin with policy ID {} ({}): {}. Plugin will be unavailable.",
+                plugin->policyId(),
+                plugin->policyName(),
+                e.what());
+            continue;
+        }
+
         _handleToPlugin[handle] = plugin.get();
         _policyIdToHandle[plugin->policyId()] = handle;
 
