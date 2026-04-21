@@ -1854,11 +1854,11 @@ void rocsolver_stedc_getMemorySize(const rocblas_evect evect,
             *size_tempvect = 0;
         *size_tempgemm = sizeof(S) * get_tempgemm_size(n) * batch_count;
         // blocks for batched GEMM are at least 8 x 8
-        I max_n_merges = 1 << (stedc_num_levels(n) - 1);
+        I max_n_merges = I(1) << (stedc_num_levels(n) - 1);
         *size_workArr = sizeof(S*) * std::max(max_n_merges * 3, batch_count);
 
         // size for split blocks and sub-blocks positions
-        *size_splits_map = sizeof(rocblas_int) * get_splits_size(n) * batch_count;
+        *size_splits_map = sizeof(I) * get_splits_size(n) * batch_count;
 
         // size for temporary diagonal and rank-1 modif vector
         *size_tmpz = sizeof(S) * get_tmpz_size(n) * batch_count;
