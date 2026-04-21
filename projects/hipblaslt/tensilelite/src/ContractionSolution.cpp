@@ -746,6 +746,13 @@ namespace TensileLite
             args.template append<uint32_t>("itersPerTile", itersPerTile);
             args.template append<uint32_t>("magicNumberItersPerTile", magicNumberItersPerTile);
             args.template append<uint32_t>("magicShiftItersPerTile", magicShiftItersPerTile);
+
+            // Custom kernels still use totalIters
+            if(!sizeMapping.customKernelName.empty())
+            {
+                args.template append<uint32_t>("totalIters", totalIters);
+            }
+
             if(sizeMapping.streamK == 1) // Basic SK
             {
                 uint32_t itersPerWave = CeilDivide(totalIters, numWorkGroups.x);
