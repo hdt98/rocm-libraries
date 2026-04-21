@@ -736,13 +736,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
     // fmha_fwd_create_kargs_and_grids asserts this 128x128 constraint at runtime when
     // block_mask_ptr is non-null.
     constexpr ck_tile::index_t kBlockMaskBlockSize = 128;
-    auto block_mask_config = ck_tile::parse_block_mask_config(block_mask_str);
+    auto block_mask_config          = ck_tile::parse_block_mask_config(block_mask_str);
     block_mask_config.block_size_q  = kBlockMaskBlockSize;
     block_mask_config.block_size_kv = kBlockMaskBlockSize;
-    auto block_mask_host = (block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
-        ? ck_tile::generate_block_mask(
-              block_mask_config, batch, nhead, max_seqlen_q, max_seqlen_k, next_seed())
-        : ck_tile::HostTensor<int32_t>({1, 1});
+    auto block_mask_host =
+        (block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+            ? ck_tile::generate_block_mask(
+                  block_mask_config, batch, nhead, max_seqlen_q, max_seqlen_k, next_seed())
+            : ck_tile::HostTensor<int32_t>({1, 1});
     if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
     {
         ck_tile::index_t num_q_blocks =
@@ -1348,8 +1349,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 ck_tile::index_t num_kv_blocks =
                     (max_seqlen_k + block_mask_config.block_size_kv - 1) /
                     block_mask_config.block_size_kv;
-                args.block_mask_ptr          = static_cast<const int32_t*>(
-                    block_mask_buf.GetDeviceBuffer());
+                args.block_mask_ptr = static_cast<const int32_t*>(block_mask_buf.GetDeviceBuffer());
                 args.stride_block_mask       = num_kv_blocks;
                 args.nhead_stride_block_mask = 0;
                 args.batch_stride_block_mask = 0;

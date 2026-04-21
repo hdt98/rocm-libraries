@@ -298,8 +298,8 @@ struct FmhaFwdKernel
 
     struct FmhaFwdBlockMaskKargs
     {
-        const int32_t* block_mask_ptr = nullptr;
-        ck_tile::index_t stride_block_mask = 0;
+        const int32_t* block_mask_ptr            = nullptr;
+        ck_tile::index_t stride_block_mask       = 0;
         ck_tile::index_t nhead_stride_block_mask = 0;
         ck_tile::index_t batch_stride_block_mask = 0;
     };
@@ -1911,7 +1911,8 @@ struct FmhaFwdKernel
             if(kargs.block_mask_ptr != nullptr)
             {
                 const index_t q_block_idx = i_tile_m;
-                block_mask_row_ptr = kargs.block_mask_ptr +
+                block_mask_row_ptr =
+                    kargs.block_mask_ptr +
                     static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
                     static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
@@ -1934,7 +1935,7 @@ struct FmhaFwdKernel
             // the dense path (the common case) compiles to the same code as before block
             // sparsity was added — no extra registers, no per-iteration skip check.
             const bool has_block_mask_runtime = (block_mask_row_ptr != nullptr);
-            auto invoke_fmha_pipeline = [&](auto&&... args) -> decltype(auto) {
+            auto invoke_fmha_pipeline         = [&](auto&&... args) -> decltype(auto) {
                 if constexpr(kPassHdimTailArgs)
                 {
                     const ck_tile::index_t valid_k0_loops =
@@ -1972,16 +1973,12 @@ struct FmhaFwdKernel
                     if(has_block_mask_runtime)
                     {
                         return FmhaPipeline{}.template operator()<true>(
-                            static_cast<decltype(args)&&>(args)...,
-                            sink_value,
-                            block_mask_row_ptr);
+                            static_cast<decltype(args)&&>(args)..., sink_value, block_mask_row_ptr);
                     }
                     else
                     {
                         return FmhaPipeline{}.template operator()<false>(
-                            static_cast<decltype(args)&&>(args)...,
-                            sink_value,
-                            block_mask_row_ptr);
+                            static_cast<decltype(args)&&>(args)..., sink_value, block_mask_row_ptr);
                     }
                 }
             };
@@ -2916,7 +2913,8 @@ struct FmhaFwdKernel
             if(kargs.block_mask_ptr != nullptr)
             {
                 const index_t q_block_idx = i_tile_m;
-                block_mask_row_ptr = kargs.block_mask_ptr +
+                block_mask_row_ptr =
+                    kargs.block_mask_ptr +
                     static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
                     static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
@@ -2946,36 +2944,36 @@ struct FmhaFwdKernel
                     if(has_block_mask_runtime_trload)
                     {
                         return FmhaPipeline{}.template operator()<true>(q_dram_window,
-                                              k_dram_window,
-                                              v_dram_window,
-                                              bias_dram_window,
-                                              lse_dram_window,
-                                              mask,
-                                              position_encoding,
-                                              kargs.scale_s,
-                                              sink_value,
-                                              smem_ptrk0,
-                                              smem_ptrk1,
-                                              smem_ptrv0,
-                                              smem_ptrv1,
-                                              block_mask_row_ptr);
+                                                                        k_dram_window,
+                                                                        v_dram_window,
+                                                                        bias_dram_window,
+                                                                        lse_dram_window,
+                                                                        mask,
+                                                                        position_encoding,
+                                                                        kargs.scale_s,
+                                                                        sink_value,
+                                                                        smem_ptrk0,
+                                                                        smem_ptrk1,
+                                                                        smem_ptrv0,
+                                                                        smem_ptrv1,
+                                                                        block_mask_row_ptr);
                     }
                     else
                     {
                         return FmhaPipeline{}.template operator()<false>(q_dram_window,
-                                              k_dram_window,
-                                              v_dram_window,
-                                              bias_dram_window,
-                                              lse_dram_window,
-                                              mask,
-                                              position_encoding,
-                                              kargs.scale_s,
-                                              sink_value,
-                                              smem_ptrk0,
-                                              smem_ptrk1,
-                                              smem_ptrv0,
-                                              smem_ptrv1,
-                                              block_mask_row_ptr);
+                                                                         k_dram_window,
+                                                                         v_dram_window,
+                                                                         bias_dram_window,
+                                                                         lse_dram_window,
+                                                                         mask,
+                                                                         position_encoding,
+                                                                         kargs.scale_s,
+                                                                         sink_value,
+                                                                         smem_ptrk0,
+                                                                         smem_ptrk1,
+                                                                         smem_ptrv0,
+                                                                         smem_ptrv1,
+                                                                         block_mask_row_ptr);
                     }
                 }
                 else
@@ -2984,30 +2982,30 @@ struct FmhaFwdKernel
                     if(has_block_mask_runtime_trload)
                     {
                         return FmhaPipeline{}.template operator()<true>(q_dram_window,
-                                              k_dram_window,
-                                              v_dram_window,
-                                              bias_dram_window,
-                                              lse_dram_window,
-                                              mask,
-                                              position_encoding,
-                                              kargs.scale_s,
-                                              smem_ptr,
-                                              sink_value,
-                                              block_mask_row_ptr);
+                                                                        k_dram_window,
+                                                                        v_dram_window,
+                                                                        bias_dram_window,
+                                                                        lse_dram_window,
+                                                                        mask,
+                                                                        position_encoding,
+                                                                        kargs.scale_s,
+                                                                        smem_ptr,
+                                                                        sink_value,
+                                                                        block_mask_row_ptr);
                     }
                     else
                     {
                         return FmhaPipeline{}.template operator()<false>(q_dram_window,
-                                              k_dram_window,
-                                              v_dram_window,
-                                              bias_dram_window,
-                                              lse_dram_window,
-                                              mask,
-                                              position_encoding,
-                                              kargs.scale_s,
-                                              smem_ptr,
-                                              sink_value,
-                                              block_mask_row_ptr);
+                                                                         k_dram_window,
+                                                                         v_dram_window,
+                                                                         bias_dram_window,
+                                                                         lse_dram_window,
+                                                                         mask,
+                                                                         position_encoding,
+                                                                         kargs.scale_s,
+                                                                         smem_ptr,
+                                                                         sink_value,
+                                                                         block_mask_row_ptr);
                     }
                 }
             }();
@@ -3042,4 +3040,3 @@ struct FmhaFwdKernel
 };
 
 } // namespace ck_tile
-

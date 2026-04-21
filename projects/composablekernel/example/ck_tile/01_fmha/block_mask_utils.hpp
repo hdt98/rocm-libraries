@@ -26,11 +26,11 @@ enum class BlockMaskPattern
 
 struct BlockMaskConfig
 {
-    BlockMaskPattern pattern = BlockMaskPattern::None;
-    float ratio              = 0.5f; // sparsity ratio (fraction of blocks to mask out)
-    ck_tile::index_t block_size_q  = 0; // Q block size (kM0), set from kernel
-    ck_tile::index_t block_size_kv = 0; // KV block size (kN0), set from kernel
-    std::string file_path;              // for file-based patterns
+    BlockMaskPattern pattern       = BlockMaskPattern::None;
+    float ratio                    = 0.5f; // sparsity ratio (fraction of blocks to mask out)
+    ck_tile::index_t block_size_q  = 0;    // Q block size (kM0), set from kernel
+    ck_tile::index_t block_size_kv = 0;    // KV block size (kN0), set from kernel
+    std::string file_path;                 // for file-based patterns
 };
 
 inline BlockMaskConfig parse_block_mask_config(const std::string& str)
@@ -43,11 +43,9 @@ inline BlockMaskConfig parse_block_mask_config(const std::string& str)
     }
 
     // Parse pattern:param format
-    auto colon_pos = str.find(':');
-    std::string pattern_str =
-        (colon_pos != std::string::npos) ? str.substr(0, colon_pos) : str;
-    std::string param_str =
-        (colon_pos != std::string::npos) ? str.substr(colon_pos + 1) : "";
+    auto colon_pos          = str.find(':');
+    std::string pattern_str = (colon_pos != std::string::npos) ? str.substr(0, colon_pos) : str;
+    std::string param_str   = (colon_pos != std::string::npos) ? str.substr(colon_pos + 1) : "";
 
     if(pattern_str == "random" || pattern_str == "r")
     {
@@ -74,8 +72,7 @@ inline BlockMaskConfig parse_block_mask_config(const std::string& str)
     }
     else
     {
-        std::cerr << "Warning: unknown block_mask pattern '" << str
-                  << "', using none" << std::endl;
+        std::cerr << "Warning: unknown block_mask pattern '" << str << "', using none" << std::endl;
         config.pattern = BlockMaskPattern::None;
     }
 
@@ -132,9 +129,8 @@ inline std::vector<int32_t> generate_stripe_block_mask(ck_tile::index_t num_q_bl
                                                        float ratio)
 {
     std::vector<int32_t> mask(num_q_blocks * num_kv_blocks, 0);
-    ck_tile::index_t stripe_width =
-        std::max(ck_tile::index_t(1),
-                 static_cast<ck_tile::index_t>(num_kv_blocks * (1.0f - ratio)));
+    ck_tile::index_t stripe_width = std::max(
+        ck_tile::index_t(1), static_cast<ck_tile::index_t>(num_kv_blocks * (1.0f - ratio)));
 
     for(ck_tile::index_t qi = 0; qi < num_q_blocks; qi++)
     {
@@ -166,16 +162,14 @@ inline std::vector<int32_t> generate_checkerboard_block_mask(ck_tile::index_t nu
 }
 
 // Main entry point: generate block mask based on config
-inline ck_tile::HostTensor<int32_t>
-generate_block_mask(const BlockMaskConfig& config,
-                    ck_tile::index_t /*batch*/,
-                    ck_tile::index_t /*nhead*/,
-                    ck_tile::index_t max_seqlen_q,
-                    ck_tile::index_t max_seqlen_k,
-                    uint32_t seed = 42)
+inline ck_tile::HostTensor<int32_t> generate_block_mask(const BlockMaskConfig& config,
+                                                        ck_tile::index_t /*batch*/,
+                                                        ck_tile::index_t /*nhead*/,
+                                                        ck_tile::index_t max_seqlen_q,
+                                                        ck_tile::index_t max_seqlen_k,
+                                                        uint32_t seed = 42)
 {
-    ck_tile::index_t num_q_blocks =
-        (max_seqlen_q + config.block_size_q - 1) / config.block_size_q;
+    ck_tile::index_t num_q_blocks = (max_seqlen_q + config.block_size_q - 1) / config.block_size_q;
     ck_tile::index_t num_kv_blocks =
         (max_seqlen_k + config.block_size_kv - 1) / config.block_size_kv;
 
@@ -189,16 +183,14 @@ generate_block_mask(const BlockMaskConfig& config,
         single_mask.assign(num_q_blocks * num_kv_blocks, 1); // all active
         break;
     case BlockMaskPattern::Random:
-        single_mask =
-            generate_random_block_mask(num_q_blocks, num_kv_blocks, config.ratio, seed);
+        single_mask = generate_random_block_mask(num_q_blocks, num_kv_blocks, config.ratio, seed);
         break;
     case BlockMaskPattern::Causal:
         single_mask = generate_causal_block_mask(
             num_q_blocks, num_kv_blocks, config.block_size_q, config.block_size_kv);
         break;
     case BlockMaskPattern::Stripe:
-        single_mask =
-            generate_stripe_block_mask(num_q_blocks, num_kv_blocks, config.ratio);
+        single_mask = generate_stripe_block_mask(num_q_blocks, num_kv_blocks, config.ratio);
         break;
     case BlockMaskPattern::Checkerboard:
         single_mask = generate_checkerboard_block_mask(num_q_blocks, num_kv_blocks);

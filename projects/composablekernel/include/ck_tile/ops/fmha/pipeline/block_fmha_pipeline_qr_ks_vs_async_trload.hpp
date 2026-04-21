@@ -988,26 +988,28 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     {
                         const auto k_origin =
                             make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
-                        set_tile_if(s_acc,
-                                    -numeric<SMPLComputeDataType>::infinity(),
-                                    [&,
-                                     physical_seqlen_k_start_ = physical_seqlen_k_start,
-                                     physical_seqlen_k_end_   = physical_seqlen_k_end](auto tile_idx) {
-                                        const auto col = k_origin.at(I0) + tile_idx.at(I1);
+                        set_tile_if(
+                            s_acc,
+                            -numeric<SMPLComputeDataType>::infinity(),
+                            [&,
+                             physical_seqlen_k_start_ = physical_seqlen_k_start,
+                             physical_seqlen_k_end_   = physical_seqlen_k_end](auto tile_idx) {
+                                const auto col = k_origin.at(I0) + tile_idx.at(I1);
 
-                                        {
-                                            return physical_seqlen_k_end_ <= col;
-                                        }
-                                    });
+                                {
+                                    return physical_seqlen_k_end_ <= col;
+                                }
+                            });
                     }
                 }
 
                 if constexpr(kPadSeqLenK || FmhaMask::IsMasking)
                 {
-                    const auto k_origin = make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
+                    const auto k_origin =
+                        make_tuple(kN0 * i_total_loops + physical_seqlen_k_start, 0);
 
-                    bool need_perpixel_check =
-                        mask.IsEdgeTile(q_origin.at(I0), k_origin.at(I0), number<kM0>{}, number<kN0>{});
+                    bool need_perpixel_check = mask.IsEdgeTile(
+                        q_origin.at(I0), k_origin.at(I0), number<kM0>{}, number<kN0>{});
                     if(need_perpixel_check)
                     {
                         set_tile_if(
@@ -1056,8 +1058,10 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 });
 
                 const auto m_old = m; // m{j-1}
-                tile_elementwise_inout(
-                    [](auto& e0, auto e1, auto e2) { e0 = max(e1, e2); }, m, m_old, m_local); // m{j}
+                tile_elementwise_inout([](auto& e0, auto e1, auto e2) { e0 = max(e1, e2); },
+                                       m,
+                                       m_old,
+                                       m_local); // m{j}
 
                 auto p_compute = make_static_distributed_tensor<SMPLComputeDataType>(
                     s_new.get_tile_distribution()); // Pcompute{j}
@@ -1093,7 +1097,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                         {
                             if constexpr(kHasLogitsSoftCap)
                             {
-                                p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                                p_compute(i_j_idx) =
+                                    exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                             }
                             else
                             {
