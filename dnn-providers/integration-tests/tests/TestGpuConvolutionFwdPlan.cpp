@@ -300,7 +300,7 @@ TEST(TestGpuConvolutionFwdPlan, ExecutePlanStride2)
 // FP16 plan execution tests (Signatures #2 and #4)
 // ============================================================================
 
-TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16)
+TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlan)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -321,7 +321,7 @@ TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16)
                                                     tolerance);
 }
 
-TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16ToFp32)
+TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanMixedOutput)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -346,7 +346,7 @@ TEST(TestGpuConvolutionFwdPlanFp16, ExecutePlanFp16ToFp32)
 // BF16 plan execution tests (Signatures #3 and #5)
 // ============================================================================
 
-TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanBfp16)
+TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlan)
 {
     SKIP_IF_NO_DEVICES();
 
@@ -367,7 +367,7 @@ TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanBfp16)
                                                                 tolerance);
 }
 
-TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanBfp16ToFp32)
+TEST(TestGpuConvolutionFwdPlanBfp16, ExecutePlanMixedOutput)
 {
     SKIP_IF_NO_DEVICES();
 
