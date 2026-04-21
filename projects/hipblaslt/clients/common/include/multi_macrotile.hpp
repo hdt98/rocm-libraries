@@ -26,7 +26,8 @@ std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
     hipDataType a_type, hipDataType b_type,
     hipDataType c_type, hipDataType d_type,
     hipblasComputeType_t compute_type,
-    bool brute_force = false);
+    bool brute_force = false,
+    bool xcd_aware = false);
 
 // ── Sub-problem descriptor ──────────────────────────────────────────────────
 
@@ -105,9 +106,8 @@ inline int estimateWorkgroups(int64_t M, int64_t N, int mt_m, int mt_n)
 
 inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K)
 {
-    if (K < 4096)              return false;
-    if (M < 10240 && N < 10240) return false;
-    return true;
+    (void)M; (void)N; (void)K;
+    return true; // Guard disabled for exploration
 }
 
 // ── Main entry point ────────────────────────────────────────────────────────
@@ -140,10 +140,18 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         return subs;
     };
 
-    bool is_m_split = (split_strategy != 18 && split_strategy != 20);
+    // Strategy mapping:
+    // 17/19 = M-split (19 = brute-force)
+    // 18/20 = N-split (20 = brute-force)
+    // 21 = 3-way M-split, 22 = 3-way N-split
+    // 23 = XCD-aware M-split, 24 = XCD-aware N-split
+    bool is_m_split = (split_strategy == 17 || split_strategy == 19 || split_strategy == 21 || split_strategy == 23);
     bool brute_force = (split_strategy == 19 || split_strategy == 20);
+    bool three_way = (split_strategy == 21 || split_strategy == 22);
+    bool xcd_aware = (split_strategy == 23 || split_strategy == 24);
 
-    if (num_splits <= 0) num_splits = 2;
+    if (three_way && num_splits <= 0) num_splits = 3;
+    else if (num_splits <= 0) num_splits = 2;
     num_splits = std::min(num_splits, 16);
 
     std::vector<int64_t> split_sizes;
@@ -156,7 +164,7 @@ inline std::vector<GemmSubProblem> splitGemmProblem(
         split_sizes = computeOrigamiOptimizedSplitsWithHandle(
             handle, dim, num_splits, mt, other, K, is_m_split,
             transA, transB, a_type, b_type, c_type, d_type, compute_type,
-            brute_force);
+            brute_force, xcd_aware);
     }
 
     if (split_sizes.empty())

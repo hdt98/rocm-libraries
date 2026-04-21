@@ -626,8 +626,9 @@ try
         value<int32_t>(&arg.split_strategy)->default_value(17),
         "Split strategy:\n"
         "  17=Origami M-split (default), 18=Origami N-split\n"
-        "  19=Brute-force M-split (test every multiple of 16)\n"
-        "  20=Brute-force N-split (test every multiple of 16)")
+        "  19=Brute-force M-split, 20=Brute-force N-split\n"
+        "  21=3-way M-split, 22=3-way N-split\n"
+        "  23=XCD-aware M-split, 24=XCD-aware N-split")
 
         ("num_splits",
         value<int32_t>(&arg.num_splits)->default_value(2),

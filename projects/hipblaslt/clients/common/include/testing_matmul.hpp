@@ -4630,7 +4630,7 @@ void testing_matmul_with_bias(const Arguments& arg,
             // === ORIGAMI EMPIRICAL MICRO-BENCHMARK ===
             // For S17/S18, test multiple candidate split ratios with actual execution
             // and re-split using the winning ratio
-            if((actual_strategy == 17 || actual_strategy == 18 || actual_strategy == 19 || actual_strategy == 20) && subProblems.size() > 1)
+            if((actual_strategy >= 17 && actual_strategy <= 24) && subProblems.size() > 1)
             {
                 auto& candidates = getOrigamiCandidates();
                 if(candidates.size() > 1)
@@ -4638,7 +4638,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                     hipblaslt_cout << "\n=== Origami Empirical Split Search ===" << std::endl;
                     hipblaslt_cout << "Testing " << candidates.size() << " candidate split ratios..." << std::endl;
 
-                    bool is_m_split = (actual_strategy == 17 || actual_strategy == 19);
+                    bool is_m_split = (actual_strategy == 17 || actual_strategy == 19 || actual_strategy == 21 || actual_strategy == 23);
                     double best_time_us = 1e18;
                     int best_idx = 0;
 
