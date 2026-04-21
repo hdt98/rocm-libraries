@@ -53,6 +53,8 @@ auto GetConvTestCasesFull(miopenDataType_t datatype)
         TestCase{{1, 8, 9, 9}, {8, 8, 3, 3}, {1, 2}, {1, 1}, {1, 2}, datatype},
         // 3D dilation=2: effective kernel size 5 in each dim, pad=2 keeps spatial dims at 8
         TestCase{{1, 8, 8, 8, 8}, {8, 8, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {2, 2, 2}, datatype},
+        // 3D asymmetric dilation: dilation=(1,2,3), pad=(1,2,3) keeps spatial dims at 8
+        TestCase{{1, 8, 8, 8, 8}, {8, 8, 3, 3, 3}, {1, 2, 3}, {1, 1, 1}, {1, 2, 3}, datatype},
         // clang-format on
     };
 }
