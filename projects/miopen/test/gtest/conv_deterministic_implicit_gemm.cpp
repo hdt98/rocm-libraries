@@ -70,20 +70,14 @@ struct DeterministicTestConfig
     }
 };
 
-// Config format: {N, C, K, H, W, y, x, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w}
-
-// FwdV4R4Xdlops: 1 config (all deterministic)
-std::vector<DeterministicTestConfig> GetConfigFwdV4R4Xdlops()
-{
-    return {{128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}};
-}
-
 template <typename T, Direction CONV_DIR, typename SolverType>
 class GPU_ConvDeterministicImplicitGemm : public ::testing::TestWithParam<DeterministicTestConfig>
 {
 protected:
     static constexpr int NUM_ITERATIONS = 3;
 
+    // Fix PRNG seed so that input tensor data is identical across runs and machines,
+    // ensuring reproducibility of any determinism failure.
     void SetUp() override { prng::reset_seed(); }
 
     void RunTest()
@@ -338,14 +332,12 @@ TEST_P(GPU_Deterministic_FwdV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(
 TEST_P(GPU_Deterministic_BwdV1R1_FP32, DeterministicTest) { this->RunTest(); };
 TEST_P(GPU_Deterministic_WrwV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
 
-// ============================================================================
-// CI tests (Smoke): 3 fast tests (~1.5s total)
-// Tests: FwdV4R4Xdlops (46ms), BwdV1R1 (1455ms), WrwV4R4Xdlops (7ms)
-// ============================================================================
+// Config format: {N, C, K, H, W, y, x, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w}
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_FwdV4R4Xdlops_FP32,
-                         testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
+                         testing::Values(DeterministicTestConfig{
+                             128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}));
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          GPU_Deterministic_BwdV1R1_FP32,
                          testing::Values(DeterministicTestConfig{

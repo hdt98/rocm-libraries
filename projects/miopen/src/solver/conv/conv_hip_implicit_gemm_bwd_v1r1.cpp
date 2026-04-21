@@ -687,9 +687,9 @@ bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
         const auto stride_w   = ProblemInterpreter::GetAdjustedConvolutionStrideW(problem);
         const auto dilation_h = ProblemInterpreter::GetAdjustedConvolutionDilationH(problem);
         const auto dilation_w = ProblemInterpreter::GetAdjustedConvolutionDilationW(problem);
-        const bool not_need_atomic =
-            (stride_h >= dilation_h * (y - 1) + 1) && (stride_w >= dilation_w * (x - 1) + 1);
-        if(!not_need_atomic)
+        const bool needs_atomic_add =
+            (stride_h < dilation_h * (y - 1) + 1) || (stride_w < dilation_w * (x - 1) + 1);
+        if(needs_atomic_add)
             return false;
     }
 
