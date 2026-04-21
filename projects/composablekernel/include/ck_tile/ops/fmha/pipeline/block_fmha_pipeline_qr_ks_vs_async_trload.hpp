@@ -133,7 +133,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
     }
 
     // Decode
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -361,14 +362,22 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
             // prefetch at the bottom of the non-skip path). Decode uses a single LDS buffer
             // for K, so we must drain that stale vmem before re-issuing the K prefetch for
             // the next block; otherwise iter i+2 would race on the K LDS slot.
-            if(block_mask_row_ptr != nullptr &&
-               block_mask_row_ptr[kv_block_idx_base_decode + i_total_loops] == 0)
+            // Gated on kHasBlockMask so dense codegen is identical to baseline.
+            if constexpr(kHasBlockMask)
             {
-                move_tile_window(k_dram_window, {kN0, 0});
-                move_tile_window(v_dram_window, {kN0, 0});
-                block_sync_lds_direct_load<0>();
-                async_load_tile(k_lds_write_window, k_dram_window);
-                continue;
+                if(block_mask_row_ptr[kv_block_idx_base_decode + i_total_loops] == 0)
+                {
+                    move_tile_window(k_dram_window, {kN0, 0});
+                    move_tile_window(v_dram_window, {kN0, 0});
+                    block_sync_lds_direct_load<0>();
+                    async_load_tile(k_lds_write_window, k_dram_window);
+                    continue;
+                }
+            }
+            else
+            {
+                (void)block_mask_row_ptr;
+                (void)kv_block_idx_base_decode;
             }
 
             block_sync_lds();
@@ -667,7 +676,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
     }
 
     // Prefill, double lds
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -912,9 +922,20 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                             KDataType* __restrict__ k_lds_read_ptr,
                             KDataType* __restrict__ v_lds_write_ptr,
                             KDataType* __restrict__ v_lds_read_ptr) {
-            // Block sparsity: check if this KV block is masked out
-            const bool skip_this_block = (block_mask_row_ptr != nullptr) &&
-                (block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0);
+            // Block sparsity: check if this KV block is masked out.
+            // Gated on kHasBlockMask template arg so dense codegen has zero overhead.
+            const bool skip_this_block = [&] {
+                if constexpr(kHasBlockMask)
+                {
+                    return block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0;
+                }
+                else
+                {
+                    (void)block_mask_row_ptr;
+                    (void)kv_block_idx_base;
+                    return false;
+                }
+            }();
 
             // ALWAYS: V prefetch
             block_sync_lds<k_lds_insts>();

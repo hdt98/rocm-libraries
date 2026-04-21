@@ -155,7 +155,8 @@ struct BlockFmhaPipelineQRKSVSAsync
         return Policy::template GetSmemSize<Problem>();
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -414,33 +415,40 @@ struct BlockFmhaPipelineQRKSVSAsync
         do
         {
             // Block sparsity: skip fully-masked KV blocks
-            if(block_mask_row_ptr != nullptr &&
-               block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0)
+            if constexpr(kHasBlockMask)
             {
-                // Drain the prefetched K sub-tile (already in flight from previous iteration)
-                async_load_fence();
-                __builtin_amdgcn_s_barrier();
+                if(block_mask_row_ptr[kv_block_idx_base + i_total_loops] == 0)
+                {
+                    // Drain the prefetched K sub-tile (already in flight from previous iteration)
+                    async_load_fence();
+                    __builtin_amdgcn_s_barrier();
 
-                // Advance windows to next KV block
-                i_total_loops++;
-                if(i_total_loops < num_total_loop)
-                {
-                    move_tile_window(k_dram_block_window, {kN0, 0});
-                    k_dram_window.set_window_origin(k_dram_block_window.get_window_origin());
-                    async_load_tile_raw(k_lds_store(LdsSeq.at(number<0>{})),
-                                        k_dram_window,
-                                        number<-1>{},
-                                        k_oob_ck,
-                                        k_pre_np);
-                    move_tile_window(k_dram_window, {0, kK0});
+                    // Advance windows to next KV block
+                    i_total_loops++;
+                    if(i_total_loops < num_total_loop)
+                    {
+                        move_tile_window(k_dram_block_window, {kN0, 0});
+                        k_dram_window.set_window_origin(k_dram_block_window.get_window_origin());
+                        async_load_tile_raw(k_lds_store(LdsSeq.at(number<0>{})),
+                                            k_dram_window,
+                                            number<-1>{},
+                                            k_oob_ck,
+                                            k_pre_np);
+                        move_tile_window(k_dram_window, {0, kK0});
+                    }
+                    move_tile_window(v_dram_window, {0, kN0});
+                    move_tile_window(bias_dram_window, {0, kN0});
+                    if constexpr(kHasDropout)
+                    {
+                        move_tile_window(randval_dram_window, {0, kN0});
+                    }
+                    continue;
                 }
-                move_tile_window(v_dram_window, {0, kN0});
-                move_tile_window(bias_dram_window, {0, kN0});
-                if constexpr(kHasDropout)
-                {
-                    move_tile_window(randval_dram_window, {0, kN0});
-                }
-                continue;
+            }
+            else
+            {
+                (void)block_mask_row_ptr;
+                (void)kv_block_idx_base;
             }
 
             float k_descale = 1.0f;
@@ -976,7 +984,8 @@ struct BlockFmhaPipelineQRKSVSAsync
         return o_acc;
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1003,7 +1012,7 @@ struct BlockFmhaPipelineQRKSVSAsync
                const float sink_v,
                const int32_t* block_mask_row_ptr = nullptr) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           identity{},
                           k_dram_block_window_tmp,
                           identity{},

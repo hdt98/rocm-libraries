@@ -1928,6 +1928,12 @@ struct FmhaFwdKernel
             // fragment counts ahead of block_mask_row_ptr. Callers below pass everything up
             // to (and including) `dropout`; this lambda owns the trailing argument layout so
             // the order stays consistent with the pipeline signatures.
+            //
+            // The pipeline operator() is templated on kHasBlockMask. We runtime-branch on
+            // block_mask_row_ptr nullness and dispatch to the matching specialization so that
+            // the dense path (the common case) compiles to the same code as before block
+            // sparsity was added — no extra registers, no per-iteration skip check.
+            const bool has_block_mask_runtime = (block_mask_row_ptr != nullptr);
             auto invoke_fmha_pipeline = [&](auto&&... args) -> decltype(auto) {
                 if constexpr(kPassHdimTailArgs)
                 {
@@ -1940,18 +1946,43 @@ struct FmhaFwdKernel
                         return ck_tile::min(remaining_n1,
                                             static_cast<ck_tile::index_t>(FmhaPipeline::kN1));
                     }();
-                    return FmhaPipeline{}(static_cast<decltype(args)&&>(args)...,
-                                          sink_value,
-                                          valid_k0_loops,
-                                          valid_last_k0_length,
-                                          valid_n1_length,
-                                          block_mask_row_ptr);
+                    if(has_block_mask_runtime)
+                    {
+                        return FmhaPipeline{}.template operator()<true>(
+                            static_cast<decltype(args)&&>(args)...,
+                            sink_value,
+                            valid_k0_loops,
+                            valid_last_k0_length,
+                            valid_n1_length,
+                            block_mask_row_ptr);
+                    }
+                    else
+                    {
+                        return FmhaPipeline{}.template operator()<false>(
+                            static_cast<decltype(args)&&>(args)...,
+                            sink_value,
+                            valid_k0_loops,
+                            valid_last_k0_length,
+                            valid_n1_length,
+                            block_mask_row_ptr);
+                    }
                 }
                 else
                 {
-                    return FmhaPipeline{}(static_cast<decltype(args)&&>(args)...,
-                                          sink_value,
-                                          block_mask_row_ptr);
+                    if(has_block_mask_runtime)
+                    {
+                        return FmhaPipeline{}.template operator()<true>(
+                            static_cast<decltype(args)&&>(args)...,
+                            sink_value,
+                            block_mask_row_ptr);
+                    }
+                    else
+                    {
+                        return FmhaPipeline{}.template operator()<false>(
+                            static_cast<decltype(args)&&>(args)...,
+                            sink_value,
+                            block_mask_row_ptr);
+                    }
                 }
             };
 
@@ -2891,6 +2922,11 @@ struct FmhaFwdKernel
                     static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
             }
 
+            // Runtime-branch on block_mask_row_ptr nullness and dispatch to the matching
+            // pipeline specialization. Dense path (the common case) compiles to the same
+            // code as before block sparsity was added — no extra registers, no per-iteration
+            // skip check.
+            const bool has_block_mask_runtime_trload = (block_mask_row_ptr != nullptr);
             auto o_acc_tile = [&]() {
                 if constexpr(PrefillCase)
                 {
@@ -2907,35 +2943,72 @@ struct FmhaFwdKernel
                     __shared__ char smem_ptrv1[FmhaPipeline::Policy::template GetSmemSizeV<
                         typename FmhaPipeline::Problem>()];
 
-                    return FmhaPipeline{}(q_dram_window,
-                                          k_dram_window,
-                                          v_dram_window,
-                                          bias_dram_window,
-                                          lse_dram_window,
-                                          mask,
-                                          position_encoding,
-                                          kargs.scale_s,
-                                          sink_value,
-                                          smem_ptrk0,
-                                          smem_ptrk1,
-                                          smem_ptrv0,
-                                          smem_ptrv1,
-                                          block_mask_row_ptr);
+                    if(has_block_mask_runtime_trload)
+                    {
+                        return FmhaPipeline{}.template operator()<true>(q_dram_window,
+                                              k_dram_window,
+                                              v_dram_window,
+                                              bias_dram_window,
+                                              lse_dram_window,
+                                              mask,
+                                              position_encoding,
+                                              kargs.scale_s,
+                                              sink_value,
+                                              smem_ptrk0,
+                                              smem_ptrk1,
+                                              smem_ptrv0,
+                                              smem_ptrv1,
+                                              block_mask_row_ptr);
+                    }
+                    else
+                    {
+                        return FmhaPipeline{}.template operator()<false>(q_dram_window,
+                                              k_dram_window,
+                                              v_dram_window,
+                                              bias_dram_window,
+                                              lse_dram_window,
+                                              mask,
+                                              position_encoding,
+                                              kargs.scale_s,
+                                              sink_value,
+                                              smem_ptrk0,
+                                              smem_ptrk1,
+                                              smem_ptrv0,
+                                              smem_ptrv1,
+                                              block_mask_row_ptr);
+                    }
                 }
                 else
                 {
                     __shared__ char smem_ptr[GetSmemSize()];
-                    return FmhaPipeline{}(q_dram_window,
-                                          k_dram_window,
-                                          v_dram_window,
-                                          bias_dram_window,
-                                          lse_dram_window,
-                                          mask,
-                                          position_encoding,
-                                          kargs.scale_s,
-                                          smem_ptr,
-                                          sink_value,
-                                          block_mask_row_ptr);
+                    if(has_block_mask_runtime_trload)
+                    {
+                        return FmhaPipeline{}.template operator()<true>(q_dram_window,
+                                              k_dram_window,
+                                              v_dram_window,
+                                              bias_dram_window,
+                                              lse_dram_window,
+                                              mask,
+                                              position_encoding,
+                                              kargs.scale_s,
+                                              smem_ptr,
+                                              sink_value,
+                                              block_mask_row_ptr);
+                    }
+                    else
+                    {
+                        return FmhaPipeline{}.template operator()<false>(q_dram_window,
+                                              k_dram_window,
+                                              v_dram_window,
+                                              bias_dram_window,
+                                              lse_dram_window,
+                                              mask,
+                                              position_encoding,
+                                              kargs.scale_s,
+                                              smem_ptr,
+                                              sink_value,
+                                              block_mask_row_ptr);
+                    }
                 }
             }();
 

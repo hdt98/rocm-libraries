@@ -157,7 +157,8 @@ struct BlockFmhaPipelineQRKSVS
         return Policy::template GetSmemSize<Problem>();
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -509,7 +510,7 @@ struct BlockFmhaPipelineQRKSVS
         do
         {
             // Block sparsity: skip fully-masked KV blocks
-            if(block_mask_row_ptr != nullptr)
+            if constexpr(kHasBlockMask)
             {
                 const auto k_origin_check = k_dram_block_window.get_window_origin();
                 const index_t kv_block_idx = k_origin_check.at(number<0>{}) / kN0;
@@ -529,6 +530,10 @@ struct BlockFmhaPipelineQRKSVS
                     }
                     continue;
                 }
+            }
+            else
+            {
+                (void)block_mask_row_ptr;
             }
             float k_descale = 1.0f;
             if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
@@ -1235,7 +1240,8 @@ struct BlockFmhaPipelineQRKSVS
         return o_acc;
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1290,7 +1296,7 @@ struct BlockFmhaPipelineQRKSVS
                const float sink_v,
                const int32_t* block_mask_row_ptr = nullptr) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           q_element_func,
                           k_dram_block_window_tmp,
                           k_element_func,
@@ -1325,7 +1331,8 @@ struct BlockFmhaPipelineQRKSVS
                           block_mask_row_ptr);
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1355,7 +1362,7 @@ struct BlockFmhaPipelineQRKSVS
                const index_t valid_n1_length,
                const int32_t* block_mask_row_ptr = nullptr) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           identity{},
                           k_dram_block_window_tmp,
                           identity{},
@@ -1390,7 +1397,8 @@ struct BlockFmhaPipelineQRKSVS
                           block_mask_row_ptr);
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1417,7 +1425,7 @@ struct BlockFmhaPipelineQRKSVS
                const float sink_v,
                const int32_t* block_mask_row_ptr = nullptr) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           k_dram_block_window_tmp,
                           v_dram_block_window_tmp,
                           bias_dram_block_window_tmp,

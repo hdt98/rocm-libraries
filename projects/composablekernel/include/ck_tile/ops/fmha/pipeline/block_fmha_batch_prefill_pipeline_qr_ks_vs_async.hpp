@@ -383,7 +383,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
         return Policy::template GetSmemSize<Problem>();
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1524,7 +1525,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
         return o_acc;
     }
 
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1556,7 +1558,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                float sink_v,
                const int32_t* block_mask_row_ptr = nullptr) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           identity{},
                           k_dram_block_window_tmp,
                           identity{},
@@ -1589,7 +1591,8 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
 
     // Overload for KV_BLOCKSCALE: K/V descale is per-page
     // This is a convenience overload that forwards to the main operator() with kv_scale parameters
-    template <typename QDramBlockWindowTmp,
+    template <bool kHasBlockMask = false,
+              typename QDramBlockWindowTmp,
               typename KDramBlockWindowTmp,
               typename VDramBlockWindowTmp,
               typename BiasDramBlockWindowTmp,
@@ -1625,7 +1628,7 @@ struct BlockFmhaBatchPrefillPipelineQRKSVSAsync
                index_t nblock_stride_kv_block_descale,
                index_t nhead_stride_kv_block_descale) const
     {
-        return operator()(q_dram_block_window_tmp,
+        return operator()<kHasBlockMask>(q_dram_block_window_tmp,
                           identity{},
                           k_dram_block_window_tmp,
                           identity{},
