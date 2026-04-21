@@ -323,6 +323,7 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
         registerTypeInfo<Float4x2>();
 #endif // #ifdef TENSILE_USE_FP4
+#endif // _WIN32
         registerTypeInfo<MXScale>();
         registerTypeInfo<E8>();
         registerTypeInfo<E5M3>();

@@ -345,15 +345,11 @@ namespace TensileLite
         }
         size_t totalAllocatedBytes() const
         {
-<<<<<<< HEAD
             // Cannot use elementSize directly as elementSize is
             // packed size for MX data types.
             auto const info = DataTypeInfo::Get(m_dataType);
             assert(totalAllocatedElements() * info.elementSize % info.packing == 0);
             return totalAllocatedElements() * info.elementSize / info.packing;
-=======
-            return multiplyElementSize(totalAllocatedElements(), elementBytes());
->>>>>>> origin/develop
         }
 
         float elementBytes() const

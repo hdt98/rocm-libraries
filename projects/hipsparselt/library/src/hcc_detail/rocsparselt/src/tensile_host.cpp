@@ -312,10 +312,7 @@ namespace
                                                        boundIndex,
                                                        static_cast<double>(*prob.beta),
                                                        prob.workspaceSize);
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/develop
         tensileProblem.setComputeInputTypeA(Tensile_Ti);
         tensileProblem.setComputeInputTypeB(Tensile_Ti);
         tensileProblem.setAlphaType(Tensile_Tc);

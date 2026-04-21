@@ -26,7 +26,6 @@
 
 #pragma once
 
-<<<<<<< HEAD
 #define TENSILE_USE_FP4
 
 #ifdef TENSILE_USE_FP4
@@ -40,17 +39,6 @@ namespace TensileLite
 
 #else // _WIN32
 
-=======
-// Workaround: ROCm's amd_hip_ocp_host.hpp has a static_assert size mismatch
-// (fp6x32_packed vs __amd_fp6x32_storage_t) in its host-fallback path, which
-// is taken for all non-gfx950/gfx1250 device targets.
-#if (!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx950__) || defined(__gfx1250__)) && !defined(WIN32) && !defined(_WIN32)
-#define TENSILE_USE_FP4
-#endif
-
-#ifdef TENSILE_USE_FP4
-
->>>>>>> origin/develop
 #ifdef TENSILE_USE_HIP
 #include <hip/hip_runtime.h>
 #endif
@@ -61,10 +49,6 @@ namespace TensileLite
 
 #include <hip/hip_ext_ocp.h>
 
-<<<<<<< HEAD
-
-=======
->>>>>>> origin/develop
 namespace TensileLite
 {
     enum class hip_f4_rounding_mode
@@ -170,9 +154,6 @@ namespace std
     }
 } // namespace std
 
-<<<<<<< HEAD
 #endif // _WIN32
 
-=======
->>>>>>> origin/develop
 #endif // TENSILE_USE_FP4
