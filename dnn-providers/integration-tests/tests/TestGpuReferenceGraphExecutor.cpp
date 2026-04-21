@@ -13,6 +13,7 @@
 
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 
 #include "ConvolutionFwdGraphTestUtils.hpp"
@@ -218,43 +219,30 @@ void runConvFwdExecutorVsCpu(const std::vector<int64_t>& xDims,
         static_cast<T*>(cpuW.rawHostData())[i] = T(1.0f);
     }
 
-    // Allocate device buffers and copy inputs to GPU
-    void* dX = nullptr;
-    void* dW = nullptr;
-    void* dY = nullptr;
-    auto freeDeviceBuffers = [&]() {
-        static_cast<void>(hipFree(dX));
-        static_cast<void>(hipFree(dW));
-        static_cast<void>(hipFree(dY));
-    };
+    // Allocate device buffers (RAII — freed automatically)
+    const hipdnn_data_sdk::utilities::Workspace dX(xCount * sizeof(T));
+    const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(T));
+    const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(T));
 
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(T)), hipSuccess) << (freeDeviceBuffers(), "");
-
-    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(T)), hipSuccess);
+    ASSERT_EQ(hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
+    ASSERT_EQ(hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(T), hipMemcpyHostToDevice),
+              hipSuccess);
 
     // Run GPU graph executor with device pointers
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = dX;
-    variantPack[W_UID] = dW;
-    variantPack[Y_UID] = dY;
+    variantPack[X_UID] = dX.get();
+    variantPack[W_UID] = dW.get();
+    variantPack[Y_UID] = dY.get();
 
     GpuReferenceGraphExecutor gpuExecutor;
     gpuExecutor.execute(graphBuilder.GetBufferPointer(), graphBuilder.GetSize(), variantPack);
 
     // Copy GPU result back to host
     std::vector<T> gpuYData(yCount);
-    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(T), hipMemcpyDeviceToHost), hipSuccess)
-        << (freeDeviceBuffers(), "");
-
-    freeDeviceBuffers();
+    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(T), hipMemcpyDeviceToHost),
+              hipSuccess);
 
     // Run CPU reference for comparison
     hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<T, T, T, ComputeT>(

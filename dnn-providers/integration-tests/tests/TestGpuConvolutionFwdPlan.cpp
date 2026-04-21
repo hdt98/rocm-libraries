@@ -11,6 +11,7 @@
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/types.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_data_sdk/utilities/Workspace.hpp>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
@@ -198,43 +199,30 @@ void runPlanExecuteVsCpuRef(const std::vector<int64_t>& xDims,
     cpuX.fillWithRandomValues(static_cast<XType>(-1), static_cast<XType>(1), SEED);
     cpuW.fillWithRandomValues(static_cast<WType>(-1), static_cast<WType>(1), SEED + 1);
 
-    // Allocate device buffers and copy inputs
-    void* dX = nullptr;
-    void* dW = nullptr;
-    void* dY = nullptr;
-    auto freeDeviceBuffers = [&]() {
-        static_cast<void>(hipFree(dX));
-        static_cast<void>(hipFree(dW));
-        static_cast<void>(hipFree(dY));
-    };
+    // Allocate device buffers (RAII — freed automatically)
+    const hipdnn_data_sdk::utilities::Workspace dX(xCount * sizeof(XType));
+    const hipdnn_data_sdk::utilities::Workspace dW(wCount * sizeof(WType));
+    const hipdnn_data_sdk::utilities::Workspace dY(yCount * sizeof(YType));
 
-    ASSERT_EQ(hipMalloc(&dX, xCount * sizeof(XType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dW, wCount * sizeof(WType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMalloc(&dY, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemset(dY, 0, yCount * sizeof(YType)), hipSuccess) << (freeDeviceBuffers(), "");
-
-    ASSERT_EQ(hipMemcpy(dX, cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
-    ASSERT_EQ(hipMemcpy(dW, cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
+    ASSERT_EQ(hipMemset(dY.get(), 0, yCount * sizeof(YType)), hipSuccess);
+    ASSERT_EQ(hipMemcpy(dX.get(), cpuX.rawHostData(), xCount * sizeof(XType), hipMemcpyHostToDevice),
+              hipSuccess);
+    ASSERT_EQ(hipMemcpy(dW.get(), cpuW.rawHostData(), wCount * sizeof(WType), hipMemcpyHostToDevice),
+              hipSuccess);
 
     // Execute
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[X_UID] = dX;
-    variantPack[W_UID] = dW;
-    variantPack[Y_UID] = dY;
+    variantPack[X_UID] = dX.get();
+    variantPack[W_UID] = dW.get();
+    variantPack[Y_UID] = dY.get();
 
     patient.execute(variantPack);
 
     // Copy result back
     std::vector<YType> gpuYData(yCount);
-    ASSERT_EQ(hipMemcpy(gpuYData.data(), dY, yCount * sizeof(YType), hipMemcpyDeviceToHost),
-              hipSuccess)
-        << (freeDeviceBuffers(), "");
-
-    freeDeviceBuffers();
+    ASSERT_EQ(
+        hipMemcpy(gpuYData.data(), dY.get(), yCount * sizeof(YType), hipMemcpyDeviceToHost),
+        hipSuccess);
 
     // CPU reference
     hipdnn_test_sdk::utilities::CpuFpReferenceConvolution::fprop<XType, WType, YType, ComputeType>(
