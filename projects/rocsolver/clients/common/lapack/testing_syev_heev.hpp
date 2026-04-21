@@ -67,7 +67,7 @@ void syev_heev_checkBadArgs(const rocblas_handle handle,
     // sizes (only check batch_count if applicable)
     if(STRIDED)
         EXPECT_ROCBLAS_STATUS(rocsolver_syev_heev(STRIDED, handle, evect, uplo, n, dA, lda, stA, dD,
-                                                  stD, dE, stE, dinfo, -1),
+                                                  stD, dE, stE, dinfo, I(-1)),
                               rocblas_status_invalid_size);
 
     // pointers
@@ -85,14 +85,14 @@ void syev_heev_checkBadArgs(const rocblas_handle handle,
                           rocblas_status_invalid_pointer);
 
     // quick return with invalid pointers
-    EXPECT_ROCBLAS_STATUS(rocsolver_syev_heev(STRIDED, handle, evect, uplo, 0, (T) nullptr, lda,
+    EXPECT_ROCBLAS_STATUS(rocsolver_syev_heev(STRIDED, handle, evect, uplo, I(0), (T) nullptr, lda,
                                               stA, (S) nullptr, stD, (S) nullptr, stE, dinfo, bc),
                           rocblas_status_success);
 
     // quick return with zero batch_count if applicable
     if(STRIDED)
         EXPECT_ROCBLAS_STATUS(rocsolver_syev_heev(STRIDED, handle, evect, uplo, n, dA, lda, stA, dD,
-                                                  stD, dE, stE, (U) nullptr, 0),
+                                                  stD, dE, stE, (U) nullptr, I(0)),
                               rocblas_status_success);
 }
 
