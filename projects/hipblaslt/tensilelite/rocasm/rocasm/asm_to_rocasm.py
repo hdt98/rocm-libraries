@@ -257,7 +257,7 @@ def _strip_comment(line: str) -> str:
     return line[:idx].rstrip() if idx != -1 else line.rstrip()
 
 
-def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple[str, dict, set]:
+def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple[str, dict, set, list]:
     """Convert assembly text to rocasm Python source code.
 
     Args:
@@ -266,11 +266,15 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
                  If None, any .set directives in asm_text are parsed.
 
     Returns:
-        A tuple ``(code, named_regs, inst_funcs)`` where *code* is the Python
-        source string, *named_regs* maps alias names to
-        ``(reg_type, phys_base, count)``, and *inst_funcs* is the set of
-        instruction function names used (e.g. ``{"vmfma_f32_16x16x16bf16_1k", ...}``).
+        A tuple ``(code, named_regs, inst_funcs, source_map)`` where *code*
+        is the Python source string, *named_regs* maps alias names to
+        ``(reg_type, phys_base, count)``, *inst_funcs* is the set of
+        instruction function names used, and *source_map* is a list of
+        ``SourceMapping`` objects providing a 1:1 map between assembly
+        instructions and generated Python lines.
     """
+    from rocasm.source_map import SourceMapping
+
     if symbols is None:
         symbols = parse_set_directives(asm_text)
 
@@ -282,6 +286,9 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
     used_named_regs: dict[str, tuple[str, int, int]] = {}
 
     body_lines = []
+    source_entries: list[SourceMapping] = []  # parallel to body_lines
+    asm_index = 0
+
     for raw_line in asm_text.splitlines():
         stripped = raw_line.strip()
 
@@ -297,7 +304,13 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
         # Labels
         if stripped.endswith(":"):
             used_block_methods.add("label")
-            body_lines.append(f'label("{stripped[:-1]}")')
+            py_line = f'label("{stripped[:-1]}")'
+            body_lines.append(py_line)
+            source_entries.append(SourceMapping(
+                asm_index=asm_index, asm_text=stripped,
+                python_index=asm_index, python_text=py_line,
+            ))
+            asm_index += 1
             continue
 
         inst_line = _strip_comment(stripped)
@@ -309,8 +322,18 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
                                      used_named_regs)
         if code is not None:
             body_lines.append(code)
+            source_entries.append(SourceMapping(
+                asm_index=asm_index, asm_text=inst_line,
+                python_index=asm_index, python_text=code,
+            ))
         else:
-            body_lines.append(f"# UNHANDLED: {stripped}")
+            py_line = f"# UNHANDLED: {stripped}"
+            body_lines.append(py_line)
+            source_entries.append(SourceMapping(
+                asm_index=asm_index, asm_text=inst_line if inst_line else stripped,
+                python_index=asm_index, python_text=py_line,
+            ))
+        asm_index += 1
 
     # Build preamble: named register aliases first, then flat fallbacks, then methods
     preamble = []
@@ -332,7 +355,7 @@ def asm_to_rocasm(asm_text: str, symbols: dict[str, int] | None = None) -> tuple
         parts.append("")  # blank separator line
     parts.append("\n".join(body_lines))
 
-    return "\n".join(parts), used_named_regs, used_inst_funcs
+    return "\n".join(parts), used_named_regs, used_inst_funcs, source_entries
 
 
 def _convert_instruction(inst_line: str, symbols: dict[str, int],

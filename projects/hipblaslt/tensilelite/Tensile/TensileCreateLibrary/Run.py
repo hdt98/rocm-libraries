@@ -335,7 +335,7 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
     num_sgprs = reg_counts.get("sgpr", 88)
 
     # Translate assembly to rocasm Python code (flat path — always needed)
-    rocasm_code, named_regs, inst_funcs = asm_to_rocasm(main_loop_text, symbols)
+    rocasm_code, named_regs, inst_funcs, source_map = asm_to_rocasm(main_loop_text, symbols)
 
     # Try the tiled path: analyze the flat code and generate loop-based output
     tile_info = None
@@ -408,6 +408,12 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
                 f.write(f"    {line}\n")
             f.write("\n")
             f.write("    return block\n")
+
+    # Write source map sidecar (JSON) alongside the Python file
+    if source_map:
+        from rocasm.source_map import MainloopSourceMap
+        map_path = mainloopPath.with_suffix(".map.json")
+        MainloopSourceMap(entries=source_map).to_json(map_path)
 
     return src
 

@@ -380,7 +380,7 @@ class TestParseRegisterCounts:
 # ─── asm_to_rocasm integration tests ────────────────────────────────────────
 
 
-def _body(result: tuple[str, dict, set] | str) -> str:
+def _body(result: tuple | str) -> str:
     """Extract the instruction body from asm_to_rocasm output, skipping the alias preamble."""
     code = result[0] if isinstance(result, tuple) else result
     lines = code.split("\n")
@@ -425,7 +425,7 @@ class TestAsmToRocasm:
 
     def test_preamble_has_register_aliases(self):
         asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[64:67], v[16:19], acc[0:3]"
-        code, named_regs, _ = asm_to_rocasm(asm, {})
+        code, named_regs, *_ = asm_to_rocasm(asm, {})
         assert "Acc = block.Acc" in code
         assert "V = block.V" in code
 
@@ -445,7 +445,7 @@ class TestAsmToRocasm:
 
     def test_mfma_named_regs(self):
         asm = "v_mfma_f32_16x16x32_bf16 acc[0:3], v[vgprValuB_X0_I0+0+0+0:vgprValuB_X0_I0+0+0+0+3], v[vgprValuA_X0_I0+0+0+0:vgprValuA_X0_I0+0+0+0+3], acc[0:3]"
-        _, named_regs, _ = asm_to_rocasm(asm, self.SYMBOLS)
+        _, named_regs, *_ = asm_to_rocasm(asm, self.SYMBOLS)
         assert "B0" in named_regs
         assert "A0" in named_regs
         assert named_regs["B0"] == ("v", 64, 4)
@@ -572,7 +572,7 @@ class TestAsmToRocasm:
             s_sub_u32 s[sgprLoopCounterL], s[sgprLoopCounterL], 1 // dec
             s_cbranch_scc0 label_LoopBeginL
         """)
-        code, named_regs, _ = asm_to_rocasm(asm, self.SYMBOLS)
+        code, named_regs, *_ = asm_to_rocasm(asm, self.SYMBOLS)
         body = _body(code)
         lines = body.strip().split("\n")
         assert len(lines) == 5
@@ -643,6 +643,6 @@ class TestAsmToRocasm:
             v_mfma_f32_16x16x16bf16_1k acc[0:3], v[vgprValuB_X0_I0+0:vgprValuB_X0_I0+0+1], v[vgprValuA_X0_I0+0:vgprValuA_X0_I0+0+1], acc[0:3]
             ds_write_b128 v[vgprLocalWriteAddrA+0], v[vgprG2LA+0:vgprG2LA+0+3] offset:0
         """)
-        _, _, inst_funcs = asm_to_rocasm(asm, self.SYMBOLS)
+        _, _, inst_funcs, _ = asm_to_rocasm(asm, self.SYMBOLS)
         assert "vmfma_f32_16x16x16bf16_1k" in inst_funcs
         assert "ds_write_b128" in inst_funcs
