@@ -679,6 +679,8 @@ try
         return 1;
     }
 
+    arg.api_method = api_method;
+
     if(algo_method_str.compare("heuristic") == 0)
     {
         arg.algo_method = 0;
