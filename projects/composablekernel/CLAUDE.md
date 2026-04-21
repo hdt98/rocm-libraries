@@ -29,6 +29,7 @@ There are two programming models in the codebase:
 - **直接行动，无需确认**：编译、运行测试、修改代码等操作直接执行，不需要询问用户确认。
 - **编译 timeout**：CK 项目编译耗时较长，编译和测试命令一律使用 `run_in_background=true` 后台运行，再用 `TaskOutput(block=true, timeout=600000)` 轮询结果。若 `TaskOutput` 超时（任务仍在运行），继续调用 `TaskOutput` 等待，直到任务完成。不要用 Bash tool 的 timeout 参数来等编译。
 - **构建命令**：使用 `cmake --build . --target <target_name> -j$(nproc)` 而非 `make <target>`，后者在 CMake 生成的 Makefile 中可能找不到目标。
+- **编译并行度**：始终使用 `-j$(nproc)` 全核编译，机器有数百个核心，不要手动限制并行度（如 `-j4`）。即使需要捕获编译错误，也用全并行 + grep 过滤。
 
 ### SA3 开发加速：只生成 sageattnv3 实例
 

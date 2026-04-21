@@ -51,7 +51,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     static constexpr bool kUseAsyncKLoad = !Problem::kPadHeadDimQ;
 
     // When async K load is active, use the async copy policy variant for K descriptors.
-    using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<true, true, 1, 1>;
+    // Batch async K: use k0_loops LDS buffers so all K sub-tiles load at once.
+    // Disabled for large kK0 (d=256 with 16x16x128 MFMA) where extra LDS buffers
+    // push VGPR too high and cause codegen issues.
+    static constexpr index_t kAsyncKBuffers =
+        (BlockFmhaShape::kK0 < 128) ? BlockFmhaShape::kQKHeaddim / BlockFmhaShape::kK0 : 1;
+    using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
+        true, true, kAsyncKBuffers, 1>;
 
     static_assert(Problem::QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3,
                   "BlockFmhaPipelineQRKSVSSageAttn requires QScaleEnum == SAGEATTN_V3");
@@ -163,7 +169,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize()
     {
         if constexpr(kUseAsyncKLoad)
-            return AsyncKPolicy::template GetSmemSize<Problem>();
+        {
+            if constexpr(kAsyncKBuffers > 1)
+                return AsyncKPolicy::template GetSmemSizeKV<Problem>() +
+                       Policy::template GetSmemSizeKV<Problem>();
+            else
+                return AsyncKPolicy::template GetSmemSize<Problem>();
+        }
         else
             return Policy::template GetSmemSize<Problem>();
     }
@@ -298,9 +310,16 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             AsyncKPolicy::template MakeKLdsLoadBlockDescriptor<Problem>().get_lengths(),
             {0, 0});
 
-        // V tile in LDS
+        // V tile in LDS — offset past K LDS when K/V are separated
+        auto* v_lds_ptr = [&]() {
+            if constexpr(kUseAsyncKLoad && kAsyncKBuffers > 1)
+                return reinterpret_cast<VDataType*>(static_cast<char*>(smem_ptr) +
+                    AsyncKPolicy::template GetSmemSizeKV<Problem>());
+            else
+                return reinterpret_cast<VDataType*>(smem_ptr);
+        }();
         auto v_lds = make_tensor_view<address_space_enum::lds>(
-            reinterpret_cast<VDataType*>(smem_ptr),
+            v_lds_ptr,
             Policy::template MakeVLdsBlockDescriptor<Problem>());
         auto v_lds_window = make_tile_window(
             v_lds, Policy::template MakeVLdsBlockDescriptor<Problem>().get_lengths(), {0, 0});
@@ -438,13 +457,28 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     return Policy::template MakeKDramTileDistribution<Problem>();
             }());
 
-        // Prologue: prefetch K sub-tile[0]
+        // Prologue: prefetch K sub-tiles
         auto k_block_tile = decltype(load_tile(k_dram_window)){};
         if constexpr(kUseAsyncKLoad)
         {
-            async_load_tile_raw(
-                k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
-            move_tile_window(k_dram_window, {0, kK0});
+            if constexpr(kAsyncKBuffers > 1)
+            {
+                // Batch: load all k0 sub-tiles into separate LDS buffers
+                static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+                    async_load_tile_raw(
+                        k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
+                        k_dram_window);
+                    if constexpr(i_k0 < k0_loops - 1)
+                        move_tile_window(k_dram_window, {0, kK0});
+                });
+            }
+            else
+            {
+                // Single buffer: load only k0=0
+                async_load_tile_raw(
+                    k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
+                move_tile_window(k_dram_window, {0, kK0});
+            }
         }
         else
         {
@@ -461,6 +495,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 (block_in_pair == 0) ? k_scale_4[1] : k_scale_4[3];
 
             // STAGE 1: QK GEMM
+            float delta_s_unique[kNIterPerWarp0];
             clear_tile(s_acc);
 
             if constexpr(!kUseAsyncKLoad)
@@ -469,20 +504,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 move_tile_window(k_dram_window, {0, kK0});
                 store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
                 k_block_tile = load_tile(k_dram_window);
-            }
-
-            // Load 4 unique delta_s values (replaces 62× redundant buffer_load_dword)
-            float delta_s_unique[kNIterPerWarp0];
-            {
-                const index_t delta_s_byte_base = static_cast<index_t>(
-                    (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
-                static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
-                    const index_t byte_offset = delta_s_byte_base +
-                        static_cast<index_t>((ni * kCNLane0 + lane_n) * sizeof(float));
-                    delta_s_unique[ni] = bit_cast<float>(
-                        llvm_amdgcn_raw_buffer_load_i32(
-                            delta_s_res, byte_offset, 0, 0));
-                });
             }
 
             // K scale: 1 int32 per k0_iter (KIterPerWarp=1 for GEMM0)
@@ -505,42 +526,97 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
             if constexpr(kUseAsyncKLoad)
             {
-                // Async path: sequential load→compute (single-buffer safe)
-                // k0=0: data already loaded by prologue (or end of prev N-iter)
-                async_load_fence();
-                __builtin_amdgcn_s_barrier();
-
+                if constexpr(kAsyncKBuffers > 1)
                 {
-                    auto k_slice = get_slice_tile(
-                        k_lds_load,
-                        sequence<LdsSeq.at(number<0>{}) * kN0, 0>{},
-                        sequence<(LdsSeq.at(number<0>{}) + 1) * kN0, kK0>{});
-                    run_gemm_0(number<0>{}, k_scale_arr_k0_0, k_slice);
-                }
-
-                // k0=1..k0_loops-1: load → fence → barrier → GEMM0
-                static_for<1, k0_loops, 1>{}([&](auto i_k0) {
-                    async_load_tile_raw(
-                        k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
-                        k_dram_window);
-                    if constexpr(i_k0 < k0_loops - 1)
-                        move_tile_window(k_dram_window, {0, kK0});
-
+                    // Batch: all K sub-tiles loaded by prologue/prev-iter
                     async_load_fence();
                     __builtin_amdgcn_s_barrier();
 
-                    const int32_t k_arr[1] = {
-                        (i_k0 < 2) ? k_scale_ki0 : k_scale_ki1};
-                    auto k_slice = get_slice_tile(
-                        k_lds_load,
-                        sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
-                        sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
-                    run_gemm_0(number<i_k0>{}, k_arr, k_slice);
-                });
+                    // Issue delta_s loads early: GEMM0 + K_next + softmax
+                    // will hide HBM latency before delta_s is consumed
+                    {
+                        const index_t delta_s_byte_base = static_cast<index_t>(
+                            (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
+                        static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
+                            const index_t byte_offset = delta_s_byte_base +
+                                static_cast<index_t>(
+                                    (ni * kCNLane0 + lane_n) * sizeof(float));
+                            delta_s_unique[ni] = bit_cast<float>(
+                                llvm_amdgcn_raw_buffer_load_i32(
+                                    delta_s_res, byte_offset, 0, 0));
+                        });
+                    }
 
-                if constexpr(k0_loops <= 2)
-                    __builtin_amdgcn_sched_barrier(0);
-                v_prefetch = load_tile(v_dram_window);
+                    // Dense GEMM0 — no intermediate stalls
+                    static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+                        const int32_t k_arr[1] = {
+                            (i_k0 < 2) ? k_scale_ki0 : k_scale_ki1};
+                        auto k_slice = get_slice_tile(
+                            k_lds_load,
+                            sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
+                            sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
+                        run_gemm_0(number<i_k0>{}, k_arr, k_slice);
+                    });
+
+                    if constexpr(k0_loops <= 2)
+                        __builtin_amdgcn_sched_barrier(0);
+
+                    // Prefetch K_next: issue async loads right after GEMM0
+                    // ~600 VALU (softmax+GEMM1) will hide HBM latency
+                    move_tile_window(k_dram_block_window, {kN0, 0});
+                    if(i_total_loops + 1 < num_total_loop)
+                    {
+                        k_dram_window.set_window_origin(
+                            k_dram_block_window.get_window_origin());
+                        static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+                            async_load_tile_raw(
+                                k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
+                                k_dram_window);
+                            if constexpr(i_k0 < k0_loops - 1)
+                                move_tile_window(k_dram_window, {0, kK0});
+                        });
+                        __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
+                    }
+
+                    v_prefetch = load_tile(v_dram_window);
+                }
+                else
+                {
+                    // Serial: single-buffer, original async path
+                    async_load_fence();
+                    __builtin_amdgcn_s_barrier();
+
+                    {
+                        auto k_slice = get_slice_tile(
+                            k_lds_load,
+                            sequence<LdsSeq.at(number<0>{}) * kN0, 0>{},
+                            sequence<(LdsSeq.at(number<0>{}) + 1) * kN0, kK0>{});
+                        run_gemm_0(number<0>{}, k_scale_arr_k0_0, k_slice);
+                    }
+
+                    static_for<1, k0_loops, 1>{}([&](auto i_k0) {
+                        async_load_tile_raw(
+                            k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
+                            k_dram_window);
+                        if constexpr(i_k0 < k0_loops - 1)
+                            move_tile_window(k_dram_window, {0, kK0});
+
+                        async_load_fence();
+                        __builtin_amdgcn_s_barrier();
+
+                        const int32_t k_arr[1] = {
+                            (i_k0 < 2) ? k_scale_ki0 : k_scale_ki1};
+                        auto k_slice = get_slice_tile(
+                            k_lds_load,
+                            sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
+                            sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
+                        run_gemm_0(number<i_k0>{}, k_arr, k_slice);
+                    });
+
+                    if constexpr(k0_loops <= 2)
+                        __builtin_amdgcn_sched_barrier(0);
+                    v_prefetch = load_tile(v_dram_window);
+                }
             }
             else
             {
@@ -570,6 +646,20 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     block_sync_lds();
                     run_gemm_0(number<k0_loops - 1>{}, k_scale_arr_k0_1, k_lds_window);
                 }
+            }
+
+            // For non-batch paths, load delta_s here (batch path loads after fence)
+            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
+            {
+                const index_t delta_s_byte_base = static_cast<index_t>(
+                    (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
+                static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
+                    const index_t byte_offset = delta_s_byte_base +
+                        static_cast<index_t>((ni * kCNLane0 + lane_n) * sizeof(float));
+                    delta_s_unique[ni] = bit_cast<float>(
+                        llvm_amdgcn_raw_buffer_load_i32(
+                            delta_s_res, byte_offset, 0, 0));
+                });
             }
 
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
@@ -731,7 +821,10 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     move_tile_window(v_dram_window, {0, kK1});
                 });
             }
-            move_tile_window(k_dram_block_window, {kN0, 0});
+            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
+            {
+                move_tile_window(k_dram_block_window, {kN0, 0});
+            }
             {
                 block_sync_lds();
                 run_gemm_1_packed(number<k1_loops - 1>{});
@@ -749,27 +842,31 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 }
             }
 
-            // Prefetch K sub-tile[0] for next iteration (after GEMM1 frees VGPRs)
-            if(i_total_loops + 1 < num_total_loop)
+            // Prefetch K for next iteration (non-batch paths only;
+            // batch async K is prefetched after GEMM0 above)
+            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
             {
-                if constexpr(kUseAsyncKLoad)
+                if(i_total_loops + 1 < num_total_loop)
                 {
-                    k_dram_window.set_window_origin(
-                        k_dram_block_window.get_window_origin());
-                    async_load_tile_raw(
-                        k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
-                    move_tile_window(k_dram_window, {0, kK0});
+                    if constexpr(kUseAsyncKLoad)
+                    {
+                        k_dram_window.set_window_origin(
+                            k_dram_block_window.get_window_origin());
+                        async_load_tile_raw(
+                            k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
+                        move_tile_window(k_dram_window, {0, kK0});
+                    }
+                    else
+                    {
+                        k_dram_window = make_tile_window(
+                            k_dram_block_window.get_bottom_tensor_view(),
+                            k_dram_block_window.get_window_lengths(),
+                            k_dram_block_window.get_window_origin(),
+                            Policy::template MakeKDramTileDistribution<Problem>());
+                        k_block_tile = load_tile(k_dram_window);
+                    }
+                    __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
                 }
-                else
-                {
-                    k_dram_window = make_tile_window(
-                        k_dram_block_window.get_bottom_tensor_view(),
-                        k_dram_block_window.get_window_lengths(),
-                        k_dram_block_window.get_window_origin(),
-                        Policy::template MakeKDramTileDistribution<Problem>());
-                    k_block_tile = load_tile(k_dram_window);
-                }
-                __builtin_amdgcn_sched_group_barrier(0x020, 2, 0); // VMEM_READ: 2
             }
 
         } while(++i_total_loops < num_total_loop);
