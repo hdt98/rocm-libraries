@@ -4240,11 +4240,21 @@ class KernelWriterAssembly(KernelWriter):
               module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%u-1)"%divider))
             elif tc == "MXSA":
               mxBlock = kernel["ProblemType"]["MXBlockA"]
-              module.add(SLShiftRightB32(dst=sgpr(stmp), src=size, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
+              if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
+                module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
+                src0 = sgpr(stmp)
+              else:
+                src0 = size
+              module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
               module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
             elif tc == "MXSB":
               mxBlock = kernel["ProblemType"]["MXBlockB"]
-              module.add(SLShiftRightB32(dst=sgpr(stmp), src=size, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
+              if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
+                module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
+                src0 = sgpr(stmp)
+              else:
+                src0 = size
+              module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
               module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
             elif tP["isSwizzled"]:
               module.addModuleAsFlatItems(self.alignTo(stmp, "SizeL", tP["swizzleK"]))
@@ -4263,20 +4273,6 @@ class KernelWriterAssembly(KernelWriter):
                 module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
             else:
               module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
-          elif (idx in kernel["ProblemType"]["IndicesSummation"]):
-            if tc in ("MXSA", "MXSB"):
-              mxBlock = kernel["ProblemType"]["MXBlockA"] if tc == "MXSA" else kernel["ProblemType"]["MXBlockB"]
-              if kernel["AssertSummationElementMultiple"] % mxBlock != 0:
-                module.add(SAddU32(dst=sgpr(stmp), src0=size, src1=(mxBlock-1), comment="(size/%d-1)" %mxBlock))
-                src0 = sgpr(stmp)
-              else:
-                src0 = size
-              module.add(SLShiftRightB32(dst=sgpr(stmp), src=src0, shiftHex=log2(mxBlock), comment="(size/%d-1)" %mxBlock))
-              module.add(SSubU32(dst=sgpr(stmp), src0=sgpr(stmp), src1=0x1, comment="(size/%d-1)" %mxBlock))
-            else:
-              module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
-          else:
-            module.add(SSubU32(dst=sgpr(stmp), src0=size, src1=0x1, comment="(size-1)"))
           module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(stmp), sgpr(stmp+1), stride, \
                       sgpr(stmp), comment="stride x (size-1)"))
           module.add(SAddU32(dst=sgpr(tensor2dSize0), src0=sgpr(tensor2dSize0), src1=sgpr(stmp+0), comment="sum tensor size"))

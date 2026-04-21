@@ -769,14 +769,6 @@ class ProblemType(Mapping):
       self["MacDataTypeB"] = DataType(config["MacDataTypeB"])
     self["MacDataTypeB"] = getRealDataTypeB(self["MacDataTypeB"])
 
-    if "MacDataTypeA" in config:
-      self["MacDataTypeA"] = DataType(config["MacDataTypeA"])
-    self["MacDataTypeA"] = getRealDataTypeA(self["MacDataTypeA"])
-
-    if "MacDataTypeB" in config:
-      self["MacDataTypeB"] = DataType(config["MacDataTypeB"])
-    self["MacDataTypeB"] = getRealDataTypeB(self["MacDataTypeB"])
-
     if "DataTypeA" in config:
       self["DataTypeA"] = DataType(config["DataTypeA"])
     else:
