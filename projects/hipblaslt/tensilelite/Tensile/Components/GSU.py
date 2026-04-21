@@ -172,10 +172,6 @@ class GSU(Component):
         module.addComment1("global read addresses: increments b")
         for i in reversed(range(kernel["ProblemType"]["NumIndicesSummation"])):
             module.add(writer.graIncrements(kernel, i, tensorParametersB))
-        if kernel["ProblemType"]["MXBlockB"]:
-          module.addComment1("global read addresses: increments mxsb")
-          for i in reversed(range(kernel["ProblemType"]["NumIndicesSummation"])):
-              module.add(writer.graIncrements(kernel, i, tensorParametersB["MX"]))
 
         return module
 

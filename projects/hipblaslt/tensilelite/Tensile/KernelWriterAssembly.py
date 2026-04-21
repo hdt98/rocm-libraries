@@ -661,19 +661,13 @@ class KernelWriterAssembly(KernelWriter):
       if not kernel["enableTDMB"]:
         module.add(self.defineSgpr("ShadowLimitB", 2, 2))
         self.addSgprVarToPool("ShadowLimitB")
+      if kernel["ProblemType"]["Sparse"]:
+        module.add(self.defineSgpr("ShadowLimitMetadata", 2, 2))
+    if self.states.use64bShadowLimitMX:
       if kernel["ProblemType"]["MXBlockA"] and not kernel["enableTDMA"]:
         module.add(self.defineSgpr("ShadowLimitMXSA", 2, 2))
         self.addSgprVarToPool("ShadowLimitMXSA")
       if kernel["ProblemType"]["MXBlockB"] and not kernel["enableTDMB"]:
-        module.add(self.defineSgpr("ShadowLimitMXSB", 2, 2))
-        self.addSgprVarToPool("ShadowLimitMXSB")
-      if kernel["ProblemType"]["Sparse"]:
-        module.add(self.defineSgpr("ShadowLimitMetadata", 2, 2))
-    if self.states.use64bShadowLimitMX:
-      if kernel["ProblemType"]["MXBlockA"]:
-        module.add(self.defineSgpr("ShadowLimitMXSA", 2, 2))
-        self.addSgprVarToPool("ShadowLimitMXSA")
-      if kernel["ProblemType"]["MXBlockB"]:
         module.add(self.defineSgpr("ShadowLimitMXSB", 2, 2))
         self.addSgprVarToPool("ShadowLimitMXSB")
 
@@ -1024,14 +1018,8 @@ class KernelWriterAssembly(KernelWriter):
     moduleVgprMacroValuBPack = Module("VALUB Pack Vgpr Macro")
     moduleVgprMacroValuM = Module("VALUMetadata Vgpr Macro")
     moduleVgprMacroValuMPack = Module("VALUMetadata Pack Vgpr Macro")
-    moduleVgprMacroValuMXSA = Module("VALUMXSA Vgpr Macro")
-    moduleVgprMacroValuMXSAPack = Module("VALUMXSA Pack Vgpr Macro")
-    moduleVgprMacroValuMXSB = Module("VALUMXSB Vgpr Macro")
-    moduleVgprMacroValuMXSBPack = Module("VALUMXSB Pack Vgpr Macro")
     moduleVgprMacroG2LA = Module("G2LA Vgpr Macro")
     moduleVgprMacroG2LB = Module("G2LB Vgpr Macro")
-    moduleVgprMacroG2LMXSA = Module("G2LMXSA Vgpr Macro")
-    moduleVgprMacroG2LMXSB = Module("G2LMXSB Vgpr Macro")
     module.add(RegSet("v", "vgprBase", self.states.startVgpr))
 
     ri = 0
@@ -1921,9 +1909,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(self.lraFinalOffset(kernel, tPB["MX"]))
     module.addComment1("local read addresses: final offsets b")
     module.add(self.lraFinalOffset(kernel, tPB))
-    if kernel["ProblemType"]["MXBlockB"]:
-      module.addComment1("local read addresses: final offsets mxsb")
-      module.add(self.lraFinalOffset(kernel, tPB["MX"]))
 
     # declare addresses
     module.addComment1("local read addresses: declare addresses a")
@@ -1939,9 +1924,6 @@ class KernelWriterAssembly(KernelWriter):
       module.add(self.lraDeclareAddresses(kernel, tPB["MX"]))
     module.addComment1("local read addresses: declare addresses b")
     module.add(self.lraDeclareAddresses(kernel, tPB))
-    if kernel["ProblemType"]["MXBlockB"]:
-      module.addComment1("local read addresses: declare addresses mxsb")
-      module.add(self.lraDeclareAddresses(kernel, tPB["MX"]))
     if self.states.a.numVgprLocalReadAddr > 0:
       module.add(self.lraSwapAddressesForDTLPad(kernel, tPA))
       module.add(self.lraAddressesInitFor3LDSBlk(kernel, tPA, False, True))
@@ -4302,7 +4284,7 @@ class KernelWriterAssembly(KernelWriter):
         module.add(self.shiftSrd(tc))
       else:
         # put limit directly into SRD:
-        module.add(scalarMultiplyBpe("Srd%s+2"%tc, str(stmp), float(tP["bpeGR"]), comment="Set limit to use bytes"))
+        module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp, float(tP["bpeGR"]), comment="Set limit to use bytes"))
         module.add(SAddU32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("Srd%s+2"%tc), src1=prePad, comment="extend limit for pre-pad"))
 
       # Apply any high-order address components to the tileStart and eventually the SRD - batch idx for batched gemm
@@ -8360,11 +8342,17 @@ class KernelWriterAssembly(KernelWriter):
                 mxsaStr = vgpr(mxsaStr_base, vgprPerInputMXSA)
                 shiftK.add(VShiftLeft(dst=vgpr(mxReg, vgprPerInUnroll), shiftHex=sgpr(tmpSgprX1), src=mxsaStr, comment=""))
                 shiftK.add(VShiftRight(dst=vgpr(mxReg, vgprPerInUnroll), shiftHex=sgpr(tmpSgprX1), src=vgpr(mxReg, vgprPerInUnroll), comment=""))
-                shiftK.add(VCmpGTI32(dst=sgpr(tmpSgprX2), src0=mxK, src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
+                # workaround for gfx950
+                if kernel["ISA"][:2] == (9, 5):
+                  # use kreg for src0
+                  src0 = vgpr(kReg)
+                else:
+                  src0 = mxK
+                shiftK.add(VCmpGTI32(dst=sgpr(tmpSgprX2, self.states.laneSGPRCount), src0=src0, src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
                 for bk in range(0, vgprPerInUnroll):
                   mxsaStr_base = self.generateSrcStrForMFMA(kernel, tPA["MX"], innerUnroll, vregSetIdx, vgprPerInputMXSA, m, u, iui, mxsa, bk=bk)
                   mxsaStr = vgpr(mxsaStr_base, 1)
-                  shiftK.add(VCndMaskB32(dst=mxsaStr, src0=mxsaStr, src1=vgpr(mxReg+bk), src2=sgpr(tmpSgprX2), comment=""))
+                  shiftK.add(VCndMaskB32(dst=mxsaStr, src0=mxsaStr, src1=vgpr(mxReg+bk), src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment=""))
 
           if kernel["ProblemType"]["MXBlockB"]:
             for mxsb in range(0, kernel["MIWaveTileMXSB"]):
@@ -8373,11 +8361,17 @@ class KernelWriterAssembly(KernelWriter):
                 mxsbStr = vgpr(mxsbStr_base, vgprPerInputMXSB)
                 shiftK.add(VShiftLeft(dst=vgpr(mxReg, vgprPerInUnroll), shiftHex=sgpr(tmpSgprX1), src=mxsbStr, comment=""))
                 shiftK.add(VShiftRight(dst=vgpr(mxReg, vgprPerInUnroll), shiftHex=sgpr(tmpSgprX1), src=vgpr(mxReg, vgprPerInUnroll), comment=""))
-                shiftK.add(VCmpGTI32(dst=sgpr(tmpSgprX2), src0=mxK, src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
+                # workaround for gfx950
+                if kernel["ISA"][:2] == (9, 5):
+                  # use kreg for src0
+                  src0 = vgpr(kReg)
+                else:
+                  src0 = mxK
+                shiftK.add(VCmpGTI32(dst=sgpr(tmpSgprX2, self.states.laneSGPRCount), src0=src0, src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
                 for bk in range(0, vgprPerInUnroll):
                   mxsbStr_base = self.generateSrcStrForMFMA(kernel, tPB["MX"], innerUnroll, vregSetIdx, vgprPerInputMXSB, m, u, iui, mxsb, bk=bk)
                   mxsbStr = vgpr(mxsbStr_base, 1)
-                  shiftK.add(VCndMaskB32(dst=mxsbStr, src0=mxsbStr, src1=vgpr(mxReg+bk), src2=sgpr(tmpSgprX2), comment=""))
+                  shiftK.add(VCndMaskB32(dst=mxsbStr, src0=mxsbStr, src1=vgpr(mxReg+bk), src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment=""))
 
         if kernel["LocalSplitU"] > 1:
           self.sgprPool.checkIn(loopCntSgpr)
@@ -8626,12 +8620,6 @@ class KernelWriterAssembly(KernelWriter):
                            acc=self.accVgprReadWriteIndex(kernel, (accStart+accStoreCIdx), (accEnd-accStart+1)), \
                            a=src0, b=src1, metadata=mStr, neg=neg_flag, \
                            comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
-            elif kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]:
-              imod.add(MXMFMAInstruction(instType=miInInstType, accType=miOutInstType, variant=variant, \
-                                       acc=self.accVgprReadWriteIndex(kernel, (accStart+accStoreCIdx), (accEnd-accStart+1)), \
-                                       a=src0, b=src1, acc2=self.accVgprReadWriteIndex(kernel, accStart, (accEnd-accStart+1)), \
-                                       mxsa=srcMX0, mxsb=srcMX1,
-                                       comment="left value = %s[%u+%u:%u+%u]" % (accumRegType, accStart, accStoreCIdx, accEnd, accStoreCIdx)))
             else:
               if kernel["UseF32XEmulation"]:
                 abOffsetStr = "+" + str(vgprPerInputA // 2)
@@ -9123,22 +9111,6 @@ class KernelWriterAssembly(KernelWriter):
                       comment="incUpper <- ?"))
           imod.add(self.incrementSrd(tP, sgpr(incLower), sgpr(incUpper)))
 
-          if "MX" in tP:
-            # TODO: DirectToVgpr
-            tc = tP["MX"]["tensorChar"]
-            imod.addComment1("global read inc %s loop%s"%(tc, loopChar))
-            if prefetchIndex:
-              imod.add(SAddU32(dst=sgpr(tmpS), src0=self.loopCounter(kernel, self.states.unrollIdx), src1=prefetchIndex, comment="remove pf(%u)"%prefetchIndex))
-              imod.add(SCmpEQU32(src0=sgpr(suStr), src1=sgpr(tmpS), comment="Is this wrapIter? (pf)"))
-            else:
-              imod.add(SCmpEQU32(src0=self.loopCounter(kernel, self.states.unrollIdx), \
-                        src1=sgpr(suStr), comment="Is this the wrapIter?"))
-            imod.add(SCSelectB32(dst=sgpr(incLower), src0=sgpr("WrapU%s+0"%tc), src1=sgpr("GlobalReadIncs%s+%u"%(tc,self.states.unrollIdx)), \
-                        comment="incLower <- ?"))
-            imod.add(SCSelectB32(dst=sgpr(incUpper), src0=sgpr("WrapU%s+1"%tc), src1=0,
-                        comment="incUpper <- ?"))
-            imod.add(self.incrementSrd(tP["MX"], sgpr(incLower), sgpr(incUpper)))
-
           if kernel["ProblemType"]["Sparse"]:
             if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) :
               tc = "Metadata"
@@ -9176,23 +9148,6 @@ class KernelWriterAssembly(KernelWriter):
             if useConstSgprGlobalReadIncs:
               srcGRInc = "GlobalReadIncs%s"%tc
           imod.add(self.incrementSrd(tP, srcGRInc, hex(incUpper)))
-
-        if "MX" in tP:
-          tc = tP["MX"]["tensorChar"]
-          imod.addComment1("global read inc %s loop%s"%(tc, loopChar))
-          if loopIdx != self.states.unrollIdx or (tc in ('MXSA', 'MXSB') and kernel["ProblemType"]["IndicesSummation"][self.states.unrollIdx] in kernel["ProblemType"]["MirrorDims%s"%tc]):
-            with self.allocTmpSgpr(1) as tmpSgprInfo:
-              incUpper = tmpSgprInfo.idx
-              # GRO may be negative for other summation if stride-other < stride-unroll or if mirror dim.
-              imod.add(SAShiftRightI32(dst=sgpr(incUpper), shiftHex=31, src=sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), comment="sign-extend"))
-              imod.add(self.incrementSrd(tP["MX"], sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), sgpr(incUpper)))
-          else:
-            incUpper = 0 # GRO is positive for loop unroll
-            srcGRInc = sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx))
-            useConstSgprGlobalReadIncs = self.states.mxsa.useConstSgprGlobalReadIncs if tc == 'MXSA' else self.states.mxsb.useConstSgprGlobalReadIncs
-            if useConstSgprGlobalReadIncs:
-              srcGRInc = "GlobalReadIncs%s"%tc
-            imod.add(self.incrementSrd(tP["MX"], srcGRInc, hex(incUpper)))
 
         if kernel["ProblemType"]["Sparse"]:
           if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) :
@@ -10564,9 +10519,6 @@ class KernelWriterAssembly(KernelWriter):
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"] and tP["is_sparse"]:
         globalReadBody(tP["tpsMetadata"])
 
-    if "MX" in tP:
-        globalReadBody(tP["MX"])
-
     if self.db["ConservativeWaitCnt"] & 0x1:
         imod.footer.add(SBarrier(comment="debug"))
         imod.footer.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=0, comment="conservative wait"))
@@ -11717,12 +11669,6 @@ class KernelWriterAssembly(KernelWriter):
       if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
         if tP["is_sparse"]:
           localWriteBody(tP["tpsMetadata"])
-    if "MX" in tP:
-      tcmx = tP["MX"]["tensorChar"]
-      if ((not kernel["DirectToLds%s"%tcmx]) and (not kernel["DirectToVgpr%s"%tcmx])) or \
-         (((tcmx == "MXSA" and kernel["NonDTLTailLoopMXSA"]) or \
-          (tcmx == "MXSB" and kernel["NonDTLTailLoopMXSB"])) and self.states.inTailLoop):
-        localWriteBody(tP["MX"])
 
     return imod
 

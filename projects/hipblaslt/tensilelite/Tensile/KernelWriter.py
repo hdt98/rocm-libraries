@@ -5980,6 +5980,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       if kernel["ProblemType"]["MXBlockA"]:
         self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"] * kernel["MIInputPerThreadMXSA"] // self.states.bpr
+        # workaround for gfx950
+        # need to allocate same amount of MIWaveTile
+        if kernel["ISA"][:2] == (9, 5):
+          self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"]
         if kernel["DirectToVgprMXSA"] and not (self.states.packDTVA or self.states.convDTVA):
           self.states.mxsa.numVgprValuPerBlock = 0
         self.states.mxsa.numVgprValu = self.states.mxsa.numVgprValuPerBlock * valuBlocksA
@@ -5988,6 +5992,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       if kernel["ProblemType"]["MXBlockB"]:
         self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"] * kernel["MIInputPerThreadMXSB"] // self.states.bpr
+        # workaround for gfx950
+        # need to allocate same amount of MIWaveTile
+        if kernel["ISA"][:2] == (9, 5):
+          self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"]
         if kernel["DirectToVgprMXSB"] and not (self.states.packDTVB or self.states.convDTVB):
           self.states.mxsb.numVgprValuPerBlock = 0
         self.states.mxsb.numVgprValu = self.states.mxsb.numVgprValuPerBlock * valuBlocksB

@@ -320,6 +320,8 @@ namespace rocisa
     template std::shared_ptr<Module>
         scalarMultiplyBpe<int, std::string>(int, std::string, float, const std::string&);
     template std::shared_ptr<Module>
+        scalarMultiplyBpe<std::string, int>(std::string, int, float, const std::string&);
+    template std::shared_ptr<Module>
         scalarMultiply64Bpe<int, int, int>(int, int, float, int, const std::string&);
     template std::shared_ptr<Module>
         scalarMultiply64Bpe<std::string, std::string, int>(std::string, std::string, float, int, const std::string&);
@@ -714,6 +716,13 @@ void math_func(nb::module_ m)
     m.def("scalarMultiplyBpe",
         nb::overload_cast<int, std::string, float, const std::string&>(
             &rocisa::scalarMultiplyBpe<int, std::string>),
+        nb::arg("dst"),
+        nb::arg("src"),
+        nb::arg("bpe"),
+        nb::arg("comment")    = "");
+    m.def("scalarMultiplyBpe",
+        nb::overload_cast<std::string, int, float, const std::string&>(
+            &rocisa::scalarMultiplyBpe<std::string, int>),
         nb::arg("dst"),
         nb::arg("src"),
         nb::arg("bpe"),
