@@ -64,12 +64,21 @@ CK_TILE_DEVICE auto warp_shuffle_down_pair(const T& v_local)
 {
     static_assert(sizeof(T) == sizeof(int32_t), "wrong!");
 
+    thread_buffer<T, 2> v;
+#if defined(__gfx950__)
     const int32x2_t x = __builtin_amdgcn_permlane32_swap(
         bit_cast<int32_t>(v_local), bit_cast<int32_t>(v_local), false, false);
-
-    thread_buffer<T, 2> v;
     v(0) = bit_cast<T>(x[0]);
     v(1) = bit_cast<T>(x[1]);
+#else
+    // SW emulation: swap lanes 0-31 with lanes 32-63 via ds_bpermute
+    const uint32_t lane_id   = static_cast<uint32_t>(__lane_id());
+    const uint32_t peer_lane = lane_id ^ 32u;
+    const int32_t v_remote   = __builtin_amdgcn_ds_bpermute(
+        static_cast<int>(peer_lane << 2), bit_cast<int32_t>(v_local));
+    v(0) = v_local;
+    v(1) = bit_cast<T>(v_remote);
+#endif
 
     return v;
 }
