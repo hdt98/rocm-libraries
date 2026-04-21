@@ -1677,8 +1677,6 @@ namespace TensileLite
         , ws(_ws)
         , Synchronizer(_Synchronizer)
         , metadata(_metadata)
-		, mxsa(_mxsa)
-        , mxsb(_mxsb)
         , compressed(_compressed)
         , mxsa(_mxsa)
         , mxsb(_mxsb)
