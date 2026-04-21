@@ -21,7 +21,6 @@
 #include <string>
 #include <algorithm>
 #include <regex>
-#include <iostream>
 
 struct OrigamiCandidate
 {
@@ -276,10 +275,10 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
               });
 
     // Print Origami ranking
-    std::cout << "Origami Analytical Ranking (" << unique.size() << " candidates):" << std::endl;
+    hipblaslt_cout << "Origami Analytical Ranking (" << unique.size() << " candidates):" << std::endl;
     for (size_t i = 0; i < std::min(unique.size(), (size_t)5); i++)
     {
-        std::cout << "  #" << (i+1) << " " << unique[i].label
+        hipblaslt_cout << "  #" << (i+1) << " " << unique[i].label
                   << " [" << unique[i].split_sizes[0] << "," << unique[i].split_sizes[1] << "]"
                   << " latency=" << std::fixed << std::setprecision(0) << unique[i].origami_total_latency
                   << " cycles" << std::endl;
