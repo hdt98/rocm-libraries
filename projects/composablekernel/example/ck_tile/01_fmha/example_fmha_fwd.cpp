@@ -54,8 +54,7 @@ auto create_args(int argc, char* argv[])
                 "  bs or 2, block scale\n"
                 "  kvbs or 3, Q per-tensor, K/V per-page block scale\n"
                 "  mx or 4, microscaling (exclusively for data types like mxfp8 and mxfp4)\n"
-                "  pb or 5, per-block (per-tile) Q/K/V descaling\n"
-                "  rw or 6, row-wise Q/K/V descaling")
+                "  pb or 5, per-block (per-tile) Q/K/V descaling")
         .insert("logits_soft_cap", "0", "attention logits soft capping value.")
         .insert("iperm",
                 "1",
