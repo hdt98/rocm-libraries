@@ -113,7 +113,7 @@ jobs:
 
       - name: Configure superbuild
         run: |
-          cmake --preset hipdnn-providers -GNinja \
+          cmake --preset hipdnn-providers-all -GNinja \
             -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET" \
@@ -171,7 +171,7 @@ jobs:
 
       - name: Configure superbuild
         run: |
-          cmake --preset hipdnn-providers -GNinja \
+          cmake --preset hipdnn-providers-all -GNinja \
             -DROCM_PATH="$ROCM_SDK_PATH" \
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET" \
