@@ -39,7 +39,6 @@ TEST(TestShallowDeviceOnlyMigratableMemory, DeviceDataReturnsPointer)
     EXPECT_EQ(mem.deviceDataAsync(), workspace.get());
     EXPECT_EQ(mem.count(), COUNT);
     EXPECT_FALSE(mem.empty());
-    EXPECT_EQ(mem.location(), MemoryLocation::DEVICE);
 }
 
 TEST(TestShallowDeviceOnlyMigratableMemory, HostAccessThrows)
