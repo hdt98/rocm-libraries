@@ -61,7 +61,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/heads/release/therock-* ]]; then
             echo "ref=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
           else
-            echo "ref=1408a826dc2c3446a0295c0ef0c71c4d92f0f4f9" >> $GITHUB_OUTPUT
+            echo "ref=2d9260c2b1c87175539a9fc45a2e9513ed36aff6" >> $GITHUB_OUTPUT
           fi
 
       - name: Checkout TheRock repository
