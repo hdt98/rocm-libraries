@@ -22,11 +22,12 @@ std::atomic<bool> gHeuristicPluginsShutdown{false};
 // Static storage for plugin paths and manager (matching EnginePluginResourceManager pattern)
 // Using file-scope statics instead of function-local static struct to avoid mutex destruction issues
 std::mutex gHeuristicPluginMutex;
-std::shared_ptr<HeuristicPluginManager> gHeuristicPluginManager;
+std::weak_ptr<HeuristicPluginManager> gHeuristicPluginManagerWeakPtr;
+std::shared_ptr<HeuristicPluginManager>
+    gHeuristicPluginManagerPersistent; // Keeps manager alive in lazy mode
 std::set<std::filesystem::path> gHeuristicCustomPaths;
 hipdnnPluginLoadingMode_ext_t gHeuristicLoadingMode = HIPDNN_PLUGIN_LOADING_ADDITIVE;
 hipdnnPluginUnloadingMode_ext_t gHeuristicUnloadingMode = HIPDNN_PLUGIN_UNLOAD_LAZY;
-bool gHeuristicHandleActive = false;
 
 // Register atexit handler to set shutdown flag
 struct HeuristicPluginShutdownRegistrar
@@ -49,30 +50,35 @@ std::shared_ptr<HeuristicPluginManager> getOrCreateManager()
 
     const std::lock_guard<std::mutex> lock(gHeuristicPluginMutex);
 
-    if(!gHeuristicPluginManager)
+    auto pm = gHeuristicPluginManagerWeakPtr.lock();
+    if(!pm)
     {
-        gHeuristicPluginManager = std::make_shared<HeuristicPluginManager>();
-        gHeuristicPluginManager->loadPlugins(gHeuristicCustomPaths, gHeuristicLoadingMode);
+        pm = std::make_shared<HeuristicPluginManager>();
+        pm->loadPlugins(gHeuristicCustomPaths, gHeuristicLoadingMode);
+        gHeuristicPluginManagerWeakPtr = pm;
+
+        // In lazy mode, keep the plugin manager alive by storing in persistent pointer
+        if(gHeuristicUnloadingMode == HIPDNN_PLUGIN_UNLOAD_LAZY)
+        {
+            gHeuristicPluginManagerPersistent = pm;
+        }
     }
 
-    return gHeuristicPluginManager;
+    return pm;
 }
 
 // Helper function that assumes mutex is already locked
 void resetManagerIfNeededLocked()
 {
-    if(gHeuristicHandleActive)
-    {
-        throw HipdnnException(
-            HIPDNN_STATUS_BAD_PARAM,
-            "Cannot change heuristic plugin paths while handles are active. "
-            "Destroy all handles first or use HIPDNN_PLUGIN_LOADING_ADDITIVE mode.");
-    }
+    // Clear persistent pointer first to allow check to work correctly.
+    // If only persistentPtr is keeping plugins alive (no active handles),
+    // then weakPtr will expire after this reset.
+    gHeuristicPluginManagerPersistent.reset();
 
-    if(gHeuristicUnloadingMode == HIPDNN_PLUGIN_UNLOAD_EAGER)
-    {
-        gHeuristicPluginManager.reset();
-    }
+    THROW_IF_FALSE(gHeuristicPluginManagerWeakPtr.expired(),
+                   HIPDNN_STATUS_BAD_PARAM,
+                   "Cannot change heuristic plugin paths while handles are active. "
+                   "Destroy all handles first or use HIPDNN_PLUGIN_LOADING_ADDITIVE mode.");
 }
 
 } // anonymous namespace
@@ -111,7 +117,29 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         plugin->setLogLevel(level);
 
         // Create plugin handle
-        auto handle = plugin->createHandle();
+        hipdnnHeuristicHandle_t handle = nullptr;
+        try
+        {
+            handle = plugin->createHandle();
+            if(handle == nullptr)
+            {
+                HIPDNN_BACKEND_LOG_ERROR("Plugin with policy ID {} ({}) returned null handle "
+                                         "despite reporting success. Plugin will be unavailable.",
+                                         plugin->policyId(),
+                                         plugin->policyName());
+                continue;
+            }
+        }
+        catch(const HipdnnException& e)
+        {
+            HIPDNN_BACKEND_LOG_ERROR("Failed to create handle for heuristic plugin with policy ID "
+                                     "{} ({}): {}. Plugin will be unavailable.",
+                                     plugin->policyId(),
+                                     plugin->policyName(),
+                                     e.what());
+            continue;
+        }
+
         _handleToPlugin[handle] = plugin.get();
         _policyIdToHandle[plugin->policyId()] = handle;
 
@@ -119,9 +147,6 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
                                 plugin->policyId(),
                                 plugin->policyName());
     }
-
-    const std::lock_guard<std::mutex> lock(gHeuristicPluginMutex);
-    gHeuristicHandleActive = true;
 }
 
 HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
@@ -141,9 +166,6 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
 
     _handleToPlugin.clear();
     _policyIdToHandle.clear();
-
-    const std::lock_guard<std::mutex> lock(gHeuristicPluginMutex);
-    gHeuristicHandleActive = false;
 }
 
 HeuristicPluginResourceManager::HeuristicPluginResourceManager(
@@ -179,9 +201,6 @@ void HeuristicPluginResourceManager::setHeuristicPluginPaths(
     gHeuristicCustomPaths.clear();
     gHeuristicCustomPaths.insert(pluginPaths.begin(), pluginPaths.end());
     gHeuristicLoadingMode = loadingMode;
-
-    // Force reload on next create()
-    gHeuristicPluginManager.reset();
 }
 
 std::set<std::filesystem::path> HeuristicPluginResourceManager::getHeuristicPluginPaths()
@@ -199,12 +218,13 @@ void HeuristicPluginResourceManager::setPluginUnloadingMode(hipdnnPluginUnloadin
 void HeuristicPluginResourceManager::setPluginLogLevel(hipdnnSeverity_t level)
 {
     const std::lock_guard<std::mutex> lock(gHeuristicPluginMutex);
-    if(!gHeuristicPluginManager)
+    auto pm = gHeuristicPluginManagerWeakPtr.lock();
+    if(!pm)
     {
         return; // No plugins loaded yet
     }
 
-    const auto& plugins = gHeuristicPluginManager->getPlugins();
+    const auto& plugins = pm->getPlugins();
     for(const auto& plugin : plugins)
     {
         auto status = plugin->setLogLevel(level);

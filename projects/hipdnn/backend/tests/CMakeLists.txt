@@ -102,7 +102,6 @@ add_executable(
     TestHeuristicPolicyPlugins.cpp
     TestBackendLogger.cpp
     TestGraphLogger.cpp
-    heuristics/TestDeviceProperties.cpp
     TestHeuristicPlugin.cpp
     TestHeuristicPluginManager.cpp
     TestHeuristicPluginResourceManager.cpp
