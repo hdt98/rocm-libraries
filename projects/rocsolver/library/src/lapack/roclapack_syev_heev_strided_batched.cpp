@@ -201,8 +201,13 @@ rocblas_status rocsolver_ssyev_strided_batched_64(rocblas_handle handle,
                                                   rocblas_int* info,
                                                   const int64_t batch_count)
 {
+#ifdef HAVE_ROCBLAS_64
+
     return rocsolver::rocsolver_syev_heev_strided_batched_impl<float>(
         handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+#else
+    return rocblas_status_not_implemented;
+#endif
 }
 
 rocblas_status rocsolver_dsyev_strided_batched_64(rocblas_handle handle,
@@ -219,8 +224,13 @@ rocblas_status rocsolver_dsyev_strided_batched_64(rocblas_handle handle,
                                                   rocblas_int* info,
                                                   const int64_t batch_count)
 {
+#ifdef HAVE_ROCBLAS_64
+
     return rocsolver::rocsolver_syev_heev_strided_batched_impl<double>(
         handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+#else
+    return rocblas_status_not_implemented;
+#endif
 }
 
 rocblas_status rocsolver_cheev_strided_batched_64(rocblas_handle handle,
@@ -237,8 +247,13 @@ rocblas_status rocsolver_cheev_strided_batched_64(rocblas_handle handle,
                                                   rocblas_int* info,
                                                   const int64_t batch_count)
 {
+#ifdef HAVE_ROCBLAS_64
+
     return rocsolver::rocsolver_syev_heev_strided_batched_impl<rocblas_float_complex>(
         handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+#else
+    return rocblas_status_not_implemented;
+#endif
 }
 
 rocblas_status rocsolver_zheev_strided_batched_64(rocblas_handle handle,
@@ -255,8 +270,13 @@ rocblas_status rocsolver_zheev_strided_batched_64(rocblas_handle handle,
                                                   rocblas_int* info,
                                                   const int64_t batch_count)
 {
+#ifdef HAVE_ROCBLAS_64
+
     return rocsolver::rocsolver_syev_heev_strided_batched_impl<rocblas_double_complex>(
         handle, evect, uplo, n, A, lda, strideA, D, strideD, E, strideE, info, batch_count);
+#else
+    return rocblas_status_not_implemented;
+#endif
 }
 
 } // extern C
