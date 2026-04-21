@@ -919,58 +919,38 @@ struct BlockFmhaPipelineQRKSVS
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
-#if CK_TILE_FMHA_FWD_FAST_EXP2
-                const auto acc_scale_log2 = [&]() {
-                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
+
+                // FAST_EXP2 keeps `m` in log2-space and folds `scale_s` into
+                // the difference for the bias-free / no-softcap path; the
+                // other paths and the non-FAST_EXP2 build use the natural-log
+                // difference directly.
+                const auto diff = [&]() {
+                    if constexpr(kFastExp2 &&
+                                 BiasEnum != BlockAttentionBiasEnum::ELEMENTWISE_BIAS &&
+                                 BiasEnum != BlockAttentionBiasEnum::ALIBI && !kHasLogitsSoftCap)
                     {
-                        return m_old[i_idx] - get_validated_m(m[i_idx]);
+                        const auto row_max = scale_s * get_validated_m(m[i_idx]);
+                        return scale_s * m_old[i_idx] - row_max;
                     }
                     else
                     {
-                        if constexpr(kHasLogitsSoftCap)
-                        {
-                            return m_old[i_idx] - get_validated_m(m[i_idx]);
-                        }
-                        else
-                        {
-                            auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return scale_s * m_old[i_idx] - row_max;
-                        }
+                        return m_old[i_idx] - get_validated_m(m[i_idx]);
                     }
                 }();
 
-                const bool need_rescale =
-                    (acc_scale_log2 < type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+                const auto safe_exp = [](auto x) {
+                    if constexpr(kFastExp2)
+                        return fmha_fast_exp2(x);
+                    else
+                        return exp(x);
+                };
 
-                if(need_rescale)
-                {
-                    const auto tmp = fmha_fast_exp2(acc_scale_log2);
-                    l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
-                    sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
-                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        o_acc(i_j_idx) *= tmp;
-                    });
-                }
-                else
-                {
-                    // Keep o_acc in m_old's frame (skip rescale).
-                    // P was computed in m_new's frame, so correct it by
-                    // exp2(m_new - m_old) before the PV GEMM (applied below).
-                    const auto correction     = fmha_fast_exp2(-acc_scale_log2);
-                    l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
-                    m(i_idx)                  = m_old[i_idx];
-                    p_row_correction(i_idx)   = correction;
-                    needs_p_correction(i_idx) = true;
-                }
-#else
-                const auto diff = m_old[i_idx] - get_validated_m(m[i_idx]);
                 const bool need_rescale =
                     (diff < type_convert<SMPLComputeDataType>(-kRescaleThreshold));
 
                 if(need_rescale)
                 {
-                    const auto tmp = exp(diff);
+                    const auto tmp = safe_exp(diff);
                     l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
@@ -980,15 +960,15 @@ struct BlockFmhaPipelineQRKSVS
                 else
                 {
                     // Keep o_acc in m_old's frame (skip rescale).
-                    // P was computed in m_new's frame, so correct it by
-                    // exp(m_new - m_old) before the PV GEMM (applied below).
-                    const auto correction     = exp(-diff);
+                    // P was computed in m_new's frame, so correct it before
+                    // the PV GEMM by exp(m_new - m_old) (or exp2 in
+                    // log2-space).
+                    const auto correction     = safe_exp(-diff);
                     l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
                     m(i_idx)                  = m_old[i_idx];
                     p_row_correction(i_idx)   = correction;
                     needs_p_correction(i_idx) = true;
                 }
-#endif
             });
 
             // Apply per-row P correction for skip-rescale rows: convert P from

@@ -47,6 +47,12 @@ inline __device__ float exp2_fma(float x)
 
 } // namespace detail
 
+// Constexpr mirror of the CK_TILE_FMHA_FWD_FAST_EXP2 build flag so call sites
+// can use `if constexpr (kFastExp2)` instead of preprocessor `#if`, which keeps
+// both branches inside one template instantiation and lets the compiler check
+// them both.
+inline constexpr bool kFastExp2 = static_cast<bool>(CK_TILE_FMHA_FWD_FAST_EXP2);
+
 // Inline wrapper for FMHA forward conditional-rescale exp2 calls.
 // Dispatches to the FMA polynomial when CK_TILE_FMHA_FWD_FAST_EXP2 is enabled
 // (the whole point of the SW exp2 path), or to the hardware v_exp_f32
