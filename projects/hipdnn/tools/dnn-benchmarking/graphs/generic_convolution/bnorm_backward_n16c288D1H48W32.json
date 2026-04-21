@@ -174,7 +174,8 @@
                 "dy_tensor_uid": 2,
                 "mean_tensor_uid": 3,
                 "inv_variance_tensor_uid": 4,
-                "scale_tensor_uid": 5
+                "scale_tensor_uid": 5,
+                "peer_stats_tensor_uid": []
             },
             "outputs": {
                 "dx_tensor_uid": 6,

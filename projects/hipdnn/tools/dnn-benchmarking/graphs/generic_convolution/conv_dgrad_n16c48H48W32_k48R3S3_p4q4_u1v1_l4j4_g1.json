@@ -61,8 +61,8 @@
     "nodes": [
         {
             "name": "conv_node",
-            "type": "ConvolutionDgradAttributes",
-            "compute_data_type": "unset",
+            "type": "ConvolutionBwdAttributes",
+            "compute_data_type": "float",
             "inputs": {
                 "dy_tensor_uid": 1,
                 "w_tensor_uid": 2

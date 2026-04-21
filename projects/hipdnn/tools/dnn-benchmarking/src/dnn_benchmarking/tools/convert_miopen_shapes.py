@@ -122,8 +122,8 @@ def _conv_direction_label(F: int) -> str:
 def _conv_node_type(F: int) -> str:
     return {
         1: "ConvolutionFwdAttributes",
-        2: "ConvolutionDgradAttributes",
-        4: "ConvolutionWgradAttributes",
+        2: "ConvolutionBwdAttributes",
+        4: "ConvolutionWrwAttributes",
     }.get(F, "ConvolutionFwdAttributes")
 
 
@@ -373,6 +373,7 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
                     "mean_tensor_uid": 3,
                     "inv_variance_tensor_uid": 4,
                     "scale_tensor_uid": 5,
+                    "peer_stats_tensor_uid": [],
                 },
                 "outputs": {
                     "dx_tensor_uid": 6,
