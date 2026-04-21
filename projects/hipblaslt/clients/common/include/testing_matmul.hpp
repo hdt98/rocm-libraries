@@ -2124,21 +2124,15 @@ void testing_matmul_with_bias(const Arguments& arg,
         }
 
         hipblaslt_seedrand();
-
-<<<<<<< HEAD
+        size_t scaleA_row = ((transA == HIPBLAS_OP_T) ? blockSize(arg.scaleA) : 1);
+        size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
         if(isBlockScaling(arg.scaleA))
         {
 #if !HIPBLASLT_ENABLE_MXDATAGENERATOR
             hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
             return;
 #else
-=======
-        size_t scaleA_row = ((transA == HIPBLAS_OP_T) ? blockSize(arg.scaleA) : 1);
-        size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
-        if(isBlockScaling(arg.scaleA))
-        {
 #ifdef HIPBLASLT_USE_ROCROLLER
->>>>>>> origin/develop
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2178,8 +2172,6 @@ void testing_matmul_with_bias(const Arguments& arg,
             // Copy data and scale to device buffers
             CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
             CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
-<<<<<<< HEAD
-=======
 #else
             hipblaslt_init_device(ABC_dims::A,
                                   arg.initialization,
@@ -2202,8 +2194,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleA),
                                   stride_a[i] / scaleA_row / scaleA_col,
                                   num_batches[i]);
->>>>>>> origin/develop
-#endif
+#endif // HIPBLASLT_USE_ROCROLLER
+#endif // !HIPBLASLT_ENABLE_MXDATAGENERATOR
         }
         else
         {
@@ -2224,14 +2216,11 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
-<<<<<<< HEAD
 #if !HIPBLASLT_ENABLE_MXDATAGENERATOR
             hipblaslt_cout << "MX format (block scaling) is not supported when mxDataGenerator is disabled." << std::endl;
             return;
 #else
-=======
 #ifdef HIPBLASLT_USE_ROCROLLER
->>>>>>> origin/develop
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2269,8 +2258,6 @@ void testing_matmul_with_bias(const Arguments& arg,
             // Copy data and scale to device buffers
             CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
             CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
-<<<<<<< HEAD
-=======
 #else
             hipblaslt_init_device(ABC_dims::B,
                                   arg.initialization,
@@ -2293,8 +2280,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                                   scaleDataType(arg.scaleB),
                                   stride_b[i] / scaleB_row / scaleB_col,
                                   num_batches[i]);
->>>>>>> origin/develop
-#endif
+#endif // HIPBLASLT_USE_ROCROLLER
+#endif // !HIPBLASLT_ENABLE_MXDATAGENERATOR
         }
         else
         {
