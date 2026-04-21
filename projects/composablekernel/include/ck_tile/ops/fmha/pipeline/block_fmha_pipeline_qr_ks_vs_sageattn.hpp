@@ -13,6 +13,26 @@
 
 namespace ck_tile {
 
+namespace sageattn_pk {
+CK_TILE_DEVICE fp32x2_t pk_add_f32(fp32x2_t lhs, fp32x2_t rhs)
+{
+    fp32x2_t result;
+    asm volatile("v_pk_add_f32 %[result], %[lhs], %[rhs]"
+                 : [result] "=v"(result)
+                 : [lhs] "v"(lhs), [rhs] "v"(rhs));
+    return result;
+}
+
+CK_TILE_DEVICE fp32x2_t pk_fma_f32(fp32x2_t a, fp32x2_t b, fp32x2_t c)
+{
+    fp32x2_t result;
+    asm volatile("v_pk_fma_f32 %[result], %[a], %[b], %[c]"
+                 : [result] "=v"(result)
+                 : [a] "v"(a), [b] "v"(b), [c] "v"(c));
+    return result;
+}
+} // namespace sageattn_pk
+
 // SageAttention V3 FMHA pipeline (qr_ks_vs variant).
 // Optimized: no sink, no LSE store, no dropout.
 // Applies deferred rescale (O1) and XOR cross-warp reduce (O2).
@@ -666,19 +686,26 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
             s_acc = tile_elementwise_in(s_acc_element_func, s_acc);
 
-            // Add delta_s correction via thread buffer direct access
+            // Add delta_s correction via packed fp32x2 (v_pk_add_f32)
             // s_acc buffer layout: [MIterPerWarp][NIterPerWarp][CMPerLane]
-            // nIter determines which unique delta_s value to use
+            // Consecutive CMPerLane elements share the same delta_s → natural pk pair
             {
                 auto& s_acc_buf = s_acc.get_thread_buffer();
+                static_assert(kCMPerLane0 % 2 == 0);
                 static_for<0, kMIterPerWarp0, 1>{}([&](auto mIter) {
                     static_for<0, kNIterPerWarp0, 1>{}([&](auto nIter) {
-                        static_for<0, kCMPerLane0, 1>{}([&](auto mi) {
+                        const auto dv =
+                            type_convert<SaccDataType>(delta_s_unique[nIter]);
+                        const fp32x2_t delta_pk = {dv, dv};
+                        static_for<0, kCMPerLane0 / 2, 1>{}([&](auto mi_half) {
                             constexpr index_t buf_idx =
                                 mIter * kNIterPerWarp0 * kCMPerLane0 +
-                                nIter * kCMPerLane0 + mi;
-                            s_acc_buf(number<buf_idx>{}) +=
-                                type_convert<SaccDataType>(delta_s_unique[nIter]);
+                                nIter * kCMPerLane0 + mi_half * 2;
+                            fp32x2_t s_pk = {s_acc_buf[number<buf_idx>{}],
+                                             s_acc_buf[number<buf_idx + 1>{}]};
+                            s_pk = sageattn_pk::pk_add_f32(s_pk, delta_pk);
+                            s_acc_buf(number<buf_idx>{})     = s_pk[0];
+                            s_acc_buf(number<buf_idx + 1>{}) = s_pk[1];
                         });
                     });
                 });
@@ -738,19 +765,42 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 }
             };
 
-            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
+            // exp2 with packed FMA: p(i,j) = exp2(scale_s * s(i,j) - row_base(i))
+            // Pair consecutive CMPerLane elements (different M rows, same nIter)
+            // so pk_fma computes two exponents in one instruction.
             const auto log2_p_scale =
                 type_convert<SMPLComputeDataType>(__builtin_amdgcn_logf(p_scale_factor));
-            sweep_tile_span(p_spans[number<0>{}], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                auto row_base =
-                    scale_s * get_validated_m(m[i_idx]) + cum_log_scale[i_idx] -
-                    log2_p_scale;
-                sweep_tile_span(p_spans[number<1>{}], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    p_compute(i_j_idx) = exp2(scale_s * s[i_j_idx] - row_base);
+            {
+                auto& s_buf = s.get_thread_buffer();
+                auto& p_buf = p_compute.get_thread_buffer();
+                const auto& m_buf = m.get_thread_buffer();
+                const auto& cls_buf = cum_log_scale.get_thread_buffer();
+                const fp32x2_t scale_pk = {scale_s, scale_s};
+
+                static_for<0, kMIterPerWarp0, 1>{}([&](auto mIter) {
+                    static_for<0, kCMPerLane0 / 2, 1>{}([&](auto mi_half) {
+                        constexpr index_t m0 = mIter * kCMPerLane0 + mi_half * 2;
+                        constexpr index_t m1 = m0 + 1;
+                        const fp32x2_t neg_rb = {
+                            -(scale_s * get_validated_m(m_buf[number<m0>{}]) +
+                              cls_buf[number<m0>{}] - log2_p_scale),
+                            -(scale_s * get_validated_m(m_buf[number<m1>{}]) +
+                              cls_buf[number<m1>{}] - log2_p_scale)};
+
+                        static_for<0, kNIterPerWarp0, 1>{}([&](auto nIter) {
+                            constexpr index_t si =
+                                mIter * kNIterPerWarp0 * kCMPerLane0 +
+                                nIter * kCMPerLane0 + mi_half * 2;
+                            const fp32x2_t s_pk = {s_buf[number<si>{}],
+                                                   s_buf[number<si + 1>{}]};
+                            auto exponent =
+                                sageattn_pk::pk_fma_f32(scale_pk, s_pk, neg_rb);
+                            p_buf(number<si>{})     = exp2(exponent[0]);
+                            p_buf(number<si + 1>{}) = exp2(exponent[1]);
+                        });
+                    });
                 });
-            });
+            }
 
             auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
                 p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0});
