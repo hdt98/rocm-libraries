@@ -143,11 +143,11 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
         }
         catch(const std::exception& e)
         {
-            HIPDNN_BACKEND_LOG_WARN(
-                "Failed to destroy handle for heuristic plugin '{}' (policy ID {}) during cleanup: {}",
-                plugin->policyName(),
-                plugin->policyId(),
-                e.what());
+            HIPDNN_BACKEND_LOG_WARN("Failed to destroy handle for heuristic plugin '{}' (policy ID "
+                                    "{}) during cleanup: {}",
+                                    plugin->policyName(),
+                                    plugin->policyId(),
+                                    e.what());
         }
         catch(...)
         {
