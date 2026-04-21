@@ -546,6 +546,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                                     delta_s_res, byte_offset, 0, 0));
                         });
                     }
+                    __builtin_amdgcn_sched_barrier(0);
 
                     // Dense GEMM0 — no intermediate stalls
                     static_for<0, k0_loops, 1>{}([&](auto i_k0) {
@@ -772,7 +773,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             }
 
             // Store prefetched V
-            block_sync_lds();
+            // Skip barrier when K/V LDS separated and k1_loops==1:
+            // previous iteration's GEMM1-end barrier (L831) already ensures
+            // all waves finished reading V from LDS.
+            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1 || k1_loops > 1)
+            {
+                block_sync_lds();
+            }
             store_tile(v_lds_window, tile_elementwise_in(v_element_func, v_prefetch));
             move_tile_window(v_dram_window, {0, kK1});
 
