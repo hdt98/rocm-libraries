@@ -94,7 +94,7 @@ bool IsDeviceSupported(Gpu supported_devs, Gpu dev)
 // ConvTestCase
 //************************************************************************************
 
-ConvTestCase::ConvTestCase() : x(miopenHalf, {}), w(miopenHalf, {}), conv({}, {}, {}){};
+ConvTestCase::ConvTestCase() : x(miopenHalf, {}), w(miopenHalf, {}), conv({}, {}, {}) {};
 
 ConvTestCase::ConvTestCase(std::vector<size_t>&& x_,
                            std::vector<size_t>&& w_,
@@ -274,7 +274,8 @@ UnitTestConvSolverParams::UnitTestConvSolverParams(Gpu supported_devs_)
       use_gpu_ref(false),
       tunable(false),
       check_xnack_disabled(false),
-      uses_ck_dynamic_lib(false)
+      uses_ck_dynamic_lib(false),
+      uses_hipconv_arch_backend(false)
 {
 }
 
@@ -291,6 +292,8 @@ void UnitTestConvSolverParams::Tunable(std::size_t iterations_max_)
 void UnitTestConvSolverParams::CheckXnackDisabled() { check_xnack_disabled = true; }
 
 void UnitTestConvSolverParams::UsesCKDynamicLib() { uses_ck_dynamic_lib = true; }
+
+void UnitTestConvSolverParams::UsesHipconvArchBackend() { uses_hipconv_arch_backend = true; }
 
 void UnitTestConvSolverParams::SetConvAttrFp16Alt(uint64_t value) { conv_attr_fp16_alt = value; }
 
@@ -928,6 +931,14 @@ void UnitTestConvSolverDevApplicabilityBase::RunTestImpl(
                 const auto& loader =
                     miopen::solver::CkImplLibLoader::Get(std::string(dev_descr.name));
                 if(!loader.IsLoaded())
+                    continue;
+            }
+            // If the solver uses a hipconv arch backend that wasn't compiled
+            // into this build (CMAKE_HIP_ARCHITECTURES did not include the
+            // arch), the solver correctly reports not-applicable.
+            if(params.uses_hipconv_arch_backend && supported && !is_applicable)
+            {
+                if(!miopen::solver::conv::ConvHipConv::HasArchBackend(dev_descr.name))
                     continue;
             }
             GTEST_FAIL() << dev_descr << " is" << (is_applicable ? "" : " not")

@@ -40,6 +40,23 @@ do_get_valid_configs(Arch arch, const Conv2dParams& par, const AlgorithmEntry& e
 } // anonymous namespace
 
 
+bool has_arch_backend(Arch arch)
+{
+    switch(arch)
+    {
+#if HIPCONV_HAS_ARCH_CDNA3
+    case Arch::gfx942:
+        return true;
+#endif
+#if HIPCONV_HAS_ARCH_CDNA4
+    case Arch::gfx950:
+        return true;
+#endif
+    default:
+        return false;
+    }
+}
+
 std::vector<KernelConfig> get_valid_configs(Arch arch, const Conv2dParams& par, Algorithm algo)
 {
     auto* entry = find_algorithm(algo);

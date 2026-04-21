@@ -185,6 +185,12 @@ bool PerformanceConfigConvHipConv::operator==(const PerformanceConfigConvHipConv
 
 // ===================== ConvHipConv =====================
 
+bool ConvHipConv::HasArchBackend(std::string_view arch_name)
+{
+    const auto arch = hipconv::parse_arch(arch_name);
+    return arch.has_value() && hipconv::has_arch_backend(*arch);
+}
+
 bool ConvHipConv::IsApplicable(const ExecutionContext& ctx, const ProblemDescription& problem) const
 {
     if(env::disabled(MIOPEN_DEBUG_CONV_HIPCONV))

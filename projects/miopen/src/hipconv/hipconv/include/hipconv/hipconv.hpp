@@ -54,6 +54,9 @@ struct KernelConfig
     int config_idx;     // selects the tuning config within that kernel's table
 };
 
+// Return true if hipconv was built with a backend for the given architecture.
+HIPCONV_API bool has_arch_backend(Arch arch);
+
 // All valid configs for the given params, best first. Empty if unsupported.
 HIPCONV_API std::vector<KernelConfig> get_valid_configs(Arch arch, const Conv2dParams& par);
 

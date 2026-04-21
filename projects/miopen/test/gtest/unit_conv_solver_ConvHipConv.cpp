@@ -209,6 +209,7 @@ const auto& GetTestParams()
     static const auto params = [] {
         auto p = miopen::unit_tests::UnitTestConvSolverParams(Gpu::gfx950);
         p.Tunable(5);
+        p.UsesHipconvArchBackend();
         return p;
     }();
     return params;
