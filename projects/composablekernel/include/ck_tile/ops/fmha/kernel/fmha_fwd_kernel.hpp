@@ -326,10 +326,10 @@ struct FmhaFwdKernel
         const int32_t* cu_seqlen_q_ptr = nullptr; // cumulative, length without PAD
         const int32_t* cu_seqlen_k_ptr = nullptr; // cumulative, length without PAD
 
-        const int32_t* block_mask_ptr              = nullptr;
-        ck_tile::index_t stride_block_mask         = 0;
-        ck_tile::index_t nhead_stride_block_mask   = 0;
-        ck_tile::index_t batch_stride_block_mask   = 0;
+        const int32_t* block_mask_ptr            = nullptr;
+        ck_tile::index_t stride_block_mask       = 0;
+        ck_tile::index_t nhead_stride_block_mask = 0;
+        ck_tile::index_t batch_stride_block_mask = 0;
     };
 
     struct FmhaFwdGroupModeKargs
@@ -362,10 +362,10 @@ struct FmhaFwdKernel
         const int32_t* cu_seqlen_q_ptr = nullptr;
         const int32_t* cu_seqlen_k_ptr = nullptr;
 
-        const int32_t* block_mask_ptr              = nullptr;
-        ck_tile::index_t stride_block_mask         = 0;
-        ck_tile::index_t nhead_stride_block_mask   = 0;
-        ck_tile::index_t batch_stride_block_mask   = 0;
+        const int32_t* block_mask_ptr            = nullptr;
+        ck_tile::index_t stride_block_mask       = 0;
+        ck_tile::index_t nhead_stride_block_mask = 0;
+        ck_tile::index_t batch_stride_block_mask = 0;
     };
 
     using Kargs = std::conditional_t<kIsGroupMode, FmhaFwdGroupModeKargs, FmhaFwdBatchModeKargs>;
@@ -1351,11 +1351,10 @@ struct FmhaFwdKernel
         // XCD-interleave remap: spread adjacent blocks across XCDs for L2 locality.
         // Tail blocks (grid_size % kNumXCDs != 0) keep identity mapping since
         // they occupy indices above the remapped range, so no collision.
-        static CK_TILE_DEVICE index_t xcd_interleave_remap(index_t i_block, index_t grid_size)
-        {
+        auto xcd_interleave_remap = [](index_t i_block, [[maybe_unused]] index_t grid_size) {
 #if !defined(__gfx950__)
-            constexpr index_t kNumXCDs = 8;
-            constexpr index_t kMinTilesPerXCD = 16;
+            constexpr index_t kNumXCDs         = 8;
+            constexpr index_t kMinTilesPerXCD  = 16;
             const index_t cus_per_xdim_per_xcd = grid_size / kNumXCDs;
             if(cus_per_xdim_per_xcd >= kMinTilesPerXCD)
             {
@@ -1368,7 +1367,7 @@ struct FmhaFwdKernel
             }
 #endif
             return i_block;
-        }
+        };
 
         if(has_padded_seqlen_k)
         {
@@ -1376,7 +1375,7 @@ struct FmhaFwdKernel
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            index_t i_block = blockIdx.z;
+            index_t i_block       = blockIdx.z;
             const index_t i_nhead = blockIdx.x;
             const index_t i_batch = blockIdx.y;
 
@@ -1416,7 +1415,7 @@ struct FmhaFwdKernel
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            index_t i_block = blockIdx.y; // blockIdx.x
+            index_t i_block       = blockIdx.y; // blockIdx.x
             const index_t i_nhead = blockIdx.x; // blockIdx.y
             const index_t i_batch = blockIdx.z;
 
@@ -1974,7 +1973,8 @@ struct FmhaFwdKernel
             if(kargs.block_mask_ptr != nullptr)
             {
                 const index_t q_block_idx = i_tile_m;
-                block_mask_row_ptr = kargs.block_mask_ptr +
+                block_mask_row_ptr =
+                    kargs.block_mask_ptr +
                     static_cast<long_index_t>(i_batch) * kargs.batch_stride_block_mask +
                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_block_mask +
                     static_cast<long_index_t>(q_block_idx) * kargs.stride_block_mask;
@@ -2985,4 +2985,3 @@ struct FmhaFwdKernel
 };
 
 } // namespace ck_tile
-

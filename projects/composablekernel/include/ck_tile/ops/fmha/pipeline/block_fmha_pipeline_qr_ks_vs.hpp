@@ -877,17 +877,17 @@ struct BlockFmhaPipelineQRKSVS
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
+                        p_compute(i_j_idx) = fmha_fast_exp2(s[i_j_idx] - validated_m);
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s[i_j_idx] - validated_m);
+                            p_compute(i_j_idx) = fmha_fast_exp2(s[i_j_idx] - validated_m);
                         }
                         else
                         {
-                            p_compute(i_j_idx) = exp2(scale_s * s[i_j_idx] - row_max);
+                            p_compute(i_j_idx) = fmha_fast_exp2(scale_s * s[i_j_idx] - row_max);
                         }
                     }
 #else
@@ -909,11 +909,11 @@ struct BlockFmhaPipelineQRKSVS
             static constexpr SMPLComputeDataType kRescaleThreshold =
                 type_convert<SMPLComputeDataType>(8.0f);
 
-            auto p_row_correction = make_static_distributed_tensor<SMPLComputeDataType>(
-                m.get_tile_distribution());
+            auto p_row_correction =
+                make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
             set_tile(p_row_correction, type_convert<SMPLComputeDataType>(1.0f));
-            auto needs_p_correction = make_static_distributed_tensor<bool>(
-                m.get_tile_distribution());
+            auto needs_p_correction =
+                make_static_distributed_tensor<bool>(m.get_tile_distribution());
             set_tile(needs_p_correction, false);
 
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
@@ -941,13 +941,12 @@ struct BlockFmhaPipelineQRKSVS
                 }();
 
                 const bool need_rescale =
-                    (acc_scale_log2 <
-                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+                    (acc_scale_log2 < type_convert<SMPLComputeDataType>(-kRescaleThreshold));
 
                 if(need_rescale)
                 {
-                    const auto tmp = exp2(acc_scale_log2);
-                    l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
+                    const auto tmp = fmha_fast_exp2(acc_scale_log2);
+                    l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         o_acc(i_j_idx) *= tmp;
@@ -958,22 +957,21 @@ struct BlockFmhaPipelineQRKSVS
                     // Keep o_acc in m_old's frame (skip rescale).
                     // P was computed in m_new's frame, so correct it by
                     // exp2(m_new - m_old) before the PV GEMM (applied below).
-                    const auto correction = exp2(-acc_scale_log2);
-                    l(i_idx) = l[i_idx] + rowsum_p[i_idx] * correction;
-                    m(i_idx) = m_old[i_idx];
-                    p_row_correction(i_idx) = correction;
+                    const auto correction     = fmha_fast_exp2(-acc_scale_log2);
+                    l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
+                    m(i_idx)                  = m_old[i_idx];
+                    p_row_correction(i_idx)   = correction;
                     needs_p_correction(i_idx) = true;
                 }
 #else
                 const auto diff = m_old[i_idx] - get_validated_m(m[i_idx]);
                 const bool need_rescale =
-                    (diff <
-                     type_convert<SMPLComputeDataType>(-kRescaleThreshold));
+                    (diff < type_convert<SMPLComputeDataType>(-kRescaleThreshold));
 
                 if(need_rescale)
                 {
                     const auto tmp = exp(diff);
-                    l(i_idx) = tmp * l[i_idx] + rowsum_p[i_idx];
+                    l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[number<1>{}], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
                         o_acc(i_j_idx) *= tmp;
@@ -984,10 +982,10 @@ struct BlockFmhaPipelineQRKSVS
                     // Keep o_acc in m_old's frame (skip rescale).
                     // P was computed in m_new's frame, so correct it by
                     // exp(m_new - m_old) before the PV GEMM (applied below).
-                    const auto correction = exp(-diff);
-                    l(i_idx) = l[i_idx] + rowsum_p[i_idx] * correction;
-                    m(i_idx) = m_old[i_idx];
-                    p_row_correction(i_idx) = correction;
+                    const auto correction     = exp(-diff);
+                    l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
+                    m(i_idx)                  = m_old[i_idx];
+                    p_row_correction(i_idx)   = correction;
                     needs_p_correction(i_idx) = true;
                 }
 #endif
@@ -1487,4 +1485,3 @@ template <typename Problem_, typename Policy_ = BlockFmhaPipelineQRKSVSDefaultPo
 using BlockFmhaPipelineQRKSVSHpad = BlockFmhaPipelineQRKSVS<Problem_, Policy_, true>;
 
 } // namespace ck_tile
-

@@ -510,17 +510,19 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                        p_compute(i_j_idx) =
+                            fmha_fast_exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                            p_compute(i_j_idx) =
+                                fmha_fast_exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
-                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                            p_compute(i_j_idx) = fmha_fast_exp2(scale_s * s_new[i_j_idx] - row_max);
                         }
                     }
                 });
@@ -544,18 +546,18 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return fmha_fast_exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            return fmha_fast_exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
                             auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            return fmha_fast_exp2(scale_s * m_old[i_idx] - row_max);
                         }
                     }
                 }();
@@ -1035,17 +1037,19 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                        p_compute(i_j_idx) =
+                            fmha_fast_exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
+                            p_compute(i_j_idx) =
+                                fmha_fast_exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
-                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                            p_compute(i_j_idx) = fmha_fast_exp2(scale_s * s_new[i_j_idx] - row_max);
                         }
                     }
                 });
@@ -1069,18 +1073,18 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
                                  BiasEnum == BlockAttentionBiasEnum::ALIBI)
                     {
-                        return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                        return fmha_fast_exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
                     }
                     else
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            return exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
+                            return fmha_fast_exp2(m_old[i_idx] - get_validated_m(m[i_idx]));
                         }
                         else
                         {
                             auto row_max = scale_s * get_validated_m(m[i_idx]);
-                            return exp2(scale_s * m_old[i_idx] - row_max);
+                            return fmha_fast_exp2(scale_s * m_old[i_idx] - row_max);
                         }
                     }
                 }();
