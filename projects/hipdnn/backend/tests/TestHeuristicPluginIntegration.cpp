@@ -19,8 +19,8 @@
 #include "plugin/HeuristicPluginResourceManager.hpp"
 #include "plugin/SharedLibrary.hpp"
 
-#include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -44,8 +44,8 @@ std::filesystem::path getTestPluginPath(const char* pluginName)
 }
 
 // Helper to serialize DevicePropertiesT using FlatBuffers Pack
-std::vector<uint8_t> serializeDeviceProperties(
-    const hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT& props)
+std::vector<uint8_t>
+    serializeDeviceProperties(const hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT& props)
 {
     flatbuffers::FlatBufferBuilder builder(256);
     auto offset = hipdnn_flatbuffers_sdk::data_objects::DeviceProperties::Pack(builder, &props);
