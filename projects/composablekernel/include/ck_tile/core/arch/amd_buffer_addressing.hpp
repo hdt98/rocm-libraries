@@ -3092,82 +3092,165 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
     }
 #undef __LDS_ADDR
 #else
-    static_assert(std::is_same_v<remove_cvref_t<T>, ck_tile::half_t> ||
-                      std::is_same_v<remove_cvref_t<T>, ck_tile::bf16_t>,
-                  "SW transpose load: only fp16/bf16 supported");
-    static_assert(N == 4, "SW transpose load: N must be 4 for 16-bit types");
-
-    // Step 1: read 2 DWORDs from LDS (normal load, no transpose)
-    const uint32_t* lds_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
-    uint32_t dw0 = lds_u32[0]; // {e0, e1}
-    uint32_t dw1 = lds_u32[1]; // {e2, e3}
-
-    // Step 2: bpermute — gather from the 4 source lanes (stride 4)
-    //
-    // HW ds_read_tr16_b64 semantics (fp16, 64-lane wave):
-    //   - The wave is divided into blocks of 16 consecutive lanes
-    //   - Within each block, a quad of 4 consecutive lanes {4k..4k+3} produces
-    //     a transposed view of 4 rows at stride 4 within the block
-    //   - The 4 source rows for quad k (0..3) within a block are:
-    //     {block_base + k, block_base + k+4, block_base + k+8, block_base + k+12}
-    //   - Lane j within the quad (j=0..3) receives column j of these 4 rows
-    //
-    // To emulate: gather dw0/dw1 from the 4 source lanes, then extract the
-    // correct column using v_perm.
-    const uint32_t lane_id       = static_cast<uint32_t>(__lane_id());
-    const uint32_t block_offset  = (lane_id / 16) * 16;  // start of 16-lane block
-    const uint32_t quad_id       = (lane_id / 4) % 4;     // which quad within block (0..3)
-    const uint32_t lane_in_quad  = lane_id % 4;            // position within quad (= column)
-
-    // Source lanes: the 4 lanes holding the stride-4 rows for this quad
-    const uint32_t src0 = block_offset + quad_id + 0 * 4;
-    const uint32_t src1 = block_offset + quad_id + 1 * 4;
-    const uint32_t src2 = block_offset + quad_id + 2 * 4;
-    const uint32_t src3 = block_offset + quad_id + 3 * 4;
-
-    // ds_bpermute index is in bytes: lane_id * 4
-    uint32_t g0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
-                                                bit_cast<int32_t>(dw0));
-    uint32_t g1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
-                                                bit_cast<int32_t>(dw0));
-    uint32_t g2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
-                                                bit_cast<int32_t>(dw0));
-    uint32_t g3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
-                                                bit_cast<int32_t>(dw0));
-
-    uint32_t h0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
-                                                bit_cast<int32_t>(dw1));
-    uint32_t h1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
-                                                bit_cast<int32_t>(dw1));
-    uint32_t h2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
-                                                bit_cast<int32_t>(dw1));
-    uint32_t h3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
-                                                bit_cast<int32_t>(dw1));
-
-    // Step 3: select sources and extract column based on lane_in_quad
-    // g[k] = {row_k[0], row_k[1]} (columns 0,1 packed in dword)
-    // h[k] = {row_k[2], row_k[3]} (columns 2,3 packed in dword)
-    // lane_in_quad 0,1 → column 0,1 → select from g[]
-    // lane_in_quad 2,3 → column 2,3 → select from h[]
-    uint32_t s0 = (lane_in_quad < 2) ? g0 : h0;
-    uint32_t s1 = (lane_in_quad < 2) ? g1 : h1;
-    uint32_t s2 = (lane_in_quad < 2) ? g2 : h2;
-    uint32_t s3 = (lane_in_quad < 2) ? g3 : h3;
-
-    // even columns (0,2) extract low halves, odd columns (1,3) extract high halves
-    // __builtin_amdgcn_perm(src0, src1, sel): src1=bytes[0:3], src0=bytes[4:7]
-    uint32_t perm_sel = (lane_in_quad & 1u) ? 0x07060302u : 0x05040100u;
-
-    uint32_t out_dw0 = __builtin_amdgcn_perm(bit_cast<int>(s1), bit_cast<int>(s0), perm_sel);
-    uint32_t out_dw1 = __builtin_amdgcn_perm(bit_cast<int>(s3), bit_cast<int>(s2), perm_sel);
-
-    // Pack 2 DWORDs into thread_buffer<T, 4>
-    struct dw2_t
+    if constexpr(std::is_same_v<remove_cvref_t<T>, ck_tile::half_t> ||
+                 std::is_same_v<remove_cvref_t<T>, ck_tile::bf16_t>)
     {
-        uint32_t v[2];
-    };
-    dw2_t raw{out_dw0, out_dw1};
-    return bit_cast<thread_buffer<T, N>>(raw);
+        // SW emulation of ds_read_tr16_b64 for fp16/bf16
+        static_assert(N == 4, "SW transpose load: N must be 4 for 16-bit types");
+
+        // Step 1: read 2 DWORDs from LDS (normal load, no transpose)
+        const uint32_t* lds_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
+        uint32_t dw0 = lds_u32[0]; // {e0, e1}
+        uint32_t dw1 = lds_u32[1]; // {e2, e3}
+
+        // Step 2: bpermute — gather from the 4 source lanes (stride 4)
+        //
+        // HW ds_read_tr16_b64 semantics (fp16, 64-lane wave):
+        //   - The wave is divided into blocks of 16 consecutive lanes
+        //   - Within each block, a quad of 4 consecutive lanes {4k..4k+3} produces
+        //     a transposed view of 4 rows at stride 4 within the block
+        //   - The 4 source rows for quad k (0..3) within a block are:
+        //     {block_base + k, block_base + k+4, block_base + k+8, block_base + k+12}
+        //   - Lane j within the quad (j=0..3) receives column j of these 4 rows
+        //
+        // To emulate: gather dw0/dw1 from the 4 source lanes, then extract the
+        // correct column using v_perm.
+        const uint32_t lane_id      = static_cast<uint32_t>(__lane_id());
+        const uint32_t block_offset = (lane_id / 16) * 16; // start of 16-lane block
+        const uint32_t quad_id      = (lane_id / 4) % 4;   // which quad within block (0..3)
+        const uint32_t lane_in_quad = lane_id % 4;          // position within quad (= column)
+
+        // Source lanes: the 4 lanes holding the stride-4 rows for this quad
+        const uint32_t src0 = block_offset + quad_id + 0 * 4;
+        const uint32_t src1 = block_offset + quad_id + 1 * 4;
+        const uint32_t src2 = block_offset + quad_id + 2 * 4;
+        const uint32_t src3 = block_offset + quad_id + 3 * 4;
+
+        // ds_bpermute index is in bytes: lane_id * 4
+        uint32_t g0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                    bit_cast<int32_t>(dw0));
+
+        uint32_t h0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                    bit_cast<int32_t>(dw1));
+
+        // Step 3: select sources and extract column based on lane_in_quad
+        // g[k] = {row_k[0], row_k[1]} (columns 0,1 packed in dword)
+        // h[k] = {row_k[2], row_k[3]} (columns 2,3 packed in dword)
+        // lane_in_quad 0,1 → column 0,1 → select from g[]
+        // lane_in_quad 2,3 → column 2,3 → select from h[]
+        uint32_t s0 = (lane_in_quad < 2) ? g0 : h0;
+        uint32_t s1 = (lane_in_quad < 2) ? g1 : h1;
+        uint32_t s2 = (lane_in_quad < 2) ? g2 : h2;
+        uint32_t s3 = (lane_in_quad < 2) ? g3 : h3;
+
+        // even columns (0,2) extract low halves, odd columns (1,3) extract high halves
+        // __builtin_amdgcn_perm(src0, src1, sel): src1=bytes[0:3], src0=bytes[4:7]
+        uint32_t perm_sel = (lane_in_quad & 1u) ? 0x07060302u : 0x05040100u;
+
+        uint32_t out_dw0 =
+            __builtin_amdgcn_perm(bit_cast<int>(s1), bit_cast<int>(s0), perm_sel);
+        uint32_t out_dw1 =
+            __builtin_amdgcn_perm(bit_cast<int>(s3), bit_cast<int>(s2), perm_sel);
+
+        // Pack 2 DWORDs into thread_buffer<T, 4>
+        struct dw2_t
+        {
+            uint32_t v[2];
+        };
+        dw2_t raw{out_dw0, out_dw1};
+        return bit_cast<thread_buffer<T, N>>(raw);
+    }
+    else if constexpr(std::is_same_v<remove_cvref_t<T>, ck_tile::fp8_t> ||
+                      std::is_same_v<remove_cvref_t<T>, ck_tile::bf8_t> ||
+                      std::is_same_v<remove_cvref_t<T>, ck_tile::int8_t>)
+    {
+        // SW emulation of ds_read_tr8_b64 for 8-bit types
+        static_assert(N == 8, "SW transpose load: N must be 8 for 8-bit types");
+
+        // Step 1: read 2 DWORDs from LDS (normal load, no transpose)
+        const uint32_t* lds_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
+        uint32_t dw0 = lds_u32[0]; // {b0, b1, b2, b3}
+        uint32_t dw1 = lds_u32[1]; // {b4, b5, b6, b7}
+
+        // Step 2: bpermute — gather from the 4 source lanes (stride 4)
+        // Same 16-lane block / quad structure as tr16
+        const uint32_t lane_id      = static_cast<uint32_t>(__lane_id());
+        const uint32_t block_offset = (lane_id / 16) * 16;
+        const uint32_t quad_id      = (lane_id / 4) % 4;
+        const uint32_t lane_in_quad = lane_id % 4;
+
+        const uint32_t src0 = block_offset + quad_id + 0 * 4;
+        const uint32_t src1 = block_offset + quad_id + 1 * 4;
+        const uint32_t src2 = block_offset + quad_id + 2 * 4;
+        const uint32_t src3 = block_offset + quad_id + 3 * 4;
+
+        uint32_t g0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                    bit_cast<int32_t>(dw0));
+        uint32_t g3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                    bit_cast<int32_t>(dw0));
+
+        uint32_t h0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                    bit_cast<int32_t>(dw1));
+        uint32_t h3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                    bit_cast<int32_t>(dw1));
+
+        // Step 3: extract byte lane_in_quad from each source DWORD
+        // Each g[k] has 4 bytes {row_k[0], row_k[1], row_k[2], row_k[3]}
+        // Lane j needs byte j from each of the 4 source rows, packed into one DWORD
+        //
+        // v_perm(src0, src1, sel): src1=bytes[0:3], src0=bytes[4:7]
+        // pair_sel picks byte j from src1 (pos j) and byte j from src0 (pos j+4)
+        uint32_t byte_sel = ((lane_in_quad + 4u) << 8u) | lane_in_quad;
+        uint32_t pair_sel = byte_sel | (byte_sel << 16u);
+
+        // Combine pairs: tmp has byte j from two sources at bytes [0] and [1]
+        uint32_t tmp_g01 =
+            __builtin_amdgcn_perm(bit_cast<int>(g1), bit_cast<int>(g0), pair_sel);
+        uint32_t tmp_g23 =
+            __builtin_amdgcn_perm(bit_cast<int>(g3), bit_cast<int>(g2), pair_sel);
+        // Final merge: pack 4 bytes from 4 source rows into one DWORD
+        uint32_t out_dw0 =
+            __builtin_amdgcn_perm(bit_cast<int>(tmp_g23), bit_cast<int>(tmp_g01), 0x05040100u);
+
+        uint32_t tmp_h01 =
+            __builtin_amdgcn_perm(bit_cast<int>(h1), bit_cast<int>(h0), pair_sel);
+        uint32_t tmp_h23 =
+            __builtin_amdgcn_perm(bit_cast<int>(h3), bit_cast<int>(h2), pair_sel);
+        uint32_t out_dw1 =
+            __builtin_amdgcn_perm(bit_cast<int>(tmp_h23), bit_cast<int>(tmp_h01), 0x05040100u);
+
+        // Pack 2 DWORDs into thread_buffer<T, 8>
+        struct dw2_t
+        {
+            uint32_t v[2];
+        };
+        dw2_t raw{out_dw0, out_dw1};
+        return bit_cast<thread_buffer<T, N>>(raw);
+    }
+    else
+    {
+        static_assert(false, "SW transpose load: unsupported type");
+    }
 #endif
 }
 
