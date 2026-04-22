@@ -82,18 +82,18 @@ class GroupedConvTraitConfig(TraitConfigBase):
     GroupedConvTraits template parameters in grouped_convolution_utils.hpp:
     - double_smem_buffer: ping-pong LDS for compute V4+ pipelines
     - num_groups_to_merge: fuse multiple groups into one tile (NumGroupsToMerge)
-    - split_image: split spatial dims for large tensors (EnableSplitImage)
+    - large_tensors: split spatial dims for large tensors (EnableSplitImage)
     - explicit_gemm: use explicit GEMM path (ExplicitGemm)
     - two_stage: two-stage bwd_weight with fp32 workspace + elementwise convert
 
     Note: CK Tile already uses long_index_t (64-bit) for group strides and
     batch offsets, so there is no separate "large_tensor" flag. For large
-    spatial dimensions, use split_image=True instead.
+    spatial dimensions, use large_tensors=True instead.
     """
 
     double_smem_buffer: bool = False
     num_groups_to_merge: int = 1
-    split_image: bool = False
+    large_tensors: bool = False
     explicit_gemm: bool = False
     two_stage: bool = False
 
@@ -436,7 +436,7 @@ struct {kernel_name}_Config {{
     static constexpr int kBlockPerCu = {config.block_per_cu};
     static constexpr index_t NumWaveGroups = {config.num_wave_groups};
     static constexpr index_t NumGroupsToMerge = {tr.num_groups_to_merge};
-    static constexpr bool EnableSplitImage = {str(tr.split_image).lower()};
+    static constexpr bool EnableSplitImage = {str(tr.large_tensors).lower()};
     static constexpr bool ExplicitGemm = {str(tr.explicit_gemm).lower()};
     static constexpr index_t NDimSpatial = {config.ndim_spatial};
     

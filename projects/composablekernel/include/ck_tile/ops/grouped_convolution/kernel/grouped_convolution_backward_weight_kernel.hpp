@@ -507,7 +507,6 @@ struct GroupedConvolutionBackwardWeightKernel
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
-        static constexpr bool EnableSplitImage = GroupedConvTraitsType_::EnableSplitImage;
         constexpr auto NumGroupsToMerge        = GroupedConvTraitsType_::NumGroupsToMerge;
         // clang-format off
         return concat('_', "grouped_convolution_backward_weight", 
@@ -522,8 +521,6 @@ struct GroupedConvolutionBackwardWeightKernel
             getConvSpecializationString(ConvSpecialization),
             "MergedGroups",
             NumGroupsToMerge,
-            "SplitImage",
-            EnableSplitImage,
             "ExplicitGemm",
             GroupedConvTraitsType_::ExplicitGemm,
             IsStreamK ? "StreamK" : "SplitK"

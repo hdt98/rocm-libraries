@@ -70,7 +70,6 @@ template <index_t NDimSpatial_,
           index_t VectorSizeB_      = 1,
           index_t VectorSizeC_      = 1,
           index_t NumGroupsToMerge_ = 1,
-          bool EnableSplitImage_    = false,
           bool ExplicitGemm_        = false>
 struct GroupedConvTraits
 {
@@ -100,7 +99,6 @@ struct GroupedConvTraits
     };
     // Compile time parameters
     static constexpr index_t NumGroupsToMerge                     = NumGroupsToMerge_;
-    static constexpr bool EnableSplitImage                        = EnableSplitImage_;
     static constexpr bool ExplicitGemm                            = ExplicitGemm_;
     static constexpr index_t NDimSpatial                          = NDimSpatial_;
     static constexpr ConvolutionSpecialization ConvSpecialization = ConvSpecialization_;
