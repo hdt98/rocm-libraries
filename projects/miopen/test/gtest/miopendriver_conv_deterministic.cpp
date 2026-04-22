@@ -19,13 +19,19 @@ static const std::string shape_3d =
     "-m conv -g 1 --iter 1 -V 0";
 // clang-format on
 
-// Returns a pair of {test args without deterministic, test args with deterministic}
-std::vector<std::pair<std::string, std::string>>
-GetTestCasePairs(const std::string& mode, const std::string& shape, int forw_flag)
+struct ConvDeterministicTestCase
+{
+    std::string base_args;    // args without --deterministic flag
+    std::string valid_args;   // args with --deterministic 1
+    std::string invalid_args; // args with --deterministic 2 (invalid value)
+};
+
+std::vector<ConvDeterministicTestCase>
+GetTestCases(const std::string& mode, const std::string& shape, int forw_flag)
 {
     const std::string dir  = " -F " + std::to_string(forw_flag);
     const std::string base = mode + " " + shape + dir;
-    return {{base, base + " --deterministic 1"}};
+    return {{base, base + " --deterministic 1", base + " --deterministic 2"}};
 }
 
 miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
@@ -38,7 +44,7 @@ miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
 }
 
 class GPU_MIOpenDriverConvDeterministicTest_FP32
-    : public testing::TestWithParam<std::pair<std::string, std::string>>
+    : public testing::TestWithParam<ConvDeterministicTestCase>
 {
 };
 
@@ -52,7 +58,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, NoDeterministicLog)
     miopen::fs::remove_all(tmp_dir);
 
     testing::internal::CaptureStderr();
-    RunMIOpenDriverTestCommand({GetParam().first}, MakeEnv(tmp_dir));
+    RunMIOpenDriverTestCommand({GetParam().base_args}, MakeEnv(tmp_dir));
     const auto output = testing::internal::GetCapturedStderr();
 
     EXPECT_THAT(output,
@@ -71,7 +77,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, RunsSuccessfullyAndLogsOverri
     miopen::fs::remove_all(tmp_dir);
 
     testing::internal::CaptureStderr();
-    RunMIOpenDriverTestCommand({GetParam().second}, MakeEnv(tmp_dir));
+    RunMIOpenDriverTestCommand({GetParam().valid_args}, MakeEnv(tmp_dir));
     const auto output = testing::internal::GetCapturedStderr();
 
     EXPECT_THAT(output, testing::HasSubstr("Restricting convolution to deterministic kernels."));
@@ -82,18 +88,15 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, RunsSuccessfullyAndLogsOverri
 // ----------------------------------------------------------------------------
 // Test 3: Invalid --deterministic value causes non-zero exit
 // ----------------------------------------------------------------------------
-TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValue)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, ExitsOnInvalidValue)
 {
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_invalid"};
     miopen::fs::remove_all(tmp_dir);
 
-    const std::string bad_args =
-        miopendriver::basearg::conv::Half + " " + shape_3d + " -F 4 --deterministic 2";
-
     int result = 0;
     miopen::Process p{MIOpenDriverExePath().string()};
     std::stringstream ss;
-    EXPECT_NO_THROW(result = p(bad_args, "", &ss, MakeEnv(tmp_dir)));
+    EXPECT_NO_THROW(result = p(GetParam().invalid_args, "", &ss, MakeEnv(tmp_dir)));
     EXPECT_NE(result, 0) << "Should exit with a non-zero code on invalid deterministic value";
     EXPECT_THAT(ss.str(), testing::HasSubstr("Invalid deterministic value"));
 
@@ -123,7 +126,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, BitExactAcrossRuns)
 
     // --dump_output writes binary output files to the working directory.
     // Run the driver twice from separate directories to get separate output files.
-    const std::string det_args = GetParam().second + " -o 1";
+    const std::string det_args = GetParam().valid_args + " -o 1";
 
     {
         auto envs = make_env(run1_dir + "/db");
@@ -178,6 +181,6 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, BitExactAcrossRuns)
 INSTANTIATE_TEST_SUITE_P(
     Full,
     GPU_MIOpenDriverConvDeterministicTest_FP32,
-    testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
+    testing::ValuesIn(GetTestCases(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
 } // namespace miopen_conv_deterministic
