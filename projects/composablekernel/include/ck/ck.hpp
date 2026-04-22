@@ -3,6 +3,15 @@
 
 #pragma once
 
+// C++20 is required starting June 22, 2026. C++17 will no longer be supported.
+#if __cplusplus < 202002L
+#  if defined(__clang__) || defined(__GNUC__)
+#    pragma message "CK: C++17 support ends June 22, 2026. Update the compilation target including this file to C++20 (-std=c++20 / CMake CXX_STANDARD 20)."
+#  elif defined(_MSC_VER)
+#    pragma message("CK: C++17 support ends June 22, 2026. Update the compilation target including this file to C++20 (/std:c++20 / CMake CXX_STANDARD 20).")
+#  endif
+#endif
+
 #include "ck/config.h"
 #include <stdint.h>
 
