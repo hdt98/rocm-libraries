@@ -226,6 +226,18 @@ namespace origami
                                              uint32_t bpeA, uint32_t bpeB, int32_t NTA, int32_t NTB,
                                              bool isGSUWGMRR);
 
+        /**
+         * @brief StreamK L2 hit rate: GSU-style baseline + multi-tile, partial-tile, and periodicity
+         *        adjustments (AIGESOLSEL-136). Does not alter computeL2CacheHitRate behavior.
+         */
+        L2CacheHitRate computeStreamKL2CacheHitRate(uint32_t M, uint32_t N, uint32_t K,
+                                                    uint32_t MT0, uint32_t MT1, uint32_t depthU,
+                                                    uint32_t L2CacheCapacity, uint32_t NumCUs,
+                                                    uint32_t NumXCDs, int32_t streamk_wgm, uint32_t batches,
+                                                    uint32_t bpeA, uint32_t bpeB, int32_t NTA, int32_t NTB,
+                                                    bool isGSUWGMRR, size_t sk_grid, size_t output_tiles,
+                                                    size_t iters_per_tile, size_t iters_per_cta);
+
         // Store request calculation functions
         
         /**

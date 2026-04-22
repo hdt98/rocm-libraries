@@ -857,6 +857,77 @@ TEST_CASE("Formocast: calculateStreamKOverhead models reduction modes and partia
     REQUIRE(oh_ws_dp == Approx(0.0));
 }
 
+TEST_CASE("Formocast: StreamK L2 hit rate model", "[formocast][streamk][l2]") {
+    Formocast simulator;
+    simulator.setHardware(hardware_t::architecture_t::gfx950);
+    const auto hw = simulator.hw_consts;
+
+    auto problem = make_problem_info(1024, 1024, 1024);
+    auto mapping = make_size_mapping();
+    simulator.setProblem(problem);
+    simulator.setSolution(mapping);
+
+    const uint32_t M = 1024, N = 1024, K = 1024;
+    const int32_t  wgm = 8;
+
+    const auto baseline_gsu1
+        = simulator.computeL2CacheHitRate(M, N, K, hw, 1u, wgm, 1u, 2u, 2u, 0, 0, false);
+
+    const size_t tiles
+        = streamk::compute_number_of_output_tiles(128, 128, 1024, 1024, 1);
+    REQUIRE(tiles == 64);
+    const size_t ipt  = streamk::num_iters_per_tile(32, 1024);
+    const size_t itot = streamk::num_iters_total(tiles, ipt);
+
+    SECTION("skgrid == tiles matches GSU=1 L2 baseline (no silent GSU drift)") {
+        const size_t ipc = streamk::num_iters_per_cta(itot, tiles);
+        auto sk = simulator.computeStreamKL2CacheHitRate(M, N, K, hw, wgm, 1u, 2u, 2u, 0, 0, false, tiles,
+                                                           tiles, ipt, ipc);
+        REQUIRE(sk.totalHitRate == Approx(baseline_gsu1.totalHitRate).margin(1e-9));
+        REQUIRE(sk.tile0HitRate == Approx(baseline_gsu1.tile0HitRate).margin(1e-9));
+        REQUIRE(sk.tile1HitRate == Approx(baseline_gsu1.tile1HitRate).margin(1e-9));
+    }
+
+    SECTION("skgrid < tiles (multi-tile CTAs) raises L2 vs balanced StreamK grid") {
+        const size_t sk_small = tiles / 2;
+        const size_t ipc_mt   = streamk::num_iters_per_cta(itot, sk_small);
+        const size_t ipc_bal  = streamk::num_iters_per_cta(itot, tiles);
+        auto sk_mt = simulator.computeStreamKL2CacheHitRate(M, N, K, hw, wgm, 1u, 2u, 2u, 0, 0, false,
+                                                            sk_small, tiles, ipt, ipc_mt);
+        auto sk_bal = simulator.computeStreamKL2CacheHitRate(M, N, K, hw, wgm, 1u, 2u, 2u, 0, 0, false,
+                                                             tiles, tiles, ipt, ipc_bal);
+        REQUIRE(sk_mt.totalHitRate > sk_bal.totalHitRate);
+    }
+
+    SECTION("skgrid > tiles (partial-tile pressure) lowers L2 vs skgrid == tiles") {
+        const size_t sk_big  = tiles * 2;
+        const size_t ipc_big = streamk::num_iters_per_cta(itot, sk_big);
+        const size_t ipc_eq  = streamk::num_iters_per_cta(itot, tiles);
+        auto sk_big_hr = simulator.computeStreamKL2CacheHitRate(M, N, K, hw, wgm, 1u, 2u, 2u, 0, 0, false,
+                                                               sk_big, tiles, ipt, ipc_big);
+        auto sk_eq = simulator.computeStreamKL2CacheHitRate(M, N, K, hw, wgm, 1u, 2u, 2u, 0, 0, false, tiles,
+                                                            tiles, ipt, ipc_eq);
+        REQUIRE(sk_big_hr.totalHitRate < sk_eq.totalHitRate);
+    }
+
+    SECTION("periodic boundary in reduced skgrid/tiles ratio (AIGESOLSEL-26)") {
+        auto p512   = make_problem_info(512, 512, 512);
+        auto map512 = make_size_mapping();
+        simulator.setProblem(p512);
+        simulator.setSolution(map512);
+        const uint32_t M2 = 512, N2 = 512, K2 = 512;
+        const size_t t16  = streamk::compute_number_of_output_tiles(128, 128, 512, 512, 1);
+        REQUIRE(t16 == 16);
+        const size_t ipt2  = streamk::num_iters_per_tile(32, 512);
+        const size_t itot2 = streamk::num_iters_total(t16, ipt2);
+        auto h5 = simulator.computeStreamKL2CacheHitRate(M2, N2, K2, hw, wgm, 1u, 2u, 2u, 0, 0, false, 5, t16,
+                                                          ipt2, streamk::num_iters_per_cta(itot2, 5));
+        auto h6 = simulator.computeStreamKL2CacheHitRate(M2, N2, K2, hw, wgm, 1u, 2u, 2u, 0, 0, false, 6, t16,
+                                                          ipt2, streamk::num_iters_per_cta(itot2, 6));
+        REQUIRE(h5.totalHitRate != Approx(h6.totalHitRate).margin(1e-9));
+    }
+}
+
 TEST_CASE("Formocast: StreamK (GlobalSplitU=0) uses schedule instead of penalty", "[formocast][streamk]") {
     Formocast simulator;
     simulator.setHardware(hardware_t::architecture_t::gfx950);

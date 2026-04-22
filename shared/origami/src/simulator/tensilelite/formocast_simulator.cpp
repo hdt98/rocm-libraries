@@ -3,6 +3,7 @@
 
 #include <origami/simulator/tensilelite/formocast_simulator.hpp>
 #include <origami/math.hpp>
+#include <origami/origami.hpp>
 #include <origami/simulator/tensilelite/formocast.hpp>
 #include <origami/streamk.hpp>
 #include <origami/hardware.hpp>
@@ -14,6 +15,7 @@
 #include <cassert>
 #include <cstring>
 #include <iomanip>
+#include <optional>
 
 namespace origami
 {
@@ -546,6 +548,9 @@ namespace origami
         size_t     sk_iters_total    = 0;
         size_t     sk_iters_per_cta  = 0;
         size_t     sk_fixup_peers    = 0;
+        std::optional<hardware_t> streamk_hw;
+        problem_t                 origami_problem{};
+        config_t                  origami_config{};
 
         if(isStreamK)
         {
@@ -563,37 +568,37 @@ namespace origami
             const size_t l2_cap  = static_cast<size_t>(std::max(hw_consts.L2CacheCapacity, 1024.0 * 1024.0));
             const int    clk_khz = std::max(1, static_cast<int>(hw_consts.math_frequency * 1000.0));
 
-            hardware_t streamk_hw = hardware_t::get_hardware_for_arch(
+            streamk_hw.emplace(hardware_t::get_hardware_for_arch(
                 hw_consts.architecture,
                 static_cast<size_t>(std::max(1.0, hw_consts.NumCUs)),
                 lds_cap,
                 l2_cap,
-                clk_khz);
+                clk_khz));
 
-            problem_t origami_problem{};
+            origami_problem      = problem_t{};
             origami_problem.size  = {m_sz, n_sz, k_sz};
             origami_problem.batch = batch_sz;
 
-            config_t origami_config{};
-            origami_config.mt                = {static_cast<size_t>(MT0),
-                                 static_cast<size_t>(MT1),
-                                 static_cast<size_t>(depthU)};
-            origami_config.mi = {static_cast<size_t>(sizeMapping.matrixInstruction[0]),
-                                  static_cast<size_t>(sizeMapping.matrixInstruction[1]),
-                                  static_cast<size_t>(sizeMapping.matrixInstruction[2])};
-            origami_config.occupancy         = std::max(sizeMapping.CUOccupancy, 1);
-            origami_config.workgroup_mapping = sizeMapping.workGroupMapping;
-            origami_config.grid_selection    = grid_selection_t::k_split_aware;
+            origami_config                             = config_t{};
+            origami_config.mt                          = {static_cast<size_t>(MT0),
+                                                          static_cast<size_t>(MT1),
+                                                          static_cast<size_t>(depthU)};
+            origami_config.mi                          = {static_cast<size_t>(sizeMapping.matrixInstruction[0]),
+                                                          static_cast<size_t>(sizeMapping.matrixInstruction[1]),
+                                                          static_cast<size_t>(sizeMapping.matrixInstruction[2])};
+            origami_config.occupancy                   = std::max(sizeMapping.CUOccupancy, 1);
+            origami_config.workgroup_mapping           = sizeMapping.workGroupMapping;
+            origami_config.grid_selection              = grid_selection_t::k_split_aware;
             // Match streamk::grid_k_split_aware workspace ceiling so grid selection mirrors runtime DP fallback.
-            origami_config.workspace_size_per_elem_c = static_cast<size_t>(problem.bpeCompute);
-            origami_config.workspace_size            = 128ull * 1024 * 1024;
+            origami_config.workspace_size_per_elem_c   = static_cast<size_t>(problem.bpeCompute);
+            origami_config.workspace_size              = 128ull * 1024 * 1024;
 
             sk_reduction = streamk::select_reduction(
-                origami_problem, streamk_hw, origami_config, grid_selection_t::k_split_aware);
+                origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware);
             origami_config.reduction_strategy = sk_reduction;
 
             sk_grid = streamk::select_grid_size(
-                origami_problem, streamk_hw, origami_config, grid_selection_t::k_split_aware, 0);
+                origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware, 0);
             sk_grid = std::max(size_t(1), sk_grid);
 
             sk_iters_per_cta = streamk::num_iters_per_cta(sk_iters_total, sk_grid);
@@ -632,8 +637,6 @@ namespace origami
         PGR = (std::floor(K_AfterGSU/depthU > 1)) ? sizeMapping.PrefetchGlobalRead : int(K_AfterGSU/depthU);
         int      PLR = (std::floor(K_AfterGSU/sizeMapping.LocalSplitU/depthU) < 1) ? 0: 1;//sizeMapping.PrefetchLocalRead;
 
-        const uint32_t gsu_for_l2 = isStreamK ? 1u : GlobalSplitU;
-
         if (PLR == 0)
         {
             pp.microSeconds = 9999999.9;
@@ -649,18 +652,52 @@ namespace origami
                                                 VWA, VWB, transA, transB,
                                                 M, N, NLCA, NLCB,
                                                 NumThreads, NumWave0, NumWave1);
-        L2CacheHitRate l2 = computeL2CacheHitRate(M,
-                                                N,
-                                                K_AfterGSU,
-                                                hw_consts,
-                                                gsu_for_l2,
-                                                WGM,
-                                                NumBatches,
-                                                bpeA,
-                                                bpeB,
-                                                0,
-                                                0,
-                                                isGSUWGMRR);
+        L2CacheHitRate l2;
+        if(isStreamK)
+        {
+            int32_t sk_wgm_for_l2 = static_cast<int32_t>(WGM);
+            if(sizeMapping.workGroupMapping == 0 && sizeMapping.workGroupMappingXCC == -1 && streamk_hw.has_value())
+            {
+                auto wgm_pick
+                    = origami::select_workgroup_mapping(origami_problem, *streamk_hw, origami_config, sk_grid);
+                sk_wgm_for_l2 = wgm_pick.wgm;
+            }
+            else if(sizeMapping.workGroupMapping == 0)
+            {
+                sk_wgm_for_l2 = static_cast<int32_t>(std::ceil(
+                    std::sqrt(static_cast<double>(hw_consts.NumCUs) / static_cast<double>(hw_consts.NumXCDs))));
+            }
+            l2 = computeStreamKL2CacheHitRate(static_cast<uint32_t>(M),
+                                              static_cast<uint32_t>(N),
+                                              static_cast<uint32_t>(K_AfterGSU),
+                                              hw_consts,
+                                              sk_wgm_for_l2,
+                                              static_cast<uint32_t>(NumBatches),
+                                              bpeA,
+                                              bpeB,
+                                              0,
+                                              0,
+                                              isGSUWGMRR,
+                                              sk_grid,
+                                              sk_output_tiles,
+                                              sk_iters_per_tile,
+                                              sk_iters_per_cta);
+        }
+        else
+        {
+            l2 = computeL2CacheHitRate(M,
+                                         N,
+                                         K_AfterGSU,
+                                         hw_consts,
+                                         GlobalSplitU,
+                                         WGM,
+                                         static_cast<uint32_t>(NumBatches),
+                                         bpeA,
+                                         bpeB,
+                                         0,
+                                         0,
+                                         isGSUWGMRR);
+        }
         L3CacheHitRate l3 = computeL3CacheHitRate(M, N, K, hw_consts,
                                                 bpeA, bpeB, 0, 0,
                                                 N_WGs_total, M_WGs_total, N_WGs_per_tile, M_WGs_per_tile);
@@ -857,6 +894,37 @@ namespace origami
         hitRate.tile0HitRate = hr.tile0HitRate;
         hitRate.tile1HitRate = hr.tile1HitRate;
 
+        return hitRate;
+    }
+
+    Formocast::L2CacheHitRate Formocast::computeStreamKL2CacheHitRate(uint32_t M,
+                                                                       uint32_t N,
+                                                                       uint32_t K,
+                                                                       const HardwareConstants& hw,
+                                                                       int32_t  streamk_wgm,
+                                                                       uint32_t batches,
+                                                                       uint32_t bpeA,
+                                                                       uint32_t bpeB,
+                                                                       int32_t  NTA,
+                                                                       int32_t  NTB,
+                                                                       bool     isGSUWGMRR,
+                                                                       size_t   sk_grid,
+                                                                       size_t   output_tiles,
+                                                                       size_t   iters_per_tile,
+                                                                       size_t   iters_per_cta) const
+    {
+        uint32_t MT0    = sizeMapping.macroTile[0];
+        uint32_t MT1    = sizeMapping.macroTile[1];
+        uint32_t depthU = sizeMapping.depthU;
+
+        auto hr = simulator::computeStreamKL2CacheHitRate(
+            M, N, K, MT0, MT1, depthU, hw.L2CacheCapacity, hw.NumCUs, hw.NumXCDs, streamk_wgm, batches,
+            bpeA, bpeB, NTA, NTB, isGSUWGMRR, sk_grid, output_tiles, iters_per_tile, iters_per_cta);
+
+        L2CacheHitRate hitRate;
+        hitRate.totalHitRate = hr.totalHitRate;
+        hitRate.tile0HitRate = hr.tile0HitRate;
+        hitRate.tile1HitRate = hr.tile1HitRate;
         return hitRate;
     }
 

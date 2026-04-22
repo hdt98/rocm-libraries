@@ -8,6 +8,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <numeric>
 #include <vector>
 #include <cstring>
 
@@ -633,6 +634,85 @@ namespace origami
             hitRate.tile1HitRate = hitRateB;
 
             return hitRate;
+        }
+
+        namespace {
+
+        double streamk_l2_clamp01(double x)
+        {
+            if(x < 0.0)
+                return 0.0;
+            if(x > 1.0)
+                return 1.0;
+            return x;
+        }
+
+        /**
+         * AIGESOLSEL-26: phase term from the reduced sk_grid : output_tiles ratio. Uses a rational
+         * with an even denominator (double the odd denominator) so the pattern repeats on
+         * half-integer/fractional boundaries of the splitting coefficient.
+         */
+        double streamk_l2_periodic_phase(size_t sk_grid, size_t output_tiles)
+        {
+            if(output_tiles == 0 || sk_grid == 0)
+                return 0.0;
+            const size_t g   = std::gcd(sk_grid, output_tiles);
+            const size_t skr = sk_grid / g;
+            const size_t tr  = output_tiles / g;
+            if(skr == tr)
+                return 0.0;
+            const double denom
+                = (tr % 2u == 0u) ? static_cast<double>(tr) : static_cast<double>(2u * tr);
+            return std::sin(static_cast<double>(M_PI) * static_cast<double>(skr) / denom);
+        }
+
+        } // namespace
+
+        L2CacheHitRate computeStreamKL2CacheHitRate(uint32_t M, uint32_t N, uint32_t K,
+                                                    uint32_t MT0, uint32_t MT1, uint32_t depthU,
+                                                    uint32_t L2CacheCapacity, uint32_t NumCUs,
+                                                    uint32_t NumXCDs, int32_t streamk_wgm, uint32_t batches,
+                                                    uint32_t bpeA, uint32_t bpeB, int32_t NTA, int32_t NTB,
+                                                    bool isGSUWGMRR, size_t sk_grid, size_t output_tiles,
+                                                    size_t iters_per_tile, size_t iters_per_cta)
+        {
+            L2CacheHitRate hr = computeL2CacheHitRate(
+                M, N, K, MT0, MT1, depthU, L2CacheCapacity, NumCUs, NumXCDs, 1u, streamk_wgm, batches,
+                bpeA, bpeB, NTA, NTB, isGSUWGMRR);
+
+            if(sk_grid == 0 || output_tiles == 0 || iters_per_tile == 0)
+                return hr;
+
+            double mult = 1.0;
+
+            // sk_grid < tiles: CTAs cover multiple output tiles sequentially — extra L2 reuse on K.
+            if(sk_grid < output_tiles)
+            {
+                const double tiles_per_wg = static_cast<double>(output_tiles) / static_cast<double>(sk_grid);
+                const double excess       = tiles_per_wg - 1.0;
+                if(excess > 0.0)
+                {
+                    const double tile_steps = static_cast<double>(iters_per_cta) / static_cast<double>(iters_per_tile);
+                    const double kiter_tail = std::max(0.0, tile_steps - 1.0);
+                    const double boost      = 0.07 * excess + 0.05 * std::min(0.5, kiter_tail);
+                    mult *= (1.0 + std::min(0.22, boost));
+                }
+            }
+
+            // sk_grid > tiles: multiple CTAs share the same output tile — overlapping K traffic.
+            if(sk_grid > output_tiles)
+            {
+                const double pressure
+                    = 1.0 - static_cast<double>(output_tiles) / static_cast<double>(sk_grid);
+                mult *= (1.0 - 0.17 * pressure);
+            }
+
+            mult *= (1.0 + 0.035 * streamk_l2_periodic_phase(sk_grid, output_tiles));
+
+            hr.tile0HitRate  = streamk_l2_clamp01(hr.tile0HitRate * mult);
+            hr.tile1HitRate  = streamk_l2_clamp01(hr.tile1HitRate * mult);
+            hr.totalHitRate  = streamk_l2_clamp01(hr.totalHitRate * mult);
+            return hr;
         }
 
         // Store request calculation functions

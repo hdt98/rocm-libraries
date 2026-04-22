@@ -571,6 +571,23 @@ namespace origami
                                              int32_t  NTA,
                                              int32_t  NTB,
                                              bool     isGSUWGMRR) const;
+
+        /** StreamK L2 model (AIGESOLSEL-136); @a streamk_wgm should match Tensile StreamK auto WGM when applicable. */
+        L2CacheHitRate computeStreamKL2CacheHitRate(uint32_t M,
+                                                    uint32_t N,
+                                                    uint32_t K,
+                                                    const HardwareConstants& hw,
+                                                    int32_t  streamk_wgm,
+                                                    uint32_t batches,
+                                                    uint32_t bpeA,
+                                                    uint32_t bpeB,
+                                                    int32_t  NTA,
+                                                    int32_t  NTB,
+                                                    bool     isGSUWGMRR,
+                                                    size_t   sk_grid,
+                                                    size_t   output_tiles,
+                                                    size_t   iters_per_tile,
+                                                    size_t   iters_per_cta) const;
         
         /**
          * @brief Compute L3 cache hit rates based on tile reuse patterns
