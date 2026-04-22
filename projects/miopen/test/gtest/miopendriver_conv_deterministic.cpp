@@ -37,17 +37,7 @@ miopen::ProcessEnvironmentMap MakeEnv(const std::string& tmp_dir)
     return envs;
 }
 
-class GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32
-    : public testing::TestWithParam<std::pair<std::string, std::string>>
-{
-};
-
-class GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32
-    : public testing::TestWithParam<std::pair<std::string, std::string>>
-{
-};
-
-class GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32
+class GPU_MIOpenDriverConvDeterministicTest_FP32
     : public testing::TestWithParam<std::pair<std::string, std::string>>
 {
 };
@@ -56,7 +46,7 @@ class GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32
 // Test 1: Without --deterministic being set, log must not mention
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, NoDeterministicLog)
 {
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_noflag"};
     miopen::fs::remove_all(tmp_dir);
@@ -75,7 +65,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32, NoDeterministicLog)
 // Test 2: With --deterministic 1 the log mentions
 // "Restricting convolution to deterministic kernels."
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32, RunsSuccessfullyAndLogsOverride)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, RunsSuccessfullyAndLogsOverride)
 {
     const auto tmp_dir = std::string{"/tmp/miopen_det_test_enabled"};
     miopen::fs::remove_all(tmp_dir);
@@ -114,7 +104,7 @@ TEST(GPU_MIOpenDriverConvDeterministicTest_InvalidValue_FP32, ExitsOnInvalidValu
 // Test 4: Reproducibility - two runs with --deterministic 1 produce
 //         identical output files (--dump_output)
 // ----------------------------------------------------------------------------
-TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32, BitExactAcrossRuns)
+TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, BitExactAcrossRuns)
 {
     const auto run1_dir = std::string{"/tmp/miopen_det_repro_run1"};
     const auto run2_dir = std::string{"/tmp/miopen_det_repro_run2"};
@@ -187,17 +177,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32, BitExactAcrossRu
 // 3D WRW
 INSTANTIATE_TEST_SUITE_P(
     Full,
-    GPU_MIOpenDriverConvDeterministicTest_NoFlag_FP32,
-    testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
-
-INSTANTIATE_TEST_SUITE_P(
-    Full,
-    GPU_MIOpenDriverConvDeterministicTest_Enabled_FP32,
-    testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
-
-INSTANTIATE_TEST_SUITE_P(
-    Full,
-    GPU_MIOpenDriverConvDeterministicTest_Reproducible_FP32,
+    GPU_MIOpenDriverConvDeterministicTest_FP32,
     testing::ValuesIn(GetTestCasePairs(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
 } // namespace miopen_conv_deterministic
