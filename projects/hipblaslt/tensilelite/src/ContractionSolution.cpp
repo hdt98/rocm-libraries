@@ -55,126 +55,26 @@ namespace TensileLite
 {
     std::string toString(CustomArgSemantic arg)
     {
-        switch(arg)
-        {
-        case CustomArgSemantic::SizeFree0:
-            return "SizeFree0";
-        case CustomArgSemantic::SizeFree1:
-            return "SizeFree1";
-        case CustomArgSemantic::SizeFree2:
-            return "SizeFree2";
-        case CustomArgSemantic::SizeSum:
-            return "SizeSum";
-        case CustomArgSemantic::AddressA:
-            return "AddressA";
-        case CustomArgSemantic::AddressB:
-            return "AddressB";
-        case CustomArgSemantic::AddressC:
-            return "AddressC";
-        case CustomArgSemantic::AddressD:
-            return "AddressD";
-        case CustomArgSemantic::StrideA0:
-            return "StrideA0";
-        case CustomArgSemantic::StrideA1:
-            return "StrideA1";
-        case CustomArgSemantic::StrideB0:
-            return "StrideB0";
-        case CustomArgSemantic::StrideB1:
-            return "StrideB1";
-        case CustomArgSemantic::StrideC0:
-            return "StrideC0";
-        case CustomArgSemantic::StrideC1:
-            return "StrideC1";
-        case CustomArgSemantic::StrideD0:
-            return "StrideD0";
-        case CustomArgSemantic::StrideD1:
-            return "StrideD1";
-        case CustomArgSemantic::Alpha:
-            return "Alpha";
-        case CustomArgSemantic::Beta:
-            return "Beta";
-        case CustomArgSemantic::SplitK:
-            return "SplitK";
-        case CustomArgSemantic::OutputBF16:
-            return "OutputBF16";
-        case CustomArgSemantic::StrideA0Bytes:
-            return "StrideA0Bytes";
-        case CustomArgSemantic::StrideB0Bytes:
-            return "StrideB0Bytes";
-        case CustomArgSemantic::StrideC0Bytes:
-            return "StrideC0Bytes";
-        case CustomArgSemantic::StrideD0Bytes:
-            return "StrideD0Bytes";
-        case CustomArgSemantic::Padding:
-            return "Padding";
-        case CustomArgSemantic::DebugPattern:
-            return "DebugPattern";
-        case CustomArgSemantic::CustomArgSemantic_Count:
-            break;
-        }
-
-        throw std::runtime_error(
-            concatenate("Invalid CustomArgSemantic value: ", static_cast<int>(arg)));
+        static const std::array<std::string, static_cast<int>(CustomArgSemantic::COUNT)> CustomArgSemanticStrings = {
+            #define X_MACRO(name) TENSILELITE_TO_STR(name),
+            CustomArgSemantic_MACRO
+            #undef X_MACRO
+        };
+        return CustomArgSemanticStrings[static_cast<int>(arg)];
     }
-
+    
     CustomArgSemantic fromStringCustomArgSemantic(std::string& str)
     {
+        static const std::map<std::string, CustomArgSemantic> CustomArgSemanticMap = {
+            #define X_MACRO(name) {TENSILELITE_TO_STR(name), CustomArgSemantic::name},
+            CustomArgSemantic_MACRO
+            #undef X_MACRO
+        };
         
-        if(str == toString(CustomArgSemantic::SizeFree0))
-            return CustomArgSemantic::SizeFree0;
-        else if(str == toString(CustomArgSemantic::SizeFree1))
-            return CustomArgSemantic::SizeFree1;
-        else if(str == toString(CustomArgSemantic::SizeFree2))
-            return CustomArgSemantic::SizeFree2;
-        else if(str == toString(CustomArgSemantic::SizeSum))
-            return CustomArgSemantic::SizeSum;
-        else if(str == toString(CustomArgSemantic::AddressA))
-            return CustomArgSemantic::AddressA;
-        else if(str == toString(CustomArgSemantic::AddressB))
-            return CustomArgSemantic::AddressB;
-        else if(str == toString(CustomArgSemantic::AddressC))
-            return CustomArgSemantic::AddressC;
-        else if(str == toString(CustomArgSemantic::AddressD))
-            return CustomArgSemantic::AddressD;
-        else if(str == toString(CustomArgSemantic::StrideA0))
-            return CustomArgSemantic::StrideA0;
-        else if(str == toString(CustomArgSemantic::StrideA1))
-            return CustomArgSemantic::StrideA1;
-        else if(str == toString(CustomArgSemantic::StrideB0))
-            return CustomArgSemantic::StrideB0;
-        else if(str == toString(CustomArgSemantic::StrideB1))
-            return CustomArgSemantic::StrideB1;
-        else if(str == toString(CustomArgSemantic::StrideC0))
-            return CustomArgSemantic::StrideC0;
-        else if(str == toString(CustomArgSemantic::StrideC1))
-            return CustomArgSemantic::StrideC1;
-        else if(str == toString(CustomArgSemantic::StrideD0))
-            return CustomArgSemantic::StrideD0;
-        else if(str == toString(CustomArgSemantic::StrideD1))
-            return CustomArgSemantic::StrideD1;
-        else if(str == toString(CustomArgSemantic::Alpha))
-            return CustomArgSemantic::Alpha;
-        else if(str == toString(CustomArgSemantic::Beta))
-            return CustomArgSemantic::Beta;
-        else if(str == toString(CustomArgSemantic::SplitK))
-            return CustomArgSemantic::SplitK;
-        else if(str == toString(CustomArgSemantic::OutputBF16))
-            return CustomArgSemantic::OutputBF16;
-        else if(str == toString(CustomArgSemantic::StrideA0Bytes))
-            return CustomArgSemantic::StrideA0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideB0Bytes))
-            return CustomArgSemantic::StrideB0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideC0Bytes))
-            return CustomArgSemantic::StrideC0Bytes;
-        else if(str == toString(CustomArgSemantic::StrideD0Bytes))
-            return CustomArgSemantic::StrideD0Bytes;
-        else if(str == toString(CustomArgSemantic::Padding))
-            return CustomArgSemantic::Padding;
-        else if(str == toString(CustomArgSemantic::DebugPattern))
-            return CustomArgSemantic::DebugPattern;
-        else
-            throw std::runtime_error(concatenate("Invalid argument type: ", str));
-        return CustomArgSemantic::CustomArgSemantic_Count;
+        auto it = CustomArgSemanticMap.find(str);
+        if (it == CustomArgSemanticMap.end())
+            throw std::runtime_error(concatenate("Invalid CustomArgSemantic value: ", str));
+        return it->second;
     }
 
     std::ostream& operator<<(std::ostream& stream, const CustomArgSemantic& t)
@@ -1001,7 +901,7 @@ namespace TensileLite
                     // then no Stream-K tiles are needed, all data-parallel
                     uint32_t skTiles = sk.grid;
                     // If not evenly divisible, determine number of Stream-K tiles
-                    if(tiles % sk.grid != 0) 
+                    if(tiles % sk.grid != 0)
                     {
                         // Number of data-parallel tiles on each workgroup would be:
                         // dpTilesPerWG = bigEnough ? (tiles - skTiles) / skGrid : 0;
@@ -2160,7 +2060,7 @@ namespace TensileLite
                                          rv.numWorkItems.x / rv.workGroupSize.x / rv.workGroupSize.y
                                              / rv.workGroupSize.z);
                 kernelArgs<T_Debug, true>(0,
-                    (uint32_t)KERNELARGTYPE::NORMAL,
+                                          (uint32_t)KERNELARGTYPE::NORMAL,
                                           rv.args,
                                           0,
                                           &hardware,

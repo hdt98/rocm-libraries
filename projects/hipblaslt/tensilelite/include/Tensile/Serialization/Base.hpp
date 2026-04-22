@@ -389,7 +389,7 @@ namespace TensileLite
 
             static void enumeration(IO& io, CustomArgSemantic& value)
             {
-                for(int i = 0; i < static_cast<int>(CustomArgSemantic::CustomArgSemantic_Count); i++)
+                for(int i = 0; i < static_cast<int>(CustomArgSemantic::COUNT); i++)
                 {
                     auto const& info = static_cast<CustomArgSemantic>(i);
                     iot::enumCase(io, value, TensileLite::toString(info).c_str(), info);

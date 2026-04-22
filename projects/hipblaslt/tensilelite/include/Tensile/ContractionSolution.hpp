@@ -50,35 +50,40 @@
 
 namespace TensileLite
 {
-    enum CustomArgSemantic
+    #define CustomArgSemantic_MACRO \
+        X_MACRO(SizeFree0) \
+        X_MACRO(SizeFree1) \
+        X_MACRO(SizeFree2) \
+        X_MACRO(SizeSum) \
+        X_MACRO(AddressA) \
+        X_MACRO(AddressB) \
+        X_MACRO(AddressC) \
+        X_MACRO(AddressD) \
+        X_MACRO(StrideA0) \
+        X_MACRO(StrideA1) \
+        X_MACRO(StrideB0) \
+        X_MACRO(StrideB1) \
+        X_MACRO(StrideC0) \
+        X_MACRO(StrideC1) \
+        X_MACRO(StrideD0) \
+        X_MACRO(StrideD1) \
+        X_MACRO(Alpha) \
+        X_MACRO(Beta) \
+        X_MACRO(SplitK) \
+        X_MACRO(OutputBF16) \
+        X_MACRO(StrideA0Bytes) \
+        X_MACRO(StrideB0Bytes) \
+        X_MACRO(StrideC0Bytes) \
+        X_MACRO(StrideD0Bytes) \
+        X_MACRO(Padding) \
+        X_MACRO(DebugPattern)
+
+    enum class CustomArgSemantic
     {
-        SizeFree0,  // 0
-        SizeFree1,  // 1
-        SizeFree2,  // 2
-        SizeSum,    // 3
-        AddressA,   // 4
-        AddressB,   // 5
-        AddressC,   // 6
-        AddressD,   // 7
-        StrideA0,   // 8
-        StrideA1,   // 9
-        StrideB0,   // 10
-        StrideB1,   // 11
-        StrideC0,   // 12
-        StrideC1,   // 13
-        StrideD0,   // 14
-        StrideD1,   // 15
-        Alpha,      // 16
-        Beta,       // 17
-        SplitK,            // 18
-        OutputBF16,        // 19
-        StrideA0Bytes,     // 20
-        StrideB0Bytes,     // 21
-        StrideC0Bytes,     // 22
-        StrideD0Bytes,     // 23
-        Padding,           // 24
-        DebugPattern,      // 25
-        CustomArgSemantic_Count,      // 26
+        #define X_MACRO(name) name,
+        CustomArgSemantic_MACRO
+        #undef X_MACRO
+        COUNT,
     };
     
     std::string toString(CustomArgSemantic arg);
