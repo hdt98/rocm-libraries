@@ -2451,144 +2451,226 @@ class Solution(collections.abc.Mapping):
       if state["LocalReadVectorWidthB"] == -1:
         state["LocalReadVectorWidthB"] = state["LocalReadVectorWidth"]
 
-      # Default LocalReadVectorWidth
-      if state["EnableMatrixInstruction"]:
+      def calLRVW():
         # Default LocalReadVectorWidth
-        autoLRVWA = False
-        maxLRVWA = int(Solution.MAX_NUM_DS_LOAD_BYTES // state["ProblemType"]["MacDataTypeA"].numBytes())
-        # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
-        if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeA"].numBytes() == 0.75:
-          maxLRVWA = 32
-        if state["LocalReadVectorWidthA"] == -1:
-          autoLRVWA = True
-          if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES):
-            state["LocalReadVectorWidthA"] = maxLRVWA
-          else:
-            state["LocalReadVectorWidthA"] = min(state["MIInputPerThread"], maxLRVWA)
-          assert state["LocalReadVectorWidthA"] <= maxLRVWA, "# bytes of lrvw > 32"
-        else:
-          if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
-            if state["LocalReadVectorWidthA"] != maxLRVWA and state["TransposeLDS"]:
-              reject(state, printRejectionReason, f"gfx1250 requires lrvwA == {maxLRVWA} for datatype {state['ProblemType']['MacDataTypeA']}, actual value: {state['LocalReadVectorWidthA']}")
-          if state["ProblemType"]["Sparse"]:
-            if isaInfoMap[isa].asmCaps["HasSMFMA"]: # gfx942, gfx950
-              if state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
-                if state["LocalReadVectorWidthA"] < state["MIInputPerThread"] // 2:
-                  reject(state, printRejectionReason, "LocalReadVectorWidthA < %u" %(state["MIInputPerThread"] // 2))
-            elif isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"]: # gfx1250
-              if state["ProblemType"]["Sparse"] and state["LocalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
-                reject(state, printRejectionReason, "LocalReadVectorWidthA * BytePerMacDataTypeA(%s) > %d bytes." % (state["ProblemType"]["MacDataTypeA"].numBytes(), Solution.MAX_NUM_DS_LOAD_BYTES))
-          elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeA"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
-            if state["LocalReadVectorWidthA"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
-              reject(state, printRejectionReason, "LocalReadVectorWidthA < %u" %(state["MIInputPerThread"]))
-          if state["LocalReadVectorWidthA"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
-            reject(state, printRejectionReason, "LocalReadVectorWidth require Transpose LDS")
-
-        if autoLRVWA:
-          if state["LocalReadVectorWidthA"] // state["MIInputPerThread"] > 1:
-            if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthA"] // state["MIInputPerThread"]):
-              # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
-              state["LocalReadVectorWidthA"] //= 2
-
-        # Default LocalReadVectorWidth
-        autoLRVWB = False
-        maxLRVWB = int(Solution.MAX_NUM_DS_LOAD_BYTES // state["ProblemType"]["MacDataTypeB"].numBytes())
-        # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
-        if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeB"].numBytes() == 0.75:
-          maxLRVWB = 32
-        if state["LocalReadVectorWidthB"] == -1:
-          autoLRVWB = True
-          if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES):
-            state["LocalReadVectorWidthB"] = maxLRVWB
-          else:
-            state["LocalReadVectorWidthB"] = min(state["MIInputPerThread"], maxLRVWB)
-          assert state["LocalReadVectorWidthB"] <= maxLRVWB, "# bytes of lrvwB > 32"
-        else:
-          if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
-            if state["LocalReadVectorWidthB"] != maxLRVWB and state["TransposeLDS"]:
-              reject(state, printRejectionReason, f"gfx1250 requires lrvwB == {maxLRVWB} for MacDataTypeB {state['ProblemType']['MacDataTypeB']}, actual value: {state['LocalReadVectorWidthB']}")
-          # TODO: Find better conditons to filter gfx1250 solutions
-          if state["ProblemType"]["Sparse"]:
-            if isaInfoMap[isa].asmCaps["HasSMFMA"]: # gfx942, gfx950
-              if state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
-                if state["LocalReadVectorWidthB"] < state["MIInputPerThread"] // 2:
-                  reject(state, printRejectionReason, "LocalReadVectorWidthB < %u" %(state["MIInputPerThread"] // 2))
-            elif isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"]: # gfx1250
-              if state["ProblemType"]["Sparse"] and state["LocalReadVectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
-                reject(state, printRejectionReason, "LocalReadVectorWidthB * BytePerMacDataTypeB(%s) > %d bytes." % (state["ProblemType"]["MacDataTypeB"].numBytes(), Solution.MAX_NUM_DS_LOAD_BYTES))
-          elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeB"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
-            if state["LocalReadVectorWidthB"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
-              reject(state, printRejectionReason, "LocalReadVectorWidthB < %u" %(state["MIInputPerThread"]))
-          if state["LocalReadVectorWidthB"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
-            reject(state, printRejectionReason, "LocalReadVectorWidthB require Transpose LDS")
-
-        if autoLRVWB:
-          if state["LocalReadVectorWidthB"] // state["MIInputPerThread"] > 1:
-            if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthB"] // state["MIInputPerThread"]):
-              # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
-              state["LocalReadVectorWidthB"] //= 2
-
-        if autoLRVWA or autoLRVWB:
-          wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
-          wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
-          if (wlrA > 1) or (wlrB > 1):
-            padA, padB, padM, padMXSA, padMXSB = calcLdsPad(isaInfoMap)
-            ldsBlockSizePerPadA = calcLdsBlockSizePerPad("A", state["LocalReadVectorWidthA"])
-            ldsBlockSizePerPadB = calcLdsBlockSizePerPad("B", state["LocalReadVectorWidthB"])
-            ldsBlockSizePerPadMXSA = calcLdsBlockSizePerPad("MXSA", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockA"] else 0
-            ldsBlockSizePerPadMXSB = calcLdsBlockSizePerPad("MXSB", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockB"] else 0
-            ldsBlockSizePerPadA = 0 if padA == 0 else ldsBlockSizePerPadA
-            ldsBlockSizePerPadB = 0 if padB == 0 else ldsBlockSizePerPadB
-            ldsBlockSizePerPadMXSA = 0 if padMXSA == 0 else ldsBlockSizePerPadMXSA
-            ldsBlockSizePerPadMXSB = 0 if padMXSB == 0 else ldsBlockSizePerPadMXSB
-            checkLdsBlockSizePerPadForTDM(ldsBlockSizePerPadA, ldsBlockSizePerPadB, ldsBlockSizePerPadMXSA, ldsBlockSizePerPadMXSB)
-            (ldsNumBytesA, ldsNumBytesAlignedA) = calcLdsNumBytesAB("A", padA, ldsBlockSizePerPadA)
-            (ldsNumBytesB, ldsNumBytesAlignedB) = calcLdsNumBytesAB("B", padB, ldsBlockSizePerPadB)
-            (ldsNumBytesMXSA, ldsNumBytesAlignedMXSA) = calcLdsNumBytesAB("MXSA", padMXSA, ldsBlockSizePerPadMXSA) if state["ProblemType"]["MXBlockA"] else 0, 0
-            (ldsNumBytesMXSB, ldsNumBytesAlignedMXSB) = calcLdsNumBytesAB("MXSB", padMXSB, ldsBlockSizePerPadMXSB) if state["ProblemType"]["MXBlockB"] else 0, 0
-            (ldsNumBytesMetadata, ldsNumBytesAlignedMetadata) = calcLdsNumBytesM()
-            ldsNumBytesMetadata, ldsNumBytesAlignedMetadata = calcLdsNumBytesM()
-            if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > state["MaxLDS"]:
-              if wlrA > 1:
-                state["LocalReadVectorWidthA"] //= 2
-              if wlrB > 1:
-                state["LocalReadVectorWidthB"] //= 2
-          wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
-          wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
-          if wlrA > wlrB:
-            state["LocalReadVectorWidthA"] = wlrB * state["MIInputPerThread"]
-          if wlrA < wlrB:
-            state["LocalReadVectorWidthB"] = wlrA * state["MIInputPerThread"]
-
-        if state["ProblemType"]["Sparse"] == 1:
-          state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthA"]
-        elif state["ProblemType"]["Sparse"] == 2:
-          state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthB"]
-
-        if state["enableGLTrA"] or state["enableGLTrB"]:
-          state["LocalReadVectorWidth"] = 8
-          state["LocalReadVectorWidthA"] = 8
-          state["LocalReadVectorWidthB"] = 8
-      else:
-        if state["UseDotInstruction"]:
-          # dot2: LRVW should be equal to NumDotElements * InnerUnroll
-          if state["LocalReadVectorWidth"] not in [-1, state["NumDotElements"] * state["InnerUnroll"]]:
-            reject(state, printRejectionReason, "dot kernel requires LocalReadVectorWidth = NumDotElements(%u) * InnerUnroll(%u)" \
-              % (state["NumDotElements"], state["InnerUnroll"]))
-            return
-          state["LocalReadVectorWidth"] = state["NumDotElements"] * state["InnerUnroll"]
-          state["LocalReadVectorWidthA"] = state["NumDotElements"] * state["InnerUnroll"]
-          state["LocalReadVectorWidthB"] = state["NumDotElements"] * state["InnerUnroll"]
-        else: # mac
-          if state["LocalReadVectorWidth"] == -1:
-            state["LocalReadVectorWidth"] = state["VectorWidthA"]
-          if state["LocalReadVectorWidth"] != state["VectorWidthA"] or \
-             state["LocalReadVectorWidth"] != state["VectorWidthB"]:
-            reject(state, printRejectionReason, "LocalReadVectorWidth must equal VectorWidthA/B for MAC kernels")
+        if state["EnableMatrixInstruction"]:
+          # Default LocalReadVectorWidth
+          autoLRVWA = False
+          maxLRVWA = int(Solution.MAX_NUM_DS_LOAD_BYTES // state["ProblemType"]["MacDataTypeA"].numBytes())
+          # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
+          if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeA"].numBytes() == 0.75:
+            maxLRVWA = 32
           if state["LocalReadVectorWidthA"] == -1:
-            state["LocalReadVectorWidthA"] = state["VectorWidthA"]
+            autoLRVWA = True
+            if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES):
+              state["LocalReadVectorWidthA"] = maxLRVWA
+            else:
+              state["LocalReadVectorWidthA"] = min(state["MIInputPerThread"], maxLRVWA)
+            assert state["LocalReadVectorWidthA"] <= maxLRVWA, "# bytes of lrvw > 32"
+          else:
+            if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+              if state["LocalReadVectorWidthA"] != maxLRVWA and state["TransposeLDS"]:
+                reject(state, printRejectionReason, f"gfx1250 requires lrvwA == {maxLRVWA} for datatype {state['ProblemType']['MacDataTypeA']}, actual value: {state['LocalReadVectorWidthA']}")
+            if state["ProblemType"]["Sparse"]:
+              if isaInfoMap[isa].asmCaps["HasSMFMA"]: # gfx942, gfx950
+                if state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
+                  if state["LocalReadVectorWidthA"] < state["MIInputPerThread"] // 2:
+                    reject(state, printRejectionReason, "LocalReadVectorWidthA < %u" %(state["MIInputPerThread"] // 2))
+              elif isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"]: # gfx1250
+                if state["ProblemType"]["Sparse"] and state["LocalReadVectorWidthA"] * state["ProblemType"]["MacDataTypeA"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
+                  reject(state, printRejectionReason, "LocalReadVectorWidthA * BytePerMacDataTypeA(%s) > %d bytes." % (state["ProblemType"]["MacDataTypeA"].numBytes(), Solution.MAX_NUM_DS_LOAD_BYTES))
+            elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeA"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
+              if state["LocalReadVectorWidthA"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+                reject(state, printRejectionReason, "LocalReadVectorWidthA < %u" %(state["MIInputPerThread"])) # << Rejected here
+            if state["LocalReadVectorWidthA"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidth require Transpose LDS")
+
+          if autoLRVWA:
+            if state["LocalReadVectorWidthA"] // state["MIInputPerThread"] > 1:
+              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthA"] // state["MIInputPerThread"]):
+                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                state["LocalReadVectorWidthA"] //= 2
+
+          # Default LocalReadVectorWidth
+          autoLRVWB = False
+          maxLRVWB = int(Solution.MAX_NUM_DS_LOAD_BYTES // state["ProblemType"]["MacDataTypeB"].numBytes())
+          # Set maxLRVW to 32 for 6 bits float: use two load instructions b128(4 vgpr) and b64(2 vgpr) to mimic b192
+          if isaInfoMap[isa].asmCaps["HasWMMA_f8f6f4"] and state["ProblemType"]["MacDataTypeB"].numBytes() == 0.75:
+            maxLRVWB = 32
           if state["LocalReadVectorWidthB"] == -1:
-            state["LocalReadVectorWidthB"] = state["VectorWidthB"]
+            autoLRVWB = True
+            if state["TransposeLDS"] or (state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES):
+              state["LocalReadVectorWidthB"] = maxLRVWB
+            else:
+              state["LocalReadVectorWidthB"] = min(state["MIInputPerThread"], maxLRVWB)
+            assert state["LocalReadVectorWidthB"] <= maxLRVWB, "# bytes of lrvwB > 32"
+          else:
+            if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+              if state["LocalReadVectorWidthB"] != maxLRVWB and state["TransposeLDS"]:
+                reject(state, printRejectionReason, f"gfx1250 requires lrvwB == {maxLRVWB} for MacDataTypeB {state['ProblemType']['MacDataTypeB']}, actual value: {state['LocalReadVectorWidthB']}")
+            # TODO: Find better conditons to filter gfx1250 solutions
+            if state["ProblemType"]["Sparse"]:
+              if isaInfoMap[isa].asmCaps["HasSMFMA"]: # gfx942, gfx950
+                if state["MIInputPerThread"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
+                  if state["LocalReadVectorWidthB"] < state["MIInputPerThread"] // 2:
+                    reject(state, printRejectionReason, "LocalReadVectorWidthB < %u" %(state["MIInputPerThread"] // 2))
+              elif isaInfoMap[isa].asmCaps["HasSWMMAC_gfx1250"]: # gfx1250
+                if state["ProblemType"]["Sparse"] and state["LocalReadVectorWidthB"] * state["ProblemType"]["MacDataTypeB"].numBytes() > Solution.MAX_NUM_DS_LOAD_BYTES:
+                  reject(state, printRejectionReason, "LocalReadVectorWidthB * BytePerMacDataTypeB(%s) > %d bytes." % (state["ProblemType"]["MacDataTypeB"].numBytes(), Solution.MAX_NUM_DS_LOAD_BYTES))
+            elif not state["ProblemType"]["Sparse"] and not state["UseF32XEmulation"] and not(state["ProblemType"]["MacDataTypeB"].is8bitFloat() and (state["MatrixInstK"] in [64, 128,])):
+              if state["LocalReadVectorWidthB"] < state["MIInputPerThread"] and not state["LDSTrInst"] and not isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
+                reject(state, printRejectionReason, "LocalReadVectorWidthB < %u" %(state["MIInputPerThread"]))
+            if state["LocalReadVectorWidthB"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidthB require Transpose LDS")
+
+          if autoLRVWB:
+            if state["LocalReadVectorWidthB"] // state["MIInputPerThread"] > 1:
+              if (state["DepthU"] // state["MatrixInstK"] <= state["LocalReadVectorWidthB"] // state["MIInputPerThread"]):
+                # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                state["LocalReadVectorWidthB"] //= 2
+
+          if autoLRVWA or autoLRVWB:
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+            if (wlrA > 1) or (wlrB > 1):
+              padA, padB, padM, padMXSA, padMXSB = calcLdsPad(isaInfoMap)
+              ldsBlockSizePerPadA = calcLdsBlockSizePerPad("A", state["LocalReadVectorWidthA"])
+              ldsBlockSizePerPadB = calcLdsBlockSizePerPad("B", state["LocalReadVectorWidthB"])
+              ldsBlockSizePerPadMXSA = calcLdsBlockSizePerPad("MXSA", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockA"] else 0
+              ldsBlockSizePerPadMXSB = calcLdsBlockSizePerPad("MXSB", state["LocalReadVectorWidthMXS"]) if state["ProblemType"]["MXBlockB"] else 0
+              ldsBlockSizePerPadA = 0 if padA == 0 else ldsBlockSizePerPadA
+              ldsBlockSizePerPadB = 0 if padB == 0 else ldsBlockSizePerPadB
+              ldsBlockSizePerPadMXSA = 0 if padMXSA == 0 else ldsBlockSizePerPadMXSA
+              ldsBlockSizePerPadMXSB = 0 if padMXSB == 0 else ldsBlockSizePerPadMXSB
+              checkLdsBlockSizePerPadForTDM(ldsBlockSizePerPadA, ldsBlockSizePerPadB, ldsBlockSizePerPadMXSA, ldsBlockSizePerPadMXSB)
+              (ldsNumBytesA, ldsNumBytesAlignedA) = calcLdsNumBytesAB("A", padA, ldsBlockSizePerPadA)
+              (ldsNumBytesB, ldsNumBytesAlignedB) = calcLdsNumBytesAB("B", padB, ldsBlockSizePerPadB)
+              (ldsNumBytesMXSA, ldsNumBytesAlignedMXSA) = calcLdsNumBytesAB("MXSA", padMXSA, ldsBlockSizePerPadMXSA) if state["ProblemType"]["MXBlockA"] else (0, 0)
+              (ldsNumBytesMXSB, ldsNumBytesAlignedMXSB) = calcLdsNumBytesAB("MXSB", padMXSB, ldsBlockSizePerPadMXSB) if state["ProblemType"]["MXBlockB"] else (0, 0)
+              (ldsNumBytesMetadata, ldsNumBytesAlignedMetadata) = calcLdsNumBytesM()
+              if (ldsNumBytesAlignedA + ldsNumBytesAlignedB) > state["MaxLDS"]:
+                if wlrA > 1:
+                  state["LocalReadVectorWidthA"] //= 2
+                if wlrB > 1:
+                  state["LocalReadVectorWidthB"] //= 2
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+            if wlrA > wlrB:
+              state["LocalReadVectorWidthA"] = wlrB * state["MIInputPerThread"]
+            if wlrA < wlrB:
+              state["LocalReadVectorWidthB"] = wlrA * state["MIInputPerThread"]
+
+          if state["ProblemType"]["Sparse"] == 1:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthA"]
+          elif state["ProblemType"]["Sparse"] == 2:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthB"]
+
+          if state["enableGLTrA"] or state["enableGLTrB"]:
+            state["LocalReadVectorWidth"] = 8
+            state["LocalReadVectorWidthA"] = 8
+            state["LocalReadVectorWidthB"] = 8
+        else:
+          if state["UseDotInstruction"]:
+            # dot2: LRVW should be equal to NumDotElements * InnerUnroll
+            if state["LocalReadVectorWidth"] not in [-1, state["NumDotElements"] * state["InnerUnroll"]]:
+              reject(state, printRejectionReason, "dot kernel requires LocalReadVectorWidth = NumDotElements(%u) * InnerUnroll(%u)" \
+                % (state["NumDotElements"], state["InnerUnroll"]))
+              return
+            state["LocalReadVectorWidth"] = state["NumDotElements"] * state["InnerUnroll"]
+            state["LocalReadVectorWidthA"] = state["NumDotElements"] * state["InnerUnroll"]
+            state["LocalReadVectorWidthB"] = state["NumDotElements"] * state["InnerUnroll"]
+          else: # mac
+            if state["LocalReadVectorWidth"] == -1:
+              state["LocalReadVectorWidth"] = state["VectorWidthA"]
+            if state["LocalReadVectorWidth"] != state["VectorWidthA"] or \
+               state["LocalReadVectorWidth"] != state["VectorWidthB"]:
+              reject(state, printRejectionReason, "LocalReadVectorWidth must equal VectorWidthA/B for MAC kernels")
+            if state["LocalReadVectorWidthA"] == -1:
+              state["LocalReadVectorWidthA"] = state["VectorWidthA"]
+            if state["LocalReadVectorWidthB"] == -1:
+              state["LocalReadVectorWidthB"] = state["VectorWidthB"]
+
+
+      def calLRVWFor950MX():
+        # Determine if we need to infer LRVW. Returns True if,
+        #   - state["LocalReadVectorWidth{tc}"] is -1, and,
+        #   - state["ProblemType"]["MacDataType{tc}"] is not 6-bit float
+        # If the LRVW is set by the user, validate the configuration and rejects if,
+        #   - state["LocalReadVectorWidth{tc}"] * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 if not sparse
+        #   - state["LocalReadVectorWidth{tc}"] // 2 * state["ProblemType"]["MacDataType{tc}"].numRegisters() < 1 is sparse
+        #   - state["LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and LDS is not transposed 
+        def isAutoLRVW(tc) -> bool:
+          autoLRVW = False
+          if state[f"LocalReadVectorWidth{tc}"] != -1:
+            tmplrvw = (state[f"LocalReadVectorWidth{tc}"] // 2) if state["ProblemType"]["Sparse"] else state[f"LocalReadVectorWidth{tc}"]
+            if tmplrvw * state["ProblemType"][f"MacDataType{tc}"].numRegisters() < 1:
+              reject(state, "LocalReadVectorWidth * dataRegister < 1")
+            if state[f"LocalReadVectorWidth{tc}"] > state["MIInputPerThread"] and not state["TransposeLDS"]:
+              reject(state, "LocalReadVectorWidth require Transpose LDS")
+          else:
+            if state["ProblemType"][f"MacDataType{tc}"].is6bitFloat():
+              state[f"LocalReadVectorWidth{tc}"] = 32 if state[f"UnrollMajorLDS{tc}"] else 16
+            else:
+              autoLRVW = True
+              if state["TransposeLDS"] and (not state[f"DirectToLds{tc}"]):
+                state[f"LocalReadVectorWidth{tc}"] = int(16 // state["ProblemType"][f"MacDataType{tc}"].numBytes())
+              else:
+                if state["ProblemType"]["Sparse"] and state["MIInputPerThread"] * state["ProblemType"][f"MacDataType{tc}"].numBytes() > 16:
+                  state[f"LocalReadVectorWidth{tc}"] = int(16 // state["ProblemType"][f"MacDataType{tc}"].numBytes())
+                else:
+                  state[f"LocalReadVectorWidth{tc}"] = state["MIInputPerThread"]
+              if state[f"LocalReadVectorWidth{tc}"] // state["MIInputPerThread"] > 1:
+                if (state["DepthU"] // state["MatrixInstK"] <= state[f"LocalReadVectorWidth{tc}"] // state["MIInputPerThread"]):
+                  # if only have 1 iteration with wider local read, reduce LRVW to have better scheduling (at least 2 iterations)
+                  state[f"LocalReadVectorWidth{tc}"] //= 2
+          return autoLRVW
+
+        if state["EnableMatrixInstruction"]:
+          autoLRVWA = isAutoLRVW("A")
+          autoLRVWB = isAutoLRVW("B")
+          if autoLRVWA or autoLRVWB:
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+
+            if (wlrA > 1) or (wlrB > 1):
+              padA, padB, padM = calcLdsPad(state["LocalReadVectorWidth"], isaInfoMap)
+              ldsBlockSizePerPadA, ldsBlockSizePerPadB = calcLdsBlockSizePerPad(state["LocalReadVectorWidth"])
+              ldsNumBytesA, ldsNumBytesAlignedA, ldsNumBytesB, ldsNumBytesAlignedB, ldsNumBytesMetadata, ldsNumBytesAlignedMetadata, \
+              ldsNumBytesMXSA, ldsNumBytesAlignedMXSA, ldsNumBytesMXSB, ldsNumBytesAlignedMXSB \
+                = calcLdsNumBytes(padA, ldsBlockSizePerPadA, padB, ldsBlockSizePerPadB)
+              ldsNumBytes = ldsNumBytesAlignedA + ldsNumBytesAlignedB + \
+                            ldsNumBytesAlignedMXSA + ldsNumBytesAlignedMXSB + \
+                            ldsNumBytesAlignedMetadata 
+              if ldsNumBytes > state["MaxLDS"]:
+                if wlrA > 1:
+                  state["LocalReadVectorWidthA"] //= 2
+                if wlrB > 1:
+                  state["LocalReadVectorWidthB"] //= 2
+
+            wlrA = max(state["LocalReadVectorWidthA"] // state["MIInputPerThread"], 1)
+            wlrB = max(state["LocalReadVectorWidthB"] // state["MIInputPerThread"], 1)
+            if wlrA > wlrB:
+              state["LocalReadVectorWidthA"] = wlrB * state["MIInputPerThread"]
+            if wlrA < wlrB:
+              state["LocalReadVectorWidthB"] = wlrA * state["MIInputPerThread"]
+
+          if state["ProblemType"]["Sparse"] == 1:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthA"]
+          elif state["ProblemType"]["Sparse"] == 2:
+            state["LocalReadVectorWidthMetadata"] = state["LocalReadVectorWidthB"]
+
+          if state["ProblemType"]["MXBlockA"]:
+            state["LocalReadVectorWidthMXSA"] = 1 # TODO: check if need to fomulization
+          if state["ProblemType"]["MXBlockB"]:
+            state["LocalReadVectorWidthMXSB"] = 1 # TODO: check if need to fomulization
+        else:
+          assert False, "expecting MFMA for MX datatypes"
+
+      # Default LocalReadVectorWidth
+      if state["ISA"] == IsaVersion(9,5,0) and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+        calLRVWFor950MX()
+      else:
+        calLRVW()
 
       def calcOptGRVW(lrvw: int, unrollMajorLDS: bool, datatype: DataType) -> int:
         # with UnrollMajorLDS, GRVW need to less or equal than LRVW to have conflict free LDS read with padding.
