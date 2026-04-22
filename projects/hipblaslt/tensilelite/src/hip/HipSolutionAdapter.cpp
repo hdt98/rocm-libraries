@@ -37,7 +37,6 @@
 //@TODO add alternative for windows
 #ifndef _WIN32
 #include <glob.h>
-#include <unistd.h>
 #endif
 #include <regex>
 
@@ -254,8 +253,7 @@ namespace TensileLite
                 size_t     loc = codeObjectFile.rfind('.');
                 hipError_t err;
 
-                static const char* coVerSuffixes[] = {"-xnack+", "-xnack-", ""};
-                for(const char* ver : coVerSuffixes)
+                for(auto ver : {"", "-xnack-", "-xnack+"})
                 {
                     std::string modifiedCOName = codeObjectFile;
                     modifiedCOName.insert(loc, ver);
@@ -374,27 +372,25 @@ namespace TensileLite
 
             if(!loaded)
             {
-                hipError_t err = hipErrorUnknown;
-
-                // ROCm 7.x often emits only xnack-qualified helper COs (e.g. gfx950-xnack+.hsaco).
-                // Try those first, then the legacy unsuffixed name. On Linux, skip missing paths with
-                // access() so we do not depend on hipErrorFileNotFound for ENOENT across HIP versions.
-                static const char* verSuffixes[] = {"-xnack+", "-xnack-", ""};
-                for(const char* ver : verSuffixes)
+                hipError_t err;
+                //Try xnack variations
+                for(auto ver : {"", "-xnack-", "-xnack+"})
                 {
-                    std::string const modifiedCOName = helperKernelName + ver + ".hsaco";
-                    std::string const fullPath       = codeObjDir + modifiedCOName;
+                    std::string modifiedCOName = helperKernelName + ver + ".hsaco";
+                    err                        = loadCodeObjectFile(codeObjDir + modifiedCOName);
 
-#ifndef _WIN32
-                    if(access(fullPath.c_str(), R_OK) != 0)
-                        continue;
-#endif
-                    err = loadCodeObjectFile(fullPath);
                     if(err == hipSuccess)
+                    {
                         return err;
-                    if(err == hipErrorFileNotFound)
+                    }
+                    else if(err == hipErrorFileNotFound)
+                    {
+                        // We expect that we could fail for cases when we have xnack variations
+                        // so clear hipErrorFileNotFound between iterations.
                         (void)hipGetLastError();
+                    }
                 }
+
                 return err;
             }
 
