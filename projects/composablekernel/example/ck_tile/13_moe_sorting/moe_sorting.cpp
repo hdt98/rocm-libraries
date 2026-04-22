@@ -1,12 +1,14 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
 
+#include <filesystem>
 #include <set>
 #include <vector>
 #include <iostream>
 #include <numeric>
 #include <cassert>
 #include <cstdlib>
+#include <format>
 #include <iostream>
 #include <time.h>
 #include <unordered_set>
@@ -58,6 +60,7 @@ auto create_args(int argc, char* argv[])
                 "-1",
                 "seed to be used. When set to -1, a random seed will be generated each time "
                 "invoking this example")
+        .insert("lgs", "1", "lane_group_size")
         .insert("kname", "0", "prints the kernel name when set to 1")
         .insert("warmup", "5", "number of iterations before benchmark the kernel")
         .insert("repeat", "20", "number of iterations to benchmark the kernel")
@@ -93,7 +96,7 @@ void topid_unique_gen(
 }
 
 template <typename WeightType, typename IndexType = ck_tile::index_t>
-bool test_moe_sorting(ck_tile::ArgParser args)
+bool test_moe_sorting(ck_tile::ArgParser args, float* ms_ = nullptr)
 {
     int validate            = args.get_int("v");
     std::string index_prec  = args.get_str("pr_i");
@@ -115,6 +118,7 @@ bool test_moe_sorting(ck_tile::ArgParser args)
     int repeat          = args.get_int("repeat");
     bool clear_inside   = args.get_int("ci") != 0;
     int dispatch_policy = args.get_int("dispatch");
+    int lane_group_size = args.get_int("lgs");
 
     int max_output_ids =
         ck_tile::integer_least_multiple(topk * tokens + num_experts * unit_size - topk, unit_size);
@@ -229,38 +233,50 @@ bool test_moe_sorting(ck_tile::ArgParser args)
         moe_sorting_ws.SetZero(); // note, clear here!!!!
 
     moe_sorting_trait trait{
-        index_prec, weight_prec, local_expert_masking, clear_inside, dispatch_policy};
+        index_prec,
+        weight_prec,
+        local_expert_masking,
+        clear_inside,
+        dispatch_policy,
+        lane_group_size,
+    };
 
-    moe_sorting_args karg{topk_ids_dev.GetDeviceBuffer(),
-                          weights_dev.GetDeviceBuffer(),
-                          local_expert_masking ? local_expert_masking_dev.GetDeviceBuffer()
-                                               : nullptr,
-                          is_local_token ? local_tokens_dev.GetDeviceBuffer() : nullptr,
-                          sorted_ids_dev.GetDeviceBuffer(),
-                          sorted_weights_dev.GetDeviceBuffer(),
-                          sorted_expert_ids_dev.GetDeviceBuffer(),
-                          sorted_id_cnt_dev.GetDeviceBuffer(),
-                          moe_buf_bytes > 0 ? moe_buf_dev.GetDeviceBuffer() : nullptr,
-                          workspace_size != 0 ? moe_sorting_ws.GetDeviceBuffer() : nullptr,
-                          tokens,
-                          unit_size,
-                          num_experts,
-                          topk,
+    moe_sorting_args karg{
+        topk_ids_dev.GetDeviceBuffer(),
+        weights_dev.GetDeviceBuffer(),
+        local_expert_masking ? local_expert_masking_dev.GetDeviceBuffer() : nullptr,
+        is_local_token ? local_tokens_dev.GetDeviceBuffer() : nullptr,
+        sorted_ids_dev.GetDeviceBuffer(),
+        sorted_weights_dev.GetDeviceBuffer(),
+        sorted_expert_ids_dev.GetDeviceBuffer(),
+        sorted_id_cnt_dev.GetDeviceBuffer(),
+        moe_buf_bytes > 0 ? moe_buf_dev.GetDeviceBuffer() : nullptr,
+        workspace_size != 0 ? moe_sorting_ws.GetDeviceBuffer() : nullptr,
+        tokens,
+        unit_size,
+        num_experts,
+        topk,
 #if MOE_SORTING_FMOE_2D_BUF
-                          moe_buf_interm_dim,
-                          moe_buf_elem_bytes
+        moe_buf_interm_dim,
+        moe_buf_elem_bytes,
 #else
-                          static_cast<ck_tile::long_index_t>(moe_buf_size * sizeof(float))
+        static_cast<ck_tile::long_index_t>(moe_buf_size * sizeof(float)),
 #endif
     };
 
-    ck_tile::stream_config sc{nullptr,
-                              true,
-                              /* log_level = */ (kname ? 1 : 0),
-                              warmup,
-                              repeat};
+    ck_tile::stream_config sc{
+        nullptr,
+        true,
+        /* log_level = */ (kname ? 1 : 0),
+        warmup,
+        repeat,
+    };
 
     auto ms = moe_sorting(trait, karg, sc);
+    if(ms_)
+    {
+        *ms_ = ms;
+    }
     // auto ms = moe_sorting_mp(trait, karg, sc);
 
 #if 0
@@ -344,6 +360,8 @@ bool test_moe_sorting(ck_tile::ArgParser args)
 #endif
     }
 
+    printf("lgs:%s, ", args.get_str("lgs").c_str());
+    printf("dispatch:%s, ", args.get_str("dispatch").c_str());
     if(ms < 0)
         printf("not supported\n");
     else
@@ -462,26 +480,52 @@ bool test_moe_sorting(ck_tile::ArgParser args)
 
 int main(int argc, char** argv)
 {
-    try
+
+    auto [result, args] = create_args(argc, argv);
+    if(!result)
+        return -1;
+    std::string index_prec  = args.get_str("pr_i");
+    std::string weight_prec = args.get_str("pr_w");
+
+    const auto go = [&](float* ms, bool* ok) {
+        *ok = test_moe_sorting<float, ck_tile::index_t>(args, ms);
+    };
+
+    int max_e = 1024;
+    int max_t = 4096;
+    int topk  = 3;
+    // int k     = 32;
+    std::vector<int> lgss{1, 2, 4, 8};
+    std::vector<int> ds{1, 2};
+
+    std::stringstream ss;
+    ss << std::format("dispatch, tokens, experts, topk, lane_group_size, ok, ms \n");
+    for(int e = 32; e < max_e; e *= 2)
     {
-        auto [result, args] = create_args(argc, argv);
-        if(!result)
-            return -1;
-
-        std::string index_prec  = args.get_str("pr_i");
-        std::string weight_prec = args.get_str("pr_w");
-
-        bool r = true;
-        if(weight_prec == "fp32" && index_prec == "int32")
+        for(int t = 1; t < max_t; t *= 2)
         {
-            r &= test_moe_sorting<float, ck_tile::index_t>(args);
-        }
+            for(auto d : ds)
+            {
+                for(auto lgs : lgss)
+                {
+                    args.input_map["lgs"].value      = std::format("{}", lgs);
+                    args.input_map["e"].value        = std::format("{}", e);
+                    args.input_map["t"].value        = std::format("{}", t);
+                    args.input_map["dispatch"].value = std::format("{}", d);
+                    args.input_map["topk"].value     = std::format("{}", topk);
 
-        return r ? 0 : -1;
+                    float ms = 0;
+                    bool ok  = false;
+                    go(&ms, &ok);
+                    ss << std::format("{}, {}, {}, {}, {}, {}, {} \n", d, t, e, topk, lgs, ok, ms);
+                }
+            }
+        }
     }
-    catch(const std::runtime_error& e)
-    {
-        std::cerr << "Runtime error: " << e.what() << '\n';
-        return EXIT_FAILURE;
-    }
+    std::filesystem::path path{
+        "/root/workspace/rocm-libraries/projects/composablekernel/times.csv"};
+    std::ofstream f;
+    f.open(path);
+    f << ss.str();
+    f.close();
 }

@@ -1,0 +1,22 @@
+# https://taskfile.dev
+
+# sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+version: "3"
+
+tasks:
+  init:
+    cmds:
+      - apt -y update
+      - apt -y install ccache htop ncdu mold
+      - pip install compdb --break-system-packages
+      # - apt -y install rocprofiler-compute
+      # - update-alternatives --install /usr/bin/rocprof-compute rocprof-compute /opt/rocm/bin/rocprof-compute 0
+      # - python3 -m pip install  --ignore-installed  -r /opt/rocm/libexec/rocprofiler-compute/requirements.txt --break-system-packages
+    status:
+      - which compdb
+
+  default:
+    deps:
+      - init
+    cmds:
+      - compdb -p /tmp/relbers/ck/build/ list > .vscode/compile_commands.json

@@ -232,7 +232,6 @@ class ArgParser
         return tokens;
     }
 
-    private:
     std::unordered_map<std::string, Arg> input_map;
     std::vector<std::string> keys;
 };

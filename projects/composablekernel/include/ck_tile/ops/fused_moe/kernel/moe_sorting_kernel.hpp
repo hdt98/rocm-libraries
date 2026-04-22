@@ -290,7 +290,7 @@ struct MoeSortingKernel
     {
 #if MOE_SORTING_USE_EX_KERNEL
         (void)h;
-        return dim3(256);
+        return dim3(kBlockSize);
 #else
         return dim3(ck_tile::integer_least_multiple(h.num_experts, ck_tile::get_warp_size()));
 #endif
@@ -775,7 +775,7 @@ struct MoeSortingKernel
         const index_t tid            = static_cast<index_t>(threadIdx.x);
         const index_t wid            = amd_wave_read_first_lane(tid / get_warp_size());
         const index_t lid            = __lane_id();
-        constexpr index_t block_size = 256;           // blockDim.x;
+        constexpr index_t block_size = kBlockSize;    // blockDim.x;
         const index_t sub_tokens     = smem_rows - 2; // sub_tokens_mdiv.divisor;
         const index_t topk           = topk_mdiv.divisor;
         auto f_sum                   = [](auto x_, auto y_) { return x_ + y_; };

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "moe_sorting_api.hpp"
+#include <stdexcept>
 
 #ifndef MOE_SORTING_USE_EX_KERNEL
 #define MOE_SORTING_USE_EX_KERNEL 1
@@ -34,7 +35,7 @@
 #else
 
 #define MOE_SORTING_DISPATCH_(                                                                          \
-    sub_token_tile_, sub_token_onshot_, local_expert_masking_, local_token_)                            \
+    sub_token_tile_, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_)          \
     constexpr ck_tile::index_t sub_token_tile = sub_token_tile_;                                        \
     constexpr bool sub_token_onshot           = sub_token_onshot_;                                      \
     constexpr bool local_expert_masking       = local_expert_masking_;                                  \
@@ -44,7 +45,10 @@
                                                                              sub_token_tile,            \
                                                                              sub_token_onshot,          \
                                                                              local_expert_masking,      \
-                                                                             local_token>;              \
+                                                                             local_token,               \
+                                                                             true,                      \
+                                                                             0,                         \
+                                                                             (lane_group_size_)>;       \
     using kernel                              = ck_tile::MoeSortingKernel<ms_problem>;                  \
     auto kargs                                = kernel::MakeKargs(a);                                   \
     const dim3 grids                          = kernel::GridSize(a);                                    \
@@ -55,52 +59,59 @@
     return ave_time;
 
 #define MOE_SORTING_DISPATCH_SUB_TOKEN_(                                                  \
-    row_, sub_token_onshot_, local_expert_masking_, local_token_)                         \
+    row_, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_)       \
     if(row_ % 8 == 0)                                                                     \
     {                                                                                     \
-        MOE_SORTING_DISPATCH_(8, sub_token_onshot_, local_expert_masking_, local_token_); \
+        MOE_SORTING_DISPATCH_(                                                            \
+            8, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_); \
     }                                                                                     \
     else if(row_ % 4 == 0)                                                                \
     {                                                                                     \
-        MOE_SORTING_DISPATCH_(4, sub_token_onshot_, local_expert_masking_, local_token_); \
+        MOE_SORTING_DISPATCH_(                                                            \
+            4, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_); \
     }                                                                                     \
     else if(row_ % 2 == 0)                                                                \
     {                                                                                     \
-        MOE_SORTING_DISPATCH_(2, sub_token_onshot_, local_expert_masking_, local_token_); \
+        MOE_SORTING_DISPATCH_(                                                            \
+            2, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_); \
     }                                                                                     \
     else                                                                                  \
     {                                                                                     \
-        MOE_SORTING_DISPATCH_(1, sub_token_onshot_, local_expert_masking_, local_token_); \
+        MOE_SORTING_DISPATCH_(                                                            \
+            1, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_); \
     }
 
-#define MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(row_, sub_token_onshot_, local_expert_masking_)    \
-    if(is_local_token)                                                                         \
-    {                                                                                          \
-        MOE_SORTING_DISPATCH_SUB_TOKEN_(row_, sub_token_onshot_, local_expert_masking_, true)  \
-    }                                                                                          \
-    else                                                                                       \
-    {                                                                                          \
-        MOE_SORTING_DISPATCH_SUB_TOKEN_(row_, sub_token_onshot_, local_expert_masking_, false) \
+#define MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(                                         \
+    row_, sub_token_onshot_, local_expert_masking_, lane_group_size_)                \
+    if(is_local_token)                                                               \
+    {                                                                                \
+        MOE_SORTING_DISPATCH_SUB_TOKEN_(                                             \
+            row_, sub_token_onshot_, local_expert_masking_, true, lane_group_size_)  \
+    }                                                                                \
+    else                                                                             \
+    {                                                                                \
+        MOE_SORTING_DISPATCH_SUB_TOKEN_(                                             \
+            row_, sub_token_onshot_, local_expert_masking_, false, lane_group_size_) \
     }
 
-#define MOE_SORTING_DISPATCH_SUBTO_(row_, local_expert_masking_)                \
-    if(is_sub_token_onshot)                                                     \
-    {                                                                           \
-        MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(row_, true, local_expert_masking_)  \
-    }                                                                           \
-    else                                                                        \
-    {                                                                           \
-        MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(row_, false, local_expert_masking_) \
+#define MOE_SORTING_DISPATCH_SUBTO_(row_, local_expert_masking_, lane_group_size_)                \
+    if(is_sub_token_onshot)                                                                       \
+    {                                                                                             \
+        MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(row_, true, local_expert_masking_, lane_group_size_)  \
+    }                                                                                             \
+    else                                                                                          \
+    {                                                                                             \
+        MOE_SORTING_DISPATCH_DYNAMIC_TOKEN_(row_, false, local_expert_masking_, lane_group_size_) \
     }
 
-#define MOE_SORTING_DISPATCH_EMASK_(row_)        \
-    if(is_local_expert_masking)                  \
-    {                                            \
-        MOE_SORTING_DISPATCH_SUBTO_(row_, true)  \
-    }                                            \
-    else                                         \
-    {                                            \
-        MOE_SORTING_DISPATCH_SUBTO_(row_, false) \
+#define MOE_SORTING_DISPATCH_EMASK_(row_, lane_group_size_)        \
+    if(is_local_expert_masking)                                    \
+    {                                                              \
+        MOE_SORTING_DISPATCH_SUBTO_(row_, true, lane_group_size_)  \
+    }                                                              \
+    else                                                           \
+    {                                                              \
+        MOE_SORTING_DISPATCH_SUBTO_(row_, false, lane_group_size_) \
     }
 
 #endif
@@ -187,8 +198,30 @@ float moe_sorting(moe_sorting_trait t, moe_sorting_args a, ck_tile::stream_confi
         bool is_local_expert_masking = t.local_expert_masking;
         bool is_local_token          = a.p_local_tokens != nullptr;
 
-        MOE_SORTING_DISPATCH_EMASK_(row_);
-        // MOE_SORTING_DISPATCH_ETILE(0, 0);
+        switch(t.lane_group_size)
+        {
+        case(1): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 1);
+        }
+        case(2): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 2);
+        }
+        case(3): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 3);
+        }
+        case(4): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 4);
+        }
+        case(6): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 6);
+        }
+        case(8): {
+            MOE_SORTING_DISPATCH_EMASK_(row_, 8);
+        }
+        default: {
+            throw std::runtime_error("Invalid lane_group_size!");
+        }
+        }
 #endif
     }
     return -1;

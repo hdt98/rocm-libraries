@@ -33,24 +33,28 @@
 
 #else
 
-#define MOE_SORTING_DISPATCH_(                                                                          \
-    sub_token_tile_, sub_token_onshot_, local_expert_masking_, local_token_)                            \
-    constexpr ck_tile::index_t sub_token_tile = sub_token_tile_;                                        \
-    constexpr bool sub_token_onshot           = sub_token_onshot_;                                      \
-    constexpr bool local_expert_masking       = local_expert_masking_;                                  \
-    constexpr bool local_token                = local_token_;                                           \
-    using ms_problem                          = ck_tile::MoeSortingProblemEx<index_t,                   \
-                                                                             ms_weight_type,            \
-                                                                             sub_token_tile,            \
-                                                                             sub_token_onshot,          \
-                                                                             local_expert_masking,      \
-                                                                             local_token>;              \
-    using kernel                              = ck_tile::MoeSortingKernel<ms_problem>;                  \
-    auto kargs                                = kernel::MakeKargs(a);                                   \
-    const dim3 grids                          = kernel::GridSize(a);                                    \
-    const dim3 blocks                         = kernel::BlockSize(a);                                   \
-    const auto lds_bytes                      = kernel::GetSmemSize(a);                                 \
-    float ave_time                            = ck_tile::launch_kernel(                                 \
+#define MOE_SORTING_DISPATCH_(                                                                           \
+    sub_token_tile_, sub_token_onshot_, local_expert_masking_, local_token_, lane_group_size_)           \
+    constexpr ck_tile::index_t sub_token_tile  = sub_token_tile_;                                        \
+    constexpr bool sub_token_onshot            = sub_token_onshot_;                                      \
+    constexpr bool local_expert_masking        = local_expert_masking_;                                  \
+    constexpr bool local_token                 = local_token_;                                           \
+    constexpr ck_tile::index_t lane_group_size = lane_group_size_;                                       \
+    using ms_problem                           = ck_tile::MoeSortingProblemEx<index_t,                   \
+                                                                              ms_weight_type,            \
+                                                                              sub_token_tile,            \
+                                                                              sub_token_onshot,          \
+                                                                              local_expert_masking,      \
+                                                                              local_token,               \
+                                                                              true,                      \
+                                                                              0,                         \
+                                                                              lane_group_size>;          \
+    using kernel                               = ck_tile::MoeSortingKernel<ms_problem>;                  \
+    auto kargs                                 = kernel::MakeKargs(a);                                   \
+    const dim3 grids                           = kernel::GridSize(a);                                    \
+    const dim3 blocks                          = kernel::BlockSize(a);                                   \
+    const auto lds_bytes                       = kernel::GetSmemSize(a);                                 \
+    float ave_time                             = ck_tile::launch_kernel(                                 \
         s, ck_tile::make_kernel(kernel{}, grids, blocks, lds_bytes, kargs)); \
     return ave_time;
 

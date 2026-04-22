@@ -18,6 +18,7 @@ struct moe_sorting_trait
                          // always use mp kernel NOTE: moe_sorting_get_workspace_size() need use
                          // same dispatch_policy value. it will be undefined behavior if ppl using
                          // different value when get ws and call the kernel
+    int lane_group_size;
 };
 
 struct moe_sorting_args : public ck_tile::MoeSortingHostArgs
