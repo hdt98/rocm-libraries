@@ -6837,36 +6837,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
             + max(self.states.a.numVgprValu + numVgprValuPackA, self.states.a.numVgprG2LAllocated)
 
     # TODO: alignment hack, figure out a better solution
-    if kernel["ProblemType"]["MXBlockA"]:
-      vgprIdx = ((vgprIdx+1)//2)*2
-      self.states.mxsa.startVgprValu = vgprIdx
-      vgprIdx += self.states.mxsa.numVgprValu
-      numVgprValuPackMXSA = 0
-      if not kernel["UnrollMajorLDSMXSA"]:
-        self.states.mxsa.startVgprValuPack = vgprIdx
-        if self.states.lrvwTileMXSA > 1:
-          numVgprValuPackMXSA = ceil(kernel["VectorWidthMXSA"] / self.states.bpr) * kernel["MIWaveTileA"] // kernel["VectorWidthMXSA"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThreadMXSA"]
-          if self.states.packDTVA:
-            # pack DTV case, double the number
-            numVgprValuPackMXSA *= 2
-        else:
-          numVgprValuPackMXSA = self.states.mxsa.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackMXSA * int(4 - 1)
-      vgprIdx += numVgprValuPackMXSA
-      self.states.mxsa.startVgprG2L = None
-      if not kernel["DirectToLdsMXSA"] or self.do["KeepDirectToLdsAlloc"]:
-        # DirectToVgpr + pack or input conversion case, overlap G2L and ValuPack
-        if self.states.packDTVA:
-          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValuPack
-        elif self.states.convDTVA:
-          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValu
-        # if PGR = True, PAP could be possibly enabled, we move G2LA later to prevent it from being reclaimed
-        # otherwise, put G2L here since it can overlap valu
-        if (not kernel["PrefetchGlobalRead"]): # g2l can overlap valu
-          self.states.mxsa.startVgprG2L = self.states.mxsa.startVgprValu
-          vgprIdx = self.states.mxsa.startVgprValu  \
-              + max(self.states.mxsa.numVgprValu + numVgprValuPackA, self.states.mxsa.numVgprG2LAllocated)
-
-    # TODO: alignment hack, figure out a better solution
     if(self.states.archCaps["VgprBank"]):
       residual = (vgprIdx % 4)
       if (residual % 2) == 0:
@@ -6905,43 +6875,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.b.startVgprG2L = self.states.b.startVgprValu
         vgprIdx = self.states.b.startVgprValu \
             + max(self.states.b.numVgprValu + numVgprValuPackB, self.states.b.numVgprG2LAllocated)
-
-    # TODO: alignment hack, figure out a better solution
-    if kernel["ProblemType"]["MXBlockB"]:
-      if(self.states.archCaps["VgprBank"]):
-        residual = (vgprIdx % 4)
-        if (residual % 2) == 0:
-          # if 2-aligned bank(bank0 and bank2), move to bank1 or bank3.
-          vgprIdx += 1
-      else:
-        vgprIdx = ((vgprIdx+1)//2)*2
-      self.states.mxsb.startVgprValu  = vgprIdx
-      vgprIdx += self.states.mxsb.numVgprValu
-      numVgprValuPackMXSB = 0
-      if not kernel["UnrollMajorLDSB"]:
-        self.states.mxsb.startVgprValuPack = vgprIdx
-        if self.states.lrvwTileMXSB > 1:
-          numVgprValuPackMXSB = ceil(kernel["VectorWidthMXSB"] / self.states.bpr) * kernel["MIWaveTileB"] // kernel["VectorWidthMXSB"] * kernel["InnerUnroll"] * self.states.numVgprBuffer * kernel["MIInputPerThreadMXSB"]
-          if self.states.packDTVB:
-            # pack DTV case, double the number
-            numVgprValuPackMXSB *= 2
-        else:
-          numVgprValuPackMXSB = self.states.mxsb.numVgprValuPerBlock * kernel["InnerUnroll"] * self.states.numVgprBufferPackMXSB * int(4 - 1)
-      vgprIdx += numVgprValuPackMXSB
-      self.states.mxsb.startVgprG2L = None
-      if not kernel["DirectToLdsB"] or self.do["KeepDirectToLdsAlloc"]:
-        # DirectToVgpr + pack  or input conversion case, overlap G2L and ValuPack
-        if self.states.packDTVB:
-          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValuPack
-        elif self.states.convDTVB:
-          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValu
-        # if PGR = True, PAP could be possibly enabled, we move G2LB later to prevent it from being reclaimed
-        # otherwise, put G2L here since it can overlap valu
-        if (not kernel["PrefetchGlobalRead"]): # g2l can overlap valu
-          self.states.mxsb.startVgprG2L = self.states.mxsb.startVgprValu
-          vgprIdx = self.states.mxsb.startVgprValu \
-              + max(self.states.mxsb.numVgprValu + numVgprValuPackMXSB, self.states.mxsb.numVgprG2LAllocated)
-
 
     if ((tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]) or                                 \
         (tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]) or                                 \
@@ -7006,16 +6939,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
       else:
         vgprIdx += self.states.a.numVgprG2LAllocated
 
-    if kernel["ProblemType"]["MXBlockA"]:
-      if self.states.mxsa.startVgprG2L is None and self.states.mxsa.numVgprG2LAllocated > 0:
-        # TODO: alignment hack, figure out a better solution
-        vgprIdx = ((vgprIdx+1)//2)*2
-        self.states.mxsa.startVgprG2L = vgprIdx;
-        if ("ULSGRODoubleG2L" in kernel) and kernel["ULSGRODoubleG2L"] == 1:
-          vgprIdx += self.states.mxsa.numVgprG2LAllocated * 2
-        else:
-          vgprIdx += self.states.mxsa.numVgprG2LAllocated
-
     if self.states.b.startVgprG2L is None and self.states.b.numVgprG2LAllocated > 0:
       # TODO: alignment hack, figure out a better solution
       vgprIdx = ((vgprIdx+1)//2)*2
@@ -7024,17 +6947,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         vgprIdx += self.states.b.numVgprG2LAllocated*2
       else:
         vgprIdx += self.states.b.numVgprG2LAllocated
-
-    if kernel["ProblemType"]["MXBlockB"]:
-      if self.states.mxsb.startVgprG2L is None and self.states.mxsb.numVgprG2LAllocated > 0:
-        # TODO: alignment hack, figure out a better solution
-        vgprIdx = ((vgprIdx+1)//2)*2
-        self.states.mxsb.startVgprG2L = vgprIdx;
-        if ("ULSGRODoubleG2L" in kernel) and kernel["ULSGRODoubleG2L"] == 1:
-          vgprIdx += self.states.mxsb.numVgprG2LAllocated * 2
-        else:
-          vgprIdx += self.states.mxsb.numVgprG2LAllocated
-
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       if self.states.m.startVgprG2L is None:
