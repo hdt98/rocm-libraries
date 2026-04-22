@@ -331,7 +331,11 @@ std::vector<Solution> EvaluateInvokers(const Handle& handle,
                 elapsed = first_elapsed;
             }
 
-            MIOPEN_THROW_IF(elapsed <= 0, "Invalid elapsed time detected in EvaluateInvokers");
+            if(elapsed <= 0)
+            {
+                MIOPEN_LOG_W("Invalid elapsed time detected in EvaluateInvokers");
+                continue;
+            }
 
             MIOPEN_LOG_I("solution(current vs best):" << sol << ": " << elapsed
                                                       << (elapsed < best ? " < " : " >= ") << best);
