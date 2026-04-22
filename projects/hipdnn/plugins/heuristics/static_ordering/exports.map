@@ -1,15 +1,13 @@
 {
     global:
-        # Module metadata
-        hipdnnHeuristicGetApiVersion;
-        hipdnnHeuristicGetPolicyId;
-        hipdnnHeuristicGetPolicyName;
-        hipdnnHeuristicGetPluginVersion;
-
-        # Logging
-        hipdnnHeuristicSetLoggingCallback;
-        hipdnnHeuristicSetLogLevel;
-        hipdnnHeuristicGetLastErrorString;
+        # Base plugin API (PluginApi.h)
+        hipdnnPluginGetName;
+        hipdnnPluginGetVersion;
+        hipdnnPluginGetApiVersion;
+        hipdnnPluginGetType;
+        hipdnnPluginSetLoggingCallback;
+        hipdnnPluginSetLogLevel;
+        hipdnnPluginGetLastErrorString;
 
         # Handle lifecycle
         hipdnnHeuristicHandleCreate;

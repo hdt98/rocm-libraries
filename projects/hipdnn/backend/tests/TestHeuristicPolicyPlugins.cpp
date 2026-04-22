@@ -18,15 +18,17 @@
 #include "descriptors/EngineHeuristicDescriptor.hpp"
 #include "descriptors/GraphDescriptor.hpp"
 #include "handle/Handle.hpp"
-#include "heuristics/DeviceProperties.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
+#include <flatbuffers/flatbuffers.h>
+#include <hip/hip_runtime.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
 
-#include <gtest/gtest.h>
 #include <filesystem>
+#include <gtest/gtest.h>
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
@@ -240,14 +242,22 @@ TEST_F(IntegrationHeuristicPolicyPlugins, DevicePropertiesAreSetOnAllHandles)
     auto heurRm = _handle->getHeuristicPluginResourceManager();
     ASSERT_NE(heurRm, nullptr);
 
-    // Create serialized device properties
-    heuristics::DeviceProperties props;
-    props.deviceId = 0;
-    props.multiProcessorCount = 64;
-    props.totalGlobalMem = 8ULL * 1024 * 1024 * 1024;
+    // Create serialized device properties using FlatBuffers
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT devProps;
+    devProps.device_id = 0;
+    devProps.multi_processor_count = 64;
+    devProps.total_global_mem = 8ULL * 1024 * 1024 * 1024;
+    devProps.architecture_name = "gfx90a";
 
-    auto serialized = heuristics::serializeDeviceProperties(props);
-    auto wrapper = heuristics::wrapSerializedDeviceProperties(serialized);
+    // Serialize using FlatBuffers
+    flatbuffers::FlatBufferBuilder builder(256);
+    auto offset = hipdnn_flatbuffers_sdk::data_objects::DeviceProperties::Pack(builder, &devProps);
+    builder.Finish(offset, "HDDP");
+
+    // Create wrapper
+    hipdnnPluginConstData_t wrapper;
+    wrapper.ptr = builder.GetBufferPointer();
+    wrapper.size = builder.GetSize();
 
     // Set on all handles (should not throw)
     EXPECT_NO_THROW(heurRm->setDevicePropertiesOnAllHandles(&wrapper));
@@ -266,8 +276,7 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PolicyIdMatchesNameHash)
         {
             // Policy ID should match engineNameToId(policyName)
             const int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(info.policyName);
-            EXPECT_EQ(info.policyId, expectedId)
-                << "Policy ID mismatch for " << info.policyName;
+            EXPECT_EQ(info.policyId, expectedId) << "Policy ID mismatch for " << info.policyName;
         }
     }
 }
@@ -312,12 +321,19 @@ TEST_F(IntegrationHeuristicPolicyPlugins, EnumerationMatchesResourceManager)
     for(size_t i = 0; i < rmInfos.size(); ++i)
     {
         int64_t apiPolicyId = -1;
-        size_t nameLen      = 0;
+        size_t nameLen = 0;
         size_t pluginVerLen = 0;
-        size_t apiVerLen    = 0;
+        size_t apiVerLen = 0;
 
-        ASSERT_EQ(hipdnnGetHeuristicPolicyInfo_ext(
-                      _handle, i, &apiPolicyId, nullptr, &nameLen, nullptr, &pluginVerLen, nullptr, &apiVerLen),
+        ASSERT_EQ(hipdnnGetHeuristicPolicyInfo_ext(_handle,
+                                                   i,
+                                                   &apiPolicyId,
+                                                   nullptr,
+                                                   &nameLen,
+                                                   nullptr,
+                                                   &pluginVerLen,
+                                                   nullptr,
+                                                   &apiVerLen),
                   HIPDNN_STATUS_SUCCESS);
 
         // Policy ID should match

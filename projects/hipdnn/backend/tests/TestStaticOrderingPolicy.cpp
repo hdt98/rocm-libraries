@@ -170,12 +170,19 @@ TEST_F(TestStaticOrderingPolicy, PolicyNeverDeclines)
     auto heurRm = _handle->getHeuristicPluginResourceManager();
     auto policyInfos = heurRm->getHeuristicPolicyInfos();
 
+    // Verify plugins were loaded
+    // Plugins should be found at hipdnn_plugins/heuristics/ relative to libhipdnn_backend.so
+    ASSERT_FALSE(policyInfos.empty())
+        << "No heuristic plugins found. Expected plugins at hipdnn_plugins/heuristics/ "
+        << "relative to libhipdnn_backend.so location. "
+        << "Verify plugins were built and are in the correct directory.";
+
     // Find StaticOrdering
     const bool found = std::any_of(policyInfos.begin(), policyInfos.end(), [](const auto& info) {
         return info.policyName.find("StaticOrdering") != std::string::npos;
     });
 
-    EXPECT_TRUE(found);
+    EXPECT_TRUE(found) << "StaticOrdering policy not found in loaded plugins";
 
     // The policy's design guarantees it never declines
     // This is enforced by always returning `applied = 1` from finalize()

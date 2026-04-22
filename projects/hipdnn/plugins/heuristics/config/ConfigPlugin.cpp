@@ -13,9 +13,9 @@
  * not by hard-coded backend logic.
  */
 
-#include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
-#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
 #include <flatbuffers/flatbuffers.h>
 #include <flatbuffers/verifier.h>
@@ -27,29 +27,26 @@
 
 // Plugin version and identification
 static constexpr const char* PLUGIN_VERSION = "1.0.0";
-static constexpr const char* API_VERSION = "1.0.0";
+static constexpr const char* API_VERSION = "0.0.1"; // Match HIPDNN_HEURISTIC_API_VERSION
 static constexpr const char* POLICY_NAME = "SelectionHeuristic::Config";
 
-// Policy ID computed from name using FNV-1a hash
-static const int64_t POLICY_ID = hipdnn_data_sdk::utilities::engineNameToId(POLICY_NAME);
-
 // Logging callback and log level
-static hipdnnHeuristicLoggingCallback_t g_loggingCallback = nullptr;
+static hipdnnCallback_t g_loggingCallback = nullptr;
 static hipdnnSeverity_t g_logLevel = HIPDNN_SEV_INFO;
 
 // Log buffer size
 constexpr size_t LOG_BUFFER_SIZE = 1024;
 
 // Helper macro for logging
-#define CONFIG_LOG(severity, ...)                                             \
-    do                                                                         \
-    {                                                                          \
-        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)          \
-        {                                                                      \
-            char buffer[LOG_BUFFER_SIZE];                                      \
-            snprintf(buffer, sizeof(buffer), __VA_ARGS__);                     \
-            g_loggingCallback(severity, "[Config] ", buffer);                  \
-        }                                                                      \
+#define CONFIG_LOG(severity, ...)                                      \
+    do                                                                 \
+    {                                                                  \
+        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)   \
+        {                                                              \
+            char buffer[LOG_BUFFER_SIZE];                              \
+            snprintf(buffer, sizeof(buffer), "[Config] " __VA_ARGS__); \
+            g_loggingCallback(severity, buffer);                       \
+        }                                                              \
     } while(0)
 
 //=============================================================================
@@ -85,7 +82,8 @@ struct ConfigPolicyDescriptor
     std::vector<int64_t> sortedEngineIds;
     bool finalized = false;
 
-    ConfigPolicyDescriptor(ConfigHandle* h) : handle(h)
+    ConfigPolicyDescriptor(ConfigHandle* h)
+        : handle(h)
     {
         CONFIG_LOG(HIPDNN_SEV_INFO, "Policy descriptor created");
     }
@@ -97,44 +95,23 @@ struct ConfigPolicyDescriptor
 };
 
 //=============================================================================
-// C ABI Implementation - Module Metadata
+// C ABI Implementation - Base Plugin API (from PluginApi.h)
 //=============================================================================
 
 extern "C" {
 
-HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicGetApiVersion(const char** version)
+// Base plugin metadata
+HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginGetName(const char** name)
 {
-    if(version == nullptr)
+    if(name == nullptr)
     {
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
-    *version = API_VERSION;
+    *name = POLICY_NAME;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicGetPolicyId(int64_t* policy_id)
-{
-    if(policy_id == nullptr)
-    {
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-    *policy_id = POLICY_ID;
-    return HIPDNN_PLUGIN_STATUS_SUCCESS;
-}
-
-HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
-{
-    if(policy_name == nullptr)
-    {
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-    *policy_name = POLICY_NAME;
-    return HIPDNN_PLUGIN_STATUS_SUCCESS;
-}
-
-HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicGetPluginVersion(const char** version)
+HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginGetVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -144,26 +121,43 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-//=============================================================================
-// C ABI Implementation - Logging
-//=============================================================================
+HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginGetApiVersion(const char** version)
+{
+    if(version == nullptr)
+    {
+        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
+    }
+    *version = API_VERSION;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
 
+HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginGetType(hipdnnPluginType_t* type)
+{
+    if(type == nullptr)
+    {
+        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
+    }
+    *type = HIPDNN_PLUGIN_TYPE_HEURISTIC;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
+
+// Base plugin logging
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicSetLoggingCallback(hipdnnHeuristicLoggingCallback_t callback)
+    hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)
 {
     g_loggingCallback = callback;
     CONFIG_LOG(HIPDNN_SEV_INFO, "Logging callback set");
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicSetLogLevel(hipdnnSeverity_t level)
+HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginSetLogLevel(hipdnnSeverity_t level)
 {
     g_logLevel = level;
     CONFIG_LOG(HIPDNN_SEV_INFO, "Log level set to %d", level);
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnHeuristicGetLastErrorString(const char** error_str)
+HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnPluginGetLastErrorString(const char** error_str)
 {
     if(error_str == nullptr)
     {
@@ -171,6 +165,10 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnHeuristicGetLastErrorString(const char
     }
     *error_str = "No error information available";
 }
+
+//=============================================================================
+// C ABI Implementation - Heuristic Plugin Extensions
+//=============================================================================
 
 //=============================================================================
 // C ABI Implementation - Handle Lifecycle
@@ -245,9 +243,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
         h->devicePropertiesBuffer.assign(data, data + device_props_serialized->size);
         h->devicePropertiesSet = true;
 
-        CONFIG_LOG(HIPDNN_SEV_INFO,
-                   "Device properties set (%zu bytes)",
-                   device_props_serialized->size);
+        CONFIG_LOG(
+            HIPDNN_SEV_INFO, "Device properties set (%zu bytes)", device_props_serialized->size);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -420,7 +417,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         }
 
         // Parse the serialized graph using FlatBuffers
-        flatbuffers::Verifier verifier(d->serializedGraphBuffer.data(), d->serializedGraphBuffer.size());
+        flatbuffers::Verifier verifier(d->serializedGraphBuffer.data(),
+                                       d->serializedGraphBuffer.size());
         if(!verifier.VerifyBuffer<hipdnn_data_sdk::data_objects::Graph>())
         {
             CONFIG_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: invalid graph buffer");
@@ -442,7 +440,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         if(!preferredEngineIdOpt.has_value())
         {
             // No preference set - policy not applicable
-            CONFIG_LOG(HIPDNN_SEV_INFO, "PolicyFinalize: no preferred_engine_id set - not applicable");
+            CONFIG_LOG(HIPDNN_SEV_INFO,
+                       "PolicyFinalize: no preferred_engine_id set - not applicable");
             *out_applied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
@@ -450,16 +449,16 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         int64_t preferredEngineId = preferredEngineIdOpt.value();
 
         // Check if the preferred engine ID is in the candidates
-        auto it = std::find(d->candidateEngineIds.begin(),
-                           d->candidateEngineIds.end(),
-                           preferredEngineId);
+        auto it = std::find(
+            d->candidateEngineIds.begin(), d->candidateEngineIds.end(), preferredEngineId);
 
         if(it == d->candidateEngineIds.end())
         {
             // Preferred engine not in candidates - policy not applicable
-            CONFIG_LOG(HIPDNN_SEV_INFO,
-                      "PolicyFinalize: preferred_engine_id 0x%llx not in candidates - not applicable",
-                      static_cast<long long>(preferredEngineId));
+            CONFIG_LOG(
+                HIPDNN_SEV_INFO,
+                "PolicyFinalize: preferred_engine_id 0x%llx not in candidates - not applicable",
+                static_cast<long long>(preferredEngineId));
             *out_applied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
@@ -497,7 +496,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 }
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
-    hipdnnHeuristicPolicyDescriptor_t desc, int64_t* engine_ids, uint32_t* num_engines)
+    hipdnnHeuristicPolicyDescriptor_t desc, int64_t* engine_ids, size_t* num_engines)
 {
     if(desc == nullptr)
     {
@@ -524,16 +523,16 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSort
         // Return count only if engine_ids is null
         if(engine_ids == nullptr)
         {
-            *num_engines = static_cast<uint32_t>(d->sortedEngineIds.size());
+            *num_engines = d->sortedEngineIds.size();
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
         // Copy sorted engine IDs
-        uint32_t count = std::min(*num_engines, static_cast<uint32_t>(d->sortedEngineIds.size()));
+        size_t count = std::min(*num_engines, d->sortedEngineIds.size());
         std::copy_n(d->sortedEngineIds.begin(), count, engine_ids);
         *num_engines = count;
 
-        CONFIG_LOG(HIPDNN_SEV_INFO, "GetSortedEngineIds: returned %u engines", count);
+        CONFIG_LOG(HIPDNN_SEV_INFO, "GetSortedEngineIds: returned %zu engines", count);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)

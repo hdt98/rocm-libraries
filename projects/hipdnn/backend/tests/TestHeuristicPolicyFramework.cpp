@@ -16,7 +16,6 @@
 #include "descriptors/EngineHeuristicDescriptor.hpp"
 #include "descriptors/GraphDescriptor.hpp"
 #include "handle/Handle.hpp"
-#include "heuristics/DeviceProperties.hpp"
 #include "heuristics/SelectionHeuristic.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
@@ -49,57 +48,6 @@ protected:
     hipdnnHandle_t _handle = nullptr;
 };
 
-// ========== Device Properties Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, DevicePropertiesQueryReturnsValidData)
-{
-    auto props = queryDeviceProperties();
-
-    // Device ID should be >= 0
-    EXPECT_GE(props.deviceId, 0);
-
-    // Multiprocessor count should be > 0 on real GPU
-    // On CPU-only systems, might be 0
-    EXPECT_GE(props.multiProcessorCount, 0);
-
-    // Total global memory should be > 0
-    EXPECT_GT(props.totalGlobalMem, 0u);
-}
-
-TEST_F(TestHeuristicPolicyFramework, DevicePropertiesSerializationRoundTrip)
-{
-    DeviceProperties original;
-    original.deviceId = 42;
-    original.multiProcessorCount = 128;
-    original.totalGlobalMem = 16ULL * 1024 * 1024 * 1024; // 16GB
-
-    // Serialize
-    auto serialized = serializeDeviceProperties(original);
-    ASSERT_FALSE(serialized.empty());
-
-    // Deserialize
-    auto deserialized = deserializeDeviceProperties(serialized.data(), serialized.size());
-
-    // Verify round-trip
-    EXPECT_EQ(deserialized.deviceId, original.deviceId);
-    EXPECT_EQ(deserialized.multiProcessorCount, original.multiProcessorCount);
-    EXPECT_EQ(deserialized.totalGlobalMem, original.totalGlobalMem);
-}
-
-TEST_F(TestHeuristicPolicyFramework, DevicePropertiesWrapperCreatesValidBuffer)
-{
-    DeviceProperties props;
-    props.deviceId = 7;
-    props.multiProcessorCount = 64;
-    props.totalGlobalMem = 8ULL * 1024 * 1024 * 1024;
-
-    auto serialized = serializeDeviceProperties(props);
-    auto wrapper = wrapSerializedDeviceProperties(serialized);
-
-    EXPECT_NE(wrapper.ptr, nullptr);
-    EXPECT_EQ(wrapper.size, serialized.size());
-}
-
 // ========== Policy Enumeration Tests ==========
 
 TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyCountReturnsNonZero)
@@ -125,8 +73,15 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoReturnsValidData)
     size_t apiVersionLen = 0;
 
     // First call: query sizes
-    hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(
-        _handle, 0, &policyId, nullptr, &policyNameLen, nullptr, &pluginVersionLen, nullptr, &apiVersionLen);
+    hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(_handle,
+                                                             0,
+                                                             &policyId,
+                                                             nullptr,
+                                                             &policyNameLen,
+                                                             nullptr,
+                                                             &pluginVersionLen,
+                                                             nullptr,
+                                                             &apiVersionLen);
 
     ASSERT_EQ(status, HIPDNN_STATUS_SUCCESS);
     EXPECT_NE(policyId, -1);
@@ -167,14 +122,14 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
     size_t apiVersionLen = 0;
 
     const hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(_handle,
-                                                              numPolicies + 100,
-                                                              &policyId,
-                                                              nullptr,
-                                                              &policyNameLen,
-                                                              nullptr,
-                                                              &pluginVersionLen,
-                                                              nullptr,
-                                                              &apiVersionLen);
+                                                                   numPolicies + 100,
+                                                                   &policyId,
+                                                                   nullptr,
+                                                                   &policyNameLen,
+                                                                   nullptr,
+                                                                   &pluginVersionLen,
+                                                                   nullptr,
+                                                                   &apiVersionLen);
 
     EXPECT_EQ(status, HIPDNN_STATUS_BAD_PARAM);
 }
@@ -184,7 +139,9 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
 TEST_F(TestHeuristicPolicyFramework, EnvironmentVariablePolicyOrderIsRespected)
 {
     // Set environment variable
-    setenv("HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config", 1);
+    setenv("HIPDNN_HEURISTIC_POLICY_ORDER",
+           "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config",
+           1);
 
     // Create a descriptor and check resolved order
     auto graph = std::make_shared<GraphDescriptor>();
@@ -307,8 +264,8 @@ TEST_F(TestHeuristicPolicyFramework, GetPolicyInfoWithNullLengthPointersFails)
     int64_t policyId = -1;
 
     // All length pointers are required (not nullptr)
-    const hipdnnStatus_t status =
-        hipdnnGetHeuristicPolicyInfo_ext(_handle, 0, &policyId, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    const hipdnnStatus_t status = hipdnnGetHeuristicPolicyInfo_ext(
+        _handle, 0, &policyId, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 
     EXPECT_NE(status, HIPDNN_STATUS_SUCCESS);
 }

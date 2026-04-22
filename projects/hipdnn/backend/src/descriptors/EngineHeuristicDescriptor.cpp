@@ -14,11 +14,13 @@
 #include "utilities/EngineOrdering.hpp"
 
 // RFC 0007: Heuristics framework
-#include "heuristics/DeviceProperties.hpp"
 #include "heuristics/SelectionHeuristic.hpp"
+#include "logging/Logging.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
-#include "logging/Logging.hpp"
+#include <flatbuffers/flatbuffers.h>
+#include <hip/hip_runtime.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 
@@ -40,8 +42,8 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     if(_policyOrderSet)
     {
         policyNames = _policyOrder;
-        HIPDNN_BACKEND_LOG_DEBUG(
-            "Using descriptor-level policy order: {} policies", policyNames.size());
+        HIPDNN_BACKEND_LOG_DEBUG("Using descriptor-level policy order: {} policies",
+                                 policyNames.size());
     }
     // 2. Handle-level override (TODO: implement handle API)
     // else if (handle has override)
@@ -65,16 +67,13 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
                 policyNames.push_back(token);
             }
         }
-        HIPDNN_BACKEND_LOG_DEBUG(
-            "Using environment variable policy order: {} policies", policyNames.size());
+        HIPDNN_BACKEND_LOG_DEBUG("Using environment variable policy order: {} policies",
+                                 policyNames.size());
     }
     // 4. Default policy list per RFC 0007 Section 5.3
     else
     {
-        policyNames = {
-            "SelectionHeuristic::Config",
-            "SelectionHeuristic::StaticOrdering"
-        };
+        policyNames = {"SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"};
         HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyNames.size());
     }
 
@@ -127,7 +126,8 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
         }
 
         // Create SelectionHeuristic for this policy slot
-        _policySlots.push_back(std::make_unique<heuristics::SelectionHeuristic>(plugin, pluginHandle));
+        _policySlots.push_back(
+            std::make_unique<heuristics::SelectionHeuristic>(plugin, pluginHandle));
     }
 }
 
@@ -153,11 +153,50 @@ void EngineHeuristicDescriptor::finalize()
     // Get candidate engine IDs from engine plugins
     auto candidates = engineRm->getApplicableEngineIds(_graph.get(), _findFirst);
 
+    // RFC 0007: If no engines available, finalize with empty result (no need to invoke heuristics)
+    // This is a valid state - not an error
+    if(candidates.empty())
+    {
+        _engineIds.clear();
+        HipdnnBackendDescriptorImpl<EngineHeuristicDescriptor>::finalize();
+        return;
+    }
+
     // RFC 0007 Section 6 & 13.2: Query and serialize device properties
-    auto devProps = heuristics::queryDeviceProperties();
-    auto devicePropsSerialized = heuristics::serializeDeviceProperties(devProps);
-    const hipdnnPluginConstData_t devicePropsWrapper =
-        heuristics::wrapSerializedDeviceProperties(devicePropsSerialized);
+    int currentDevice;
+    auto status = hipGetDevice(&currentDevice);
+    if(status != hipSuccess)
+    {
+        throw HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR, "Failed to get current device");
+    }
+
+    hipDeviceProp_t hipProps;
+    status = hipGetDeviceProperties(&hipProps, currentDevice);
+    if(status != hipSuccess)
+    {
+        throw HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR, "Failed to get device properties");
+    }
+
+    // Create DevicePropertiesT from HIP device properties
+    hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT devProps;
+    devProps.device_id = currentDevice;
+    devProps.multi_processor_count = hipProps.multiProcessorCount;
+    devProps.total_global_mem = hipProps.totalGlobalMem;
+    devProps.architecture_name = hipProps.gcnArchName;
+
+    // Serialize DevicePropertiesT using FlatBuffers
+    flatbuffers::FlatBufferBuilder builder(256);
+    auto offset = hipdnn_flatbuffers_sdk::data_objects::DeviceProperties::Pack(builder, &devProps);
+    builder.Finish(offset, "HDDP");
+
+    // Copy serialized data to persistent storage
+    std::vector<uint8_t> devicePropsSerialized(builder.GetBufferPointer(),
+                                               builder.GetBufferPointer() + builder.GetSize());
+
+    // Wrap serialized buffer in hipdnnPluginConstData_t
+    hipdnnPluginConstData_t devicePropsWrapper;
+    devicePropsWrapper.ptr = devicePropsSerialized.data();
+    devicePropsWrapper.size = devicePropsSerialized.size();
 
     // RFC 0007 Section 13.1: Get serialized graph from GraphDescriptor
     const hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
@@ -190,8 +229,9 @@ void EngineHeuristicDescriptor::finalize()
     // Convert to vector and sort by handle pointer for deterministic iteration
     std::vector<std::pair<hipdnnHeuristicHandle_t, const plugin::HeuristicPlugin*>> sortedHandles(
         distinctHandles.begin(), distinctHandles.end());
-    std::sort(sortedHandles.begin(), sortedHandles.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::sort(sortedHandles.begin(), sortedHandles.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+    });
 
     for(const auto& [pluginHandle, plugin] : sortedHandles)
     {
@@ -230,11 +270,11 @@ void EngineHeuristicDescriptor::finalize()
         catch(const HipdnnException& e)
         {
             // Policy threw an exception - log and continue to next policy
-            HIPDNN_BACKEND_LOG_WARN(
-                "Heuristic policy at slot {} (ID {}) threw exception: {}. Continuing to next policy.",
-                i,
-                _orderedPolicyIds[i],
-                e.what());
+            HIPDNN_BACKEND_LOG_WARN("Heuristic policy at slot {} (ID {}) threw exception: {}. "
+                                    "Continuing to next policy.",
+                                    i,
+                                    _orderedPolicyIds[i],
+                                    e.what());
             continue;
         }
     }
@@ -570,8 +610,7 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
     }
 
     _policyOrderSet = true;
-    HIPDNN_BACKEND_LOG_DEBUG(
-        "Set descriptor-level policy order: {} policies", _policyOrder.size());
+    HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: {} policies", _policyOrder.size());
 }
 
 void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attributeType,
