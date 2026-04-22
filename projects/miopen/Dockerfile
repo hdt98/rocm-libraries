@@ -232,7 +232,8 @@ RUN if [ "$BUILD_JOBS" = "0" ]; then \
 # REGULAR: Use the pre-built ROCm image from TheRock to build the rest of
 # the MIOpen environment
 #============================================================================
-FROM rocm/miopen:therock AS prebuilt_therock
+ARG THEROCK_BASE_IMAGE=rocm/miopen:therock
+FROM ${THEROCK_BASE_IMAGE} AS prebuilt_therock
 
 # ============================================================================
 # Select which build stage to use
