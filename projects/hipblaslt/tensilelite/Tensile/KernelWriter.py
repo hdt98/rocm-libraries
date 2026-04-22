@@ -2785,11 +2785,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
       module.add(replaceHolder(moduleTmp, 0))
       module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
       if "MX" in tensorParameters1st:
-        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"])
+        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"], skipWait=True)
         module.add(replaceHolder(moduleTmp, 0))
         module.add(self.globalReadDo(kernel, 0, tensorParameters1st["MX"]))
       if "MX" in tensorParameters2nd:
-        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd["MX"])
+        moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters2nd["MX"], skipWait=True)
         module.add(replaceHolder(moduleTmp, 0))
         module.add(self.globalReadDo(kernel, 0, tensorParameters2nd["MX"]))
       skip2ndWaitForDtl = kernel["DirectToLds%s"%tensorParameters1st["tensorChar"]]
@@ -3422,11 +3422,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # M0 update for directToLds, skip if using custom main loop schedule
     self.codes.dtlsM0UpdateA = self.directToLdsM0Update(kernel, 1, tensorParameters1st, kernel["UseCustomMainLoopSchedule"])
     if "MX" in tensorParameters1st:
-      self.codes.dtlsM0UpdateMXSA = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"])
+      self.codes.dtlsM0UpdateMXSA = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"], skipWait=True)
     else:
       self.codes.dtlsM0UpdateMXSA = StructuredModule()
     if "MX" in tensorParameters2nd:
-      self.codes.dtlsM0UpdateMXSB = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"])
+      self.codes.dtlsM0UpdateMXSB = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"], skipWait=True)
     else:
       self.codes.dtlsM0UpdateMXSB = StructuredModule()
     # skip wait for DTL if global load 1st is DTL
@@ -4208,14 +4208,14 @@ class KernelWriter(metaclass=abc.ABCMeta):
             if kernel["UnrollLoopSwapGlobalReadOrder"] == 1 or kernel["DirectToVgprMXS%s"%tc1]:
               # use second buffer
               g2lBufIdx1st = 1
-            module.add(self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"]))
+            module.add(self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"], skipWait=True))
             module.add(self.globalReadDo(kernel, 0, tensorParameters1st["MX"], g2lBufIdx=g2lBufIdx1st))
           if not skipMXS2nd:
             g2lBufIdx2nd = 0
             if kernel["UnrollLoopSwapGlobalReadOrder"] == 1 or kernel["DirectToVgprMXS%s"%tc2]:
               # use second buffer
               g2lBufIdx2nd = 1
-            module.add(self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"]))
+            module.add(self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"], skipWait=True))
             module.add(self.globalReadDo(kernel, 0, tensorParameters2nd["MX"], g2lBufIdx=g2lBufIdx2nd))
           if not skip2nd:
             g2lBufIdx2nd = 0
@@ -4765,7 +4765,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           #TODO: To handle KRS with MX
           if "MX" in tensorParameters1st:
             module.addComment1("Update M0 for DTLDS")
-            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"])
+            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"], skipWait=True)
             module.add(replaceHolder(moduleTmp, 0))
             module.addComment1("Tail global read MXS%s"%tc1)
             if tailLoopOpt1st and (globalReadMode1st == 2):
@@ -4775,7 +4775,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
           if "MX" in tensorParameters2nd:
             module.addComment1("Update M0 for DTLDS")
-            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"])
+            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"], skipWait=True)
             module.add(replaceHolder(moduleTmp, 0))
             module.addComment1("Tail global read MXS%s"%tc2)
             if tailLoopOpt2nd and (globalReadMode2nd == 2):

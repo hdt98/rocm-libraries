@@ -9967,9 +9967,6 @@ class KernelWriterAssembly(KernelWriter):
         if tP["is_sparse"]:
             globalReadGuardKBody(tP["tpsMetadata"])
 
-      if "MX" in tP:
-          globalReadGuardKBody(tP["MX"])
-
       if self.db["ConservativeWaitCnt"] & 0x1:
           module.add(SBarrier(comment="debug"))
           module.add(SWaitCnt(dscnt=0, vlcnt=0, vscnt=0, comment=""))
@@ -10348,10 +10345,6 @@ class KernelWriterAssembly(KernelWriter):
         destVgprPrefix = "G2L%s%u"%(tc, g2lBufIdx + 1)
       else:
         destVgprPrefix = "G2L%s"%(tc)
-
-      # add m0 init code for MX here
-      if tc == "MXSA" or tc == "MXSB":
-        imod.middle.add(self.directToLdsM0Update(kernel, mode, tP, skipWait=True))
 
       loopCnt = -1
       for perp in range(0, tP["nrp"]):

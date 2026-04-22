@@ -1409,6 +1409,10 @@ class LocalReadMFMA(LocalRead):
 
                             if kernel["ConvertAfterDS"] and kernel["UnrollMajorLDS%s"%tc]:
                                 valufIdx += blockWidth * (tP["bpe"] // tP["bpeDS"]) if (not tP["isM"]) else 1
+                            # workaround for gfx950 MX
+                            # need to increment valufIdx by 1
+                            elif tc in ("MXSA", "MXSB") and tuple(kernel["ISA"][:2]) == (9, 5):
+                                valufIdx += 1
                             else:
                                 valufIdx += blockWidth if (not tP["isM"]) else (numVgpr if writer.states.asmCaps["HasSWMMAC_gfx1250"] else 1)
 

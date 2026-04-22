@@ -766,6 +766,10 @@ class LraTileAssignmentMFMA(LraTileAssignment):
            sReg = writer.vgprPool.checkOut(1,"sReg") # remainder
 
         noUnrollOffset = writer.states.asmCaps["HasWMMA_V1"] or ("MXS" in tP["tensorChar"])
+        # workaround for gfx950
+        # force noUnrollOffset=False for MX
+        if kernel["ISA"][:2] == (9, 5):
+            noUnrollOffset = False
 
         # get constant parameter
         tc        = tP["tensorChar"]
