@@ -179,7 +179,7 @@ TEST_P(GPU_MIOpenDriverConvDeterministicTest_FP32, BitExactAcrossRuns)
 
 // 3D WRW
 INSTANTIATE_TEST_SUITE_P(
-    Full,
+    Smoke,
     GPU_MIOpenDriverConvDeterministicTest_FP32,
     testing::ValuesIn(GetTestCases(miopendriver::basearg::conv::Float, shape_3d, 4)));
 
