@@ -543,8 +543,9 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         __shared__ char smem_ptr_ping[GetSmemPingSize()];
         __shared__ char smem_ptr_pong[GetSmemPongSize()];
 
-        // k_id selects the K split; blockIdx.z is 0 when k_batch == 1 or persistent (where
-        // IsSupportedArgument requires k_batch == 1).
+        // k_id selects the split-K batch id. blockIdx.z is 0 only when k_batch == 1; when
+        // k_batch > 1, blockIdx.z selects the active split-K batch in both persistent and
+        // non-persistent modes.
         const index_t k_id = amd_wave_read_first_lane(blockIdx.z);
 
         // Support both persistent and non-persistent modes
