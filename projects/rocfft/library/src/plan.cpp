@@ -94,6 +94,44 @@ constexpr bool dft_is_inverse(rocfft_transform_type fft_type)
            || fft_type == rocfft_transform_type_real_inverse;
 }
 
+template <typename T>
+static std::set<rocfft_location_t> locations_in(const T& arg)
+{
+    std::set<rocfft_location_t> ret;
+    if constexpr(std::is_same<T, std::vector<rocfft_brick_t>>::value)
+    {
+        for(const auto& brick : arg)
+            ret.insert(brick.location);
+    }
+    else if constexpr(std::is_same<T, rocfft_field_t>::value)
+    {
+        return locations_in(arg.bricks);
+    }
+    else if constexpr(std::is_same<T, std::vector<rocfft_field_t>>::value)
+    {
+        for(const auto& field : arg)
+            for(const auto& loc : locations_in(field.bricks))
+                ret.insert(loc);
+    }
+    else
+    {
+        static_assert(false); // unimplemented, unforeseen usage
+    }
+    return ret;
+}
+
+template <typename T, typename... Args>
+static std::set<rocfft_location_t> locations_in(const T& first, Args... others)
+{
+    std::set<rocfft_location_t> ret;
+    if constexpr(sizeof...(others) > 0)
+        ret = locations_in(others...);
+
+    for(auto loc : locations_in(first))
+        ret.insert(loc);
+    return ret;
+}
+
 rocfft_status rocfft_plan_description_set_scale_factor(rocfft_plan_description description,
                                                        const double            scale_factor)
 try
@@ -3370,6 +3408,53 @@ rocfft_plan_t::field_view_t rocfft_plan_t::field_view_t::get_embedding_view() co
     return field_view_t(embedding_field, buffers, embedding_array_type, precision, group_name);
 }
 
+rocfft_plan_t::field_view_t rocfft_plan_t::make_intermediary_field_view(
+    std::vector<rocfft_plan_t::TempBufferLease>& leased_buffers,
+    const field_view_t&                          last,
+    const field_view_t&                          next,
+    const std::set<size_t>&                      required_full_length_axes)
+{
+    const auto full_range = last.field.get_full_data_range();
+    if(full_range != next.field.get_full_data_range())
+    {
+        throw std::invalid_argument(ROCFFT_CURRENT_FUNCTION
+                                    + " cannot create an intermediary field view between views "
+                                      "that do not share the same full range of data");
+    }
+    if(std::any_of(
+           required_full_length_axes.begin(),
+           required_full_length_axes.end(),
+           [&full_range](const auto& len_axis) { return len_axis >= full_range.get_len_rank(); }))
+    {
+        throw std::invalid_argument("Invalid set of required full length axes given to "
+                                    + ROCFFT_CURRENT_FUNCTION);
+    }
+    if(last.array_type != next.array_type || last.precision != next.precision)
+    {
+        throw std::invalid_argument(ROCFFT_CURRENT_FUNCTION
+                                    + " cannot create an intermediary field view between two views "
+                                      "using different array types or different precisions");
+    }
+
+    rocfft_field_t intermediary_field = rocfft_field_t::make_intermediary_field(
+        last.field, next.field, required_full_length_axes);
+    std::string group_name = "intermediary_field";
+
+    std::vector<BufferPtr> intermediary_buffers;
+    intermediary_buffers.reserve(intermediary_field.bricks.size());
+    for(const auto& brick : intermediary_field.bricks)
+    {
+        leased_buffers.emplace_back(tempBuffers,
+                                    desc.get_local_comm_rank(),
+                                    brick.location,
+                                    brick.layout.buffer_element_count()
+                                        * element_size(last.precision, last.array_type));
+        intermediary_buffers.emplace_back(BufferPtr::temp(leased_buffers.back().data()));
+    }
+    return field_view_t(
+        intermediary_field, intermediary_buffers, last.array_type, last.precision, group_name);
+}
+
 bool rocfft_plan_t::BuildOptMultiDevicePlan()
 {
     const auto local_comm_rank = desc.get_local_comm_rank();
@@ -3761,12 +3846,6 @@ bool rocfft_plan_t::BuildMultiDevicePlan()
         if(axes_computed_on_input.empty() || axes_computed_on_output.empty())
             return false;
 
-        if(!partial_axes.empty())
-        {
-            // Support for pencil decompositions to be added later on
-            return false;
-        }
-
         // The desired multi-device transform is tackled via a sequence of successive
         // lower-dimensional transforms & transpositions that creates a sequence of field
         // views from the input field view to the output field view.
@@ -3802,26 +3881,26 @@ bool rocfft_plan_t::BuildMultiDevicePlan()
         sequence_of_sub_ffts.emplace_front(
             make_embarrassingly_parallel_fft_from_user_field<io_data_label::INPUT>(
                 axes_computed_on_input, leased_buffers, prefer_inplace_on_input_field));
-        //if(!partial_axes.empty())
-        //{
-        //    const auto embedded_intermediary_view
-        //        = make_intermediary_field_view(
-        //              leased_buffers,
-        //              sequence_of_sub_ffts.front().output.get_embedding_view(),
-        //              sequence_of_sub_ffts.back().input.get_embedding_view(),
-        //              partial_axes)
-        //              .get_view_for_lengths(partial_axes);
-        //    // Intermediary view is always complex and internally-defined: in-place is always possible
-        //    sequence_of_sub_ffts.insert(
-        //        std::next(sequence_of_sub_ffts.begin()),
-        //        embarrassingly_parallel_fft(dft_is_forward(transformType)
-        //                                        ? rocfft_transform_type_complex_forward
-        //                                        : rocfft_transform_type_complex_inverse,
-        //                                    rocfft_placement_inplace,
-        //                                    precision,
-        //                                    embedded_intermediary_view,
-        //                                    embedded_intermediary_view));
-        //}
+        if(!partial_axes.empty())
+        {
+            const auto embedded_intermediary_view
+                = make_intermediary_field_view(
+                      leased_buffers,
+                      sequence_of_sub_ffts.front().output.get_embedding_view(),
+                      sequence_of_sub_ffts.back().input.get_embedding_view(),
+                      partial_axes)
+                      .get_view_for_lengths(partial_axes);
+            // Intermediary view is always complex and internally-defined: in-place is always possible
+            sequence_of_sub_ffts.insert(
+                std::next(sequence_of_sub_ffts.begin()),
+                embarrassingly_parallel_fft(dft_is_forward(transformType)
+                                                ? rocfft_transform_type_complex_forward
+                                                : rocfft_transform_type_complex_inverse,
+                                            rocfft_placement_inplace,
+                                            precision,
+                                            embedded_intermediary_view,
+                                            embedded_intermediary_view));
+        }
 
         // add load/store callbacks to the relevant embarrassingly-parallel FFTs
         sequence_of_sub_ffts.front().set_load_ops(desc.loadOps);
@@ -4324,6 +4403,218 @@ std::optional<rocfft_field_t> rocfft_field_t::get_other_embarrassingly_parallel_
             }
         }
     }
+    return ret;
+}
+
+std::map<size_t, std::vector<rocfft_brick_t>>
+    rocfft_field_t::get_bricks_by_slabs(size_t slab_splitting_axis) const
+{
+    std::map<size_t, std::vector<rocfft_brick_t>> ret;
+    for(const auto& brick : bricks)
+    {
+        const auto it = ret.find(brick.layout[slab_splitting_axis].lower);
+        if(it == ret.end())
+            ret.emplace(
+                decltype(ret)::value_type(brick.layout[slab_splitting_axis].lower, {brick}));
+        else
+        {
+            if(brick.layout[slab_splitting_axis].upper
+               != it->second.front().layout[slab_splitting_axis].upper)
+            {
+                throw std::logic_error("Field incompatible with slab-grouping detected by "
+                                       + ROCFFT_CURRENT_FUNCTION);
+            }
+            it->second.emplace_back(brick);
+        }
+    }
+    return ret;
+}
+
+namespace
+{
+    template <typename T>
+    std::set<T> intersection_of(const std::set<T>& a, const std::set<T>& b)
+    {
+        std::set<T> ret;
+        const auto& set_to_parse = a.size() < b.size() ? a : b;
+        const auto& other_set    = a.size() < b.size() ? b : a;
+        for(const auto& v : set_to_parse)
+        {
+            if(other_set.contains(v))
+                ret.insert(v);
+        }
+        return ret;
+    }
+}
+
+rocfft_field_t
+    rocfft_field_t::make_intermediary_field(const rocfft_field_t&   last_field,
+                                            const rocfft_field_t&   next_field,
+                                            const std::set<size_t>& required_full_length_axes)
+{
+    const auto full_range = last_field.get_full_data_range();
+    if(!full_range.has_same_logical_range_as(next_field.get_full_data_range()))
+    {
+        throw std::invalid_argument(
+            ROCFFT_CURRENT_FUNCTION
+            + " requires the last and next fields to have the same full range of data");
+    }
+    std::optional<size_t> slab_splitting_axis_in_last, slab_splitting_axis_in_next;
+    for(size_t dim = 0; dim < full_range.get_full_rank(); dim++)
+    {
+        if(dim < full_range.get_len_rank())
+        {
+            if(required_full_length_axes.contains(dim))
+                continue;
+            if(!slab_splitting_axis_in_last && !last_field.has_undistributed_axis(dim))
+                slab_splitting_axis_in_last = dim;
+            if(!slab_splitting_axis_in_next && !next_field.has_undistributed_axis(dim))
+                slab_splitting_axis_in_next = dim;
+        }
+        else
+        {
+            // definition of intermediary field by intersection of slabs requires full batch
+            // coverage in all of the last and next fields' bricks
+            if(!last_field.has_undistributed_axis(dim) || !next_field.has_undistributed_axis(dim))
+            {
+                slab_splitting_axis_in_last.reset();
+                slab_splitting_axis_in_next.reset();
+                break;
+            }
+        }
+    }
+
+    rocfft_field_t ret;
+    if(slab_splitting_axis_in_last && slab_splitting_axis_in_next
+       && slab_splitting_axis_in_last != slab_splitting_axis_in_next)
+    {
+        const auto last_slabs = last_field.get_bricks_by_slabs(*slab_splitting_axis_in_last);
+        const auto next_slabs = next_field.get_bricks_by_slabs(*slab_splitting_axis_in_next);
+
+        // Define the intermediary field's bricks by intersection of the slabs in last and next fields
+        auto brick_lower   = full_range.lower();
+        auto brick_upper   = full_range.upper();
+        auto brick_strides = full_range.strides_and_distances();
+        for(const auto& it_last : last_slabs)
+        {
+            const auto& last_slab           = it_last.second;
+            const auto  last_slab_locations = locations_in(last_slab);
+            brick_lower[*slab_splitting_axis_in_last]
+                = last_slab[0].layout[*slab_splitting_axis_in_last].lower;
+            brick_upper[*slab_splitting_axis_in_last]
+                = last_slab[0].layout[*slab_splitting_axis_in_last].upper;
+            for(const auto& it_next : next_slabs)
+            {
+                const auto& next_slab           = it_next.second;
+                const auto& next_slab_locations = locations_in(next_slab);
+                brick_lower[*slab_splitting_axis_in_next]
+                    = next_slab[0].layout[*slab_splitting_axis_in_next].lower;
+                brick_upper[*slab_splitting_axis_in_next]
+                    = next_slab[0].layout[*slab_splitting_axis_in_next].upper;
+                for(size_t dim = 0; dim < full_range.get_full_rank(); dim++)
+                {
+                    if(dim == 0)
+                        brick_strides[dim] = 1;
+                    else
+                        brick_strides[dim] = brick_strides[dim - 1]
+                                             * (brick_upper[dim - 1] - brick_lower[dim - 1]);
+                }
+
+                const auto preferred_locations
+                    = intersection_of(last_slab_locations, next_slab_locations);
+                const auto brick_loc
+                    = preferred_locations.empty()
+                          ? (last_slab_locations.size() > next_slab_locations.size()
+                                 ? *last_slab_locations.begin()
+                                 : *next_slab_locations.begin())
+                          : *preferred_locations.begin();
+
+                ret.bricks.emplace_back(brick_lower, brick_upper, brick_strides, brick_loc);
+            }
+        }
+    }
+    else
+    {
+        const auto usable_locations = locations_in(last_field.bricks, next_field.bricks);
+        const auto num_locs         = usable_locations.size();
+        size_t     split_len_dims[2]
+            = {std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max()};
+        for(size_t dim = 0; dim < full_range.get_len_rank(); dim++)
+        {
+            if(required_full_length_axes.contains(dim))
+                continue;
+            for(auto& split_dim : split_len_dims)
+            {
+                if(split_dim < full_range.get_len_rank())
+                    continue;
+                split_dim = dim;
+                break;
+            }
+        }
+        const auto full_lengths = full_range.lengths_and_batches();
+        // find best-balanced factorization of num_locs
+        size_t factors[2] = {0, 0};
+        for(size_t tmp = 1; tmp <= num_locs; tmp++)
+        {
+            if(num_locs % tmp != 0 || num_locs / tmp > full_lengths[split_len_dims[0]]
+               || tmp > full_lengths[split_len_dims[1]])
+                continue;
+            if(factors[0] * factors[1] != num_locs
+               || std::max(factors[0], factors[1]) - std::min(factors[0], factors[1])
+                      > std::max(num_locs / tmp, tmp) - std::min(num_locs / tmp, tmp))
+            {
+                factors[0] = num_locs / tmp;
+                factors[1] = tmp;
+            }
+        }
+        if(factors[0] * factors[1] != num_locs)
+            throw std::runtime_error(
+                ROCFFT_CURRENT_FUNCTION
+                + "could not find a well-balanced intermediary pencil decomposition");
+
+        for(size_t loc_idx = 0; loc_idx < num_locs; loc_idx++)
+        {
+            std::vector<size_t> brick_lower(full_lengths.size(), 0);
+            std::vector<size_t> brick_strides(full_lengths.size(), 1);
+            auto                brick_upper = full_lengths;
+            for(size_t split_dim_idx = 0; split_dim_idx < 2; split_dim_idx++)
+            {
+                const auto pencil_idx_in_dim
+                    = split_dim_idx == 0 ? loc_idx / factors[1] : loc_idx % factors[1];
+                const auto split_dim = split_len_dims[split_dim_idx];
+                brick_lower[split_dim]
+                    = pencil_idx_in_dim * (full_lengths[split_dim] / factors[split_dim_idx])
+                      + std::min(pencil_idx_in_dim,
+                                 full_lengths[split_dim] % factors[split_dim_idx]);
+                brick_upper[split_dim]
+                    = brick_lower[split_dim] + full_lengths[split_dim] / factors[split_dim_idx]
+                      + (pencil_idx_in_dim < (full_lengths[split_dim] % factors[split_dim_idx])
+                             ? 1
+                             : 0);
+            }
+            for(size_t dim = 1; dim < full_range.get_full_rank(); dim++)
+            {
+                brick_strides[dim]
+                    = brick_strides[dim - 1] * (brick_upper[dim - 1] - brick_lower[dim - 1]);
+            }
+            ret.bricks.emplace_back(brick_lower,
+                                    brick_upper,
+                                    brick_strides,
+                                    *std::next(usable_locations.begin(), loc_idx));
+        }
+    }
+
+    ret.finalize();
+    if(!full_range.has_same_logical_range_as(ret.get_full_data_range())
+       || !ret.has_valid_tessellation()
+       || std::any_of(required_full_length_axes.begin(),
+                      required_full_length_axes.end(),
+                      [&](const auto dim) { return !ret.has_undistributed_axis(dim); }))
+    {
+        throw std::logic_error(ROCFFT_CURRENT_FUNCTION
+                               + " produced an inconsistent intermediary field");
+    }
+
     return ret;
 }
 

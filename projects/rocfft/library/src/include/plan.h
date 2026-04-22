@@ -191,6 +191,15 @@ struct rocfft_field_t
     {
         return bricks == other.bricks;
     }
+
+    static rocfft_field_t
+        make_intermediary_field(const rocfft_field_t&   last_field,
+                                const rocfft_field_t&   next_field,
+                                const std::set<size_t>& required_full_length_axes);
+
+private:
+    std::map<size_t, std::vector<rocfft_brick_t>>
+        get_bricks_by_slabs(size_t slab_splitting_axis) const;
 };
 
 struct rocfft_plan_description_t
@@ -684,6 +693,11 @@ private:
 
     template <io_data_label io>
     field_view_t make_user_field_view() const;
+
+    field_view_t make_intermediary_field_view(std::vector<TempBufferLease>& leased_buffers,
+                                              const field_view_t&           last,
+                                              const field_view_t&           next,
+                                              const std::set<size_t>& required_full_length_axes);
 
     struct embarrassingly_parallel_fft
     {
