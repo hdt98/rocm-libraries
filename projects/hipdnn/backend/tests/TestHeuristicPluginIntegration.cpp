@@ -14,6 +14,7 @@
 
 #include "HipdnnException.hpp"
 #include "PlatformUtils.hpp"
+#include "TestPluginConstants.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
@@ -28,6 +29,7 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
+using namespace hipdnn_backend::plugin_constants;
 
 namespace
 {
@@ -36,10 +38,10 @@ namespace
 
 std::filesystem::path getTestPluginPath(const char* pluginName)
 {
-    // Get the directory containing the test binary, then navigate to test plugins directory
-    // Test binary is in build/bin/, plugins are in build/lib/test_plugins/custom/
+    // Plugins are in build/{bin,lib}/test_plugins/custom/ (getTestPluginDefaultDir() handles platform)
     const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
-    const auto pluginDir = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
+    const auto testPluginDir = std::filesystem::path(getTestPluginDefaultDir());
+    const auto pluginDir = testBinDir.parent_path() / testPluginDir / "custom";
     return pluginDir / hipdnn_data_sdk::utilities::getLibraryName(pluginName);
 }
 
