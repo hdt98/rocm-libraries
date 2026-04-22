@@ -737,9 +737,8 @@ namespace TensileLite
             size_t elementsAfterData    = 0;
 
             BoundsCheckMode boundsCheck = m_dataInit->getCurBoundsCheck();
-            // For input tensors with NaN bounds checking, copy the full padded buffer from GPU
-            // Output tensors don't have NaN padding initialized by copyBadInputBuffers, so skip them
-            if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
+            // For NaN bounds checking, copy the full padded buffer from GPU for all tensors
+            if(boundsCheck == BoundsCheckMode::NaN)
                 elementsToCopy = maxElement;
             size_t bytesToCopy = elementsToCopy * sizeof(ValidType);
 
@@ -767,19 +766,23 @@ namespace TensileLite
 
             auto copykind = isgpu ? hipMemcpyDeviceToHost : hipMemcpyHostToHost;
 
-            {
-                ScopedTimer timer("validate_gpu_readback");
-                HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
-            }
-
-            // For input tensors, check NaN padding on the GPU result buffer
-            // Note: Output tensors have NaN padding allocated but not initialized by copyBadInputBuffers
-            if(boundsCheck == BoundsCheckMode::NaN && !tensor.isOutput())
+            // For NaN bounds checking, the result pointer points to valid data (middle of buffer)
+            // We need to adjust it back to buffer start to copy the NaN padding
+            void const* copySource = result;
+            if(boundsCheck == BoundsCheckMode::NaN)
             {
                 ptrdiff_t bPadding = maxElement - tensor.totalAllocatedElements();
                 elementsBeforeData = bPadding / 2;
                 elementsAfterData
                     = elementsToCopy - (tensor.totalAllocatedElements() + elementsBeforeData);
+                // Adjust pointer back to buffer start (before the padding)
+                copySource = (uint8_t const*)result
+                             - elementsBeforeData * sizeof(ValidType);
+            }
+
+            {
+                ScopedTimer timer("validate_gpu_readback");
+                HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), copySource, bytesToCopy, copykind));
             }
             // If there was extra data allocated before the tensor to do bounds
             // checking, resultBuffer is the whole allocation, while resultData

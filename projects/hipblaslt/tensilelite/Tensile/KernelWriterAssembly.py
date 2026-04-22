@@ -1802,16 +1802,18 @@ class KernelWriterAssembly(KernelWriter):
           module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr(Batch), src1=0x8, comment="offset of global buffer address"))
           module.add(SLoadB64(dst=sgpr("AddressD", 2), base=sgpr("AddressD",2), soffset=sgpr(tmpSgpr), comment="load global buffer D address"))
 
-      endCheckLabel = Label(self.labels.getName(f"label_skip_c_buffer_deref_{Batch}"), "")
-      module.add(BranchIfZero("Beta", kernel["ProblemType"]["ComputeDataType"].toEnum(), tmpSgpr, laneSC, endCheckLabel, \
-                     kernel['WavefrontSize']))
+      # Only load C buffer address if Beta is used and potentially non-zero
+      if kernel["ProblemType"]["UseBeta"]:
+        endCheckLabel = Label(self.labels.getName(f"label_skip_c_buffer_deref_{Batch}"), "")
+        module.add(BranchIfZero("Beta", kernel["ProblemType"]["ComputeDataType"].toEnum(), tmpSgpr, laneSC, endCheckLabel, \
+                       kernel['WavefrontSize']))
 
-      for idx in kernel["ProblemType"]["IndicesBatch"]:
-        if not isPackedIndex(kernel,idx):
-          module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr(Batch), src1=0x8, comment="offset of global buffer address"))
-          module.add(SLoadB64(dst=sgpr("AddressC", 2), base=sgpr("AddressC",2), soffset=sgpr(tmpSgpr), comment="load global buffer C address"))
+        for idx in kernel["ProblemType"]["IndicesBatch"]:
+          if not isPackedIndex(kernel,idx):
+            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr(Batch), src1=0x8, comment="offset of global buffer address"))
+            module.add(SLoadB64(dst=sgpr("AddressC", 2), base=sgpr("AddressC",2), soffset=sgpr(tmpSgpr), comment="load global buffer C address"))
 
-      module.add(endCheckLabel)
+        module.add(endCheckLabel)
 
     #handle Batch A/B
     endCheckLabel = Label(self.labels.getName(f"label_skip_ab_buffer_deref_{Batch}"), "")
@@ -13741,8 +13743,8 @@ class KernelWriterAssembly(KernelWriter):
         self.sgprPool.checkIn(sgprScaleA)
         self.sgprPool.checkIn(sgprScaleB)
 
-      # Update beta
-      if kernel["ProblemType"]["UseScaleCD"] and ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["StreamK"] > 0):
+      # Update beta with ScaleC (only when Beta is actually used)
+      if kernel["ProblemType"]["UseBeta"] and kernel["ProblemType"]["UseScaleCD"] and ((kernel["GlobalSplitU"] == 1 or kernel["GlobalSplitU"] == -1) or kernel["StreamK"] > 0):
         assert(kernel["ProblemType"]["ComputeDataType"].isSingle())
         newBetaVgpr = self.vgprPool.checkOut(1)
         module.add(VMovB32(dst=vgpr(newBetaVgpr), src=sgpr("Beta")))

@@ -761,12 +761,14 @@ namespace TensileLite
                                   size_t                  totalElements,
                                   hipMemcpyKind           kind)
         {
+            // First, copy the NaN-filled bad buffer to the entire destination for padding
             HIP_CHECK_EXC(
                 hipMemcpy(dst,
-                          src,
+                          bad,
                           multiplyElementSize(totalElements,
                                               DataTypeInfo::Get(descriptor.dataType()).elementSize),
                           kind));
+            // Then, copy valid data to the middle section, overwriting the NaN padding in that region
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
             dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
             void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
