@@ -19,7 +19,7 @@ class ConvInstanceTemplateParams:
         scheduler,
         scalar_per_vector,
         num_groups_to_merge,
-        split_image,
+        large_tensors,
         explicit_gemm,
         id,
     ):
@@ -34,16 +34,16 @@ class ConvInstanceTemplateParams:
         self.scheduler = scheduler
         self.scalar_per_vector = scalar_per_vector
         self.num_groups_to_merge = num_groups_to_merge
-        self.split_image = split_image
+        self.large_tensors = large_tensors
         self.explicit_gemm = explicit_gemm
         self.id = id
 
     def get_optimizations(self):
         explicit_gemm = "true" if self.explicit_gemm else "false"
-        split_image = "true" if self.split_image else "false"
+        large_tensors = "true" if self.large_tensors else "false"
         num_groups_to_merge = str(self.num_groups_to_merge)
         two_stage_instance = "true" if self.is_two_stage_instance else "false"
-        return f"ckt::TileOptimizations{{.num_groups_to_merge = {num_groups_to_merge}, .split_image = {split_image}, .explicit_gemm = {explicit_gemm}, .two_stage = {two_stage_instance}}}"
+        return f"ckt::TileOptimizations{{.num_groups_to_merge = {num_groups_to_merge}, .large_tensors = {large_tensors}, .explicit_gemm = {explicit_gemm}, .two_stage = {two_stage_instance}}}"
 
     def get_specialization(self):
         namespace = "ckb::TileConvSpecialization::"
@@ -212,7 +212,7 @@ def parse_fwd_instances(instances, problem_name):
         args = parse_instance_string(params_str)
 
         is_v3_instance = instance.find("Xdl_CShuffle_V3") != -1
-        split_image = instance.find("Large_Tensor") != -1
+        large_tensors = instance.find("Large_Tensor") != -1
 
         if is_v3_instance:
             spec = args[14]
@@ -249,7 +249,7 @@ def parse_fwd_instances(instances, problem_name):
             scheduler = "Intrawave"
             pipeline_version = "v1"
             direct_load = 0
-            num_groups_to_merge = 0 if split_image else int(args[48])
+            num_groups_to_merge = 0 if large_tensors else int(args[48])
 
         double_smem_buffer = pipeline_version == "v4"
         num_wave_groups = 1
@@ -271,8 +271,8 @@ def parse_fwd_instances(instances, problem_name):
         dtype = get_dtype(problem_name)
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
-        if split_image:
-            print(f"Skipping instance {instance_id} with split_image since it's not supported yet.")
+        if large_tensors:
+            print(f"Skipping instance {instance_id} with large_tensors since it's not supported yet.")
             continue
         if pipeline_version == "V5":
             print(f"Skipping instance {instance_id} with V5 since it's not supported yet.")
@@ -295,7 +295,7 @@ def parse_fwd_instances(instances, problem_name):
             scheduler,
             [a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector],
             num_groups_to_merge,
-            split_image,
+            large_tensors,
             False,
             instance_id,
         )
@@ -424,7 +424,7 @@ def parse_bwd_weight_instances(instances, problem_name):
         if blk_gemm_pipeline_version not in ["v1", "v2", "v3", "v4", "v5"]:
             raise RuntimeError(f"Invalid Block GEMM pipeline version: {blk_gemm_pipeline_version} in instance: {instance}")
 
-        split_image = instance.find("Large") != -1
+        large_tensors = instance.find("Large") != -1
         double_smem_buffer = blk_gemm_pipeline_version == "v4"
         num_wave_groups = 1
         scheduler = block_gemm_pipeline_scheduler
@@ -478,7 +478,7 @@ def parse_bwd_weight_instances(instances, problem_name):
             scheduler,
             [a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector],
             num_groups_to_merge,
-            split_image,
+            large_tensors,
             is_explicit_gemm,
             instance_id,
         )
@@ -528,7 +528,7 @@ def parse_bwd_data_instances(instances, problem_name):
         k1 = min(ak1, bk1)
 
         # TODO: Do we need split image for 3D bwd data convs?
-        split_image = False
+        large_tensors = False
 
         # Default optimization parameters
         num_groups_to_merge = 1
@@ -607,7 +607,7 @@ def parse_bwd_data_instances(instances, problem_name):
             scheduler,
             [a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector],
             num_groups_to_merge,
-            split_image,
+            large_tensors,
             is_explicit_gemm,
             instance_id,
         )

@@ -153,7 +153,7 @@ concept TileBlockGemmDescriptor = requires(T t) {
 template <typename T>
 concept TileOptimizationsDescriptor = requires(T t) {
     { t.num_groups_to_merge } -> std::convertible_to<int>;
-    { t.split_image } -> std::convertible_to<bool>;
+    { t.large_tensors } -> std::convertible_to<bool>;
     { t.explicit_gemm } -> std::convertible_to<bool>;
     { t.two_stage } -> std::convertible_to<bool>;
 };
@@ -294,7 +294,7 @@ concept SpecifiesTileBlockGemm = requires {
 template <typename T>
 concept SpecifiesTileOptimizations = requires {
     { T::optimizations.num_groups_to_merge } -> std::convertible_to<int>;
-    { T::optimizations.split_image } -> std::convertible_to<bool>;
+    { T::optimizations.large_tensors } -> std::convertible_to<bool>;
     { T::optimizations.explicit_gemm } -> std::convertible_to<bool>;
     { T::optimizations.two_stage } -> std::convertible_to<bool>;
 };

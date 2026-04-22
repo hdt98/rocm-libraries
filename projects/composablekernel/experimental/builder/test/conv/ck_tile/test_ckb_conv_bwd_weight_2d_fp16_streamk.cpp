@@ -32,7 +32,7 @@ constexpr auto ALGORITHM =
         .with_tile_block_gemm(cku::TileBlockGemmDesc_16x16_v3_intrawave)
         .with_tile_transfer(cku::TileTransfer_4x4x4)
         .with_tile_optimizations(ckt::TileOptimizations{.num_groups_to_merge = 1,
-                                                        .split_image         = false,
+                                                        .large_tensors         = false,
                                                         .explicit_gemm       = false,
                                                         .two_stage           = false})
         .with_streamk(ckt::TileStreamKConfig{
