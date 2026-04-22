@@ -26,6 +26,7 @@
 
 #include <Tensile/ContractionSolution.hpp>
 
+#include <Tensile/Debug.hpp>
 #include <Tensile/hip/HipUtils.hpp>
 
 #include <Tensile/AMDGPU.hpp>
@@ -3454,6 +3455,91 @@ namespace TensileLite
         // TODO round up for alignment?
 
         return size;
+    }
+
+    void ContractionSolution::applyStreamKPlumbingToOrigamiConfig(Problem const&      problem,
+                                                                  Hardware const&     hardware,
+                                                                  origami::config_t& config) const
+    {
+        if(sizeMapping.streamK == 0)
+            return;
+        if(calculateAutoGSU(problem, &hardware) != 0)
+            return;
+
+        auto tiles = problem.getNumTiles(sizeMapping, 1);
+        if(tiles == 0)
+            return;
+
+        origami::reduction_t reduction = getSKReduction(problem, hardware);
+        size_t               skGrid    = getSKGrid(problem, hardware, tiles, reduction);
+
+        const bool streamKDP = Debug::Instance().useStreamKDataParrallel();
+        if(skGrid > 0
+           && (reduction == origami::reduction_t::parallel
+               || (tiles % skGrid != 0 && !streamKDP)))
+        {
+            size_t idealWorkspace = partialTileSize(skGrid);
+            if(idealWorkspace > problem.workspaceSize())
+            {
+                reduction = origami::reduction_t::tree;
+                skGrid    = tiles;
+            }
+        }
+
+        auto [wgm, wgmxcc, wgmxccchunk] = calculateAutoWGM(problem, &hardware, static_cast<uint32_t>(skGrid));
+        (void)wgmxccchunk;
+
+        auto& tp                       = config.tensile();
+        tp.streamk_sk_grid             = static_cast<uint32_t>(skGrid);
+        tp.streamk_reduction_mode      = reduction;
+        tp.streamk_partial_tiles       = static_cast<uint32_t>(tiles % std::max(size_t(1), skGrid));
+        tp.streamk_workspace_available = problem.workspaceSize();
+        tp.streamk_plumbed_wgm         = static_cast<int>(wgm);
+        tp.streamk_plumbed_wgmxcc      = static_cast<int>(wgmxcc);
+    }
+
+    void ContractionSolution::applyStreamKPlumbingToFormocastSizeMapping(
+        Problem const& problem, Hardware const& hardware, origami::Formocast::SizeMapping& sm) const
+    {
+        if(sizeMapping.streamK == 0)
+            return;
+        if(calculateAutoGSU(problem, &hardware) != 0)
+            return;
+
+        auto tiles = problem.getNumTiles(sizeMapping, 1);
+        if(tiles == 0)
+            return;
+
+        origami::reduction_t reduction = getSKReduction(problem, hardware);
+        size_t               skGrid    = getSKGrid(problem, hardware, tiles, reduction);
+
+        const bool streamKDP = Debug::Instance().useStreamKDataParrallel();
+        if(skGrid > 0
+           && (reduction == origami::reduction_t::parallel
+               || (tiles % skGrid != 0 && !streamKDP)))
+        {
+            size_t idealWorkspace = partialTileSize(skGrid);
+            if(idealWorkspace > problem.workspaceSize())
+            {
+                reduction = origami::reduction_t::tree;
+                skGrid    = tiles;
+            }
+        }
+
+        auto [wgm, wgmxcc, wgmxccchunk] = calculateAutoWGM(problem, &hardware, static_cast<uint32_t>(skGrid));
+        (void)wgmxccchunk;
+
+        sm.skGrid               = static_cast<uint32_t>(skGrid);
+        sm.skReduction          = reduction;
+        sm.skPartialTiles       = static_cast<uint32_t>(tiles % std::max(size_t(1), skGrid));
+        sm.skWorkspaceAvailable = problem.workspaceSize();
+        if(sm.skGrid > 0)
+        {
+            if(wgm != 0)
+                sm.workGroupMapping = static_cast<int>(wgm);
+            if(wgmxcc != 0)
+                sm.workGroupMappingXCC = static_cast<int>(wgmxcc);
+        }
     }
 
     float ContractionSolution::computeGranularity(float x)

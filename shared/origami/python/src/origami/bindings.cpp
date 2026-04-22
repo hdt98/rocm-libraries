@@ -122,7 +122,13 @@ NB_MODULE(origami, m) {
       .def_rw("workgroup_mapping_xcc", &origami::tensile_params_t::workgroup_mapping_xcc)
       .def_rw("workgroup_mapping_xcc_group", &origami::tensile_params_t::workgroup_mapping_xcc_group)
       .def_rw("global_split_u_coalesced", &origami::tensile_params_t::global_split_u_coalesced)
-      .def_rw("global_split_u_wgm_round_robin", &origami::tensile_params_t::global_split_u_wgm_round_robin);
+      .def_rw("global_split_u_wgm_round_robin", &origami::tensile_params_t::global_split_u_wgm_round_robin)
+      .def_rw("streamk_sk_grid", &origami::tensile_params_t::streamk_sk_grid)
+      .def_rw("streamk_reduction_mode", &origami::tensile_params_t::streamk_reduction_mode)
+      .def_rw("streamk_partial_tiles", &origami::tensile_params_t::streamk_partial_tiles)
+      .def_rw("streamk_workspace_available", &origami::tensile_params_t::streamk_workspace_available)
+      .def_rw("streamk_plumbed_wgm", &origami::tensile_params_t::streamk_plumbed_wgm)
+      .def_rw("streamk_plumbed_wgmxcc", &origami::tensile_params_t::streamk_plumbed_wgmxcc);
 
   nanobind::class_<origami::config_t>(m, "config_t")
       .def(nanobind::init<>())

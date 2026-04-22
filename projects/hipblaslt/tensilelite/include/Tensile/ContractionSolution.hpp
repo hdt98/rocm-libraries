@@ -44,6 +44,7 @@
 #include <Tensile/Utils.hpp>
 
 #include "origami/origami.hpp"
+#include <origami/simulator/tensilelite/formocast_simulator.hpp>
 #include "origami/streamk.hpp"
 
 #define TENSILE_COMMON_KERNEL_ARGS_SIZE 16
@@ -338,6 +339,16 @@ namespace TensileLite
                                        size_t               tiles,
                                        origami::reduction_t reductionStrat) const;
         size_t               partialTileSize(size_t skGrid) const;
+
+        /// Fill StreamK Formocast fields on \p config (PredictionLibrary simulation path).
+        void applyStreamKPlumbingToOrigamiConfig(Problem const&      problem,
+                                                 Hardware const&     hardware,
+                                                 origami::config_t& config) const;
+
+        /// Fill StreamK Formocast fields on \p sm (client / SolutionIterator path).
+        void applyStreamKPlumbingToFormocastSizeMapping(Problem const&               problem,
+                                                       Hardware const&              hardware,
+                                                       origami::Formocast::SizeMapping& sm) const;
 
         static float computeGranularity(float x);
 

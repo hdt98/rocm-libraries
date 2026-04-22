@@ -30,6 +30,7 @@
 #include <set>
 #include <vector>
 
+#include <Tensile/ContractionProblem.hpp>
 #include <Tensile/UtilsOrigami.hpp>
 
 namespace TensileLite
@@ -181,8 +182,18 @@ namespace TensileLite
                 .b_mx_block_size = 0, // MX Data types come from rocroller
             };
 
+            std::vector<origami::config_t> configs_for_rank = origami_config_list;
+            if(auto const* gemmProblem = dynamic_cast<ContractionProblemGemm const*>(&problem))
+            {
+                for(size_t i = 0; i < configs_for_rank.size(); ++i)
+                {
+                    solution_list[i].second->applyStreamKPlumbingToOrigamiConfig(
+                        *gemmProblem, hardware, configs_for_rank[i]);
+                }
+            }
+
             auto prediction_result = origami::rank_configs(
-                origami_problem, *(pAMDGPU->analyticalHardware), origami_config_list);
+                origami_problem, *(pAMDGPU->analyticalHardware), configs_for_rank);
 
             for(const auto& r : prediction_result)
             {

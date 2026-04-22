@@ -15,6 +15,7 @@
 #include <cassert>
 #include <cstring>
 #include <iomanip>
+#include <iostream>
 #include <optional>
 
 namespace origami
@@ -593,17 +594,46 @@ namespace origami
             origami_config.workspace_size_per_elem_c   = static_cast<size_t>(problem.bpeCompute);
             origami_config.workspace_size              = 128ull * 1024 * 1024;
 
-            sk_reduction = streamk::select_reduction(
-                origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware);
-            origami_config.reduction_strategy = sk_reduction;
+            const bool use_plumbed_sk = (sizeMapping.skGrid > 0);
+            if(use_plumbed_sk)
+            {
+                sk_grid = sizeMapping.skGrid;
+                sk_reduction
+                    = sizeMapping.skReduction != reduction_t::none
+                          ? sizeMapping.skReduction
+                          : streamk::select_reduction(
+                              origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware);
+                origami_config.reduction_strategy = sk_reduction;
+                sk_iters_per_cta                  = streamk::num_iters_per_cta(sk_iters_total, sk_grid);
+                sk_fixup_peers                    = streamk::num_fixup_peers_v2(
+                    sk_grid, sk_iters_total, sk_iters_per_tile, sk_iters_per_cta);
+            }
+            else
+            {
+                sk_reduction = streamk::select_reduction(
+                    origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware);
+                origami_config.reduction_strategy = sk_reduction;
 
-            sk_grid = streamk::select_grid_size(
-                origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware, 0);
-            sk_grid = std::max(size_t(1), sk_grid);
+                sk_grid = streamk::select_grid_size(
+                    origami_problem, *streamk_hw, origami_config, grid_selection_t::k_split_aware, 0);
+                sk_grid = std::max(size_t(1), sk_grid);
 
-            sk_iters_per_cta = streamk::num_iters_per_cta(sk_iters_total, sk_grid);
-            sk_fixup_peers
-                = streamk::num_fixup_peers_v2(sk_grid, sk_iters_total, sk_iters_per_tile, sk_iters_per_cta);
+                sk_iters_per_cta = streamk::num_iters_per_cta(sk_iters_total, sk_grid);
+                sk_fixup_peers
+                    = streamk::num_fixup_peers_v2(sk_grid, sk_iters_total, sk_iters_per_tile, sk_iters_per_cta);
+            }
+
+            if(std::getenv("FORMOCAST_STREAMK_DEBUG"))
+            {
+                const uint32_t partial_log
+                    = use_plumbed_sk ? sizeMapping.skPartialTiles
+                                     : static_cast<uint32_t>(sk_output_tiles
+                                                             % std::max(size_t(1), sk_grid));
+                std::cerr << "[formocast][StreamK] " << (use_plumbed_sk ? "plumbed" : "derived")
+                          << " skGrid=" << sk_grid << " reduction=" << static_cast<unsigned>(sk_reduction)
+                          << " partialTiles=" << partial_log << " outputTiles=" << sk_output_tiles
+                          << std::endl;
+            }
         }
 
         double K_AfterGSU = isStreamK ? K
@@ -724,7 +754,9 @@ namespace origami
             const double   math_overall_pre  = math_clk / hw_consts.math_frequency;
             const size_t   tile_ws_bytes     = static_cast<size_t>(MT0) * static_cast<size_t>(MT1)
                                             * static_cast<size_t>(problem.bpeCompute);
-            constexpr size_t streamk_ws_cap  = 128ull * 1024 * 1024;
+            const size_t streamk_ws_cap      = sizeMapping.skWorkspaceAvailable > 0
+                                                   ? sizeMapping.skWorkspaceAvailable
+                                                   : (128ull * 1024 * 1024);
             gsu_overall                      = calculateStreamKOverhead(sk_reduction,
                                                      sk_output_tiles,
                                                      sk_grid,

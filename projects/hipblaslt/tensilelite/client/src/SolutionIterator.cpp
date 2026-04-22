@@ -236,6 +236,7 @@ namespace TensileLite
             sm.DirectToLdsB       = sizeMapping.DirectToLdsB;
 
             sm.waveGroup = sizeMapping.waveGroup;
+            solution.applyStreamKPlumbingToFormocastSizeMapping(problem, hardware, sm);
             return sm;
         }
 

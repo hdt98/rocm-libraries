@@ -77,6 +77,13 @@ namespace origami
 
             bool DirectToLdsA = false;
             bool DirectToLdsB = false;
+
+            /// Native StreamK fields (PredictionLibrary / tensile_host). If \p skGrid==0, Formocast
+            /// derives grid and reduction locally (fallback for direct callers).
+            std::uint32_t skGrid = 0;
+            reduction_t   skReduction = reduction_t::none;
+            std::uint32_t skPartialTiles = 0;
+            std::size_t   skWorkspaceAvailable = 0;
         };
 
         /**

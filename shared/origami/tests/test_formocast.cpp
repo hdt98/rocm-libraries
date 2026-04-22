@@ -6,6 +6,7 @@
 #include <origami/simulator/tensilelite/formocast_simulator.hpp>
 #include <origami/hardware.hpp>
 #include <origami/streamk.hpp>
+#include <origami/types.hpp>
 #include <queue>
 
 using Catch::Approx;
@@ -960,6 +961,80 @@ TEST_CASE("Formocast: StreamK (GlobalSplitU=0) uses schedule instead of penalty"
         REQUIRE(t2 != Approx(9999999.9));
         REQUIRE(t1 != t2);
     }
+}
+
+TEST_CASE("Formocast: StreamK plumbed SK matches local derivation", "[formocast][streamk][plumb]") {
+    Formocast sim;
+    sim.setHardware(hardware_t::architecture_t::gfx950);
+    auto p = make_problem_info(1024, 1024, 1024);
+    auto sm0 = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 0);
+
+    sim.setProblem(p);
+    sim.setSolution(sm0);
+    const double t_derived = sim.predictedPerformance().microSeconds;
+
+    const size_t       mt0   = 128;
+    const size_t       mt1   = 128;
+    const size_t       du    = 32;
+    const size_t       m     = 1024;
+    const size_t       n     = 1024;
+    const size_t       k     = 1024;
+    const size_t       batch = 1;
+    const size_t       tiles = streamk::compute_number_of_output_tiles(mt0, mt1, m, n, batch);
+    auto               hwc   = sim.getHardwareConstants(hardware_t::architecture_t::gfx950);
+    const hardware_t   hw    = hardware_t::get_hardware_for_arch(
+        hardware_t::architecture_t::gfx950,
+        static_cast<size_t>(hwc.NumCUs),
+        static_cast<size_t>(64 * 1024),
+        static_cast<size_t>(std::max(hwc.L2CacheCapacity, 1024.0 * 1024.0)),
+        std::max(1, static_cast<int>(hwc.math_frequency * 1000.0)));
+    problem_t op{};
+    op.size  = {m, n, k};
+    op.batch = batch;
+    config_t oc{};
+    oc.mt                        = {mt0, mt1, du};
+    oc.mi                        = {static_cast<size_t>(sm0.matrixInstruction[0]),
+                                    static_cast<size_t>(sm0.matrixInstruction[1]),
+                                    static_cast<size_t>(sm0.matrixInstruction[2])};
+    oc.occupancy                 = std::max(1, sm0.CUOccupancy);
+    oc.workgroup_mapping         = sm0.workGroupMapping;
+    oc.grid_selection            = grid_selection_t::k_split_aware;
+    oc.workspace_size_per_elem_c = 2;
+    oc.workspace_size            = 128ull * 1024 * 1024;
+    reduction_t red = streamk::select_reduction(op, hw, oc, grid_selection_t::k_split_aware);
+    oc.reduction_strategy = red;
+    size_t skg            = streamk::select_grid_size(op, hw, oc, grid_selection_t::k_split_aware, 0);
+    skg                   = std::max(size_t(1), skg);
+
+    auto sm1            = sm0;
+    sm1.skGrid          = static_cast<uint32_t>(skg);
+    sm1.skReduction     = red;
+    sm1.skPartialTiles  = static_cast<uint32_t>(tiles % std::max(size_t(1), skg));
+    sim.setSolution(sm1);
+    const double t_plumbed = sim.predictedPerformance().microSeconds;
+
+    REQUIRE(t_derived > 0.0);
+    REQUIRE(t_plumbed > 0.0);
+    REQUIRE(t_derived == Approx(t_plumbed).epsilon(1e-5));
+}
+
+TEST_CASE("Formocast: StreamK tiny workspace limit shifts overhead model", "[formocast][streamk][plumb]") {
+    Formocast sim;
+    sim.setHardware(hardware_t::architecture_t::gfx950);
+    auto p  = make_problem_info(1024, 1024, 1024);
+    auto sm = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 0);
+
+    const size_t tiles = streamk::compute_number_of_output_tiles(128, 128, 1024, 1024, 1);
+    sm.skGrid                 = 48;
+    sm.skReduction            = reduction_t::tree;
+    sm.skPartialTiles         = static_cast<uint32_t>(tiles % 48);
+    sm.skWorkspaceAvailable   = 512;
+
+    sim.setProblem(p);
+    sim.setSolution(sm);
+    auto perf = sim.predictedPerformance();
+    REQUIRE(perf.microSeconds > 0.0);
+    REQUIRE(perf.microSeconds < 1e7);
 }
 
 TEST_CASE("Formocast: Edge cases and error handling", "[formocast]") {

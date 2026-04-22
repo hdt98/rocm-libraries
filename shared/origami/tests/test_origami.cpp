@@ -1047,5 +1047,9 @@ TEST_CASE("Origami: tensile_params_t hash function", "[origami]") {
     origami::tensile_params_t params_wgm_xcc = base_params;
     params_wgm_xcc.workgroup_mapping_xcc     = 8;
     REQUIRE(base_params.hash() != params_wgm_xcc.hash());
+
+    origami::tensile_params_t params_streamk = base_params;
+    params_streamk.streamk_sk_grid           = 304;
+    REQUIRE(base_params.hash() != params_streamk.hash());
   }
 }

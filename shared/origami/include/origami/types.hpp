@@ -380,6 +380,15 @@ struct tensile_params_t {
   bool global_split_u_coalesced = false;
   bool global_split_u_wgm_round_robin = false;
 
+  /// StreamK parameters for Formocast (AIGESOLSEL-137). \p streamk_sk_grid==0 means the
+  /// simulator derives grid/reduction locally (older callers / tests).
+  std::uint32_t streamk_sk_grid = 0;
+  reduction_t   streamk_reduction_mode = reduction_t::none;
+  std::uint32_t streamk_partial_tiles = 0;
+  std::size_t   streamk_workspace_available = 0;
+  int           streamk_plumbed_wgm = 0;
+  int           streamk_plumbed_wgmxcc = 0;
+
   constexpr bool operator==(const tensile_params_t& o) const noexcept {
     return depth_u == o.depth_u && global_split_u == o.global_split_u &&
            global_accumulation == o.global_accumulation && local_split_u == o.local_split_u &&
@@ -394,7 +403,13 @@ struct tensile_params_t {
            workgroup_mapping_xcc == o.workgroup_mapping_xcc &&
            workgroup_mapping_xcc_group == o.workgroup_mapping_xcc_group &&
            global_split_u_coalesced == o.global_split_u_coalesced &&
-           global_split_u_wgm_round_robin == o.global_split_u_wgm_round_robin;
+           global_split_u_wgm_round_robin == o.global_split_u_wgm_round_robin &&
+           streamk_sk_grid == o.streamk_sk_grid &&
+           streamk_reduction_mode == o.streamk_reduction_mode &&
+           streamk_partial_tiles == o.streamk_partial_tiles &&
+           streamk_workspace_available == o.streamk_workspace_available &&
+           streamk_plumbed_wgm == o.streamk_plumbed_wgm &&
+           streamk_plumbed_wgmxcc == o.streamk_plumbed_wgmxcc;
   }
 
   std::size_t hash() const {
@@ -404,7 +419,9 @@ struct tensile_params_t {
         num_loads_coalesced_a, num_loads_coalesced_b, wave_num,
         wave_group_m, wave_group_n, prefetch_global_read, math_clocks_unrolled_loop,
         swizzle_a, swizzle_b, workgroup_mapping_xcc, workgroup_mapping_xcc_group,
-        global_split_u_coalesced, global_split_u_wgm_round_robin);
+        global_split_u_coalesced, global_split_u_wgm_round_robin, streamk_sk_grid,
+        static_cast<std::uint32_t>(streamk_reduction_mode), streamk_partial_tiles,
+        streamk_workspace_available, streamk_plumbed_wgm, streamk_plumbed_wgmxcc);
   }
 };
 

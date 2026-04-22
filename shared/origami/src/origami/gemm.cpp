@@ -1045,7 +1045,10 @@ static double compute_formocast_latency(const problem_t& problem,
   // Use depth_u if set, otherwise use mt.k
   size_mapping.depthU = (config.tensile().depth_u > 0) ? config.tensile().depth_u : config.mt.k;
 
-  size_mapping.globalSplitU = std::max(static_cast<int16_t>(1), config.tensile().global_split_u);
+  // Preserve StreamK global_split_u==0 for native scheduling (AIGESOLSEL-137).
+  // DEPRECATED fallback (AIGESOLSEL-93): older paths clamped 0 -> 1 so Formocast reused GSU
+  // math; that is lossy and no longer used for PredictionLibrary simulation mode.
+  size_mapping.globalSplitU = config.tensile().global_split_u;
   size_mapping.globalAccumulation = config.tensile().global_accumulation;
   size_mapping.LocalSplitU = config.tensile().local_split_u;
 
@@ -1077,6 +1080,17 @@ static double compute_formocast_latency(const problem_t& problem,
   size_mapping.CUOccupancy = config.occupancy;
   size_mapping.PrefetchGlobalRead = config.tensile().prefetch_global_read;
   size_mapping.MathClocksUnrolledLoop = config.tensile().math_clocks_unrolled_loop;
+
+  const auto& tps = config.tensile();
+  size_mapping.skGrid                = tps.streamk_sk_grid;
+  size_mapping.skReduction           = tps.streamk_reduction_mode;
+  size_mapping.skPartialTiles        = tps.streamk_partial_tiles;
+  size_mapping.skWorkspaceAvailable  = tps.streamk_workspace_available;
+  if(tps.streamk_sk_grid > 0)
+  {
+      size_mapping.workGroupMapping    = tps.streamk_plumbed_wgm;
+      size_mapping.workGroupMappingXCC = tps.streamk_plumbed_wgmxcc;
+  }
 
   // Set problem, solution, and hardware in Formocast
   formocast.setProblem(prob_info);
