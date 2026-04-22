@@ -968,9 +968,6 @@ class ProblemType(Mapping):
     computeType = self["ComputeDataType"]
 
     gemmType = ( inType.toChar(), outType.toChar(), computeType.toChar() )
-    if gemmType not in _validGEMMTypes:
-      raise Exception("This typed-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet."%(gemmType[0], gemmType[1], gemmType[2]))
-
     if self["MXBlockA"] or self["MXBlockB"]:
       if gemmType not in _validMXGEMMTypes:
         raise Exception("This typed-MX-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet." % (gemmType[0], gemmType[1], gemmType[2]))
@@ -984,6 +981,8 @@ class ProblemType(Mapping):
         raise Exception("MXShape is not supported")
       elif (self["MXBlockA"] not in _validMXGEMMBlock):
         raise Exception("MXShape is not supported")
+    elif gemmType not in _validGEMMTypes:
+      raise Exception("This typed-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet."%(gemmType[0], gemmType[1], gemmType[2]))
 
   ########################################
   def initGEMM(self):
