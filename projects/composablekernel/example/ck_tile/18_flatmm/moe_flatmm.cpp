@@ -229,28 +229,48 @@ float moe_gemm(const ck_tile::MoeFlatmmHostArgs<ScaleM, ScaleN>& args,
                                                 ? 2
                                                 : 1; // determined by scale shuffle pattern
 
-        using GemmEpilogue = ck_tile::CShuffleEpilogue<
-            ck_tile::CShuffleEpilogueProblem<ADataType,
-                                             BDataType,
-                                             DsDatatype,
-                                             AccDataType,
-                                             CDataType,
-                                             DsLayout,
-                                             ELayout,
-                                             CDEElementWise,
-                                             TilePartitioner::MPerBlock,
-                                             TilePartitioner::NPerBlock,
-                                             FlatmmConfig::M_Warp,
-                                             FlatmmConfig::N_Warp,
-                                             FlatmmConfig::M_Warp_Tile,
-                                             FlatmmConfig::N_Warp_Tile,
-                                             FlatmmConfig::K_Warp_Tile,
-                                             CodegenPipelineProblem::TransposeC,
-                                             FlatmmConfig::NumWaveGroups,
-                                             false,
-                                             1,
-                                             FlatmmConfig::TiledMMAPermuteN,
-                                             BlockedXDLN_PerWarp>>;
+        using GemmEpilogue = std::conditional_t<
+            FlatmmConfig::TiledMMAPermuteN,
+            ck_tile::PermuteNEpilogue<
+                ck_tile::PermuteNEpilogueProblem<ADataType,
+                                                 BDataType,
+                                                 DsDatatype,
+                                                 AccDataType,
+                                                 CDataType,
+                                                 DsLayout,
+                                                 ELayout,
+                                                 CDEElementWise,
+                                                 TilePartitioner::MPerBlock,
+                                                 TilePartitioner::NPerBlock,
+                                                 FlatmmConfig::M_Warp,
+                                                 FlatmmConfig::N_Warp,
+                                                 FlatmmConfig::M_Warp_Tile,
+                                                 FlatmmConfig::N_Warp_Tile,
+                                                 FlatmmConfig::K_Warp_Tile,
+                                                 CodegenPipelineProblem::TransposeC,
+                                                 false,
+                                                 1>>,
+            ck_tile::CShuffleEpilogue<
+                ck_tile::CShuffleEpilogueProblem<ADataType,
+                                                 BDataType,
+                                                 DsDatatype,
+                                                 AccDataType,
+                                                 CDataType,
+                                                 DsLayout,
+                                                 ELayout,
+                                                 CDEElementWise,
+                                                 TilePartitioner::MPerBlock,
+                                                 TilePartitioner::NPerBlock,
+                                                 FlatmmConfig::M_Warp,
+                                                 FlatmmConfig::N_Warp,
+                                                 FlatmmConfig::M_Warp_Tile,
+                                                 FlatmmConfig::N_Warp_Tile,
+                                                 FlatmmConfig::K_Warp_Tile,
+                                                 CodegenPipelineProblem::TransposeC,
+                                                 FlatmmConfig::NumWaveGroups,
+                                                 false,
+                                                 1,
+                                                 BlockedXDLN_PerWarp>>>;
 
         using CodegenFlatmmPipeline =
             ck_tile::MoeFlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
@@ -443,7 +463,6 @@ float mx_moe_gemm(const MoeFlatmmHostArgs& args, const ck_tile::stream_config& s
                                              FlatmmConfig::NumWaveGroups,
                                              false,
                                              1,
-                                             FlatmmConfig::TiledMMAPermuteN,
                                              BlockedXDLN_PerWarp>>;
 
         using CodegenFlatmmPipeline =
