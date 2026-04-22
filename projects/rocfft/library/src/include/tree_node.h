@@ -1222,7 +1222,7 @@ private:
 // RCCL-based all-to-all communication for multi-GPU transpose.
 struct CommRCCLAllToAll : public MultiPlanItem
 {
-    CommRCCLAllToAll(rocfft_rccl::Communicator&            _rccl,
+    CommRCCLAllToAll(rocfft_rccl_comm_t&                   _rccl,
                      int                                   local_comm_rank,
                      rocfft_precision                      _precision,
                      rocfft_array_type                     _arrayType,
@@ -1285,7 +1285,7 @@ struct CommRCCLAllToAll : public MultiPlanItem
     }
 
 private:
-    rocfft_rccl::Communicator& rccl;
+    rocfft_rccl_comm_t& rccl;
 
     const rocfft_precision  precision;
     const rocfft_array_type arrayType;
@@ -1316,9 +1316,9 @@ struct CommRCCLGrouped : public MultiPlanItem
         hipStream_wrapper_t stream; // each transfer has its own stream
     };
 
-    CommRCCLGrouped(rocfft_rccl::Communicator& _rccl,
-                    rocfft_precision           _precision,
-                    rocfft_array_type          _arrayType)
+    CommRCCLGrouped(rocfft_rccl_comm_t& _rccl,
+                    rocfft_precision    _precision,
+                    rocfft_array_type   _arrayType)
         : rccl(_rccl)
         , precision(_precision)
         , arrayType(_arrayType)
@@ -1386,9 +1386,9 @@ struct CommRCCLGrouped : public MultiPlanItem
     }
 
 private:
-    rocfft_rccl::Communicator& rccl;
-    const rocfft_precision     precision;
-    const rocfft_array_type    arrayType;
+    rocfft_rccl_comm_t&     rccl;
+    const rocfft_precision  precision;
+    const rocfft_array_type arrayType;
 
 public:
     std::vector<Transfer> transfers;

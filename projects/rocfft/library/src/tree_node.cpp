@@ -709,7 +709,7 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan                     plan,
     //   recvBuffers[d]:  slot[src_rank] at offset src_rank * count_per_rank
     //                    (populated by the collective; read by unpack step)
     {
-        rocfft_rccl::Group group; // ncclGroupStart called in constructor
+        rocfft_rccl_group_t group; // ncclGroupStart called in constructor
 
         size_t stream_idx = 0;
         for(size_t i = 0; i < locations.size(); ++i)
@@ -805,7 +805,7 @@ void CommRCCLGrouped::ExecuteAsync(const rocfft_plan                     plan,
     const bool   is_complex = array_type_is_complex(arrayType);
 
     // group all operations - ncclGroupStart called in constructor
-    rocfft_rccl::Group group;
+    rocfft_rccl_group_t group;
 
     for(auto& t : transfers)
     {

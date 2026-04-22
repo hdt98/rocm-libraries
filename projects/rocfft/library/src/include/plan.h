@@ -33,7 +33,9 @@
 #include "exec_info.h"
 #include "function_pool.h"
 #include "load_store_ops.h"
+#ifdef ROCFFT_RCCL_ENABLE
 #include "rccl_wrapper.h"
+#endif
 #include "rocfft_mpi.h"
 #include "tree_node.h"
 
@@ -323,8 +325,12 @@ struct rocfft_plan_t
     rocfft_plan_description_t desc;
 
 #ifdef ROCFFT_RCCL_ENABLE
-    // rccl communicator used for single-proc multi-GPU transforms
-    std::shared_ptr<rocfft_rccl::Communicator> rccl;
+    // RCCL communicator used by GlobalTransposeRCCL.  Populated only
+    // when the plan runs in a single process (local_comm_size == 1)
+    // and has >= 2 local devices; empty otherwise, in which case
+    // GlobalTransposeP2P / GlobalTransposeA2A handle the transpose.
+    // Value-semantic handle; copies share state via shared_ptr<Impl>.
+    rocfft_rccl_comm_t rccl;
 #endif
 
     rocfft_plan_t() = default;

@@ -24,7 +24,9 @@
 #include "../../shared/environment.h"
 #include "../../shared/rocfft_hip.h"
 #include "logging.h"
+#ifdef ROCFFT_RCCL_ENABLE
 #include "rccl_wrapper.h"
+#endif
 #include "repo.h"
 #include "rocfft/rocfft-version.h"
 #include "rocfft/rocfft.h"
@@ -168,7 +170,9 @@ try
     Repo::Clear();
     RTCCache::single.reset();
 
-    rocfft_rccl::Communicator::comm_world.reset();
+#ifdef ROCFFT_RCCL_ENABLE
+    rocfft_rccl_comm_t::comm_world = {};
+#endif
 
     TuningBenchmarker::GetSingleton().Clean();
 

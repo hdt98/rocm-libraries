@@ -2345,7 +2345,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     // ranks in the communicator to participate
     if(cross_device_count != ndevices * (ndevices - 1))
         alltoall_eligible = false;
-    if(alltoall_eligible && rccl && static_cast<size_t>(rccl->num_ranks()) != ndevices)
+    if(alltoall_eligible && rccl && static_cast<size_t>(rccl.num_ranks()) != ndevices)
         alltoall_eligible = false;
 
     // two RCCL collective strategies are supported:
@@ -2501,7 +2501,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
             recvOffsets.push_back(0);
         }
 
-        auto rcclAllToAll         = std::make_unique<CommRCCLAllToAll>(*rccl,
+        auto rcclAllToAll         = std::make_unique<CommRCCLAllToAll>(rccl,
                                                                local_comm_rank,
                                                                precision,
                                                                desc.inArrayType,
@@ -2557,7 +2557,7 @@ void rocfft_plan_t::GlobalTransposeRCCL(size_t                     elem_size,
     {
         // grouped send/recv path (general case)
 
-        auto rcclGrouped   = std::make_unique<CommRCCLGrouped>(*rccl, precision, desc.inArrayType);
+        auto rcclGrouped   = std::make_unique<CommRCCLGrouped>(rccl, precision, desc.inArrayType);
         rcclGrouped->group = itemGroup;
         rcclGrouped->description = "RCCL grouped send/recv";
 
@@ -3256,8 +3256,10 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
         return false;
 
 #ifdef ROCFFT_RCCL_ENABLE
-    // Collect local devices for RCCL communicator creation.
-    // Only devices owned by local_comm_rank are included.
+    // RCCL path is single-process multi-GPU today: one comm spans the
+    // local devices and the grouped send/recv path uses device ids as
+    // NCCL peer ranks. GlobalTransposeA2A handles multi-rank plans.
+    if(desc.get_local_comm_size() == 1)
     {
         std::set<int> device_set;
         for(const auto& brick : desc.inFields.front().bricks)
@@ -3271,10 +3273,9 @@ bool rocfft_plan_t::BuildOptMultiDevicePlan()
                 device_set.insert(brick.location.device);
         }
         if(device_set.size() > 1)
-            rccl = rocfft_rccl::Communicator::create(device_set);
+            rccl = rocfft_rccl_comm_t::create(device_set);
     }
 #endif
-
     // work out what FFT dimensions are already contiguous in the fields
     std::vector<size_t> contiguousInputDims;
     std::vector<size_t> contiguousOutputDims;

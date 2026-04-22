@@ -21,100 +21,110 @@
 #ifndef ROCFFT_RCCL_WRAPPER_H
 #define ROCFFT_RCCL_WRAPPER_H
 
+// this header is only meaningful when rocFFT is built with RCCL support.
+// callers must guard their inclusion with ROCFFT_RCCL_ENABLE as well; with
+// the macro undefined the file expands to nothing.
+#ifdef ROCFFT_RCCL_ENABLE
+
 #include <hip/hip_runtime.h>
 #include <memory>
 #include <set>
 #include <vector>
 
-#ifdef ROCFFT_RCCL_ENABLE
 #include <rccl/rccl.h>
-#endif
 
-namespace rocfft_rccl
+// value-semantic handle to an RCCL communicator set for single-process
+// multi-GPU transfers.
+class rocfft_rccl_comm_t
 {
-    // RCCL communicator wrapper for single-process multi-GPU
-    class Communicator
+public:
+    // default-constructs an empty (unpopulated) handle.
+    rocfft_rccl_comm_t()  = default;
+    ~rocfft_rccl_comm_t() = default;
+
+    // copy/move share the underlying Impl via shared_ptr; no duplication
+    // of ncclComm_t handles occurs.
+    rocfft_rccl_comm_t(const rocfft_rccl_comm_t&) = default;
+    rocfft_rccl_comm_t& operator=(const rocfft_rccl_comm_t&) = default;
+    rocfft_rccl_comm_t(rocfft_rccl_comm_t&&)                 = default;
+    rocfft_rccl_comm_t& operator=(rocfft_rccl_comm_t&&) = default;
+
+    // true iff this handle refers to an initialized RCCL communicator.
+    explicit operator bool() const
     {
-    public:
-        // default ctor does not actually initialize rccl - call
-        // create to init and check success
-        Communicator();
-        ~Communicator();
+        return static_cast<bool>(pimpl);
+    }
 
-        // allow moves
-        Communicator(Communicator&&);
-        Communicator& operator=(Communicator&&);
+    // return a populated handle for the specified devices, or an empty
+    // handle if RCCL is disabled, fewer than two devices were given, or
+    // initialization failed.
+    static rocfft_rccl_comm_t create(const std::set<int>& devices);
 
-        // return a communicator for the specified devices
-        static std::shared_ptr<Communicator> create(const std::set<int>& devices);
-        // cached communicator for the requested devices, created
-        // on demand and destroyed at cleanup
-        static std::shared_ptr<Communicator> comm_world;
+    // process-wide cached communicator.  created on demand by create()
+    // and reset at rocfft_cleanup().
+    static rocfft_rccl_comm_t comm_world;
 
-        // get the RCCL communicator for a specific device
-        void* get_comm(int device_id) const;
+    // get the RCCL communicator for a specific device
+    void* get_comm(int device_id) const;
 
-        // total number of ranks in this communicator
-        int num_ranks() const;
+    // total number of ranks in this communicator
+    int num_ranks() const;
 
-        // NCCL rank assigned to the given device, or -1 if not found
-        int get_rank(int device_id) const;
+    // NCCL rank assigned to the given device, or -1 if not found
+    int get_rank(int device_id) const;
 
-        // all-to-all with uniform counts.
-        // base_type_size is the size of one real component (2/4/8).
-        bool alltoall(const void* sendbuf,
-                      void*       recvbuf,
-                      size_t      count,
-                      int         device_id,
-                      hipStream_t stream,
-                      size_t      base_type_size,
-                      bool        is_complex);
-
-        // point-to-point send.
-        // base_type_size is the size of one real component (2/4/8).
-        bool send(const void* sendbuf,
+    // all-to-all with uniform counts.
+    // base_type_size is the size of one real component (2/4/8).
+    bool alltoall(const void* sendbuf,
+                  void*       recvbuf,
                   size_t      count,
-                  int         peer_rank,
                   int         device_id,
                   hipStream_t stream,
                   size_t      base_type_size,
                   bool        is_complex);
 
-        // point-to-point receive.
-        // base_type_size is the size of one real component (2/4/8).
-        bool recv(void*       recvbuf,
-                  size_t      count,
-                  int         peer_rank,
-                  int         device_id,
-                  hipStream_t stream,
-                  size_t      base_type_size,
-                  bool        is_complex);
+    // point-to-point send.
+    // base_type_size is the size of one real component (2/4/8).
+    bool send(const void* sendbuf,
+              size_t      count,
+              int         peer_rank,
+              int         device_id,
+              hipStream_t stream,
+              size_t      base_type_size,
+              bool        is_complex);
 
-    private:
-        // non-copyable
-        Communicator(const Communicator&) = delete;
-        Communicator& operator=(const Communicator&) = delete;
+    // point-to-point receive.
+    // base_type_size is the size of one real component (2/4/8).
+    bool recv(void*       recvbuf,
+              size_t      count,
+              int         peer_rank,
+              int         device_id,
+              hipStream_t stream,
+              size_t      base_type_size,
+              bool        is_complex);
 
-#ifdef ROCFFT_RCCL_ENABLE
-        struct Impl;
-        std::unique_ptr<Impl> pimpl;
-#endif
-    };
+private:
+    struct Impl;
+    // shared so copies of the handle refer to the same RCCL state; the
+    // Impl destructor (running exactly once when the last handle dies)
+    // calls ncclCommFinalize/Destroy on the owned communicators.
+    std::shared_ptr<Impl> pimpl;
+};
 
-    // RAII wrapper for RCCL group operations
-    class Group
-    {
-    public:
-        Group();
-        ~Group();
+// RAII wrapper for RCCL group operations
+class rocfft_rccl_group_t
+{
+public:
+    rocfft_rccl_group_t();
+    ~rocfft_rccl_group_t();
 
-        // non-copyable, non-movable
-        Group(const Group&) = delete;
-        Group& operator=(const Group&) = delete;
-        Group(Group&&)                 = delete;
-        Group& operator=(Group&&) = delete;
-    };
+    // non-copyable, non-movable
+    rocfft_rccl_group_t(const rocfft_rccl_group_t&) = delete;
+    rocfft_rccl_group_t& operator=(const rocfft_rccl_group_t&) = delete;
+    rocfft_rccl_group_t(rocfft_rccl_group_t&&)                 = delete;
+    rocfft_rccl_group_t& operator=(rocfft_rccl_group_t&&) = delete;
+};
 
-} // namespace rocfft_rccl
+#endif // ROCFFT_RCCL_ENABLE
 
 #endif // ROCFFT_RCCL_WRAPPER_H
