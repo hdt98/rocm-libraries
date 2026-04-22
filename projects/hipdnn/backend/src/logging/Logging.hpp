@@ -70,11 +70,6 @@ void loggerShutdown();
 
 void backendLoggingCallback(hipdnnSeverity_t severity, const char* msg);
 
-// Heuristic plugin logging callback (3-parameter version with component prefix)
-void heuristicLoggingCallback(hipdnnSeverity_t severity,
-                              const char* componentPrefix,
-                              const char* msg);
-
 void logHipDeviceInfo(hipStream_t stream);
 
 hipdnnStatus_t setUserLogCallback(hipdnnUserLogCallback_t callback,

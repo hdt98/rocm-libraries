@@ -42,7 +42,7 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnHeuristicLoggingCallback_t callback)
+hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback)
 {
     (void)callback;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;

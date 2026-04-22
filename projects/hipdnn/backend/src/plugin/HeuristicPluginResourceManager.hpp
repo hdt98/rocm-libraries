@@ -14,6 +14,19 @@
 #include "hipdnn_backend.h"
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
+// Forward declarations
+namespace hipdnn_backend::plugin
+{
+class HeuristicPlugin;
+class HeuristicPluginManager;
+} // namespace hipdnn_backend::plugin
+
+// Include base template (manager types will be complete when base methods are used in .cpp)
+#include "PluginResourceManagerBase.hpp"
+
+// Include complete manager type for template instantiation
+#include "HeuristicPluginManager.hpp"
+
 namespace hipdnn_backend::plugin
 {
 
@@ -45,28 +58,52 @@ struct HeuristicPolicyInfo
  * its own HeuristicPluginResourceManager instance.
  */
 class HeuristicPluginResourceManager
+    : public PluginResourceManagerBase<HeuristicPluginResourceManager,
+                                       HeuristicPluginManager,
+                                       HeuristicPlugin>
 {
+    // Allow base class to access private static accessors
+    friend class PluginResourceManagerBase<HeuristicPluginResourceManager,
+                                           HeuristicPluginManager,
+                                           HeuristicPlugin>;
+
+private:
+    // Static accessors for CRTP base class
+    static std::mutex& getMutex();
+    static PluginLoadingConfig& getConfig();
+    static std::weak_ptr<HeuristicPluginManager>& getWeakPtr();
+    static std::shared_ptr<HeuristicPluginManager>& getPersistentPtr();
+    static std::atomic<bool>& getShutdownFlag();
+    static const char* getPluginTypeName();
+
 protected:
     // Protected constructor for mock testing
     HeuristicPluginResourceManager();
 
 public:
-    // Static methods for path configuration (MT-safe)
+    // MT-safe static functions (inherited from base, re-declared for documentation)
+    using PluginResourceManagerBase::getPluginPaths;
+    using PluginResourceManagerBase::setPluginLogLevel;
+    using PluginResourceManagerBase::setPluginPaths;
+    using PluginResourceManagerBase::setPluginUnloadingMode;
+
+    // Compatibility aliases for heuristic-specific naming
     static void setHeuristicPluginPaths(const std::vector<std::filesystem::path>& pluginPaths,
-                                        hipdnnPluginLoadingMode_ext_t loadingMode);
-    static std::set<std::filesystem::path> getHeuristicPluginPaths();
+                                        hipdnnPluginLoadingMode_ext_t loadingMode)
+    {
+        setPluginPaths(pluginPaths, loadingMode);
+    }
 
-    // Set plugin unloading mode (lazy keeps plugins loaded until app exit or path change)
-    static void setPluginUnloadingMode(hipdnnPluginUnloadingMode_ext_t mode);
-
-    // Set the log level on all currently loaded heuristic plugins
-    static void setPluginLogLevel(hipdnnSeverity_t level);
+    static std::set<std::filesystem::path> getHeuristicPluginPaths()
+    {
+        return getPluginPaths();
+    }
 
     // Factory method
     static std::shared_ptr<HeuristicPluginResourceManager> create();
 
     HeuristicPluginResourceManager(std::shared_ptr<HeuristicPluginManager> pm);
-    virtual ~HeuristicPluginResourceManager();
+    ~HeuristicPluginResourceManager() override;
 
     // Prevent copying
     HeuristicPluginResourceManager(const HeuristicPluginResourceManager&) = delete;
@@ -122,16 +159,8 @@ public:
      */
     virtual std::vector<HeuristicPolicyInfo> getHeuristicPolicyInfos() const;
 
-    /**
-     * @brief Get the file paths of all loaded heuristic plugin libraries.
-     *
-     * @param numPlugins Output: number of loaded plugins
-     * @param pluginPaths Output: array of plugin file paths (caller-allocated)
-     * @param maxStringLen Output: maximum string length needed
-     */
-    virtual void getLoadedHeuristicPluginFiles(size_t* numPlugins,
-                                               char** pluginPaths,
-                                               size_t* maxStringLen) const;
+    // Inherited from base: getLoadedPluginFiles()
+    using PluginResourceManagerBase::getLoadedPluginFiles;
 
     /**
      * @brief Get a string representation of the resource manager state.
@@ -140,8 +169,10 @@ public:
      */
     virtual std::string toString() const;
 
+protected:
+    // Note: _pm member is inherited from PluginResourceManagerBase
+
 private:
-    std::shared_ptr<HeuristicPluginManager> _pm;
     std::unordered_map<hipdnnHeuristicHandle_t, const HeuristicPlugin*> _handleToPlugin;
     std::unordered_map<int64_t, hipdnnHeuristicHandle_t> _policyIdToHandle;
     mutable std::optional<std::vector<HeuristicPolicyInfo>> _cachedPolicyInfos;

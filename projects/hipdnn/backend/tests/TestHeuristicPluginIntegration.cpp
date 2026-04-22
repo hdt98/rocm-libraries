@@ -14,6 +14,7 @@
 
 #include "HipdnnException.hpp"
 #include "PlatformUtils.hpp"
+#include "TestPluginConstants.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
@@ -28,6 +29,7 @@
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
+using namespace hipdnn_backend::plugin_constants;
 
 namespace
 {
@@ -36,10 +38,10 @@ namespace
 
 std::filesystem::path getTestPluginPath(const char* pluginName)
 {
-    // Get the directory containing the test binary, then navigate to test plugins directory
-    // Test binary is in build/bin/, plugins are in build/lib/test_plugins/custom/
+    // Plugins are in build/{bin,lib}/test_plugins/custom/ (getTestPluginDefaultDir() handles platform)
     const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
-    const auto pluginDir = testBinDir.parent_path() / "lib" / "test_plugins" / "custom";
+    const auto testPluginDir = std::filesystem::path(getTestPluginDefaultDir());
+    const auto pluginDir = testBinDir.parent_path() / testPluginDir / "custom";
     return pluginDir / hipdnn_data_sdk::utilities::getLibraryName(pluginName);
 }
 
@@ -363,7 +365,7 @@ TEST_F(IntegrationHeuristicPlugin, GetApiVersionFromLoadedPlugin)
 
     const auto apiVersion = plugin->apiVersion();
     EXPECT_FALSE(apiVersion.empty());
-    EXPECT_NE(apiVersion.find("1."), std::string_view::npos); // Should be version 1.x
+    EXPECT_NE(apiVersion.find("0."), std::string_view::npos); // Should be version 0.x
 }
 
 TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
@@ -377,9 +379,9 @@ TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
     const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
     ASSERT_NE(plugin, nullptr);
 
-    // Heuristic plugins report UNSPECIFIED type (no dedicated enum value)
+    // Heuristic plugins report HEURISTIC type
     const auto pluginType = plugin->type();
-    EXPECT_EQ(pluginType, HIPDNN_PLUGIN_TYPE_UNSPECIFIED);
+    EXPECT_EQ(pluginType, HIPDNN_PLUGIN_TYPE_HEURISTIC);
 }
 
 // ========== Resource Manager Enumeration Coverage ==========
@@ -392,7 +394,7 @@ TEST_F(IntegrationHeuristicPlugin, GetLoadedPluginFilesReturnsCorrectCount)
     size_t numPlugins = 0;
     size_t maxStringLen = 0;
 
-    rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, &maxStringLen);
+    rm->getLoadedPluginFiles(&numPlugins, nullptr, &maxStringLen);
 
     // Should have at least the test plugins
     EXPECT_GT(numPlugins, 0u);
@@ -653,7 +655,7 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 {
     const auto version = plugin().apiVersion();
     EXPECT_FALSE(version.empty());
-    EXPECT_EQ(version, "1.0.0"); // HIPDNN_HEURISTIC_API_VERSION
+    EXPECT_EQ(version, "0.0.1"); // HIPDNN_HEURISTIC_API_VERSION
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {

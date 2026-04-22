@@ -70,7 +70,7 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnHeuristicLoggingCallback_t callback)
+hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback)
 {
     (void)callback;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
@@ -230,7 +230,7 @@ hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescript
 hipdnnPluginStatus_t
     hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t descriptor,
                                             [[maybe_unused]] int64_t* engine_ids,
-                                            uint32_t* count)
+                                            size_t* count)
 {
     if(descriptor == nullptr)
     {

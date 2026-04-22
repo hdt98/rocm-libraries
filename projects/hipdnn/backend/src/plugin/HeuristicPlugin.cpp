@@ -75,6 +75,16 @@ void HeuristicPlugin::resolveSymbols()
     GET_REQUIRED_SYMBOL(_funcPolicyGetSortedEngineIds, "hipdnnHeuristicPolicyGetSortedEngineIds");
 
 #undef GET_REQUIRED_SYMBOL
+
+    // Eagerly cache policy ID - it's always needed for plugin matching
+    // Compute it once during initialization rather than lazily
+    auto name = policyName();
+    if(name.empty())
+    {
+        throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                              "Cannot load heuristic plugin: policy name is empty");
+    }
+    _policyId = hipdnn_data_sdk::utilities::engineNameToId(name);
 }
 
 std::string_view HeuristicPlugin::apiVersion() const
@@ -98,25 +108,13 @@ std::string_view HeuristicPlugin::version() const
 
 hipdnnPluginType_t HeuristicPlugin::type() const
 {
-    // Heuristic plugins return UNSPECIFIED type
-    return HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
+    // Heuristic plugins return HEURISTIC type
+    return HIPDNN_PLUGIN_TYPE_HEURISTIC;
 }
 
 int64_t HeuristicPlugin::policyId() const
 {
-    if(_policyId != -1)
-    {
-        return _policyId;
-    }
-
-    // Policy ID is always computed from policy name
-    auto name = policyName();
-    if(name.empty())
-    {
-        throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                              "Cannot compute policy ID: policy name is empty");
-    }
-    _policyId = hipdnn_data_sdk::utilities::engineNameToId(name);
+    // Policy ID is eagerly cached during construction in resolveSymbols()
     return _policyId;
 }
 
@@ -134,21 +132,9 @@ std::string_view HeuristicPlugin::pluginVersion() const
     return version;
 }
 
-hipdnnPluginStatus_t
-    HeuristicPlugin::setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const
+hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
 {
     return _funcSetLoggingCallback(callback);
-}
-
-// 2-parameter callback overload for PluginManagerBase compatibility
-// Uses the existing heuristicLoggingCallback which wraps 2-param to 3-param
-hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t /*callback*/) const
-{
-    // The heuristicLoggingCallback function in logging/Logging.cpp already
-    // wraps the backend's 2-param callback to the plugin's 3-param interface
-    // by combining componentPrefix and message before calling backendLoggingCallback
-    // We ignore the passed callback and use the global heuristicLoggingCallback
-    return setLoggingCallback(hipdnn_backend::logging::heuristicLoggingCallback);
 }
 
 hipdnnPluginStatus_t HeuristicPlugin::setLogLevel(hipdnnSeverity_t level) const
@@ -219,7 +205,7 @@ std::vector<int64_t>
     HeuristicPlugin::getSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc) const
 {
     // Query the count first (pass nullptr for engine_ids)
-    uint32_t count = 0;
+    size_t count = 0;
     invokeHeuristicFunction(
         "get sorted engine IDs count", _funcPolicyGetSortedEngineIds, desc, nullptr, &count);
 
@@ -230,7 +216,7 @@ std::vector<int64_t>
 
     // Retrieve the actual IDs
     std::vector<int64_t> ids(count);
-    uint32_t actualCount = count;
+    size_t actualCount = count;
     invokeHeuristicFunction(
         "get sorted engine IDs", _funcPolicyGetSortedEngineIds, desc, ids.data(), &actualCount);
 

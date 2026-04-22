@@ -161,7 +161,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesWhenNoneLoaded)
     size_t maxStringLen = 0;
 
     // Query counts
-    rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, &maxStringLen);
+    rm->getLoadedPluginFiles(&numPlugins, nullptr, &maxStringLen);
 
     EXPECT_EQ(numPlugins, 0u);
     EXPECT_EQ(maxStringLen, 0u);
@@ -173,7 +173,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesWithNullNumPlugin
     auto rm = std::make_shared<HeuristicPluginResourceManager>(pm);
 
     // nullptr for numPlugins should throw
-    EXPECT_THROW(rm->getLoadedHeuristicPluginFiles(nullptr, nullptr, nullptr), HipdnnException);
+    EXPECT_THROW(rm->getLoadedPluginFiles(nullptr, nullptr, nullptr), HipdnnException);
 }
 
 // ========== String Representation Tests ==========
@@ -391,7 +391,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesWithNonNullPathsS
     std::array<char*, 10> paths{};
 
     // Query with paths array (not yet implemented, should not crash)
-    EXPECT_NO_THROW(rm->getLoadedHeuristicPluginFiles(&numPlugins, paths.data(), nullptr));
+    EXPECT_NO_THROW(rm->getLoadedPluginFiles(&numPlugins, paths.data(), nullptr));
 }
 
 TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesQueriesCountOnly)
@@ -401,7 +401,7 @@ TEST_F(TestHeuristicPluginResourceManager, GetLoadedPluginFilesQueriesCountOnly)
 
     size_t numPlugins = 999; // Should be overwritten
 
-    rm->getLoadedHeuristicPluginFiles(&numPlugins, nullptr, nullptr);
+    rm->getLoadedPluginFiles(&numPlugins, nullptr, nullptr);
 
     EXPECT_EQ(numPlugins, 0u); // No plugins loaded
 }

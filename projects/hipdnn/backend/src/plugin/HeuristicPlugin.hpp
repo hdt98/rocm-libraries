@@ -39,22 +39,17 @@ public:
     std::string_view name() const override; // Override to return policy name
     std::string_view version() const override; // Override to return plugin version
     hipdnnPluginType_t type() const override; // Override to return plugin type
-    int64_t policyId() const;
-    std::string_view policyName() const;
-    std::string_view pluginVersion() const;
+    virtual int64_t policyId() const;
+    virtual std::string_view policyName() const;
+    virtual std::string_view pluginVersion() const;
 
-    // Plugin type - heuristic plugins return UNSPECIFIED (they don't have their own type yet)
+    // Plugin type - heuristic plugins return HEURISTIC
     static hipdnnPluginType_t getPluginType()
     {
-        return HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
+        return HIPDNN_PLUGIN_TYPE_HEURISTIC;
     }
 
     // Logging setup (called at module load time)
-    // 3-parameter version for heuristic-specific callback
-    hipdnnPluginStatus_t setLoggingCallback(hipdnnHeuristicLoggingCallback_t callback) const;
-
-    // 2-parameter version for compatibility with PluginManagerBase
-    // This wraps the 2-param callback to provide a component prefix
     hipdnnPluginStatus_t setLoggingCallback(hipdnnCallback_t callback) const;
 
     hipdnnPluginStatus_t setLogLevel(hipdnnSeverity_t level) const;
@@ -122,14 +117,14 @@ private:
     bool _initialized = false;
 #endif
 
-    // Cached metadata
-    mutable int64_t _policyId = -1;
+    // Cached metadata (eagerly initialized in resolveSymbols)
+    int64_t _policyId = -1;
 
     // Module metadata function pointers
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
     hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
     hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnHeuristicLoggingCallback_t);
+    hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnCallback_t);
     hipdnnPluginStatus_t (*_funcSetLogLevel)(hipdnnSeverity_t);
     void (*_funcGetLastErrorString)(const char**);
 
@@ -155,7 +150,7 @@ private:
     hipdnnPluginStatus_t (*_funcPolicyFinalize)(hipdnnHeuristicPolicyDescriptor_t, int32_t*);
     hipdnnPluginStatus_t (*_funcPolicyGetSortedEngineIds)(hipdnnHeuristicPolicyDescriptor_t,
                                                           int64_t*,
-                                                          uint32_t*);
+                                                          size_t*);
 
     friend class PluginManagerBase<HeuristicPlugin>;
 };
