@@ -1438,6 +1438,11 @@ namespace TensileLite
         void*                ws           = nullptr;
         void*                Synchronizer = nullptr;
 
+        // Co-tenant stop-flag pointer (32-bit device memory). Used by kernels
+        // built with PersistentKernelHostStop. The host writes a non-zero value
+        // from another stream to make the persistent loop exit cleanly.
+        void*                stopFlag     = nullptr;
+
         std::vector<size_t> maxElements;
         size_t              workspaceSize;
         bool                gpu = false;

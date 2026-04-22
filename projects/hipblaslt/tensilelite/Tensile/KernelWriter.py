@@ -5774,6 +5774,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     numSgprAddressB = self.states.rpga # til read offsets
     numSgprAddressWS = self.states.rpga
     numSgprAddressFlags = self.states.rpga
+    numSgprAddressStopFlag = self.states.rpga
 
     numSgprAddressMetadata = self.states.rpga if kernel["ProblemType"]["Sparse"] else 0
 
@@ -5932,6 +5933,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("AddressWS", numSgprAddressWS)
       self.defineSgpr("AddressFlags", numSgprAddressFlags)
       self.states.numSgprStreamK += numSgprAddressWS + numSgprAddressFlags
+      if kernel.get("PersistentKernelHostStop", False):
+        # SGPR pair holds the device pointer to the 32-bit stop_flag.
+        # Loaded with the rest of the StreamK args via the bulk kernarg load,
+        # then sampled in PersistentLoop.closePersistentLoop.
+        self.defineSgpr("AddressStopFlag", numSgprAddressStopFlag)
+        self.states.numSgprStreamK += numSgprAddressStopFlag
 
     #asm input interface depen
     self.defineSgpr("StridesD", self.states.d.numSgprStrides)

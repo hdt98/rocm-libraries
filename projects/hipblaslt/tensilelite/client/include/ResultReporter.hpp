@@ -138,6 +138,12 @@ namespace TensileLite
             // rocprof
             const std::string RocProfCounter      = "rocprof-counters";
 #endif
+
+            // Co-tenant (Phase 2 contended-perf benchmarking). Empty/zero when
+            // --cotenant-library is not set.
+            const std::string CoTenantLibrary      = "cotenant-library";
+            const std::string CoTenantCUs          = "cotenant-cus";
+            const std::string CoTenantSolutionName = "cotenant-solution";
         }; // namespace ResultKey
 
         class ResultReporter : public RunListener

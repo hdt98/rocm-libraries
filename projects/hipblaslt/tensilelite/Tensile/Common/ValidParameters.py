@@ -760,6 +760,12 @@ validParameters = { # we need to make sure this matches develop
     # Termination is via process death (SIGKILL of host process tears down
     # the HIP context and KFD preempts the in-flight waves).
     "PersistentKernelLoopForever": [False, True],
+    # Persistent-kernel co-tenant: when True, the persistent loop reads a 32-bit
+    # stop_flag from device memory (passed as a kernel arg) and exits when the
+    # value is non-zero. The host writes the flag from another stream to stop
+    # the kernel cleanly. Adds one global-pointer arg ("AddressStopFlag") to
+    # the kernel signature.
+    "PersistentKernelHostStop": [False, True],
     # Controls desired width (#elements) for loads from global memory -> LDS.
     # and eliminates the pointer unshift logic
     # -1 : Set GlobalReadVectorWidth =  VectorWidth

@@ -141,7 +141,10 @@ namespace TensileLite
                                                                      ClockRateMem,
                                                                      FanSpeedRPMs,
                                                                      HardwareSampleCount,
-                                                                     EnqueueTime},
+                                                                     EnqueueTime,
+                                                                     CoTenantLibrary,
+                                                                     CoTenantCUs,
+                                                                     CoTenantSolutionName},
                                                                     stream,
                                                                     dumpTensors,
                                                                     PrintWinnersOnly));

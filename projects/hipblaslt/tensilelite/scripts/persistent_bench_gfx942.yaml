@@ -1,0 +1,58 @@
+# Benchmark kernel for MI300/MI350 (gfx942 / gfx950).
+# StreamK: 4 (dynamic work queue, commit 5ebff00cb0).
+# Run with TENSILE_STREAMK_FIXED_GRID=<TOTAL_CUS> to occupy the full device.
+
+GlobalParameters:
+  NumElementsToValidate: 0
+  BoundsCheck: False
+  KernelTime: True
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 1
+  DataInitTypeA: 12
+  DataInitTypeB: 13
+  DataInitTypeC: 12
+  MaxWorkspaceSize: 134217728
+  NumWarmups: 3
+  EnqueuesPerSync: 10
+  NumBenchmarks: 3
+  SyncsPerBenchmark: 1
+
+BenchmarkProblems:
+  - # HGEMM NT
+    - OperationType: GEMM
+      DataType: h
+      DestDataType: h
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: False
+      TransposeB: True
+      UseBeta: True
+      Batched: True
+
+    - InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [True]
+      ForkParameters:
+        - 1LDSBuffer: [1]
+        - DepthU: [64]
+        - ExpandPointerSwap: [False]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - MatrixInstruction: [[16, 16, 16, 1, 1, 4, 4, 2, 2]]
+        - MIArchVgpr: [0]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [True]
+        - StoreRemapVectorWidth: [0]
+        - StreamK: [4]
+        - TransposeLDS: [0]
+        - WorkGroupMapping: [1]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [4096, 4096, 1, 4096]

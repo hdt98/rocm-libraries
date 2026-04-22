@@ -1,0 +1,81 @@
+# Co-tenant kernel for in-process contended-perf benchmarking on gfx1201 (RDNA4, RX 9000 series).
+#
+# StreamK: 3 enables the persistent loop; PersistentKernelHostStop: True makes
+# the loop epilogue read a host-writable 32-bit stop_flag from device memory
+# and exit when non-zero. Termination is via tensilelite-client writing 1 to
+# that flag from another stream after the benchmark completes.
+#
+# NOTE: StreamK has no test coverage on RDNA in this tree. If codegen rejects
+# this config or the kernel never terminates, see the Phase 2 ticket's
+# "Risks / Known limitations" section for the SCOPE_DEV cache modifier and
+# the StreamK-on-RDNA caveats.
+#
+# Match this kernel's problem shape to the benchmark's first problem
+# (scripts/persistent_bench_gfx1201.yaml).
+#
+# Adapted from Tensile/Tests/common/gemm/gfx12/fp16_gfx12.yaml:
+#   - WavefrontSize: [32]    (gfx12 is wave32, not wave64)
+#   - MatrixInstruction:     WMMA 16x16x16 (not MFMA)
+#   - dropped MIArchVgpr     (gfx94x knob)
+#   - dropped TransposeLDS / StoreRemapVectorWidth from the gfx94x version
+#   - added LDS pad / cluster knobs that gfx12 references use
+
+GlobalParameters:
+  NumElementsToValidate: 0
+  BoundsCheck: False
+  KernelTime: False
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 1
+  DataInitTypeA: 12
+  DataInitTypeB: 13
+  DataInitTypeC: 12
+  MaxWorkspaceSize: 134217728
+  NumWarmups: 0
+  EnqueuesPerSync: 0
+  NumBenchmarks: 0
+
+BenchmarkProblems:
+  - # HGEMM NT
+    - OperationType: GEMM
+      DataType: h
+      DestDataType: h
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: False
+      TransposeB: True
+      UseBeta: True
+      Batched: True
+
+    - InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - WavefrontSize: [32]
+        - MatrixInstruction: [[16, 16, 16, 1, 1, 4, 4, 2, 2]]   # 128x128 macrotile, wave32
+        - DepthU: [32]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ClusterLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - ExpandPointerSwap: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - LocalReadVectorWidth: [8]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - 1LDSBuffer: [-1]
+        - GlobalSplitU: [0]
+        - SourceSwap: [True]
+        - StreamK: [3]
+        - PersistentKernelHostStop: [True]
+        - WorkGroupMapping: [1]
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [4096, 4096, 1, 4096]

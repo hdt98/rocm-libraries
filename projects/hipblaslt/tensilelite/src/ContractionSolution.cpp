@@ -642,6 +642,14 @@ namespace TensileLite
                 args.template append<void*>("Flags", nullptr);
             else
                 args.template append<void*>("Flags", inputs.Synchronizer);
+
+            if(sizeMapping.persistentKernelHostStop)
+            {
+                // Co-tenant stop flag pointer (32-bit device memory). The
+                // persistent loop polls it every iteration; the host writes a
+                // non-zero value from another stream to stop the kernel.
+                args.template append<void*>("stop_flag", inputs.stopFlag);
+            }
         }
 
         size_t startStrideCD = problemType.useInitialStridesCD ? 0 : 1;

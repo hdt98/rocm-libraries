@@ -175,6 +175,10 @@ namespace TensileLite
                     m_output.setHeaderForKey(ResultKey::SolutionWinnerIdx, "WinnerIdx");
                     m_output.setHeaderForKey(ResultKey::SolutionWinner, "WinnerName");
                 }
+
+                m_output.setHeaderForKey(ResultKey::CoTenantLibrary, "CoTenantLibrary");
+                m_output.setHeaderForKey(ResultKey::CoTenantCUs, "CoTenantCUs");
+                m_output.setHeaderForKey(ResultKey::CoTenantSolutionName, "CoTenantSolutionName");
             }
         }
 

@@ -21,8 +21,10 @@
 ################################################################################
 
 from rocisa.code import Module, Label
-from rocisa.container import vgpr, sgpr
-from rocisa.instruction import VMovB32, SCmpGeU32, SLongBranchNegative
+from rocisa.container import vgpr, sgpr, SMEMModifiers
+from rocisa.enum import CacheScope
+from rocisa.instruction import VMovB32, SCmpEQU32, SCmpGeU32, SLoadB32, \
+    SLongBranchNegative, SWaitCnt
 from ..Component import Component
 import abc
 
@@ -132,6 +134,22 @@ class PersistentLoopOn(PersistentLoop):
             # Infinite loop: never exit. Termination is via process death.
             with writer.allocTmpSgpr(3) as tmpSgprInfo:
                 module.add(SLongBranchNegative(Label("PersistentLoopStart", ""), tmpSgprInfo))
+        elif kernel.get("PersistentKernelHostStop", False):
+            # Co-tenant stop: read 32-bit *AddressStopFlag from device memory.
+            # If 0, branch back to PersistentLoopStart; if non-zero, fall through
+            # to exit. The host writes 1 from another stream to stop the kernel.
+            # glc/dlc/SCOPE_DEV ensure we observe the host's write through the
+            # device-coherent path (mirrors AddressFlags reads in StreamK.py).
+            with writer.allocTmpSgpr(1) as tmpSgprInfo:
+                tmpSgpr = tmpSgprInfo.idx
+                module.add(SLoadB32(dst=sgpr(tmpSgpr), base=sgpr("AddressStopFlag", 2), soffset=0,
+                                    smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV),
+                                    comment="load co-tenant stop_flag"))
+                module.add(SWaitCnt(kmcnt=0, comment="wait for stop_flag load"))
+                module.add(SCmpEQU32(src0=sgpr(tmpSgpr), src1=0, comment="stop_flag == 0?"))
+            # SCC is preserved across allocTmpSgpr exit; longBranchScc1 grabs
+            # its own scratch SGPRs internally for the long-form branch encoding.
+            module.add(writer.longBranchScc1(Label("PersistentLoopStart", ""), posNeg=-1))
         elif kernel["StreamK"] == 4:
             # module.add(SCmpGeU32(src0=sgpr("StreamKTileIdx"), src1=sgpr("SKTiles"), comment="Check if done all StreamK tiles"))
             with writer.allocTmpSgpr(3) as tmpSgprInfo:

@@ -24,6 +24,9 @@
  *
  *******************************************************************************/
 
+#include <Tensile/AMDGPU.hpp>
+#include <Tensile/ContractionProblem.hpp>
+#include <Tensile/ContractionSolution.hpp>
 #include <Tensile/Contractions.hpp>
 #include <Tensile/DataTypes.hpp>
 #include <Tensile/EmbeddedLibrary.hpp>
@@ -62,16 +65,15 @@
 #endif
 
 #include <chrono>
-#include <csignal>
 #include <cstddef>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
-#include <pthread.h>
 #include <sstream>
-#include <sys/prctl.h>
+#include <thread>
 
 namespace TensileLite
 {
@@ -378,10 +380,19 @@ namespace TensileLite
                 ("output-amaxD",              po::value<bool>()->default_value(false), "Output AmaxD.")
                 ("timing-instrumentation",    po::value<bool>()->default_value(false)->implicit_value(true), "Enable detailed timing instrumentation output to stderr.")
                 ("rocprof-counter",           vector_default_empty<std::string>(), "Rocprof counters.")
-                ("persistent",                po::value<bool>()->default_value(false)->implicit_value(true),
-                                              "Run in persistent mode: prctl PR_SET_PDEATHSIG, "
-                                              "launch kernel async, skip sync/validate/timing, exit on signal. "
-                                              "Used as co-tenant load for contended-perf benchmarking.")
+                ("cotenant-library",          po::value<std::string>()->default_value(""),
+                                              "Path to a co-tenant solution library YAML (the same kind of file as --library-file). "
+                                              "If set, a single solution from this library is launched on a separate stream "
+                                              "alongside the benchmark to produce synthetic GPU contention. "
+                                              "The kernel must be built with PersistentKernelHostStop=True. "
+                                              "Empty (default) = no co-tenant; behavior is identical to a standard run.")
+                ("cotenant-code-object",      vector_default_empty<std::string>(),
+                                              "Code object file(s) for the --cotenant-library kernel. "
+                                              "Required when --cotenant-library is set.")
+                ("cotenant-cus",              po::value<int>()->default_value(0),
+                                              "TENSILE_STREAMK_FIXED_GRID for the co-tenant launch — "
+                                              "number of CUs the co-tenant should occupy. Required (>0) when "
+                                              "--cotenant-library is set.")
                 ;
             // clang-format on
 
@@ -879,24 +890,25 @@ int main(int argc, const char* argv[])
 
     auto args = parse_args(argc, argv);
 
-    if(args["persistent"].as<bool>())
+    // --cotenant-library / --cotenant-cus validation (Phase 2). Both must be set
+    // together; the actual library / kernel validation (PersistentKernelHostStop
+    // present in metadata) happens after the library is loaded.
     {
-        // The persistent code path lives inside the warmup launch block, so
-        // num-warmups must be >= 1. With 0 the persistent branch is never
-        // reached, the code falls through to the benchmark loop, and the
-        // first benchmark sync hangs on our infinite kernel.
-        if(args["num-warmups"].as<int>() < 1)
+        auto const& cotenantLib = args["cotenant-library"].as<std::string>();
+        int         cotenantCus = args["cotenant-cus"].as<int>();
+        if(cotenantLib.empty() != (cotenantCus <= 0))
         {
-            std::cerr << "ERROR: --persistent requires --num-warmups >= 1 "
-                         "(YAML: GlobalParameters.NumWarmups). Got "
-                      << args["num-warmups"].as<int>() << ".\n";
+            std::cerr << "ERROR: --cotenant-library and --cotenant-cus must be set together. "
+                      << "Got cotenant-library=\"" << cotenantLib
+                      << "\" cotenant-cus=" << cotenantCus << ".\n";
             return 2;
         }
-
-        // Die if our parent dies, no matter how (SIGKILL too).
-        // Limitation: only covers the immediate parent; do not invoke this client
-        // through a wrapper script if you rely on this safety net.
-        prctl(PR_SET_PDEATHSIG, SIGKILL);
+        if(!cotenantLib.empty()
+           && args["cotenant-code-object"].as<std::vector<std::string>>().empty())
+        {
+            std::cerr << "ERROR: --cotenant-library requires at least one --cotenant-code-object.\n";
+            return 2;
+        }
     }
 
     // Enable timing instrumentation if requested
@@ -998,6 +1010,85 @@ int main(int argc, const char* argv[])
         dataInit = std::make_shared<DataInitialization>(args, problemFactory);
     }
 
+    // === Co-tenant setup =====================================================
+    // Phase 2: when --cotenant-library is set, we run a second kernel on a
+    // separate stream alongside the benchmark to produce synthetic GPU
+    // contention. The kernel is built with PersistentKernelHostStop so it loops
+    // forever until we write 1 to a host-mapped stop_flag.
+    struct CoTenant
+    {
+        bool                                                              active = false;
+        int                                                               cus    = 0;
+        std::string                                                       libraryFile;
+        std::string                                                       solutionName;
+        std::shared_ptr<MasterSolutionLibrary<ContractionProblemGemm>>    library;
+        std::shared_ptr<ContractionSolution>                              solution;
+        hipStream_t                                                       stream      = nullptr;
+        void*                                                             stopFlagH   = nullptr;
+        void*                                                             stopFlagD   = nullptr;
+        bool                                                              launched    = false;
+    };
+    CoTenant cotenant;
+    {
+        auto const& libPath = args["cotenant-library"].as<std::string>();
+        if(!libPath.empty())
+        {
+            ScopedTimer timer("cotenant_setup");
+            cotenant.active      = true;
+            cotenant.cus         = args["cotenant-cus"].as<int>();
+            cotenant.libraryFile = libPath;
+
+            cotenant.library
+                = std::dynamic_pointer_cast<MasterSolutionLibrary<ContractionProblemGemm>>(
+                    LoadLibraryFile<ContractionProblemGemm>(libPath));
+            if(!cotenant.library)
+                throw std::runtime_error("Failed to load --cotenant-library: " + libPath);
+
+            // Load co-tenant code object(s) into the SAME adapter; the adapter
+            // can hold multiple .co's keyed by kernel name and looks them up at
+            // launch time, so this won't conflict with the benchmark kernels.
+            for(auto const& f :
+                args["cotenant-code-object"].as<std::vector<std::string>>())
+            {
+                HIP_CHECK_EXC(adapter.loadCodeObjectFile(f));
+            }
+
+            // Pick the first solution whose metadata advertises
+            // PersistentKernelHostStop. Anything else would hang the process
+            // (no host-stop contract, the kernel never exits).
+            for(auto const& kv : cotenant.library->solutions)
+            {
+                auto const& sol = kv.second;
+                if(sol && sol->sizeMapping.persistentKernelHostStop)
+                {
+                    cotenant.solution     = sol;
+                    cotenant.solutionName = sol->name();
+                    break;
+                }
+            }
+            if(!cotenant.solution)
+                throw std::runtime_error(
+                    "No solution in --cotenant-library has PersistentKernelHostStop=True; "
+                    "rebuild the co-tenant YAML with PersistentKernelHostStop: [True]. File: "
+                    + libPath);
+
+            // Stop flag: 32-bit word in host-mapped pinned memory. The host
+            // write becomes visible to in-flight GPU waves through the
+            // device-coherent SMEM read in PersistentLoop.closePersistentLoop.
+            HIP_CHECK_EXC(hipHostMalloc(
+                &cotenant.stopFlagH, sizeof(uint32_t), hipHostMallocMapped));
+            std::memset(cotenant.stopFlagH, 0, sizeof(uint32_t));
+            HIP_CHECK_EXC(hipHostGetDevicePointer(
+                &cotenant.stopFlagD, cotenant.stopFlagH, 0));
+
+            HIP_CHECK_EXC(hipStreamCreate(&cotenant.stream));
+
+            std::cout << "[cotenant] library=" << libPath
+                      << " solution=" << cotenant.solutionName
+                      << " cus=" << cotenant.cus << std::endl;
+        }
+    }
+
     std::shared_ptr<SolutionIterator> solutionIterator;
     {
         ScopedTimer timer("solution_iterator_setup");
@@ -1086,6 +1177,15 @@ int main(int argc, const char* argv[])
                 reporters->report(ResultKey::ProblemProgress,
                                   concatenate(problemIdx, "/", lastProblemIdx));
 
+                // Co-tenant config flows into the result row so a perf-vs-N
+                // sweep produces a self-describing table. Empty/zero when
+                // --cotenant-library is not set.
+                reporters->report(ResultKey::CoTenantLibrary,
+                                  cotenant.active ? cotenant.libraryFile : std::string{});
+                reporters->report(ResultKey::CoTenantCUs, cotenant.cus);
+                reporters->report(ResultKey::CoTenantSolutionName,
+                                  cotenant.active ? cotenant.solutionName : std::string{});
+
                 {
                     ScopedTimer timer("pre_problem");
                     listeners.preProblem(problem);
@@ -1094,6 +1194,53 @@ int main(int argc, const char* argv[])
                 {
                     ScopedTimer timer("gpu_input_preparation");
                     inputs = dataInit->prepareGPUInputs(problem);
+                }
+
+                // Launch the co-tenant kernel exactly once, on the first
+                // problem after inputs are available. We reuse the benchmark's
+                // GPU buffers as the co-tenant kernel's A/B/C/D — the
+                // co-tenant's outputs are irrelevant (synthetic contention
+                // workload), and benchmark validation runs against the host
+                // reference, not against any co-tenant write. Constraint: the
+                // co-tenant solution must be valid for this problem's shape.
+                if(cotenant.active && !cotenant.launched)
+                {
+                    auto* gemmInputs = dynamic_cast<ContractionInputs*>(inputs.get());
+                    auto* gemmProblem
+                        = dynamic_cast<ContractionProblemGemm const*>(problem);
+                    if(!gemmInputs || !gemmProblem)
+                        throw std::runtime_error(
+                            "Co-tenant requires a single (non-grouped) GEMM benchmark problem.");
+
+                    ContractionInputs cInputs = *gemmInputs;
+                    cInputs.stopFlag          = cotenant.stopFlagD;
+
+                    // Override skFixedGrid for the co-tenant solve only, so the
+                    // co-tenant grid size is --cotenant-cus regardless of what
+                    // TENSILE_STREAMK_FIXED_GRID is set to for the benchmark.
+                    auto* mutHw = const_cast<AMDGPU*>(
+                        dynamic_cast<AMDGPU const*>(hardware.get()));
+                    if(!mutHw)
+                        throw std::runtime_error(
+                            "Co-tenant: expected AMDGPU hardware backend.");
+                    int origGrid       = mutHw->skFixedGrid;
+                    mutHw->skFixedGrid = cotenant.cus;
+                    auto cotenantKernels
+                        = cotenant.solution->solve(*gemmProblem,
+                                                   cInputs,
+                                                   *hardware,
+                                                   nullptr,
+                                                   0,
+                                                   cotenant.stream);
+                    mutHw->skFixedGrid = origGrid;
+
+                    HIP_CHECK_EXC(adapter.launchKernels(
+                        cotenantKernels, cotenant.stream, nullptr, nullptr));
+                    cotenant.launched = true;
+
+                    // Settle: let the co-tenant's N workgroups become resident
+                    // before the benchmark workgroups race the scheduler.
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 }
 
                 size_t warmupInvocations    = listeners.numWarmupRuns();
@@ -1175,19 +1322,6 @@ int main(int argc, const char* argv[])
                                                                             stream,
                                                                             warmupStartEvents[0],
                                                                             warmupStopEvents[0]));
-                                    }
-
-                                    if(args["persistent"].as<bool>())
-                                    {
-                                        // Block until orchestrator signals us. exit() handles HIP teardown.
-                                        sigset_t mask;
-                                        sigemptyset(&mask);
-                                        sigaddset(&mask, SIGTERM);
-                                        sigaddset(&mask, SIGINT);
-                                        pthread_sigmask(SIG_BLOCK, &mask, nullptr);
-                                        int sig;
-                                        sigwait(&mask, &sig);
-                                        std::exit(0);
                                     }
 
                                     {
@@ -1292,6 +1426,25 @@ int main(int argc, const char* argv[])
         }
 
         listeners.postBenchmarkRun();
+    }
+
+    // === Co-tenant teardown ==================================================
+    // Write 1 to the host-mapped stop flag; the persistent loop sees a non-zero
+    // value on its next epilogue iteration and falls through to the kernel
+    // exit. We then sync the co-tenant stream normally — no signals, no
+    // process death, no orphans.
+    if(cotenant.active && cotenant.launched)
+    {
+        ScopedTimer timer("cotenant_teardown");
+        *static_cast<volatile uint32_t*>(cotenant.stopFlagH) = 1;
+        HIP_CHECK_EXC(hipStreamSynchronize(cotenant.stream));
+    }
+    if(cotenant.active)
+    {
+        if(cotenant.stream)
+            HIP_CHECK_EXC(hipStreamDestroy(cotenant.stream));
+        if(cotenant.stopFlagH)
+            HIP_CHECK_EXC(hipHostFree(cotenant.stopFlagH));
     }
 
     {

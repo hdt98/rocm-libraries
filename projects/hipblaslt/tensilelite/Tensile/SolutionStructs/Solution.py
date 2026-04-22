@@ -1206,6 +1206,8 @@ class Solution(collections.abc.Mapping):
           reject(state, printRejectionReason, "Atomic Stream-K requires BufferStore")
         if state["LocalSplitU"] > 1:
           reject(state, printRejectionReason, "Atomic Stream-K not working with LocalSplitU")
+      if state.get("PersistentKernelHostStop", False) and state["StreamKAtomic"] != 0:
+        reject(state, printRejectionReason, "PersistentKernelHostStop requires StreamKAtomic == 0 (the AddressStopFlag arg shares the StreamK ws/Flags arg block)")
       if not state["Valid"]:
         print2("in assignDerivedParameters, state['Valid'] = False")
         return
@@ -1216,6 +1218,7 @@ class Solution(collections.abc.Mapping):
       state["StreamKFixupTreeReduction"] = 0
       state["DebugStreamK"] = 0
       state["PersistentKernelLoopForever"] = False
+      state["PersistentKernelHostStop"] = False
 
     computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
     state["_WorkspaceSizePerElemC"] = computeBytes

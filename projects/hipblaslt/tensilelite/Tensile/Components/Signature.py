@@ -171,6 +171,11 @@ class SignatureDefault(Signature):
         if kernel["StreamK"] > 0 and kernel["StreamKAtomic"] == 0:
             signature.addArg("AddressWS", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
             signature.addArg("AddressFlags", SVK.SIG_GLOBALBUFFER, dstValueType, "generic")
+            if kernel.get("PersistentKernelHostStop", False):
+                # Co-tenant stop flag: 32-bit value in device memory; persistent
+                # loop exits when host writes a non-zero value. See
+                # PersistentLoop.closePersistentLoop.
+                signature.addArg("AddressStopFlag", SVK.SIG_GLOBALBUFFER, "u32", "generic")
 
         for i in range(0, writer.states.d.numSgprStrides):
             signature.addArg(              "strideD%u"%i, SVK.SIG_VALUE,               "u32")

@@ -140,6 +140,7 @@ namespace TensileLite
         int    streamKAtomic              = 0;
         int    persistentKernel           = 0;
         bool   persistentKernelAlongBatch = false;
+        bool   persistentKernelHostStop   = false;
 
         bool sourceKernel = false;
 
