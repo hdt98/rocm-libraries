@@ -6,47 +6,24 @@
 
 using Row = ck_tile::tensor_layout::gemm::RowMajor;
 using Col = ck_tile::tensor_layout::gemm::ColumnMajor;
+using FP4 = ck_tile::pk_fp4_t;
 
-using MxFp4Types = ::testing::Types<
-    std::tuple<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, MXfp4_GemmConfig16, Row, Col, Row>>;
+using MxFP4Types =
+    ::testing::Types<std::tuple<FP4, FP4, MXfp4_GemmConfig16, Row, Col, Row>,
+                     std::tuple<FP4, FP4, MXfp4_GemmConfig16_Preshuffle, Row, Col, Row>,
+                     std::tuple<FP4, FP4, MXfp4_GemmConfig16_PermuteN, Row, Col, Row>>;
 
 template <typename TypeParam>
-class TestMxGemmFp4 : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
-                                            std::tuple_element_t<1, TypeParam>,
-                                            std::tuple_element_t<2, TypeParam>,
-                                            std::tuple_element_t<3, TypeParam>,
-                                            std::tuple_element_t<4, TypeParam>,
-                                            std::tuple_element_t<5, TypeParam>>
+class TestMxGemmFp4 : public TestMxGemmUtil<TypeParam>
 {
 };
 
-TYPED_TEST_SUITE(TestMxGemmFp4, MxFp4Types);
+TYPED_TEST_SUITE(TestMxGemmFp4, MxFP4Types);
 
 TYPED_TEST(TestMxGemmFp4, BasicSizes)
-{
-    this->Run(64, 64, 256);
-    this->Run(128, 128, 256);
-    this->Run(64, 128, 512);
-}
-
-using MxFp4PreshuffleTypes = ::testing::Types<
-    std::tuple<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, MXfp4_GemmConfig16_Preshuffle, Row, Col, Row>>;
-
-template <typename TypeParam>
-class TestMxGemmFp4Preshuffle : public TestMxGemmUtil<std::tuple_element_t<0, TypeParam>,
-                                                      std::tuple_element_t<1, TypeParam>,
-                                                      std::tuple_element_t<2, TypeParam>,
-                                                      std::tuple_element_t<3, TypeParam>,
-                                                      std::tuple_element_t<4, TypeParam>,
-                                                      std::tuple_element_t<5, TypeParam>>
-{
-};
-
-TYPED_TEST_SUITE(TestMxGemmFp4Preshuffle, MxFp4PreshuffleTypes);
-
-TYPED_TEST(TestMxGemmFp4Preshuffle, BasicSizes)
 {
     this->Run(128, 512, 256);
     this->Run(256, 512, 256);
     this->Run(256, 1024, 512);
+    this->Run(256, 1024, 1024);
 }

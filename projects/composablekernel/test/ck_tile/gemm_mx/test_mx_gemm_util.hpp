@@ -80,17 +80,77 @@ struct TestMXGemmArchTraits
 
         return shuffled;
     }
+
+    template <bool KLast, typename dtype>
+    static auto preShuffleScalePermuteN(const ck_tile::HostTensor<dtype>& src)
+    {
+        auto src_lengths = src.get_lengths();
+        const auto MN    = KLast ? src_lengths[0] : src_lengths[1];
+        const auto K     = KLast ? src_lengths[1] : src_lengths[0];
+
+        constexpr std::size_t MNXdlPack   = 2;
+        constexpr std::size_t KXdlPack    = 2;
+        constexpr std::size_t XdlMNThread = GemmConfig::N_Warp_Tile;
+        constexpr std::size_t NPerBlock   = GemmConfig::N_Tile;
+        constexpr std::size_t NWarp       = GemmConfig::N_Warp;
+        constexpr std::size_t NRepeat     = NPerBlock / NWarp / XdlMNThread;
+        constexpr std::size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread; // 4
+
+        const auto MNPadded = ck_tile::integer_least_multiple(MN, NPerBlock);
+        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor(
+            {static_cast<std::size_t>(MNPadded * K)}, {static_cast<std::size_t>(1)}));
+
+        const std::size_t K0 = K / KXdlPack / XdlKThread;
+
+        for(std::size_t n = 0; n < static_cast<std::size_t>(MNPadded); ++n)
+        {
+            for(std::size_t k = 0; k < static_cast<std::size_t>(K); ++k)
+            {
+                const auto n0     = n / NPerBlock;
+                const auto tempn0 = n % NPerBlock;
+                const auto n1     = tempn0 / (XdlMNThread * NRepeat);
+                const auto tempn1 = tempn0 % (XdlMNThread * NRepeat);
+                const auto n2     = tempn1 / (NRepeat);
+                const auto tempn2 = tempn1 % (NRepeat);
+                const auto n3     = tempn2 % MNXdlPack;
+                const auto n4     = tempn2 / MNXdlPack;
+
+                const auto k0    = k / (XdlKThread * KXdlPack);
+                const auto tempk = k % (XdlKThread * KXdlPack);
+                const auto k1    = tempk % XdlKThread;
+                const auto k2    = tempk / XdlKThread;
+
+                const auto outputIndex =
+                    n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp *
+                        (NRepeat / MNXdlPack) +
+                    n1 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
+                    n2 * MNXdlPack * KXdlPack +
+                    k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
+                    k1 * MNXdlPack * KXdlPack * XdlMNThread + k2 * MNXdlPack +
+                    n4 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp + n3;
+
+                if constexpr(KLast)
+                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
+                else
+                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(k, n) : dtype{};
+            }
+        }
+
+        return shuffled;
+    }
 };
 
-template <typename ADataType,
-          typename BDataType,
-          typename GemmConfig,
-          typename ALayout,
-          typename BLayout,
-          typename CLayout>
+template <typename Tuple>
 class TestMxGemmUtil : public ::testing::Test
 {
     protected:
+    using ADataType  = std::tuple_element_t<0, Tuple>;
+    using BDataType  = std::tuple_element_t<1, Tuple>;
+    using GemmConfig = std::tuple_element_t<2, Tuple>;
+    using ALayout    = std::tuple_element_t<3, Tuple>;
+    using BLayout    = std::tuple_element_t<4, Tuple>;
+    using CLayout    = std::tuple_element_t<5, Tuple>;
+
     using AccDataType = float;
     using CDataType   = ck_tile::fp16_t;
     using ScaleType   = ck_tile::e8m0_t;
@@ -204,7 +264,10 @@ class TestMxGemmUtil : public ::testing::Test
 
         const auto b_host_for_device = [&]() {
             if constexpr(GemmConfig::Preshuffle)
-                return ck_tile::shuffle_b<GemmConfig>(b_host);
+                if constexpr(GemmConfig::TiledMMAPermuteN)
+                    return ck_tile::shuffle_b_permuteN<GemmConfig, BDataType, NXdlPackEff>(b_host);
+                else
+                    return ck_tile::shuffle_b<GemmConfig>(b_host);
             else
                 return b_host;
         }();
@@ -219,8 +282,12 @@ class TestMxGemmUtil : public ::testing::Test
 
         const auto scale_b_host_for_device = [&]() {
             if constexpr(GemmConfig::Preshuffle)
-                return TestMXGemmArchTraits<GemmConfig>::template preShuffleScale<false>(
-                    scale_b_host);
+                if constexpr(GemmConfig::TiledMMAPermuteN)
+                    return TestMXGemmArchTraits<GemmConfig>::template preShuffleScalePermuteN<
+                        false>(scale_b_host);
+                else
+                    return TestMXGemmArchTraits<GemmConfig>::template preShuffleScale<false>(
+                        scale_b_host);
             else
                 return scale_b_packed;
         }();
