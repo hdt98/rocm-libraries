@@ -1219,7 +1219,7 @@ private:
 };
 
 #ifdef ROCFFT_RCCL_ENABLE
-// RCCL-based all-to-all communication for multi-GPU transpose
+// RCCL-based all-to-all communication for multi-GPU transpose.
 struct CommRCCLAllToAll : public MultiPlanItem
 {
     CommRCCLAllToAll(rocfft_rccl::Communicator&            _rccl,
@@ -1228,15 +1228,19 @@ struct CommRCCLAllToAll : public MultiPlanItem
                      rocfft_array_type                     _arrayType,
                      size_t                                _count_per_rank,
                      const std::vector<rocfft_location_t>& _locations,
-                     const std::vector<BufferPtr>&         _buffers,
-                     const std::vector<size_t>&            _offsets)
+                     const std::vector<BufferPtr>&         _sendBuffers,
+                     const std::vector<BufferPtr>&         _recvBuffers,
+                     const std::vector<size_t>&            _sendOffsets,
+                     const std::vector<size_t>&            _recvOffsets)
         : rccl(_rccl)
         , precision(_precision)
         , arrayType(_arrayType)
         , count_per_rank(_count_per_rank)
         , locations(_locations)
-        , buffers(_buffers)
-        , offsets(_offsets)
+        , sendBuffers(_sendBuffers)
+        , recvBuffers(_recvBuffers)
+        , sendOffsets(_sendOffsets)
+        , recvOffsets(_recvOffsets)
     {
         // allocate stream for each participating device
         for(const auto& loc : locations)
@@ -1262,7 +1266,7 @@ struct CommRCCLAllToAll : public MultiPlanItem
 
     bool WritesToBuffer(const BufferPtr& ptr) const override
     {
-        for(const auto& buf : buffers)
+        for(const auto& buf : recvBuffers)
         {
             if(ptr == buf)
                 return true;
@@ -1287,10 +1291,12 @@ private:
     const rocfft_array_type arrayType;
     const size_t            count_per_rank; // elements per rank (uniform)
 
-    // all participating devices/buffers
+    // all participating devices and their per-device send/recv buffers
     const std::vector<rocfft_location_t> locations;
-    const std::vector<BufferPtr>         buffers;
-    const std::vector<size_t>            offsets;
+    const std::vector<BufferPtr>         sendBuffers;
+    const std::vector<BufferPtr>         recvBuffers;
+    const std::vector<size_t>            sendOffsets;
+    const std::vector<size_t>            recvOffsets;
 
     // streams for async execution
     std::vector<hipStream_wrapper_t> streams;

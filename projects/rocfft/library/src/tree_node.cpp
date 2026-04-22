@@ -679,32 +679,35 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan                     plan,
     const size_t base_size  = real_type_size(precision);
     const bool   is_complex = array_type_is_complex(arrayType);
 
-    // collect all device data pointers first
-    std::vector<void*> data_ptrs(locations.size(), nullptr);
+    // collect send and recv pointers per device.  sendBuffers[i] and
+    // recvBuffers[i] are distinct allocations, mirroring the MPI path.
+    std::vector<void*> send_ptrs(locations.size(), nullptr);
+    std::vector<void*> recv_ptrs(locations.size(), nullptr);
     for(size_t i = 0; i < locations.size(); ++i)
     {
-        const auto& loc    = locations[i];
-        const auto& buffer = buffers[i];
-        const auto& offset = offsets[i];
-
+        const auto& loc = locations[i];
         if(loc.comm_rank == local_comm_rank)
         {
             rocfft_scoped_device dev(loc.device);
-            data_ptrs[i] = ptr_offset(
-                buffer.get(in_buffer, out_buffer, local_comm_rank), offset, precision, arrayType);
+            send_ptrs[i] = ptr_offset(sendBuffers[i].get(in_buffer, out_buffer, local_comm_rank),
+                                      sendOffsets[i],
+                                      precision,
+                                      arrayType);
+            recv_ptrs[i] = ptr_offset(recvBuffers[i].get(in_buffer, out_buffer, local_comm_rank),
+                                      recvOffsets[i],
+                                      precision,
+                                      arrayType);
         }
     }
 
-    // RCCL collectives must be called from ALL devices simultaneously.
+    // RCCL collectives must be called from ALL devices simultaneously;
     // use ncclGroupStart/End to batch all calls together.
     //
-    // In-place alltoall (sendbuf == recvbuf): the pack step above
-    // writes each device's a2a buffer with layout
-    //   slot[dst_rank] at offset dst_rank * count_per_rank
-    // which is exactly what ncclAllToAll expects as send layout.
-    // After the in-place collective, slot[i] contains data received
-    // from rank i, which the subsequent unpack step reads from
-    // offset src_rank * count_per_rank.
+    // Buffer layout (disjoint send/recv):
+    //   sendBuffers[d]:  slot[dst_rank] at offset dst_rank * count_per_rank
+    //                    (populated by the pack step antecedents)
+    //   recvBuffers[d]:  slot[src_rank] at offset src_rank * count_per_rank
+    //                    (populated by the collective; read by unpack step)
     {
         rocfft_rccl::Group group; // ncclGroupStart called in constructor
 
@@ -713,12 +716,12 @@ void CommRCCLAllToAll::ExecuteAsync(const rocfft_plan                     plan,
         {
             const auto& loc = locations[i];
 
-            if(loc.comm_rank == local_comm_rank && data_ptrs[i] != nullptr)
+            if(loc.comm_rank == local_comm_rank && send_ptrs[i] != nullptr)
             {
                 rocfft_scoped_device dev(loc.device);
 
-                bool success = rccl.alltoall(data_ptrs[i],
-                                             data_ptrs[i],
+                bool success = rccl.alltoall(send_ptrs[i],
+                                             recv_ptrs[i],
                                              count_per_rank,
                                              loc.device,
                                              streams[stream_idx],
@@ -767,7 +770,8 @@ void CommRCCLAllToAll::Print(rocfft_ostream& os, const int indent) const
     for(size_t i = 0; i < locations.size(); ++i)
     {
         os << indentStr << "  rank " << i << ": device=" << locations[i].device
-           << " buf=" << PrintBufferPtrOffset(buffers[i], offsets[i]) << "\n";
+           << " sendBuf=" << PrintBufferPtrOffset(sendBuffers[i], sendOffsets[i])
+           << " recvBuf=" << PrintBufferPtrOffset(recvBuffers[i], recvOffsets[i]) << "\n";
     }
     os << std::endl;
 }

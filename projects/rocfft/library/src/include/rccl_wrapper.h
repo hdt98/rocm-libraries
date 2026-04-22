@@ -70,19 +70,6 @@ namespace rocfft_rccl
                       size_t      base_type_size,
                       bool        is_complex);
 
-        // all-to-all with variable counts.
-        // base_type_size is the size of one real component (2/4/8).
-        bool alltoallv(const void*                sendbuf,
-                       void*                      recvbuf,
-                       const std::vector<size_t>& sendcounts,
-                       const std::vector<size_t>& recvcounts,
-                       const std::vector<size_t>& sdispls,
-                       const std::vector<size_t>& rdispls,
-                       int                        device_id,
-                       hipStream_t                stream,
-                       size_t                     base_type_size,
-                       bool                       is_complex);
-
         // point-to-point send.
         // base_type_size is the size of one real component (2/4/8).
         bool send(const void* sendbuf,

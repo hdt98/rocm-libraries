@@ -302,64 +302,6 @@ namespace rocfft_rccl
 #endif
     }
 
-    bool Communicator::alltoallv(const void*                sendbuf,
-                                 void*                      recvbuf,
-                                 const std::vector<size_t>& sendcounts,
-                                 const std::vector<size_t>& recvcounts,
-                                 const std::vector<size_t>& sdispls,
-                                 const std::vector<size_t>& rdispls,
-                                 int                        device_id,
-                                 hipStream_t                stream,
-                                 size_t                     base_type_size,
-                                 bool                       is_complex)
-    {
-#ifdef ROCFFT_RCCL_ENABLE
-        ncclComm_t* comm_ptr = static_cast<ncclComm_t*>(get_comm(device_id));
-        if(!comm_ptr)
-            return false;
-
-        auto [dtype, multiplier] = get_nccl_type_info(base_type_size, is_complex);
-
-        // scale counts and displacements by the multiplier (2x for complex)
-        std::vector<size_t> adj_sendcounts = sendcounts;
-        std::vector<size_t> adj_recvcounts = recvcounts;
-        std::vector<size_t> adj_sdispls    = sdispls;
-        std::vector<size_t> adj_rdispls    = rdispls;
-
-        if(multiplier > 1)
-        {
-            for(auto& c : adj_sendcounts)
-                c *= multiplier;
-            for(auto& c : adj_recvcounts)
-                c *= multiplier;
-            for(auto& d : adj_sdispls)
-                d *= multiplier;
-            for(auto& d : adj_rdispls)
-                d *= multiplier;
-        }
-
-        ncclResult_t result = ncclAllToAllv(sendbuf,
-                                            adj_sendcounts.data(),
-                                            adj_sdispls.data(),
-                                            recvbuf,
-                                            adj_recvcounts.data(),
-                                            adj_rdispls.data(),
-                                            dtype,
-                                            *comm_ptr,
-                                            stream);
-
-        if(result != ncclSuccess)
-        {
-            log_trace(__func__, "ncclAllToAllv failed", result);
-            return false;
-        }
-
-        return true;
-#else
-        return false;
-#endif
-    }
-
     bool Communicator::send(const void* sendbuf,
                             size_t      count,
                             int         peer_rank,
