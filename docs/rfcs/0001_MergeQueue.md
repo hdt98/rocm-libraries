@@ -186,23 +186,26 @@ Queue state is stored entirely in PR metadata — labels and a hidden JSON comme
 **Per-cycle algorithm.**
 
 ```
+# ALL_QUEUES is the fixed set of six queue names defined in §4.1.
+
 process_cycle():
     # 1. Discover: rebuild each queue by searching for its membership label.
+    #    One API call per queue; a PR labeled mq:hipdnn AND mq:miopen-provider
+    #    is returned by both searches and appears in both members lists.
     members = {q: [] for q in ALL_QUEUES}
     for q in ALL_QUEUES:
-        for pr in search_prs(label=f"mq:{q}"):       # one API call per queue
-            meta = parse_metadata_comment(pr)         # enqueued_at, queues
-            members[q].append((meta.enqueued_at, pr))
+        for pr in search_prs(label=f"mq:{q}"):
+            pr.meta = parse_metadata_comment(pr)      # enqueued_at, queues
+            members[q].append(pr)
+    pulls = {pr for q in ALL_QUEUES for pr in members[q]}
 
     # 2. Build queues: each queue is a FIFO sorted by enqueue time.
     for q in ALL_QUEUES:
-        members[q].sort(key=lambda entry: entry.enqueued_at)
+        members[q].sort(key=lambda p: p.meta.enqueued_at)
 
     # 3. Identify ready PRs: head of every queue they belong to.
-    ready = set()
-    for pr in pulls:
-        if all(members[q][0].pr == pr for q in pr.meta.queues):
-            ready.add(pr)
+    ready = {pr for pr in pulls
+             if all(members[q][0] == pr for q in pr.meta.queues)}
 
     # 4. For each ready PR, advance its state machine.
     for pr in ready:
