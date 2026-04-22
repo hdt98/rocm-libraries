@@ -5065,7 +5065,6 @@ void testing_matmul_with_bias(const Arguments& arg,
                 int device_id = 0;
                 hipGetDevice(&device_id);
                 double total_origami_latency = 0.0;
-                double total_sub_us = 0.0;
                 int total_sub_wg = 0;
 
                 for(size_t sp = 0; sp < subProblems.size(); sp++)
@@ -5128,61 +5127,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                     hipblaslt_cout << "    Granularity: " << std::fixed << std::setprecision(2) << sp_gran
                                   << " WG/CU (" << sp_waves << " waves, last wave " << std::setprecision(1) << sp_last_util << "% util)" << std::endl;
                     hipblaslt_cout << "    Origami latency: " << std::fixed << std::setprecision(0) << sp_origami << " cycles" << std::endl;
-
-                    // Measure per-subproblem latency
-                    if(spCtxs.size() > sp && spCtxs[sp].valid)
-                    {
-                        // Re-create context for individual timing (layouts were destroyed above, need fresh ones)
-                        hipblasLtMatrixLayout_t tmp_matA, tmp_matB, tmp_matC, tmp_matD;
-                        hipblasLtMatmulDesc_t tmp_desc;
-                        int64_t rA = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                        int64_t cA = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                        hipblasLtMatrixLayoutCreate(&tmp_matA, arg.a_type, rA, cA, lda[0]);
-                        int64_t rB = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                        int64_t cB = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                        hipblasLtMatrixLayoutCreate(&tmp_matB, arg.b_type, rB, cB, ldb[0]);
-                        hipblasLtMatrixLayoutCreate(&tmp_matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                        hipblasLtMatrixLayoutCreate(&tmp_matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-                        hipblasLtMatmulDescCreate(&tmp_desc, arg.compute_type, arg.scale_type);
-                        hipblasLtMatmulDescSetAttribute(tmp_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
-                        hipblasLtMatmulDescSetAttribute(tmp_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
-                        hipblasLtMatmulDescSetAttribute(tmp_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
-                        hipblasLtMatmulDescSetAttribute(tmp_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
-                        hipblasLtMatmulHeuristicResult_t tmp_heur; int tmp_ret = 0;
-                        hipblasLtMatmulAlgoGetHeuristic(handle, tmp_desc, tmp_matA, tmp_matB, tmp_matC, tmp_matD, pref, 1, &tmp_heur, &tmp_ret);
-                        if(tmp_ret > 0)
-                        {
-                            void* sp_A = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                            void* sp_B = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                            void* sp_C = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                            void* sp_D = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-                            for(int w = 0; w < 3; w++)
-                                hipblasLtMatmul(handle, tmp_desc, alpha_in[0], sp_A, tmp_matA, sp_B, tmp_matB,
-                                               &(h_beta[0]), sp_C, tmp_matC, sp_D, tmp_matD, &tmp_heur.algo, *dWorkspace, workspace_size, stream);
-                            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                            auto sp_start = std::chrono::high_resolution_clock::now();
-                            for(int i = 0; i < timing_iters; i++)
-                                hipblasLtMatmul(handle, tmp_desc, alpha_in[0], sp_A, tmp_matA, sp_B, tmp_matB,
-                                               &(h_beta[0]), sp_C, tmp_matC, sp_D, tmp_matD, &tmp_heur.algo, *dWorkspace, workspace_size, stream);
-                            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                            auto sp_end = std::chrono::high_resolution_clock::now();
-                            double sp_us = std::chrono::duration<double, std::micro>(sp_end - sp_start).count() / timing_iters;
-                            total_sub_us += sp_us;
-                            double sp_flops = 2.0 * sub.m_size * sub.n_size * sub.k_size;
-                            double sp_gf = (sp_flops / sp_us) / 1000.0;
-                            hipblaslt_cout << "    Measured latency: " << std::fixed << std::setprecision(2) << sp_us << " us ("
-                                          << std::setprecision(1) << sp_gf << " GFLOPS, " << std::setprecision(3) << sp_gf/1000.0 << " TFLOPS)" << std::endl;
-                        }
-                        hipblasLtMatrixLayoutDestroy(tmp_matA); hipblasLtMatrixLayoutDestroy(tmp_matB);
-                        hipblasLtMatrixLayoutDestroy(tmp_matC); hipblasLtMatrixLayoutDestroy(tmp_matD);
-                        hipblasLtMatmulDescDestroy(tmp_desc);
-                    }
                 }
                 hipblaslt_cout << std::endl << "  Multi-MT totals:" << std::endl;
                 hipblaslt_cout << "    Total origami_latency (sum): " << std::fixed << std::setprecision(0) << total_origami_latency << " cycles" << std::endl;
                 hipblaslt_cout << "    Total workgroups (sum): " << total_sub_wg << std::endl;
-                hipblaslt_cout << "    Sum of individual sub-problem latencies: " << std::fixed << std::setprecision(2) << total_sub_us << " us" << std::endl;
-                hipblaslt_cout << "    Combined sequential latency (from timing loop): " << std::fixed << std::setprecision(2) << avg_time_us << " us" << std::endl;
+                hipblaslt_cout << "    Combined measured latency: " << std::fixed << std::setprecision(2) << avg_time_us << " us" << std::endl;
             }
             hipblaslt_cout << std::endl;
 

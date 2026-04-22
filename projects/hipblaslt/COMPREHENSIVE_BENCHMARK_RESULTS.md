@@ -305,3 +305,128 @@ cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
 ### Safe Rule
 
 **Enable when M ≥ 5120 AND N ≥ 2048 AND K ≥ 2048.** Under these conditions, across 716 tested data points, the win rate is >75% with effectively zero catastrophic regressions.
+
+---
+
+## 10. BF16 (BBS) Broad M×N Sweep with Origami & Workgroup Analysis
+
+**Precision:** BF16 (bf16_r → BBS: BFloat16 A, BFloat16 B, FP32 compute)  
+**K:** 8192 (fixed)  
+**M, N range:** Both > 8192, step 256 up to 20480+  
+**Devices:** `--device 0` through `--device 7` (8× MI350X)  
+**Total data points:** 651 (after filtering cold-start artifacts)  
+**New in this section:** Origami analytical latency, workgroup counts, granularity, and per-subproblem metrics for every run
+
+### 10.1 BF16 Summary
+
+| Metric | Value |
+|--------|-------|
+| **Data points** | **651** |
+| Wins (>+2%) | 225 (35%) |
+| Neutral (±2%) | 215 (33%) |
+| Losses (>-2%) | 211 (32%) |
+| Best gain | +45.5% (8704×11776) |
+| Worst loss | -81.2% (10496×8960) |
+| Average (all) | +2.1% |
+| Average (wins only) | +14.9% |
+
+BF16 shows a mixed result: the baseline already runs at **MT256x256x64** for 97% of problems (since M,N>8192 map directly to the optimal MacroTile). Multi-MT can still win by improving granularity and tail-wave utilization, but has higher loss risk since the baseline is already well-optimized.
+
+### 10.2 Baseline MacroTile Distribution (BF16)
+
+| Baseline MT | Count | Wins | Win Rate | Avg Gain |
+|-------------|-------|------|----------|----------|
+| MT256x256x64 | 635 | 216 | 34% | +2.2% |
+| MT256x224x64 | 16 | 9 | 56% | -0.7% |
+
+Unlike FP16 where MT256x240x64 caused a 97% win rate, BF16 problems with M,N>8192 almost always get the optimal MT256x256x64 baseline. Multi-MT gains come purely from workgroup granularity effects, not MacroTile upgrades.
+
+### 10.3 Granularity Effect on BF16 Performance
+
+| Baseline Granularity | Count | Wins | Losses | Avg Gain |
+|---------------------|-------|------|--------|----------|
+| < 5 WG/CU | 19 | 2 | 12 | -5.1% |
+| 5 – 8 WG/CU | 288 | 136 | 115 | **+5.0%** |
+| 8 – 12 WG/CU | 336 | 80 | 84 | +0.0% |
+| ≥ 12 WG/CU | 8 | 7 | 0 | **+5.1%** |
+
+The sweet spot for Multi-MT is **5–8 WG/CU granularity** (136 wins, +5.0% avg) and **≥12 WG/CU** (7/8 wins). Below 5 WG/CU, sub-problems don't have enough work to fill the GPU. Above 8 WG/CU the baseline is already efficient.
+
+### 10.4 Top 15 BF16 Gains (with Origami & WG Detail)
+
+| Problem | BL (TF) | BL WG | BL Gran | BL Last% | MT (TF) | Gain | Winning Split |
+|---------|---------|-------|---------|----------|---------|------|---------------|
+| **8704×11776** | 793 | 1564 | 6.11 | 10.9% | **1153** | **+45.5%** | pow2-4k [4096,4608] |
+| **10752×11264** | 812 | 1848 | 7.22 | 21.9% | **1171** | **+44.2%** | asym-40/60 [4224,6528] |
+| **13312×8960** | 850 | 1820 | 7.11 | 10.9% | **1222** | **+43.8%** | uniform [6656,6656] |
+| **12800×9472** | 868 | 1850 | 7.23 | 22.7% | **1248** | **+43.7%** | uniform [6400,6400] |
+| **11776×10496** | 884 | 1886 | 7.37 | 36.7% | **1270** | **+43.7%** | asym-40/60 [4608,7168] |
+| **12544×9728** | 865 | 1862 | 7.27 | 27.3% | **1239** | **+43.2%** | asym-40/60 [4992,7552] |
+| **11264×10496** | 798 | 1804 | 7.05 | 4.7% | **1142** | **+43.0%** | uniform [5632,5632] |
+| **14848×8448** | 901 | 1914 | 7.48 | 47.7% | **1288** | **+43.0%** | uniform [7424,7424] |
+| **11008×10752** | 856 | 1806 | 7.05 | 5.5% | **1221** | **+42.7%** | uniform [5504,5504] |
+| **12288×9728** | 806 | 1824 | 7.12 | 12.5% | **1148** | **+42.5%** | uniform [6144,6144] |
+| **9216×13312** | 861 | 1872 | 7.31 | 31.2% | **1227** | **+42.5%** | uniform [4608,4608] |
+| **11776×10240** | 867 | 1840 | 7.19 | 18.8% | **1226** | **+41.3%** | asym-40/60 [4608,7168] |
+| **12800×9216** | 874 | 1800 | 7.03 | 3.1% | **1231** | **+40.9%** | pow2-8k [8192,4608] |
+| **10752×9728** | 859 | 1596 | 6.23 | 23.4% | **1211** | **+40.9%** | asym-30/70 [3200,7552] |
+| **13824×8960** | 891 | 1890 | 7.38 | 38.3% | **1254** | **+40.7%** | uniform [6912,6912] |
+
+**Pattern:** All top gains have baseline < 900 TFLOPS (below ~60% of peak ~1500TF) AND last-wave utilization < 50%. Multi-MT improves throughput from ~800TF to ~1200TF by creating sub-problems with better wave utilization.
+
+### 10.5 BF16 Losses (>-10%)
+
+| Problem | BL (TF) | BL WG | BL Last% | MT (TF) | Loss | Cause |
+|---------|---------|-------|----------|---------|------|-------|
+| 10496×8960 | 1402 | 1435 | 60.5% | 264 | -81.2% | BL already at peak; MT search found catastrophically bad split |
+| 9472×8960 | 1181 | 1480 | 78.1% | 243 | -79.4% | BL efficient; split [3712,5760] creates tiny sub-problem |
+| 8448×11264 | 1303 | 1452 | 67.2% | 272 | -79.1% | BL very fast; MT splits degrade both sub-problems |
+| 9472×10496 | 1309 | 1517 | 92.6% | 280 | -78.6% | BL at 92.6% last-wave util; no room to improve |
+| 8448×13568 | 1336 | 1749 | 83.2% | 311 | -76.7% | BL excellent; MT adds overhead only |
+| 11008×11008 | 1344 | 1849 | 22.3% | 332 | -75.3% | Despite low last-wave%, BL kernels are perfectly tuned |
+
+**Loss pattern:** All severe losses have baseline **> 1100 TFLOPS** (already >73% of peak). When the single kernel is already efficient, the empirical search overhead and split overhead outweigh any granularity benefit.
+
+### 10.6 Origami Latency Prediction Accuracy (BF16)
+
+| Metric | Value |
+|--------|-------|
+| Origami predicts MT wins | 153 |
+| Actual wins (>2%) | 240 |
+| Both agree | 70 |
+| **Precision** (when Origami says win, is it?) | **45%** |
+| **Recall** (of actual wins, how many did Origami predict?) | **29%** |
+
+The Origami analytical model has limited accuracy for BF16: it captures only ~29% of actual wins. This is because Origami estimates compute latency but doesn't model the empirical search's ability to find better splits, nor does it account for actual kernel-level optimizations at specific dimensions.
+
+### 10.7 Reproducing BF16 Results (with Full Detail)
+
+```bash
+cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
+
+# Single run with full baseline + multi-MT + origami + WG analysis:
+./clients/hipblaslt-bench -m $M -n $N -k 8192 --precision bf16_r \
+  --device 1 --api_method c -i 5 -j 5 \
+  --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints
+
+# Output includes:
+#   === Baseline Analysis ===
+#     Baseline kernel: MT256x256x64_MI
+#     Baseline WG grid: 40 x 40 = 1600 workgroups
+#     Baseline granularity: 6.25 WG/CU (7 waves, last wave 25.0% util)
+#     Baseline origami_latency: 118902829 cycles
+#     Baseline measured: 1253.58 us (1370466.1 GFLOPS, 1370.466 TFLOPS)
+#   === Sub-Problem Detailed Analysis ===
+#     Sub[0]: MT, WG grid, Granularity, Origami latency
+#     Sub[1]: MT, WG grid, Granularity, Origami latency
+#   Multi-MT totals: sum origami, sum WG, combined latency
+```
+
+### 10.8 BF16 Decision Rules
+
+| Condition | Action | Expected |
+|-----------|--------|----------|
+| Baseline < 900 TFLOPS AND last-wave < 50% | **Enable** | +20% to +45% |
+| 5–8 WG/CU granularity | **Enable** | +5% avg |
+| Baseline > 1100 TFLOPS | **Do not enable** | Risk of -10% to -81% |
+| last-wave util > 80% | **Cautious** | Modest gain at best |
