@@ -891,10 +891,10 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
         const index_t num_total_loop =
             integer_divide_ceil(physical_seqlen_k_end - aligned_physical_seqlen_k_start, kN0);
 
-        index_t i_total_loops      = 0;
+        index_t i_total_loops           = 0;
         const index_t kv_block_idx_base = physical_seqlen_k_start / kN0;
-        constexpr index_t k0_loops = kQKHeaddim / kK0;
-        constexpr index_t k1_loops = kN0 / kK1;
+        constexpr index_t k0_loops      = kQKHeaddim / kK0;
+        constexpr index_t k1_loops      = kN0 / kK1;
 
         static_assert(1 <= k0_loops);
         static_assert(1 <= k1_loops);

@@ -2925,21 +2925,21 @@ struct FmhaFwdKernel
             // code as before block sparsity was added — no extra registers, no per-iteration
             // skip check.
             const bool has_block_mask_runtime_trload = (block_mask_row_ptr != nullptr);
-            auto o_acc_tile = [&]() {
+            auto o_acc_tile                          = [&]() {
                 if constexpr(PrefillCase)
                 {
                     // allocate double lds
                     // add __restrict__ here to avoid aliasing
                     __shared__ char smem_ptrk0
                         [FmhaPipeline::Policy::template GetSmemSizeK<typename FmhaPipeline::Problem,
-                                                                     true>()];
+                                                                                              true>()];
                     __shared__ char smem_ptrk1
                         [FmhaPipeline::Policy::template GetSmemSizeK<typename FmhaPipeline::Problem,
-                                                                     true>()];
+                                                                                              true>()];
                     __shared__ char smem_ptrv0[FmhaPipeline::Policy::template GetSmemSizeV<
-                        typename FmhaPipeline::Problem>()];
+                                                 typename FmhaPipeline::Problem>()];
                     __shared__ char smem_ptrv1[FmhaPipeline::Policy::template GetSmemSizeV<
-                        typename FmhaPipeline::Problem>()];
+                                                 typename FmhaPipeline::Problem>()];
 
                     if(has_block_mask_runtime_trload)
                     {
