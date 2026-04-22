@@ -51,7 +51,7 @@ struct tensor_view
     using TensorCoord = decltype(make_tensor_coordinate(TensorDesc{}, TensorIndex{}));
     static constexpr auto DstInMemOp    = DstInMemOp_;
     static constexpr index_t PackedSize = ck_tile::numeric_traits<DataType_>::PackedSize;
-    static constexpr bool ForceGlobalLoad = LargeTensor_;
+    static constexpr bool LargeTensor = LargeTensor_;
 
     template <typename T>
     using vector_scalar_t = typename vector_traits<remove_cvref_t<T>>::scalar_type;
@@ -95,7 +95,7 @@ struct tensor_view
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             bool_constant<oob_conditional_check>{},
-                                bool_constant<ForceGlobalLoad>{});
+                                bool_constant<LargeTensor>{});
     }
 
     template <typename X,
@@ -114,7 +114,7 @@ struct tensor_view
                                     linear_offset / PackedSize,
                                     is_valid_element,
                                     bool_constant<oob_conditional_check>{},
-                                bool_constant<ForceGlobalLoad>{});
+                                bool_constant<LargeTensor>{});
     }
 
     // X is vector of DataType.
@@ -324,7 +324,7 @@ struct tensor_view
                             const X& x,
                             bool_constant<oob_conditional_check> = {})
     {
-        buf_.template set<X, oob_conditional_check>(
+        buf_.template set<X, oob_conditional_check, LargeTensor>(
             coord.get_offset() / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
@@ -344,7 +344,7 @@ struct tensor_view
                             const X& x,
                             bool_constant<oob_conditional_check> = {})
     {
-        buf_.template set<X, oob_conditional_check>(
+        buf_.template set<X, oob_conditional_check, LargeTensor>(
             coord.get_offset(), linear_offset, is_valid_element, x);
     }
 
@@ -398,7 +398,7 @@ struct tensor_view
                                const X& x,
                                bool_constant<oob_conditional_check> = {})
     {
-        buf_.template update<DstInMemOp, X, oob_conditional_check>(
+        buf_.template update<DstInMemOp, X, oob_conditional_check, LargeTensor>(
             coord.get_offset() / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
@@ -418,7 +418,7 @@ struct tensor_view
                                const X& x,
                                bool_constant<oob_conditional_check> = {})
     {
-        buf_.template update<DstInMemOp, X, oob_conditional_check>(
+        buf_.template update<DstInMemOp, X, oob_conditional_check, LargeTensor>(
             coord.get_offset() / PackedSize, linear_offset / PackedSize, is_valid_element, x);
     }
 
@@ -568,7 +568,7 @@ CK_TILE_HOST_DEVICE constexpr auto transform_tensor_view(const OldTensorView& ol
     return tensor_view<typename OldTensorView::buffer_view,
                        remove_cvref_t<decltype(new_desc)>,
                        remove_cvref_t<OldTensorView>::DstInMemOp,
-                       remove_cvref_t<OldTensorView>::ForceGlobalLoad>{old_tensor_view.buf_, new_desc};
+                       remove_cvref_t<OldTensorView>::LargeTensor>{old_tensor_view.buf_, new_desc};
 }
 
 template <typename TensorView,
