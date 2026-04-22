@@ -130,6 +130,12 @@ protected:
             }
         }
 
+        // --skip-graph-validation: graph is confirmed supported, exit early with PASS
+        if(TestConfig::get().skipGraphValidation())
+        {
+            return;
+        }
+
         // Build execution plans, engine preference set above should ensure that
         // correct engine is selected.
         auto result = graph.create_execution_plans();

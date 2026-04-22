@@ -56,6 +56,7 @@ public:
     static void initialize(std::optional<std::filesystem::path> articlePath,
                            std::optional<std::string> engineName,
                            bool failOnUnsupported = false,
+                           bool skipGraphValidation = false,
                            std::optional<std::filesystem::path> configPath = std::nullopt,
                            std::optional<ReferenceExecutorType> referenceExecutorType
                            = std::nullopt)
@@ -68,6 +69,7 @@ public:
         instance._articlePath = std::move(articlePath);
         instance._engineName = std::move(engineName);
         instance._failOnUnsupported = failOnUnsupported;
+        instance._skipGraphValidation = skipGraphValidation;
         instance._referenceExecutorType = referenceExecutorType;
 
         // If CLI didn't provide a value, check env var once at init
@@ -115,6 +117,12 @@ public:
     {
         throwIfNotInitialized();
         return _failOnUnsupported;
+    }
+
+    bool skipGraphValidation() const
+    {
+        throwIfNotInitialized();
+        return _skipGraphValidation;
     }
 
     // Get the article (plugin .so) path. Throws if not provided.
@@ -200,6 +208,7 @@ private:
     std::optional<TestSettings> _testSettings;
     std::optional<ReferenceExecutorType> _referenceExecutorType;
     bool _failOnUnsupported = false;
+    bool _skipGraphValidation = false;
     bool _initialized = false;
 };
 
