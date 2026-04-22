@@ -19,36 +19,6 @@ namespace origami
 {
     using math::safe_ceil_div;
 
-    /// StreamK fixup / reduction overhead (microseconds), separate from GSU split-K.
-    static double streamkReductionOverheadUs(reduction_t sk_reduction,
-                                             size_t      fixup_peers,
-                                             size_t      sk_grid,
-                                             size_t      output_tiles,
-                                             double      math_overall_us,
-                                             double      store_us)
-    {
-        if(sk_grid == 0) return 0.0;
-        // Data-parallel launch: one WG per output tile — no StreamK cross-tile fixup.
-        if(output_tiles > 0 && sk_grid == output_tiles) return 0.0;
-        const bool uneven = (output_tiles % sk_grid) != 0 || sk_grid < output_tiles;
-        if(fixup_peers <= 1 && !uneven) return 0.0;
-
-        const double fix = static_cast<double>(fixup_peers > 1 ? fixup_peers - 1 : 0);
-        const double base = math_overall_us * 0.02;
-
-        switch(sk_reduction)
-        {
-        case reduction_t::parallel:
-        case reduction_t::atomic:
-            return fix * base * 2.5 + store_us * 0.05 * fix + (uneven ? base * 0.5 : 0.0);
-        case reduction_t::tree:
-        case reduction_t::spinlock:
-            return fix * base * 1.5 + store_us * 0.08 * fix + (uneven ? base * 0.35 : 0.0);
-        default:
-            return fix * base + store_us * 0.04 * fix;
-        }
-    }
-
     static double getPrefetchPerformance(int      grvwa,
                                          int      grvwb,
                                          int      bpeA,
@@ -241,6 +211,75 @@ namespace origami
         }
 
         return gsu_overall;
+    }
+
+    double Formocast::calculateStreamKOverhead(reduction_t sk_reduction,
+                                               size_t      output_tiles,
+                                               size_t      sk_grid,
+                                               size_t      iters_per_tile,
+                                               size_t      iters_total,
+                                               size_t      iters_per_cta,
+                                               size_t      fixup_peers,
+                                               double      math_overall_us,
+                                               double      store_us,
+                                               size_t      workspace_limit_bytes,
+                                               size_t      tile_workspace_bytes) const
+    {
+        if(sk_grid == 0) return 0.0;
+        // Data-parallel: one WG per output tile — no StreamK cross-tile fixup overhead.
+        if(output_tiles > 0 && sk_grid == output_tiles) return 0.0;
+
+        // Mirror streamk::grid_k_split_aware: insufficient workspace for uneven tile assignment
+        // forces grid back to one WG per tile (DP), which has no reduction path here.
+        if(workspace_limit_bytes > 0 && tile_workspace_bytes > 0
+           && (output_tiles % sk_grid) != 0
+           && tile_workspace_bytes * sk_grid > workspace_limit_bytes)
+            return 0.0;
+
+        const bool uneven = (output_tiles % sk_grid) != 0 || sk_grid < output_tiles;
+        if(fixup_peers <= 1 && !uneven) return 0.0;
+
+        const double base = math_overall_us * 0.02;
+        const double fix  = static_cast<double>(fixup_peers > 1 ? fixup_peers - 1 : 0);
+
+        // Partial tile assignment: remainder output tiles across sk_grid (tiles % sk_grid).
+        const size_t tile_remainder = output_tiles % sk_grid;
+        const double partial_tile_us =
+            (tile_remainder != 0)
+                ? base * (0.35 + 0.25 * static_cast<double>(tile_remainder)
+                                      / static_cast<double>(sk_grid))
+                : 0.0;
+
+        // K-partial within a WG: last chunk does not align to full tile depth-U steps.
+        const bool k_partial_in_wg =
+            (iters_per_tile > 0 && iters_per_cta > 0)
+            && (iters_per_cta % iters_per_tile != 0 || (iters_total % sk_grid) != 0);
+        const double k_straddle_us = k_partial_in_wg ? base * 0.12 : 0.0;
+
+        // Cross-workgroup sync at shared tile boundaries scales with fixup peer count.
+        const double boundary_sync_us = fix * base * 0.32;
+
+        double reduction_us = 0.0;
+        switch(sk_reduction)
+        {
+        case reduction_t::parallel:
+        case reduction_t::atomic:
+            // Atomics: lower setup, extra contention risk modeled on store traffic.
+            reduction_us = fix * base * 2.5 + store_us * 0.05 * fix;
+            reduction_us += partial_tile_us * 1.15 + k_straddle_us + boundary_sync_us * 1.1;
+            break;
+        case reduction_t::tree:
+        case reduction_t::spinlock:
+            // Workspace / tree reduction: heavier scratch traffic, fewer atomics.
+            reduction_us = fix * base * 1.5 + store_us * 0.08 * fix;
+            reduction_us += partial_tile_us + k_straddle_us + boundary_sync_us;
+            break;
+        default:
+            reduction_us = fix * base + store_us * 0.04 * fix;
+            reduction_us += partial_tile_us * 0.85 + k_straddle_us + boundary_sync_us * 0.9;
+            break;
+        }
+        return reduction_us;
     }
 
     double Formocast::calculateLocalSplitUOverhead(double MT0, double MT1, double lsu,
@@ -545,6 +584,9 @@ namespace origami
             origami_config.occupancy         = std::max(sizeMapping.CUOccupancy, 1);
             origami_config.workgroup_mapping = sizeMapping.workGroupMapping;
             origami_config.grid_selection    = grid_selection_t::k_split_aware;
+            // Match streamk::grid_k_split_aware workspace ceiling so grid selection mirrors runtime DP fallback.
+            origami_config.workspace_size_per_elem_c = static_cast<size_t>(problem.bpeCompute);
+            origami_config.workspace_size            = 128ull * 1024 * 1024;
 
             sk_reduction = streamk::select_reduction(
                 origami_problem, streamk_hw, origami_config, grid_selection_t::k_split_aware);
@@ -642,13 +684,21 @@ namespace origami
         double gsu_overall = 0.0;
         if(isStreamK)
         {
-            const double math_overall_pre = math_clk / hw_consts.math_frequency;
-            gsu_overall                   = streamkReductionOverheadUs(sk_reduction,
-                                                     sk_fixup_peers,
-                                                     sk_grid,
+            const double   math_overall_pre  = math_clk / hw_consts.math_frequency;
+            const size_t   tile_ws_bytes     = static_cast<size_t>(MT0) * static_cast<size_t>(MT1)
+                                            * static_cast<size_t>(problem.bpeCompute);
+            constexpr size_t streamk_ws_cap  = 128ull * 1024 * 1024;
+            gsu_overall                      = calculateStreamKOverhead(sk_reduction,
                                                      sk_output_tiles,
+                                                     sk_grid,
+                                                     sk_iters_per_tile,
+                                                     sk_iters_total,
+                                                     sk_iters_per_cta,
+                                                     sk_fixup_peers,
                                                      math_overall_pre,
-                                                     store);
+                                                     store,
+                                                     streamk_ws_cap,
+                                                     tile_ws_bytes);
         }
         else
         {

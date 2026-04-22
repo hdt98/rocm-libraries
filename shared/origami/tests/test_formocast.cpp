@@ -803,6 +803,60 @@ TEST_CASE("StreamK scheduling primitives: multi-tile and partial stream", "[form
     REQUIRE(fp >= 2);
 }
 
+TEST_CASE("Formocast: calculateStreamKOverhead models reduction modes and partial tiles", "[formocast][streamk]") {
+    Formocast sim;
+    // Shared StreamK-ish geometry: uneven tile assignment (10 tiles, 4 WGs) => tiles % sk_grid != 0.
+    const size_t tiles           = 10;
+    const size_t sk_grid         = 4;
+    const size_t iters_per_tile  = 4;
+    const size_t iters_total     = 40;
+    const size_t iters_per_cta   = streamk::num_iters_per_cta(iters_total, sk_grid);
+    const size_t fixup_peers     = streamk::num_fixup_peers_v2(sk_grid, iters_total, iters_per_tile, iters_per_cta);
+    const double math_us         = 50.0;
+    const double store_us        = 3.0;
+    const size_t tile_ws         = 128 * 128 * 2;
+    const size_t ws_limit        = 128ull * 1024 * 1024;
+
+    const double oh_parallel = sim.calculateStreamKOverhead(
+        reduction_t::parallel, tiles, sk_grid, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, ws_limit, tile_ws);
+    const double oh_tree = sim.calculateStreamKOverhead(
+        reduction_t::tree, tiles, sk_grid, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, ws_limit, tile_ws);
+    const double oh_atomic = sim.calculateStreamKOverhead(
+        reduction_t::atomic, tiles, sk_grid, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, ws_limit, tile_ws);
+    const double oh_dp = sim.calculateStreamKOverhead(
+        reduction_t::tree, tiles, tiles, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, ws_limit, tile_ws);
+
+    REQUIRE(oh_parallel > 0.0);
+    REQUIRE(oh_tree > 0.0);
+    REQUIRE(oh_parallel != Approx(oh_tree));
+    REQUIRE(oh_atomic == Approx(oh_parallel));
+    REQUIRE(oh_dp == Approx(0.0));
+
+    // Partial-tile boundary: same grid, but tiles quantize evenly => smaller remainder term.
+    const size_t tiles_even = 8;
+    const size_t fix_even   = streamk::num_fixup_peers_v2(
+        sk_grid, tiles_even * iters_per_tile, iters_per_tile,
+        streamk::num_iters_per_cta(tiles_even * iters_per_tile, sk_grid));
+    const double oh_partial_boundary = sim.calculateStreamKOverhead(
+        reduction_t::tree, tiles, sk_grid, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, ws_limit, tile_ws);
+    const double oh_even_remainder = sim.calculateStreamKOverhead(
+        reduction_t::tree, tiles_even, sk_grid, iters_per_tile, tiles_even * iters_per_tile,
+        streamk::num_iters_per_cta(tiles_even * iters_per_tile, sk_grid), fix_even, math_us, store_us,
+        ws_limit, tile_ws);
+    REQUIRE(oh_partial_boundary != Approx(oh_even_remainder));
+
+    // Workspace-driven DP fallback (mirrors grid_k_split_aware): no reduction overhead modeled.
+    const double oh_ws_dp = sim.calculateStreamKOverhead(
+        reduction_t::parallel, tiles, sk_grid, iters_per_tile, iters_total, iters_per_cta, fixup_peers,
+        math_us, store_us, /*workspace_limit_bytes=*/4096, /*tile_workspace_bytes=*/1024 * 1024);
+    REQUIRE(oh_ws_dp == Approx(0.0));
+}
+
 TEST_CASE("Formocast: StreamK (GlobalSplitU=0) uses schedule instead of penalty", "[formocast][streamk]") {
     Formocast simulator;
     simulator.setHardware(hardware_t::architecture_t::gfx950);

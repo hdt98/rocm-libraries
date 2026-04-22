@@ -421,6 +421,26 @@ namespace origami
                                     uint32_t WGs_per_tile, uint32_t WGs_per_tile_XCD,
                                     double MT0, double MT1, uint32_t numWGs, double vgprCheck,
                                     double storeGSU) const;
+
+        /**
+         * @brief StreamK-only overhead (partial tiles, reduction mode, workspace fallback, cross-WG sync).
+         *
+         * Not used for GSU split-K; keep separate from calculateGlobalSplitUOverhead().
+         *
+         * @param workspace_limit_bytes 0 disables workspace-based DP fallback modeling.
+         * @param tile_workspace_bytes bytes per output tile for reduction workspace (MT*MT*bpeC).
+         */
+        double calculateStreamKOverhead(reduction_t sk_reduction,
+                                      size_t output_tiles,
+                                      size_t sk_grid,
+                                      size_t iters_per_tile,
+                                      size_t iters_total,
+                                      size_t iters_per_cta,
+                                      size_t fixup_peers,
+                                      double math_overall_us,
+                                      double store_us,
+                                      size_t workspace_limit_bytes,
+                                      size_t tile_workspace_bytes) const;
         
         /**
          * @brief Calculate overhead for Local Split U (split along K dimension within workgroup)
