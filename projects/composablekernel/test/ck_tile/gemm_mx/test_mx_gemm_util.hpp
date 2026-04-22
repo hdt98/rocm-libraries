@@ -84,7 +84,18 @@ class TestMxGemmUtil : public ::testing::Test
                         ck_tile::index_t orig_k =
                             k_group * XdlKThread * KPack + ik * XdlKThread + k_lane;
 
-                        ck_tile::e8m0_t v = kLast ? src(orig_mn, orig_k) : src(orig_k, orig_mn);
+                        // Handle K/MN not aligned to XdlKThread*KPack / XdlMNThread*MNPack:
+                        // any byte whose logical (mn, k) position falls outside the original
+                        // scale tensor is stored as the zero exponent (2^-127, not NaN).
+                        // Note: e8m0_t's default constructor is 0xFF (NaN); using it here would
+                        // poison surrounding lanes. pad_tensor_view on the GPU side makes this
+                        // value unreachable in principle, but GPU loads that touch the same
+                        // packed int32_t as valid lanes must not contain NaN bytes either.
+                        ck_tile::e8m0_t v{static_cast<ck_tile::e8m0_raw_t>(0)};
+                        if(orig_mn < MN && orig_k < K_scale)
+                        {
+                            v = kLast ? src(orig_mn, orig_k) : src(orig_k, orig_mn);
+                        }
                         val |= (static_cast<int32_t>(v.get()) << (byteIdx * 8));
                     }
                 }
@@ -94,7 +105,11 @@ class TestMxGemmUtil : public ::testing::Test
         return packed;
     }
 
-    void Run(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K, int seed = 1234)
+    void Run(ck_tile::index_t M,
+             ck_tile::index_t N,
+             ck_tile::index_t K,
+             ck_tile::index_t k_batch = 1,
+             int seed                 = 1234)
     {
         const ck_tile::index_t scale_k_size = K / 32;
         const ck_tile::index_t stride_A =
@@ -168,7 +183,7 @@ class TestMxGemmUtil : public ::testing::Test
         MXGemmHostArgs<ScaleM, ScaleN> args(a_dev_buf.GetDeviceBuffer(),
                                             b_dev_buf.GetDeviceBuffer(),
                                             c_dev_buf.GetDeviceBuffer(),
-                                            1,
+                                            k_batch,
                                             M,
                                             N,
                                             K,

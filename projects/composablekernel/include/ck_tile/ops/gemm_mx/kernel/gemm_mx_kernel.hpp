@@ -124,8 +124,40 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
 
     static constexpr int kBlockPerCu = 1;
 
+    // Scale block size (same constant used by MXGemmPipeline): each e8m0 scale covers 32 K elements
+    static constexpr index_t ScaleBlockSize = 32;
+
+    // Padding flags pulled from pipeline so the kernel can pad the (unscaled) C and scale views
+    // consistently with the A/B views that the pipeline already pads via
+    // Underlying::MakeA/BBlockWindows.
+    static constexpr bool kPadM = MXGemmPipeline::kPadM;
+    static constexpr bool kPadN = MXGemmPipeline::kPadN;
+    static constexpr bool kPadK = MXGemmPipeline::kPadK;
+
     static_assert(DsLayout::size() == DsDataType::size(),
                   "The size of DsLayout and DsDataType should be the same");
+
+    // ------------------------------------------------------------------
+    // Compile-time padding-support invariants for the MX comp-async pipeline.
+    //
+    //   - K padding is NOT supported: async_load_tile issues vector buffer reads whose
+    //     OOB check is per-vector-start, so a vector that straddles the K pad boundary
+    //     pulls in data from the adjacent row / next K tile rather than zero. The packed
+    //     scale tile has the same vector-load property. Until the async path learns how
+    //     to do per-element pad masking, we forbid kPadK at compile time.
+    //
+    //   - kPadM / kPadN are supported only when the GEMM has at least one full block
+    //     along that dimension; the CShuffleEpilogue's LDS shuffle uses thread positions
+    //     that do not all participate when the entire dimension is smaller than a tile
+    //     (resulting in zeros being written into in-range output rows). The "entire
+    //     dimension < tile" case is rejected at runtime in IsSupportedArgument; we
+    //     cannot statically catch it because M and N are runtime values.
+    // ------------------------------------------------------------------
+    static_assert(!kPadK,
+                  "MX GEMM (comp-async pipeline): K padding (kPadK = true) is not supported. "
+                  "The async vector loads do not mask elements that straddle the K pad "
+                  "boundary, so partial K tiles produce silently wrong results. Choose K so "
+                  "that K is a multiple of KPerBlock * k_batch.");
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
@@ -199,13 +231,108 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
             const int persistent_block_size = prop.multiProcessorCount * maxActiveBlocksPerCU;
             const int actual_grid_size      = min(persistent_block_size, total_work_tile_cnt);
 
-            return dim3(actual_grid_size, 1, 1);
+            // blockIdx.z selects the K split. For split-K, each k_id gets its own set of
+            // persistent blocks looping over the MxN tile space.
+            return dim3(actual_grid_size, 1, kargs.k_batch);
         }
         else
         {
-            // Non-persistent: use full grid size based on number of tiles
-            return dim3(total_work_tile_cnt, 1, 1);
+            // Non-persistent: grid is (MxN tiles) x 1 x k_batch. blockIdx.z selects the K split.
+            return dim3(total_work_tile_cnt, 1, kargs.k_batch);
         }
+    }
+
+    template <class ScaleM, class ScaleN>
+    CK_TILE_HOST static bool IsSupportedArgument(const KernelArgs<ScaleM, ScaleN>& kargs)
+    {
+        // Reject unsupported combinations early; the MX pipeline silently produces wrong
+        // results otherwise (OOB reads, partial-tile shuffle artifacts, mis-aligned splits).
+        // See the static_assert block at the top of MXGemmKernel for the rationale behind
+        // each constraint.
+        const bool log = ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING));
+
+        if(kargs.k_batch < 1)
+        {
+            if(log)
+                CK_TILE_ERROR("MX GEMM: k_batch must be >= 1.");
+            return false;
+        }
+
+        // M / N must be a multiple of the block tile when padding is disabled.
+        if(!kPadM && (kargs.M % TilePartitioner::MPerBlock != 0))
+        {
+            if(log)
+                CK_TILE_ERROR("MX GEMM: M must be a multiple of MPerBlock when kPadM is false. "
+                              "Enable kPadM on the GEMM config to run this shape.");
+            return false;
+        }
+        if(!kPadN && (kargs.N % TilePartitioner::NPerBlock != 0))
+        {
+            if(log)
+                CK_TILE_ERROR("MX GEMM: N must be a multiple of NPerBlock when kPadN is false. "
+                              "Enable kPadN on the GEMM config to run this shape.");
+            return false;
+        }
+
+        // CShuffleEpilogue cannot run with a single partial tile along M or N: the shuffle's
+        // LDS write/read pattern leaves some in-range output rows/cols at zero. Reject these
+        // pathological shapes whether or not kPadM/kPadN is enabled.
+        if(kargs.M < TilePartitioner::MPerBlock)
+        {
+            if(log)
+                CK_TILE_ERROR("MX GEMM: M must be >= MPerBlock. Partial-only M tiles are not "
+                              "supported by the MX CShuffleEpilogue.");
+            return false;
+        }
+        if(kargs.N < TilePartitioner::NPerBlock)
+        {
+            if(log)
+                CK_TILE_ERROR("MX GEMM: N must be >= NPerBlock. Partial-only N tiles are not "
+                              "supported by the MX CShuffleEpilogue.");
+            return false;
+        }
+
+        // K padding is unconditionally rejected (kPadK is also a compile-time error -- see the
+        // static_assert at the top of MXGemmKernel). Every split must consume an exact number
+        // of K tiles, otherwise the async vector loads read garbage past the K boundary.
+        const index_t k_tile = TilePartitioner::KPerBlock;
+        if(kargs.K % (k_tile * kargs.k_batch) != 0)
+        {
+            if(log)
+                CK_TILE_ERROR(
+                    "MX GEMM: K must be a multiple of KPerBlock * k_batch. The MX comp-async "
+                    "pipeline does not currently support K padding (vector loads across the K "
+                    "pad boundary read garbage); pick aligned K dimensions or change k_batch.");
+            return false;
+        }
+
+        // Scales are granular in K: each packed int32_t covers ScaleBlockSize * KXdlPackEff
+        // consecutive K elements. Every split-K boundary must land on that granularity so that
+        // each split can compute a packed-scale K offset. K1 is the WarpTile K, which is a
+        // multiple of that granularity for all shipped configs, but be defensive.
+        constexpr index_t scale_granularity_k = ScaleBlockSize * KXdlPackEff;
+        if(kargs.k_batch > 1)
+        {
+            // splitk_batch_offset allocates K in units of K1 (warp-tile K). If K1 itself is
+            // not a multiple of the scale granularity, split-K is not safe.
+            constexpr index_t K1 = BlockGemmShape::WarpTile::at(number<2>{});
+            static_assert(K1 % scale_granularity_k == 0,
+                          "MX GEMM: WarpTile K must be a multiple of ScaleBlockSize * KXdlPack "
+                          "to support split-K.");
+            // Defensive runtime check: K must split evenly along K1 boundaries so that each
+            // k_id consumes a whole number of warp-tile K chunks (and therefore a whole
+            // number of packed-scale K elements).
+            if(kargs.K % (K1 * kargs.k_batch) != 0)
+            {
+                if(log)
+                    CK_TILE_ERROR("MX GEMM: with k_batch > 1, K must be a multiple of WarpTile_K * "
+                                  "k_batch so that every split lands on a packed-scale boundary.");
+                return false;
+            }
+        }
+
+        return Underlying::IsSupportedArgument(
+            static_cast<const typename Underlying::KernelArgs&>(kargs));
     }
 
     using SplitKBatchOffset = typename Underlying::SplitKBatchOffset;
@@ -242,23 +369,12 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
             }
         }();
 
-        // Create padded view
-        const auto& e_pad_view = [&]() {
-            if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
-            {
-                return pad_tensor_view(e_tensor_view,
-                                       make_tuple(number<TilePartitioner::MPerBlock>{},
-                                                  number<TilePartitioner::NPerBlock>{}),
-                                       sequence<false, false>{});
-            }
-            else
-            {
-                return pad_tensor_view(e_tensor_view,
-                                       make_tuple(number<TilePartitioner::MPerBlock>{},
-                                                  number<TilePartitioner::NPerBlock>{}),
-                                       sequence<false, false>{});
-            }
-        }();
+        // Pad both dims so OOB C writes (including partial trailing tiles where M < MPerBlock
+        // or N < NPerBlock) are masked by the pad transform.
+        const auto& e_pad_view = pad_tensor_view(
+            e_tensor_view,
+            make_tuple(number<TilePartitioner::MPerBlock>{}, number<TilePartitioner::NPerBlock>{}),
+            sequence<kPadM, kPadN>{});
 
         // Create block window
         auto c_block_window = make_tile_window(
@@ -269,12 +385,16 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         return c_block_window;
     }
 
-    // Create scale A block windows with packed int32_t layout
-    // Host packs 2M x 2K e8m0_t values into one int32_t
-    // Tensor view: [M/MXdlPack, K/32/KXdlPack] of int32_t
+    // Create scale A block windows with packed int32_t layout.
+    // Host packs (MXdlPack x KXdlPack) e8m0_t values into a single int32_t, producing a
+    // packed tensor of shape [M/MXdlPackEff, K/ScaleBlockSize/KXdlPackEff].
+    //
+    //   k_elem_offset: starting K element index for this block (0 unless split-K).
+    //                  Must be a multiple of ScaleBlockSize * KXdlPackEff.
     template <typename ScaleM, typename ScaleN>
     CK_TILE_DEVICE static auto MakeScaleABlockWindows(const KernelArgs<ScaleM, ScaleN>& kargs,
-                                                      const index_t i_m)
+                                                      const index_t i_m,
+                                                      const index_t k_elem_offset = 0)
     {
         auto scale_a = kargs.scale_m_ptr;
 
@@ -282,28 +402,35 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         const auto scale_k_packed           = kargs.K / BlockScaleSize / KXdlPackEff;
         const auto scale_m_packed           = kargs.M / MXdlPackEff;
 
-        // A scale tensor view - layout [M/MXdlPackEff, K/32/KXdlPackEff] with int32_t elements
         const auto scale_a_tensor_view = make_naive_tensor_view<address_space_enum::global>(
             reinterpret_cast<const int32_t*>(scale_a.ptr),
             make_tuple(scale_m_packed, scale_k_packed),
             make_tuple(scale_k_packed, 1));
 
-        // Tile window shape: [MPerBlock/MXdlPackEff, KPerBlock/32/KXdlPackEff]
-        auto scale_a_block_window = make_tile_window(
+        // Pad the scale view so that partial trailing tiles along M and K are handled safely
+        // (OOB scale loads return zero; with A/B also zero on the padded region the contribution
+        // is zero regardless of scale value). Mirrors the A/B view padding done by the pipeline.
+        const auto scale_a_pad_view = pad_tensor_view(
             scale_a_tensor_view,
             make_tuple(number<TilePartitioner::MPerBlock / MXdlPackEff>{},
                        number<TilePartitioner::KPerBlock / BlockScaleSize / KXdlPackEff>{}),
-            {i_m / MXdlPackEff, 0});
+            sequence<kPadM, kPadK>{});
+
+        const index_t k_scale_offset = k_elem_offset / BlockScaleSize / KXdlPackEff;
+
+        auto scale_a_block_window = make_tile_window(
+            scale_a_pad_view,
+            make_tuple(number<TilePartitioner::MPerBlock / MXdlPackEff>{},
+                       number<TilePartitioner::KPerBlock / BlockScaleSize / KXdlPackEff>{}),
+            {i_m / MXdlPackEff, k_scale_offset});
 
         return scale_a_block_window;
     }
 
-    // Create scale B block windows with packed int32_t layout
-    // Host packs 2N x 2K e8m0_t values into one int32_t
-    // Tensor view: [N/NXdlPack, K/32/KXdlPack] of int32_t
     template <typename ScaleM, typename ScaleN>
     CK_TILE_DEVICE static auto MakeScaleBBlockWindows(const KernelArgs<ScaleM, ScaleN>& kargs,
-                                                      const index_t i_n)
+                                                      const index_t i_n,
+                                                      const index_t k_elem_offset = 0)
     {
         auto scale_b = kargs.scale_n_ptr;
 
@@ -311,23 +438,31 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         const auto scale_k_packed           = kargs.K / BlockScaleSize / KXdlPackEff;
         const auto scale_n_packed           = kargs.N / NXdlPackEff;
 
-        // B scale tensor view - [N/NXdlPackEff, K/32/KXdlPackEff] of int32_t
         const auto scale_b_tensor_view = make_naive_tensor_view<address_space_enum::global>(
             reinterpret_cast<const int32_t*>(scale_b.ptr),
             make_tuple(scale_n_packed, scale_k_packed),
             make_tuple(scale_k_packed, 1));
 
-        // Tile window shape: [NPerBlock/NXdlPackEff, KPerBlock/32/KXdlPackEff]
-        auto scale_b_block_window = make_tile_window(
+        const auto scale_b_pad_view = pad_tensor_view(
             scale_b_tensor_view,
             make_tuple(number<TilePartitioner::NPerBlock / NXdlPackEff>{},
                        number<TilePartitioner::KPerBlock / BlockScaleSize / KXdlPackEff>{}),
-            {i_n / NXdlPackEff, 0});
+            sequence<kPadN, kPadK>{});
+
+        const index_t k_scale_offset = k_elem_offset / BlockScaleSize / KXdlPackEff;
+
+        auto scale_b_block_window = make_tile_window(
+            scale_b_pad_view,
+            make_tuple(number<TilePartitioner::NPerBlock / NXdlPackEff>{},
+                       number<TilePartitioner::KPerBlock / BlockScaleSize / KXdlPackEff>{}),
+            {i_n / NXdlPackEff, k_scale_offset});
 
         return scale_b_block_window;
     }
 
-    template <class ScaleM, class ScaleN>
+    template <memory_operation_enum DstInMemOp = memory_operation_enum::set,
+              class ScaleM,
+              class ScaleN>
     CK_TILE_DEVICE static void RunMxGemm(const std::array<const ADataType*, NumATensor>& as_ptr,
                                          const std::array<const BDataType*, NumBTensor>& bs_ptr,
                                          const std::array<const void*, NumDTensor>& ds_ptr,
@@ -337,7 +472,8 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
                                          const KernelArgs<ScaleM, ScaleN>& kargs,
                                          const SplitKBatchOffset& splitk_batch_offset,
                                          const index_t i_m,
-                                         const index_t i_n)
+                                         const index_t i_n,
+                                         const index_t k_elem_offset = 0)
     {
         // Create block windows directly, following the new pattern from UniversalGemmKernel
         // i_m and i_n are element offsets (iM * MPerBlock, iN * NPerBlock), not tile indices
@@ -347,9 +483,10 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
             Underlying::MakeBBlockWindows(bs_ptr, kargs, splitk_batch_offset.splitted_k, i_n);
         const auto& d_block_window = Underlying::MakeDBlockWindows(ds_ptr, kargs, i_m, i_n);
 
-        // Create scale block windows using our new functions
-        const auto& scale_a_block_window = MakeScaleABlockWindows(kargs, i_m);
-        const auto& scale_b_block_window = MakeScaleBBlockWindows(kargs, i_n);
+        // Create scale block windows. For split-K (k_batch > 1), k_elem_offset advances the
+        // scale origin into the correct packed-K slice for this k_id; otherwise it is zero.
+        const auto& scale_a_block_window = MakeScaleABlockWindows(kargs, i_m, k_elem_offset);
+        const auto& scale_b_block_window = MakeScaleBBlockWindows(kargs, i_n, k_elem_offset);
 
         const index_t num_loop = TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k);
 
@@ -366,8 +503,8 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
                                                     smem_ptr_ping,
                                                     smem_ptr_pong);
 
-        // Run Epilogue Pipeline - create C block window directly
-        auto c_block_window = MakeCBlockWindows(e_ptr, kargs, i_m, i_n);
+        // Run Epilogue Pipeline - create C block window with the requested memory op.
+        auto c_block_window = MakeCBlockWindows<DstInMemOp>(e_ptr, kargs, i_m, i_n);
         EpiloguePipeline{}(c_block_window, c_block_tile, d_block_window, smem_ptr_ping);
     }
 
@@ -381,6 +518,20 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         return MXGemmPipeline::GetSmemSize();
     }
 
+    // Compute the K-element offset for a given split-K batch id. Matches the formula used by
+    // Underlying::SplitKBatchOffset so that scale windows stay in lock-step with A/B windows.
+    CK_TILE_DEVICE static index_t GetSplitKElemOffset(index_t K, index_t k_batch, index_t k_id)
+    {
+        constexpr auto K1       = BlockGemmShape::WarpTile::at(number<2>{});
+        const index_t num_all   = K / K1;
+        index_t num_full        = num_all % k_batch;
+        num_full                = (num_full == 0) ? k_batch : num_full;
+        const index_t num_iters = max(integer_divide_ceil(num_all, k_batch), 1);
+        const index_t full_k    = num_iters * K1;
+        const index_t partial_k = (num_iters - 1) * K1;
+        return min(k_id, num_full) * full_k + max(k_id - num_full, 0) * partial_k;
+    }
+
     template <class ScaleM, class ScaleN>
     CK_TILE_DEVICE void operator()(KernelArgs<ScaleM, ScaleN> kargs,
                                    int partition_idx = get_block_id()) const
@@ -392,6 +543,10 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         __shared__ char smem_ptr_ping[GetSmemPingSize()];
         __shared__ char smem_ptr_pong[GetSmemPongSize()];
 
+        // k_id selects the K split; blockIdx.z is 0 when k_batch == 1 or persistent (where
+        // IsSupportedArgument requires k_batch == 1).
+        const index_t k_id = amd_wave_read_first_lane(blockIdx.z);
+
         // Support both persistent and non-persistent modes
         do
         {
@@ -400,13 +555,15 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
             const index_t i_m = amd_wave_read_first_lane(iM * TilePartitioner::MPerBlock);
             const index_t i_n = amd_wave_read_first_lane(iN * TilePartitioner::NPerBlock);
 
-            // Cast to base class for SplitKBatchOffset construction
+            // SplitKBatchOffset defaults k_id to blockIdx.z, which is what we want here.
             const SplitKBatchOffset splitk_batch_offset(
                 static_cast<const typename Underlying::KernelArgs&>(kargs));
-            // options
+
+            const index_t k_elem_offset =
+                amd_wave_read_first_lane(GetSplitKElemOffset(kargs.K, kargs.k_batch, k_id));
+
             EDataType* e_ptr = static_cast<EDataType*>(kargs.e_ptr);
 
-            // options
             std::array<const ADataType*, NumATensor> as_ptr;
             static_for<0, NumATensor, 1>{}([&](auto i) {
                 as_ptr[i] = static_cast<const ADataType*>(kargs.as_ptr[i]) +
@@ -419,16 +576,42 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
                             splitk_batch_offset.bs_k_split_offset[i] / BPackedSize;
             });
 
-            RunMxGemm<ScaleM, ScaleN>(as_ptr,
-                                      bs_ptr,
-                                      kargs.ds_ptr,
-                                      e_ptr,
-                                      smem_ptr_ping,
-                                      smem_ptr_pong,
-                                      kargs,
-                                      splitk_batch_offset,
-                                      i_m,
-                                      i_n);
+            // Dispatch epilogue: when k_batch > 1 each split accumulates a partial result into
+            // the same C tile, so we need atomic add (universal_gemm_kernel pattern). For atomic
+            // add of fp16/bf16 the epilogue requires even vector size -- guard against invalid
+            // combinations the same way UniversalGemmKernel does.
+            if(kargs.k_batch == 1)
+            {
+                RunMxGemm<memory_operation_enum::set>(as_ptr,
+                                                      bs_ptr,
+                                                      kargs.ds_ptr,
+                                                      e_ptr,
+                                                      smem_ptr_ping,
+                                                      smem_ptr_pong,
+                                                      kargs,
+                                                      splitk_batch_offset,
+                                                      i_m,
+                                                      i_n,
+                                                      /*k_elem_offset=*/0);
+            }
+            else
+            {
+                if constexpr(EpiloguePipeline::GetVectorSizeC() % 2 == 0 ||
+                             !is_any_of<EDataType, fp16_t, bf16_t>::value)
+                {
+                    RunMxGemm<memory_operation_enum::atomic_add>(as_ptr,
+                                                                 bs_ptr,
+                                                                 kargs.ds_ptr,
+                                                                 e_ptr,
+                                                                 smem_ptr_ping,
+                                                                 smem_ptr_pong,
+                                                                 kargs,
+                                                                 splitk_batch_offset,
+                                                                 i_m,
+                                                                 i_n,
+                                                                 k_elem_offset);
+                }
+            }
             partition_idx += gridDim.x;
         } while(UsePersistentKernel && partition_idx < total_work_tile_cnt);
     }

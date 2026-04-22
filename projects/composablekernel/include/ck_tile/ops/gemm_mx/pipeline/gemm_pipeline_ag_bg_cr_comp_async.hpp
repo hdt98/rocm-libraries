@@ -26,7 +26,13 @@ struct BaseMXGemmPipelineAgBgCrCompAsync
 
     CK_TILE_HOST_DEVICE static constexpr bool BlockHasHotloop(index_t num_loop)
     {
-        return num_loop > PrefetchStages;
+        // The pipeline issues 3 global prefetches before the hot loop and the do-while body
+        // always executes at least one iteration (2 gemms). The tail then contributes 1, 2 or 3
+        // more gemms depending on TailNumber. Total gemms must equal num_loop, so the hot loop
+        // is only legal when num_loop >= 4 (hot_loop=2 + tail<=2 for even num_loop, or
+        // hot_loop=2 + tail=3 for odd num_loop >= 5). In particular num_loop == 3 must NOT enter
+        // the hot loop: pre-pipeline + TailNumber::Three already produces exactly 3 gemms.
+        return num_loop > PrefetchStages + 1;
     }
 
     CK_TILE_HOST_DEVICE static constexpr TailNumber GetBlockLoopTailNum(index_t num_loop)

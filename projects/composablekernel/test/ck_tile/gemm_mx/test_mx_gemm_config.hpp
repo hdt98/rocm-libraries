@@ -93,3 +93,12 @@ struct MXfp8_GemmConfig16 : MxGemmConfig
     static constexpr ck_tile::index_t N_Tile = 64;
     static constexpr ck_tile::index_t K_Tile = 256;
 };
+
+// Variant with M/N padding enabled. Used to cover shapes where M/N are not multiples of
+// the respective block tiles. K is still required to be a multiple of K_Tile -- the MX
+// comp-async pipeline does not support K padding (see MXGemmKernel::IsSupportedArgument).
+struct MXfp8_GemmConfig16_PadMN : MXfp8_GemmConfig16
+{
+    static constexpr bool kPadM = true;
+    static constexpr bool kPadN = true;
+};
