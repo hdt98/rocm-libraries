@@ -502,6 +502,8 @@ struct GroupedConvolutionForwardKernel
 
     using GroupedConvFwdKernelArgsSpecialized =
         GroupedConvFwdKernelArgs<GroupedConvTraitsType_, CDElementwise>;
+    
+    static constexpr bool LargeTensors  = GemmPipeline::LargeTensors;
 
     static constexpr bool IsSplitKSupported = false;
 
@@ -887,18 +889,20 @@ struct GroupedConvolutionForwardKernel
     CK_TILE_DEVICE static auto
     MakeABlockWindow(const InDataType* a_ptr, const ADescType& a_desc, const index_t block_idx_m)
     {
+        constexpr bool pad_not_contiguous_dim = LargeTensors;
+
         if constexpr(GroupedConvTraitsType_::NumGroupsToMerge == 1)
         {
             // Access by K
             // Step 1: Create tensor view
-            const auto& a_tensor_view = make_tensor_view<address_space_enum::global>(a_ptr, a_desc);
+            const auto& a_tensor_view = make_tensor_view<address_space_enum::global, memory_operation_enum::set, amd_buffer_coherence_enum::coherence_default, LargeTensors>(a_ptr, a_desc);
 
             // Step 2: Create padded view
             const auto& a_pad_view =
                 pad_tensor_view(a_tensor_view,
                                 make_tuple(number<TilePartitioner::MPerBlock>{},
                                            number<TilePartitioner::KPerBlock>{}),
-                                sequence<false, true>{});
+                                sequence<pad_not_contiguous_dim, true>{});
 
             // Step 3: Create tile window
             return make_tile_window(a_pad_view,
@@ -917,14 +921,14 @@ struct GroupedConvolutionForwardKernel
                 make_tuple(sequence<1>{}, sequence<0>{}));
             // Step 1: Create tensor view
             const auto& a_tensor_view =
-                make_tensor_view<address_space_enum::global>(a_ptr, a_desc_reversed);
+                make_tensor_view<address_space_enum::global, memory_operation_enum::set, amd_buffer_coherence_enum::coherence_default, LargeTensors>(a_ptr, a_desc_reversed);
 
             // Step 2: Create padded view
             const auto& a_pad_view =
                 pad_tensor_view(a_tensor_view,
                                 make_tuple(number<TilePartitioner::KPerBlock>{},
                                            number<TilePartitioner::MPerBlock>{}),
-                                sequence<false, true>{});
+                                sequence<pad_not_contiguous_dim, true>{});
 
             // Step 3: Create tile window
             return make_tile_window(a_pad_view,
@@ -938,14 +942,16 @@ struct GroupedConvolutionForwardKernel
     CK_TILE_DEVICE static auto
     MakeBBlockWindow(const WeiDataType* b_ptr, const BDescType& b_desc, const index_t block_idx_n)
     {
+        constexpr bool pad_not_contiguous_dim = LargeTensors;
+
         // Step 1: Create tensor view
-        const auto& b_tensor_view = make_tensor_view<address_space_enum::global>(b_ptr, b_desc);
+        const auto& b_tensor_view = make_tensor_view<address_space_enum::global, memory_operation_enum::set, amd_buffer_coherence_enum::coherence_default, LargeTensors>(b_ptr, b_desc);
 
         // Step 2: Create padded view
         const auto& b_pad_view = pad_tensor_view(
             b_tensor_view,
             make_tuple(number<TilePartitioner::NPerBlock>{}, number<TilePartitioner::KPerBlock>{}),
-            sequence<false, true>{});
+            sequence<pad_not_contiguous_dim, true>{});
 
         // Step 3: Create tile window
         return make_tile_window(
@@ -960,6 +966,8 @@ struct GroupedConvolutionForwardKernel
                                                  const index_t block_idx_m,
                                                  const index_t block_idx_n)
     {
+        constexpr bool pad_not_contiguous_dim = LargeTensors;
+
         // Step 1: Create tensor views
         const auto& ds_tensor_view = generate_tuple(
             [&](auto i) {
@@ -970,7 +978,7 @@ struct GroupedConvolutionForwardKernel
                 static_assert(std::is_same_v<std::tuple_element_t<i, DsDataType>, OutDataType>,
                               "Not supported!");
 
-                return make_tensor_view<address_space_enum::global>(
+                return make_tensor_view<address_space_enum::global, memory_operation_enum::set, amd_buffer_coherence_enum::coherence_default, LargeTensors>(
                     static_cast<const OutDataType*>(ds_ptr[i]), c_desc);
             },
             number<NumDTensor>{});
@@ -981,7 +989,7 @@ struct GroupedConvolutionForwardKernel
                 return pad_tensor_view(ds_tensor_view[i],
                                        make_tuple(number<TilePartitioner::MPerBlock>{},
                                                   number<TilePartitioner::NPerBlock>{}),
-                                       sequence<false, true>{});
+                                       sequence<pad_not_contiguous_dim, true>{});
             },
             number<NumDTensor>{});
 
@@ -1004,15 +1012,15 @@ struct GroupedConvolutionForwardKernel
     {
         // Step 1: Create tensor view
         const auto& c_tensor_view =
-            make_tensor_view<address_space_enum::global, DstInMemOp>(c_ptr, c_desc);
+            make_tensor_view<address_space_enum::global, DstInMemOp, amd_buffer_coherence_enum::coherence_default, LargeTensors>(c_ptr, c_desc);
 
         // For bf16_t and atomic_add global_atomic_add is used instead of buffer_atomic_add
         // Add padding for not contiguous dim due to the lack of OOB check
         // Not needed from gfx950.
 #if defined(__gfx950__)
-        constexpr bool pad_not_contiguous_dim = false;
+        constexpr bool pad_not_contiguous_dim = LargeTensors;
 #else
-        constexpr bool pad_not_contiguous_dim =
+        constexpr bool pad_not_contiguous_dim = LargeTensors ||
             std::is_same_v<OutDataType, bf16_t> && DstInMemOp == memory_operation_enum::atomic_add;
 #endif
         // Step 2: Create padded view
