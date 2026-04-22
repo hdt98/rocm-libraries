@@ -82,7 +82,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
         const long_index_t e_batch_offset = amd_wave_read_first_lane(
             static_cast<long_index_t>(compute_ptr_offset_of_batch.GetEPtrOffset(g_idx)));
 
-        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
 
         DispatchSplitKHack<GridwiseGemm,
                            AGridDesc_AK0_M_K1,
@@ -155,8 +155,8 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
 
         // Pass two lds pointer is the key to tell compiler that ds_read/write
         // operate on different lds chunk at same time without order dependecy
-        __shared__ char p_shared_0[GridwiseGemm::GetSharedMemoryNumberOfByte()];
-        __shared__ char p_shared_1[GridwiseGemm::GetSharedMemoryNumberOfByte()];
+        __shared__ char p_shared_0[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
+        __shared__ char p_shared_1[GridwiseGemm::GetSharedMemoryNumberOfByte(get_device_arch())];
 
         DispatchSplitKHack_2Lds<GridwiseGemm,
                                 AGridDesc_AK0_M_K1,
@@ -702,7 +702,7 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
 
                 // Ensure that k_batch_ does not exceed the maximum value
                 // for the GEMM pipeline.
-                const auto k_batch_max = static_cast<index_t>((gemmK - 1) / KPerBlock);
+                const auto k_batch_max = math::integer_divide_ceil(gemmK, KPerBlock);
                 k_batch_               = std::max(std::min(k_batch_, k_batch_max), 1);
 
                 if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
@@ -1031,30 +1031,14 @@ struct DeviceGroupedConvBwdWeightTwoStage_Xdl_CShuffle
             const auto Run = [&](const auto& kernel) {
                 if(stream_config.flush_cache)
                 {
-                    typename GridwiseGemm::Argument gemm_arg_ = gemm_arg;
-                    ck::utility::RotatingMemWrapper<typename GridwiseGemm::Argument> rotating_mem(
-                        gemm_arg_,
-                        stream_config.rotating_count,
-                        gemm_arg_.M * gemm_arg_.K * sizeof(ADataType),
-                        gemm_arg_.K * gemm_arg_.N * sizeof(BDataType));
-                    rotating_mem.Print();
-
-                    auto run_flush_cache = [&]() {
-                        // flush icache
-                        ck::utility::flush_icache();
-                        // rotating mem
-                        rotating_mem.Next();
-                        clear_workspace();
-                    };
-
-                    ave_time += ck::utility::launch_and_time_kernel_with_preprocess<false>(
+                    ave_time += launch_and_time_kernel_with_preprocess_flush_cache(
                         stream_config,
-                        run_flush_cache,
+                        clear_workspace,
                         kernel,
                         dim3(gdx, gdy, gdz),
                         dim3(BlockSize),
                         0,
-                        gemm_arg_,
+                        gemm_arg,
                         arg.a_grid_desc_k0_m_k1_,
                         arg.b_grid_desc_k0_n_k1_,
                         arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,

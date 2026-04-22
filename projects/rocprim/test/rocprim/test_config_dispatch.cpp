@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright (c) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2022-2026 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -418,12 +418,7 @@ TEST(RocprimConfigDispatchTests, ExecuteLaunchPlan)
 
     hipStream_t stream = 0;
 
-    target_arch target_arch;
-    HIP_CHECK(host_target_arch(stream, target_arch));
-    gpu target_gpu;
-    HIP_CHECK(host_target_gpu(stream, target_gpu));
-
-    const target current_target(target_arch, target_gpu);
+    const target current_target(stream);
 
     target* d_output;
     HIP_CHECK(hipMalloc(&d_output, sizeof(target)));
@@ -459,4 +454,7 @@ TEST(RocprimConfigDispatchTests, ExecuteLaunchPlan)
     HIP_CHECK(hipMemcpy(&h_output, d_output, sizeof(target), hipMemcpyDeviceToHost));
     // Should have the same targets as most_common_config.
     ASSERT_EQ(most_common_config<Targets>(current_target), h_output);
+
+	// Clean up
+	HIP_CHECK(hipFree(d_output));
 }

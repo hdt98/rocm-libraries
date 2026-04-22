@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright 2025 AMD ROCm(TM) Software
+ * Copyright 2025-2026 AMD ROCm(TM) Software
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,12 +31,14 @@
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
+#include <vector>
 
 #include <hip/hip_runtime.h>
 
 #include "origami/types.hpp"
 
 namespace origami {
+
 /**
  * @brief Represents hardware characteristics and capabilities of GPU architectures.
  *
@@ -47,7 +49,19 @@ class hardware_t {
    * @brief Enumeration of supported GPU architectures.
    *
    */
-  enum class architecture_t { gfx90a, gfx942, gfx950, gfx1201, gfx1100, gfx1151, Count };
+  enum class architecture_t {
+    gfx90a,
+    gfx942,
+    gfx950,
+    gfx1201,
+    gfx1100,
+    gfx1150,
+    gfx1151,
+    gfx1152,
+    gfx1153,
+    gfx1250,
+    Count
+  };
 
   /**
    * @brief Convert architecture name string to architecture_t enum.
@@ -61,8 +75,30 @@ class hardware_t {
     if (str == "gfx950") return architecture_t::gfx950;
     if (str == "gfx1201") return architecture_t::gfx1201;
     if (str == "gfx1100") return architecture_t::gfx1100;
+    if (str == "gfx1150") return architecture_t::gfx1150;
     if (str == "gfx1151") return architecture_t::gfx1151;
+    if (str == "gfx1152") return architecture_t::gfx1152;
+    if (str == "gfx1153") return architecture_t::gfx1153;
+    if (str == "gfx1250") return architecture_t::gfx1250;
     return architecture_t::Count;
+  }
+
+  /**
+   * @brief Convert architecture_t to string (e.g. for logging).
+   *
+   * @param a Architecture enum value
+   * @return std::string_view Corresponding string value
+   */
+  static constexpr std::string_view arch_enum_to_name(architecture_t a) noexcept {
+    switch (a) {
+      case architecture_t::gfx90a: return "gfx90a";
+      case architecture_t::gfx942: return "gfx942";
+      case architecture_t::gfx950: return "gfx950";
+      case architecture_t::gfx1201: return "gfx1201";
+      case architecture_t::gfx1100: return "gfx1100";
+      case architecture_t::gfx1151: return "gfx1151";
+      default: return "unknown";
+    }
   }
 
   /**
@@ -70,7 +106,6 @@ class hardware_t {
    *
    */
   struct architecture_constants {
-    size_t num_xcds;  ///< Number of XCDs (XCD = XGMI Complex Die)
     double mem1_perf_ratio;
     double mem2_perf_ratio;
     double mem3_perf_ratio;
@@ -79,21 +114,25 @@ class hardware_t {
         mem_bw_per_wg_coefficients;  ///< Memory bandwidth coefficients per workgroup
     double mem_clock_ratio;          ///< Memory clock ratio relative to compute clock
 
-    constexpr architecture_constants(size_t num_xcds,
-                                     double mem1_perf_ratio,
+    constexpr architecture_constants(double mem1_perf_ratio,
                                      double mem2_perf_ratio,
                                      double mem3_perf_ratio,
                                      size_t parallel_mi_cu,
                                      std::tuple<double, double, double> mem_bw_per_wg_coefficients,
                                      double mem_clock_ratio)  // Obtained through microbenchmarking
-        : num_xcds(num_xcds)
-        , mem1_perf_ratio(mem1_perf_ratio)
+        : mem1_perf_ratio(mem1_perf_ratio)
         , mem2_perf_ratio(mem2_perf_ratio)
         , mem3_perf_ratio(mem3_perf_ratio)
         , parallel_mi_cu(parallel_mi_cu)
         , mem_bw_per_wg_coefficients(mem_bw_per_wg_coefficients)
         , mem_clock_ratio(mem_clock_ratio) {}
   };
+
+  /**
+   * MALL value for those architectures that do not support it.
+   * The value '1000' is just a big number.
+   */
+  static constexpr double NO_MALL_AVAILABLE = 1.21875121875121875122 * 1000;
 
   /**
    * @brief Get architecture-specific constants for a given architecture.
@@ -108,28 +147,47 @@ class hardware_t {
   static constexpr architecture_constants get_arch_constants(architecture_t arch) {
     switch (arch) {
       case architecture_t::gfx90a:
-        return {1, 5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
+        return {5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
       case architecture_t::gfx942:
-        return {8, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
+        return {17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
       case architecture_t::gfx950:
-        return {8, 17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
+        return {17,
+                1.21875121875121875122 * 7,
+                6,
+                4,
+                std::make_tuple(-0.000013, 0.007070, 0.027355),
+                1.5};
       case architecture_t::gfx1201:
-        return {1, 5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
+        return {5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
       case architecture_t::gfx1100:
-        return {1, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5};
+        return {7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5};
+      case architecture_t::gfx1150:
+        // AMD Strix Point iGPU
+        return {1.497, NO_MALL_AVAILABLE, 0.077, 16, std::make_tuple(0, 0.18, 0), 1.5};
       case architecture_t::gfx1151:
-        return {1, 2.47, 1.21875121875121875122 * 0.93, 0.215, 2, std::make_tuple(0, 0.22, 0), 1.5};
-      default: return {0, 0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
+        // AMD Strix Halo iGPU
+        return {2.47, 1.21875121875121875122 * 0.93, 0.215, 2, std::make_tuple(0, 0.22, 0), 1.5};
+      case architecture_t::gfx1152:
+        // AMD Radeon 840M iGPU
+        return {0.849, NO_MALL_AVAILABLE, 0.096, 4, std::make_tuple(0, 0.13, 0), 1.5};
+      case architecture_t::gfx1153:
+        // AMD Radeon 820M iGPU
+        return {0.240, NO_MALL_AVAILABLE, 0.066, 2, std::make_tuple(0, 0.19, 0), 1.5};
+      case architecture_t::gfx1250:
+        // TODO: Update this, but for now using gfx950 values
+        return {17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
+      default: return {0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
     }
   }
 
   /**
    * @brief Map of matrix instruction latencies by architecture.
-   * 
+   *
    * Inline to prevent ODR violations when included in multiple shared libraries.
    * This ensures only one definition exists across all translation units. (PR#1862)
    */
-  static inline const std::unordered_map<architecture_t, std::unordered_map<matrix_instruction, size_t>>
+  static inline const std::unordered_map<architecture_t,
+                                         std::unordered_map<matrix_instruction, size_t>>
       INSTRUCTION_MAP = {
           // clang-format off
         {architecture_t::gfx90a,
@@ -343,31 +401,59 @@ class hardware_t {
         {architecture_t::gfx1100,
          {
              // F16
-             {matrix_instruction(16, 16, 16, data_type_t::Half), 32}, // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
-
+             {matrix_instruction(16, 16, 16, data_type_t::Half), 32},  // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
              // BF16
-             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32}, // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
-
+             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32},  // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
              // I8
-             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32}, // v_wmma_i32_16x16x16_iu8
-
+             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32},  // v_wmma_i32_16x16x16_iu8
              // I4
-             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16}, // v_wmma_i32_16x16x16_iu4
+             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16},  // v_wmma_i32_16x16x16_iu4
+         }},
+        {architecture_t::gfx1150,
+         {
+             // F16
+             {matrix_instruction(16, 16, 16, data_type_t::Half), 32},  // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
+             // BF16
+             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32},  // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
+             // I8
+             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32},  // v_wmma_i32_16x16x16_iu8
+             // I4
+             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16},  // v_wmma_i32_16x16x16_iu4
          }},
         {architecture_t::gfx1151,
          {
              // F16
-             {matrix_instruction(16, 16, 16, data_type_t::Half), 32}, // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
-
+             {matrix_instruction(16, 16, 16, data_type_t::Half), 32},  // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
              // BF16
-             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32}, // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
-
+             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32},  // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
              // I8
-             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32}, // v_wmma_i32_16x16x16_iu8
-
+             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32},  // v_wmma_i32_16x16x16_iu8
              // I4
-             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16}, // v_wmma_i32_16x16x16_iu4
-         }}};
+             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16},  // v_wmma_i32_16x16x16_iu4
+         }},
+        {architecture_t::gfx1152,
+         {
+             // F16
+             {matrix_instruction(16, 16, 16, data_type_t::Half), 32},  // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
+             // BF16
+             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32},  // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
+             // I8
+             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32},  // v_wmma_i32_16x16x16_iu8
+             // I4
+             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16},  // v_wmma_i32_16x16x16_iu4
+         }},
+        {architecture_t::gfx1153,
+         {
+             // F16
+             {matrix_instruction(16, 16, 16, data_type_t::Half), 32},  // v_wmma_f32_16x16x16_f16/v_wmma_f16_16x16x16_f16
+             // BF16
+             {matrix_instruction(16, 16, 16, data_type_t::BFloat16), 32},  // v_wmma_f32_16x16x16_bf16/v_wmma_bf16_16x16x16_bf16
+             // I8
+             {matrix_instruction(16, 16, 16, data_type_t::Int8), 32},  // v_wmma_i32_16x16x16_iu8
+             // I4
+             {matrix_instruction(16, 16, 16, data_type_t::Int4), 16},  // v_wmma_i32_16x16x16_iu4
+         }},
+      };
   // clang-format on
 
   architecture_t arch;  ///< GPU architecture type
@@ -412,6 +498,31 @@ class hardware_t {
              std::tuple<double, double, double> mem_bw_per_wg_coefficients);
 
   /**
+   * @brief Construct hardware_t using architecture constants and a clock frequency.
+   *
+   * Computes memory performance ratios from the provided architecture constants
+   * and compute clock, then delegates to the full constructor.
+   *
+   * @param arch GPU architecture type
+   * @param N_CU Number of compute units
+   * @param lds_capacity LDS capacity in bytes
+   * @param constants Architecture-specific constants
+   * @param num_xcds Number of XCDs — provided separately from constants so that
+   *                 it can come from a runtime query or a known-architecture table
+   * @param L2_capacity L2 cache capacity in bytes
+   * @param compute_clock_ghz Compute clock frequency in GHz
+   * @param memory_clock_ghz Memory clock frequency in GHz
+   */
+  hardware_t(architecture_t arch,
+             size_t N_CU,
+             size_t lds_capacity,
+             const architecture_constants& constants,
+             size_t num_xcds,
+             size_t L2_capacity,
+             double compute_clock_ghz,
+             double memory_clock_ghz);
+
+  /**
    * @brief Construct hardware_t from HIP device properties.
    *
    * Automatically determines architecture and extracts hardware parameters
@@ -431,11 +542,14 @@ class hardware_t {
   /**
    * @brief Create hardware_t instance from HIP device properties.
    *
-   *
    * @param properties HIP device properties structure
+   * @param num_xcds_override If non-zero, use this XCD count instead of
+   *                          the hardcoded default. Passed by
+   *                          get_hardware_for_device() after a runtime query.
    * @return hardware_t Configured hardware instance
    */
-  static hardware_t get_hardware_for_properties(hipDeviceProp_t properties);
+  static hardware_t get_hardware_for_properties(hipDeviceProp_t properties,
+                                                size_t num_xcds_override = 0);
 
   /**
    * @brief Create hardware_t instance for a specific HIP device.
@@ -447,6 +561,41 @@ class hardware_t {
    * @return hardware_t Configured hardware instance for the device
    */
   static hardware_t get_hardware_for_device(int deviceId);
+
+  /**
+   * @brief Create hardware_t instance for a specific architecture with specified parameters.
+   *
+   * Creates a hardware instance using the specified architecture and hardware parameters.
+   * Useful for analytical modeling when actual hardware is not available.
+   *
+   * @param arch Architecture enum value
+   * @param N_CU Number of compute units
+   * @param lds_capacity LDS capacity in bytes
+   * @param L2_capacity L2 cache capacity in bytes
+   * @param compute_clock_khz Compute clock in KHz
+   * @return hardware_t Configured hardware instance
+   * @throws std::runtime_error if architecture is not supported
+   */
+  static hardware_t get_hardware_for_arch(architecture_t arch,
+                                          size_t N_CU,
+                                          size_t lds_capacity,
+                                          size_t L2_capacity,
+                                          int compute_clock_khz);
+
+  /**
+   * @brief Get the default (hardcoded) XCD count for a known architecture.
+   *
+   * Legacy fallback table for architectures that predate the runtime XCC
+   * query (hipDeviceAttributeNumberOfXccs, HIP 7.0+). Do NOT add new
+   * architectures here — new hardware should rely solely on the runtime
+   * query via get_hardware_for_device(). Throws for architectures not in
+   * the table.
+   *
+   * @param arch Architecture enum value
+   * @return Number of XCDs for the architecture
+   * @throws std::runtime_error if the architecture has no hardcoded default
+   */
+  static size_t get_default_num_xcds(architecture_t arch);
 
   /**
    * @brief Check if the hardware described by properties is supported.
@@ -476,6 +625,37 @@ class hardware_t {
    * @return size_t Instruction latency in cycles, or 0 if not found
    */
   size_t get_mi_latency(size_t MI_M, size_t MI_N, size_t MI_K, data_type_t mi_input_type) const;
+
+  /**
+   * @brief Get valid matrix instruction dimensions for a given datatype.
+   *
+   * Returns a list of valid matrix instruction dimensions (M, N, K) for
+   * the specified datatype on the current hardware architecture. Multiple
+   * dimensions may be available for the same datatype.
+   *
+   * @param mi_input_type Input data type for the matrix instruction
+   * @return std::vector<dim3_t> List of valid dimensions for the datatype
+   */
+  std::vector<dim3_t> get_valid_matrix_instructions(data_type_t mi_input_type) const;
+
+  /**
+   * @brief Get recommended matrix instruction dimensions for a given datatype.
+   *
+   * Returns the single best matrix instruction dimension for the specified datatype
+   * based on throughput (M*N*K/latency). If multiple instructions are available,
+   * returns the one with the highest throughput.
+   *
+   * @param mi_input_type Input data type for the matrix instruction
+   * @return dim3_t Recommended dimension for the datatype. Returns {0,0,0} if not supported.
+   */
+  dim3_t get_recommended_matrix_instruction(data_type_t mi_input_type) const;
+
+  /**
+   * @brief Check if the architecture has MALL (Memory Attached Last Level).
+   *
+   * @return true if the architecture has MALL, false otherwise
+   */
+  bool has_MALL() const;
 
  private:
   /**

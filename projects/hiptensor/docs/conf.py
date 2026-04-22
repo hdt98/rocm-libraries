@@ -2,7 +2,7 @@
  #
  # MIT License
  #
- # Copyright (C) 2023-2025 Advanced Micro Devices, Inc. All rights reserved.
+ # Copyright (C) 2023-2026 Advanced Micro Devices, Inc. All rights reserved.
  #
  # Permission is hereby granted, free of charge, to any person obtaining a copy
  # of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,7 @@ import re
 from rocm_docs import ROCmDocs
 
 with open('../CMakeLists.txt', encoding='utf-8') as f:
-    match = re.search(r'.*\bset \( VERSION_STRING\s+\"?([0-9.]+)[^0-9.]+', f.read())
+    match = re.search(r'.*\bset\s*\(\s*VERSION_STRING\s+\"?([0-9.]+)[^0-9.]+', f.read())
     if not match:
         raise ValueError("VERSION not found!")
     version_number = match[1]

@@ -29,8 +29,12 @@
 #include <hipblaslt/hipblaslt.h>
 #include <stdint.h>
 
+#include <string_view>
+#include <vector>
+
 #ifdef HIPBLASLT_USE_ROCROLLER
 std::vector<float> generateMXInput(hipDataType                dataType,
+                                   hipDataType                scaleType,
                                    void*                      data,
                                    void*                      scale,
                                    uint64_t                   row,
@@ -38,6 +42,7 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                    uint64_t                   stride,
                                    bool                       isTranspose,
                                    const std::vector<size_t>& preSwizzleTile,
+                                   const std::vector<size_t>& preTile,
                                    int const                  scaleBlockRowSize,
                                    int const                  scaleBlockColSize,
                                    bool                       isMatrixA,

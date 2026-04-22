@@ -16,6 +16,9 @@
 #include "ck/host_utility/device_prop.hpp"
 #include "ck/host_utility/kernel_launch.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck {
 template <typename GridwiseGemm,
           typename ReduceTrait,
@@ -188,7 +191,10 @@ struct DeviceGemmBiasAddReduce_Wmma_CShuffleV3
         ComputeTypeA,
         ComputeTypeB,
         PermuteA,
-        PermuteB>;
+        PermuteB,
+        false, // IsBPreShuffled
+        false, // ForceThreadTileTransfer
+        true>; // IsFusedKernel
 
     using ReduceTrait = ReduceTrait_<ReduceAccDataType,
                                      ReducePtrsGlobal,
@@ -468,6 +474,28 @@ struct DeviceGemmBiasAddReduce_Wmma_CShuffleV3
             return false;
         }
 
+        if(ck::is_gfx12_supported() &&
+           !GridwiseGemm::CheckValidityAWaveTransfer(arg.MRaw_, arg.KRaw_))
+        {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Wave Transfer not applicable for matrix A" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
+            return false;
+        }
+
+        if(ck::is_gfx12_supported() &&
+           !GridwiseGemm::CheckValidityBWaveTransfer(arg.NRaw_, arg.KRaw_))
+        {
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "Wave Transfer not applicable for matrix B" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
+            }
+            return false;
+        }
+
         typename GridwiseGemm::Argument gemm_arg{
             std::array<const void*, 1>{arg.p_a_grid_},
             std::array<const void*, 1>{arg.p_b_grid_},
@@ -680,3 +708,4 @@ struct DeviceGemmBiasAddReduce_Wmma_CShuffleV3
 } // namespace device
 } // namespace tensor_operation
 } // namespace ck
+#pragma clang diagnostic pop

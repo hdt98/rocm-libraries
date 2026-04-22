@@ -29,6 +29,7 @@
 #include <miopen/errors.hpp>
 #include <miopen/generic_search.hpp>
 #include <miopen/any_solver.hpp>
+#include <miopen/solver/ck_impl_lib_loader.hpp>
 
 #include "unit_conv_solver.hpp"
 
@@ -49,10 +50,10 @@ class ConvAttrFp16AltScopedSetter
 {
 public:
     ConvAttrFp16AltScopedSetter() noexcept {}
-    ConvAttrFp16AltScopedSetter(const ConvAttrFp16AltScopedSetter&) = delete;
-    ConvAttrFp16AltScopedSetter(ConvAttrFp16AltScopedSetter&&)      = delete;
+    ConvAttrFp16AltScopedSetter(const ConvAttrFp16AltScopedSetter&)            = delete;
+    ConvAttrFp16AltScopedSetter(ConvAttrFp16AltScopedSetter&&)                 = delete;
     ConvAttrFp16AltScopedSetter& operator=(const ConvAttrFp16AltScopedSetter&) = delete;
-    ConvAttrFp16AltScopedSetter& operator=(ConvAttrFp16AltScopedSetter&&) = delete;
+    ConvAttrFp16AltScopedSetter& operator=(ConvAttrFp16AltScopedSetter&&)      = delete;
 
     ~ConvAttrFp16AltScopedSetter()
     {
@@ -272,7 +273,8 @@ UnitTestConvSolverParams::UnitTestConvSolverParams(Gpu supported_devs_)
       use_cpu_ref(false),
       use_gpu_ref(false),
       tunable(false),
-      check_xnack_disabled(false)
+      check_xnack_disabled(false),
+      uses_ck_dynamic_lib(false)
 {
 }
 
@@ -288,11 +290,18 @@ void UnitTestConvSolverParams::Tunable(std::size_t iterations_max_)
 
 void UnitTestConvSolverParams::CheckXnackDisabled() { check_xnack_disabled = true; }
 
+void UnitTestConvSolverParams::UsesCKDynamicLib() { uses_ck_dynamic_lib = true; }
+
 void UnitTestConvSolverParams::SetConvAttrFp16Alt(uint64_t value) { conv_attr_fp16_alt = value; }
 
 void UnitTestConvSolverParams::SetTolerance(Gpu gpu, miopenDataType_t type, float value)
 {
     tolerances.Set(gpu, type, value);
+}
+
+void UnitTestConvSolverParams::ExcludeDevice(std::string_view name)
+{
+    excluded_devices.emplace(name);
 }
 
 std::ostream& operator<<(std::ostream& os, const UnitTestConvSolverParams& p)
@@ -341,10 +350,18 @@ miopen::solver::ConvSolution FindSolution(const miopen::solver::conv::ConvSolver
 template <typename T>
 double GetThreshold(miopenConvAlgorithm_t algo,
                     miopen::conv::Direction direction,
-                    const Tolerances& tolerances)
+                    const Tolerances& tolerances,
+                    const bool use_tf32_compute)
 {
     double tolerance = tolerances.Get(GetDevGpuType(), miopen_type<T>{});
     double threshold = std::numeric_limits<T>::epsilon() * tolerance;
+    if constexpr(std::is_same_v<T, float>)
+    {
+        if(use_tf32_compute)
+        {
+            threshold = std::numeric_limits<half_float::half>::epsilon() * tolerance;
+        }
+    }
     return threshold;
 }
 
@@ -353,7 +370,8 @@ void VerifyData(const std::vector<T>& data,
                 const std::vector<Tref>& ref_data,
                 miopenConvAlgorithm_t algo,
                 miopen::conv::Direction direction,
-                const Tolerances& tolerances)
+                const Tolerances& tolerances,
+                bool use_tf32_compute = false)
 {
     ASSERT_FALSE(miopen::range_zero(ref_data)) << "Reference data is all zeros";
     if constexpr(!std::is_integral_v<T>)
@@ -380,7 +398,7 @@ void VerifyData(const std::vector<T>& data,
     else
     {
         const auto error       = miopen::rms_range(ref_data, data);
-        const double threshold = GetThreshold<T>(algo, direction, tolerances);
+        const double threshold = GetThreshold<T>(algo, direction, tolerances, use_tf32_compute);
         ASSERT_LT(error, threshold) << "Error beyond tolerance";
         // std::cout << "error: " << error << " threshold: " << threshold << std::endl;
     }
@@ -436,8 +454,17 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
     const auto ctx = [&] {
         auto tmp = miopen::ExecutionContext{&handle};
         problem.SetupFloats(tmp);
-        return tmp;
+        problem.SetupComputeType(tmp);
+        return std::move(tmp);
     }();
+
+    auto device_name = ctx.GetStream().GetDeviceName();
+    if(!(miopen::StartsWith(device_name, "gfx942") || miopen::StartsWith(device_name, "gfx950")) &&
+       conv_config.GetXDataType() == miopenFloat &&
+       conv_config.GetConv().GetMathType() == miopenMathDefault)
+    {
+        GTEST_SKIP() << "TF32 test is not supported on this device";
+    }
 
     if(!solv.IsApplicable(ctx, problem))
     {
@@ -494,8 +521,12 @@ void RunSolverFwd(const miopen::solver::conv::ConvSolverInterface& solv,
 
     output.data = handle.Read<Tout>(out_dev, output.data.size());
 
-    VerifyData(
-        output.data, ref_out.data, algo, miopen::conv::Direction::Forward, params.tolerances);
+    VerifyData(output.data,
+               ref_out.data,
+               algo,
+               miopen::conv::Direction::Forward,
+               params.tolerances,
+               problem.UseTF32());
 }
 
 template <typename T, typename Tref>
@@ -557,7 +588,8 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
     const auto ctx = [&] {
         auto tmp = miopen::ExecutionContext{&handle};
         problem.SetupFloats(tmp);
-        return tmp;
+        problem.SetupComputeType(tmp);
+        return std::move(tmp);
     }();
 
     if(!solv.IsApplicable(ctx, problem))
@@ -615,8 +647,12 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
 
     input.data = handle.Read<Tin>(in_dev, input.data.size());
 
-    VerifyData(
-        input.data, ref_in.data, algo, miopen::conv::Direction::BackwardData, params.tolerances);
+    VerifyData(input.data,
+               ref_in.data,
+               algo,
+               miopen::conv::Direction::BackwardData,
+               params.tolerances,
+               problem.UseTF32());
 }
 
 template <typename T, typename Tref>
@@ -678,7 +714,8 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
     const auto ctx = [&] {
         auto tmp = miopen::ExecutionContext{&handle};
         problem.SetupFloats(tmp);
-        return tmp;
+        problem.SetupComputeType(tmp);
+        return std::move(tmp);
     }();
 
     if(!solv.IsApplicable(ctx, problem))
@@ -740,7 +777,8 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
                ref_weights.data,
                algo,
                miopen::conv::Direction::BackwardWeights,
-               params.tolerances);
+               params.tolerances,
+               problem.UseTF32());
 }
 
 template <typename T, typename Tref>
@@ -825,6 +863,10 @@ void UnitTestConvSolverBase::SetUpImpl(const UnitTestConvSolverParams& params)
     {
         GTEST_SKIP();
     }
+    else if(params.excluded_devices.count(get_handle().GetDeviceName()) > 0)
+    {
+        GTEST_SKIP();
+    }
     else if(params.check_xnack_disabled && get_handle_xnack())
     {
         GTEST_SKIP();
@@ -863,13 +905,15 @@ void UnitTestConvSolverDevApplicabilityBase::RunTestImpl(
     const auto all_known_devs = GetAllKnownDevices();
     for(const auto& [dev, dev_descr] : all_known_devs)
     {
-        const auto supported = IsDeviceSupported(params.supported_devs, dev);
+        const auto supported = IsDeviceSupported(params.supported_devs, dev) &&
+                               params.excluded_devices.count(dev_descr.name) == 0;
         // std::cout << "Test " << dev_descr << " (supported: " << supported << ")" << std::endl;
 
         auto handle    = MockHandle{dev_descr, params.check_xnack_disabled};
         const auto ctx = [&] {
             auto tmp = miopen::ExecutionContext{&handle};
             problem.SetupFloats(tmp);
+            problem.SetupComputeType(tmp);
             return tmp;
         }();
 
@@ -877,6 +921,15 @@ void UnitTestConvSolverDevApplicabilityBase::RunTestImpl(
         // std::cout << "IsApplicable: " << is_applicable << std::endl;
         if(is_applicable != supported)
         {
+            // If the solver uses CK dynamic libraries and the library for this
+            // device wasn't built, the solver correctly reports not-applicable.
+            if(params.uses_ck_dynamic_lib && supported && !is_applicable)
+            {
+                const auto& loader =
+                    miopen::solver::CkImplLibLoader::Get(std::string(dev_descr.name));
+                if(!loader.IsLoaded())
+                    continue;
+            }
             GTEST_FAIL() << dev_descr << " is" << (is_applicable ? "" : " not")
                          << " applicable for " << solver.SolverDbId() << " but "
                          << (supported ? "" : "not ") << "marked as supported";
