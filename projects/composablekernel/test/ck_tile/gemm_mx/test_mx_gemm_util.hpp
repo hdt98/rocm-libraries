@@ -10,6 +10,7 @@
 #include "ck_tile/host/check_err.hpp"
 #include "ck_tile/host/reference/reference_gemm.hpp"
 #include "ck_tile/host/tensor_shuffle_utils.hpp"
+#include "ck_tile/host/mx_processing.hpp"
 #include "test_mx_gemm_config.hpp"
 #include "test_mx_gemm_instance.hpp"
 
@@ -31,115 +32,6 @@ auto calculate_rtol_atol_mx(ck_tile::index_t K, float max_accumulated_value)
     return ck_tile::make_tuple(rtol, atol);
 }
 
-template <typename GemmConfig>
-struct TestMXGemmArchTraits
-{
-    template <bool KLast, typename dtype>
-    static auto preShuffleScale(ck_tile::HostTensor<dtype>& src)
-    {
-        auto src_lengths = src.get_lengths();
-        const auto MN    = KLast ? src_lengths[0] : src_lengths[1];
-        const auto K     = KLast ? src_lengths[1] : src_lengths[0];
-
-        constexpr std::size_t MNXdlPack   = 2;
-        constexpr std::size_t KXdlPack    = 2;
-        constexpr std::size_t XdlMNThread = GemmConfig::N_Warp_Tile;
-        constexpr std::size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread;
-
-        const auto MNPadded = ck_tile::integer_least_multiple(MN, XdlMNThread * MNXdlPack);
-        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor(
-            {static_cast<std::size_t>(MNPadded * K)}, {static_cast<std::size_t>(1)}));
-
-        const std::size_t K0 = K / KXdlPack / XdlKThread;
-
-        for(std::size_t n = 0; n < static_cast<std::size_t>(MNPadded); ++n)
-        {
-            for(std::size_t k = 0; k < static_cast<std::size_t>(K); ++k)
-            {
-                const auto n0    = n / (XdlMNThread * MNXdlPack);
-                const auto tempn = n % (XdlMNThread * MNXdlPack);
-                const auto n1    = tempn % XdlMNThread;
-                const auto n2    = tempn / XdlMNThread;
-
-                const auto k0    = k / (XdlKThread * KXdlPack);
-                const auto tempk = k % (XdlKThread * KXdlPack);
-                const auto k1    = tempk % XdlKThread;
-                const auto k2    = tempk / XdlKThread;
-
-                const auto outputIndex = n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
-                                         k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
-                                         k1 * MNXdlPack * KXdlPack * XdlMNThread +
-                                         n1 * MNXdlPack * KXdlPack + k2 * MNXdlPack + n2;
-
-                if constexpr(KLast)
-                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
-                else
-                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(k, n) : dtype{};
-            }
-        }
-
-        return shuffled;
-    }
-
-    template <bool KLast, typename dtype>
-    static auto preShuffleScalePermuteN(const ck_tile::HostTensor<dtype>& src)
-    {
-        auto src_lengths = src.get_lengths();
-        const auto MN    = KLast ? src_lengths[0] : src_lengths[1];
-        const auto K     = KLast ? src_lengths[1] : src_lengths[0];
-
-        constexpr std::size_t MNXdlPack   = 2;
-        constexpr std::size_t KXdlPack    = 2;
-        constexpr std::size_t XdlMNThread = GemmConfig::N_Warp_Tile;
-        constexpr std::size_t NPerBlock   = GemmConfig::N_Tile;
-        constexpr std::size_t NWarp       = GemmConfig::N_Warp;
-        constexpr std::size_t NRepeat     = NPerBlock / NWarp / XdlMNThread;
-        constexpr std::size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread; // 4
-
-        const auto MNPadded = ck_tile::integer_least_multiple(MN, NPerBlock);
-        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor(
-            {static_cast<std::size_t>(MNPadded * K)}, {static_cast<std::size_t>(1)}));
-
-        const std::size_t K0 = K / KXdlPack / XdlKThread;
-
-        for(std::size_t n = 0; n < static_cast<std::size_t>(MNPadded); ++n)
-        {
-            for(std::size_t k = 0; k < static_cast<std::size_t>(K); ++k)
-            {
-                const auto n0     = n / NPerBlock;
-                const auto tempn0 = n % NPerBlock;
-                const auto n1     = tempn0 / (XdlMNThread * NRepeat);
-                const auto tempn1 = tempn0 % (XdlMNThread * NRepeat);
-                const auto n2     = tempn1 / (NRepeat);
-                const auto tempn2 = tempn1 % (NRepeat);
-                const auto n3     = tempn2 % MNXdlPack;
-                const auto n4     = tempn2 / MNXdlPack;
-
-                const auto k0    = k / (XdlKThread * KXdlPack);
-                const auto tempk = k % (XdlKThread * KXdlPack);
-                const auto k1    = tempk % XdlKThread;
-                const auto k2    = tempk / XdlKThread;
-
-                const auto outputIndex =
-                    n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp *
-                        (NRepeat / MNXdlPack) +
-                    n1 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
-                    n2 * MNXdlPack * KXdlPack +
-                    k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
-                    k1 * MNXdlPack * KXdlPack * XdlMNThread + k2 * MNXdlPack +
-                    n4 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp + n3;
-
-                if constexpr(KLast)
-                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
-                else
-                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(k, n) : dtype{};
-            }
-        }
-
-        return shuffled;
-    }
-};
-
 template <typename Tuple>
 class TestMxGemmUtil : public ::testing::Test
 {
@@ -157,56 +49,7 @@ class TestMxGemmUtil : public ::testing::Test
     using ScaleM      = ck_tile::MXScalePointer<ScaleType, 1, 32>;
     using ScaleN      = ck_tile::MXScalePointer<ScaleType, 1, 32>;
 
-    // Pack [MN, K/32] e8m0_t scales into [MN/MNPack, K/32/KPack] int32_t
-    // Each int32_t contains MNPack * KPack e8m0_t values with byte layout matching
-    // the GPU tile distribution: values are XdlMNThread apart in M and XdlKThread apart in K.
-    //   byte[ik * MNPack + imn] = e8m0 at strided (mn, k) position
-    // kLast=true for A scales (layout [M, K/32]), kLast=false for B scales (layout [K/32, N])
-    template <ck_tile::index_t MNPack      = 2,
-              ck_tile::index_t KPack       = 2,
-              ck_tile::index_t XdlMNThread = 16,
-              ck_tile::index_t XdlKThread  = 4>
-    static auto packScalesMNxK(const ck_tile::HostTensor<ck_tile::e8m0_t>& src, bool kLast)
-    {
-        auto src_lengths                 = src.get_lengths();
-        const ck_tile::index_t MN        = kLast ? src_lengths[0] : src_lengths[1];
-        const ck_tile::index_t K_scale   = kLast ? src_lengths[1] : src_lengths[0];
-        const ck_tile::index_t MN_packed = MN / MNPack;
-        const ck_tile::index_t K_packed  = K_scale / KPack;
-        ck_tile::HostTensor<int32_t> packed(ck_tile::HostTensorDescriptor(
-            {static_cast<std::size_t>(MN_packed), static_cast<std::size_t>(K_packed)},
-            {static_cast<std::size_t>(K_packed), static_cast<std::size_t>(1)}));
-
-        for(ck_tile::index_t packed_mn = 0; packed_mn < MN_packed; packed_mn++)
-        {
-            for(ck_tile::index_t packed_k = 0; packed_k < K_packed; packed_k++)
-            {
-                int32_t val               = 0;
-                ck_tile::index_t mn_lane  = packed_mn % XdlMNThread;
-                ck_tile::index_t mn_group = packed_mn / XdlMNThread;
-                ck_tile::index_t k_lane   = packed_k % XdlKThread;
-                ck_tile::index_t k_group  = packed_k / XdlKThread;
-                for(ck_tile::index_t ik = 0; ik < KPack; ik++)
-                {
-                    for(ck_tile::index_t imn = 0; imn < MNPack; imn++)
-                    {
-                        ck_tile::index_t byteIdx = ik * MNPack + imn;
-                        ck_tile::index_t orig_mn =
-                            mn_group * XdlMNThread * MNPack + imn * XdlMNThread + mn_lane;
-                        ck_tile::index_t orig_k =
-                            k_group * XdlKThread * KPack + ik * XdlKThread + k_lane;
-
-                        ck_tile::e8m0_t v = kLast ? src(orig_mn, orig_k) : src(orig_k, orig_mn);
-                        val |= (static_cast<int32_t>(v.get()) << (byteIdx * 8));
-                    }
-                }
-                packed(packed_mn, packed_k) = val;
-            }
-        }
-        return packed;
-    }
-
-    void Run(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K, int seed = 1234)
+    void Run(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K)
     {
         const ck_tile::index_t scale_k_size = K / 32;
         const ck_tile::index_t stride_A =
@@ -231,10 +74,23 @@ class TestMxGemmUtil : public ::testing::Test
         ck_tile::HostTensor<ScaleType> scale_b_host(ck_tile::host_tensor_descriptor(
             scale_k_size, N, stride_scale_b, is_row_major(BLayout{})));
 
-        ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f, seed++}(a_host);
-        ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f, seed++}(b_host);
-        ck_tile::FillUniformDistribution<ScaleType>{0.001f, 10.f, seed++}(scale_a_host);
-        ck_tile::FillUniformDistribution<ScaleType>{0.001f, 10.f, seed++}(scale_b_host);
+        std::mt19937 gen(42);
+        std::uniform_int_distribution<std::uint32_t> fill_seed(0, 500);
+
+        auto gen_scales = [&](auto& scales, float range_min, float range_max) {
+            // e8m0_t is basically an exponent of float32
+            ck_tile::HostTensor<float> pow2(scales.get_lengths());
+            ck_tile::FillUniformDistributionIntegerValue<float>{
+                range_min, range_max, fill_seed(gen)}(pow2);
+            scales.ForEach([&](auto& self, const auto& i) {
+                self(i) = static_cast<ScaleType>(std::exp2(pow2(i)));
+            });
+        };
+
+        ck_tile::FillUniformDistribution<ADataType>{-2.f, 2.f, fill_seed(gen)}(a_host);
+        ck_tile::FillUniformDistribution<BDataType>{-2.f, 2.f, fill_seed(gen)}(b_host);
+        gen_scales(scale_a_host, -2, 2);
+        gen_scales(scale_b_host, -2, 2);
 
         // Compute effective XdlPack sizes based on GemmConfig tile dimensions
         constexpr ck_tile::index_t MPerXdl = GemmConfig::M_Warp_Tile;
@@ -258,9 +114,11 @@ class TestMxGemmUtil : public ::testing::Test
 
         // Pack scales into int32_t for GPU consumption
         auto scale_a_packed =
-            packScalesMNxK<MXdlPackEff, KXdlPackEff, XdlMNThread, XdlKThread>(scale_a_host, true);
+            ck_tile::packScalesMNxK<MXdlPackEff, KXdlPackEff, XdlMNThread, XdlKThread>(scale_a_host,
+                                                                                       true);
         auto scale_b_packed =
-            packScalesMNxK<NXdlPackEff, KXdlPackEff, XdlMNThread, XdlKThread>(scale_b_host, false);
+            ck_tile::packScalesMNxK<NXdlPackEff, KXdlPackEff, XdlMNThread, XdlKThread>(scale_b_host,
+                                                                                       false);
 
         const auto b_host_for_device = [&]() {
             if constexpr(GemmConfig::Preshuffle)
@@ -274,20 +132,22 @@ class TestMxGemmUtil : public ::testing::Test
 
         const auto scale_a_host_for_device = [&]() {
             if constexpr(GemmConfig::Preshuffle)
-                return TestMXGemmArchTraits<GemmConfig>::template preShuffleScale<true>(
-                    scale_a_host);
+                return ck_tile::preShuffleScale<GemmConfig::N_Warp_Tile>(scale_a_host, true);
             else
                 return scale_a_packed;
         }();
 
+        constexpr ck_tile::index_t XdlNThread = GemmConfig::N_Warp_Tile;
+        constexpr ck_tile::index_t NPerBlock  = GemmConfig::N_Tile;
+        constexpr ck_tile::index_t NWarp      = GemmConfig::N_Warp;
+
         const auto scale_b_host_for_device = [&]() {
             if constexpr(GemmConfig::Preshuffle)
                 if constexpr(GemmConfig::TiledMMAPermuteN)
-                    return TestMXGemmArchTraits<GemmConfig>::template preShuffleScalePermuteN<
-                        false>(scale_b_host);
+                    return ck_tile::preShuffleScalePermuteN<NWarp, NPerBlock, XdlNThread>(
+                        scale_b_host, false);
                 else
-                    return TestMXGemmArchTraits<GemmConfig>::template preShuffleScale<false>(
-                        scale_b_host);
+                    return ck_tile::preShuffleScale<XdlNThread>(scale_b_host, false);
             else
                 return scale_b_packed;
         }();
