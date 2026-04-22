@@ -1752,6 +1752,15 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
         {
             return false;
         }
+        // NoShuffle epilogue (ScalarPerVector==1) uses XDL-specific VGPR-to-global mapping
+        // that is incompatible with WMMA (gfx11/gfx12). Reject on non-CDNA architectures.
+        if constexpr(CDEBlockTransferScalarPerVector_NPerBlock == 1)
+        {
+            if(ck::is_gfx11_supported() || ck::is_gfx12_supported())
+            {
+                return false;
+            }
+        }
         if(!is_bf16_atomic_supported() && std::is_same_v<EDataType, ck::bhalf_t> &&
            arg.k_batch_ > 1)
         {
