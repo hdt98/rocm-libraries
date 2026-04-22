@@ -5,6 +5,10 @@ Documentation for rocFFT is available at
 
 ## (Unreleased) rocFFT 1.0.37
 
+### Added
+
+* Support for the gfx90c architecture.
+
 ### Optimized
 
 * Allow plans to share hipModules if they use the same kernels.  This reduces time spent and memory used when

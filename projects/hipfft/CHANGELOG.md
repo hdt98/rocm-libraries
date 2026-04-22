@@ -35,6 +35,7 @@ Documentation for hipFFT is available at
 
 ### Added
 * Support for gfx1150 architecture.
+* Support for the gfx90c architecture.
 
 ### Resolved issues
 

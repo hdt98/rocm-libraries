@@ -96,6 +96,7 @@ static std::string get_arch_name(const hipDeviceProp_t& prop)
                                                        "gfx906",
                                                        "gfx908",
                                                        "gfx90a",
+                                                       "gfx90c",
                                                        "gfx942",
                                                        "gfx1030",
                                                        "gfx1100",
