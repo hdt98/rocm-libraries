@@ -33,7 +33,8 @@ template <typename IndexType_,
           bool LocalExpertMasking_, // used in EP case
           bool LocalToken_,         // used in EP case
           bool SkipExpertsWithZeroTokens_ = true,
-          index_t ExpertTile_             = 0>
+          index_t ExpertTile_             = 0,
+          index_t LaneGroupSize_          = 8>
 struct MoeSortingProblemEx
 {
     // TODO: this kernel only support warp per row
@@ -48,7 +49,8 @@ struct MoeSortingProblemEx
     static constexpr bool LocalToken                = LocalToken_;
     static constexpr bool SkipExpertsWithZeroTokens = SkipExpertsWithZeroTokens_;
     static_assert(SubTokenTile == 1 || SubTokenTile == 2 || SubTokenTile == 4 || SubTokenTile == 8);
-    static constexpr index_t ExpertTile = ExpertTile_; // TODO: only used in store out
+    static constexpr index_t ExpertTile    = ExpertTile_; // TODO: only used in store out
+    static constexpr index_t LaneGroupSize = LaneGroupSize_;
 };
 
 template <typename IndexType_,
