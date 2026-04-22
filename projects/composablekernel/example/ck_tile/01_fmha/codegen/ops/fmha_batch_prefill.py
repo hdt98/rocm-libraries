@@ -844,7 +844,13 @@ class CompatibilityRuleFactory:
                 return False
             return True
 
-        return [check_mode, check_hdim, check_feature]
+        # batch_prefill pipeline requires group mode (static_assert in pipeline problem)
+        def check_group_mode_required(
+            problem_ctx: ProblemContext, kernel_ctx: KernelContext
+        ) -> bool:
+            return problem_ctx.mode == "group"
+
+        return [check_group_mode_required, check_mode, check_hdim, check_feature]
 
 
 class CompatibilityRuleFactoryGfx9(CompatibilityRuleFactory):
