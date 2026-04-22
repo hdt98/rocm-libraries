@@ -5,11 +5,13 @@
 
 // TODO: Remove this block after June 22, 2026 when C++17 support is dropped.
 #if __cplusplus < 202002L
-#  if defined(__clang__) || defined(__GNUC__)
-#    pragma message "CK: C++17 support ends June 22, 2026. Migrate to C++20 (-std=c++20 / CMake CXX_STANDARD 20)."
-#  elif defined(_MSC_VER)
-#    pragma message("CK: C++17 support ends June 22, 2026. Migrate to C++20 (/std:c++20 / CMake CXX_STANDARD 20).")
-#  endif
+#if defined(__clang__) || defined(__GNUC__)
+#pragma message \
+    "CK: C++17 support ends June 22, 2026. Migrate to C++20 (-std=c++20 / CMake CXX_STANDARD 20)."
+#elif defined(_MSC_VER)
+#pragma message( \
+    "CK: C++17 support ends June 22, 2026. Migrate to C++20 (/std:c++20 / CMake CXX_STANDARD 20).")
+#endif
 #endif
 
 #include "ck/config.h"
