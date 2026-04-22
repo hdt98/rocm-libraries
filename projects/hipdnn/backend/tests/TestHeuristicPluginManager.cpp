@@ -77,7 +77,8 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsFromNonexistentDirectorySucceeds)
 {
     HeuristicPluginManager manager;
 
-    const std::filesystem::path nonexistentDir = "/nonexistent/path/to/plugins";
+    const std::filesystem::path nonexistentDir
+        = std::filesystem::temp_directory_path() / "nonexistent_path_to_plugins";
 
     // Should not throw - just logs warning and continues
     EXPECT_NO_THROW(manager.loadPlugins({nonexistentDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
@@ -87,7 +88,10 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithMultiplePathsSucceeds)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths = {"/tmp/path1", "/tmp/path2", "/tmp/path3"};
+    const std::set<std::filesystem::path> paths
+        = {std::filesystem::temp_directory_path() / "path1",
+           std::filesystem::temp_directory_path() / "path2",
+           std::filesystem::temp_directory_path() / "path3"};
 
     // Should not throw
     EXPECT_NO_THROW(manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
@@ -114,7 +118,8 @@ TEST_F(TestHeuristicPluginManager, MultipleLoadCyclesSucceed)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths = {"/tmp/test_plugins"};
+    const std::set<std::filesystem::path> paths
+        = {std::filesystem::temp_directory_path() / "test_plugins"};
 
     // Load multiple times
     for(int i = 0; i < 5; ++i)
@@ -128,10 +133,12 @@ TEST_F(TestHeuristicPluginManager, LoadingDifferentPathsSucceeds)
     HeuristicPluginManager manager;
 
     // Load from path 1
-    EXPECT_NO_THROW(manager.loadPlugins({"/tmp/path1"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    EXPECT_NO_THROW(manager.loadPlugins({std::filesystem::temp_directory_path() / "path1"},
+                                        HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 
     // Load from path 2
-    EXPECT_NO_THROW(manager.loadPlugins({"/tmp/path2"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    EXPECT_NO_THROW(manager.loadPlugins({std::filesystem::temp_directory_path() / "path2"},
+                                        HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 }
 
 // ========== Thread Safety Tests ==========
@@ -142,8 +149,10 @@ TEST_F(TestHeuristicPluginManager, MultipleInstancesAreIndependent)
     HeuristicPluginManager manager2;
 
     // Load different paths
-    manager1.loadPlugins({"/tmp/path1"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-    manager2.loadPlugins({"/tmp/path2"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    manager1.loadPlugins({std::filesystem::temp_directory_path() / "path1"},
+                         HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    manager2.loadPlugins({std::filesystem::temp_directory_path() / "path2"},
+                         HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     // Both should work independently
     SUCCEED();
@@ -165,7 +174,7 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithSamePathTwiceSucceeds)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths = {"/tmp/test"};
+    const std::set<std::filesystem::path> paths = {std::filesystem::temp_directory_path() / "test"};
 
     // Set automatically handles duplicates, but test that loading twice works
     manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
@@ -178,7 +187,8 @@ TEST_F(TestHeuristicPluginManager, DestructorCleansUpResources)
 {
     {
         HeuristicPluginManager manager;
-        manager.loadPlugins({"/tmp/test"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+        manager.loadPlugins({std::filesystem::temp_directory_path() / "test"},
+                            HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     } // manager destroyed here
 
     // If we get here without crashes, cleanup succeeded
@@ -190,7 +200,8 @@ TEST_F(TestHeuristicPluginManager, MultipleDestructionsSucceed)
     for(int i = 0; i < 10; ++i)
     {
         HeuristicPluginManager manager;
-        manager.loadPlugins({"/tmp/test"}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+        manager.loadPlugins({std::filesystem::temp_directory_path() / "test"},
+                            HIPDNN_PLUGIN_LOADING_ABSOLUTE);
         // Destroyed at end of loop
     }
 
@@ -356,7 +367,8 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithNonexistentPathSucceeds)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths = {"/nonexistent/path/to/plugins"};
+    const std::set<std::filesystem::path> paths
+        = {std::filesystem::temp_directory_path() / "nonexistent_path_to_plugins"};
     EXPECT_NO_THROW(manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 }
 
@@ -364,8 +376,10 @@ TEST_F(TestHeuristicPluginManager, MultipleLoadCallsSucceed)
 {
     HeuristicPluginManager manager;
 
-    const std::set<std::filesystem::path> paths1 = {"/tmp/plugins1"};
-    const std::set<std::filesystem::path> paths2 = {"/tmp/plugins2"};
+    const std::set<std::filesystem::path> paths1
+        = {std::filesystem::temp_directory_path() / "plugins1"};
+    const std::set<std::filesystem::path> paths2
+        = {std::filesystem::temp_directory_path() / "plugins2"};
 
     EXPECT_NO_THROW(manager.loadPlugins(paths1, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
     EXPECT_NO_THROW(manager.loadPlugins(paths2, HIPDNN_PLUGIN_LOADING_ADDITIVE));
