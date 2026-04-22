@@ -50,9 +50,6 @@ struct MXGemmArchTraits
                                          k1 * MNXdlPack * KXdlPack * XdlMNThread +
                                          n1 * MNXdlPack * KXdlPack + k2 * MNXdlPack + n2;
 
-                if constexpr(!KLast)
-                    std::cout << k << " " << n << " " << outputIndex << std::endl;
-
                 if constexpr(KLast)
                     shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
                 else
