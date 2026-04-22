@@ -44,6 +44,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <random>
+#include <string_view>
 
 #ifdef ENABLE_ROCTX
 #include <roctracer/roctx.h>
@@ -747,6 +748,18 @@ namespace TensileLite
             args.template append<uint32_t>("itersPerTile", itersPerTile);
             args.template append<uint32_t>("magicNumberItersPerTile", magicNumberItersPerTile);
             args.template append<uint32_t>("magicShiftItersPerTile", magicShiftItersPerTile);
+
+            if(const char* skDiag = std::getenv("HIPBLASLT_STREAMK_DIAG"))
+            {
+                if(skDiag[0] != '\0' && std::string_view{skDiag} != "0")
+                {
+                    std::cerr << "[HIPBLASLT_STREAMK_DIAG] sk_user_args"
+                              << " streamK=" << sizeMapping.streamK
+                              << " itersPerTile=" << itersPerTile << " totalIters=" << totalIters
+                              << " append_totalIters=" << (!sizeMapping.customKernelName.empty() ? 1 : 0)
+                              << std::endl;
+                }
+            }
 
             // Custom kernels still use totalIters
             if(!sizeMapping.customKernelName.empty())
