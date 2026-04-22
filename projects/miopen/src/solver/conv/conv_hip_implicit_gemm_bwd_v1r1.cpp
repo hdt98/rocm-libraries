@@ -674,25 +674,6 @@ bool ConvHipImplicitGemmBwdDataV1R1::IsApplicable(const ExecutionContext& ctx,
     }
 #endif
 
-    // In deterministic mode, reject configs that would use AtomicAdd.
-    // The kernel uses AtomicAdd when stride < dilation*(kernel_size-1)+1,
-    // because multiple output positions map to the same input position.
-    // Formula from:
-    // static_kernel_gridwise_convolution_backward_data_implicit_gemm_v1r1_nchw_kcyx_nkhw.hpp:122
-    if(problem.GetConv().attribute.deterministic)
-    {
-        const auto y          = ProblemInterpreter::GetFilterHeightY(problem);
-        const auto x          = ProblemInterpreter::GetFilterWidthX(problem);
-        const auto stride_h   = ProblemInterpreter::GetAdjustedConvolutionStrideH(problem);
-        const auto stride_w   = ProblemInterpreter::GetAdjustedConvolutionStrideW(problem);
-        const auto dilation_h = ProblemInterpreter::GetAdjustedConvolutionDilationH(problem);
-        const auto dilation_w = ProblemInterpreter::GetAdjustedConvolutionDilationW(problem);
-        const bool needs_atomic_add =
-            (stride_h < dilation_h * (y - 1) + 1) || (stride_w < dilation_w * (x - 1) + 1);
-        if(needs_atomic_add)
-            return false;
-    }
-
     const auto k = ProblemInterpreter::GetOutputChannelK(problem);
     if(k % GetEPackLength(ctx, problem, false) != 0)
         return false;
