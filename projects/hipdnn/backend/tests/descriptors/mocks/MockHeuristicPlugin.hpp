@@ -25,8 +25,8 @@ public:
     // Module metadata
     MOCK_METHOD(std::string_view, apiVersion, (), (const, override));
     MOCK_METHOD(int64_t, policyId, (), (const, override));
-    MOCK_METHOD(std::string_view, policyName, (), (const, override));
-    MOCK_METHOD(std::string_view, pluginVersion, (), (const, override));
+    MOCK_METHOD(std::string_view, name, (), (const, override));
+    MOCK_METHOD(std::string_view, version, (), (const, override));
 
     // Handle lifecycle
     MOCK_METHOD(hipdnnHeuristicHandle_t, createHandle, (), (const, override));

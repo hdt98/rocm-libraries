@@ -110,7 +110,7 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
                 HIPDNN_BACKEND_LOG_ERROR("Plugin with policy ID {} ({}) returned null handle "
                                          "despite reporting success. Plugin will be unavailable.",
                                          plugin->policyId(),
-                                         plugin->policyName());
+                                         plugin->name());
                 continue;
             }
         }
@@ -119,7 +119,7 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
             HIPDNN_BACKEND_LOG_ERROR("Failed to create handle for heuristic plugin with policy ID "
                                      "{} ({}): {}. Plugin will be unavailable.",
                                      plugin->policyId(),
-                                     plugin->policyName(),
+                                     plugin->name(),
                                      e.what());
             continue;
         }
@@ -129,7 +129,7 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
 
         HIPDNN_BACKEND_LOG_INFO("Created heuristic plugin handle for policy ID {} ({})",
                                 plugin->policyId(),
-                                plugin->policyName());
+                                plugin->name());
     }
 }
 
@@ -145,7 +145,7 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
         {
             HIPDNN_BACKEND_LOG_WARN("Failed to destroy handle for heuristic plugin '{}' (policy ID "
                                     "{}) during cleanup: {}",
-                                    plugin->policyName(),
+                                    plugin->name(),
                                     plugin->policyId(),
                                     e.what());
         }
@@ -154,7 +154,7 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
             HIPDNN_BACKEND_LOG_WARN(
                 "Failed to destroy handle for heuristic plugin '{}' (policy ID {}) during cleanup: "
                 "unknown error",
-                plugin->policyName(),
+                plugin->name(),
                 plugin->policyId());
         }
     };
@@ -259,8 +259,8 @@ std::vector<HeuristicPolicyInfo> HeuristicPluginResourceManager::getHeuristicPol
     {
         HeuristicPolicyInfo info;
         info.policyId = plugin->policyId();
-        info.policyName = std::string(plugin->policyName());
-        info.pluginVersion = std::string(plugin->pluginVersion());
+        info.policyName = std::string(plugin->name());
+        info.pluginVersion = std::string(plugin->version());
         info.apiVersion = std::string(plugin->apiVersion());
         infos.push_back(info);
     }
