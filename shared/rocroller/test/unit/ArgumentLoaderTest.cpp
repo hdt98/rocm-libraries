@@ -16,6 +16,8 @@
 #include "GenericContextFixture.hpp"
 #include "SourceMatcher.hpp"
 
+#include <common/Utilities.hpp>
+
 using namespace rocRoller;
 
 namespace rocRollerTest
@@ -168,7 +170,14 @@ namespace rocRollerTest
             s_load_dwordx16 s[4:19], s[0:1], 64
         )";
 
-        EXPECT_EQ(NormalizedSource(expected), NormalizedSource(output()));
+        auto generatedCode = output();
+        EXPECT_EQ(NormalizedSource(expected), NormalizedSource(generatedCode));
+
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx16 "), 1);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx8 "), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx4 "), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx2 "), 0);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dword "), 0);
     }
 
     TEST_F(ArgumentLoaderTest, eagerLoadMixedArgs)
@@ -178,30 +187,44 @@ namespace rocRollerTest
 
         VariableType floatPtr{DataType::Float, PointerType::PointerGlobal};
 
-        // Simulate layout after SortArguments: 4 pointers (32B) + 8 scalars (32B)
-        // = 64 bytes total starting at offset 64 should produce a single s_load_dwordx16.
+        // Simulate layout after SortArguments: 8 pointers (64B) + 15 scalars (60B)
+        // = 124 bytes (31 dwords) starting at offset 64 should produce
+        // s_load_dwordx16 + s_load_dwordx8 + s_load_dwordx4 + s_load_dwordx2 + s_load_dword.
         kernel->addArgument({"a", floatPtr, DataDirection::ReadOnly, nullptr, 64});
         kernel->addArgument({"b", floatPtr, DataDirection::ReadOnly});
         kernel->addArgument({"c", floatPtr, DataDirection::ReadOnly});
         kernel->addArgument({"d", floatPtr, DataDirection::ReadOnly});
-        kernel->addArgument({"e", {DataType::Float}, DataDirection::ReadOnly});
-        kernel->addArgument({"f", {DataType::Float}, DataDirection::ReadOnly});
-        kernel->addArgument({"g", {DataType::Float}, DataDirection::ReadOnly});
-        kernel->addArgument({"h", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"e", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"f", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"g", floatPtr, DataDirection::ReadOnly});
+        kernel->addArgument({"h", floatPtr, DataDirection::ReadOnly});
         kernel->addArgument({"i", {DataType::Float}, DataDirection::ReadOnly});
         kernel->addArgument({"j", {DataType::Float}, DataDirection::ReadOnly});
         kernel->addArgument({"k", {DataType::Float}, DataDirection::ReadOnly});
         kernel->addArgument({"l", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"m", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"n", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"o", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"p", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"q", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"r", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"s", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"t", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"u", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"v", {DataType::Float}, DataDirection::ReadOnly});
+        kernel->addArgument({"w", {DataType::Float}, DataDirection::ReadOnly});
 
         auto loader = m_context->argLoader();
         m_context->schedule(kernel->allocateInitialRegisters());
         m_context->schedule(loader->eagerLoadArguments());
 
-        std::string expected = R"(
-            s_load_dwordx16 s[4:19], s[0:1], 64
-        )";
+        auto generatedCode = output();
 
-        EXPECT_EQ(NormalizedSource(expected), NormalizedSource(output()));
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx16 "), 1);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx8 "), 1);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx4 "), 1);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dwordx2 "), 1);
+        EXPECT_EQ(countSubstring(generatedCode, "s_load_dword "), 1);
     }
 
     TEST_F(ArgumentLoaderTest, releaseArguments)
