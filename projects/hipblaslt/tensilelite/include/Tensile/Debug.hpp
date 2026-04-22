@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdlib>
 #include <set>
 #include <string>
@@ -83,6 +84,14 @@ namespace TensileLite
         bool printSolutionSelectionTime() const;
 
         int getGridbasedTopSols() const;
+
+        /**
+         * Max leaf entries for CachingLibrary CacheMap LRU (see CachingLibrary.hpp).
+         * From HIPBLASLT_CACHE_MAP_MAX_ENTRIES, else TENSILE_CACHE_MAP_MAX_ENTRIES.
+         * Parsed as signed decimal: 0 = cache off; negative = unlimited;
+         * positive N = LRU cap; unset defaults to unlimited.
+         */
+        size_t getCacheMapMaxLeafEntries() const;
 
         bool printStreamKGridInfo() const;
 
@@ -146,6 +155,7 @@ namespace TensileLite
         bool        m_printMarker         = false;
         bool        m_disableStaggerU     = false;
         StringSet   m_excludedFromGetAll;
+        size_t      m_cacheMapMaxLeafEntries;
 
         Debug();
     };

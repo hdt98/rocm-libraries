@@ -26,6 +26,7 @@
 
 #include <Tensile/Debug.hpp>
 
+#include <limits>
 #include <mutex>
 
 #ifndef DEBUG_SM
@@ -155,6 +156,11 @@ namespace TensileLite
         return m_gridbasedTopSols;
     }
 
+    size_t Debug::getCacheMapMaxLeafEntries() const
+    {
+        return m_cacheMapMaxLeafEntries;
+    }
+
     bool Debug::gridBasedKDTree() const
     {
         return m_gridbasedKdTree;
@@ -183,7 +189,26 @@ namespace TensileLite
     Debug::Debug()
         : m_value(DEBUG_SM)
         , m_value2(DEBUG_SM2)
+        , m_cacheMapMaxLeafEntries(std::numeric_limits<size_t>::max())
     {
+        const char* cache_map_entries = std::getenv("HIPBLASLT_CACHE_MAP_MAX_ENTRIES");
+        if(!cache_map_entries || !*cache_map_entries)
+            cache_map_entries = std::getenv("TENSILE_CACHE_MAP_MAX_ENTRIES");
+        if(cache_map_entries && *cache_map_entries)
+        {
+            char*     end = nullptr;
+            long long v   = std::strtoll(cache_map_entries, &end, 10);
+            if(end != cache_map_entries)
+            {
+                if(v == 0)
+                    m_cacheMapMaxLeafEntries = 0;
+                else if(v < 0)
+                    m_cacheMapMaxLeafEntries = std::numeric_limits<size_t>::max();
+                else
+                    m_cacheMapMaxLeafEntries = static_cast<size_t>(v);
+            }
+        }
+
         const char* db = std::getenv("TENSILE_DB");
         if(db)
             m_value = strtol(db, nullptr, 0);
