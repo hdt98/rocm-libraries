@@ -1416,4 +1416,3 @@ template <typename Problem_, typename Policy_ = BlockFmhaPipelineQRKSVSDefaultPo
 using BlockFmhaPipelineQRKSVSHpad = BlockFmhaPipelineQRKSVS<Problem_, Policy_, true>;
 
 } // namespace ck_tile
-

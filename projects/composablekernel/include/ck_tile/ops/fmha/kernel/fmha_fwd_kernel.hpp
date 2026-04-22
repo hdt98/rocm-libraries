@@ -232,9 +232,9 @@ struct FmhaFwdKernel
 
     struct FmhaFwdCommonPerBlockKargs : FmhaFwdCommonQScaleKargs
     {
-        ck_tile::index_t stride_q_descale       = 0;
-        ck_tile::index_t stride_k_descale       = 0;
-        ck_tile::index_t stride_v_descale       = 0;
+        ck_tile::index_t stride_q_descale = 0;
+        ck_tile::index_t stride_k_descale = 0;
+        ck_tile::index_t stride_v_descale = 0;
 
         ck_tile::index_t nhead_stride_q_descale = 0;
         ck_tile::index_t nhead_stride_k_descale = 0;
@@ -336,13 +336,15 @@ struct FmhaFwdKernel
           std::conditional_t<
               QScaleEnum == BlockAttentionQuantScaleEnum::PERTENSOR,
               FmhaFwdCommonQScaleKargs,
-              std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
-                                 FmhaFwdBatchBlockScaleKargs,
-                                 std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
-                                                    FmhaFwdBatchMXKargs,
-                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
-                                                                       FmhaFwdBatchPerBlockKargs,
-                                                                       FmhaFwdEmptyKargs<3>>>>>,
+              std::conditional_t<
+                  QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
+                  FmhaFwdBatchBlockScaleKargs,
+                  std::conditional_t<
+                      QScaleEnum == BlockAttentionQuantScaleEnum::MX,
+                      FmhaFwdBatchMXKargs,
+                      std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
+                                         FmhaFwdBatchPerBlockKargs,
+                                         FmhaFwdEmptyKargs<3>>>>>,
           std::conditional_t<kHasDropout, FmhaFwdBatchModeDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>
     {
@@ -369,13 +371,15 @@ struct FmhaFwdKernel
           std::conditional_t<
               QScaleEnum == BlockAttentionQuantScaleEnum::PERTENSOR,
               FmhaFwdCommonQScaleKargs,
-              std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
-                                 FmhaFwdGroupBlockScaleKargs,
-                                 std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::MX,
-                                                    FmhaFwdGroupMXKargs,
-                                                    std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
-                                                                       FmhaFwdGroupPerBlockKargs,
-                                                                       FmhaFwdEmptyKargs<3>>>>>,
+              std::conditional_t<
+                  QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE,
+                  FmhaFwdGroupBlockScaleKargs,
+                  std::conditional_t<
+                      QScaleEnum == BlockAttentionQuantScaleEnum::MX,
+                      FmhaFwdGroupMXKargs,
+                      std::conditional_t<QScaleEnum == BlockAttentionQuantScaleEnum::PERBLOCK,
+                                         FmhaFwdGroupPerBlockKargs,
+                                         FmhaFwdEmptyKargs<3>>>>>,
           std::conditional_t<kHasDropout, FmhaFwdCommonDropoutKargs, FmhaFwdEmptyKargs<4>>,
           std::conditional_t<kHasLogitsSoftCap, FmhaFwdLogitsSoftCapKargs, FmhaFwdEmptyKargs<5>>,
           std::conditional_t<kSkipMinSeqlenQ, FmhaFwdSkipMinSeqlenQKargs, FmhaFwdEmptyKargs<6>>
@@ -2257,9 +2261,9 @@ struct FmhaFwdKernel
                     // Per-block: fuse Q descale into scale_s
                     constexpr ck_tile::index_t kM0 = FmhaPipeline::kM0;
                     constexpr ck_tile::index_t kN0 = FmhaPipeline::kN0;
-                    size_t q_idx = i_m0 / kM0;
-                    float q_descale = q_descale_ptr[q_idx];
-                    float fused_scale_s = kargs.scale_s * q_descale;
+                    size_t q_idx                   = i_m0 / kM0;
+                    float q_descale                = q_descale_ptr[q_idx];
+                    float fused_scale_s            = kargs.scale_s * q_descale;
 
                     float scale_p =
                         ck_tile::type_convert<float>(ck_tile::numeric<PDataType>::max());
@@ -2284,8 +2288,8 @@ struct FmhaFwdKernel
                                                 identity{}, // bias_element_func
                                                 randval_dram_window,
                                                 lse_dram_window,
-                                                identity{},               // lse_element_func
-                                                scales<float>{1.0f},      // s_acc_element_func
+                                                identity{},          // lse_element_func
+                                                scales<float>{1.0f}, // s_acc_element_func
                                                 scales<remove_cvref_t<decltype(scale_p)>>{
                                                     scale_p},       // p_compute_element_func
                                                 o_acc_element_func, // o_acc_element_func

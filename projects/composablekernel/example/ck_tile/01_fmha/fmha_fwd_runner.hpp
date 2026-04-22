@@ -1776,7 +1776,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     nhead_k,
                     group_size_opt.value(),
                     qscale.type == quant_scale_enum::blockscale ||
-                    qscale.type == quant_scale_enum::perblock,
+                        qscale.type == quant_scale_enum::perblock,
                     [&](const auto& traits, auto& args, const auto& sc) {
                         return fmha_fwd(traits, args, sc);
                     });
