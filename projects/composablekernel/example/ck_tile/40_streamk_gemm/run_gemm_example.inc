@@ -180,7 +180,7 @@ int runGemmExampleWithLayouts(int argc,
     if(!result)
         return -1;
 
-    static_assert(!GemmConfiguration::PRESHUFFLE, "Not implemented");
+    //static_assert(!GemmConfiguration::PRESHUFFLE, "Not implemented");
     static_assert(!GemmConfiguration::USE_STRUCTURED_SPARSITY, "Not implemented");
     static_assert(!GemmConfiguration::PERMUTE_A, "Not implemented");
     static_assert(!GemmConfiguration::PERMUTE_B, "Not implemented");

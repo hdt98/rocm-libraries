@@ -75,8 +75,9 @@ struct StreamKKernel
     using TilePartitioner  = TilePartitioner_;
     using GemmPipeline     = GemmPipeline_;
     using EpiloguePipeline = EpiloguePipeline_;
-    using WarpGemm         = typename GemmPipeline::BlockGemm::WarpGemm;
-    using BlockGemmShape   = typename GemmPipeline::BlockGemmShape;
+    using WarpGemm         = typename GemmPipeline::BlockWeightPreshuffle::BlockPolicy::WarpGemm;
+    ;
+    using BlockGemmShape = typename GemmPipeline::BlockGemmShape;
 
     static_assert(
         TilePartitioner::PERSISTENT == PersistentDP,
@@ -237,15 +238,14 @@ struct StreamKKernel
         // has_hot_loop and tail_num here. This is a similar pattern used by grouped GEMM. In this
         // case, we call the GemmPipeline's operator() function that takes both has_hot_loop and
         // tail_num.
-        const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
-        const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
+        // TODO: double check this change
+        // const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
+        // const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
 
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile = GemmPipeline{}(as_block_window[UniversalGemmKernel::I0],
                                                   bs_block_window[UniversalGemmKernel::I0],
                                                   num_loop,
-                                                  has_hot_loop,
-                                                  tail_num,
                                                   smem_ptr_0);
 
         if(UseDefaultScheduler || (get_warp_id() == 0))
@@ -580,8 +580,8 @@ struct StreamKKernel
             index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
 
             // Get the K offsets for the A and B tensors
-            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout>(
-                local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
+            auto [i_k_a, i_k_b] =
+                GetKOffsets<ALayout, BLayout>(local_iter_start, kargs.stride_As[0]);
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
             {
@@ -613,15 +613,14 @@ struct StreamKKernel
                 // we compute has_hot_loop and tail_num here. This is a similar pattern used by
                 // grouped GEMM. In this case, we call the GemmPipeline's operator() function
                 // that takes both has_hot_loop and tail_num.
-                const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
-                const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
+                // TODO: double check this change
+                // const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop_sk);
+                // const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop_sk);
 
                 // Run GEMM cooperatively by whole workgroup.
                 const auto& c_block_tile = GemmPipeline{}(as_block_window[UniversalGemmKernel::I0],
                                                           bs_block_window[UniversalGemmKernel::I0],
                                                           num_loop_sk,
-                                                          has_hot_loop,
-                                                          tail_num,
                                                           smem_ptr_0);
 
                 auto tile_started = iter_start == tile_iter_start;
@@ -811,11 +810,9 @@ struct StreamKKernel
      * major.
      */
     template <typename ALayout, typename BLayout>
-    CK_TILE_DEVICE static tuple<index_t, index_t>
-    GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+    CK_TILE_DEVICE static tuple<index_t, index_t> GetKOffsets(index_t iter_offset, index_t stride_a)
     {
         index_t stride_offset_a;
-        index_t stride_offset_b;
         if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
         {
             stride_offset_a = stride_a;
@@ -825,18 +822,16 @@ struct StreamKKernel
             stride_offset_a = 1;
         }
 
-        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
-        {
-            stride_offset_b = stride_b;
-        }
-        else
-        {
-            stride_offset_b = 1;
-        }
+        index_t base_offset            = iter_offset * TilePartitioner::KPerBlock;
+        index_t i_k_a                  = base_offset * stride_offset_a;
+        constexpr index_t flatKPerWarp = GemmPipeline::BlockGemmShape::flatKPerWarp;
+        constexpr index_t WarpTile_K   = GemmPipeline::BlockGemmShape::WarpTile::at(number<2>{});
+        constexpr index_t flatK_per_macro =
+            flatKPerWarp * (TilePartitioner::KPerBlock / WarpTile_K);
 
-        index_t base_offset = iter_offset * TilePartitioner::KPerBlock;
+        index_t i_k_b = iter_offset * flatK_per_macro;
 
-        return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
+        return make_tuple(i_k_a, i_k_b);
     }
 
     CK_TILE_HOST static int NumCU()

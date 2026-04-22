@@ -41,8 +41,13 @@ struct GemmConfigurationMemoryInterwave : public GemmConfigurationBase
     static constexpr ck_tile::index_t N_WARP_TILE = 32;
     static constexpr ck_tile::index_t K_WARP_TILE = sizeof(PrecisionType) == 2 ? 8 : 16;
 
-    static constexpr bool PERSISTENT = IsPersistent;
-    static constexpr auto SCHEDULER  = ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr bool PERSISTENT                = IsPersistent;
+    static constexpr auto SCHEDULER                 = ck_tile::GemmPipelineScheduler::Intrawave;
+    static constexpr ck_tile::GemmPipeline Pipeline = ck_tile::GemmPipeline::PRESHUFFLE_V2;
+    static constexpr bool Preshuffle                = true;
+    static constexpr bool DoubleSmemBuffer          = true;
+    static constexpr int N_Repeat                   = N_TILE / N_WARP_TILE / N_WARP;
+    static constexpr bool TiledMMAPermuteN          = N_Repeat % 2 == 0;
 };
 
 template <typename ADataType_, typename BDataType_ = ADataType_, typename CDataType_ = ADataType_>
