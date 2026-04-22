@@ -689,12 +689,12 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     // Compute Pack-GQA dimensions early so buffer allocations use the right sizes
     const int nhead_ratio = nhead / nhead_k;
-    int pack_gqa_nhead = nhead;
+    int pack_gqa_nhead    = nhead;
     int pack_gqa_seqlen_q = shape_seqlen_q;
     if(pack_gqa && nhead_ratio > 1 && mask.type == mask_enum::no_mask && i_perm && o_perm &&
        mode == mode_enum::batch)
     {
-        pack_gqa_nhead = nhead_k;
+        pack_gqa_nhead    = nhead_k;
         pack_gqa_seqlen_q = nhead_ratio * shape_seqlen_q;
     }
 
@@ -746,9 +746,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
         std::max(shape_seqlen_q, shape_seqlen_k), rotary_dim, next_seed());
 
     ck_tile::HostTensor<LSEDataType> lse_acc_host(
-        1 < num_splits || use_kvcache
-            ? std::array<ck_tile::index_t, 4>{shape_batch, pack_gqa_nhead, num_splits, pack_gqa_seqlen_q}
-            : std::array<ck_tile::index_t, 4>{1, 1, 1, 1});
+        1 < num_splits || use_kvcache ? std::array<ck_tile::index_t, 4>{shape_batch,
+                                                                        pack_gqa_nhead,
+                                                                        num_splits,
+                                                                        pack_gqa_seqlen_q}
+                                      : std::array<ck_tile::index_t, 4>{1, 1, 1, 1});
     ck_tile::HostTensor<OaccDataType> o_acc_host(
         1 < num_splits || use_kvcache ? std::array<ck_tile::index_t, 5>{shape_batch,
                                                                         pack_gqa_nhead,
@@ -1182,7 +1184,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
                   << ", seqlen_q " << shape_seqlen_q << "->" << pack_gqa_seqlen_q << std::endl;
     }
 
-    const auto init_args = [&, pack_gqa_nhead_ = pack_gqa_nhead, pack_gqa_seqlen_q_ = pack_gqa_seqlen_q, k_paddings_ = seqlen_kpads](auto& args) {
+    const auto init_args = [&,
+                            pack_gqa_nhead_    = pack_gqa_nhead,
+                            pack_gqa_seqlen_q_ = pack_gqa_seqlen_q,
+                            k_paddings_        = seqlen_kpads](auto& args) {
         /// NOTE: we broadcast bias from [1, 1, seqlen_q, seqlen_k] to [batch, nhead, seqlen_q,
         ///       seqlen_k] in this example, hence both the 'batch_stride_bias' &
         ///       'nhead_stride_bias' are 0.
@@ -1233,7 +1238,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         const ck_tile::index_t nhead_stride_lse     = pack_gqa_seqlen_q_;
         const ck_tile::index_t nhead_stride_lse_acc = (num_splits * pack_gqa_seqlen_q_);
         const ck_tile::index_t nhead_stride_o_acc   = (num_splits * pack_gqa_seqlen_q_ * hdim_v);
-        const ck_tile::index_t nhead_stride_o       = (o_perm ? pack_gqa_seqlen_q_ * hdim_v : hdim_v);
+        const ck_tile::index_t nhead_stride_o = (o_perm ? pack_gqa_seqlen_q_ * hdim_v : hdim_v);
         const ck_tile::index_t nhead_stride_q_descale = num_block_scale_q;
         const ck_tile::index_t nhead_stride_k_descale = num_block_scale_kv;
         const ck_tile::index_t nhead_stride_v_descale = num_block_scale_kv;
@@ -1246,13 +1251,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
         const ck_tile::index_t batch_stride_v =
             (0 < page_block_size ? (nhead_k * hdim_v * page_block_size)
                                  : (nhead_k * hdim_v * shape_seqlen_k));
-        const ck_tile::index_t batch_stride_vnew    = (nhead_k * hdim_v * seqlen_knew);
-        const ck_tile::index_t batch_stride_bias    = (0 * nhead * shape_seqlen_q * max_seqlen_k);
-        const ck_tile::index_t batch_stride_randval = (pack_gqa_nhead_ * pack_gqa_seqlen_q_ * max_seqlen_k);
-        const ck_tile::index_t batch_stride_lse     = (pack_gqa_nhead_ * pack_gqa_seqlen_q_);
-        const ck_tile::index_t batch_stride_lse_acc = (pack_gqa_nhead_ * num_splits * pack_gqa_seqlen_q_);
-        const ck_tile::index_t batch_stride_o_acc = (pack_gqa_nhead_ * num_splits * pack_gqa_seqlen_q_ * hdim_v);
-        const ck_tile::index_t batch_stride_o     = (pack_gqa_nhead_ * pack_gqa_seqlen_q_ * hdim_v);
+        const ck_tile::index_t batch_stride_vnew = (nhead_k * hdim_v * seqlen_knew);
+        const ck_tile::index_t batch_stride_bias = (0 * nhead * shape_seqlen_q * max_seqlen_k);
+        const ck_tile::index_t batch_stride_randval =
+            (pack_gqa_nhead_ * pack_gqa_seqlen_q_ * max_seqlen_k);
+        const ck_tile::index_t batch_stride_lse = (pack_gqa_nhead_ * pack_gqa_seqlen_q_);
+        const ck_tile::index_t batch_stride_lse_acc =
+            (pack_gqa_nhead_ * num_splits * pack_gqa_seqlen_q_);
+        const ck_tile::index_t batch_stride_o_acc =
+            (pack_gqa_nhead_ * num_splits * pack_gqa_seqlen_q_ * hdim_v);
+        const ck_tile::index_t batch_stride_o = (pack_gqa_nhead_ * pack_gqa_seqlen_q_ * hdim_v);
         const ck_tile::index_t batch_stride_block_table = (max_num_page_blocks / batch);
         const ck_tile::index_t batch_stride_q_descale   = num_block_scale_q * nhead;
         const ck_tile::index_t batch_stride_k_descale   = num_block_scale_kv * nhead_k;
@@ -1325,7 +1333,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
             args.lse_ptr  = lse_buf.GetDeviceBuffer();
             args.o_ptr    = o_buf.GetDeviceBuffer();
 
-            args.seqlen_k     = shape_seqlen_k; // unused in group mode (or kvcache enabled)
+            args.seqlen_k     = shape_seqlen_k;     // unused in group mode (or kvcache enabled)
             args.max_seqlen_q = pack_gqa_seqlen_q_; // use packed seqlen for grid size
 
             args.scale_s = scale_s;
@@ -2318,7 +2326,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 {
                     lse_host_result.ForEach([&](auto& self, auto idx) {
                         ck_tile::index_t packed_head = idx[0] / nhead_ratio;
-                        ck_tile::index_t packed_seq = (idx[0] % nhead_ratio) * real_seqlen_q + idx[1] + query_offset;
+                        ck_tile::index_t packed_seq =
+                            (idx[0] % nhead_ratio) * real_seqlen_q + idx[1] + query_offset;
                         self(idx) = lse_host(b_idx, packed_head, packed_seq);
                     });
                 }
@@ -2362,11 +2371,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     ck_tile::HostTensor<RandValOutputDataType> randval_host_ref(
                         {nhead, real_seqlen_q, real_seqlen_k});
                     randval_host_ref.ForEach([&](auto& self, const auto& idx) {
-                        ck_tile::index_t h = idx[0];
-                        ck_tile::index_t s = idx[1];
-                        ck_tile::index_t k = idx[2];
+                        ck_tile::index_t h           = idx[0];
+                        ck_tile::index_t s           = idx[1];
+                        ck_tile::index_t k           = idx[2];
                         ck_tile::index_t packed_head = h / nhead_ratio_local;
-                        ck_tile::index_t packed_seq = (h % nhead_ratio_local) * real_seqlen_q + s;
+                        ck_tile::index_t packed_seq  = (h % nhead_ratio_local) * real_seqlen_q + s;
                         self(idx) = randval_packed_ref(packed_head, packed_seq, k);
                     });
 
