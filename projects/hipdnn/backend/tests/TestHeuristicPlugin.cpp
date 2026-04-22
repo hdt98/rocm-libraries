@@ -212,9 +212,9 @@ TEST_F(TestHeuristicPlugin, MockPluginEmptyPolicyNameIsValid)
 {
     const NiceMock<MockHeuristicPlugin> plugin;
 
-    EXPECT_CALL(plugin, policyName()).WillOnce(Return(""));
+    EXPECT_CALL(plugin, name()).WillOnce(Return(""));
 
-    const auto name = plugin.policyName();
+    const auto name = plugin.name();
     EXPECT_TRUE(name.empty());
 }
 
@@ -223,9 +223,9 @@ TEST_F(TestHeuristicPlugin, MockPluginLongPolicyNameIsValid)
     const NiceMock<MockHeuristicPlugin> plugin;
 
     const std::string_view longName = "VeryLongPolicyNameThatExceedsTypicalLengthsButIsStillValid";
-    EXPECT_CALL(plugin, policyName()).WillOnce(Return(longName));
+    EXPECT_CALL(plugin, name()).WillOnce(Return(longName));
 
-    const auto name = plugin.policyName();
+    const auto name = plugin.name();
     EXPECT_EQ(name, longName);
 }
 

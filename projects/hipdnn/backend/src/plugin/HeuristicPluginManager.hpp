@@ -28,7 +28,7 @@ namespace hipdnn_backend::plugin
  * Validation includes:
  * - Heuristic C ABI major version compatibility
  * - Unique policy IDs across all loaded heuristic plugins
- * - Policy ID ↔ policy name consistency (when GetPolicyName is provided)
+ * - Policy name is provided via hipdnnPluginGetName()
  */
 class HeuristicPluginManager : public PluginManagerBase<HeuristicPlugin>
 {
@@ -72,15 +72,14 @@ protected:
         }
 
         // Validate policy name is provided (required for all heuristic plugins)
-        auto policyNameView = plugin.policyName();
+        auto policyNameView = plugin.name();
         if(policyNameView.empty())
         {
             throw HipdnnException(
                 HIPDNN_STATUS_PLUGIN_ERROR,
                 "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
                 "Policy name is required but was not provided.\n"
-                "Plugin must implement hipdnnHeuristicGetPolicyName() and return a "
-                "non-empty policy name.");
+                "Plugin must implement hipdnnPluginGetName() and return a non-empty policy name.");
         }
     }
 

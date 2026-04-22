@@ -9,7 +9,7 @@
  * in HeuristicPlugin::resolveSymbols().
  *
  * Missing symbols:
- * - hipdnnHeuristicGetPolicyName (required)
+ * - hipdnnPluginGetName (required)
  * - hipdnnHeuristicPolicyFinalize (required)
  * - hipdnnHeuristicPolicyGetSortedEngineIds (required)
  *
@@ -22,7 +22,7 @@ extern "C" {
 
 // ========== Module Metadata (Partial) ==========
 
-hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetApiVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -32,7 +32,7 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -42,13 +42,23 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback)
+hipdnnPluginStatus_t hipdnnPluginGetType(hipdnnPluginType_t* type)
+{
+    if(type == nullptr)
+    {
+        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+    }
+    *type = HIPDNN_PLUGIN_TYPE_HEURISTIC;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)
 {
     (void)callback;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-void hipdnnHeuristicGetLastErrorString(const char** error_str)
+void hipdnnPluginGetLastErrorString(const char** error_str)
 {
     if(error_str != nullptr)
     {
@@ -129,7 +139,7 @@ hipdnnPluginStatus_t
 }
 
 // ========== MISSING REQUIRED SYMBOLS ==========
-// hipdnnHeuristicGetPolicyName - NOT IMPLEMENTED
+// hipdnnPluginGetName - NOT IMPLEMENTED
 // hipdnnHeuristicPolicyFinalize - NOT IMPLEMENTED
 // hipdnnHeuristicPolicyGetSortedEngineIds - NOT IMPLEMENTED
 

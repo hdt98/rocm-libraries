@@ -11,8 +11,8 @@
 #include <vector>
 
 // NOLINTNEXTLINE
-thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError
-    [HIPDNN_HEURISTIC_PLUGIN_ERROR_STRING_MAX_LENGTH]
+thread_local char
+    hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError[HIPDNN_PLUGIN_ERROR_STRING_MAX_LENGTH]
     = "";
 
 namespace
@@ -46,33 +46,21 @@ struct PolicyDescriptorImpl
 // NOLINTBEGIN(readability-identifier-naming)
 extern "C" {
 
-// ========== Module Metadata ==========
+// ========== Base Plugin API (PluginApi.h) ==========
 
-hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetName(const char** name)
 {
-    if(version == nullptr)
+    if(name == nullptr)
     {
         hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                                "version pointer is null");
+                                                                "name pointer is null");
         return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
     }
-    *version = HIPDNN_HEURISTIC_API_VERSION;
+    *name = POLICY_NAME;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
-{
-    if(policy_name == nullptr)
-    {
-        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
-                                                                "policy_name pointer is null");
-        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
-    }
-    *policy_name = POLICY_NAME;
-    return HIPDNN_PLUGIN_STATUS_SUCCESS;
-}
-
-hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -84,19 +72,43 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback)
+hipdnnPluginStatus_t hipdnnPluginGetApiVersion(const char** version)
+{
+    if(version == nullptr)
+    {
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "version pointer is null");
+        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+    }
+    *version = HIPDNN_HEURISTIC_API_VERSION;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
+
+hipdnnPluginStatus_t hipdnnPluginGetType(hipdnnPluginType_t* type)
+{
+    if(type == nullptr)
+    {
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "type pointer is null");
+        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+    }
+    *type = HIPDNN_PLUGIN_TYPE_HEURISTIC;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)
 {
     g_loggingCallback = callback;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLogLevel(hipdnnSeverity_t level)
+hipdnnPluginStatus_t hipdnnPluginSetLogLevel(hipdnnSeverity_t level)
 {
     g_logLevel = level;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-void hipdnnHeuristicGetLastErrorString(const char** error_str)
+void hipdnnPluginGetLastErrorString(const char** error_str)
 {
     if(error_str != nullptr)
     {

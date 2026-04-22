@@ -12,14 +12,14 @@
  * Used to test optional symbol handling via tryAssignSymbol().
  *
  * Missing optional symbols:
- * - hipdnnHeuristicSetLogLevel (optional)
+ * - hipdnnPluginSetLogLevel (optional)
  *
  * This tests the code paths where _funcSetLogLevel is nullptr.
  */
 
 // NOLINTNEXTLINE
-thread_local char hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError
-    [HIPDNN_HEURISTIC_PLUGIN_ERROR_STRING_MAX_LENGTH]
+thread_local char
+    hipdnn_plugin_sdk::PluginLastErrorManager::s_lastError[HIPDNN_PLUGIN_ERROR_STRING_MAX_LENGTH]
     = "";
 
 namespace
@@ -34,7 +34,7 @@ extern "C" {
 
 // ========== Module Metadata (Required Only) ==========
 
-hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetApiVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -46,7 +46,7 @@ hipdnnPluginStatus_t hipdnnHeuristicGetApiVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
+hipdnnPluginStatus_t hipdnnPluginGetName(const char** policy_name)
 {
     if(policy_name == nullptr)
     {
@@ -58,7 +58,7 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPolicyName(const char** policy_name)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
+hipdnnPluginStatus_t hipdnnPluginGetVersion(const char** version)
 {
     if(version == nullptr)
     {
@@ -70,15 +70,27 @@ hipdnnPluginStatus_t hipdnnHeuristicGetPluginVersion(const char** version)
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-hipdnnPluginStatus_t hipdnnHeuristicSetLoggingCallback(hipdnnCallback_t callback)
+hipdnnPluginStatus_t hipdnnPluginGetType(hipdnnPluginType_t* type)
+{
+    if(type == nullptr)
+    {
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_INVALID_VALUE,
+                                                                "type pointer is null");
+        return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+    }
+    *type = HIPDNN_PLUGIN_TYPE_HEURISTIC;
+    return HIPDNN_PLUGIN_STATUS_SUCCESS;
+}
+
+hipdnnPluginStatus_t hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)
 {
     (void)callback;
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-// hipdnnHeuristicSetLogLevel - OPTIONAL, NOT IMPLEMENTED
+// hipdnnPluginSetLogLevel - OPTIONAL, NOT IMPLEMENTED
 
-void hipdnnHeuristicGetLastErrorString(const char** error_str)
+void hipdnnPluginGetLastErrorString(const char** error_str)
 {
     if(error_str != nullptr)
     {

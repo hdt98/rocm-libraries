@@ -47,15 +47,16 @@ void HeuristicPlugin::resolveSymbols()
     } while(0)
     // NOLINTEND(bugprone-macro-parentheses, cppcoreguidelines-macro-usage)
 
-    // Required module metadata symbols
-    GET_REQUIRED_SYMBOL(_funcGetApiVersion, "hipdnnHeuristicGetApiVersion");
-    GET_REQUIRED_SYMBOL(_funcGetPolicyName, "hipdnnHeuristicGetPolicyName");
-    GET_REQUIRED_SYMBOL(_funcGetPluginVersion, "hipdnnHeuristicGetPluginVersion");
-    GET_REQUIRED_SYMBOL(_funcSetLoggingCallback, "hipdnnHeuristicSetLoggingCallback");
-    GET_REQUIRED_SYMBOL(_funcGetLastErrorString, "hipdnnHeuristicGetLastErrorString");
+    // Required base plugin symbols (from PluginApi.h)
+    GET_REQUIRED_SYMBOL(_funcGetName, "hipdnnPluginGetName");
+    GET_REQUIRED_SYMBOL(_funcGetVersion, "hipdnnPluginGetVersion");
+    GET_REQUIRED_SYMBOL(_funcGetApiVersion, "hipdnnPluginGetApiVersion");
+    GET_REQUIRED_SYMBOL(_funcGetType, "hipdnnPluginGetType");
+    GET_REQUIRED_SYMBOL(_funcSetLoggingCallback, "hipdnnPluginSetLoggingCallback");
+    GET_REQUIRED_SYMBOL(_funcGetLastErrorString, "hipdnnPluginGetLastErrorString");
 
-    // Optional module metadata symbols
-    tryAssignSymbol(_funcSetLogLevel, "hipdnnHeuristicSetLogLevel");
+    // Optional base plugin symbols
+    tryAssignSymbol(_funcSetLogLevel, "hipdnnPluginSetLogLevel");
 
     // Required handle lifecycle symbols
     GET_REQUIRED_SYMBOL(_funcHandleCreate, "hipdnnHeuristicHandleCreate");
@@ -76,15 +77,24 @@ void HeuristicPlugin::resolveSymbols()
 
 #undef GET_REQUIRED_SYMBOL
 
+    // Verify plugin type
+    auto pluginType = type();
+    if(pluginType != HIPDNN_PLUGIN_TYPE_HEURISTIC)
+    {
+        throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                              "Plugin type mismatch: expected HIPDNN_PLUGIN_TYPE_HEURISTIC, got "
+                                  + std::to_string(pluginType));
+    }
+
     // Eagerly cache policy ID - it's always needed for plugin matching
     // Compute it once during initialization rather than lazily
-    auto name = policyName();
-    if(name.empty())
+    auto pluginName = name();
+    if(pluginName.empty())
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                               "Cannot load heuristic plugin: policy name is empty");
     }
-    _policyId = hipdnn_data_sdk::utilities::engineNameToId(name);
+    _policyId = hipdnn_data_sdk::utilities::engineNameToId(pluginName);
 }
 
 std::string_view HeuristicPlugin::apiVersion() const
@@ -96,40 +106,29 @@ std::string_view HeuristicPlugin::apiVersion() const
 
 std::string_view HeuristicPlugin::name() const
 {
-    // For heuristic plugins, use the policy name as the plugin name
-    return policyName();
+    const char* name = nullptr;
+    invokeHeuristicFunction("get plugin name", _funcGetName, &name);
+    return (name != nullptr) ? name : "";
 }
 
 std::string_view HeuristicPlugin::version() const
 {
-    // For heuristic plugins, delegate to pluginVersion()
-    return pluginVersion();
+    const char* version = nullptr;
+    invokeHeuristicFunction("get plugin version", _funcGetVersion, &version);
+    return version;
 }
 
 hipdnnPluginType_t HeuristicPlugin::type() const
 {
-    // Heuristic plugins return HEURISTIC type
-    return HIPDNN_PLUGIN_TYPE_HEURISTIC;
+    hipdnnPluginType_t pluginType = HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
+    invokeHeuristicFunction("get plugin type", _funcGetType, &pluginType);
+    return pluginType;
 }
 
 int64_t HeuristicPlugin::policyId() const
 {
     // Policy ID is eagerly cached during construction in resolveSymbols()
     return _policyId;
-}
-
-std::string_view HeuristicPlugin::policyName() const
-{
-    const char* name = nullptr;
-    invokeHeuristicFunction("get policy name", _funcGetPolicyName, &name);
-    return (name != nullptr) ? name : "";
-}
-
-std::string_view HeuristicPlugin::pluginVersion() const
-{
-    const char* version = nullptr;
-    invokeHeuristicFunction("get plugin version", _funcGetPluginVersion, &version);
-    return version;
 }
 
 hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const

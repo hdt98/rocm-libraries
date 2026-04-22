@@ -19,7 +19,7 @@ namespace hipdnn_backend::plugin
  * HeuristicsPluginApi.h. It manages symbol resolution and provides type-safe
  * wrappers around the C function pointers.
  *
- * Heuristic plugins are separate from engine plugins and do NOT implement PluginApi.h.
+ * Heuristic plugins implement base PluginApi.h functions PLUS HeuristicsPluginApi.h extensions.
  */
 class HeuristicPlugin : public PluginBase
 {
@@ -34,14 +34,16 @@ public:
     // Virtual destructor for polymorphic class
     ~HeuristicPlugin() override = default;
 
-    // Module metadata (called before handle creation)
+    // Base plugin metadata (from PluginApi.h)
     std::string_view apiVersion() const override;
-    std::string_view name() const override; // Override to return policy name
-    std::string_view version() const override; // Override to return plugin version
-    hipdnnPluginType_t type() const override; // Override to return plugin type
-    virtual int64_t policyId() const;
-    virtual std::string_view policyName() const;
-    virtual std::string_view pluginVersion() const;
+    std::string_view name() const override; // Returns policy name (via hipdnnPluginGetName)
+    std::string_view
+        version() const override; // Returns plugin version (via hipdnnPluginGetVersion)
+    hipdnnPluginType_t
+        type() const override; // Returns HIPDNN_PLUGIN_TYPE_HEURISTIC (via hipdnnPluginGetType)
+
+    // Heuristic-specific metadata
+    virtual int64_t policyId() const; // Computed from name via engineNameToId
 
     // Plugin type - heuristic plugins return HEURISTIC
     static hipdnnPluginType_t getPluginType()
@@ -120,10 +122,11 @@ private:
     // Cached metadata (eagerly initialized in resolveSymbols)
     int64_t _policyId = -1;
 
-    // Module metadata function pointers
+    // Base plugin function pointers (from PluginApi.h)
+    hipdnnPluginStatus_t (*_funcGetName)(const char**);
+    hipdnnPluginStatus_t (*_funcGetVersion)(const char**);
     hipdnnPluginStatus_t (*_funcGetApiVersion)(const char**);
-    hipdnnPluginStatus_t (*_funcGetPolicyName)(const char**);
-    hipdnnPluginStatus_t (*_funcGetPluginVersion)(const char**);
+    hipdnnPluginStatus_t (*_funcGetType)(hipdnnPluginType_t*);
     hipdnnPluginStatus_t (*_funcSetLoggingCallback)(hipdnnCallback_t);
     hipdnnPluginStatus_t (*_funcSetLogLevel)(hipdnnSeverity_t);
     void (*_funcGetLastErrorString)(const char**);
