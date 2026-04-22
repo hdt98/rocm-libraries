@@ -16,6 +16,7 @@
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
+#include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
@@ -323,12 +324,29 @@ protected:
         namespace fe = hipdnn_frontend::graph;
         using namespace hipdnn_test_sdk::utilities;
 
-        if(dynamic_cast<const fe::ConvolutionFpropNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceFwd<T>());
-        if(dynamic_cast<const fe::ConvolutionDgradNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceBwd<T>());
-        if(dynamic_cast<const fe::ConvolutionWgradNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceWrw<T>());
+        // Convolution tolerances: use dynamic calculation based on MAC count.
+        // Fill range matches initializeBundle default of [-1.0, 1.0].
+        constexpr double fillMin = -1.0;
+        constexpr double fillMax = 1.0;
+
+        if(const auto* fpropNode = dynamic_cast<const fe::ConvolutionFpropNode*>(&node))
+        {
+            auto wAttr = fpropNode->attributes.get_w();
+            return conv::calculateConvFpropTolerance<T, T, float>(
+                fillMin, fillMax, fillMin, fillMax, wAttr->get_dim());
+        }
+        if(const auto* dgradNode = dynamic_cast<const fe::ConvolutionDgradNode*>(&node))
+        {
+            auto wAttr = dgradNode->attributes.get_w();
+            return conv::calculateConvDgradTolerance<T, T, float>(
+                fillMin, fillMax, fillMin, fillMax, wAttr->get_dim());
+        }
+        if(const auto* wgradNode = dynamic_cast<const fe::ConvolutionWgradNode*>(&node))
+        {
+            auto dyAttr = wgradNode->attributes.get_dy();
+            return conv::calculateConvWrwTolerance<T, T, float>(
+                fillMin, fillMax, fillMin, fillMax, dyAttr->get_dim());
+        }
         if(dynamic_cast<const fe::BatchnormInferenceNodeVarianceExt*>(&node) != nullptr)
             return static_cast<float>(batchnorm::getToleranceInferenceWithVariance<T>());
         if(dynamic_cast<const fe::BatchnormInferenceNode*>(&node) != nullptr)
@@ -368,8 +386,11 @@ protected:
         ASSERT_TRUE(serErr.is_good()) << serErr.get_message();
 
         auto& executor = getReferenceExecutor();
-        auto variantPack = executor.requiresDeviceMemory() ? bundle.toDeviceVariantPack()
-                                                           : bundle.toHostVariantPack();
+        const bool usesDevice = executor.requiresDeviceMemory();
+        HIPDNN_PLUGIN_LOG_TRACE("executeReferenceGraph: using "
+                                << (usesDevice ? "device" : "host") << " variant pack");
+        auto variantPack
+            = usesDevice ? bundle.toDeviceVariantPack() : bundle.toHostVariantPack();
 
         executor.execute(serializedGraph.data(), serializedGraph.size(), variantPack);
     }

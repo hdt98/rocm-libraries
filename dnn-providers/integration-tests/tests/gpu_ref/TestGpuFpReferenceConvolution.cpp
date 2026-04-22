@@ -280,6 +280,14 @@ std::vector<ConvFwdShapeCase> getSmall3dConvCases()
         {{1, 1, 5, 5, 5}, {1, 1, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, 1, "Stride2x3d"},
         // 3D with dilation=2
         {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
+        // 3D with dilation=2 + padding=2 (matches integration Correctness/13)
+        {{1, 16, 16, 16, 16},
+         {1, 16, 3, 3, 3},
+         {1, 1, 1},
+         {2, 2, 2},
+         {2, 2, 2},
+         1,
+         "Dilation2Pad2x3d"},
         // 3D multi-channel (3 in, 2 out)
         {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
     };

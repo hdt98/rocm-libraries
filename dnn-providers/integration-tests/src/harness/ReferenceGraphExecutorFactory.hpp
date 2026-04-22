@@ -6,6 +6,8 @@
 #include <memory>
 #include <stdexcept>
 
+#include <hipdnn_plugin_sdk/PluginLogging.hpp>
+
 #include "CpuReferenceGraphExecutorAdapter.hpp"
 #include "IReferenceGraphExecutor.hpp"
 #include "TestConfig.hpp"
@@ -22,8 +24,10 @@ public:
         switch(type)
         {
         case ReferenceExecutorType::CPU:
+            HIPDNN_PLUGIN_LOG_TRACE("ReferenceGraphExecutorFactory: creating CPU reference executor");
             return std::make_unique<CpuReferenceGraphExecutorAdapter>();
         case ReferenceExecutorType::GPU:
+            HIPDNN_PLUGIN_LOG_TRACE("ReferenceGraphExecutorFactory: creating GPU reference executor");
             return std::make_unique<gpu_graph_executor::GpuReferenceGraphExecutor>();
         default:
             throw std::runtime_error("Unknown reference executor type");
