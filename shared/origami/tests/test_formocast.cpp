@@ -5,6 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <origami/simulator/tensilelite/formocast_simulator.hpp>
 #include <origami/hardware.hpp>
+#include <origami/streamk.hpp>
 #include <queue>
 
 using Catch::Approx;
@@ -781,6 +782,58 @@ TEST_CASE("Formocast: Tie-breaker info", "[formocast]") {
         
         // Equal configs
         REQUIRE(simulator.isBetter(config1, config1) == false);
+    }
+}
+
+TEST_CASE("StreamK scheduling primitives: multi-tile and partial stream", "[formocast][streamk]") {
+    // Multi-tile: 16 output tiles, K/depthU = 4 steps per tile => 64 total stream steps.
+    const size_t tiles = origami::streamk::compute_number_of_output_tiles(128, 128, 512, 512, 1);
+    REQUIRE(tiles == 16);
+    const size_t ipt = origami::streamk::num_iters_per_tile(32, 128);
+    REQUIRE(ipt == 4);
+    const size_t itotal = origami::streamk::num_iters_total(tiles, ipt);
+    REQUIRE(itotal == 64);
+    // 304 WGs: one step per WG
+    REQUIRE(origami::streamk::num_iters_per_cta(itotal, 304) == 1);
+    // Partial stream: 10 steps, 3 WGs => ceil(10/3)=4 iters on hot WG
+    REQUIRE(origami::streamk::num_iters_per_cta(10, 3) == 4);
+    const size_t ipc = origami::streamk::num_iters_per_cta(itotal, 5);
+    const size_t fp  = origami::streamk::num_fixup_peers_v2(5, itotal, ipt, ipc);
+    REQUIRE(ipc == 13);
+    REQUIRE(fp >= 2);
+}
+
+TEST_CASE("Formocast: StreamK (GlobalSplitU=0) uses schedule instead of penalty", "[formocast][streamk]") {
+    Formocast simulator;
+    simulator.setHardware(hardware_t::architecture_t::gfx950);
+
+    SECTION("multi-tile problem returns finite prediction") {
+        auto problem = make_problem_info(1024, 1024, 1024);
+        auto mapping = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 0);
+        simulator.setProblem(problem);
+        simulator.setSolution(mapping);
+
+        auto perf = simulator.predictedPerformance();
+        REQUIRE(perf.microSeconds > 0.0);
+        REQUIRE(perf.microSeconds < 1e7);
+        REQUIRE(perf.microSeconds != Approx(9999999.9));
+    }
+
+    SECTION("partial MN tile counts change prediction vs smaller K") {
+        auto p1 = make_problem_info(1000, 1000, 512);
+        auto p2 = make_problem_info(1000, 1000, 256);
+        auto mapping = make_size_mapping(128, 128, 32, 32, 32, 8, 4, 0);
+
+        simulator.setSolution(mapping);
+        simulator.setProblem(p1);
+        const double t1 = simulator.predictedPerformance().microSeconds;
+        simulator.setProblem(p2);
+        const double t2 = simulator.predictedPerformance().microSeconds;
+        REQUIRE(t1 > 0.0);
+        REQUIRE(t2 > 0.0);
+        REQUIRE(t1 != Approx(9999999.9));
+        REQUIRE(t2 != Approx(9999999.9));
+        REQUIRE(t1 != t2);
     }
 }
 

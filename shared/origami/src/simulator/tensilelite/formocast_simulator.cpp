@@ -4,6 +4,8 @@
 #include <origami/simulator/tensilelite/formocast_simulator.hpp>
 #include <origami/math.hpp>
 #include <origami/simulator/tensilelite/formocast.hpp>
+#include <origami/streamk.hpp>
+#include <origami/hardware.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -16,6 +18,36 @@
 namespace origami
 {
     using math::safe_ceil_div;
+
+    /// StreamK fixup / reduction overhead (microseconds), separate from GSU split-K.
+    static double streamkReductionOverheadUs(reduction_t sk_reduction,
+                                             size_t      fixup_peers,
+                                             size_t      sk_grid,
+                                             size_t      output_tiles,
+                                             double      math_overall_us,
+                                             double      store_us)
+    {
+        if(sk_grid == 0) return 0.0;
+        // Data-parallel launch: one WG per output tile — no StreamK cross-tile fixup.
+        if(output_tiles > 0 && sk_grid == output_tiles) return 0.0;
+        const bool uneven = (output_tiles % sk_grid) != 0 || sk_grid < output_tiles;
+        if(fixup_peers <= 1 && !uneven) return 0.0;
+
+        const double fix = static_cast<double>(fixup_peers > 1 ? fixup_peers - 1 : 0);
+        const double base = math_overall_us * 0.02;
+
+        switch(sk_reduction)
+        {
+        case reduction_t::parallel:
+        case reduction_t::atomic:
+            return fix * base * 2.5 + store_us * 0.05 * fix + (uneven ? base * 0.5 : 0.0);
+        case reduction_t::tree:
+        case reduction_t::spinlock:
+            return fix * base * 1.5 + store_us * 0.08 * fix + (uneven ? base * 0.35 : 0.0);
+        default:
+            return fix * base + store_us * 0.04 * fix;
+        }
+    }
 
     static double getPrefetchPerformance(int      grvwa,
                                          int      grvwb,
@@ -431,14 +463,6 @@ namespace origami
 
         // 3.1 Early terminate. FIXME: Can filter most of the solutions with an outside function.
         // FIXME: add an extra function to reject the solutions first.
-        if (GlobalSplitU == 0)
-        {
-            // FIXME: Need to support streamK kernels.
-            GlobalSplitU = 1;
-            pp.microSeconds = 9999999.9;
-            pp.hitRate = 0;
-            return pp;
-        }
         if ((M < 128 && MT0 - M >= 16) || (N < 128 && MT1 - N >= 16))
         {
             pp.microSeconds = 9999999.9;
@@ -475,7 +499,69 @@ namespace origami
         }
 
         // 4. Derived Problem/Workgroup Dimensions
-        double K_AfterGSU = safe_ceil_div(static_cast<uint32_t>(K), static_cast<uint32_t>(GlobalSplitU));
+        const bool isStreamK = (GlobalSplitU == 0);
+        size_t     sk_grid           = 0;
+        reduction_t sk_reduction     = reduction_t::none;
+        size_t     sk_output_tiles   = 0;
+        size_t     sk_iters_per_tile = 0;
+        size_t     sk_iters_total    = 0;
+        size_t     sk_iters_per_cta  = 0;
+        size_t     sk_fixup_peers    = 0;
+
+        if(isStreamK)
+        {
+            const size_t m_sz     = static_cast<size_t>(std::max(0.0, M));
+            const size_t n_sz     = static_cast<size_t>(std::max(0.0, N));
+            const size_t k_sz     = static_cast<size_t>(std::max(0.0, K));
+            const size_t batch_sz = static_cast<size_t>(std::max(0.0, NumBatches));
+
+            sk_output_tiles = streamk::compute_number_of_output_tiles(
+                static_cast<size_t>(MT0), static_cast<size_t>(MT1), m_sz, n_sz, batch_sz);
+            sk_iters_per_tile = streamk::num_iters_per_tile(static_cast<size_t>(depthU), k_sz);
+            sk_iters_total    = streamk::num_iters_total(sk_output_tiles, sk_iters_per_tile);
+
+            const size_t lds_cap = static_cast<size_t>(64 * 1024);
+            const size_t l2_cap  = static_cast<size_t>(std::max(hw_consts.L2CacheCapacity, 1024.0 * 1024.0));
+            const int    clk_khz = std::max(1, static_cast<int>(hw_consts.math_frequency * 1000.0));
+
+            hardware_t streamk_hw = hardware_t::get_hardware_for_arch(
+                hw_consts.architecture,
+                static_cast<size_t>(std::max(1.0, hw_consts.NumCUs)),
+                lds_cap,
+                l2_cap,
+                clk_khz);
+
+            problem_t origami_problem{};
+            origami_problem.size  = {m_sz, n_sz, k_sz};
+            origami_problem.batch = batch_sz;
+
+            config_t origami_config{};
+            origami_config.mt                = {static_cast<size_t>(MT0),
+                                 static_cast<size_t>(MT1),
+                                 static_cast<size_t>(depthU)};
+            origami_config.mi = {static_cast<size_t>(sizeMapping.matrixInstruction[0]),
+                                  static_cast<size_t>(sizeMapping.matrixInstruction[1]),
+                                  static_cast<size_t>(sizeMapping.matrixInstruction[2])};
+            origami_config.occupancy         = std::max(sizeMapping.CUOccupancy, 1);
+            origami_config.workgroup_mapping = sizeMapping.workGroupMapping;
+            origami_config.grid_selection    = grid_selection_t::k_split_aware;
+
+            sk_reduction = streamk::select_reduction(
+                origami_problem, streamk_hw, origami_config, grid_selection_t::k_split_aware);
+            origami_config.reduction_strategy = sk_reduction;
+
+            sk_grid = streamk::select_grid_size(
+                origami_problem, streamk_hw, origami_config, grid_selection_t::k_split_aware, 0);
+            sk_grid = std::max(size_t(1), sk_grid);
+
+            sk_iters_per_cta = streamk::num_iters_per_cta(sk_iters_total, sk_grid);
+            sk_fixup_peers
+                = streamk::num_fixup_peers_v2(sk_grid, sk_iters_total, sk_iters_per_tile, sk_iters_per_cta);
+        }
+
+        double K_AfterGSU = isStreamK ? K
+                                      : static_cast<double>(
+                                          safe_ceil_div(static_cast<uint32_t>(K), GlobalSplitU));
         uint32_t M_WGs_total = safe_ceil_div(static_cast<uint32_t>(M), static_cast<uint32_t>(MT0));
         uint32_t N_WGs_total = safe_ceil_div(static_cast<uint32_t>(N), static_cast<uint32_t>(MT1));
         int N_WGs_per_tile_XCD = std::min((uint32_t)WGM, N_WGs_total);
@@ -484,14 +570,27 @@ namespace origami
         int M_WGs_per_tile = std::min(M_WGs_total, static_cast<uint32_t>(safe_ceil_div(int(hw_consts.NumCUs), N_WGs_per_tile_XCD)));
         int N_WGs_per_tile
             = std::min(N_WGs_total, static_cast<uint32_t>(N_WGs_per_tile_XCD * safe_ceil_div(M_WGs_per_tile, M_WGs_total)));
-        uint32_t numberWGs = M_WGs_total * N_WGs_total * NumBatches * GlobalSplitU;
+        uint32_t numberWGs = isStreamK ? static_cast<uint32_t>(sk_grid)
+                                       : M_WGs_total * N_WGs_total * NumBatches * GlobalSplitU;
         uint32_t WGs_per_tile = std::min(uint32_t(hw_consts.NumCUs), numberWGs);
         uint32_t WGs_per_tile_XCD = safe_ceil_div(WGs_per_tile, hw_consts.NumXCDs);
         uint32_t num_tiles = safe_ceil_div(numberWGs, uint32_t(hw_consts.NumCUs));
-        uint32_t loopCnt = K_AfterGSU / depthU;
-        uint32_t K_tail = K_AfterGSU - (loopCnt * depthU);
+        uint32_t loopCnt   = 0;
+        uint32_t K_tail    = 0;
+        if(isStreamK)
+        {
+            loopCnt = static_cast<uint32_t>(sk_iters_per_cta);
+            K_tail  = 0;
+        }
+        else
+        {
+            loopCnt = static_cast<uint32_t>(K_AfterGSU / depthU);
+            K_tail  = static_cast<uint32_t>(K_AfterGSU - static_cast<double>(loopCnt) * static_cast<double>(depthU));
+        }
         PGR = (std::floor(K_AfterGSU/depthU > 1)) ? sizeMapping.PrefetchGlobalRead : int(K_AfterGSU/depthU);
         int      PLR = (std::floor(K_AfterGSU/sizeMapping.LocalSplitU/depthU) < 1) ? 0: 1;//sizeMapping.PrefetchLocalRead;
+
+        const uint32_t gsu_for_l2 = isStreamK ? 1u : GlobalSplitU;
 
         if (PLR == 0)
         {
@@ -512,7 +611,7 @@ namespace origami
                                                 N,
                                                 K_AfterGSU,
                                                 hw_consts,
-                                                GlobalSplitU,
+                                                gsu_for_l2,
                                                 WGM,
                                                 NumBatches,
                                                 bpeA,
@@ -540,9 +639,23 @@ namespace origami
         // 7. Calculate GSU Overhead
         double storeGSU = store * 2; //FIXME: incorrect
         auto vgprUsageCheck = MT0 * MT1 / miSize / miSize;
-        double gsu_overall = calculateGlobalSplitUOverhead(M, N, K, NumBatches, GlobalSplitU, gsuMethod,
-                                                  problem, hw_consts, WGs_per_tile, WGs_per_tile_XCD,
-                                                  MT0, MT1, numberWGs, vgprUsageCheck, storeGSU);
+        double gsu_overall = 0.0;
+        if(isStreamK)
+        {
+            const double math_overall_pre = math_clk / hw_consts.math_frequency;
+            gsu_overall                   = streamkReductionOverheadUs(sk_reduction,
+                                                     sk_fixup_peers,
+                                                     sk_grid,
+                                                     sk_output_tiles,
+                                                     math_overall_pre,
+                                                     store);
+        }
+        else
+        {
+            gsu_overall = calculateGlobalSplitUOverhead(M, N, K, NumBatches, GlobalSplitU, gsuMethod,
+                                                        problem, hw_consts, WGs_per_tile, WGs_per_tile_XCD,
+                                                        MT0, MT1, numberWGs, vgprUsageCheck, storeGSU);
+        }
 
         // 8. Calcupate LSU Overhead
         double lsu_overall = calculateLocalSplitUOverhead(MT0, MT1, LSU, GWVWD, NumThreads, problem, hw_consts);

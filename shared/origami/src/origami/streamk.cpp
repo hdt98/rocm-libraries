@@ -16,51 +16,6 @@ size_t compute_number_of_output_tiles(size_t mt_m, size_t mt_n, size_t m, size_t
 }
 
 /**
- * @brief Returns number of k-iterations.
- *
- * @param output_tiles Number of output tiles.
- * @param iters_per_tile Number of iterations per tile.
- * @return constexpr size_t Number of total iterations.
- */
-constexpr size_t num_iters_total(size_t output_tiles, size_t iters_per_tile) {
-  return output_tiles * iters_per_tile;
-}
-
-/**
- * @brief Returns number of k-iterations per tile.
- *
- * @param mt_k K-dimension tile size.
- * @param k Reduction dimension.
- * @return constexpr size_t Number of k-iteration per tile.
- */
-constexpr size_t num_iters_per_tile(size_t mt_k, size_t k) { return math::safe_ceil_div(k, mt_k); }
-
-/**
- * @brief Number of iterations per cta.
- *
- * @param iters_total Total number of k-iterations.
- * @param g Number of workgroups (grid-size).
- * @return constexpr size_t Number of iterations per cta.
- */
-constexpr size_t num_iters_per_cta(size_t iters_total, int g) {
-  return math::safe_ceil_div(iters_total, g);
-}
-
-constexpr size_t num_fixup_peers_v2(size_t g,
-                                    size_t iters_total,
-                                    size_t iters_per_tile,
-                                    size_t iters_per_cta) {
-  // If tiles don't evenly divide there are always at least 2 fixup peers, and more if
-  // iters_per_tile > iters_per_cta
-  size_t hasFixup =
-      (iters_total % g == 0 &&               // Check if some WGs have more iters than others
-       iters_per_cta % iters_per_tile == 0)  // Check if WGs have an even number of full tiles
-          ? 0
-          : 1;
-  return math::safe_ceil_div(iters_per_tile, iters_per_cta) + hasFixup;
-}
-
-/**
  * @brief Number of workgroups involved in the Stream-K's fixup step.
  *
  * @param g Number of total workgroups (grid-size.)

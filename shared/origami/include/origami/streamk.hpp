@@ -27,12 +27,49 @@
 #pragma once
 
 #include "origami/hardware.hpp"
+#include "origami/math.hpp"
 #include "origami/types.hpp"
 
 #include <vector>
 
 namespace origami {
 namespace streamk {
+
+/**
+ * @brief Returns number of k-iterations (depth-U steps) per output tile.
+ *
+ * Matches Tensile `getItersPerTile` when `mt_k` is the kernel depthU / BLK_K.
+ */
+inline constexpr size_t num_iters_per_tile(size_t mt_k, size_t k) {
+  return math::safe_ceil_div(k, mt_k);
+}
+
+/**
+ * @brief Total K-iterations across all output tiles (StreamK stream length in steps).
+ */
+inline constexpr size_t num_iters_total(size_t output_tiles, size_t iters_per_tile) {
+  return output_tiles * iters_per_tile;
+}
+
+/**
+ * @brief StreamK iterations assigned to each workgroup (ceil of stream / grid).
+ */
+inline constexpr size_t num_iters_per_cta(size_t iters_total, size_t grid) {
+  return grid == 0 ? 0 : math::safe_ceil_div(iters_total, grid);
+}
+
+/**
+ * @brief Fixup peer count (v2) for uneven StreamK schedules (partial / multi-tile WGs).
+ */
+inline constexpr size_t num_fixup_peers_v2(size_t g,
+                                           size_t iters_total,
+                                           size_t iters_per_tile,
+                                           size_t iters_per_cta) {
+  if (g == 0) return 0;
+  size_t hasFixup = (iters_total % g == 0 && iters_per_cta % iters_per_tile == 0) ? 0 : 1;
+  return math::safe_ceil_div(iters_per_tile, iters_per_cta) + hasFixup;
+}
+
 /**
  * @brief Number of output tiles.
  *
