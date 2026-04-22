@@ -90,7 +90,7 @@ struct MemEcoSystemTestCase
 };
 } // namespace
 
-struct GPU_MemoryEcosystemGeneric_SYS : public ::testing::TestWithParam<MemEcoGenericTestCase>
+struct Smoke_MemoryEcosystemGeneric_NONE : public ::testing::TestWithParam<MemEcoGenericTestCase>
 {
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
@@ -125,7 +125,7 @@ inline std::vector<MemEcoGenericTestCase> GenericCases()
     };
 };
 
-TEST_P(GPU_MemoryEcosystemGeneric_SYS, GenericAbleToAllocate)
+TEST_P(Smoke_MemoryEcosystemGeneric_NONE, GenericAbleToAllocate)
 {
     const auto& test_case = this->GetParam();
 
@@ -140,11 +140,11 @@ TEST_P(GPU_MemoryEcosystemGeneric_SYS, GenericAbleToAllocate)
 }
 
 INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_MemoryEcosystemGeneric_SYS,
+                         Smoke_MemoryEcosystemGeneric_NONE,
                          testing::ValuesIn(GenericCases()),
                          MemEcoGenericTestCase::NameGenerator{});
 
-struct GPU_MemoryEcosystemSystem_SYS : public ::testing::TestWithParam<MemEcoSystemTestCase>
+struct Smoke_MemoryEcosystemSystem_NONE : public ::testing::TestWithParam<MemEcoSystemTestCase>
 {
     static auto IsAbleToAllocate(const MemEcoGenericTestCase& testcase)
     {
@@ -169,17 +169,17 @@ inline std::vector<MemEcoSystemTestCase> SystemCases()
     std::vector<MemEcoSystemTestCase> system_cases = {
         {info, {50, 50}, {50, 50}, 0},   // should always be able
         {info, {50, 50}, {50, 50}, 10},  // should always be unable
+        {info, {50, 50}, {50, 50}, 110}, // should always be unable
         {info, {101}, {0}, 0},           // always able if SVRAM > DVRAM
         {info, {101}, {0}, 10},          // may be able if SVRAM > DVRAM
         {info, {0}, {101}, 0},           // always able if DVRAM > SVRAM
         {info, {0}, {101}, 10},          // may be able if DVRAM > SVRAM
-        {info, {50, 50}, {50, 50}, 110}, // should always be unable
     };
 
     return system_cases;
 }
 
-TEST_P(GPU_MemoryEcosystemSystem_SYS, SystemAbleToAllocate)
+TEST_P(Smoke_MemoryEcosystemSystem_NONE, SystemAbleToAllocate)
 {
     const auto& test_case = this->GetParam();
     const auto& info      = test_case.info;
@@ -253,6 +253,6 @@ TEST_P(GPU_MemoryEcosystemSystem_SYS, SystemAbleToAllocate)
 }
 
 INSTANTIATE_TEST_SUITE_P(Full,
-                         GPU_MemoryEcosystemSystem_SYS,
+                         Smoke_MemoryEcosystemSystem_NONE,
                          testing::ValuesIn(SystemCases()),
                          MemEcoSystemTestCase::NameGenerator{});
