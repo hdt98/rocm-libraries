@@ -100,6 +100,9 @@ struct MXfp4_GemmConfig16_Preshuffle : MXfp4_GemmConfig16
     static constexpr auto Scheduler          = ck_tile::GemmPipelineScheduler::Default;
     static constexpr bool Preshuffle         = true;
     static constexpr ck_tile::index_t BContiguousItemsPerAccess = 32;
+
+    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
+    static constexpr bool TiledMMAPermuteN = N_Repeat % 2 == 0;
 };
 
 // GEMM config with 16x16 warp tile
@@ -116,6 +119,9 @@ struct MXfp8_GemmConfig16_Preshuffle : MXfp8_GemmConfig16
     static constexpr ck_tile::index_t M_Tile = 128;
     static constexpr ck_tile::index_t N_Tile = 256;
     static constexpr ck_tile::index_t K_Tile = 256;
-    static constexpr auto Scheduler          = ck_tile::GemmPipelineScheduler::Default;
-    static constexpr bool Preshuffle         = true;
+
+    static constexpr auto Scheduler        = ck_tile::GemmPipelineScheduler::Default;
+    static constexpr bool Preshuffle       = true;
+    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
+    static constexpr bool TiledMMAPermuteN = N_Repeat % 2 == 0;
 };

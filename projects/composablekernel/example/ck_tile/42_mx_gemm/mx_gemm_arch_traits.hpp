@@ -50,6 +50,67 @@ struct MXGemmArchTraits
                                          k1 * MNXdlPack * KXdlPack * XdlMNThread +
                                          n1 * MNXdlPack * KXdlPack + k2 * MNXdlPack + n2;
 
+                if constexpr(!KLast)
+                    std::cout << k << " " << n << " " << outputIndex << std::endl;
+
+                if constexpr(KLast)
+                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
+                else
+                    shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(k, n) : dtype{};
+            }
+        }
+
+        return shuffled;
+    }
+
+    template <bool KLast, typename dtype>
+    static auto preShuffleScalePermuteN(const ck_tile::HostTensor<dtype>& src)
+    {
+        auto src_lengths = src.get_lengths();
+        const auto MN    = KLast ? src_lengths[0] : src_lengths[1];
+        const auto K     = KLast ? src_lengths[1] : src_lengths[0];
+
+        constexpr std::size_t MNXdlPack   = 2;
+        constexpr std::size_t KXdlPack    = 2;
+        constexpr std::size_t XdlMNThread = Config::N_Warp_Tile;
+        constexpr std::size_t NPerBlock   = Config::N_Tile;
+        constexpr std::size_t NWarp       = Config::N_Warp;
+        constexpr std::size_t NRepeat     = NPerBlock / NWarp / XdlMNThread;
+        constexpr std::size_t XdlKThread  = ck_tile::get_warp_size() / XdlMNThread; // 4
+
+        const auto MNPadded = ck_tile::integer_least_multiple(MN, NPerBlock);
+        ck_tile::HostTensor<dtype> shuffled(ck_tile::HostTensorDescriptor(
+            {static_cast<std::size_t>(MNPadded * K)}, {static_cast<std::size_t>(1)}));
+
+        const std::size_t K0 = K / KXdlPack / XdlKThread;
+
+        for(std::size_t n = 0; n < static_cast<std::size_t>(MNPadded); ++n)
+        {
+            for(std::size_t k = 0; k < static_cast<std::size_t>(K); ++k)
+            {
+                const auto n0     = n / NPerBlock;
+                const auto tempn0 = n % NPerBlock;
+                const auto n1     = tempn0 / (XdlMNThread * NRepeat);
+                const auto tempn1 = tempn0 % (XdlMNThread * NRepeat);
+                const auto n2     = tempn1 / (NRepeat);
+                const auto tempn2 = tempn1 % (NRepeat);
+                const auto n3     = tempn2 % MNXdlPack;
+                const auto n4     = tempn2 / MNXdlPack;
+
+                const auto k0    = k / (XdlKThread * KXdlPack);
+                const auto tempk = k % (XdlKThread * KXdlPack);
+                const auto k1    = tempk % XdlKThread;
+                const auto k2    = tempk / XdlKThread;
+
+                const auto outputIndex =
+                    n0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp *
+                        (NRepeat / MNXdlPack) +
+                    n1 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 +
+                    n2 * MNXdlPack * KXdlPack +
+                    k0 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread +
+                    k1 * MNXdlPack * KXdlPack * XdlMNThread + k2 * MNXdlPack +
+                    n4 * MNXdlPack * KXdlPack * XdlMNThread * XdlKThread * K0 * NWarp + n3;
+
                 if constexpr(KLast)
                     shuffled(outputIndex) = n < static_cast<std::size_t>(MN) ? src(n, k) : dtype{};
                 else
