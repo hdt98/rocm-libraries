@@ -298,12 +298,12 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-    template <>
-    __device__ __host__ constexpr auto
-    GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1<gfx125_t>(gfx125_t)
+    template <typename DeviceArch>
+    __device__ __host__ static constexpr auto
+    GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1_impl(DeviceArch)
     {
         constexpr index_t KPerBlockInByte = KPerBlock * sizeof(ADataType) / APackedSize;
-        constexpr index_t LdsSize         = get_n_lds_banks(gfx125_t{}) * 4 / KPerBlockInByte;
+        constexpr index_t LdsSize         = get_n_lds_banks(DeviceArch{}) * 4 / KPerBlockInByte;
         constexpr bool EnableLdsLayer     = ABlockTransferThreadClusterLengths_AK0_M_AK1{}[0] *
                                             ABlockTransferThreadClusterLengths_AK0_M_AK1{}[1] *
                                             ABlockTransferThreadClusterLengths_AK0_M_AK1{}[2] ==
@@ -418,7 +418,7 @@ struct GridwiseGemm_xdl_cshuffle_base
             constexpr index_t NWave    = NPerBlock / (NXdlPerWave * NPerXdl);
             constexpr index_t WaveSize = BlockSize / (MWave * NWave);
 
-            constexpr auto LdsBankSize = get_n_lds_banks(gfx125_t{}) * 4;
+            constexpr auto LdsBankSize = get_n_lds_banks(DeviceArch{}) * 4;
             constexpr auto M0          = ABlockTransferThreadClusterLengths_AK0_M_AK1{}.At(I1);
             constexpr auto M1          = MPerBlock / M0;
 
@@ -502,6 +502,20 @@ struct GridwiseGemm_xdl_cshuffle_base
 
             return a_lds_block_desc_ak0_m_ak1;
         }
+    }
+
+    template <>
+    __device__ __host__ constexpr auto
+    GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1<gfx125_t>(gfx125_t)
+    {
+        return GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1_impl<gfx125_t>(gfx125_t{});
+    }
+
+    template <>
+    __device__ __host__ constexpr auto
+    GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1<gfx13_t>(gfx13_t)
+    {
+        return GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1_impl<gfx13_t>(gfx13_t{});
     }
 
     template <typename DeviceArch>
@@ -661,13 +675,13 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
-    template <>
-    __device__ __host__ constexpr auto
-    GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1<gfx125_t>(gfx125_t)
+    template <typename DeviceArch>
+    __device__ __host__ static constexpr auto
+    GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1_impl(DeviceArch)
     {
         constexpr index_t KPerBlockInByte = KPerBlock * sizeof(BDataType) / BPackedSize;
         // NLdsLayer * K0 as logical Bank
-        constexpr index_t LdsSize     = get_n_lds_banks(gfx125_t{}) * 4 / KPerBlockInByte;
+        constexpr index_t LdsSize     = get_n_lds_banks(DeviceArch{}) * 4 / KPerBlockInByte;
         constexpr bool EnableLdsLayer = BBlockTransferThreadClusterLengths_BK0_N_BK1::Size() == 3 &&
                                         (BBlockTransferThreadClusterLengths_BK0_N_BK1{}[0] *
                                              BBlockTransferThreadClusterLengths_BK0_N_BK1{}[1] *
@@ -782,7 +796,7 @@ struct GridwiseGemm_xdl_cshuffle_base
             constexpr index_t NWave    = NPerBlock / (NXdlPerWave * NPerXdl);
             constexpr index_t WaveSize = BlockSize / (MWave * NWave);
 
-            constexpr auto LdsBankSize = get_n_lds_banks(gfx125_t{}) * 4;
+            constexpr auto LdsBankSize = get_n_lds_banks(DeviceArch{}) * 4;
             constexpr auto N0          = BBlockTransferThreadClusterLengths_BK0_N_BK1{}.At(I1);
             constexpr auto N1          = NPerBlock / N0;
 
@@ -869,6 +883,20 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
+    template <>
+    __device__ __host__ constexpr auto
+    GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1<gfx125_t>(gfx125_t)
+    {
+        return GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1_impl<gfx125_t>(gfx125_t{});
+    }
+
+    template <>
+    __device__ __host__ constexpr auto
+    GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1<gfx13_t>(gfx13_t)
+    {
+        return GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1_impl<gfx13_t>(gfx13_t{});
+    }
+
     template <typename DeviceArch>
     __device__ __host__ static constexpr auto
     GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(DeviceArch)
@@ -886,9 +914,9 @@ struct GridwiseGemm_xdl_cshuffle_base
         return c_shuffle_block_desc_mblock_mperblock_nblock_nperblock;
     }
 
-    template <>
-    __device__ __host__ constexpr auto
-    GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock<gfx125_t>(gfx125_t)
+    template <typename DeviceArch>
+    __device__ __host__ static constexpr auto
+    GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock_impl(DeviceArch)
     {
         constexpr index_t MWave = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t NWave = NPerBlock / (NXdlPerWave * NPerXdl);
@@ -896,7 +924,7 @@ struct GridwiseGemm_xdl_cshuffle_base
         constexpr index_t CShuffleM = CShuffleMXdlPerWavePerShuffle * MWave * MPerXdl;
         constexpr index_t CShuffleN = CShuffleNXdlPerWavePerShuffle * NWave * NPerXdl;
         constexpr index_t LdsSize =
-            get_n_lds_banks(gfx125_t{}) * 4 / CShuffleN / sizeof(CShuffleDataType);
+            get_n_lds_banks(DeviceArch{}) * 4 / CShuffleN / sizeof(CShuffleDataType);
         constexpr index_t CShuffleLdsLayer = LdsSize < 1 ? 1 : LdsSize;
 
         constexpr index_t CShuffleNStride = CShuffleN + 16 / sizeof(CShuffleDataType);
@@ -952,6 +980,22 @@ struct GridwiseGemm_xdl_cshuffle_base
         }
     }
 
+    template <>
+    __device__ __host__ constexpr auto
+    GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock<gfx125_t>(gfx125_t)
+    {
+        return GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock_impl<gfx125_t>(
+            gfx125_t{});
+    }
+
+    template <>
+    __device__ __host__ constexpr auto
+    GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock<gfx13_t>(gfx13_t)
+    {
+        return GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock_impl<gfx13_t>(
+            gfx13_t{});
+    }
+
     template <typename DeviceArch>
     __host__ __device__ static constexpr auto
     GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl(DeviceArch)
@@ -972,16 +1016,16 @@ struct GridwiseGemm_xdl_cshuffle_base
         return c_block_desc_mblock_mxdlperwave_mwavemperxdl_nblock_nxdlperwave_nwavenperxdl;
     }
 
-    template <>
-    __host__ __device__ constexpr auto
-    GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl<gfx125_t>(
-        gfx125_t)
+    template <typename DeviceArch>
+    __host__ __device__ static constexpr auto
+    GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl_impl(
+        DeviceArch)
     {
         constexpr index_t MWave = MPerBlock / (MXdlPerWave * MPerXdl);
         constexpr index_t NWave = NPerBlock / (NXdlPerWave * NPerXdl);
 
         constexpr auto c_shuffle_block_desc_mblock_mperblock_nblock_nperblock =
-            GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(gfx125_t{});
+            GetCShuffleBlockDescriptor_MBlock_MPerBlock_NBlock_NPerBlock(DeviceArch{});
         return transform_tensor_descriptor(
             c_shuffle_block_desc_mblock_mperblock_nblock_nperblock,
             make_tuple(make_pass_through_transform(I1),
@@ -992,6 +1036,24 @@ struct GridwiseGemm_xdl_cshuffle_base
                                                          Number<NWave * NPerXdl>{}))),
             make_tuple(Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}),
             make_tuple(Sequence<0>{}, Sequence<1, 2>{}, Sequence<3>{}, Sequence<4, 5>{}));
+    }
+
+    template <>
+    __host__ __device__ constexpr auto
+    GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl<gfx125_t>(
+        gfx125_t)
+    {
+        return GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl_impl<
+            gfx125_t>(gfx125_t{});
+    }
+
+    template <>
+    __host__ __device__ constexpr auto
+    GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl<gfx13_t>(
+        gfx13_t)
+    {
+        return GetCBlockDescriptor_MBlock_NXdlPerWave_MWaveMPerXdl_NBlock_NXdlPerWave_NWaveNPerXdl_impl<
+            gfx13_t>(gfx13_t{});
     }
 
     template <typename ABlockDescriptor_AK0PerBlock_MPerBlock_AK1>
