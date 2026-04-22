@@ -50,7 +50,6 @@
 #include <Tensile/DataTypes_Float6.hpp>
 #include <Tensile/DataTypes_BFloat6.hpp>
 #include <Tensile/DataTypes_Float4.hpp>
-#include <Tensile/DataTypes_MXScale.hpp>
 #include <Tensile/DataTypes_E8.hpp>
 #include <Tensile/DataTypes_E5M3.hpp>
 
@@ -329,12 +328,6 @@ namespace TensileLite
     };
 #endif // _WIN32
     template <>
-    struct TypeInfo<MXScale>
-        : public BaseTypeInfo<MXScale, rocisa::DataType::MXScale, 1, false, false>
-    {
-    };
-
-    template <>
     struct TypeInfo<E8>
         : public BaseTypeInfo<E8, rocisa::DataType::E8, 1, false, false>
     {
@@ -364,9 +357,8 @@ namespace TensileLite
 #ifndef _WIN32
                                          Float6x32,
                                          BFloat6x32,
-                                         Float4x2,
+                                         Float4x2
 #endif // !_WIN32
-                                         MXScale
                                         >;
 
     // Convert variants to type T

@@ -394,7 +394,7 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
-            case rocisa::DataType::MXScale:;
+            ;
             }
             return DataInitialization::getValue<Accumulator, InitMode::Zero>();
         }
@@ -514,7 +514,6 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
-            case rocisa::DataType::MXScale:
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
@@ -574,7 +573,6 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
-            case rocisa::DataType::MXScale:
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
@@ -1386,8 +1384,8 @@ namespace TensileLite
             typename Inputs::BType const* bPtr    = (typename Inputs::BType const*)inputs.b;
             typename Inputs::CType const* cPtr    = (typename Inputs::CType const*)inputs.c;
             typename Inputs::DType*       dPtr    = (typename Inputs::DType*)inputs.d;
-            MXScale const*                mxsaPtr = (MXScale const*)inputs.mxsa;
-            MXScale const*                mxsbPtr = (MXScale const*)inputs.mxsb;
+            E8 const*                mxsaPtr = (E8 const*)inputs.mxsa;
+            E8 const*                mxsbPtr = (E8 const*)inputs.mxsb;
 
             auto const& freeIndicesA = problem.freeIndicesA();
             auto const& freeIndicesB = problem.freeIndicesB();

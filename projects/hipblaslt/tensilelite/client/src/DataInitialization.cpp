@@ -1965,9 +1965,6 @@ namespace TensileLite
                         break;
 #endif // #ifdef TENSILE_USE_FP4
 #endif // !_WIN32
-                    case rocisa::DataType::MXScale:
-                        prop.value = getValue<MXScale>(prop.init, prop.freeValue);
-                        break;
                     case rocisa::DataType::E8:
                     case rocisa::DataType::E5M3:
                     case rocisa::DataType::Int64:
