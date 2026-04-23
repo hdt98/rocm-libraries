@@ -9,9 +9,6 @@ name: hipDNN Superbuild CI
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled]
-    paths:
-      - 'projects/hipdnn/**'
-      - 'dnn-providers/**'
 
 permissions:
   contents: read
@@ -22,7 +19,7 @@ concurrency:
 
 env:
   # Labels that trigger this workflow. Extend this list to gate on additional labels.
-  TRIGGER_LABELS: '["project: hipdnn"]'
+  TRIGGER_LABELS: '["project: hipdnn", "project: miopen-provider", "project: hipblaslt-provider", "project: hip-kernel-provider", "project: hipdnn-integration-tests"]'
 
 jobs:
   gate:
@@ -37,13 +34,6 @@ jobs:
           PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
         run: |
           echo "PR labels: $PR_LABELS"
-
-          # TODO: Uncomment to respect skip-therockci label
-          # if echo "$PR_LABELS" | jq -e '. | index("skip-therockci")' > /dev/null 2>&1; then
-          #   echo "skip-therockci label detected — skipping"
-          #   echo "should_run=false" >> "$GITHUB_OUTPUT"
-          #   exit 0
-          # fi
 
           # Check if any trigger label is present
           TRIGGER='${{ env.TRIGGER_LABELS }}'
