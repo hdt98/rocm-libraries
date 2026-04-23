@@ -18,14 +18,14 @@ namespace ck_tile {
  *  pattern that avoids LDS bank conflicts.
  *
  *  Definition:  2 dims --> 2 dims
- *  Traversal:   2 upper --> 2 lower
+ *  Traversal:   2 input --> 2 output
  *
- *  lower[0] = upper[0]
- *  lower[1] = upper[1] ^ (upper[0] % length_1)
+ *  output[0] = input[0]
+ *  output[1] = input[1] ^ (input[0] % length_1)
  *
  *  XOR is its own inverse — applying it twice recovers the original indices.
  *
- *  ndim_upper = 2, ndim_lower = 2
+ *  ndim_input = 2, ndim_output = 2
  */
 template <>
 struct TransformImpl<TransformType::XOR>
@@ -55,32 +55,32 @@ struct TransformImpl<TransformType::XOR>
 
     /** @brief Forward: swizzle dim 1 by XORing with dim 0 (mod length_1). */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
+    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
-        auto d   = readSchema(t);
-        lower[0] = upper[0];
-        lower[1] = upper[1] ^ (upper[0] % d.length_1);
+        auto d    = readSchema(t);
+        output[0] = input[0];
+        output[1] = input[1] ^ (input[0] % d.length_1);
     }
 
     /** @brief Reverse: XOR is self-inverse — same operation undoes itself. */
     static CK_TILE_HOST_DEVICE constexpr void
-    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
+    reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
         auto d   = readSchema(t);
-        upper[0] = lower[0];
-        upper[1] = lower[1] ^ (lower[0] % d.length_1);
+        input[0] = output[0];
+        input[1] = output[1] ^ (output[0] % d.length_1);
     }
 
     /** @brief Always valid — XOR preserves index range for power-of-2 length_1
      *  (the typical LDS use case). For non-power-of-2, results may exceed bounds. */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& /*t*/,
-                                                           const index_t* /*upper*/)
+    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& /*t*/,
+                                                           const index_t* /*input*/)
     {
         return true;
     }
 
-    /** @brief Get the length of the i-th upper dimension. */
-    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+    /** @brief Get the length of the i-th input dimension. */
+    static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i)
     {
         auto d = readSchema(t);

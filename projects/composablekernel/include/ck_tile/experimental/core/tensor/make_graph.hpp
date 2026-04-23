@@ -4,12 +4,21 @@
 /** @file make_graph.hpp
  *  @brief Factory functions for constructing TransformGraph instances.
  *
- *  These are plain constexpr functions (no __host__ __device__) because they
- *  run only at compile time during graph construction. The resulting
- *  TransformGraph values flow to device code via NTTP.
+ *  Three overloads of make_transform_graph:
  *
- *  Every factory calls canonicalize() before returning to guarantee
- *  NTTP deduplication safety (all unused slots zeroed).
+ *  1. make_transform_graph(desc) — single TensorDescriptor → Embed graph.
+ *     N inputs (descriptor dims), 1 output (memory offset). Implicit.
+ *
+ *  2. make_transform_graph(graph) — identity, returns a copy.
+ *
+ *  3. make_transform_graph(outputs(...), transforms..., inputs(...))
+ *     Full explicit API. outputs() and inputs() declare the graph's
+ *     interface. Transforms use global slot indices with read()/write().
+ *     Supports transform(xform, ...), transform(desc, ...), and
+ *     transform(graph, ...) for sub-graph embedding.
+ *
+ *  If the graph has more than one transform, inputs() and outputs() are
+ *  REQUIRED. There is no implicit derivation of the graph's interface.
  */
 
 #pragma once
@@ -24,384 +33,316 @@ namespace ck_tile {
 
 namespace detail {
 
-/** @brief Zero-fill all unused array slots to guarantee NTTP deduplication.
- *
- *  Two graphs with identical meaningful content but different garbage in
- *  unused slots would be different NTTP values, causing duplicate template
- *  instantiations. This function ensures all unused slots are zeroed.
- *
- *  Called automatically by all graph factory functions.
- *
- *  @param g  Graph to canonicalize (modified in place)
- */
+void graph_validation_error_double_write_to_slot();
+void graph_validation_error_wrong_traversal_order();
+void graph_validation_error_input_slot_is_written();
+void graph_validation_error_output_slot_is_read_only();
+void graph_validation_error_too_many_transforms();
+
 constexpr void canonicalize(TransformGraph& g)
 {
     for(index_t t = g.num_transforms; t < MAX_TRANSFORMS; ++t)
     {
-        g.transforms[t]    = CoordinateTransform{};
-        g.t_upper_slots[t] = DimIds{};
-        g.t_lower_slots[t] = DimIds{};
+        g.transforms[t]     = CoordinateTransform{};
+        g.t_input_slots[t]  = DimIds{};
+        g.t_output_slots[t] = DimIds{};
     }
-    for(index_t i = g.ndim_upper; i < MAX_TENSOR_DIMS; ++i)
-    {
-        g.upper_slots[i] = 0;
-    }
-    for(index_t i = g.ndim_lower; i < MAX_TENSOR_DIMS; ++i)
-    {
-        g.lower_slots[i] = 0;
-    }
+    for(index_t i = g.ndim_input; i < MAX_TENSOR_DIMS; ++i)
+        g.input_slots[i] = 0;
+    for(index_t i = g.ndim_output; i < MAX_TENSOR_DIMS; ++i)
+        g.output_slots[i] = 0;
 }
 
-/** @brief Create a transform graph from a tensor descriptor.
+/** @brief Single-descriptor graph: Embed with N inputs, 1 output.
  *
- *  Produces a single Embed transform that maps the descriptor's dimensions
- *  to a 1D memory offset using its lengths and strides.
- *
- *  This is the bridge between tensor metadata (TensorDescriptor) and
- *  coordinate mapping (TransformGraph). The descriptor describes WHAT
- *  the tensor looks like; the graph describes HOW to compute offsets.
- *
- *  @param desc  Tensor descriptor with lengths and strides
- *  @return TransformGraph with 1 Embed transform, ndim_upper=desc.ndim, ndim_lower=1
- *
- *  Example:
- *    constexpr auto desc = make_tensor_descriptor({8, 128, 8}, {1032, 8, 1});
- *    constexpr auto graph = make_transform_graph(desc);
+ *  Used by the public make_transform_graph(desc) convenience overload.
+ *  Inputs are the descriptor's dims (slots 1..N), output is the memory
+ *  offset (slot 0).
  */
-constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc)
+constexpr TransformGraph make_transform_graph(const TensorDescriptor& desc)
 {
-    using EmbedImpl = TransformImpl<TransformType::EMBED>;
+    TransformGraph g{};
 
-    detail::TransformGraph g{};
-
-    // Build Embed transform via Schema.
-    // Cannot delegate to make_embed() because it is templated on NDim
-    // (compile-time) while desc.ndim is a constexpr runtime value.
-    // Both use the same Schema layout and bijectivity/magic_div logic.
-    CoordinateTransform embed{};
-    embed.type       = TransformType::EMBED;
-    embed.ndim_upper = desc.ndim;
-    embed.ndim_lower = 1;
-
-    EmbedImpl::Schema d{};
-    for(index_t i = 0; i < desc.ndim; ++i)
-    {
-        d.dim_lengths[i] = desc.lengths[i];
-        d.strides[i]     = desc.strides[i];
-    }
-
-    embed.is_bijective = true;
-    for(index_t i = 0; i < desc.ndim - 1; ++i)
-    {
-        if(desc.strides[i] < desc.strides[i + 1] * desc.lengths[i + 1])
-            embed.is_bijective = false;
-        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
-    }
-
-    EmbedImpl::writeSchema(embed, d);
-    g.transforms[0]  = embed;
+    g.transforms[0]  = make_embed(desc);
     g.num_transforms = 1;
 
-    // Routing: Embed reads from slots 1..N, writes to slot 0
-    g.t_lower_slots[0][0] = 0;
+    g.t_output_slots[0][0] = 0;
     for(index_t i = 0; i < desc.ndim; ++i)
-    {
-        g.t_upper_slots[0][i] = 1 + i;
-    }
+        g.t_input_slots[0][i] = 1 + i;
 
-    // Graph endpoints
-    g.ndim_upper = desc.ndim;
-    g.ndim_lower = 1;
+    g.ndim_input  = desc.ndim;
+    g.ndim_output = 1;
     for(index_t i = 0; i < desc.ndim; ++i)
-    {
-        g.upper_slots[i] = 1 + i;
-    }
-    g.lower_slots[0] = 0;
+        g.input_slots[i] = 1 + i;
+    g.output_slots[0] = 0;
 
     g.num_slots = 1 + desc.ndim;
 
-    detail::canonicalize(g);
+    canonicalize(g);
     return g;
 }
 
-/** @brief Push new transforms onto the graph's transform stack.
- *
- *  New transforms are pushed above the existing stack (closer to the user).
- *  During traversal, they will be popped first (LIFO). Slot routing is
- *  computed automatically.
- *
- *  See transform_graph.hpp file header for the complete explanation of how
- *  input_dims and output_dims control slot routing, with worked examples
- *  and diagrams.
- *
- *  @tparam NumNewTransforms  Number of transforms to add (deduced)
- *  @param graph        The existing graph to extend
- *  @param transforms   New transforms to append
- *  @param input_dims   Which OLD graph dims each transform REPLACES.
- *                      Controls WRITE routing during traversal.
- *  @param output_dims  Which NEW user-facing dims each transform CREATES.
- *                      Controls READ routing during traversal.
- *  @return New graph with transforms appended, routing computed, and canonicalized.
- */
-template <index_t NumNewTransforms>
-constexpr detail::TransformGraph
-applyTransforms(const detail::TransformGraph& graph,
-                const static_array<CoordinateTransform, NumNewTransforms>& new_transforms,
-                const static_array<DimIds, NumNewTransforms>& input_dims,
-                const static_array<DimIds, NumNewTransforms>& output_dims)
-{
-    static_assert(NumNewTransforms >= 1, "applyTransforms: need at least 1 transform");
-
-    detail::TransformGraph g = graph;
-
-    index_t next_slot = g.num_slots;
-
-    for(index_t i = 0; i < NumNewTransforms; ++i)
-    {
-        index_t t_idx = g.num_transforms + i;
-
-        g.transforms[t_idx] = new_transforms[i];
-
-        // input_dims controls WRITE routing during traversal:
-        // "which old dims does this transform replace?"
-        // Wire the transform's output slots to those old dim slots.
-        for(index_t d = 0; d < new_transforms[i].ndim_lower; ++d)
-        {
-            index_t old_upper_dim     = input_dims[i][d];
-            g.t_lower_slots[t_idx][d] = graph.upper_slots[old_upper_dim];
-        }
-
-        // Allocate fresh slots for the transform's READ side.
-        // output_dims (below) will map these to user-facing dimensions.
-        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
-        {
-            g.t_upper_slots[t_idx][d] = next_slot++;
-        }
-    }
-
-    g.num_transforms = graph.num_transforms + NumNewTransforms;
-    g.num_slots      = next_slot;
-
-    // output_dims controls READ routing during traversal:
-    // "which new user-facing dim does each transform's input become?"
-    // Map user dim indices to the fresh slots allocated above.
-    index_t new_ndim_upper = 0;
-    for(index_t i = 0; i < NumNewTransforms; ++i)
-    {
-        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
-        {
-            if(output_dims[i][d] >= 0)
-            {
-                index_t new_dim_idx = output_dims[i][d];
-                if(new_dim_idx + 1 > new_ndim_upper)
-                {
-                    new_ndim_upper = new_dim_idx + 1;
-                }
-            }
-        }
-    }
-
-    // Wire user-facing dim indices to the fresh slots that transforms read from.
-    static_array<index_t, MAX_TENSOR_DIMS> new_upper_slots{};
-    for(index_t i = 0; i < NumNewTransforms; ++i)
-    {
-        for(index_t d = 0; d < new_transforms[i].ndim_upper; ++d)
-        {
-            if(output_dims[i][d] >= 0)
-            {
-                index_t new_dim_idx          = output_dims[i][d];
-                index_t t_idx                = graph.num_transforms + i;
-                new_upper_slots[new_dim_idx] = g.t_upper_slots[t_idx][d];
-            }
-        }
-    }
-
-    g.ndim_upper  = new_ndim_upper;
-    g.upper_slots = new_upper_slots;
-
-    // lower_slots and ndim_lower remain unchanged from original graph
-
-    detail::canonicalize(g);
-    return g;
-}
-
-/** @brief Check whether all transforms in a graph are bijective.
- *
- *  A graph is reversible if and only if every transform is bijective.
- *  The is_bijective flag is set automatically by factory functions.
- *
- *  @tparam G  The transform graph (NTTP)
- *  @return true if all transforms are bijective
- */
-template <detail::TransformGraph G>
+template <TransformGraph G>
 constexpr bool isGraphBijective()
 {
     for(index_t t = 0; t < G.num_transforms; ++t)
-    {
         if(!G.transforms[t].is_bijective)
-        {
             return false;
-        }
-    }
     return true;
 }
 
-/// Unpack N TransformBindings into parallel arrays for applyTransforms.
-template <index_t N>
-constexpr detail::TransformGraph applyBindings(const detail::TransformGraph& graph,
-                                               const static_array<TransformBinding, N>& bindings)
+/** @brief Build a graph from bindings with explicit inputs/outputs.
+ *
+ *  All read()/write() values are global slot positions. inputs() and
+ *  outputs() declare the graph's interface and ordering.
+ */
+constexpr TransformGraph
+buildGraphWithIO(const static_array<TransformBinding, MAX_TRANSFORMS>& bindings,
+                 index_t num_bindings,
+                 const GraphInputs& ins,
+                 const GraphOutputs& outs)
 {
-    static_array<CoordinateTransform, N> transforms{};
-    static_array<DimIds, N> lower_dims{}; // which old dims to replace
-    static_array<DimIds, N> upper_dims{}; // which new dims to create
+    TransformGraph g{};
 
-    for(index_t i = 0; i < N; ++i)
+    index_t max_slot = 0;
+    for(index_t i = 0; i < num_bindings; ++i)
     {
-        transforms[i] = bindings[i].xform;
-        lower_dims[i] = bindings[i].lower_dims;
-        upper_dims[i] = bindings[i].upper_dims;
+        g.transforms[i] = bindings[i].xform;
+
+        for(index_t d = 0; d < bindings[i].xform.ndim_output; ++d)
+        {
+            g.t_output_slots[i][d] = bindings[i].write_dims[d];
+            if(bindings[i].write_dims[d] + 1 > max_slot)
+                max_slot = bindings[i].write_dims[d] + 1;
+        }
+
+        for(index_t d = 0; d < bindings[i].xform.ndim_input; ++d)
+        {
+            g.t_input_slots[i][d] = bindings[i].read_dims[d];
+            if(bindings[i].read_dims[d] + 1 > max_slot)
+                max_slot = bindings[i].read_dims[d] + 1;
+        }
     }
 
-    // applyTransforms param order: (transforms, input_dims=lower, output_dims=upper)
-    return applyTransforms(graph, transforms, lower_dims, upper_dims);
+    g.num_transforms = num_bindings;
+    g.num_slots      = max_slot;
+
+    static_array<index_t, MAX_SLOTS> write_count{};
+    static_array<index_t, MAX_SLOTS> is_read{};
+    static_array<index_t, MAX_SLOTS> written_by{};
+
+    for(index_t s = 0; s < MAX_SLOTS; ++s)
+        written_by[s] = -1;
+
+    for(index_t i = 0; i < num_bindings; ++i)
+    {
+        for(index_t d = 0; d < bindings[i].xform.ndim_output; ++d)
+        {
+            index_t s = bindings[i].write_dims[d];
+            if(s >= 0)
+            {
+                write_count[s]++;
+                written_by[s] = i;
+            }
+        }
+        for(index_t d = 0; d < bindings[i].xform.ndim_input; ++d)
+        {
+            index_t s = bindings[i].read_dims[d];
+            if(s >= 0)
+                is_read[s] = 1;
+        }
+    }
+
+    for(index_t s = 0; s < max_slot; ++s)
+    {
+        if(write_count[s] > 1)
+            graph_validation_error_double_write_to_slot();
+    }
+
+    for(index_t i = 0; i < num_bindings; ++i)
+    {
+        for(index_t d = 0; d < bindings[i].xform.ndim_input; ++d)
+        {
+            index_t s = bindings[i].read_dims[d];
+            if(s >= 0 && write_count[s] > 0)
+            {
+                if(written_by[s] <= i)
+                    graph_validation_error_wrong_traversal_order();
+            }
+        }
+    }
+
+    index_t n_ins = count_valid(ins.slots);
+    for(index_t i = 0; i < n_ins; ++i)
+    {
+        if(write_count[ins.slots[i]] > 0)
+            graph_validation_error_input_slot_is_written();
+    }
+
+    index_t n_outs = count_valid(outs.slots);
+    for(index_t i = 0; i < n_outs; ++i)
+    {
+        if(is_read[outs.slots[i]] && !write_count[outs.slots[i]])
+            graph_validation_error_output_slot_is_read_only();
+    }
+
+    g.ndim_input = n_ins;
+    for(index_t i = 0; i < n_ins; ++i)
+        g.input_slots[i] = ins.slots[i];
+
+    g.ndim_output = n_outs;
+    for(index_t i = 0; i < n_outs; ++i)
+        g.output_slots[i] = outs.slots[i];
+
+    canonicalize(g);
+    return g;
+}
+
+constexpr index_t expandGraphBinding(static_array<TransformBinding, MAX_TRANSFORMS>& arr,
+                                     index_t idx,
+                                     const GraphBinding& gb,
+                                     index_t slot_offset)
+{
+    const auto& sub = gb.graph;
+
+    static_array<index_t, MAX_SLOTS> remap{};
+    for(index_t s = 0; s < MAX_SLOTS; ++s)
+        remap[s] = slot_offset + s;
+
+    for(index_t i = 0; i < sub.ndim_input; ++i)
+        remap[sub.input_slots[i]] = gb.read_dims[i];
+
+    for(index_t i = 0; i < sub.ndim_output; ++i)
+        remap[sub.output_slots[i]] = gb.write_dims[i];
+
+    for(index_t i = 0; i < sub.num_transforms; ++i)
+    {
+        if(idx + i >= MAX_TRANSFORMS)
+            graph_validation_error_too_many_transforms();
+
+        arr[idx + i].xform = sub.transforms[i];
+
+        DimIds remapped_read{};
+        for(auto& x : remapped_read.elems)
+            x = -1;
+        for(index_t d = 0; d < sub.transforms[i].ndim_input; ++d)
+            remapped_read[d] = remap[sub.t_input_slots[i][d]];
+        arr[idx + i].read_dims = remapped_read;
+
+        DimIds remapped_write{};
+        for(auto& x : remapped_write.elems)
+            x = -1;
+        for(index_t d = 0; d < sub.transforms[i].ndim_output; ++d)
+            remapped_write[d] = remap[sub.t_output_slots[i][d]];
+        arr[idx + i].write_dims = remapped_write;
+    }
+
+    return sub.num_transforms;
+}
+
+// --- Recursive helpers: outputs(...), transforms..., inputs(...) ---
+
+template <typename... Rest>
+constexpr TransformGraph collectBindingsAndBuild(GraphOutputs,
+                                                 static_array<TransformBinding, MAX_TRANSFORMS>,
+                                                 index_t,
+                                                 index_t,
+                                                 TransformBinding,
+                                                 Rest...);
+template <typename... Rest>
+constexpr TransformGraph collectBindingsAndBuild(GraphOutputs,
+                                                 static_array<TransformBinding, MAX_TRANSFORMS>,
+                                                 index_t,
+                                                 index_t,
+                                                 GraphBinding,
+                                                 Rest...);
+
+constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
+                                                 static_array<TransformBinding, MAX_TRANSFORMS> arr,
+                                                 index_t idx,
+                                                 index_t /*max_slot*/,
+                                                 GraphInputs ins)
+{
+    return buildGraphWithIO(arr, idx, ins, outs);
+}
+
+template <typename... Rest>
+constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
+                                                 static_array<TransformBinding, MAX_TRANSFORMS> arr,
+                                                 index_t idx,
+                                                 index_t max_slot,
+                                                 TransformBinding binding,
+                                                 Rest... rest)
+{
+    arr[idx] = binding;
+    for(index_t d = 0; d < binding.xform.ndim_input; ++d)
+        if(binding.read_dims[d] >= 0 && binding.read_dims[d] + 1 > max_slot)
+            max_slot = binding.read_dims[d] + 1;
+    for(index_t d = 0; d < binding.xform.ndim_output; ++d)
+        if(binding.write_dims[d] >= 0 && binding.write_dims[d] + 1 > max_slot)
+            max_slot = binding.write_dims[d] + 1;
+    return collectBindingsAndBuild(outs, arr, idx + 1, max_slot, rest...);
+}
+
+template <typename... Rest>
+constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
+                                                 static_array<TransformBinding, MAX_TRANSFORMS> arr,
+                                                 index_t idx,
+                                                 index_t max_slot,
+                                                 GraphBinding gbinding,
+                                                 Rest... rest)
+{
+    index_t n_r = count_valid(gbinding.read_dims);
+    index_t n_w = count_valid(gbinding.write_dims);
+    for(index_t i = 0; i < n_r; ++i)
+        if(gbinding.read_dims[i] + 1 > max_slot)
+            max_slot = gbinding.read_dims[i] + 1;
+    for(index_t i = 0; i < n_w; ++i)
+        if(gbinding.write_dims[i] + 1 > max_slot)
+            max_slot = gbinding.write_dims[i] + 1;
+
+    index_t added = expandGraphBinding(arr, idx, gbinding, max_slot);
+    return collectBindingsAndBuild(
+        outs, arr, idx + added, max_slot + gbinding.graph.num_slots, rest...);
 }
 
 } // namespace detail
 
 // ============================================================================
-// User-facing make_transform_graph overloads using TransformBinding
+// make_transform_graph — the only graph construction function
 // ============================================================================
 
-/** @brief Create a transform graph from a descriptor and transform bindings.
+/** @brief Convenience: single descriptor → Embed graph.
  *
- *  Builds one layer of transforms on top of a descriptor's base Embed.
- *  All bindings are applied as a single batch — lower() indices always
- *  refer to the descriptor's upper dims, never to another binding's output.
- *
- *  Index flow:
- *    Base Embed:  lower = [0] (memory offset)
- *                 upper = [0, 1, 2, ...] (descriptor dims)
- *    Bindings:    lower() references the Embed's upper indices
- *                 upper() defines the result graph's upper indices
- *    Result:      lower = [0] (memory offset)
- *                 upper = [0, 1, ...] (as defined by bindings' upper())
- *
- *  To add a second layer on top of this graph's outputs, use
- *  apply_transforms() on the result.
- *
- *  Example (desc has 3 dims: [0]=K/8, [1]=M, [2]=K%8):
- *    constexpr auto g = make_transform_graph(desc,
- *        transform(make_pass_through(M), lower(1),    upper(0)),
- *        transform(make_merge(K/8, 8),   lower(0, 2), upper(1)));
- *    // Result: lower=[0] (offset), upper=[0]=M, [1]=K
+ *  Creates a graph with one Embed transform. The descriptor's N dims
+ *  become the graph's N inputs; the memory offset is the single output.
+ *  Inputs and outputs are implicit because the Embed's interface is
+ *  fully determined by the descriptor.
  */
-template <typename... Bindings>
-constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc,
-                                                      Bindings... bindings)
+constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc)
 {
-    constexpr index_t N = sizeof...(Bindings);
-    auto g              = detail::make_transform_graph(desc);
-    static_array<TransformBinding, N> arr{bindings...};
-    return detail::applyBindings(g, arr);
+    return detail::make_transform_graph(desc);
 }
 
-/** @brief Create a transform graph from transform bindings only (no descriptor).
+/** @brief Identity: returns a copy of the graph. */
+constexpr detail::TransformGraph make_transform_graph(const detail::TransformGraph& g) { return g; }
+
+/** @brief Full explicit graph construction with inputs/outputs.
  *
- *  For general coordinate mappings that don't involve a tensor. The first
- *  binding typically provides the base transform (e.g., an Embed defining
- *  the memory layout).
+ *  outputs() at the top, transforms in base-first order, inputs() at
+ *  the bottom. Reading top-to-bottom follows the graph from memory to
+ *  user. Every multi-transform graph MUST use this overload.
  *
- *  @param first     First transform binding (typically the base/Embed)
- *  @param rest      Additional transform bindings (variadic)
- *  @return TransformGraph with all bindings applied
- *
- *  Example:
- *    constexpr auto g = make_transform_graph(
- *        transform(make_embed({8,128,8}, {1032,8,1}), upper(0,1,2), lower(0)),
- *        transform(make_pass_through(128),            upper(0),     lower(1)),
- *        transform(make_merge({8, 8}),                upper(1),     lower(0, 2)));
+ *  Transforms can be:
+ *    transform(xform, read(...), write(...))  — single transform
+ *    transform(desc,  read(...), write(...))  — descriptor as Embed
+ *    transform(graph, read(...), write(...))  — sub-graph inlined
  */
-template <typename... Bindings>
-constexpr detail::TransformGraph make_transform_graph(TransformBinding first, Bindings... rest)
+template <typename... Args>
+constexpr detail::TransformGraph make_transform_graph(GraphOutputs outs, Args... args)
 {
-    // Build the base graph from the first binding
-    detail::TransformGraph g{};
-
-    g.transforms[0]  = first.xform;
-    g.num_transforms = 1;
-
-    // Wire based on the first binding's dims
-    // Lower dims: where the transform writes (toward memory)
-    index_t num_lower = 0;
-    for(index_t i = 0; i < MAX_TENSOR_DIMS; ++i)
-    {
-        if(first.lower_dims[i] >= 0)
-        {
-            g.t_lower_slots[0][i] = first.lower_dims[i];
-            num_lower++;
-        }
-    }
-    g.ndim_lower = num_lower;
-    for(index_t i = 0; i < num_lower; ++i)
-    {
-        g.lower_slots[i] = first.lower_dims[i];
-    }
-
-    // Upper dims: where the transform reads (from user side)
-    index_t num_upper = 0;
-    index_t max_slot  = num_lower;
-    for(index_t i = 0; i < MAX_TENSOR_DIMS; ++i)
-    {
-        if(first.upper_dims[i] >= 0)
-        {
-            index_t slot                       = num_lower + i;
-            g.t_upper_slots[0][i]              = slot;
-            g.upper_slots[first.upper_dims[i]] = slot;
-            if(slot >= max_slot)
-                max_slot = slot + 1;
-            num_upper++;
-        }
-    }
-    g.ndim_upper = num_upper;
-    g.num_slots  = max_slot;
-
-    detail::canonicalize(g);
-
-    // Apply remaining bindings as a batch
-    if constexpr(sizeof...(rest) > 0)
-    {
-        constexpr index_t N = sizeof...(rest);
-        static_array<TransformBinding, N> arr{rest...};
-        g = detail::applyBindings(g, arr);
-    }
-    return g;
-}
-
-/** @brief Apply transform bindings to an existing graph (adds a new layer).
- *
- *  Bindings are applied as a single batch. lower() indices refer to the
- *  input graph's upper dims — NOT to the original descriptor's dims.
- *
- *  Index flow:
- *    Input graph: lower = [0] (memory offset)
- *                 upper = [0, 1] (e.g., M, K from a previous layer)
- *    Bindings:    lower() references the input graph's upper indices
- *                 upper() defines the result graph's upper indices
- *    Result:      lower = [0] (memory offset, unchanged)
- *                 upper = [0, 1, ...] (as defined by bindings' upper())
- *
- *  Example (input graph has upper=[0]=M, [1]=K):
- *    constexpr auto g2 = apply_transforms(g,
- *        transform(make_xor(M, K), lower(0, 1), upper(0, 1)));
- *    // Result: lower=[0] (offset), upper=[0]=M_xored, [1]=K_xored
- */
-template <typename... Bindings>
-constexpr detail::TransformGraph apply_transforms(const detail::TransformGraph& graph,
-                                                  Bindings... bindings)
-{
-    constexpr index_t N = sizeof...(Bindings);
-    static_array<TransformBinding, N> arr{bindings...};
-    return detail::applyBindings(graph, arr);
+    static_array<TransformBinding, MAX_TRANSFORMS> arr{};
+    return detail::collectBindingsAndBuild(outs, arr, 0, 0, args...);
 }
 
 } // namespace ck_tile

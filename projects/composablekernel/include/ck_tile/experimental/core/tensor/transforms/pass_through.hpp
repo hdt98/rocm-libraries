@@ -16,7 +16,7 @@ namespace ck_tile {
  *  Definition:  1 dim --> 1 dim (same value, same length)
  *  Traversal:   1 dim --> 1 dim (identity in both directions)
  *
- *  ndim_upper = 1, ndim_lower = 1
+ *  ndim_input = 1, ndim_output = 1
  */
 template <>
 struct TransformImpl<TransformType::PASS_THROUGH>
@@ -43,29 +43,29 @@ struct TransformImpl<TransformType::PASS_THROUGH>
 
     // ── Operations ──
 
-    /** @brief Forward: upper to lower (identity). */
+    /** @brief Forward: input to output (identity). */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& /*t*/, index_t* lower, const index_t* upper)
+    mapIndices(const CoordinateTransform& /*t*/, index_t* output, const index_t* input)
     {
-        lower[0] = upper[0];
+        output[0] = input[0];
     }
 
     /** @brief Reverse: identity (same as forward). */
     static CK_TILE_HOST_DEVICE constexpr void
-    reverseMapIndices(const CoordinateTransform& /*t*/, index_t* upper, const index_t* lower)
+    reverseMapIndices(const CoordinateTransform& /*t*/, index_t* input, const index_t* output)
     {
-        upper[0] = lower[0];
+        input[0] = output[0];
     }
 
     /** @brief Always valid — identity cannot produce out-of-bounds. */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& /*t*/,
-                                                           const index_t* /*upper*/)
+    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& /*t*/,
+                                                           const index_t* /*input*/)
     {
         return true;
     }
 
     /** @brief Upper dimension length. */
-    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+    static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
         auto d = readSchema(t);

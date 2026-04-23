@@ -7,8 +7,8 @@
  *  Each TransformType has a TransformImpl specialization providing:
  *  - mapIndices(): the forward index mapping (traversal direction)
  *  - reverseMapIndices(): the inverse index mapping (reverse traversal)
- *  - isValidUpper(): bounds checking
- *  - upperLength(): query input dimension length
+ *  - isValidInput(): bounds checking
+ *  - inputLength(): query input dimension length
  *
  *  Specializations are in separate files under transforms/.
  *  The primary template uses = delete to produce a clear compile error
@@ -41,17 +41,17 @@ template <TransformType Type>
 struct TransformImpl
 {
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper) = delete;
+    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input) = delete;
 
     /// Inverse of mapIndices. Takes output-side values, produces input-side values.
     /// Each specialization implements this alongside mapIndices (open/closed).
     static CK_TILE_HOST_DEVICE constexpr void
-    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower) = delete;
+    reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output) = delete;
 
-    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
-                                                           const index_t* upper) = delete;
+    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
+                                                           const index_t* input) = delete;
 
-    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+    static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i) = delete;
 };
 

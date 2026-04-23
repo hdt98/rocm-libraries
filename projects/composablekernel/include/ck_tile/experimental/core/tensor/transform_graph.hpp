@@ -50,9 +50,9 @@
  *      [0] Embed   reads {1,2,3}   writes {0}   strides=(1032,8,1)
  *
  *    Endpoints:
- *      upper_slots  = {1, 2, 3}    (dim 0=K/8, dim 1=M, dim 2=K_mod8)
- *      lower_slots = {0}          (memory offset)
- *      ndim_upper   = 3
+ *      input_slots  = {1, 2, 3}    (dim 0=K/8, dim 1=M, dim 2=K_mod8)
+ *      output_slots = {0}          (memory offset)
+ *      ndim_input   = 3
  *
  *  At this point the user would need to provide 3 coordinates (K/8, M, K_mod8).
  *  We want to reduce this to 2 coordinates (M, K) by merging K/8 and K_mod8.
@@ -136,7 +136,7 @@
  *    User provides:   dim 0 = M                dim 1 = K
  *                         |                        |
  *                         v                        v
- *    upper_slots:      slot[4]                  slot[5]
+ *    input_slots:      slot[4]                  slot[5]
  *                         |                        |
  *                   .-----'                  .-----'
  *                   |                        |
@@ -159,7 +159,7 @@
  *                   '-----.
  *                         |
  *                         v
- *    lower_slots:     slot[0]
+ *    output_slots:     slot[0]
  *                    memory offset
  *
  *
@@ -192,18 +192,18 @@
  *                         output = 2107
  *
  *
- *  ndim_upper AND ndim_lower
+ *  ndim_input AND ndim_output
  *  ==========================
  *
  *  These fields describe the traversal direction (top-down) for each transform:
  *
- *    ndim_upper  = dimensions received from above (from the user, or from
+ *    ndim_input  = dimensions received from above (from the user, or from
  *                  the transform above in the stack)
- *    ndim_lower = dimensions sent below (toward memory, feeding the
+ *    ndim_output = dimensions sent below (toward memory, feeding the
  *                  transform below in the stack)
  *
  *   .-------------------.---------------------------------------------------.
- *   | Transform         | ndim_upper (from above)  | ndim_lower (to below) |
+ *   | Transform         | ndim_input (from above)  | ndim_output (to below) |
  *   |-------------------|--------------------------|------------------------|
  *   | Merge (N->1)      | 1 (one merged value)     | N (N components)       |
  *   | Unmerge (1->N)    | N (N component values)   | 1 (one flat value)     |
@@ -214,7 +214,7 @@
  *
  *  Note: Merge is defined as "combine N dims into 1", but during traversal
  *  it must UNDO itself --- decomposing 1 merged value back into N components.
- *  So ndim_upper=1 and ndim_lower=N, which is the inverse of the definition.
+ *  So ndim_input=1 and ndim_output=N, which is the inverse of the definition.
  *  This is true for every transform: traversal applies the inverse because
  *  it walks the stack top-down while the stack was built bottom-up.
  */
@@ -230,7 +230,7 @@
 
 namespace ck_tile {
 
-inline constexpr index_t MAX_TRANSFORMS = 5; ///< Max transforms per graph
+inline constexpr index_t MAX_TRANSFORMS = 20; ///< Max transforms per graph
 inline constexpr index_t MAX_SLOTS =
     70; ///< Max working array slots (1 + MAX_TENSOR_DIMS for base Embed)
 
@@ -242,7 +242,7 @@ namespace detail {
  *  Used as an NTTP: template<TransformGraph G> to guarantee compile-time
  *  constant folding of all transform parameters.
  *
- *  Common use case: tensor layout descriptor where ndim_lower=1 (memory offset).
+ *  Common use case: tensor layout descriptor where ndim_output=1 (memory offset).
  *  The graph is general and can map between any two coordinate spaces.
  *
  *  Internally routes indices through a working array of slots. The user
@@ -256,8 +256,8 @@ namespace detail {
  *    constexpr auto g = ...;
  *    auto offset = calculateOffset<g>(static_array<index_t, 2>{m, k});
  *
- *  @note Internal routing fields (t_upper_slots, t_lower_slots, upper_slots,
- *        lower_slots, num_slots) must be public for structural NTTP requirements.
+ *  @note Internal routing fields (t_input_slots, t_output_slots, input_slots,
+ *        output_slots, num_slots) must be public for structural NTTP requirements.
  *        They are assigned by factory functions. Users should not set them directly.
  */
 struct TransformGraph
@@ -271,20 +271,20 @@ struct TransformGraph
 
     // --- Internal routing (assigned by factory functions, not user-facing) ---
     // Per-transform: which working-array slots each transform reads from / writes to.
-    static_array<DimIds, MAX_TRANSFORMS> t_upper_slots{};
-    static_array<DimIds, MAX_TRANSFORMS> t_lower_slots{};
+    static_array<DimIds, MAX_TRANSFORMS> t_input_slots{};
+    static_array<DimIds, MAX_TRANSFORMS> t_output_slots{};
     index_t num_slots = 0;
 
     // --- Input / output dimensions ---
-    index_t ndim_upper = 0; ///< Number of input coordinate dimensions
-    index_t ndim_lower = 0; ///< Number of output coordinate dimensions
-    static_array<index_t, MAX_TENSOR_DIMS> upper_slots{}; ///< Which slots receive input coords
-    static_array<index_t, MAX_TENSOR_DIMS> lower_slots{}; ///< Which slots hold output coords
+    index_t ndim_input  = 0; ///< Number of input coordinate dimensions
+    index_t ndim_output = 0; ///< Number of output coordinate dimensions
+    static_array<index_t, MAX_TENSOR_DIMS> input_slots{};  ///< Which slots receive input coords
+    static_array<index_t, MAX_TENSOR_DIMS> output_slots{}; ///< Which slots hold output coords
 
     constexpr bool operator==(const TransformGraph&) const = default;
 };
 
-static_assert(sizeof(TransformGraph) < 16384,
+static_assert(sizeof(TransformGraph) < 65536,
               "TransformGraph NTTP size canary — consider capacity templating if this fires");
 
 // ============================================================================
@@ -304,21 +304,21 @@ CK_TILE_HOST_DEVICE constexpr void applySingleTransform(static_array<index_t, G.
     constexpr auto transform = G.transforms[t];
 
     // Gather inputs from working array
-    static_array<index_t, MAX_TENSOR_DIMS> t_upper{};
-    for(index_t d = 0; d < transform.ndim_upper; ++d)
+    static_array<index_t, MAX_TENSOR_DIMS> t_input{};
+    for(index_t d = 0; d < transform.ndim_input; ++d)
     {
-        t_upper[d] = slots[G.t_upper_slots[t][d]];
+        t_input[d] = slots[G.t_input_slots[t][d]];
     }
 
     // Static dispatch — TransformImpl<Type> selected at compile time.
     // No switch, no dead branches, no runtime dispatch.
-    static_array<index_t, MAX_TENSOR_DIMS> t_lower{};
-    TransformImpl<transform.type>::mapIndices(transform, t_lower.elems, t_upper.elems);
+    static_array<index_t, MAX_TENSOR_DIMS> t_output{};
+    TransformImpl<transform.type>::mapIndices(transform, t_output.elems, t_input.elems);
 
     // Scatter outputs back to working array
-    for(index_t d = 0; d < transform.ndim_lower; ++d)
+    for(index_t d = 0; d < transform.ndim_output; ++d)
     {
-        slots[G.t_lower_slots[t][d]] = t_lower[d];
+        slots[G.t_output_slots[t][d]] = t_output[d];
     }
 }
 
@@ -342,32 +342,32 @@ CK_TILE_HOST_DEVICE constexpr void applyAllTransforms(static_array<index_t, G.nu
  *  expression for guaranteed compile-time dispatch.
  *
  *  @tparam G       The transform graph (NTTP — all values are compile-time constants)
- *  @param[out] output  Output coordinate buffer (size >= G.ndim_lower)
- *  @param[in]  input   Input coordinate buffer (size >= G.ndim_upper)
+ *  @param[out] output  Output coordinate buffer (size >= G.ndim_output)
+ *  @param[in]  input   Input coordinate buffer (size >= G.ndim_input)
  */
 template <TransformGraph G>
-CK_TILE_HOST_DEVICE constexpr void map(index_t* lower, const index_t* upper)
+CK_TILE_HOST_DEVICE constexpr void map(index_t* output, const index_t* input)
 {
     static_array<index_t, G.num_slots> slots{};
 
     // Place input coordinate into assigned slots
-    for(index_t i = 0; i < G.ndim_upper; ++i)
+    for(index_t i = 0; i < G.ndim_input; ++i)
     {
-        slots[G.upper_slots[i]] = upper[i];
+        slots[G.input_slots[i]] = input[i];
     }
 
     // Pop transforms from top of stack to base (user-facing → memory).
     // Fold expression guarantees compile-time dispatch.
     applyAllTransforms<G>(slots, make_index_sequence<G.num_transforms>{});
 
-    // Extract lower coordinate from assigned slots
-    for(index_t i = 0; i < G.ndim_lower; ++i)
+    // Extract output coordinate from assigned slots
+    for(index_t i = 0; i < G.ndim_output; ++i)
     {
-        lower[i] = slots[G.lower_slots[i]];
+        output[i] = slots[G.output_slots[i]];
     }
 }
 
-/** @brief Convenience: compute memory offset when ndim_lower == 1.
+/** @brief Convenience: compute memory offset when ndim_output == 1.
  *
  *  Type-safe overload that takes a static_array and validates dimensions
  *  at compile time.
@@ -380,10 +380,10 @@ CK_TILE_HOST_DEVICE constexpr void map(index_t* lower, const index_t* upper)
 template <TransformGraph G, index_t N>
 CK_TILE_HOST_DEVICE constexpr index_t calculateOffset(const static_array<index_t, N>& input)
 {
-    static_assert(N == G.ndim_upper,
-                  "calculateOffset: input coordinate size must match graph's ndim_upper");
-    static_assert(G.ndim_lower == 1,
-                  "calculateOffset: requires ndim_lower == 1 (use map() for N->M)");
+    static_assert(N == G.ndim_input,
+                  "calculateOffset: input coordinate size must match graph's ndim_input");
+    static_assert(G.ndim_output == 1,
+                  "calculateOffset: requires ndim_output == 1 (use map() for N->M)");
     index_t output;
     map<G>(&output, input.elems);
     return output;
@@ -391,14 +391,14 @@ CK_TILE_HOST_DEVICE constexpr index_t calculateOffset(const static_array<index_t
 
 /// Check a single transform (compile-time index) for a matching slot.
 template <TransformGraph G, index_t T>
-CK_TILE_HOST_DEVICE constexpr index_t tryUpperLengthAt(index_t slot)
+CK_TILE_HOST_DEVICE constexpr index_t tryInputLengthAt(index_t slot)
 {
     constexpr auto transform = G.transforms[T];
-    for(index_t d = 0; d < transform.ndim_upper; ++d)
+    for(index_t d = 0; d < transform.ndim_input; ++d)
     {
-        if(G.t_upper_slots[T][d] == slot)
+        if(G.t_input_slots[T][d] == slot)
         {
-            return TransformImpl<transform.type>::upperLength(transform, d);
+            return TransformImpl<transform.type>::inputLength(transform, d);
         }
     }
     return -1; // not found at this transform
@@ -406,7 +406,7 @@ CK_TILE_HOST_DEVICE constexpr index_t tryUpperLengthAt(index_t slot)
 
 /// Fold over all transforms to find the one matching a slot.
 template <TransformGraph G, index_t... Ts>
-CK_TILE_HOST_DEVICE constexpr index_t upperDimLengthDispatch(index_t slot, sequence<Ts...>)
+CK_TILE_HOST_DEVICE constexpr index_t inputDimLengthDispatch(index_t slot, sequence<Ts...>)
 {
     index_t result = -1;
     // Check transforms in reverse order; keep first valid result
@@ -416,7 +416,7 @@ CK_TILE_HOST_DEVICE constexpr index_t upperDimLengthDispatch(index_t slot, seque
             result = candidate;
         }
     };
-    (check(tryUpperLengthAt<G, G.num_transforms - 1 - Ts>(slot)), ...);
+    (check(tryInputLengthAt<G, G.num_transforms - 1 - Ts>(slot)), ...);
     return result;
 }
 
@@ -431,10 +431,10 @@ CK_TILE_HOST_DEVICE constexpr index_t upperDimLengthDispatch(index_t slot, seque
  *  @return Length of the i-th input dimension
  */
 template <TransformGraph G>
-CK_TILE_HOST_DEVICE constexpr index_t upperDimLength(index_t i)
+CK_TILE_HOST_DEVICE constexpr index_t inputDimLength(index_t i)
 {
-    index_t slot = G.upper_slots[i];
-    return detail::upperDimLengthDispatch<G>(slot, make_index_sequence<G.num_transforms>{});
+    index_t slot = G.input_slots[i];
+    return detail::inputDimLengthDispatch<G>(slot, make_index_sequence<G.num_transforms>{});
 }
 
 // ============================================================================
@@ -457,20 +457,20 @@ reverseApplySingleTransform(static_array<index_t, G.num_slots>& slots)
     constexpr auto transform = G.transforms[t];
 
     // Gather from output slots (we're going backwards through the wiring)
-    static_array<index_t, MAX_TENSOR_DIMS> t_lower{};
-    for(index_t d = 0; d < transform.ndim_lower; ++d)
+    static_array<index_t, MAX_TENSOR_DIMS> t_output{};
+    for(index_t d = 0; d < transform.ndim_output; ++d)
     {
-        t_lower[d] = slots[G.t_lower_slots[t][d]];
+        t_output[d] = slots[G.t_output_slots[t][d]];
     }
 
     // Reverse dispatch — each TransformImpl provides reverseMapIndices
-    static_array<index_t, MAX_TENSOR_DIMS> t_upper{};
-    TransformImpl<transform.type>::reverseMapIndices(transform, t_upper.elems, t_lower.elems);
+    static_array<index_t, MAX_TENSOR_DIMS> t_input{};
+    TransformImpl<transform.type>::reverseMapIndices(transform, t_input.elems, t_output.elems);
 
     // Scatter to input slots
-    for(index_t d = 0; d < transform.ndim_upper; ++d)
+    for(index_t d = 0; d < transform.ndim_input; ++d)
     {
-        slots[G.t_upper_slots[t][d]] = t_upper[d];
+        slots[G.t_input_slots[t][d]] = t_input[d];
     }
 }
 
@@ -490,11 +490,11 @@ reverseApplyAllTransforms(static_array<index_t, G.num_slots>& slots, sequence<Is
  *  Requires all transforms to be bijective (checked at compile time).
  *
  *  @tparam G       The transform graph (NTTP)
- *  @param[out] input   Recovered input coordinate (size >= G.ndim_upper)
- *  @param[in]  output  Output coordinate to reverse (size >= G.ndim_lower)
+ *  @param[out] input   Recovered input coordinate (size >= G.ndim_input)
+ *  @param[in]  output  Output coordinate to reverse (size >= G.ndim_output)
  */
 template <TransformGraph G>
-CK_TILE_HOST_DEVICE constexpr void reverseMap(index_t* upper, const index_t* lower)
+CK_TILE_HOST_DEVICE constexpr void reverseMap(index_t* input, const index_t* output)
 {
     // Verify all transforms are bijective at compile time
     static_assert(
@@ -507,35 +507,35 @@ CK_TILE_HOST_DEVICE constexpr void reverseMap(index_t* upper, const index_t* low
         "reverseMap: all transforms must be bijective");
     static_array<index_t, G.num_slots> slots{};
 
-    // Place lower coordinate into lower slots
-    for(index_t i = 0; i < G.ndim_lower; ++i)
+    // Place output coordinate into output slots
+    for(index_t i = 0; i < G.ndim_output; ++i)
     {
-        slots[G.lower_slots[i]] = lower[i];
+        slots[G.output_slots[i]] = output[i];
     }
 
     // Apply transforms in forward array order (base → top), each reversed
     reverseApplyAllTransforms<G>(slots, make_index_sequence<G.num_transforms>{});
 
-    // Extract upper coordinate from upper slots
-    for(index_t i = 0; i < G.ndim_upper; ++i)
+    // Extract input coordinate from input slots
+    for(index_t i = 0; i < G.ndim_input; ++i)
     {
-        upper[i] = slots[G.upper_slots[i]];
+        input[i] = slots[G.input_slots[i]];
     }
 }
 
 /** @brief Convenience: recover user coordinates from a memory offset.
  *
  *  @tparam G  The transform graph (NTTP)
- *  @tparam N  Number of input dimensions (must match G.ndim_upper)
+ *  @tparam N  Number of input dimensions (must match G.ndim_input)
  *  @param offset  The memory offset to reverse
  *  @return The input coordinate that maps to this offset
  */
 template <TransformGraph G>
-CK_TILE_HOST_DEVICE constexpr static_array<index_t, G.ndim_upper>
+CK_TILE_HOST_DEVICE constexpr static_array<index_t, G.ndim_input>
 reverseCalculateOffset(index_t offset)
 {
-    static_assert(G.ndim_lower == 1, "reverseCalculateOffset: requires ndim_lower == 1");
-    static_array<index_t, G.ndim_upper> result{};
+    static_assert(G.ndim_output == 1, "reverseCalculateOffset: requires ndim_output == 1");
+    static_array<index_t, G.ndim_input> result{};
     reverseMap<G>(result.elems, &offset);
     return result;
 }

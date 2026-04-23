@@ -14,9 +14,9 @@ namespace ck_tile {
 /** @brief Combine N component dims into 1 user-facing dim.
  *
  *  Definition:  N base dims --> 1 user dim   (flatten / combine)
- *  Traversal:   1 upper --> N lower          (DECOMPOSE via magic division)
+ *  Traversal:   1 input --> N output          (DECOMPOSE via magic division)
  *
- *  ndim_upper = 1, ndim_lower = N
+ *  ndim_input = 1, ndim_output = N
  */
 template <>
 struct TransformImpl<TransformType::MERGE>
@@ -49,55 +49,55 @@ struct TransformImpl<TransformType::MERGE>
 
     // ── Operations ──
 
-    /** @brief Decompose 1 upper value into N lower values via magic division. */
+    /** @brief Decompose 1 input value into N output values via magic division. */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
+    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
         auto d            = readSchema(t);
-        index_t remaining = upper[0];
+        index_t remaining = input[0];
 
-        for(index_t i = 0; i < t.ndim_lower - 1; ++i)
+        for(index_t i = 0; i < t.ndim_output - 1; ++i)
         {
             index_t quotient =
                 static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), d.magic_divs[i]));
-            lower[i] = quotient;
+            output[i] = quotient;
             remaining -= quotient * d.strides[i];
         }
-        lower[t.ndim_lower - 1] = remaining;
+        output[t.ndim_output - 1] = remaining;
     }
 
     /** @brief Reverse: compose N components into 1 flat value (multiply-accumulate). */
     static CK_TILE_HOST_DEVICE constexpr void
-    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
+    reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
         auto d   = readSchema(t);
-        upper[0] = 0;
-        for(index_t i = 0; i < t.ndim_lower; ++i)
+        input[0] = 0;
+        for(index_t i = 0; i < t.ndim_output; ++i)
         {
-            upper[0] += lower[i] * d.strides[i];
+            input[0] += output[i] * d.strides[i];
         }
     }
 
-    /** @brief Check the merged upper index is within [0, product_of_lengths). */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
-                                                           const index_t* upper)
+    /** @brief Check the merged input index is within [0, product_of_lengths). */
+    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
+                                                           const index_t* input)
     {
         auto d          = readSchema(t);
         index_t product = 1;
-        for(index_t i = 0; i < t.ndim_lower; ++i)
+        for(index_t i = 0; i < t.ndim_output; ++i)
         {
             product *= d.component_lengths[i];
         }
-        return upper[0] >= 0 && upper[0] < product;
+        return input[0] >= 0 && input[0] < product;
     }
 
     /** @brief Upper dimension length = product of all component lengths. */
-    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+    static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
         auto d          = readSchema(t);
         index_t product = 1;
-        for(index_t i = 0; i < t.ndim_lower; ++i)
+        for(index_t i = 0; i < t.ndim_output; ++i)
         {
             product *= d.component_lengths[i];
         }

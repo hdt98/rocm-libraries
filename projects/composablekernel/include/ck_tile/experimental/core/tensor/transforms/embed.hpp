@@ -14,7 +14,7 @@ namespace ck_tile {
 /** @brief Linear combination with strides. Computes a 1D memory offset
  *  from N-dimensional indices. Sits at the BASE of the transform stack.
  *
- *  ndim_upper = N, ndim_lower = 1
+ *  ndim_input = N, ndim_output = 1
  */
 template <>
 struct TransformImpl<TransformType::EMBED>
@@ -49,49 +49,49 @@ struct TransformImpl<TransformType::EMBED>
 
     // ── Operations ──
 
-    /** @brief Forward: N upper dims to 1 lower offset via linear combination. */
+    /** @brief Forward: N input dims to 1 output offset via linear combination. */
     static CK_TILE_HOST_DEVICE constexpr void
-    mapIndices(const CoordinateTransform& t, index_t* lower, const index_t* upper)
+    mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
-        auto d   = readSchema(t);
-        lower[0] = 0;
-        for(index_t i = 0; i < t.ndim_upper; ++i)
+        auto d    = readSchema(t);
+        output[0] = 0;
+        for(index_t i = 0; i < t.ndim_input; ++i)
         {
-            lower[0] += upper[i] * d.strides[i];
+            output[0] += input[i] * d.strides[i];
         }
     }
 
     /** @brief Reverse: decompose offset into N indices via magic division on strides. */
     static CK_TILE_HOST_DEVICE constexpr void
-    reverseMapIndices(const CoordinateTransform& t, index_t* upper, const index_t* lower)
+    reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
         auto d            = readSchema(t);
-        index_t remaining = lower[0];
-        for(index_t i = 0; i < t.ndim_upper - 1; ++i)
+        index_t remaining = output[0];
+        for(index_t i = 0; i < t.ndim_input - 1; ++i)
         {
             index_t quotient =
                 static_cast<index_t>(doMagicDiv(static_cast<uint32_t>(remaining), d.magic_divs[i]));
-            upper[i] = quotient;
+            input[i] = quotient;
             remaining -= quotient * d.strides[i];
         }
-        upper[t.ndim_upper - 1] = remaining;
+        input[t.ndim_input - 1] = remaining;
     }
 
-    /** @brief Check all upper indices are within [0, dim_length). */
-    static CK_TILE_HOST_DEVICE constexpr bool isValidUpper(const CoordinateTransform& t,
-                                                           const index_t* upper)
+    /** @brief Check all input indices are within [0, dim_length). */
+    static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
+                                                           const index_t* input)
     {
         auto d = readSchema(t);
-        for(index_t i = 0; i < t.ndim_upper; ++i)
+        for(index_t i = 0; i < t.ndim_input; ++i)
         {
-            if(upper[i] < 0 || upper[i] >= d.dim_lengths[i])
+            if(input[i] < 0 || input[i] >= d.dim_lengths[i])
                 return false;
         }
         return true;
     }
 
-    /** @brief Get the length of the i-th upper dimension. */
-    static CK_TILE_HOST_DEVICE constexpr index_t upperLength(const CoordinateTransform& t,
+    /** @brief Get the length of the i-th input dimension. */
+    static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i)
     {
         auto d = readSchema(t);

@@ -56,7 +56,7 @@ using TransformDataBuffer = static_array<uint8_t, MAX_TRANSFORM_DATA_SIZE>;
  *
  *  Example usage in a TransformImpl:
  *    auto d = readSchema(t);        // bit_cast<Schema>(t.data) — typed view
- *    lower[0] = d.left_pad;     // self-documenting field access
+ *    output[0] = d.left_pad;     // self-documenting field access
  *
  *  Unused buffer bytes MUST be zero-initialized for NTTP deduplication.
  *  Factory functions guarantee this via schema default initialization.
@@ -64,8 +64,8 @@ using TransformDataBuffer = static_array<uint8_t, MAX_TRANSFORM_DATA_SIZE>;
 struct CoordinateTransform
 {
     TransformType type     = TransformType::UNDEFINED;
-    index_t ndim_upper     = 0; ///< Dims on the user side (top of stack)
-    index_t ndim_lower     = 0; ///< Dims on the memory side (bottom of stack)
+    index_t ndim_input     = 0; ///< Dims on the user side (top of stack)
+    index_t ndim_output    = 0; ///< Dims on the memory side (bottom of stack)
     bool skip_bounds_check = false;
     bool is_bijective      = false;
 
