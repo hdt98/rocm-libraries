@@ -652,7 +652,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_ab_scale<BlockGemmPipelineScheduler::Intr
                 static_for<0, KRepeat / num_scale_k_block, 1>{}([&](auto k0) {
                     vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                     vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
-
+                    constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
@@ -742,7 +742,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_ab_scale<BlockGemmPipelineScheduler::Intr
                 static_for<0, KRepeat / num_scale_k_block, 1>{}([&](auto k0) {
                     vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                     vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
-
+                    constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
@@ -799,7 +799,7 @@ struct BlockwiseGemmXdlops_pipeline_v1_ab_scale<BlockGemmPipelineScheduler::Intr
                 static_for<0, KRepeat / num_scale_k_block, 1>{}([&](auto k0) {
                     vector_type<ComputeDataTypeBuf, KPack> a_thread_vec;
                     vector_type<ComputeDataTypeBuf, KPack> b_thread_vec;
-
+                    constexpr auto var = kscale0 * KRepeat / num_scale_k_block + k0;
                     auto loadA =
                         thread_buf_to_vec_loader<decltype(a_thread_vec),
                                                  decltype(a_thread_buf),
