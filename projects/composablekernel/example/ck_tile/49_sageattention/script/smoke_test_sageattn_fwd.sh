@@ -2,7 +2,7 @@
 # Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier: MIT
 #
-# SageAttention forward smoke tests — structure mirrors
+# SageAttention forward smoke tests - structure mirrors
 #   example/ck_tile/01_fmha/script/smoke_test_fwd.sh
 #
 # Run from the ComposableKernel *build* directory (after ninja), same as FMHA:
@@ -47,7 +47,7 @@ run_exe() {
     set -e
 }
 
-# Core FP8×BF16 cases aligned with FMHA smoke_test_fwd.sh (lines 80–87): batch/group shapes,
+# Core FP8xBF16 cases aligned with FMHA smoke_test_fwd.sh (lines 80-87): batch/group shapes,
 # masks, GQA, short seqlen, k-only pad. Sweeps blockscale (2) vs per-warp (3) and layouts.
 run_fp8bf16_smoke() {
     local qscale
@@ -118,7 +118,7 @@ run_bf16_pipeline_smoke() {
         $COMMON_ARGS -mode=0 -b=1 -h=4 -h_k=1 -d=128 -s=256 -s_k=128 -mask=t:32,32
 }
 
-# int8 / int4 × fp8×bf16 (hdim divisible by 8 for int4)
+# int8 / int4 x fp8xbf16 (hdim divisible by 8 for int4)
 run_int_quant_smoke() {
     run_exe -prec=i8fp8bf16 -init=3 -qscale=3 -iperm=0 -operm=0 -vlayout=r -kname=$KNAME \
         $COMMON_ARGS -mode=0 -b=2 -h=2 -d=128 -s=128 -s_k=128 -mask=1

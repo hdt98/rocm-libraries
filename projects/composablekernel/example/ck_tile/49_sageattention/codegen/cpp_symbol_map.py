@@ -9,13 +9,6 @@ FWD_DTYPE_MAP = {
     "i4fp8bf16": "SageAttentionFwdI4Fp8Bf16",
 }
 
-BWD_DTYPE_MAP = {"fp32": "FmhaBwdFp32", "fp16": "FmhaBwdFp16", "bf16": "FmhaBwdBf16"}
-
-MASK_IMPL = {
-    "generic": "ck_tile::GenericAttentionMask",
-    "simplified": "ck_tile::SimplifiedGenericAttentionMask",
-}
-
 _MASK_SIMPLIFIED_MAP = {
     "s_no": "ck_tile::SimplifiedGenericAttentionMask<false>",
     "s_mask": "ck_tile::SimplifiedGenericAttentionMask<true>",

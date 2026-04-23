@@ -15,6 +15,7 @@
 #include <cmath>
 #include <numeric>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -58,7 +59,7 @@ auto get_elimit<SageAttentionFwdFp8Bf16>(std::string /*init_method*/)
 template <>
 auto get_elimit<SageAttentionFwdI8Fp8Bf16>(std::string /*init_method*/)
 {
-    // atol=0.18: K, V still FP8 (dominant error source). Matches FP8×FP8 despite
+    // atol=0.18: K, V still FP8 (dominant error source). Matches FP8xFP8 despite
     // lower Q quantization error (int8 ~0.0078 vs fp8 ~0.0625) to avoid test fragility.
     double rtol = 1e-2;
     double atol = 1.8e-1;
@@ -1121,29 +1122,33 @@ fwd_result sageattn_fwd_run(mode_enum mode,
 
     if(json)
     {
-        dump_fmha_fwd_json_results(*json,
-                                   data_type,
-                                   mode == mode_enum::batch ? "batch" : "group",
-                                   io_layout(i_perm, o_perm),
-                                   batch,
-                                   nhead,
-                                   nhead_k,
-                                   seqlen_qs[0],
-                                   seqlen_ks[0],
-                                   seqlen_kpads[0],
-                                   hdim_q,
-                                   hdim_v,
-                                   scale_s,
-                                   0.0f,  // p_drop (dropout disabled for sageattention)
-                                   false, // lse (always disabled for sageattention)
-                                   qscale.type == quant_scale_enum::no_scale ? "no_scale"
-                                                                             : "pertensor",
-                                   "no_bias",
-                                   is_v_rowmajor ? "r" : "c",
-                                   pass,
-                                   ave_time,
-                                   tflops,
-                                   gb_per_sec);
+        dump_fmha_fwd_json_results(
+            *json,
+            data_type,
+            mode == mode_enum::batch ? "batch" : "group",
+            io_layout(i_perm, o_perm),
+            batch,
+            nhead,
+            nhead_k,
+            seqlen_qs[0],
+            seqlen_ks[0],
+            seqlen_kpads[0],
+            hdim_q,
+            hdim_v,
+            scale_s,
+            0.0f,  // p_drop (dropout disabled for sageattention)
+            false, // lse (always disabled for sageattention)
+            [&qscale]() {
+                std::ostringstream ss;
+                qscale.serialize(ss);
+                return ss.str();
+            }(),
+            "no_bias",
+            is_v_rowmajor ? "r" : "c",
+            pass,
+            ave_time,
+            tflops,
+            gb_per_sec);
     }
 
     return pass ? fwd_result::success : fwd_result::failure;

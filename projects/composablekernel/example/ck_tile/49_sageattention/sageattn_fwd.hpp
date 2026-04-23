@@ -324,7 +324,7 @@ auto sageattn_fwd_create_kargs_and_grids(sageattn_fwd_args args)
     }
 }
 
-// this is used to pattern-match internl kernel implementation, not to instantiate kernel
+// this is used to pattern-match internal kernel implementation, not to instantiate kernel
 template <ck_tile::index_t HDim_,
           typename DataType_,
           bool kIsGroupMode_,

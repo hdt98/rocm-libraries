@@ -583,8 +583,8 @@ struct SageAttnFwdKernel
                          QScaleEnum == BlockSageAttentionQuantScaleEnum::PERTHREAD)
             {
                 // BLOCKSCALE, PERWARP, and PERTHREAD all use block_scale_seqstart in group mode
-                // They differ only in block size: BLOCKSCALE (Q:128, K:64), PERWARP (Q:32, K:64),
-                // PERTHREAD (Q:4, K:16)
+                // They differ only in block size: BLOCKSCALE (Q:128, K:128), PERWARP (Q:32, K:64),
+                // PERTHREAD (Q:4, K:16); see TileSageAttnTraits::kBlockScaleSizeQ/K.
                 const long_index_t bquery_start = kargs.block_scale_seqstart_q_ptr[i_batch];
                 const long_index_t bkey_start   = kargs.block_scale_seqstart_k_ptr[i_batch];
                 batch_offset_q_descale          = bquery_start;
@@ -685,8 +685,9 @@ struct SageAttnFwdKernel
                 ck_tile::numeric_traits<KDataType>::PackedSize;
         const VDataType* v_ptr =
             reinterpret_cast<const VDataType*>(kargs.v_ptr) +
-            static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) * kargs.nhead_stride_v +
-            batch_offset_v;
+            (static_cast<long_index_t>(i_nhead / kargs.nhead_ratio_qk) * kargs.nhead_stride_v +
+             batch_offset_v) /
+                ck_tile::numeric_traits<VDataType>::PackedSize;
         ODataType* o_ptr = reinterpret_cast<ODataType*>(kargs.o_ptr) +
                            static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_o +
                            batch_offset_o;
@@ -948,8 +949,8 @@ struct SageAttnFwdKernel
                     batch_offset_v_descale;
 
                 // Q row from tile origin i_m0 + wave M strip + lane; clamp q_scale_idx to the
-                // last scale block for this seqlen_q (e.g. seqlen_q=129, S=32 ⇒ ceil(129/32)=5
-                // blocks, indices 0..4; row 128 → 128/32=4, padding rows → min(raw_idx, 4)).
+                // last scale block for this seqlen_q (e.g. seqlen_q=129, S=32: ceil(129/32)=5
+                // blocks, indices 0..4; row 128 -> 128/32=4; padding -> min(raw_idx, max_idx)).
                 constexpr index_t kBlockSq = PipelineProblem::kBlockScaleSizeQ;
                 const index_t wave_id = __builtin_amdgcn_readfirstlane(threadIdx.x / kWarpSize);
                 const index_t q_row_raw =
