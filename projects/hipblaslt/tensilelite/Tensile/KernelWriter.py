@@ -3062,8 +3062,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-        doReadMXSA = 1 if u == 0 else 0
-        doReadMXSB = 1 if u == 0 else 0
       # reads for next loop
       doNext = uNext > localWriteEndIter
       doReadA = doReadA or (hasLiveLdsData and doNext)
@@ -3074,6 +3072,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadB = doReadB or (hasLiveLdsData and doNext)
       doReadM = doReadM or (hasLiveLdsData and doNext)
       doReadM = doReadM and (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"])
+      if (hasLiveLdsData and doNext) or (self.states.numItersPLR == 0 and isSwapLroIter):
+        # swap LR buffer token only when the LR buffer actually changes
+        self.states.ldsReadTokenIdx = self.states.memTokenLdsBuffer1 if self.states.ldsReadTokenIdx == self.states.memTokenLdsBuffer0 else self.states.memTokenLdsBuffer0
       for iui in range(0,kernel["InnerUnroll"]):
         # use full prefetch only for next loop
         usePLRPackA = self.states.doFullPackCodePrefetch and (doNext or u == 0)
@@ -3084,6 +3085,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = doReadMXSB and iui*self.states.numReadsIterCoalescedMXSB < kernel["InnerUnroll"]
         doReadB = doReadB and iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]
         doReadM = doReadM and iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]
+        if (doReadA or doReadB or doReadM or doReadMXSA or doReadMXSB) and kernel["ForceUnrollSubIter"] and not self.states.doFullPackCodePrefetch:
+          pack[1] = Module()
         if doReadA:
           localReads.addComment1("local read a")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadA
@@ -3105,6 +3108,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             packPre[packStoreIdx*self.states.numIterPerCoalescedReadA].add(packCodeA)
           else:
             pack[packStoreIdx*self.states.numIterPerCoalescedReadA].add(packCodeA)
+          if kernel["ForceUnrollSubIter"] and not self.states.doFullPackCodePrefetch:
+            pack[1].add(packCodeA)
         if doReadMXSA:
           localReads.addComment1("local read mxsa")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadMXSA
@@ -3116,6 +3121,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReads.add(localReadCodeMXSA)
           pack[packStoreIdx*self.states.numIterPerCoalescedReadMXSA].add(packPreMXSA)
           pack[packStoreIdx*self.states.numIterPerCoalescedReadMXSA].add(packCodeMXSA)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeMXSA)
         if doReadM:
           localReads.addComment1("local read metadata")
           localReadCodeM, packCodeM, packPreM = self.localReadDo(kernel, plrIdx*self.states.numIterPerCoalescedReadMetadata, iui*self.states.numReadsIterCoalescedMetadata, 0, tPM)
@@ -3135,6 +3142,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             localReads.add(localReadCodeMXSB)
           pack[packStoreIdx*self.states.numIterPerCoalescedReadMXSB].add(packPreMXSB)
           pack[packStoreIdx*self.states.numIterPerCoalescedReadMXSB].add(packCodeMXSB)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeMXSB)
         if doReadB:
           localReads.addComment1("local read b")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadB
@@ -3769,8 +3778,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-        doReadMXSA = 1 if u == 0 else 0
-        doReadMXSB = 1 if u == 0 else 0
 
       # reads for next loop
       doNext = uNext > localWriteEndIter
@@ -3784,9 +3791,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       doReadM = doReadM and (kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"])
       # Prefetch reads for next loop target LDS1; current iteration reads target LDS0
       if hasLiveLdsData and doNext:
-        self.states.ldsReadTokenIdx = self.states.memTokenLdsBuffer1
-      else:
-        self.states.ldsReadTokenIdx = self.states.memTokenLdsBuffer0
+        # swap LR buffer
+        self.states.ldsReadTokenIdx = self.states.memTokenLdsBuffer1 if self.states.ldsReadTokenIdx == self.states.memTokenLdsBuffer0 else self.states.memTokenLdsBuffer0
       for iui in range(0,kernel["InnerUnroll"]):
         # use full prefetch only for next loop
         usePLRPackA = self.states.doFullPackCodePrefetch and (doNext or u == 0)
@@ -3797,6 +3803,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = doReadMXSB and iui*self.states.numReadsIterCoalescedMXSB < kernel["InnerUnroll"]
         doReadB = doReadB and iui*self.states.numReadsIterCoalescedB < kernel["InnerUnroll"]
         doReadM = doReadM and iui*self.states.numReadsIterCoalescedMetadata < kernel["InnerUnroll"]
+        if (doReadA or doReadMXSA or doReadMXSB or doReadB or doReadM) and kernel["ForceUnrollSubIter"]:
+          pack[1] = Module()
         if doReadA:
           localReads.addComment1("local read a")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadA
@@ -3823,6 +3831,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             LRCodeAAllIters[uIdx].add(localReadCodeA)
             PackCodeAAllIters[uIdx].add(packPreA)
             PackCodeAAllIters[uIdx].add(packCodeA)
+          if kernel["ForceUnrollSubIter"] and not self.states.doFullPackCodePrefetch:
+            pack[1].add(packCodeA)
         if doReadMXSA:
           localReads.addComment1("local read maxa")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadMXSA
@@ -3838,6 +3848,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             LRCodeAAllIters[uIdx].add(localReadCodeMXSA)
             PackCodeAAllIters[uIdx].add(packPreMXSA)
             PackCodeAAllIters[uIdx].add(packCodeMXSA)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeMXSA)
         if doReadMXSB:
           localReads.addComment1("local read mxsb")
           bufferIdx = plrIdx*self.states.numIterPerCoalescedReadMXSB
@@ -3853,6 +3865,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
             LRCodeAAllIters[uIdx].add(localReadCodeMXSB)
             PackCodeAAllIters[uIdx].add(packPreMXSB)
             PackCodeAAllIters[uIdx].add(packCodeMXSB)
+          if kernel["ForceUnrollSubIter"]:
+            pack[1].add(packCodeMXSB)
         if doReadM:
           localReads.addComment1("local read metadata")
           plrIdxM = plrIdx*self.states.numIterPerCoalescedReadMetadata

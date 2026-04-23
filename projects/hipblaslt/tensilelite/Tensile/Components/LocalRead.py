@@ -62,12 +62,12 @@ class LocalReadVALU(LocalRead):
         # dot2: currently only support unroll major LDS
         if kernel["UseDotInstruction"]:
             numVectorsPerTile = kernel["ThreadTile%u"%tile01]
-            numReadsPerVector = ceil((writer.states.lrvwUnrollA * tP["bpe"]) / (blockWidth*4)) # bytes/register
+            numReadsPerVector = ceil((writer.states.lrvwUnrollA * tP["bpe"]) // (blockWidth*4)) # bytes/register
             LdsPad            = kernel["LdsPad%s"%tc] if kernel["LdsBlockSizePerPad%s"%tc] == 0 else 0
             tileStride        = kernel["_DepthU%s"%tc] + LdsPad if kernel["UnrollMajorLDS%s" % tP["tensorChar"]] else 1
         else:
             numVectorsPerTile = (kernel["ThreadTile%u"%tile01]//kernel["VectorWidthA"])
-            numReadsPerVector = ceil((kernel["VectorWidthA"] * tP["bpe"]) / (blockWidth*4)) # bytes/register
+            numReadsPerVector = ceil((kernel["VectorWidthA"] * tP["bpe"]) // (blockWidth*4)) # bytes/register
 
         for vIdx in range(0, numVectorsPerTile):
             for rIdx in range(0, int(numReadsPerVector)):
@@ -129,24 +129,24 @@ class LocalReadVALU(LocalRead):
                             # localReadCode.addInst( "s_waitcnt_vscnt", -2, "0", "")
                             localReadCode.add(SWaitCnt(vlcnt=0, vscnt=0))
 
-                        if kernel["ProblemType"]["MacDataTypeA"].isHalf():
+                        if kernel["ProblemType"]["DataType"].isHalf():
                             localReadCode.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(0x3c003c00), comment="CheckValue1: FP16")) # packed 1s
                             localReadCode.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
-                        elif kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
+                        elif kernel["ProblemType"]["DataType"].isBFloat16():
                             localReadCode.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(0x3f803f80), comment="CheckValue1: BF16")) # packed 1s
                             localReadCode.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
                         # TODO - Check if this works
-                        if kernel["ProblemType"]["MacDataTypeA"].isInt8():
+                        if kernel["ProblemType"]["DataType"].isInt8():
                             localReadCode.add(SMovB32(dst=sgpr(tmpSgpr), src=hex(0x01010101), comment="CheckValue1: INT8")) # packed 1s
                             localReadCode.add(writer.assert_eq( dbgVgpr, sgpr(tmpSgpr)))
 
                         # TODO - Check if this works
-                        elif kernel["ProblemType"]["MacDataTypeA"].isInt8x4():
+                        elif kernel["ProblemType"]["DataType"].isInt8x4():
                             localReadCode.add(writer.assert_eq( dbgVgpr, 1))
 
-                        elif kernel["ProblemType"]["MacDataTypeA"].isSingle():
+                        elif kernel["ProblemType"]["DataType"].isSingle():
                             localReadCode.add(writer.assert_eq( dbgVgpr, 1.0) )
 
         return imod, pack, Module()
@@ -235,10 +235,28 @@ class LocalReadMFMA(LocalRead):
                     table.append(row * miInputPerThread + col * lrvwTile + group * halfM)
         return table
 
+    @staticmethod
+    def kernelMIInputPerThreadForTc(kernel, tc):
+        if tc == "Metadata":
+            return kernel["MIInputPerThreadMetadata"]
+        key = "MIInputPerThread%s" % tc
+        return kernel[key] if key in kernel else kernel["MIInputPerThread"]
+
     def getTransposeXorTIndex(self, writer, kernel, idx, tc, lrvwTile, dst, isNext, localRead=False):
-        mipt = kernel["MIInputPerThread"]
+        mipt = self.kernelMIInputPerThreadForTc(kernel, tc)
         assert(lrvwTile <= 4, "lrvwTile is %d"%lrvwTile)
-        abmatrixinfo = writer.states.a if tc == 'A' else writer.states.b
+        if tc == "A":
+            abmatrixinfo = writer.states.a
+        elif tc == "MXSA":
+            abmatrixinfo = writer.states.mxsa
+        elif tc == "B":
+            abmatrixinfo = writer.states.b
+        elif tc == "MXSB":
+            abmatrixinfo = writer.states.mxsb
+        elif tc == "Metadata":
+            abmatrixinfo = writer.states.m
+        else:
+            abmatrixinfo = writer.states.b
         if isNext:
             useTransposeCode = abmatrixinfo.useTransposeCodeNext
             useDirect32XEmulation = abmatrixinfo.useDirect32XEmulationNext
@@ -261,7 +279,7 @@ class LocalReadMFMA(LocalRead):
                 idx = dsReadConvTable[tableIdx] + blockIdx * blockSize
             if TF32EmuInterleaveTreg:
                 if writer.states.doFullPackCodePrefetch:
-                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, kernel["MIInputPerThread"])
+                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, mipt)
                 else:
                     withinGroup = idx % 8
                     if withinGroup < 4:
@@ -282,7 +300,7 @@ class LocalReadMFMA(LocalRead):
                 pass
             elif TF32EmuInterleaveTreg:
                 if writer.states.doFullPackCodePrefetch:
-                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, kernel["MIInputPerThread"])
+                    idx, XTchar = self.TXInterleaveLayoutIdx(idx, mipt)
                 else:
                     withinGroup = idx % 8
                     if withinGroup < 4:
@@ -295,7 +313,7 @@ class LocalReadMFMA(LocalRead):
                 idx = idx % swapBlockSizeSub
                 if lrvwTile > 1 and not useTransposeCode:
                     # do index transpose for src only
-                    idx = self.getTransposeIndex(kernel, idx, lrvwTile)
+                    idx = self.getTransposeIndex(kernel, idx, lrvwTile, mipt)
         else:
             # dst case
             # always "X"
@@ -331,10 +349,10 @@ class LocalReadMFMA(LocalRead):
     #   reg 5 reg 13 reg 21 reg 29
     #   reg 6 reg 14 reg 22 reg 30
     #   reg 7 reg 15 reg 23 reg 31
-    def getTransposeIndex(self, kernel, idx, lrvwTile):
+    def getTransposeIndex(self, kernel, idx, lrvwTile, miInputPerThread=None):
         if lrvwTile == 1:
             return idx
-        mipt = kernel["MIInputPerThread"]
+        mipt = miInputPerThread if miInputPerThread is not None else kernel["MIInputPerThread"]
         assert(lrvwTile <= 4, "lrvwTile is %d"%lrvwTile)
         blockSize = mipt * lrvwTile
         blockIdx = idx // blockSize
@@ -345,7 +363,18 @@ class LocalReadMFMA(LocalRead):
 
     # if prefetch is for NextLoop or not
     def getIsNext(self, writer, kernel, tc, bufferIdx):
-        numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadA if tc == "A" else writer.states.numIterPerCoalescedReadB
+        if tc == "A":
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadA
+        elif tc == "MXSA":
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadMXSA
+        elif tc == "B":
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadB
+        elif tc == "MXSB":
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadMXSB
+        elif tc == "Metadata":
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadMetadata
+        else:
+            numIterPerCoalescedRead = writer.states.numIterPerCoalescedReadB
         isNext = bufferIdx < writer.states.numItersPLR * numIterPerCoalescedRead
         # subIter case
         if kernel["ForceUnrollSubIter"]:
@@ -394,10 +423,11 @@ class LocalReadMFMA(LocalRead):
         last = start + totalRegs - 1
         if lrvwTile == 1:
             return module
+        mipt = self.kernelMIInputPerThreadForTc(kernel, tc)
         done = [start, last]
         for idx in range(start + 1,last):
             vSrc = self.getVgprForEmu(writer, kernel, tc, bufferIdx, iui, idx, 1, localRead=True)
-            newIdx = self.getTransposeIndex(kernel, idx, lrvwTile)
+            newIdx = self.getTransposeIndex(kernel, idx, lrvwTile, mipt)
             if idx in done or idx == newIdx:
                 # Already done or same vreg. No need to swap
                 done.append(idx)
@@ -561,7 +591,7 @@ class LocalReadMFMA(LocalRead):
 
         tc = tP["tensorChar"]
         if tc == "A":
-            writer.states.localReadDoCntA += 1
+           writer.states.localReadDoCntA += 1
         elif tc == "MXSA":
             writer.states.localReadDoCntMXSA += 1
         elif tc == "Metadata":
@@ -571,7 +601,7 @@ class LocalReadMFMA(LocalRead):
         elif tc == "MXSB":
             writer.states.localReadDoCntMXSB += 1
         else:
-            raise Exception(f"unsupport tc %s{tc}")
+            raise Exception(f"unsupport tc {tc}")
 
         MacDataType      = f"MacDataType{tc}" if(tc=="A" or tc=="B") else "DataType"
         tile01           = tP["tile01Idx"]
@@ -627,7 +657,7 @@ class LocalReadMFMA(LocalRead):
             lrvwTile = writer.states.lrvwTileMetadata
             abmatrixinfo = writer.states.m
         else:
-            raise Exception(f"unsupport tc %s{tc}")
+            raise Exception(f"unsupport tc {tc}")
 
         numElementPerRead = 1 if kernel["ConvertAfterDS"] and not kernel["UseF32XEmulation"] else int(int(blockWidth * bpr) // tP['bpe'] // lrvwTile)
         perpStride = abmatrixinfo.gNLCPerpStride
@@ -642,22 +672,19 @@ class LocalReadMFMA(LocalRead):
             needPack = blockWidth == 0.25
         needPack |= (kernel["ConvertAfterDS"] and (tP["bpe"] != tP["bpeDS"]))
         needPack |= kernel["UseF32XEmulation"]
-        if tc in ("MXSA", "MXSB"):
-            # TODO: fix hard code
-            needPack = False
-
         pack     = Module("pack%s_I%s"%(tc,iui))
         packPre = Module("pack%s_I%s Pre"%(tc,iui))
 
         isNext = self.getIsNext(writer, kernel, tc, bufferIdx)
         if isNext:
-            useTransposeCode = writer.states.a.useTransposeCodeNext if tc == "A" else writer.states.b.useTransposeCodeNext
-            useDirect32XEmulation = writer.states.a.useDirect32XEmulationNext if tc == "A" else writer.states.b.useDirect32XEmulationNext
+            useTransposeCode = abmatrixinfo.useTransposeCodeNext
+            useDirect32XEmulation = abmatrixinfo.useDirect32XEmulationNext
         else:
-            useTransposeCode = writer.states.a.useTransposeCodeThis if tc == "A" else writer.states.b.useTransposeCodeThis
-            useDirect32XEmulation = writer.states.a.useDirect32XEmulationThis if tc == "A" else writer.states.b.useDirect32XEmulationThis
+            useTransposeCode = abmatrixinfo.useTransposeCodeThis
+            useDirect32XEmulation = abmatrixinfo.useDirect32XEmulationThis
         indexTranpose = lrvwTile > 1 and (not useTransposeCode)
 
+        # split Metadata when localread width > mi input
         numSplitMetadata = max(ceil((blockWidth * 4) // tP["bpeDS"]) - 1, 0) if tP["isM"] else 0
 
         # caculate SMFMA layout
@@ -1398,10 +1425,6 @@ class LocalReadMFMA(LocalRead):
 
                             if kernel["ConvertAfterDS"] and kernel["UnrollMajorLDS%s"%tc]:
                                 valufIdx += blockWidth * (tP["bpe"] // tP["bpeDS"]) if (not tP["isM"]) else 1
-                            # workaround for gfx950 MX
-                            # need to increment valufIdx by 1
-                            elif tc in ("MXSA", "MXSB") and tuple(kernel["ISA"][:2]) == (9, 5):
-                                valufIdx += 1
                             else:
                                 valufIdx += blockWidth if (not tP["isM"]) else (numVgpr if writer.states.asmCaps["HasSWMMAC_gfx1250"] else 1)
 
@@ -1491,7 +1514,7 @@ class LocalReadMFMA(LocalRead):
                                 offset_val = offset_val + tP["localReadSwapByteOffset"]
                                 # TODO: Add NLC>1 offset calcs here? 
                                 if (kernel["DirectToLds%s" % tc] and  \
-                                    kernel["GlobalReadVectorWidth%s"%tc] * tP["bpeDS"] > 4) and not kernel["UseGeneralizedNLCOne%s"%tc]:
+                                    kernel["GlobalReadVectorWidth%c"%tc] * tP["bpeDS"] > 4) and not kernel["UseGeneralizedNLCOne%s"%tc]:
                                   # another address conversion for DirectToLds + NumLoadsCoalesced > 1
                                   dummy, offset_val = writer.lraOffsetConversionForDTLandNLC(kernel, tP, offset_val)
 
