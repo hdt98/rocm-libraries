@@ -35,13 +35,13 @@ int run_grouped_conv_fwd_example(int argc, char* argv[])
                                                       ck_tile::half_t>(
             in_layout, wei_layout, out_layout, argc, argv);
     }
-    // else if(data_type == "bf16")
-    // {
-    //     return run_grouped_conv_fwd_example_prec_type<Invoker,
-    //                                                   ConvConfig<ck_tile::bf16_t>,
-    //                                                   ck_tile::bf16_t>(
-    //         in_layout, wei_layout, out_layout, argc, argv);
-    // }
+    else if(data_type == "bf16")
+    {
+        return run_grouped_conv_fwd_example_prec_type<Invoker,
+                                                      ConvConfig<ck_tile::bf16_t>,
+                                                      ck_tile::bf16_t>(
+            in_layout, wei_layout, out_layout, argc, argv);
+    }
     else
     {
         throw std::runtime_error("Unsupported data type for this operation !!!");
