@@ -24,10 +24,12 @@ public:
         switch(type)
         {
         case ReferenceExecutorType::CPU:
-            HIPDNN_PLUGIN_LOG_TRACE("ReferenceGraphExecutorFactory: creating CPU reference executor");
+            HIPDNN_PLUGIN_LOG_TRACE(
+                "ReferenceGraphExecutorFactory: creating CPU reference executor");
             return std::make_unique<CpuReferenceGraphExecutorAdapter>();
         case ReferenceExecutorType::GPU:
-            HIPDNN_PLUGIN_LOG_TRACE("ReferenceGraphExecutorFactory: creating GPU reference executor");
+            HIPDNN_PLUGIN_LOG_TRACE(
+                "ReferenceGraphExecutorFactory: creating GPU reference executor");
             return std::make_unique<gpu_graph_executor::GpuReferenceGraphExecutor>();
         default:
             throw std::runtime_error("Unknown reference executor type");

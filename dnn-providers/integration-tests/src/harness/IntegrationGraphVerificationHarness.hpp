@@ -15,8 +15,8 @@
 #include <hipdnn_plugin_sdk/PluginLogging.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
-#include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
+#include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/GraphTensorBundle.hpp>
@@ -387,10 +387,9 @@ protected:
 
         auto& executor = getReferenceExecutor();
         const bool usesDevice = executor.requiresDeviceMemory();
-        HIPDNN_PLUGIN_LOG_TRACE("executeReferenceGraph: using "
-                                << (usesDevice ? "device" : "host") << " variant pack");
-        auto variantPack
-            = usesDevice ? bundle.toDeviceVariantPack() : bundle.toHostVariantPack();
+        HIPDNN_PLUGIN_LOG_TRACE("executeReferenceGraph: using " << (usesDevice ? "device" : "host")
+                                                                << " variant pack");
+        auto variantPack = usesDevice ? bundle.toDeviceVariantPack() : bundle.toHostVariantPack();
 
         executor.execute(serializedGraph.data(), serializedGraph.size(), variantPack);
     }
