@@ -4,11 +4,9 @@
 #pragma once
 
 #include <cstddef>
-#include <hip/hip_runtime.h>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_flatbuffers_sdk/flatbuffer_utilities/GraphWrapper.hpp>
 #include <stdexcept>
-#include <vector>
 
 #include "IGpuGraphNodePlanBuilder.hpp"
 #include "IGpuGraphNodePlanExecutor.hpp"
@@ -31,31 +29,12 @@ public:
 
     void execute(const std::unordered_map<int64_t, void*>& variantPack) override
     {
-        const auto* deviceInput = static_cast<const float*>(variantPack.at(_inputUid));
-        auto* deviceOutput = static_cast<float*>(variantPack.at(_outputUid));
-
-        std::vector<float> hostInput(_elementCount);
-        std::vector<float> hostOutput(_elementCount);
-
-        if(hipMemcpy(
-               hostInput.data(), deviceInput, _elementCount * sizeof(float), hipMemcpyDeviceToHost)
-           != hipSuccess)
-        {
-            throw std::runtime_error("GpuDummyAddOnePlan: failed to copy input from device");
-        }
+        const auto* input = static_cast<const float*>(variantPack.at(_inputUid));
+        auto* output = static_cast<float*>(variantPack.at(_outputUid));
 
         for(size_t i = 0; i < _elementCount; ++i)
         {
-            hostOutput[i] = hostInput[i] + 1.0f;
-        }
-
-        if(hipMemcpy(deviceOutput,
-                     hostOutput.data(),
-                     _elementCount * sizeof(float),
-                     hipMemcpyHostToDevice)
-           != hipSuccess)
-        {
-            throw std::runtime_error("GpuDummyAddOnePlan: failed to copy output to device");
+            output[i] = input[i] + 1.0f;
         }
     }
 

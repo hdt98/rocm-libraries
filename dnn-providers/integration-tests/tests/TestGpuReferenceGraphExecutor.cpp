@@ -314,8 +314,6 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneExecutes)
 {
     SKIP_IF_NO_DEVICES();
 
-    using hipdnn_data_sdk::utilities::Workspace;
-
     constexpr int64_t INPUT_UID = 1;
     constexpr int64_t OUTPUT_UID = 2;
     const std::vector<int64_t> dims = {4};
@@ -324,23 +322,14 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneExecutes)
     auto builder = createSimplePointwiseGraph(INPUT_UID, OUTPUT_UID, dims, strides);
 
     std::array<float, 4> input = {2.0f, 3.0f, 5.0f, 7.0f};
-
-    const Workspace dInput(4 * sizeof(float));
-    const Workspace dOutput(4 * sizeof(float));
-    ASSERT_EQ(hipMemcpy(dInput.get(), input.data(), 4 * sizeof(float), hipMemcpyHostToDevice),
-              hipSuccess);
-    ASSERT_EQ(hipMemset(dOutput.get(), 0, 4 * sizeof(float)), hipSuccess);
+    std::array<float, 4> output = {};
 
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[INPUT_UID] = dInput.get();
-    variantPack[OUTPUT_UID] = dOutput.get();
+    variantPack[INPUT_UID] = input.data();
+    variantPack[OUTPUT_UID] = output.data();
 
     GpuReferenceGraphExecutor executor;
     executor.execute(builder.GetBufferPointer(), builder.GetSize(), variantPack);
-
-    std::array<float, 4> output = {};
-    ASSERT_EQ(hipMemcpy(output.data(), dOutput.get(), 4 * sizeof(float), hipMemcpyDeviceToHost),
-              hipSuccess);
 
     EXPECT_FLOAT_EQ(output[0], 3.0f);
     EXPECT_FLOAT_EQ(output[1], 4.0f);
@@ -352,8 +341,6 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneMultiDimensional)
 {
     SKIP_IF_NO_DEVICES();
 
-    using hipdnn_data_sdk::utilities::Workspace;
-
     constexpr int64_t INPUT_UID = 1;
     constexpr int64_t OUTPUT_UID = 2;
     const std::vector<int64_t> dims = {2, 3};
@@ -362,23 +349,14 @@ TEST(TestGpuReferenceGraphExecutor, PointwiseDummyAddOneMultiDimensional)
     auto builder = createSimplePointwiseGraph(INPUT_UID, OUTPUT_UID, dims, strides);
 
     std::array<float, 6> input = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-
-    const Workspace dInput(6 * sizeof(float));
-    const Workspace dOutput(6 * sizeof(float));
-    ASSERT_EQ(hipMemcpy(dInput.get(), input.data(), 6 * sizeof(float), hipMemcpyHostToDevice),
-              hipSuccess);
-    ASSERT_EQ(hipMemset(dOutput.get(), 0, 6 * sizeof(float)), hipSuccess);
+    std::array<float, 6> output = {};
 
     std::unordered_map<int64_t, void*> variantPack;
-    variantPack[INPUT_UID] = dInput.get();
-    variantPack[OUTPUT_UID] = dOutput.get();
+    variantPack[INPUT_UID] = input.data();
+    variantPack[OUTPUT_UID] = output.data();
 
     GpuReferenceGraphExecutor executor;
     executor.execute(builder.GetBufferPointer(), builder.GetSize(), variantPack);
-
-    std::array<float, 6> output = {};
-    ASSERT_EQ(hipMemcpy(output.data(), dOutput.get(), 6 * sizeof(float), hipMemcpyDeviceToHost),
-              hipSuccess);
 
     for(size_t i = 0; i < input.size(); ++i)
     {
