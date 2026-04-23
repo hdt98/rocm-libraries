@@ -104,8 +104,19 @@ def executeStepsInConfig(
     ##############################################################################
     gfxName = isaToGfx(next(iter(isaInfoMap)))
     if "BenchmarkProblems" in config:
+        backend_cfg = config.get("Backend", {"Name": "tensile", "Config": {}})
+        if not isinstance(backend_cfg, dict):
+            printExit(f"Invalid backend configuration type: {type(backend_cfg).__name__}. Expected dict.")
+        if "Name" not in backend_cfg:
+            backend_cfg["Name"] = "tensile"
+        if "Config" not in backend_cfg or backend_cfg["Config"] is None:
+            backend_cfg["Config"] = {}
+        if not isinstance(backend_cfg["Config"], dict):
+            printExit("Invalid backend configuration: 'Config' must be a dictionary.")
+
         with timing_context("python_benchmark_problems"):
             BenchmarkProblems.main(
+                backend_cfg,
                 config["BenchmarkProblems"],
                 config["UseCache"],
                 asmToolchain,
@@ -217,6 +228,8 @@ def addCommonArguments(argParser):
         action="store", default="yaml", help="select which logic format to use")
     argParser.add_argument("--library-format", dest="LibraryFormat", choices=["yaml", "msgpack"], \
         action="store", default="yaml", help="select which library format to use")
+    argParser.add_argument("--backend", dest="Backend", choices=["tensile", "ductile"], \
+        action="store", default=None, help="select which benchmark backend to use (overrides YAML Backend; defaults to YAML Backend or tensile)")
     argParser.add_argument("--client-lock", default=None)
     argParser.add_argument("--prebuilt-client", default=str(TENSILE_CLIENT_PATH),
         type=os.path.abspath, help="Specify the full path to a pre-built tensilelite-client executable")
@@ -563,6 +576,43 @@ def Tensile(userArgs):
 
     config["UseCache"] = useCache
     globalParameters["ConfigPath"] = configPaths
+
+    # Backend selection precedence:
+    # 1) explicit CLI --backend
+    # 2) YAML Backend
+    # 3) tensile (default)
+    backend_name = "tensile"
+    backend_cfg = {}
+    yaml_backend = config.get("Backend", None)
+
+    if yaml_backend is not None:
+        if not isinstance(yaml_backend, dict):
+            printExit("Invalid backend configuration: 'Backend' must be a dictionary with key 'Name' and optional key 'Config'.")
+
+        if "Name" not in yaml_backend:
+            printExit("Invalid backend configuration: 'Backend' must contain key 'Name'.")
+
+        yaml_name = yaml_backend.get("Name")
+        yaml_cfg = yaml_backend.get("Config", {})
+
+        if not isinstance(yaml_name, str) or not yaml_name.strip():
+            printExit("Invalid backend configuration: 'Backend.Name' must be a non-empty string.")
+        if yaml_cfg is None:
+            yaml_cfg = {}
+        if not isinstance(yaml_cfg, dict):
+            printExit("Invalid backend configuration: 'Backend.Config' must be a dictionary.")
+
+        backend_name = yaml_name.strip().lower()
+        backend_cfg = yaml_cfg
+
+    if args.Backend:
+        cli_backend = args.Backend.lower()
+        if yaml_backend is not None and cli_backend != backend_name:
+            printWarning(f"Command-line backend override differs from YAML Backend.Name: YAML={backend_name}, CLI={cli_backend}. Using CLI backend.")
+            backend_cfg = {}
+        backend_name = cli_backend
+
+    config["Backend"] = {"Name": backend_name, "Config": backend_cfg}
 
     asm_debug = config["GlobalParameters"].get("AsmDebug", False)
     device_id = config["GlobalParameters"].get("Device", int(args.device))

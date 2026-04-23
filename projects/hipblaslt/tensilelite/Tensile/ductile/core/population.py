@@ -1,0 +1,241 @@
+################################################################################
+#
+# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+################################################################################
+from typing import Sequence, Union
+from scipy.spatial.distance import pdist
+from numbers import Number
+from typing import Sequence
+import functools
+import numpy as np
+import pandas as pd
+
+
+@functools.total_ordering
+class Individual:
+    def __init__(self, X: dict, F: float = 0.0, G: Sequence = [0]):
+        if not (isinstance(X, dict) and len(X) > 0):
+            raise ValueError("X must be a non-empty dictionary.")
+        if not all(isinstance(v, Number) for v in X.values()):
+            raise ValueError("X must be a dictionary of basic types.")
+        self.X = dict(sorted(X.items()))
+        self.F = float(F)  # Convert to Python float to ensure consistency
+        self.G = G
+
+    @property
+    def names(self):
+        return tuple(self.X.keys())
+
+    @property
+    def values(self):
+        return tuple(self.X.values())
+
+    @property
+    def items(self):
+        return tuple(zip(self.names, self.values))
+
+    @property
+    def size(self):
+        return len(self.X)
+
+    def copy(self):
+        return Individual(self.X, self.F, self.G)  # init already makes a copy of X
+
+    def update(self, X: dict):
+        self.X.update(X)
+        self.F = 0.0
+
+    def diff(self, other):
+        return sorted({k for k in self.names if self[k] != other[k]})
+
+    def __getitem__(self, key: str):
+        return self.X[key]
+
+    def __iter__(self):
+        return dict.__iter__(self.X)
+
+    def __setitem__(self, key: str, value):
+        if key not in self.X:
+            raise KeyError(key)
+        self.X[key] = value
+        self.F = 0.0
+
+    def __eq__(self, other):
+        if isinstance(other, Individual):
+            return self.X == other.X
+        return False
+
+    def __lt__(self, other):
+        if isinstance(other, Individual):
+            return self.F < other.F
+        return self.F < other
+
+    def __add__(self, other):
+        return self.F + other.F if isinstance(other, Individual) else self.F + other
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __sub__(self, other):
+        return self.F - other.F if isinstance(other, Individual) else self.F - other
+
+    def __rsub__(self, other):
+        return self.__sub__(other)
+
+    def __mul__(self, other):
+        return self.F * other.F if isinstance(other, Individual) else self.F * other
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __truediv__(self, other):
+        return self.F / other.F if isinstance(other, Individual) else self.F / other
+
+    def __copy__(self):
+        return self.copy()
+
+    def __hash__(self):
+        return hash(self.values)
+
+    def __repr__(self):
+        return f"Individual(X={self.X}, F={self.F:.4f})"
+
+
+class ExceedsCapacity(Exception):
+    pass
+
+
+class IndividualSet(set):
+    def __init__(self, s=(), capacity=np.inf):
+        self.capacity = capacity
+
+        if isinstance(s, IndividualSet):
+            self.capacity = s.capacity
+        self.msg = f"{self.capacity}"
+
+        if self.capacity and len(s) > self.capacity:
+            raise ExceedsCapacity(self.msg)
+        super().__init__(s)
+
+    def add(self, el):
+        new_size = len(self) + (len(el) if hasattr(el, "__len__") else 1)
+        if new_size > self.capacity:
+            raise ExceedsCapacity(self.msg)
+        super().add(el)
+
+
+class Population(np.ndarray, Sequence):
+    def __new__(cls, individuals=[]):
+        if isinstance(individuals, Individual):
+            individuals = [individuals]
+        if isinstance(individuals, set):
+            individuals = list(individuals)
+        if not all([isinstance(individual, Individual) for individual in individuals]):
+            raise ValueError("must be of type Individual")
+        if len(set(tuple(ind.names for ind in individuals))) > 1:
+            raise ValueError("all individuals must have the same variables")
+        return np.array(individuals).view(cls)
+
+    def __array_finalize__(self, obj):
+        self.names = ()
+        if hasattr(obj, "__len__") and len(obj) == 0:
+            return
+        if isinstance(obj[0], Individual):
+            self.names = obj[0].names
+
+    @property
+    def shape(self):
+        return self.size, len(self.names)
+
+    def get(self, *keys):
+        return np.array([[p[k] for k in keys] for p in self]).squeeze()
+
+    @property
+    def ary(self):
+        return np.array([ind.values for ind in self])
+
+    def unique(self,
+               key: str = None,
+               return_index=False):
+        if key:
+            return np.unique([p[key] for p in self], return_index=return_index)
+
+        uniq = pd.DataFrame([p.X for p in self]).drop_duplicates()
+        uniq_pop = Population([Individual(ind) for ind in uniq.T.to_dict().values()])
+        if not return_index:
+            return uniq_pop
+        return uniq_pop, uniq.index.values
+
+    def nunique(self, key: str = None) -> Union[pd.Series, int]:
+        if key:
+            return len(np.unique([p[key] for p in self]))
+        return pd.DataFrame([p.X for p in self]).nunique(axis=0)
+
+    def merge(self, other):
+        merged = np.concatenate((self, other)).view(Population)
+        if len(set(tuple(ind.names for ind in merged))) > 1:
+            raise ValueError("all individuals must have the same variables")
+        return merged
+
+    def diversity(self, reduce=True, metric="hamming"):
+        if self.size == 0:
+            return 0
+
+        X = self.ary
+        if reduce:
+            return pdist(X, metric=metric).mean()
+
+        div = [pdist(x[:, None], metric=metric).mean() for x in X.T]
+        return dict(zip(self.names, div))
+
+    @property
+    def F(self):
+        return np.array([ind.F for ind in self])
+
+    @F.setter
+    def F(self, scores):
+        for ind, score in zip(self, scores):
+            ind.F = score
+
+    @property
+    def G(self):
+        return np.array([ind.G for ind in self])
+
+    @G.setter
+    def G(self, scores):
+        for i, ind in enumerate(self):
+            ind.G = scores[:, i]
+
+    def argsort(self):
+        return np.array(np.argsort(self))[::-1]
+
+    def sort(self):
+        return self[self.argsort()]
+
+    def shuffle(self):
+        return np.random.permutation(self)
+
+    def copy(self):
+        return Population([ind.copy() for ind in self])
+
+    def __str__(self):
+        return self.__repr__()

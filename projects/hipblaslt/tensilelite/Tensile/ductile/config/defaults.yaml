@@ -1,0 +1,69 @@
+################################################################################
+#
+# Copyright (C) 2022-2025 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+################################################################################
+algorithm: GA
+pop_size: 512
+n_gen: 30
+soo: False
+period: 5 # 0 disables it
+tol: 0.0008
+div_thr: 0.5
+max_iters: 250
+seed: 0
+verbose: 1
+log_file: optimization.log
+weights: null
+validate_best: true
+survival:
+  name: fitness
+#  ratio: 1.0 # TODO
+selection:
+  name: tournament
+  tournament:
+    k: 2
+  truncation:
+    elite_ratio: 0.231579
+  beta:
+    a: 1
+    b: 2.5
+  ranked_round_robin: # Need to test this
+    var_name: MatrixInstruction #MatrixInstruction # null means cluster fitness
+    mode: elite # 'elite' is the default and will pop the best of each group, rank will sample with ranked prob
+  common:
+    ratio: 0.5
+    elitism: 0.05
+    replacement: true
+crossover:
+  name: ux
+  common:
+    mode: random
+    prob: 0.9 # Should be in the (0.8, 1.0) range usually
+mutation:
+  prob: null # If set should be something small (e.g. 0.02~0.06), set to 1 / n_params by default
+#  weights:
+#    group_0: 2.1 # MatrixInstruction group is more important to explore/exploit, so we increase its mutation rate, this is just an example
+#    DepthU: 2.1
+# weights' role is to increase the mutation rate for certain parameters, the final prob will be prob * w
+# after proper testing, if this is necessary we can make it self-adaptive/dynamic (diversity based)
+
+
