@@ -2203,11 +2203,7 @@ namespace rocisa
             {
                 int idx                       = dstCopy.regName->offsets.size() - 1;
                 dstCopy.regName->offsets[idx] = dstCopy.regName->offsets[idx] + regNum;
-<<<<<<< HEAD
-                dstCopy.regNum = 2;
-=======
                 dstCopy.regNum                = 2;
->>>>>>> origin/develop
             }
             else
             {
@@ -2239,7 +2235,6 @@ namespace rocisa
             auto dsCopy = ds ? std::make_shared<DSModifiers>(*ds) : std::make_shared<DSModifiers>();
             dsCopy->offset += 16;
             kStr2 += dsCopy->toString();
-<<<<<<< HEAD
 
             // Format both instructions
             kStr = formatWithComment(kStr);
@@ -2249,15 +2244,6 @@ namespace rocisa
 
             int const idx = dstCopyPtr->regName->offsets.size() - 1;
             int const regNum = 4;
-=======
-            kStr  = formatWithComment(kStr);
-            kStr2 = formatWithComment(kStr2);
-            // compute 2 different dst vgpr msb
-            auto dstCopyPtr
-                = std::make_shared<RegisterContainer>(*dynamic_cast<RegisterContainer*>(dst.get()));
-            int idx            = dstCopyPtr->regName->offsets.size() - 1;
-            int regNum         = 4;
->>>>>>> origin/develop
             dstCopyPtr->regNum = regNum;
             dstCopyPtr->setMsb();
             setMsb(kStr, {srcs}, dstCopyPtr);
@@ -2618,11 +2604,7 @@ namespace rocisa
             {
                 int idx                       = srcCopy.regName->offsets.size() - 1;
                 srcCopy.regName->offsets[idx] = srcCopy.regName->offsets[idx] + regNum;
-<<<<<<< HEAD
-                srcCopy.regNum = 2;
-=======
                 srcCopy.regNum                = 2;
->>>>>>> origin/develop
             }
             else
             {
@@ -2654,15 +2636,6 @@ namespace rocisa
             auto dsCopy = ds ? std::make_shared<DSModifiers>(*ds) : std::make_shared<DSModifiers>();
             dsCopy->offset += 16;
             kStr2 += dsCopy->toString();
-<<<<<<< HEAD
-            // Format both instructions
-            kStr = formatWithComment(kStr);
-            kStr2 = formatWithComment(kStr2);
-
-            auto srcCopyPtr = std::make_shared<RegisterContainer>(*dynamic_cast<RegisterContainer*>(src0.get()));
-            int idx = srcCopyPtr->regName->offsets.size() - 1;
-            int const regNum = 4;
-=======
             kStr  = formatWithComment(kStr);
             kStr2 = formatWithComment(kStr2);
             // compute 2 different src vgpr msb
@@ -2670,7 +2643,6 @@ namespace rocisa
                 *dynamic_cast<RegisterContainer*>(src0.get()));
             int idx            = srcCopyPtr->regName->offsets.size() - 1;
             int regNum         = 4;
->>>>>>> origin/develop
             srcCopyPtr->regNum = regNum;
             srcCopyPtr->setMsb();
             setMsb(kStr, {dstAddr, srcCopyPtr}, nullptr);

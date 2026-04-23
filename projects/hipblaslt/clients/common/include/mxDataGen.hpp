@@ -28,16 +28,11 @@
 
 #include <hip/hip_runtime.h>
 
-<<<<<<< HEAD
-#include <vector>
-
-#if HIPBLASLT_ENABLE_MXDATAGENERATOR
-=======
 #include <string_view>
 #include <vector>
 
-#ifdef HIPBLASLT_USE_ROCROLLER
->>>>>>> origin/develop
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
+
 std::vector<float> generateMXInput(hipDataType                dataType,
                                    hipDataType                scaleType,
                                    void*                      data,
