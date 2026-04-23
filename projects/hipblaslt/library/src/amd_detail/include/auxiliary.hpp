@@ -113,6 +113,10 @@ constexpr hipblasOperation_t char_to_hipblas_operation(char value)
 HIPBLASLT_EXPORT
 constexpr const char* hip_datatype_to_string(hipDataType type)
 {
+    if(type == static_cast<hipDataType>(HIP_R_8F_E5M3_EXT))
+    {
+        return "e5m3_r";
+    }
     switch(type)
     {
     case HIP_R_32F:
@@ -143,8 +147,6 @@ constexpr const char* hip_datatype_to_string(hipDataType type)
         return "bf6_r";
     case HIP_R_4F_E2M1:
         return "f4_r";
-    case static_cast<hipDataType>(HIP_R_8F_E5M3_EXT):
-        return "e5m3_r";
     default:
         return "non-supported type";
     }

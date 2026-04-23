@@ -290,7 +290,6 @@ hipblasStatus_t hipblasltSoftmaxRun(hipDataType datatype,
     TensileLite::KernelInvocation invocation{kernelName,
                                              sol->getCodeObjectPath(),
                                              false,
-                                             false,
                                              {0, 0, 0},
                                              {WORKGROUP_SIZE, 1, 1},
                                              {numWorkgroups, 1, 1},
@@ -419,7 +418,6 @@ hipblasStatus_t hipblasltAMaxRun(const hipDataType datatype,
     TensileLite::KernelInvocation invocation;
     invocation.kernelName      = kernelName;
     invocation.codeObjectFile  = sol->getCodeObjectPath();
-    invocation.enableCluster   = false;
     invocation.clusterDim.x    = 0;
     invocation.clusterDim.y    = 0;
     invocation.clusterDim.z    = 0;
