@@ -82,28 +82,8 @@
 
 namespace
 {
-    // HIPBLASLT_STREAMK_DIAG (stderr, for CI / local triage; unset or "0" disables):
-    //   "1" — log one line per Tensile run only when the chosen solution has streamK != 0.
-    //   "all" or "2" — log every Tensile solution selection (very noisy on full hipblaslt-test).
-    const char* hipblaslt_streamk_diag_env()
-    {
-        return std::getenv("HIPBLASLT_STREAMK_DIAG");
-    }
-
-    bool hipblaslt_streamk_diag_all_solutions(const char* v)
-    {
-        return v && (std::string_view{v} == "all" || std::string_view{v} == "2");
-    }
-
-    bool hipblaslt_streamk_diag_log_solution(const char* v, int streamK)
-    {
-        if(!v || v[0] == '\0' || std::string_view{v} == "0")
-            return false;
-        return (streamK != 0) || hipblaslt_streamk_diag_all_solutions(v);
-    }
-
+    // Temporary: always log Stream-K selections to stderr (same as former HIPBLASLT_STREAMK_DIAG=1).
     void hipblaslt_streamk_diag_log_line(
-        const char* skDiag,
         int                                       gpuId,
         int                                       solIdx,
         const TensileLite::ContractionProblemGemm& probGm,
@@ -113,7 +93,7 @@ namespace
     {
         if(!solution || !library)
             return;
-        if(!hipblaslt_streamk_diag_log_solution(skDiag, solution->getSizeMapping().streamK))
+        if(solution->getSizeMapping().streamK == 0)
             return;
         const auto& sm = solution->getSizeMapping();
         std::cerr << "[HIPBLASLT_STREAMK_DIAG] tensile_run"
@@ -2888,8 +2868,7 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
 
         auto solution = library->getSolutionByIndex(data->problem, *hardware, *solutionIndex);
 
-        hipblaslt_streamk_diag_log_line(hipblaslt_streamk_diag_env(),
-                                        handle->device,
+        hipblaslt_streamk_diag_log_line(handle->device,
                                         *solutionIndex,
                                         data->problem,
                                         solution,
@@ -3216,8 +3195,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             data->algoIndex = *solutionIndex;
             auto solution   = library->getSolutionByIndex(data->problem, *hardware, *solutionIndex);
 
-            hipblaslt_streamk_diag_log_line(hipblaslt_streamk_diag_env(),
-                                            handle->device,
+            hipblaslt_streamk_diag_log_line(handle->device,
                                             *solutionIndex,
                                             data->problem,
                                             solution,
@@ -3272,8 +3250,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             auto solution
                 = library->getSolutionByIndex(data->problem.gemms[0], *hardware, *solutionIndex);
 
-            hipblaslt_streamk_diag_log_line(hipblaslt_streamk_diag_env(),
-                                            handle->device,
+            hipblaslt_streamk_diag_log_line(handle->device,
                                             *solutionIndex,
                                             data->problem.gemms[0],
                                             solution,
