@@ -6,9 +6,11 @@
 import glob
 import socket
 import sys
+import tarfile
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, Tuple
 
 from ..common.exceptions import ExecutionError, GraphLoadError
 from ..config.benchmark_config import (
@@ -31,6 +33,52 @@ from ..reporting.suite_results import (
 )
 from ..validation.reference_provider import ReferenceProviderRegistry
 from .parser import create_parser
+
+
+_TARBALL_SUFFIXES = {".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz"}
+
+
+def _is_tarball(path: str) -> bool:
+    """Return True if path looks like a tarball by suffix."""
+    p = path.lower()
+    return any(p.endswith(s) for s in _TARBALL_SUFFIXES)
+
+
+def _extract_tarball(tarball_path: str) -> Tuple[tempfile.TemporaryDirectory, List[str]]:
+    """Extract JSON graph files from a tarball into a temporary directory.
+
+    Args:
+        tarball_path: Path to the tarball file.
+
+    Returns:
+        Tuple of (TemporaryDirectory to keep alive, sorted list of JSON file paths).
+
+    Raises:
+        SystemExit: If the tarball cannot be opened or contains no JSON files.
+    """
+    if not tarfile.is_tarfile(tarball_path):
+        print(f"Not a valid tarball: {tarball_path}", file=sys.stderr)
+        sys.exit(1)
+
+    tmpdir = tempfile.TemporaryDirectory(prefix="dnn_benchmarking_")
+    try:
+        with tarfile.open(tarball_path) as tf:
+            json_members = [m for m in tf.getmembers() if m.name.endswith(".json")]
+            if not json_members:
+                tmpdir.cleanup()
+                print(
+                    f"No .json files found in tarball: {tarball_path}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            tf.extractall(path=tmpdir.name, members=json_members)
+    except Exception as exc:
+        tmpdir.cleanup()
+        print(f"Failed to extract tarball {tarball_path}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    extracted = sorted(glob.glob(f"{tmpdir.name}/**/*.json", recursive=True))
+    return tmpdir, extracted
 
 
 def run_pytorch_benchmark(
@@ -344,6 +392,7 @@ def _orchestrate_suite_cli(
     config: SuiteConfig,
     output_path: Optional[Path],
     plugin_path: Optional[Path],
+    tarball_source: Optional[str] = None,
 ) -> int:
     """CLI orchestration wrapper around run_suite().
 
@@ -371,7 +420,7 @@ def _orchestrate_suite_cli(
             )
             return 1
 
-    reporter.print_suite_header(total)
+    reporter.print_suite_header(total, tarball_source=tarball_source)
 
     try:
         import hipdnn_frontend as hipdnn
@@ -431,152 +480,171 @@ def main() -> int:
 
     gpu_backend = "none" if args.no_kernel_timing else "auto"
 
-    # Resolve --graph: glob expansion for suite mode.
-    # recursive=True so '**' patterns match nested directories.
-    resolved_files = sorted(glob.glob(args.graph, recursive=True))
+    # Resolve --graph: tarball, glob, or single file.
+    tarball_source: Optional[str] = None
+    _tmpdir: Optional[tempfile.TemporaryDirectory] = None
 
-    # Backward compatibility: if raw string is a single existing file
-    if not resolved_files and Path(args.graph).is_file():
-        resolved_files = [args.graph]
+    if _is_tarball(args.graph):
+        tarball_source = args.graph
+        _tmpdir, resolved_files = _extract_tarball(args.graph)
+        print(
+            f"Extracted {len(resolved_files)} graph(s) from {args.graph}",
+            file=sys.stderr,
+        )
+    else:
+        # Glob expansion for suite mode (per D-05)
+        # recursive=True so '**' patterns match nested directories.
+        resolved_files = sorted(glob.glob(args.graph, recursive=True))
+
+        # Backward compatibility: if raw string is a single existing file
+        if not resolved_files and Path(args.graph).is_file():
+            resolved_files = [args.graph]
 
     if not resolved_files:
+        if _tmpdir is not None:
+            _tmpdir.cleanup()
         print(
             f"No graph files found matching: {args.graph}",
             file=sys.stderr,
         )
         return 1
 
-    # A/B testing mode: --AId or --BId specified (kept as a separate path for now).
-    # TODO(follow-up): --output is currently silently ignored in this mode -- run_ab_test
-    # has no JSON export. Either add export or reject --output here.
-    if args.AId is not None or args.BId is not None:
-        if len(resolved_files) > 1:
-            print(
-                "A/B testing requires a single graph file, not a glob pattern",
-                file=sys.stderr,
-            )
-            return 1
+    try:
+        # A/B testing mode: --AId or --BId specified (kept as a separate path for now).
+        # TODO(follow-up): --output is currently silently ignored in this mode -- run_ab_test
+        # has no JSON export. Either add export or reject --output here.
+        if args.AId is not None or args.BId is not None:
+            if len(resolved_files) > 1:
+                print(
+                    "A/B testing requires a single graph file, not a glob pattern",
+                    file=sys.stderr,
+                )
+                return 1
 
-        if args.AId is None or args.BId is None:
-            print(
-                "A/B testing requires both --AId and --BId to be specified",
-                file=sys.stderr,
-            )
-            return 1
+            if args.AId is None or args.BId is None:
+                print(
+                    "A/B testing requires both --AId and --BId to be specified",
+                    file=sys.stderr,
+                )
+                return 1
 
-        # --engine is meaningless in A/B mode (configurations come from
-        # --AId / --BId). Reject rather than silently using args.engine[0].
-        if args.engine:
-            print(
-                "--engine is not supported in A/B testing mode "
-                "(use --AId and --BId instead)",
-                file=sys.stderr,
-            )
-            return 1
+            # --engine is meaningless in A/B mode (configurations come from
+            # --AId / --BId). Reject rather than silently using args.engine[0].
+            if args.engine:
+                print(
+                    "--engine is not supported in A/B testing mode "
+                    "(use --AId and --BId instead)",
+                    file=sys.stderr,
+                )
+                return 1
 
-        try:
-            # engine_id is unused by the A/B path (it uses a_id / b_id
-            # from ABTestConfig); pass a benign default.
-            config = BenchmarkConfig(
-                graph_path=Path(resolved_files[0]),
-                warmup_iters=args.warmup,
-                benchmark_iters=args.iters,
-                engine_id=args.AId,
-            )
-        except ValueError as e:
-            print(f"Configuration error: {e}", file=sys.stderr)
-            return 1
-
-        try:
-            ab_config = ABTestConfig(
-                a_path=args.APath,
-                a_id=args.AId,
-                b_path=args.BPath,
-                b_id=args.BId,
-                rtol=args.rtol,
-                atol=args.atol,
-            )
-        except ValueError as e:
-            print(f"A/B configuration error: {e}", file=sys.stderr)
-            return 1
-
-        ab_validation_config = None
-        if args.validate != "none":
             try:
-                ab_validation_config = ValidationConfig(
-                    provider=args.validate,
+                # engine_id is unused by the A/B path (it uses a_id / b_id
+                # from ABTestConfig); pass a benign default.
+                config = BenchmarkConfig(
+                    graph_path=Path(resolved_files[0]),
+                    warmup_iters=args.warmup,
+                    benchmark_iters=args.iters,
+                    engine_id=args.AId,
+                )
+            except ValueError as e:
+                print(f"Configuration error: {e}", file=sys.stderr)
+                return 1
+
+            try:
+                ab_config = ABTestConfig(
+                    a_path=args.APath,
+                    a_id=args.AId,
+                    b_path=args.BPath,
+                    b_id=args.BId,
                     rtol=args.rtol,
                     atol=args.atol,
                 )
             except ValueError as e:
-                print(f"Validation configuration error: {e}", file=sys.stderr)
+                print(f"A/B configuration error: {e}", file=sys.stderr)
                 return 1
 
-        return run_ab_test(
-            config,
-            ab_config,
-            seed=args.seed,
-            gpu_backend=gpu_backend,
-            validation_config=ab_validation_config,
-        )
+            ab_validation_config = None
+            if args.validate != "none":
+                try:
+                    ab_validation_config = ValidationConfig(
+                        provider=args.validate,
+                        rtol=args.rtol,
+                        atol=args.atol,
+                    )
+                except ValueError as e:
+                    print(f"Validation configuration error: {e}", file=sys.stderr)
+                    return 1
 
-    # PyTorch backend: single-graph only, separate executor (no provider discovery)
-    if args.backend == "pytorch":
-        if len(resolved_files) > 1:
-            print(
-                "Suite mode is not supported with --backend pytorch",
-                file=sys.stderr,
+            return run_ab_test(
+                config,
+                ab_config,
+                seed=args.seed,
+                gpu_backend=gpu_backend,
+                validation_config=ab_validation_config,
             )
-            return 1
-        # PyTorch backend executes one engine; a multi-ID list is ambiguous.
-        if args.engine and len(args.engine) > 1:
-            print(
-                "--engine accepts only a single ID with --backend pytorch "
-                "(got: " + ",".join(str(e) for e in args.engine) + ")",
-                file=sys.stderr,
+
+        # PyTorch backend: single-graph only, separate executor (no provider discovery)
+        if args.backend == "pytorch":
+            if len(resolved_files) > 1:
+                print(
+                    "Suite mode is not supported with --backend pytorch",
+                    file=sys.stderr,
+                )
+                return 1
+            # PyTorch backend executes one engine; a multi-ID list is ambiguous.
+            if args.engine and len(args.engine) > 1:
+                print(
+                    "--engine accepts only a single ID with --backend pytorch "
+                    "(got: " + ",".join(str(e) for e in args.engine) + ")",
+                    file=sys.stderr,
+                )
+                return 1
+            try:
+                pt_engine_id = args.engine[0] if args.engine else 1
+                pt_config = BenchmarkConfig(
+                    graph_path=Path(resolved_files[0]),
+                    warmup_iters=args.warmup,
+                    benchmark_iters=args.iters,
+                    engine_id=pt_engine_id,
+                )
+            except ValueError as e:
+                print(f"Configuration error: {e}", file=sys.stderr)
+                return 1
+            return run_pytorch_benchmark(
+                pt_config,
+                seed=args.seed,
+                output_path=args.output,
             )
-            return 1
+
+        # Unified hipDNN path: handles 1..N graphs x 1..N engines.
+        # Single-graph is just a 1x1 instance; verbose flag selects rich vs summary.
         try:
-            pt_engine_id = args.engine[0] if args.engine else 1
-            pt_config = BenchmarkConfig(
-                graph_path=Path(resolved_files[0]),
+            suite_config = SuiteConfig(
                 warmup_iters=args.warmup,
                 benchmark_iters=args.iters,
-                engine_id=pt_engine_id,
+                seed=args.seed,
+                engine_filter=args.engine,
+                rtol=args.rtol,
+                atol=args.atol,
+                gpu_backend=gpu_backend,
+                reference_provider=args.validate,
+                verbose=args.verbose,
             )
         except ValueError as e:
-            print(f"Configuration error: {e}", file=sys.stderr)
+            print(f"Suite configuration error: {e}", file=sys.stderr)
             return 1
-        return run_pytorch_benchmark(
-            pt_config,
-            seed=args.seed,
+
+        return _orchestrate_suite_cli(
+            graph_paths=[Path(p) for p in resolved_files],
+            config=suite_config,
             output_path=args.output,
+            plugin_path=args.plugin_path,
+            tarball_source=tarball_source,
         )
-
-    # Unified hipDNN path: handles 1..N graphs x 1..N engines.
-    # Single-graph is just a 1x1 instance; verbose flag selects rich vs summary.
-    try:
-        suite_config = SuiteConfig(
-            warmup_iters=args.warmup,
-            benchmark_iters=args.iters,
-            seed=args.seed,
-            engine_filter=args.engine,
-            rtol=args.rtol,
-            atol=args.atol,
-            gpu_backend=gpu_backend,
-            reference_provider=args.validate,
-            verbose=args.verbose,
-        )
-    except ValueError as e:
-        print(f"Suite configuration error: {e}", file=sys.stderr)
-        return 1
-
-    return _orchestrate_suite_cli(
-        graph_paths=[Path(p) for p in resolved_files],
-        config=suite_config,
-        output_path=args.output,
-        plugin_path=args.plugin_path,
-    )
+    finally:
+        if _tmpdir is not None:
+            _tmpdir.cleanup()
 
 
 if __name__ == "__main__":

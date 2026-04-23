@@ -412,11 +412,15 @@ class Reporter:
 
     # Suite Methods
 
-    def print_suite_header(self, total_graphs: int) -> None:
+    def print_suite_header(
+        self, total_graphs: int, tarball_source: Optional[str] = None
+    ) -> None:
         """Print suite execution header."""
         self._print_line("=")
         self._print(f"hipDNN Benchmark Suite: {total_graphs} graph(s)")
         self._print_line("=")
+        if tarball_source is not None:
+            self._print(f"Source:  {tarball_source} (extracted)")
         self._print("")
 
     def print_suite_graph_start(self, index: int, total: int, graph_name: str) -> None:

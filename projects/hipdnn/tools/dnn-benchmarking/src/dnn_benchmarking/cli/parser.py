@@ -79,6 +79,10 @@ Suite Mode (multiple graphs):
   dnn-benchmark --graph 'graphs/*.json' --warmup 10 --iters 100
   dnn-benchmark --graph 'graphs/*.json' -o results.json
   dnn-benchmark --graph 'graphs/*.json' -v           # rich block per (graph, engine)
+
+Tarball Input:
+  dnn-benchmark --graph graphs.tar.gz
+  dnn-benchmark --graph graphs.tgz -o results.json
         """,
     )
 
@@ -88,8 +92,9 @@ Suite Mode (multiple graphs):
         type=str,
         required=True,
         metavar="PATH",
-        help="Path to JSON graph file, or glob pattern for suite mode "
-        "(e.g., 'graphs/*.json')",
+        help="Path to JSON graph file, glob pattern for suite mode "
+        "(e.g., 'graphs/*.json'), or tarball (.tar, .tar.gz, .tgz) "
+        "containing JSON graph files",
     )
 
     parser.add_argument(
