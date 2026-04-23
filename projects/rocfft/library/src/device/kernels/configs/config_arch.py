@@ -33,7 +33,6 @@ class supported_arch(Enum):
     GFX_906 = "gfx906"
     GFX_908 = "gfx908"
     GFX_90A = "gfx90a"
-    GFX_90C = "gfx90c"
     GFX_942 = "gfx942"
     GFX_950 = "gfx950"
     GFX_1030 = "gfx1030"
