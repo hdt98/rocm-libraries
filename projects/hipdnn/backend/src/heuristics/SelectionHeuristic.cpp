@@ -13,12 +13,10 @@ SelectionHeuristic::SelectionHeuristic(const plugin::HeuristicPlugin* plugin,
                                        hipdnnHeuristicHandle_t pluginHandle)
     : _plugin(plugin)
 {
-    THROW_IF_FALSE(_plugin != nullptr,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "HeuristicPlugin pointer cannot be null");
-    THROW_IF_FALSE(pluginHandle != nullptr,
-                   HIPDNN_STATUS_BAD_PARAM,
-                   "hipdnnHeuristicHandle_t cannot be null");
+    THROW_IF_FALSE(
+        _plugin != nullptr, HIPDNN_STATUS_BAD_PARAM, "HeuristicPlugin pointer cannot be null");
+    THROW_IF_FALSE(
+        pluginHandle != nullptr, HIPDNN_STATUS_BAD_PARAM, "hipdnnHeuristicHandle_t cannot be null");
 
     // Create the policy descriptor bound to this plugin handle
     _descriptor = _plugin->createPolicyDescriptor(pluginHandle);
@@ -42,9 +40,10 @@ SelectionHeuristic::~SelectionHeuristic()
 }
 
 SelectionHeuristic::SelectionHeuristic(SelectionHeuristic&& other) noexcept
-    : _plugin(other._plugin), _descriptor(other._descriptor)
+    : _plugin(other._plugin)
+    , _descriptor(other._descriptor)
 {
-    other._plugin     = nullptr;
+    other._plugin = nullptr;
     other._descriptor = nullptr;
 }
 
@@ -66,9 +65,9 @@ SelectionHeuristic& SelectionHeuristic::operator=(SelectionHeuristic&& other) no
         }
 
         // Move from other
-        _plugin           = other._plugin;
-        _descriptor       = other._descriptor;
-        other._plugin     = nullptr;
+        _plugin = other._plugin;
+        _descriptor = other._descriptor;
+        other._plugin = nullptr;
         other._descriptor = nullptr;
     }
     return *this;
@@ -76,18 +75,16 @@ SelectionHeuristic& SelectionHeuristic::operator=(SelectionHeuristic&& other) no
 
 void SelectionHeuristic::setEngineIds(const std::vector<int64_t>& engineIds)
 {
-    THROW_IF_FALSE(_descriptor != nullptr,
-                   HIPDNN_STATUS_NOT_INITIALIZED,
-                   "Policy descriptor not initialized");
+    THROW_IF_FALSE(
+        _descriptor != nullptr, HIPDNN_STATUS_NOT_INITIALIZED, "Policy descriptor not initialized");
 
     _plugin->setEngineIds(_descriptor, engineIds.data(), engineIds.size());
 }
 
 void SelectionHeuristic::setSerializedGraph(const hipdnnPluginConstData_t* serializedGraph)
 {
-    THROW_IF_FALSE(_descriptor != nullptr,
-                   HIPDNN_STATUS_NOT_INITIALIZED,
-                   "Policy descriptor not initialized");
+    THROW_IF_FALSE(
+        _descriptor != nullptr, HIPDNN_STATUS_NOT_INITIALIZED, "Policy descriptor not initialized");
     THROW_IF_FALSE(serializedGraph != nullptr,
                    HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                    "Serialized graph pointer cannot be null");
@@ -97,9 +94,8 @@ void SelectionHeuristic::setSerializedGraph(const hipdnnPluginConstData_t* seria
 
 bool SelectionHeuristic::finalize()
 {
-    THROW_IF_FALSE(_descriptor != nullptr,
-                   HIPDNN_STATUS_NOT_INITIALIZED,
-                   "Policy descriptor not initialized");
+    THROW_IF_FALSE(
+        _descriptor != nullptr, HIPDNN_STATUS_NOT_INITIALIZED, "Policy descriptor not initialized");
 
     // Call the plugin's finalize method
     // Returns true if policy succeeded (won the outer loop)
@@ -109,9 +105,8 @@ bool SelectionHeuristic::finalize()
 
 std::vector<int64_t> SelectionHeuristic::getSortedEngineIds()
 {
-    THROW_IF_FALSE(_descriptor != nullptr,
-                   HIPDNN_STATUS_NOT_INITIALIZED,
-                   "Policy descriptor not initialized");
+    THROW_IF_FALSE(
+        _descriptor != nullptr, HIPDNN_STATUS_NOT_INITIALIZED, "Policy descriptor not initialized");
 
     // Call the plugin's getSortedEngineIds method
     // This is valid only after finalize() returned true

@@ -18,7 +18,6 @@
 #include "EngineHeuristicDescriptor.hpp"
 #include "ExecutionPlanDescriptor.hpp"
 #include "GraphDescriptor.hpp"
-#include "heuristics/SelectionHeuristic.hpp"
 #include "HipdnnException.hpp"
 #include "KnobDescriptor.hpp"
 #include "KnobSettingDescriptor.hpp"
@@ -31,6 +30,7 @@
 #include "SdpaFwdOperationDescriptor.hpp"
 #include "TensorDescriptor.hpp"
 #include "VariantDescriptor.hpp"
+#include "heuristics/SelectionHeuristic.hpp"
 #include "logging/Logging.hpp"
 
 namespace hipdnn_backend

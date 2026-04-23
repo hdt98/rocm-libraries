@@ -51,8 +51,7 @@ public:
      * @param pluginHandle The hipdnnHeuristicHandle_t for this policy's module.
      *                     Created by HeuristicPluginResourceManager.
      */
-    SelectionHeuristic(const plugin::HeuristicPlugin* plugin,
-                       hipdnnHeuristicHandle_t pluginHandle);
+    SelectionHeuristic(const plugin::HeuristicPlugin* plugin, hipdnnHeuristicHandle_t pluginHandle);
 
     /**
      * @brief Destroys the SelectionHeuristic and releases the policy descriptor.

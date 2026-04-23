@@ -653,7 +653,7 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetEngineInfo_ext(hipdnnHandle_t hand
  * @see hipdnnGetHeuristicPolicyInfo_ext for retrieving individual policy metadata
  */
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHandle_t handle,
-                                                                        size_t* numPolicies);
+                                                                       size_t* numPolicies);
 
 /**
  * @brief Gets information about a loaded heuristic policy by index.
@@ -686,14 +686,14 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHan
  * @see hipdnnGetHeuristicPolicyCount_ext for getting the total policy count
  */
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHandle_t handle,
-                                                                       size_t policyIndex,
-                                                                       int64_t* policyId,
-                                                                       char* policyName,
-                                                                       size_t* policyNameLen,
-                                                                       char* pluginVersion,
-                                                                       size_t* pluginVersionLen,
-                                                                       char* apiVersion,
-                                                                       size_t* apiVersionLen);
+                                                                      size_t policyIndex,
+                                                                      int64_t* policyId,
+                                                                      char* policyName,
+                                                                      size_t* policyNameLen,
+                                                                      char* pluginVersion,
+                                                                      size_t* pluginVersionLen,
+                                                                      char* apiVersion,
+                                                                      size_t* apiVersionLen);
 
 /**
  * @brief Returns hipdnn backend version string. Returns an error if nullptr is passed

@@ -14,8 +14,8 @@
 #include "mocks/MockDescriptor.hpp"
 #include "mocks/MockEnginePluginResourceManager.hpp"
 #include "mocks/MockHandle.hpp"
-#include "mocks/MockHeuristicPluginResourceManager.hpp"
 #include "mocks/MockHeuristicPlugin.hpp"
+#include "mocks/MockHeuristicPluginResourceManager.hpp"
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
@@ -94,18 +94,17 @@ public:
     void setupMockHeuristicPlugin() const
     {
         // Mock policy IDs for both well-known policies
-        const int64_t configPolicyId =
-            hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::Config");
-        const int64_t staticOrderingPolicyId =
-            hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::StaticOrdering");
+        const int64_t configPolicyId
+            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::Config");
+        const int64_t staticOrderingPolicyId
+            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::StaticOrdering");
 
         // Mock handles and descriptors
         auto mockHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0x1234);
         auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
 
         // Set up expectations for resource manager - Config policy returns nullptr (skips)
-        EXPECT_CALL(*_mockHeuristicPluginResourceManager,
-                    getPluginForPolicyId(configPolicyId))
+        EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(configPolicyId))
             .WillRepeatedly(Return(nullptr));
         EXPECT_CALL(*_mockHeuristicPluginResourceManager,
                     getHeuristicHandleForPolicyId(configPolicyId))
@@ -118,8 +117,7 @@ public:
         EXPECT_CALL(*_mockHeuristicPluginResourceManager,
                     getHeuristicHandleForPolicyId(staticOrderingPolicyId))
             .WillRepeatedly(Return(mockHandle));
-        EXPECT_CALL(*_mockHeuristicPluginResourceManager,
-                    setDevicePropertiesOnAllHandles(_))
+        EXPECT_CALL(*_mockHeuristicPluginResourceManager, setDevicePropertiesOnAllHandles(_))
             .WillRepeatedly(Return());
 
         // Set up expectations for the mock plugin
@@ -154,8 +152,10 @@ protected:
     std::unique_ptr<HipdnnBackendDescriptor> _mockGraphBadTypeWrapper = nullptr;
     std::unique_ptr<HipdnnBackendDescriptor> _mockWrongTypeWrapper = nullptr;
     std::unique_ptr<NiceMock<MockHandle>> _mockHandle = nullptr;
-    std::shared_ptr<NiceMock<MockEnginePluginResourceManager>> _mockEnginePluginResourceManager = nullptr;
-    std::shared_ptr<NiceMock<MockHeuristicPluginResourceManager>> _mockHeuristicPluginResourceManager = nullptr;
+    std::shared_ptr<NiceMock<MockEnginePluginResourceManager>> _mockEnginePluginResourceManager
+        = nullptr;
+    std::shared_ptr<NiceMock<MockHeuristicPluginResourceManager>>
+        _mockHeuristicPluginResourceManager = nullptr;
     std::shared_ptr<NiceMock<MockHeuristicPlugin>> _mockHeuristicPlugin = nullptr;
     mutable std::vector<int64_t> _mockStoredEngineIds;
 
@@ -166,8 +166,10 @@ protected:
         _mockGraphBadTypeWrapper = createDescriptor<MockGraphDescriptor>();
         _mockWrongTypeWrapper = createDescriptor<MockDescriptor<EngineHeuristicDescriptor>>();
         _mockHandle = std::make_unique<NiceMock<MockHandle>>();
-        _mockEnginePluginResourceManager = std::make_shared<NiceMock<MockEnginePluginResourceManager>>();
-        _mockHeuristicPluginResourceManager = std::make_shared<NiceMock<MockHeuristicPluginResourceManager>>();
+        _mockEnginePluginResourceManager
+            = std::make_shared<NiceMock<MockEnginePluginResourceManager>>();
+        _mockHeuristicPluginResourceManager
+            = std::make_shared<NiceMock<MockHeuristicPluginResourceManager>>();
         _mockHeuristicPlugin = std::make_shared<NiceMock<MockHeuristicPlugin>>();
     }
 

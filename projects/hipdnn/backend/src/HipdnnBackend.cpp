@@ -605,7 +605,7 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetEngineInfo_ext(hipdnnHandle_t hand
 }
 
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHandle_t handle,
-                                                                        size_t* numPolicies)
+                                                                       size_t* numPolicies)
 {
     LOG_API_ENTRY("handle={:p}, numPolicies_ptr={:p}",
                   static_cast<void*>(handle),
@@ -623,14 +623,14 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHan
 }
 
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHandle_t handle,
-                                                                       size_t policyIndex,
-                                                                       int64_t* policyId,
-                                                                       char* policyName,
-                                                                       size_t* policyNameLen,
-                                                                       char* pluginVersion,
-                                                                       size_t* pluginVersionLen,
-                                                                       char* apiVersion,
-                                                                       size_t* apiVersionLen)
+                                                                      size_t policyIndex,
+                                                                      int64_t* policyId,
+                                                                      char* policyName,
+                                                                      size_t* policyNameLen,
+                                                                      char* pluginVersion,
+                                                                      size_t* pluginVersionLen,
+                                                                      char* apiVersion,
+                                                                      size_t* apiVersionLen)
 {
     LOG_API_ENTRY("handle={:p}, policyIndex={}, policyId_ptr={:p}, policyName_ptr={:p}, "
                   "pluginVersion_ptr={:p}, apiVersion_ptr={:p}",
@@ -676,8 +676,7 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHand
         }
 
         // Retrieve mode: check buffer sizes
-        if(*policyNameLen < requiredPolicyNameLen
-           || *pluginVersionLen < requiredPluginVersionLen
+        if(*policyNameLen < requiredPolicyNameLen || *pluginVersionLen < requiredPluginVersionLen
            || *apiVersionLen < requiredApiVersionLen)
         {
             throw HipdnnException(HIPDNN_STATUS_BAD_PARAM, "Insufficient buffer space provided.");

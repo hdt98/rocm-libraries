@@ -231,8 +231,7 @@ public:
         }
         else if(!filesToLoad.empty())
         {
-            HIPDNN_BACKEND_LOG_INFO(
-                "✓ Successfully loaded all {} plugin(s)", filesToLoad.size());
+            HIPDNN_BACKEND_LOG_INFO("✓ Successfully loaded all {} plugin(s)", filesToLoad.size());
         }
     }
 
