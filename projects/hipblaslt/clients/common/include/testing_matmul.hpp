@@ -4703,6 +4703,56 @@ void testing_matmul_with_bias(const Arguments& arg,
                 ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
             }
 
+            // === Guard: skip multi-MT if all sub-problems use the same MacroTile ===
+            // Splitting only helps when it changes the heuristic's MT selection.
+            // If every sub-problem lands on the same MT as each other, splitting
+            // adds launch overhead without improving tile efficiency.
+            if(subProblems.size() > 1)
+            {
+                bool all_same_mt = true;
+                size_t first_mt_m = 0, first_mt_n = 0, first_mt_k = 0;
+                bool have_first = false;
+
+                for(size_t sp = 0; sp < spCtxs.size(); sp++)
+                {
+                    if(!spCtxs[sp].valid) continue;
+                    try {
+                        std::string sn = hipblaslt_ext::getSolutionNameFromAlgo(handle, spCtxs[sp].algo);
+                        size_t mt_m = 0, mt_n = 0, mt_k = 0;
+                        if(parseMacroTileFromName(sn, mt_m, mt_n, mt_k))
+                        {
+                            if(!have_first)
+                            {
+                                first_mt_m = mt_m; first_mt_n = mt_n; first_mt_k = mt_k;
+                                have_first = true;
+                            }
+                            else if(mt_m != first_mt_m || mt_n != first_mt_n || mt_k != first_mt_k)
+                            {
+                                all_same_mt = false;
+                                break;
+                            }
+                        }
+                    } catch(...) {}
+                }
+
+                if(have_first && all_same_mt)
+                {
+                    hipblaslt_cout << "Multi-MacroTile skipped: all sub-problems use the same MacroTile (MT"
+                                  << first_mt_m << "x" << first_mt_n << "x" << first_mt_k
+                                  << "); splitting adds overhead without changing tile selection" << std::endl;
+                    for(size_t sp = 0; sp < spCtxs.size(); sp++)
+                    {
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matA);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matB);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matC);
+                        hipblasLtMatrixLayoutDestroy(spCtxs[sp].matD);
+                        if(spCtxs[sp].owns_matmul_desc)
+                            hipblasLtMatmulDescDestroy(spCtxs[sp].matmul_desc);
+                    }
+                    goto skip_multimt;
+                }
+            }
+
             // === OPT 5: Concurrent warmup on separate streams ===
             {
                 std::vector<hipStream_t> warmup_streams(subProblems.size());
