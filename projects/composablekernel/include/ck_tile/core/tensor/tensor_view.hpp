@@ -50,8 +50,9 @@ struct tensor_view
     using TensorIndex = array<index_t, TensorDesc::get_num_of_top_dimension()>;
     using TensorCoord = decltype(make_tensor_coordinate(TensorDesc{}, TensorIndex{}));
     static constexpr auto DstInMemOp    = DstInMemOp_;
-    static constexpr index_t PackedSize = ck_tile::numeric_traits<DataType_>::PackedSize;
     static constexpr bool LargeTensor = LargeTensor_;
+    using OffsetType = std::conditional_t<LargeTensor, long_index_t, index_t>;
+    static constexpr OffsetType PackedSize = static_cast<OffsetType>(ck_tile::numeric_traits<DataType_>::PackedSize);
 
     template <typename T>
     using vector_scalar_t = typename vector_traits<remove_cvref_t<T>>::scalar_type;
@@ -87,11 +88,14 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr remove_cvref_t<X>
     get_vectorized_elements(const TensorCoord& coord,
-                            index_t linear_offset,
+                            OffsetType linear_offset,
                             bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template get<X>(
-            coord.get_offset() / PackedSize,
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        return buf_.template get<X, OffsetType>(
+            offset / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             bool_constant<oob_conditional_check>{},
@@ -106,12 +110,15 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr remove_cvref_t<X>
     get_vectorized_elements(const TensorCoord& coord,
-                            index_t linear_offset,
+                            OffsetType linear_offset,
                             bool is_valid_element, // flag
                             bool_constant<oob_conditional_check> = {}) const
     {
-        return buf_.template get<X>(coord.get_offset() / PackedSize,
-                                    linear_offset / PackedSize,
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        return buf_.template get<X, OffsetType>(coord.get_offset() / PackedSize,
+                                    offset / PackedSize,
                                     is_valid_element,
                                     bool_constant<oob_conditional_check>{},
                                 bool_constant<LargeTensor>{});
@@ -320,12 +327,16 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr void
     set_vectorized_elements(const TensorCoord& coord,
-                            index_t linear_offset,
+                            OffsetType linear_offset,
                             const X& x,
                             bool_constant<oob_conditional_check> = {})
     {
-        buf_.template set<X, oob_conditional_check, LargeTensor>(
-            coord.get_offset() / PackedSize,
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+
+        buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
+            offset / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             x);
@@ -339,13 +350,17 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr void
     set_vectorized_elements(const TensorCoord& coord,
-                            index_t linear_offset,
+                            OffsetType linear_offset,
                             bool is_valid_element,
                             const X& x,
                             bool_constant<oob_conditional_check> = {})
     {
-        buf_.template set<X, oob_conditional_check, LargeTensor>(
-            coord.get_offset(), linear_offset, is_valid_element, x);
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+
+        buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
+            offset, linear_offset, is_valid_element, x);
     }
 
     template <typename X,
@@ -394,12 +409,16 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr void
     update_vectorized_elements(const TensorCoord& coord,
-                               index_t linear_offset,
+                               OffsetType linear_offset,
                                const X& x,
                                bool_constant<oob_conditional_check> = {})
     {
-        buf_.template update<DstInMemOp, X, oob_conditional_check, LargeTensor>(
-            coord.get_offset() / PackedSize,
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+
+        buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
+            offset / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             x);
@@ -413,13 +432,17 @@ struct tensor_view
                   bool>::type = false>
     CK_TILE_HOST_DEVICE constexpr void
     update_vectorized_elements(const TensorCoord& coord,
-                               index_t linear_offset,
+                               OffsetType linear_offset,
                                bool is_valid_element,
                                const X& x,
                                bool_constant<oob_conditional_check> = {})
     {
-        buf_.template update<DstInMemOp, X, oob_conditional_check, LargeTensor>(
-            coord.get_offset() / PackedSize, linear_offset / PackedSize, is_valid_element, x);
+        const OffsetType offset = coord.get_offset();
+        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+
+        buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
+            offset / PackedSize, linear_offset / PackedSize, is_valid_element, x);
     }
 
     // X is vector of DataType.
