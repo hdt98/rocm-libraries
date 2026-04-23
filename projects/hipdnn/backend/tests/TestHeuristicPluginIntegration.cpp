@@ -820,10 +820,10 @@ TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
                 ASSERT_NE(pathEnd, std::string::npos);
                 const std::filesystem::path pluginPathInMessage(
                     errorMsg.substr(pathStart, pathEnd - pathStart));
-                EXPECT_TRUE(hipdnn_data_sdk::utilities::pathCompEq(pluginPathInMessage,
-                                                                   canonicalPath))
-                    << "pluginPathInMessage='" << pluginPathInMessage.string() << "' canonicalPath='"
-                    << canonicalPath.string() << "'";
+                EXPECT_TRUE(
+                    hipdnn_data_sdk::utilities::pathCompEq(pluginPathInMessage, canonicalPath))
+                    << "pluginPathInMessage='" << pluginPathInMessage.string()
+                    << "' canonicalPath='" << canonicalPath.string() << "'";
                 throw;
             }
         },
