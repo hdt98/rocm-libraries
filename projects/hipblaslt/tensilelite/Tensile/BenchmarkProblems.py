@@ -656,8 +656,6 @@ def main(
         solutionPoolFiles: If non-empty, load solutions from matching pool files
             instead of generating from ForkParameters.
     """
-    getClientExecutablePath()
-
     if config is None:
         print(f'No config specified in {globalParameters["ConfigPath"]}, built client only')
         return
