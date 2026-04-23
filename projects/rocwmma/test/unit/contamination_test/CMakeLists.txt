@@ -360,7 +360,4 @@ set(ContaminationTestSources ${UnitCommonSources}
                      )
 
 
-add_rocwmma_unit_test(contamination_test ${ContaminationTestSources})
-
-# Override default timeout for contamination_test
-set_property(TEST contamination_test PROPERTY TIMEOUT 900)
+add_rocwmma_unit_test(contamination_test ${ContaminationTestSources} TIMEOUT 900)

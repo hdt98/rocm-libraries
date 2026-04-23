@@ -94,6 +94,21 @@ set(ROCWMMA_TEST_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 set(ROCWMMA_COMMON_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/hip_device.cpp
                                 ${CMAKE_CURRENT_SOURCE_DIR}/rocwmma_gtest_main.cpp)
 
+# Build the rocwmma ptrace wrapper for gdb attachment without sudo
+if(UNIX AND NOT APPLE)
+  set(PTRACE_WRAPPER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rocwmma_ptrace_wrapper.c")
+  set(PTRACE_WRAPPER_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rocwmma_ptrace_wrapper")
+
+  add_custom_command(
+    OUTPUT ${PTRACE_WRAPPER_OUTPUT}
+    COMMAND ${CMAKE_C_COMPILER} -o ${PTRACE_WRAPPER_OUTPUT} ${PTRACE_WRAPPER_SOURCE}
+    DEPENDS ${PTRACE_WRAPPER_SOURCE}
+    COMMENT "Building rocwmma ptrace wrapper for gdb attachment"
+  )
+
+  add_custom_target(rocwmma_ptrace_wrapper ALL DEPENDS ${PTRACE_WRAPPER_OUTPUT})
+endif()
+
 set(INSTALL_TEST_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
 file(WRITE "${INSTALL_TEST_FILE}"
 [=[
@@ -121,8 +136,22 @@ file(WRITE "${INSTALL_REGRESSION_TEST_FILE}"
 # designation for validation or benchmarking
 function(add_rocwmma_test TEST_TARGET TEST_SOURCE)
 
-  list(APPEND TEST_SOURCE ${ARGN})
-  add_executable(${TEST_TARGET} ${TEST_SOURCE})
+  # Parse optional timeout parameter
+  # Usage: add_rocwmma_test(target sources... [TIMEOUT timeout_value])
+  set(TEST_TIMEOUT 600)  # Default timeout
+  set(SOURCES_LIST ${TEST_SOURCE} ${ARGN})
+
+  # Check if TIMEOUT keyword is present
+  list(FIND SOURCES_LIST "TIMEOUT" TIMEOUT_INDEX)
+  if(NOT TIMEOUT_INDEX EQUAL -1)
+    # Extract timeout value (next item after TIMEOUT keyword)
+    math(EXPR TIMEOUT_VALUE_INDEX "${TIMEOUT_INDEX} + 1")
+    list(GET SOURCES_LIST ${TIMEOUT_VALUE_INDEX} TEST_TIMEOUT)
+    # Remove TIMEOUT and its value from sources list
+    list(REMOVE_AT SOURCES_LIST ${TIMEOUT_INDEX} ${TIMEOUT_VALUE_INDEX})
+  endif()
+
+  add_executable(${TEST_TARGET} ${SOURCES_LIST})
   target_link_libraries(${TEST_TARGET} rocwmma GTest::gtest)
   target_link_libraries(${TEST_TARGET} ${ROCWMMA_OPENMP_LIBRARY})
   if(UNIX)
@@ -160,9 +189,14 @@ function(add_rocwmma_test TEST_TARGET TEST_SOURCE)
     endforeach()
   endif()
 
-  add_test(NAME ${TEST_TARGET} COMMAND ${TEST_TARGET})
+  # Set up watchdog wrapper script
+  set(WATCHDOG_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/scripts/watchdog_wrapper.sh")
+
+  # Add test with watchdog wrapper
+  add_test(NAME ${TEST_TARGET}
+           COMMAND ${WATCHDOG_WRAPPER} ${TEST_TIMEOUT} $<TARGET_FILE:${TEST_TARGET}>)
   set_property(TEST ${TEST_TARGET} PROPERTY SKIP_REGULAR_EXPRESSION "no ROCm-capable device" "unsupported host device")
-  set_property(TEST ${TEST_TARGET} PROPERTY TIMEOUT 600)
+  set_property(TEST ${TEST_TARGET} PROPERTY TIMEOUT ${TEST_TIMEOUT})
 
   rocm_install_targets(
     TARGETS ${TEST_TARGET}
