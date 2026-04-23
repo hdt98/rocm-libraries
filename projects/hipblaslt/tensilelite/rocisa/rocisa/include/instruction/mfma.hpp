@@ -574,10 +574,8 @@ namespace rocisa
 
         std::string preStr() const override
         {
-<<<<<<< HEAD
-            std::string variantStr = std::to_string(variant[0]) + "x"
-                                     + std::to_string(variant[1]) + "x"
-                                     + std::to_string(variant[2]);
+            std::string variantStr = std::to_string(variant[0]) + "x" + std::to_string(variant[1])
+                                     + "x" + std::to_string(variant[2]);
             if(getAsmCaps()["HasMFMA"])
             {
                 return "v_mfma_scale_f32_" + variantStr + "_f8f6f4";
@@ -587,12 +585,6 @@ namespace rocisa
                 std::string blkStr = (block == 16) ? "16" : "";
                 return "v_wmma_scale" + blkStr + "_f32_" + variantStr + "_" + typeConvert();
             }
-=======
-            std::string variantStr = std::to_string(variant[0]) + "x" + std::to_string(variant[1])
-                                     + "x" + std::to_string(variant[2]);
-            std::string blkStr = (block == 16) ? "16" : "";
-            return "v_wmma_scale" + blkStr + "_f32_" + variantStr + "_" + typeConvert();
->>>>>>> origin/develop
         }
 
         std::string mfmaInputPermuteStr() const
