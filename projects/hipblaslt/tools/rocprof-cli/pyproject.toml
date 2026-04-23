@@ -1,0 +1,17 @@
+[project]
+name = "rocprof-cli"
+version = "0.1.0"
+description = "Terminal UI for viewing rocasm Python code with ATT profiling annotations"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = [
+    "textual>=0.40",
+    "rocasm",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["rocprof_cli*"]
