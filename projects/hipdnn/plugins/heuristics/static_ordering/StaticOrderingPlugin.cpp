@@ -17,6 +17,7 @@
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <memory>
 #include <vector>
@@ -34,15 +35,15 @@ static hipdnnSeverity_t g_logLevel = HIPDNN_SEV_INFO;
 constexpr size_t LOG_BUFFER_SIZE = 1024;
 
 // Helper macro for logging
-#define STATIC_ORDERING_LOG(severity, ...)                                     \
-    do                                                                         \
-    {                                                                          \
-        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)           \
-        {                                                                      \
-            char buffer[LOG_BUFFER_SIZE];                                      \
-            snprintf(buffer, sizeof(buffer), "[StaticOrdering] " __VA_ARGS__); \
-            g_loggingCallback(severity, buffer);                               \
-        }                                                                      \
+#define STATIC_ORDERING_LOG(severity, ...)                                           \
+    do                                                                               \
+    {                                                                                \
+        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)                 \
+        {                                                                            \
+            std::array<char, LOG_BUFFER_SIZE> buffer;                                \
+            snprintf(buffer.data(), buffer.size(), "[StaticOrdering] " __VA_ARGS__); \
+            g_loggingCallback(severity, buffer.data());                              \
+        }                                                                            \
     } while(0)
 
 //=============================================================================
@@ -152,13 +153,13 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnPluginSetLogLevel(hipd
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
-HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnPluginGetLastErrorString(const char** error_str)
+HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnPluginGetLastErrorString(const char** errorStr)
 {
-    if(error_str == nullptr)
+    if(errorStr == nullptr)
     {
         return;
     }
-    *error_str = "No error information available";
+    *errorStr = "No error information available";
 }
 
 //=============================================================================
@@ -170,9 +171,9 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnPluginGetLastErrorString(const char** 
 //=============================================================================
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* out_handle)
+    hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* outHandle)
 {
-    if(out_handle == nullptr)
+    if(outHandle == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "HandleCreate: null output pointer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -181,7 +182,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     try
     {
         auto handle = new StaticOrderingHandle();
-        *out_handle = reinterpret_cast<hipdnnHeuristicHandle_t>(handle);
+        *outHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(handle);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -214,7 +215,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 }
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
-    hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* device_props_serialized)
+    hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* devicePropsSerialized)
 {
     if(handle == nullptr)
     {
@@ -222,8 +223,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
-    if(device_props_serialized == nullptr || device_props_serialized->ptr == nullptr
-       || device_props_serialized->size == 0)
+    if(devicePropsSerialized == nullptr || devicePropsSerialized->ptr == nullptr
+       || devicePropsSerialized->size == 0)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetDeviceProperties: invalid buffer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -234,12 +235,12 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
         auto h = reinterpret_cast<StaticOrderingHandle*>(handle);
 
         // Store device properties (StaticOrdering doesn't use them, but we store for completeness)
-        const auto* data = reinterpret_cast<const uint8_t*>(device_props_serialized->ptr);
-        h->devicePropertiesBuffer.assign(data, data + device_props_serialized->size);
+        const auto* data = reinterpret_cast<const uint8_t*>(devicePropsSerialized->ptr);
+        h->devicePropertiesBuffer.assign(data, data + devicePropsSerialized->size);
         h->devicePropertiesSet = true;
 
         STATIC_ORDERING_LOG(
-            HIPDNN_SEV_INFO, "Device properties set (%zu bytes)", device_props_serialized->size);
+            HIPDNN_SEV_INFO, "Device properties set (%zu bytes)", devicePropsSerialized->size);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -254,15 +255,15 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
 //=============================================================================
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorCreate(
-    hipdnnHeuristicHandle_t plugin_handle, hipdnnHeuristicPolicyDescriptor_t* out_desc)
+    hipdnnHeuristicHandle_t pluginHandle, hipdnnHeuristicPolicyDescriptor_t* outDesc)
 {
-    if(plugin_handle == nullptr)
+    if(pluginHandle == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorCreate: null handle");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
-    if(out_desc == nullptr)
+    if(outDesc == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorCreate: null output pointer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -270,9 +271,9 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyDescrip
 
     try
     {
-        auto h = reinterpret_cast<StaticOrderingHandle*>(plugin_handle);
+        auto h = reinterpret_cast<StaticOrderingHandle*>(pluginHandle);
         auto desc = new StaticOrderingPolicyDescriptor(h);
-        *out_desc = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(desc);
+        *outDesc = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(desc);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -309,7 +310,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 //=============================================================================
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(
-    hipdnnHeuristicPolicyDescriptor_t desc, const int64_t* engine_ids, size_t engine_id_count)
+    hipdnnHeuristicPolicyDescriptor_t desc, const int64_t* engineIds, size_t engineIdCount)
 {
     if(desc == nullptr)
     {
@@ -317,7 +318,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngi
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
-    if(engine_ids == nullptr && engine_id_count > 0)
+    if(engineIds == nullptr && engineIdCount > 0)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetEngineIds: null engine_ids with count > 0");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -326,11 +327,10 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngi
     try
     {
         auto d = reinterpret_cast<StaticOrderingPolicyDescriptor*>(desc);
-        d->candidateEngineIds.assign(engine_ids, engine_ids + engine_id_count);
+        d->candidateEngineIds.assign(engineIds, engineIds + engineIdCount);
         d->finalized = false; // Reset finalized state when inputs change
 
-        STATIC_ORDERING_LOG(
-            HIPDNN_SEV_INFO, "SetEngineIds: %zu candidate engines", engine_id_count);
+        STATIC_ORDERING_LOG(HIPDNN_SEV_INFO, "SetEngineIds: %zu candidate engines", engineIdCount);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -341,7 +341,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngi
 }
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
-    hipdnnHeuristicPolicyDescriptor_t desc, const hipdnnPluginConstData_t* serialized_graph)
+    hipdnnHeuristicPolicyDescriptor_t desc, const hipdnnPluginConstData_t* serializedGraph)
 {
     if(desc == nullptr)
     {
@@ -350,7 +350,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
     }
 
     // StaticOrdering doesn't use the graph, but validate the parameter
-    if(serialized_graph == nullptr)
+    if(serializedGraph == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetSerializedGraph: null graph pointer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -359,7 +359,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
     STATIC_ORDERING_LOG(HIPDNN_SEV_INFO,
                         "SetSerializedGraph: graph received (%zu bytes) - not used by "
                         "StaticOrdering",
-                        serialized_graph->size);
+                        serializedGraph->size);
     return HIPDNN_PLUGIN_STATUS_SUCCESS;
 }
 
@@ -368,7 +368,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
 //=============================================================================
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
-    hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* out_applied)
+    hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* outApplied)
 {
     if(desc == nullptr)
     {
@@ -376,7 +376,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
-    if(out_applied == nullptr)
+    if(outApplied == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: null output pointer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -390,7 +390,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         {
             STATIC_ORDERING_LOG(HIPDNN_SEV_WARN,
                                 "PolicyFinalize: no candidate engines - not applicable");
-            *out_applied = 0;
+            *outApplied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
@@ -399,7 +399,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         hipdnn_data_sdk::utilities::sortEngineIds(d->sortedEngineIds);
 
         d->finalized = true;
-        *out_applied = 1; // Policy succeeded
+        *outApplied = 1; // Policy succeeded
 
         STATIC_ORDERING_LOG(HIPDNN_SEV_INFO,
                             "PolicyFinalize: sorted %zu engines using static ordering",
@@ -414,7 +414,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 }
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
-    hipdnnHeuristicPolicyDescriptor_t desc, int64_t* engine_ids, size_t* num_engines)
+    hipdnnHeuristicPolicyDescriptor_t desc, int64_t* engineIds, size_t* numEngines)
 {
     if(desc == nullptr)
     {
@@ -422,7 +422,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSort
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
-    if(num_engines == nullptr)
+    if(numEngines == nullptr)
     {
         STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "GetSortedEngineIds: null num_engines pointer");
         return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
@@ -438,17 +438,17 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSort
             return HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED;
         }
 
-        // Return count only if engine_ids is null
-        if(engine_ids == nullptr)
+        // Return count only if engineIds is null
+        if(engineIds == nullptr)
         {
-            *num_engines = d->sortedEngineIds.size();
+            *numEngines = d->sortedEngineIds.size();
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
         // Copy sorted engine IDs
-        size_t count = std::min(*num_engines, d->sortedEngineIds.size());
-        std::copy_n(d->sortedEngineIds.begin(), count, engine_ids);
-        *num_engines = count;
+        const size_t count = std::min(*numEngines, d->sortedEngineIds.size());
+        std::copy_n(d->sortedEngineIds.begin(), count, engineIds);
+        *numEngines = count;
 
         STATIC_ORDERING_LOG(HIPDNN_SEV_INFO, "GetSortedEngineIds: returned %zu engines", count);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
