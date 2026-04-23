@@ -79,16 +79,6 @@ typedef struct hipdnnHeuristicPolicyDescriptor_opaque* hipdnnHeuristicPolicyDesc
 /** @} */ // End of HeuristicPluginDataTypes group
 
 /**
- * @defgroup HeuristicPluginExtensions Heuristic Plugin Extensions
- * @brief Heuristic-specific functions beyond the base PluginApi.h.
- *
- * See the file comment for the complete list of required base plugin functions.
- * @{
- */
-
-/** @} */ // End of HeuristicPluginExtensions group
-
-/**
  * @defgroup HeuristicPluginHandleLifecycle Heuristic Plugin Handle Lifecycle
  * @brief Functions for managing the plugin session handle.
  * @{
