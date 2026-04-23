@@ -65,7 +65,7 @@ struct GemmPipelineAGmemBGmemCRegV2 : public BaseGemmPipelineAGmemBGmemCRegV2<Pr
     static constexpr index_t BPackedSize =
         ck_tile::numeric_traits<remove_cvref_t<BDataType>>::PackedSize;
 
-        static constexpr bool LargeTensors = Problem::LargeTensors;
+    static constexpr bool LargeTensors = Problem::LargeTensors;
 
     static constexpr index_t BlockSize = Problem::kBlockSize;
 

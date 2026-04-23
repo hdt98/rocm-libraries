@@ -40,7 +40,7 @@ namespace ck_tile {
 template <typename BufferView_,
           typename TensorDesc_,
           memory_operation_enum DstInMemOp_ = memory_operation_enum::set,
-          bool LargeTensor_ = false>
+          bool LargeTensor_                 = false>
 struct tensor_view
 {
     using buffer_view = remove_reference_t<BufferView_>;
@@ -49,10 +49,11 @@ struct tensor_view
     using TensorDesc  = remove_cvref_t<TensorDesc_>;
     using TensorIndex = array<index_t, TensorDesc::get_num_of_top_dimension()>;
     using TensorCoord = decltype(make_tensor_coordinate(TensorDesc{}, TensorIndex{}));
-    static constexpr auto DstInMemOp    = DstInMemOp_;
+    static constexpr auto DstInMemOp  = DstInMemOp_;
     static constexpr bool LargeTensor = LargeTensor_;
-    using OffsetType = std::conditional_t<LargeTensor, long_index_t, index_t>;
-    static constexpr OffsetType PackedSize = static_cast<OffsetType>(ck_tile::numeric_traits<DataType_>::PackedSize);
+    using OffsetType                  = std::conditional_t<LargeTensor, long_index_t, index_t>;
+    static constexpr OffsetType PackedSize =
+        static_cast<OffsetType>(ck_tile::numeric_traits<DataType_>::PackedSize);
 
     template <typename T>
     using vector_scalar_t = typename vector_traits<remove_cvref_t<T>>::scalar_type;
@@ -92,14 +93,18 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {}) const
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
         return buf_.template get<X, OffsetType>(
             offset / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
             bool_constant<oob_conditional_check>{},
-                                bool_constant<LargeTensor>{});
+            bool_constant<LargeTensor>{});
     }
 
     template <typename X,
@@ -115,13 +120,17 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {}) const
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
         return buf_.template get<X, OffsetType>(coord.get_offset() / PackedSize,
-                                    offset / PackedSize,
-                                    is_valid_element,
-                                    bool_constant<oob_conditional_check>{},
-                                bool_constant<LargeTensor>{});
+                                                offset / PackedSize,
+                                                is_valid_element,
+                                                bool_constant<oob_conditional_check>{},
+                                                bool_constant<LargeTensor>{});
     }
 
     // X is vector of DataType.
@@ -332,8 +341,12 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
 
         buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
             offset / PackedSize,
@@ -356,8 +369,12 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
 
         buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
             offset, linear_offset, is_valid_element, x);
@@ -414,8 +431,12 @@ struct tensor_view
                                bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
 
         buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
             offset / PackedSize,
@@ -438,8 +459,12 @@ struct tensor_view
                                bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> && std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor || (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> && std::is_same_v<decltype(linear_offset), index_t>));
+        static_assert(!LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
+                       std::is_same_v<decltype(linear_offset), long_index_t>));
+        static_assert(LargeTensor ||
+                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
+                       std::is_same_v<decltype(linear_offset), index_t>));
 
         buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
             offset / PackedSize, linear_offset / PackedSize, is_valid_element, x);
@@ -501,7 +526,10 @@ template <typename T>
 struct is_tensor_view : std::false_type
 {
 };
-template <typename BufferView, typename TensorDesc, memory_operation_enum DstInMemOp, bool LargeTensor>
+template <typename BufferView,
+          typename TensorDesc,
+          memory_operation_enum DstInMemOp,
+          bool LargeTensor>
 struct is_tensor_view<tensor_view<BufferView, TensorDesc, DstInMemOp, LargeTensor>> : std::true_type
 {
 };
@@ -515,7 +543,7 @@ inline constexpr bool is_tensor_view_v = is_tensor_view<T>::value;
 template <address_space_enum BufferAddressSpace = address_space_enum::generic,
           memory_operation_enum DstInMemOp      = memory_operation_enum::set,
           amd_buffer_coherence_enum Coherence   = amd_buffer_coherence_enum::coherence_default,
-          bool LargeTensor = false,
+          bool LargeTensor                      = false,
           typename DataType,
           typename... Ts>
 CK_TILE_HOST_DEVICE constexpr auto make_tensor_view(DataType* __restrict__ p,
@@ -524,13 +552,14 @@ CK_TILE_HOST_DEVICE constexpr auto make_tensor_view(DataType* __restrict__ p,
     auto buffer_view =
         make_buffer_view<BufferAddressSpace, Coherence>(p, desc.get_element_space_size());
 
-        return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp, LargeTensor>{buffer_view, desc};
+    return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp, LargeTensor>{buffer_view,
+                                                                                       desc};
 }
 
 template <address_space_enum BufferAddressSpace = address_space_enum::generic,
           memory_operation_enum DstInMemOp      = memory_operation_enum::set,
           amd_buffer_coherence_enum Coherence   = amd_buffer_coherence_enum::coherence_default,
-          bool LargeTensor = false,
+          bool LargeTensor                      = false,
           typename DataType,
           typename... Lengths,
           typename... Strides,
@@ -552,7 +581,8 @@ make_naive_tensor_view(DataType* __restrict__ p,
     auto buffer_view =
         make_buffer_view<BufferAddressSpace, Coherence>(p, desc.get_element_space_size());
 
-    return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp, LargeTensor>{buffer_view, desc};
+    return tensor_view<decltype(buffer_view), decltype(desc), DstInMemOp, LargeTensor>{buffer_view,
+                                                                                       desc};
 }
 
 template <address_space_enum BufferAddressSpace = address_space_enum::generic,

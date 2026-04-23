@@ -61,7 +61,9 @@ struct GroupedConvolutionForwardInvoker
             GroupedConvTraitsType::FixedGemmParams::UseStructuredSparsity,
             GroupedConvTraitsType::FixedGemmParams::Persistent,
             ConvConfig::NumWaveGroups,
-            GroupedConvTraitsType::FixedGemmParams::Preshuffle, GroupedConvTraitsType::FixedGemmParams::LDSVectorSize, LargeTensors>;
+            GroupedConvTraitsType::FixedGemmParams::Preshuffle,
+            GroupedConvTraitsType::FixedGemmParams::LDSVectorSize,
+            LargeTensors>;
         constexpr auto scheduler = ConvConfig::Scheduler;
 
         // =====================================================================

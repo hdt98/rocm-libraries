@@ -45,7 +45,7 @@ template <bool kPadM_,
           index_t NumWaveGroups_      = 1,
           bool Preshuffle_            = false,
           int VectorSize_             = 16,
-          bool LargeTensors_ = false>
+          bool LargeTensors_          = false>
 struct TileGemmUniversalTraits
 {
     static constexpr bool kPadM            = kPadM_;
@@ -53,7 +53,7 @@ struct TileGemmUniversalTraits
     static constexpr bool kPadK            = kPadK_;
     static constexpr int _VectorSize       = VectorSize_;
     static constexpr bool DoubleSmemBuffer = DoubleSmemBuffer_;
-    static constexpr bool LargeTensors = LargeTensors_;
+    static constexpr bool LargeTensors     = LargeTensors_;
 
     using AsLayout                   = AsLayout_;
     using BsLayout                   = BsLayout_;
