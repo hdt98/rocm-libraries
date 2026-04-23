@@ -57,6 +57,7 @@ struct ConvTileFactory
                                                              SCALAR_PER_VECTOR.b,
                                                              SCALAR_PER_VECTOR.c,
                                                              OPTIMIZATIONS.num_groups_to_merge,
+                                                             OPTIMIZATIONS.split_image,
                                                              OPTIMIZATIONS.explicit_gemm>;
 
     using GemmShape = ck_tile::TileGemmShape<
@@ -82,11 +83,7 @@ struct ConvTileFactory
         GroupedConvTraitsType::FixedGemmParams::TransposeC,
         GroupedConvTraitsType::FixedGemmParams::UseStructuredSparsity,
         GroupedConvTraitsType::FixedGemmParams::Persistent,
-        BLOCK_GEMM.num_wave_groups,
-        GroupedConvTraitsType::FixedGemmParams::Preshuffle,
-        GroupedConvTraitsType::FixedGemmParams::LDSLoadSize,
-        OPTIMIZATIONS.large_tensors
-        >;
+        BLOCK_GEMM.num_wave_groups>;
 
     using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
         typename Types::ADataType,

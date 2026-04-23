@@ -22,6 +22,7 @@ TEST(InstanceTraits, TileInstanceStringReturnsCorrectFormat)
                                    4 /*VectorSizeB*/,
                                    4 /*VectorSizeC*/,
                                    1 /*NumGroupsToMerge*/,
+                                   false /*EnableSplitImage*/,
                                    false /*ExplicitGemm*/>;
 
     using GemmShape = ck_tile::TileGemmShape<
@@ -103,6 +104,7 @@ TEST(InstanceTraits, TileInstanceStringReturnsCorrectFormat)
                                ",4"           // VectorSizeB
                                ",4"           // VectorSizeC
                                ",1"           // NumGroupsToMerge
+                               ",0"           // EnableSplitImage
                                ",0"           // ExplicitGemm
                                ",128"         // MPerBlock
                                ",128"         // NPerBlock

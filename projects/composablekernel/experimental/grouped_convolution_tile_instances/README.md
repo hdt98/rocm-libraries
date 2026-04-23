@@ -98,7 +98,7 @@ constexpr auto ALGORITHM = cku::ConvAlgorithm_Tile_GroupedConvolutionKernel{}
     })
     .with_tile_optimizations(ckt::TileOptimizations{
         .num_groups_to_merge = 1,
-        .large_tensors         = false,
+        .split_image         = false,
         .explicit_gemm       = false
     });
 ```
