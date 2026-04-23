@@ -455,13 +455,29 @@ def _convert_line(operation: str, args: Dict[str, str],
 
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Convert MIOpen driver shape files to hipDNN JSON graph files."
+        description="Convert MIOpen driver shape files or inline args to hipDNN JSON graph files."
     )
     parser.add_argument(
         "inputs",
-        nargs="+",
+        nargs="*",
         metavar="SHAPES_FILE",
         help="One or more MIOpen shape .txt files to convert.",
+    )
+    parser.add_argument(
+        "-A", "--args",
+        metavar="MIOPEN_ARGS",
+        default=None,
+        help=(
+            "Inline MIOpen driver arguments (everything after the executable path), "
+            "e.g. 'convbfp16 -n 16 -c 96 -H 48 -W 32 -k 96 -y 3 -x 1 ...'. "
+            "Use with --output to write to a specific file."
+        ),
+    )
+    parser.add_argument(
+        "--output",
+        metavar="FILE",
+        default=None,
+        help="Output JSON file path (used with --args; ignored for file inputs).",
     )
     parser.add_argument(
         "--outdir",
@@ -473,6 +489,37 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     return parser
+
+
+def _process_inline_args(args_str: str, output: Optional[str]) -> int:
+    """Convert a single inline MIOpen driver argument string to a JSON file."""
+    parts = args_str.split()
+    if not parts:
+        print("ERROR: --args is empty.", file=sys.stderr)
+        return 1
+
+    operation = parts[0]
+    flag_tokens = parts[1:]
+    parsed_args = _parse_args(flag_tokens)
+
+    try:
+        name_stem, graph = _convert_line(operation, parsed_args, "")
+        # Strip leading underscore that results from empty prefix
+        name_stem = name_stem.lstrip("_")
+        graph["name"] = name_stem
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        out_path = Path(f"{name_stem}.json")
+
+    out_path.write_text(json.dumps(graph, indent=4) + "\n")
+    print(f"Written: {out_path}")
+    return 0
 
 
 def _process_file(input_path: Path, outdir: Path) -> Tuple[int, int, int]:
@@ -517,6 +564,16 @@ def _process_file(input_path: Path, outdir: Path) -> Tuple[int, int, int]:
 def main() -> int:
     parser = _build_arg_parser()
     ns = parser.parse_args()
+
+    if ns.args:
+        if ns.inputs:
+            print("ERROR: cannot combine --args with positional SHAPES_FILE arguments.", file=sys.stderr)
+            return 1
+        return _process_inline_args(ns.args, ns.output)
+
+    if not ns.inputs:
+        parser.print_help(sys.stderr)
+        return 1
 
     total_written = 0
     total_skipped = 0
