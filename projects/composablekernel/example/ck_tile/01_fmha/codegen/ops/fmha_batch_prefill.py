@@ -216,10 +216,13 @@ float {F_func_name}([[maybe_unused]] fmha_batch_prefill_traits t, [[maybe_unused
 
 FMHA_FWD_API_FOOTER_TEMPLATE = """
 float fmha_batch_prefill(fmha_batch_prefill_traits t, fmha_batch_prefill_args a, const ck_tile::stream_config& s) {{
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
     if ({F_is_v3_enabled}) {{
         float r = fmha_batch_prefill_v3(t, a, s);
         if (r >= 0) return r;
     }}
+#pragma clang diagnostic pop
     return fmha_batch_prefill_v2(t, a, s);
 }}
 """
