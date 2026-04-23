@@ -1610,10 +1610,10 @@ static bool DimensionSplitInField(size_t length, size_t dimIdx, const rocfft_fie
 
 // Construct a single-device execPlan - fill out the provided
 // execPlan with nodes to implement the FFT.
-static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         rootPlanData,
-                                                       int                   local_comm_rank,
-                                                       rocfft_location_t     location,
-                                                       rocfft_transform_type transformType,
+template <bool probe_solution_map = true>
+static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&     rootPlanData,
+                                                       int               local_comm_rank,
+                                                       rocfft_location_t location,
                                                        const std::optional<LoadOps>&  loadOps,
                                                        const std::optional<StoreOps>& storeOps,
                                                        bool partOfMultiPlan)
@@ -1629,33 +1629,9 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
 
         // If we are doing tuning initializing now, we shouldn't apply any solution,
         // since we are trying enumerating solutions now
-        if(TuningBenchmarker::GetSingleton().IsInitializingTuning() == false)
+        if constexpr(probe_solution_map)
         {
-            // Solutions do not consider strides.  Even-length real
-            // transforms need special consideration, since the
-            // even-length optimization is only valid for stride-1 on
-            // the fastest dimension.  So only apply a solution if
-            // we're not doing even-length real, or if fastest dim
-            // stride is 1.
-            const auto& realLength     = transformType == rocfft_transform_type_real_forward
-                                             ? execPlan.rootPlan->length
-                                             : execPlan.rootPlan->outputLength;
-            const bool  evenLengthReal = (transformType == rocfft_transform_type_real_forward
-                                         || transformType == rocfft_transform_type_real_inverse)
-                                        && realLength.front() % 2 == 0;
-            const bool stride1 = execPlan.rootPlan->inStride.front() == 1
-                                 && execPlan.rootPlan->outStride.front() == 1;
-            if(evenLengthReal && !stride1)
-            {
-                if(LOG_TRACE_ENABLED())
-                {
-                    (*LogSingleton::GetInstance().GetTraceOS())
-                        << "transform is even-length real but not stride-1, not applying solution "
-                           "map"
-                        << std::endl;
-                }
-            }
-            else
+            if(TuningBenchmarker::GetSingleton().IsInitializingTuning() == false)
             {
                 execPlan.rootScheme = ApplySolution(execPlan);
                 if(execPlan.rootScheme)
@@ -1698,7 +1674,28 @@ static std::unique_ptr<ExecPlan> BuildSingleDevicePlan(NodeMetaData&         roo
         }
 
         // TODO: more descriptions are needed
-        ProcessNode(execPlan);
+        try
+        {
+            ProcessNode(execPlan);
+        }
+        catch(const std::exception& e)
+        {
+            // No fallback if the solution map wasn't used
+            if constexpr(!probe_solution_map)
+                throw;
+
+            if(!execPlan.rootScheme)
+                throw; // solution map was probed but no entry found therein
+
+            if(LOG_TRACE_ENABLED())
+            {
+                (*LogSingleton::GetInstance().GetTraceOS())
+                    << "Node couldn't be processed using solution map entry. Details: " << e.what()
+                    << std::endl;
+            }
+            return BuildSingleDevicePlan<!probe_solution_map>(
+                rootPlanData, local_comm_rank, location, loadOps, storeOps, partOfMultiPlan);
+        }
 
         // Plan is compiled, no need to alloc twiddles + kargs etc
         if(rocfft_getenv("ROCFFT_INTERNAL_COMPILE_ONLY") == "1")
@@ -2076,7 +2073,6 @@ void rocfft_plan_t::MakeSingleDevPlanWithGatherScatterIfNeeded()
     auto exec_item             = BuildSingleDevicePlan(exec_plan_metadata,
                                            desc.get_local_comm_rank(),
                                            exec_plan_location,
-                                           transformType,
                                            desc.loadOps,
                                            desc.storeOps,
                                            !plan_is_single_dev);
@@ -2144,13 +2140,8 @@ static size_t C2CBrickOneDimension(rocfft_plan_t&                 plan,
     rootPlanData.input_buffer      = input;
     rootPlanData.output_buffer     = output;
 
-    auto singlePlan = BuildSingleDevicePlan(rootPlanData,
-                                            plan.desc.get_local_comm_rank(),
-                                            location,
-                                            plan.transformType,
-                                            loadOps,
-                                            storeOps,
-                                            true);
+    auto singlePlan = BuildSingleDevicePlan(
+        rootPlanData, plan.desc.get_local_comm_rank(), location, loadOps, storeOps, true);
     return plan.AddMultiPlanItem(std::move(singlePlan), antecedents);
 }
 
@@ -4118,6 +4109,17 @@ void TreeNode::SanityCheck(SchemeTree* solution_scheme, std::vector<FMKey>& kern
             throw std::runtime_error("scheme-decomposition error: plan-tree != scheme-tree");
         if(scheme != solution_scheme->curScheme)
             throw std::runtime_error("scheme-decomposition error: node-scheme != solution-scheme");
+        // Add any other scheme-specific assumptions omitted in the map's keys below
+        switch(solution_scheme->curScheme)
+        {
+        case CS_REAL_TRANSFORM_EVEN:
+            if(inStride.front() != 1 || outStride.front() != 1)
+                throw std::runtime_error("scheme-decomposition error: CS_REAL_TRANSFORM_EVEN "
+                                         "schemes cannot be used with non-unit strides");
+            break;
+        default:
+            break;
+        }
     }
 
     OperatingBuffer previousOut = obIn;
@@ -5075,28 +5077,9 @@ void ProcessNode(ExecPlan& execPlan)
     execPlan.rootPlan->CollapseContiguousDims();
 
     // Check the buffer, param and tree integrity, Note we do this after fusion
-    try
-    {
-        // rootScheme might be nullptr and solution_kernels might be empty (when no solution)
-        // if has solution, will also check if it's valid
-        execPlan.rootPlan->SanityCheck(rootScheme, execPlan.solution_kernels);
-    }
-    catch(const std::exception& e)
-    {
-        // When SanityCheck fails,
-        // if solution_kernels is empty or rootScheme is nullptr,
-        // means this has nothing to do with solution map. Throw to terminate
-        if(execPlan.solution_kernels.empty() || rootScheme == nullptr)
-            throw;
-        else
-        {
-            // data from solution map are invalid, then we're not able to use them
-            if(LOG_TRACE_ENABLED())
-                (*LogSingleton::GetInstance().GetTraceOS())
-                    << "input solution are invalid, try replacing kernels" << std::endl;
-            execPlan.rootPlan->SanityCheck();
-        }
-    }
+    // rootScheme might be nullptr and solution_kernels might be empty (when no solution)
+    // if has solution, will also check if it's valid
+    execPlan.rootPlan->SanityCheck(rootScheme, execPlan.solution_kernels);
 
     // get workBufSize..
     size_t tmpBufSize       = 0;
