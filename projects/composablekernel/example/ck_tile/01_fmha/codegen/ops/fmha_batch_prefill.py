@@ -1019,7 +1019,7 @@ def get_factory(target: str):
         return KernelComponentFactoryGfx950
     if target.startswith("gfx9"):
         return CustomFactory
-    raise Exception(f"Unsupported device target {target}")
+    return None
 
 
 def get_product(receipt: int) -> Product:
@@ -1114,7 +1114,10 @@ def get_fwd_blobs(
     gen = list()
     api_pool = FmhaFwdApiPool()
 
-    factories = get_factories_for_targets(targets, get_factory)
+    supported = [t for t in targets if get_factory(t) is not None]
+    if not supported:
+        return api_pool, gen
+    factories = get_factories_for_targets(supported, get_factory)
 
     for factory, dtype in ((f, t) for f in factories for t in f.supported_dtypes()):
         d = factory.get_hdim_tile_size_dict(dtype)
