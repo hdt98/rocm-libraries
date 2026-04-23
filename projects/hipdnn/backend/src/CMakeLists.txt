@@ -55,6 +55,8 @@ add_library(
     FlatbufferUtilities.cpp
     plugin/EnginePlugin.cpp
     plugin/EnginePluginResourceManager.cpp
+    plugin/HeuristicPlugin.cpp
+    plugin/HeuristicPluginResourceManager.cpp
     plugin/PluginCore.cpp
     plugin/SharedLibrary.cpp
     utilities/EngineOrdering.cpp
@@ -69,7 +71,7 @@ target_include_directories(
 )
 
 target_compile_options(hipdnn_backend_private PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS} ${HIPDNN_NO_RTTI_OPTIONS})
-target_link_libraries(hipdnn_backend_private PUBLIC hip::host hipdnn_data_sdk hipdnn_plugin_sdk)
+target_link_libraries(hipdnn_backend_private PUBLIC hip::host hipdnn_data_sdk hipdnn_plugin_sdk hipdnn_flatbuffers_sdk)
 target_link_libraries(hipdnn_backend_private PRIVATE ${CMAKE_DL_LIBS})
 target_compile_definitions(hipdnn_backend_private PRIVATE HIPDNN_BACKEND_COMPILATION)
 
