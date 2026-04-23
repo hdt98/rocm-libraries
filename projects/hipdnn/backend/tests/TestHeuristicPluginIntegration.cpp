@@ -21,11 +21,13 @@
 #include "plugin/SharedLibrary.hpp"
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <flatbuffers/flatbuffers.h>
 
 #include <gtest/gtest.h>
+#include <string_view>
 
 using namespace hipdnn_backend;
 using namespace hipdnn_backend::plugin;
@@ -807,9 +809,21 @@ TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
                 const std::string errorMsg(e.what());
                 EXPECT_NE(errorMsg.find("HEURISTIC PLUGIN ABI INCOMPLETE"), std::string::npos);
                 EXPECT_NE(errorMsg.find("Missing required symbol"), std::string::npos);
-                // Use weakly_canonical to match the path format in the error message
+                // Error text uses SharedLibrary's weakly_canonical path; on Windows the string can
+                // differ in drive-letter case or separators from a fresh weakly_canonical(pluginPath).
                 const auto canonicalPath = std::filesystem::weakly_canonical(pluginPath);
-                EXPECT_NE(errorMsg.find(canonicalPath.string()), std::string::npos);
+                static constexpr std::string_view kPluginPrefix{"Plugin: "};
+                const auto prefixPos = errorMsg.find(kPluginPrefix);
+                ASSERT_NE(prefixPos, std::string::npos);
+                const auto pathStart = prefixPos + kPluginPrefix.size();
+                const auto pathEnd = errorMsg.find('\n', pathStart);
+                ASSERT_NE(pathEnd, std::string::npos);
+                const std::filesystem::path pluginPathInMessage(
+                    errorMsg.substr(pathStart, pathEnd - pathStart));
+                EXPECT_TRUE(hipdnn_data_sdk::utilities::pathCompEq(pluginPathInMessage,
+                                                                   canonicalPath))
+                    << "pluginPathInMessage='" << pluginPathInMessage.string() << "' canonicalPath='"
+                    << canonicalPath.string() << "'";
                 throw;
             }
         },
