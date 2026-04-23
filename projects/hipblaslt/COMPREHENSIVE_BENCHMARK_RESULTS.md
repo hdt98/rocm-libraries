@@ -314,8 +314,10 @@ cd /home/smalekta/MultiMT/rocm-libraries/projects/hipblaslt/build/release
 **K:** 8192 (fixed)  
 **M, N range:** Both > 8192, step 256 up to 20480+  
 **Devices:** `--device 0` through `--device 7` (8× MI350X)  
-**Total data points:** 651 (after filtering cold-start artifacts)  
-**New in this section:** Origami analytical latency, workgroup counts, granularity, and per-subproblem metrics for every run
+**Total data points:** 651 unique M×N pairs (after filtering cold-start artifacts)  
+**M, N range covered:** 8448 – 22528  
+**New in this section:** Origami analytical latency, workgroup counts, granularity, and per-subproblem metrics for every run  
+**Note:** Larger problems (M or N > ~15000) could not complete benchmarking due to the Origami analytical re-scoring inside the empirical search loop becoming quadratically expensive (4+ hours per problem). This is a known performance limitation of the current empirical search implementation, not of the multi-MT execution itself.
 
 ### 10.1 BF16 Summary
 
