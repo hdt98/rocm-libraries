@@ -328,10 +328,10 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
         node_type = "BatchnormInferenceAttributes"
         tensors = [
             _make_tensor(1, "input_x", x_dims, x_strides),
-            _make_tensor(2, "mean", scale_dims, scale_strides),
-            _make_tensor(3, "inv_variance", scale_dims, scale_strides),
-            _make_tensor(4, "scale", scale_dims, scale_strides),
-            _make_tensor(5, "bias", scale_dims, scale_strides),
+            _make_tensor(2, "mean", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(3, "inv_variance", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(4, "scale", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(5, "bias", scale_dims, scale_strides, data_type="float"),
             _make_tensor(6, "output_y", x_dims, x_strides),
         ]
         nodes = [
@@ -355,12 +355,12 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
         tensors = [
             _make_tensor(1, "input_x", x_dims, x_strides),
             _make_tensor(2, "input_dy", x_dims, x_strides),
-            _make_tensor(3, "mean", scale_dims, scale_strides),
-            _make_tensor(4, "inv_variance", scale_dims, scale_strides),
-            _make_tensor(5, "scale", scale_dims, scale_strides),
+            _make_tensor(3, "mean", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(4, "inv_variance", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(5, "scale", scale_dims, scale_strides, data_type="float"),
             _make_tensor(6, "output_dx", x_dims, x_strides),
-            _make_tensor(7, "output_dscale", scale_dims, scale_strides),
-            _make_tensor(8, "output_dbias", scale_dims, scale_strides),
+            _make_tensor(7, "output_dscale", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(8, "output_dbias", scale_dims, scale_strides, data_type="float"),
         ]
         nodes = [
             {
