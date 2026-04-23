@@ -233,7 +233,7 @@ public:
                                          KernelVersion kernel_version,
                                          const ProblemDescription& problem)
     {
-        if(StartsWith(dev_name, "gfx94"))
+        if(StartsWith(dev_name, "gfx942"))
         {
             return (kernel_version == KernelVersion::V4_6) ? PerfParams::GFX942_V4_6
                    : (problem.IsFp16())                    ? PerfParams::GFX942_V4_9_fp16
@@ -315,7 +315,7 @@ bool ConvWinoRageRxSCommon<Winodata, Winofilter>::IsApplicable(const ExecutionCo
         return false;
 
     const auto devName = ctx.GetStream().GetDeviceName();
-    if(!(StartsWith(devName, "gfx94") || StartsWith(devName, "gfx12")))
+    if(!(StartsWith(devName, "gfx942") || StartsWith(devName, "gfx12")))
     {
         return false;
     }
@@ -406,7 +406,7 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
     }(kernelVersion, devName);
 
     const auto archStr = [](const std::string& dn) -> std::string {
-        if(StartsWith(dn, "gfx94"))
+        if(StartsWith(dn, "gfx942"))
             return "_gfx9";
         if(StartsWith(dn, "gfx12"))
             return "_gfx12";
