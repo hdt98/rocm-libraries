@@ -2129,6 +2129,51 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
         if(isBlockScaling(arg.scaleA))
         {
+<<<<<<< HEAD
+=======
+#ifdef HIPBLASLT_USE_ROCROLLER
+            if(arg.initialization != hipblaslt_initialization::hpl
+               && arg.initialization != hipblaslt_initialization::trig_float
+               && arg.initialization != hipblaslt_initialization::uniform_01)
+            {
+                hipblaslt_cout << "Initialization of microscaling data only allows hpl, trig_float "
+                                  "or uniform_01, not "
+                               << hipblaslt_initialization2string(arg.initialization) << std::endl;
+                return;
+            }
+            if(arg.algo_method == 1)
+            {
+                hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
+                return;
+            }
+            // For MX format, use mxDataGenerator to generate input data
+            // (consists of data part and scale part)
+            // TODO: mxDataGenerator can only generate data on CPU. Using
+            //       GPU to generate data might be more efficient and avoid
+            //       unnecessary hipMemCpy when CPU verification is not needed.
+
+            // preTile for A: {tileK, tileM} - swap from preTileSizeForScaleA which returns {tileM, tileK}
+            auto preTileATmp = preTileSizeForScaleA(arg.scaleA);
+            auto preTileA = (preTileATmp.size() == 2) ? std::vector<size_t>{preTileATmp[1], preTileATmp[0]} : std::vector<size_t>{};
+            refA.emplace_back(generateMXInput(TiA,
+                                              scaleDataType(arg.scaleA),
+                                              hA[i].buf(),
+                                              hScaleA[i].buf(),
+                                              A_row[i],
+                                              A_col[i],
+                                              lda[i],
+                                              transA == HIPBLAS_OP_T,
+                                              preSwizzleSizeForScale(arg.scaleA),
+                                              preTileA,
+                                              blockSize(arg.scaleA),
+                                              1,
+                                              true,
+                                              hipblaslt_initialization2string(arg.initialization)));
+            // Copy data and scale to device buffers
+            CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
+            CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
+#else
+>>>>>>> origin/develop
             hipblaslt_init_device(ABC_dims::A,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),
@@ -2170,6 +2215,49 @@ void testing_matmul_with_bias(const Arguments& arg,
         size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
+<<<<<<< HEAD
+=======
+#ifdef HIPBLASLT_USE_ROCROLLER
+            if(arg.initialization != hipblaslt_initialization::hpl
+               && arg.initialization != hipblaslt_initialization::trig_float
+               && arg.initialization != hipblaslt_initialization::uniform_01)
+            {
+                hipblaslt_cout << "Initialization of microscaling data only allows hpl, trig_float "
+                                  "or uniform_01, not "
+                               << hipblaslt_initialization2string(arg.initialization) << std::endl;
+                return;
+            }
+            if(arg.algo_method == 1)
+            {
+                hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
+                return;
+            }
+            // For MX format, use mxDataGenerator to generate
+            // input data (consists of data part and scale part)
+            // TODO: mxDataGenerator can only generate data on CPU. Using
+            //       GPU to generate data might be more efficient and avoid
+            //       unnecessary hipMemCpy when CPU verification is not needed.
+            // preTile for B: {tileK, tileN}
+            auto preTileB = preTileSizeForScaleB(arg.scaleB);
+            refB.emplace_back(generateMXInput(TiB,
+                                              scaleDataType(arg.scaleB),
+                                              hB[i].buf(),
+                                              hScaleB[i].buf(),
+                                              B_row[i],
+                                              B_col[i],
+                                              ldb[i],
+                                              transB == HIPBLAS_OP_T,
+                                              preSwizzleSizeForScale(arg.scaleB),
+                                              preTileB,
+                                              1,
+                                              blockSize(arg.scaleB),
+                                              false,
+                                              hipblaslt_initialization2string(arg.initialization)));
+            // Copy data and scale to device buffers
+            CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
+            CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
+#else
+>>>>>>> origin/develop
             hipblaslt_init_device(ABC_dims::B,
                                   arg.initialization,
                                   alpha_isnan_type(arg, Talpha),

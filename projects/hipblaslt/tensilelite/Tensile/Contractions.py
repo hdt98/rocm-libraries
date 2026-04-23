@@ -628,6 +628,7 @@ class SizeMapping:
                  'streamKAtomic',
                  'sourceKernel',
                  'globalAccumulation',
+                 'adaptiveGemmGSUA',
                  'workspaceSizePerElemC',
                  'workspaceSizePerElemBias',
                  'activationFused',
@@ -662,9 +663,9 @@ class SizeMapping:
     @classmethod
     def FromOriginalState(cls, d):
         globalAccum = 0
-        if d['GlobalSplitUAlgorithm'] == 'SingleBuffer':
+        if d['_GlobalAccumulation'] == 'SingleBuffer':
             globalAccum = 1
-        if d['GlobalSplitUAlgorithm'] == 'MultipleBuffer':
+        if d['_GlobalAccumulation'] == 'MultipleBuffer':
             globalAccum = 2
         if d['_GlobalAccumulation'] == 'MultipleBufferSingleKernel':
             globalAccum = 3
@@ -716,6 +717,7 @@ class SizeMapping:
                    magicDivAlg              = d.get('MagicDivAlg', 1),
                    sourceKernel             = d['KernelLanguage'] == 'Source',
                    globalAccumulation       = globalAccum,
+                   adaptiveGemmGSUA         = d['AdaptiveGemmGSUA'] if 'AdaptiveGemmGSUA' in d else 0,
                    workspaceSizePerElemC    = d['_WorkspaceSizePerElemC'],
                    workspaceSizePerElemBias = d['_WorkspaceSizePerElemBias'],
                    activationFused          = d['ActivationFused'],
