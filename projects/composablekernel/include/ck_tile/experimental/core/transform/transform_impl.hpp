@@ -28,23 +28,19 @@
 
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/experimental/core/tensor/coordinate_transform.hpp"
+#include "ck_tile/experimental/core/transform/coordinate_transform.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Primary template — intentionally deleted to force specialization.
- *
- *  Using an unimplemented TransformType produces a clear compile error
- *  showing which type is missing.
- */
+// Primary template — intentionally deleted to force specialization. Using
+// an unimplemented TransformType value produces a clear compile error
+// pointing at the missing specialization.
 template <TransformType Type>
 struct TransformImpl
 {
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input) = delete;
 
-    /// Inverse of mapIndices. Takes output-side values, produces input-side values.
-    /// Each specialization implements this alongside mapIndices (open/closed).
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output) = delete;
 
@@ -55,13 +51,13 @@ struct TransformImpl
                                                              index_t i) = delete;
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail
 
 // Include all specializations.
 // To add a new transform, add a #include here and create the corresponding file.
-#include "ck_tile/experimental/core/tensor/transforms/pass_through.hpp"
-#include "ck_tile/experimental/core/tensor/transforms/embed.hpp"
-#include "ck_tile/experimental/core/tensor/transforms/merge.hpp"
-#include "ck_tile/experimental/core/tensor/transforms/unmerge.hpp"
-#include "ck_tile/experimental/core/tensor/transforms/pad.hpp"
-#include "ck_tile/experimental/core/tensor/transforms/xor.hpp"
+#include "ck_tile/experimental/core/transform/impl/pass_through.hpp"
+#include "ck_tile/experimental/core/transform/impl/embed.hpp"
+#include "ck_tile/experimental/core/transform/impl/merge.hpp"
+#include "ck_tile/experimental/core/transform/impl/unmerge.hpp"
+#include "ck_tile/experimental/core/transform/impl/pad.hpp"
+#include "ck_tile/experimental/core/transform/impl/xor.hpp"

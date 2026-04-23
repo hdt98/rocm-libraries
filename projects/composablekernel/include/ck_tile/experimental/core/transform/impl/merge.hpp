@@ -1,23 +1,18 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/merge.hpp
- *  @brief TransformImpl specialization for MERGE (decomposition during traversal).
- */
-
+/// @file
+/// @brief TransformImpl specialization for MERGE (decomposition during traversal).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Combine N component dims into 1 user-facing dim.
- *
- *  Definition:  N base dims --> 1 user dim   (flatten / combine)
- *  Traversal:   1 input --> N output          (DECOMPOSE via magic division)
- *
- *  ndim_input = 1, ndim_output = N
- */
+// Combine N component dims into 1 user-facing dim.
+//   Definition:  N base dims  --> 1 user dim   (flatten / combine)
+//   Traversal:   1 input      --> N output     (decompose via magic division)
+// ndim_input == 1, ndim_output == N.
 template <>
 struct TransformImpl<TransformType::MERGE>
 {
@@ -49,7 +44,7 @@ struct TransformImpl<TransformType::MERGE>
 
     // ── Operations ──
 
-    /** @brief Decompose 1 input value into N output values via magic division. */
+    // Decompose 1 input value into N output values via magic division.
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
@@ -66,7 +61,7 @@ struct TransformImpl<TransformType::MERGE>
         output[t.ndim_output - 1] = remaining;
     }
 
-    /** @brief Reverse: compose N components into 1 flat value (multiply-accumulate). */
+    // Reverse: compose N components into 1 flat value (multiply-accumulate).
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
@@ -78,7 +73,7 @@ struct TransformImpl<TransformType::MERGE>
         }
     }
 
-    /** @brief Check the merged input index is within [0, product_of_lengths). */
+    // Check the merged input index is within [0, product_of_lengths).
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
                                                            const index_t* input)
     {
@@ -91,7 +86,7 @@ struct TransformImpl<TransformType::MERGE>
         return input[0] >= 0 && input[0] < product;
     }
 
-    /** @brief Upper dimension length = product of all component lengths. */
+    // Upper dimension length = product of all component lengths.
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
@@ -105,4 +100,4 @@ struct TransformImpl<TransformType::MERGE>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

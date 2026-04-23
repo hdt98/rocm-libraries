@@ -1,21 +1,17 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/embed.hpp
- *  @brief TransformImpl specialization for EMBED (linear combination with strides).
- */
-
+/// @file
+/// @brief TransformImpl specialization for EMBED (linear combination with strides).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Linear combination with strides. Computes a 1D memory offset
- *  from N-dimensional indices. Sits at the BASE of the transform stack.
- *
- *  ndim_input = N, ndim_output = 1
- */
+// Linear combination with strides — computes a 1D memory offset from
+// N-dimensional indices. Sits at the base of the transform stack.
+// ndim_input == N, ndim_output == 1.
 template <>
 struct TransformImpl<TransformType::EMBED>
 {
@@ -49,7 +45,7 @@ struct TransformImpl<TransformType::EMBED>
 
     // ── Operations ──
 
-    /** @brief Forward: N input dims to 1 output offset via linear combination. */
+    // Forward: N input dims to 1 output offset via linear combination.
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
@@ -61,7 +57,7 @@ struct TransformImpl<TransformType::EMBED>
         }
     }
 
-    /** @brief Reverse: decompose offset into N indices via magic division on strides. */
+    // Reverse: decompose offset into N indices via magic division on strides.
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
@@ -77,7 +73,7 @@ struct TransformImpl<TransformType::EMBED>
         input[t.ndim_input - 1] = remaining;
     }
 
-    /** @brief Check all input indices are within [0, dim_length). */
+    // Check all input indices are within [0, dim_length).
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
                                                            const index_t* input)
     {
@@ -90,7 +86,7 @@ struct TransformImpl<TransformType::EMBED>
         return true;
     }
 
-    /** @brief Get the length of the i-th input dimension. */
+    // Get the length of the i-th input dimension.
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i)
     {
@@ -99,4 +95,4 @@ struct TransformImpl<TransformType::EMBED>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

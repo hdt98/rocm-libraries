@@ -1,43 +1,17 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file make_graph.hpp
- *  @brief Factory functions for constructing TransformGraph instances.
- *
- *  Three overloads of make_transform_graph:
- *
- *  1. make_transform_graph(desc) — single TensorDescriptor → Embed graph.
- *     N inputs (descriptor dims), 1 output (memory offset). Implicit.
- *
- *  2. make_transform_graph(graph) — identity, returns a copy.
- *
- *  3. make_transform_graph(outputs(...), transforms..., inputs(...))
- *     Full explicit API. outputs() and inputs() declare the graph's
- *     interface. Transforms use global slot indices with read()/write().
- *     Supports transform(xform, ...), transform(desc, ...), and
- *     transform(graph, ...) for sub-graph embedding.
- *
- *  If the graph has more than one transform, inputs() and outputs() are
- *  REQUIRED. There is no implicit derivation of the graph's interface.
- */
-
+/// @file
+/// @brief Definitions for graph-construction algorithms declared in
+///        `graph_construction.hpp`.
+///
+/// Auto-included from the bottom of `graph_construction.hpp`. Do not
+/// include directly.
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/graph_construction.hpp"
 #pragma once
 
-#include "ck_tile/core/container/static_array.hpp"
-#include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp"
-#include "ck_tile/experimental/core/tensor/transform_graph.hpp"
-#include "ck_tile/experimental/core/tensor/make_transform.hpp"
+#include "ck_tile/experimental/core/transform/graph_construction.hpp"
 
-namespace ck_tile {
-
-namespace detail {
-
-void graph_validation_error_double_write_to_slot();
-void graph_validation_error_wrong_traversal_order();
-void graph_validation_error_input_slot_is_written();
-void graph_validation_error_output_slot_is_read_only();
-void graph_validation_error_too_many_transforms();
+namespace ck_tile::core::transform::detail {
 
 constexpr void canonicalize(TransformGraph& g)
 {
@@ -53,12 +27,6 @@ constexpr void canonicalize(TransformGraph& g)
         g.output_slots[i] = 0;
 }
 
-/** @brief Single-descriptor graph: Embed with N inputs, 1 output.
- *
- *  Used by the public make_transform_graph(desc) convenience overload.
- *  Inputs are the descriptor's dims (slots 1..N), output is the memory
- *  offset (slot 0).
- */
 constexpr TransformGraph make_transform_graph(const TensorDescriptor& desc)
 {
     TransformGraph g{};
@@ -82,20 +50,6 @@ constexpr TransformGraph make_transform_graph(const TensorDescriptor& desc)
     return g;
 }
 
-template <TransformGraph G>
-constexpr bool isGraphBijective()
-{
-    for(index_t t = 0; t < G.num_transforms; ++t)
-        if(!G.transforms[t].is_bijective)
-            return false;
-    return true;
-}
-
-/** @brief Build a graph from bindings with explicit inputs/outputs.
- *
- *  All read()/write() values are global slot positions. inputs() and
- *  outputs() declare the graph's interface and ordering.
- */
 constexpr TransformGraph
 buildGraphWithIO(const static_array<TransformBinding, MAX_TRANSFORMS>& bindings,
                  index_t num_bindings,
@@ -156,7 +110,7 @@ buildGraphWithIO(const static_array<TransformBinding, MAX_TRANSFORMS>& bindings,
     for(index_t s = 0; s < max_slot; ++s)
     {
         if(write_count[s] > 1)
-            graph_validation_error_double_write_to_slot();
+            graphValidationErrorDoubleWriteToSlot();
     }
 
     for(index_t i = 0; i < num_bindings; ++i)
@@ -167,23 +121,23 @@ buildGraphWithIO(const static_array<TransformBinding, MAX_TRANSFORMS>& bindings,
             if(s >= 0 && write_count[s] > 0)
             {
                 if(written_by[s] <= i)
-                    graph_validation_error_wrong_traversal_order();
+                    graphValidationErrorWrongTraversalOrder();
             }
         }
     }
 
-    index_t n_ins = count_valid(ins.slots);
+    index_t n_ins = countValid(ins.slots);
     for(index_t i = 0; i < n_ins; ++i)
     {
         if(write_count[ins.slots[i]] > 0)
-            graph_validation_error_input_slot_is_written();
+            graphValidationErrorInputSlotIsWritten();
     }
 
-    index_t n_outs = count_valid(outs.slots);
+    index_t n_outs = countValid(outs.slots);
     for(index_t i = 0; i < n_outs; ++i)
     {
         if(is_read[outs.slots[i]] && !write_count[outs.slots[i]])
-            graph_validation_error_output_slot_is_read_only();
+            graphValidationErrorOutputSlotIsReadOnly();
     }
 
     g.ndim_input = n_ins;
@@ -218,7 +172,7 @@ constexpr index_t expandGraphBinding(static_array<TransformBinding, MAX_TRANSFOR
     for(index_t i = 0; i < sub.num_transforms; ++i)
     {
         if(idx + i >= MAX_TRANSFORMS)
-            graph_validation_error_too_many_transforms();
+            graphValidationErrorTooManyTransforms();
 
         arr[idx + i].xform = sub.transforms[i];
 
@@ -239,23 +193,6 @@ constexpr index_t expandGraphBinding(static_array<TransformBinding, MAX_TRANSFOR
 
     return sub.num_transforms;
 }
-
-// --- Recursive helpers: outputs(...), transforms..., inputs(...) ---
-
-template <typename... Rest>
-constexpr TransformGraph collectBindingsAndBuild(GraphOutputs,
-                                                 static_array<TransformBinding, MAX_TRANSFORMS>,
-                                                 index_t,
-                                                 index_t,
-                                                 TransformBinding,
-                                                 Rest...);
-template <typename... Rest>
-constexpr TransformGraph collectBindingsAndBuild(GraphOutputs,
-                                                 static_array<TransformBinding, MAX_TRANSFORMS>,
-                                                 index_t,
-                                                 index_t,
-                                                 GraphBinding,
-                                                 Rest...);
 
 constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
                                                  static_array<TransformBinding, MAX_TRANSFORMS> arr,
@@ -292,8 +229,8 @@ constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
                                                  GraphBinding gbinding,
                                                  Rest... rest)
 {
-    index_t n_r = count_valid(gbinding.read_dims);
-    index_t n_w = count_valid(gbinding.write_dims);
+    index_t n_r = countValid(gbinding.read_dims);
+    index_t n_w = countValid(gbinding.write_dims);
     for(index_t i = 0; i < n_r; ++i)
         if(gbinding.read_dims[i] + 1 > max_slot)
             max_slot = gbinding.read_dims[i] + 1;
@@ -306,43 +243,4 @@ constexpr TransformGraph collectBindingsAndBuild(GraphOutputs outs,
         outs, arr, idx + added, max_slot + gbinding.graph.num_slots, rest...);
 }
 
-} // namespace detail
-
-// ============================================================================
-// make_transform_graph — the only graph construction function
-// ============================================================================
-
-/** @brief Convenience: single descriptor → Embed graph.
- *
- *  Creates a graph with one Embed transform. The descriptor's N dims
- *  become the graph's N inputs; the memory offset is the single output.
- *  Inputs and outputs are implicit because the Embed's interface is
- *  fully determined by the descriptor.
- */
-constexpr detail::TransformGraph make_transform_graph(const TensorDescriptor& desc)
-{
-    return detail::make_transform_graph(desc);
-}
-
-/** @brief Identity: returns a copy of the graph. */
-constexpr detail::TransformGraph make_transform_graph(const detail::TransformGraph& g) { return g; }
-
-/** @brief Full explicit graph construction with inputs/outputs.
- *
- *  outputs() at the top, transforms in base-first order, inputs() at
- *  the bottom. Reading top-to-bottom follows the graph from memory to
- *  user. Every multi-transform graph MUST use this overload.
- *
- *  Transforms can be:
- *    transform(xform, read(...), write(...))  — single transform
- *    transform(desc,  read(...), write(...))  — descriptor as Embed
- *    transform(graph, read(...), write(...))  — sub-graph inlined
- */
-template <typename... Args>
-constexpr detail::TransformGraph make_transform_graph(GraphOutputs outs, Args... args)
-{
-    static_array<TransformBinding, MAX_TRANSFORMS> arr{};
-    return detail::collectBindingsAndBuild(outs, arr, 0, 0, args...);
-}
-
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

@@ -18,11 +18,12 @@
 
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-#include "ck_tile/experimental/core/tensor/coordinate_transform.hpp"
-#include "ck_tile/experimental/core/tensor/magic_division.hpp"
 #include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp"
+#include "ck_tile/experimental/core/transform/coordinate_transform.hpp"
+#include "ck_tile/experimental/core/transform/magic_division.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform {
 
 /** @brief Create a right-sized array of dimension values from variadic arguments.
  *
@@ -40,36 +41,13 @@ constexpr static_array<index_t, sizeof...(Ts)> dims(Ts... vs)
     return {static_cast<index_t>(vs)...};
 }
 
-/** @brief Create a DimIds routing array with -1 sentinel padding.
- *
- *  Produces a 64-element DimIds array for slot routing in transform graphs.
- *  Unused slots are set to -1 (sentinel). Called by read() and write().
- *
- *  @param is  Dimension indices (variadic)
- *  @return DimIds{is..., -1, -1, ...}
- */
-template <typename... Ts>
-constexpr DimIds dim_ids(Ts... is)
-{
-    static_assert(sizeof...(Ts) <= MAX_TENSOR_DIMS,
-                  "dim_ids: too many indices (max MAX_TENSOR_DIMS)");
-    DimIds result{};
-    for(auto& x : result.elems)
-    {
-        x = -1;
-    }
-    index_t idx = 0;
-    ((result[idx++] = static_cast<index_t>(is)), ...);
-    return result;
-}
-
 /** @brief Create a PASS_THROUGH transform (identity mapping).
  *  @param dim_length  Length of the dimension
  *  @return CoordinateTransform with type = PASS_THROUGH, ndim_input = 1, ndim_output = 1
  */
 constexpr CoordinateTransform make_pass_through(index_t dim_length)
 {
-    using Impl = TransformImpl<TransformType::PASS_THROUGH>;
+    using Impl = detail::TransformImpl<TransformType::PASS_THROUGH>;
 
     CoordinateTransform t{};
     t.type         = TransformType::PASS_THROUGH;
@@ -107,7 +85,7 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
     static_assert(N <= MAX_TENSOR_DIMS, "make_merge: too many dims (max MAX_TENSOR_DIMS)");
     static_assert(N >= 2, "make_merge: need at least 2 dims to merge");
 
-    using Impl = TransformImpl<TransformType::MERGE>;
+    using Impl = detail::TransformImpl<TransformType::MERGE>;
 
     CoordinateTransform t{};
     t.type         = TransformType::MERGE;
@@ -126,7 +104,7 @@ constexpr CoordinateTransform make_merge(const static_array<index_t, N>& compone
 
     // Pre-compute magic division constants
     for(index_t i = 0; i < N - 1; ++i)
-        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
+        d.magic_divs[i] = detail::computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
 
     Impl::writeSchema(t, d);
     return t;
@@ -163,7 +141,7 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
     static_assert(N <= MAX_TENSOR_DIMS, "make_unmerge: too many dims (max MAX_TENSOR_DIMS)");
     static_assert(N >= 2, "make_unmerge: need at least 2 dims to unmerge");
 
-    using Impl = TransformImpl<TransformType::UNMERGE>;
+    using Impl = detail::TransformImpl<TransformType::UNMERGE>;
 
     CoordinateTransform t{};
     t.type         = TransformType::UNMERGE;
@@ -182,7 +160,7 @@ constexpr CoordinateTransform make_unmerge(const static_array<index_t, N>& compo
 
     // Pre-compute magic division for reversal
     for(index_t i = 0; i < N - 1; ++i)
-        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
+        d.magic_divs[i] = detail::computeMagicDiv(static_cast<uint32_t>(d.strides[i]));
 
     Impl::writeSchema(t, d);
     return t;
@@ -211,7 +189,7 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
 {
     static_assert(N <= MAX_TENSOR_DIMS, "make_embed: too many dims (max MAX_TENSOR_DIMS)");
 
-    using Impl = TransformImpl<TransformType::EMBED>;
+    using Impl = detail::TransformImpl<TransformType::EMBED>;
 
     CoordinateTransform t{};
     t.type        = TransformType::EMBED;
@@ -231,7 +209,7 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
     {
         if(strides[i] < strides[i + 1] * dim_lengths[i + 1])
             t.is_bijective = false;
-        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(strides[i]));
+        d.magic_divs[i] = detail::computeMagicDiv(static_cast<uint32_t>(strides[i]));
     }
 
     Impl::writeSchema(t, d);
@@ -249,7 +227,7 @@ constexpr CoordinateTransform make_embed(const static_array<index_t, N>& dim_len
  */
 constexpr CoordinateTransform make_embed(const TensorDescriptor& desc)
 {
-    using Impl = TransformImpl<TransformType::EMBED>;
+    using Impl = detail::TransformImpl<TransformType::EMBED>;
 
     CoordinateTransform t{};
     t.type        = TransformType::EMBED;
@@ -268,7 +246,7 @@ constexpr CoordinateTransform make_embed(const TensorDescriptor& desc)
     {
         if(desc.strides[i] < desc.strides[i + 1] * desc.lengths[i + 1])
             t.is_bijective = false;
-        d.magic_divs[i] = computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
+        d.magic_divs[i] = detail::computeMagicDiv(static_cast<uint32_t>(desc.strides[i]));
     }
 
     Impl::writeSchema(t, d);
@@ -288,7 +266,7 @@ constexpr CoordinateTransform make_embed(const TensorDescriptor& desc)
 constexpr CoordinateTransform
 make_pad(index_t dim_length, index_t left_pad, index_t right_pad, bool skip_check = false)
 {
-    using Impl = TransformImpl<TransformType::PAD>;
+    using Impl = detail::TransformImpl<TransformType::PAD>;
 
     CoordinateTransform t{};
     t.type              = TransformType::PAD;
@@ -323,7 +301,7 @@ constexpr CoordinateTransform make_right_pad(index_t dim_length, index_t pad_amo
  */
 constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
 {
-    using Impl = TransformImpl<TransformType::XOR>;
+    using Impl = detail::TransformImpl<TransformType::XOR>;
 
     CoordinateTransform t{};
     t.type         = TransformType::XOR;
@@ -339,159 +317,4 @@ constexpr CoordinateTransform make_xor(index_t length_0, index_t length_1)
     return t;
 }
 
-// ============================================================================
-// Graph interface declarations: inputs() + outputs()
-// ============================================================================
-
-struct GraphInputs
-{
-    DimIds slots{};
-    constexpr bool operator==(const GraphInputs&) const = default;
-};
-
-struct GraphOutputs
-{
-    DimIds slots{};
-    constexpr bool operator==(const GraphOutputs&) const = default;
-};
-
-template <typename... Ts>
-constexpr GraphInputs inputs(Ts... ids)
-{
-    return {dim_ids(ids...)};
-}
-
-template <typename... Ts>
-constexpr GraphOutputs outputs(Ts... ids)
-{
-    return {dim_ids(ids...)};
-}
-
-constexpr index_t count_valid(const DimIds& ids)
-{
-    index_t n = 0;
-    for(index_t i = 0; i < MAX_TENSOR_DIMS; ++i)
-        if(ids[i] >= 0)
-            n++;
-    return n;
-}
-
-// ============================================================================
-// Transform binding API: transform() + read() + write()
-// ============================================================================
-
-/** @brief Specify which slots this transform reads from during traversal.
- *
- *  During traversal (user → memory), the transform reads values from
- *  these slots. In descriptor-based construction, these are relative
- *  to the new user-facing dims. In global-index construction, these
- *  are direct slot positions.
- *
- *  @param ids  Slot indices (variadic)
- *  @return DimIds array with -1 padding for unused slots
- */
-template <typename... Ts>
-constexpr DimIds read(Ts... ids)
-{
-    return dim_ids(ids...);
-}
-
-/** @brief Specify which slots this transform writes to during traversal.
- *
- *  During traversal (user → memory), the transform writes results to
- *  these slots. In descriptor-based construction, these are relative
- *  to the existing graph's dims. In global-index construction, these
- *  are direct slot positions.
- *
- *  @param ids  Slot indices (variadic)
- *  @return DimIds array with -1 padding for unused slots
- */
-template <typename... Ts>
-constexpr DimIds write(Ts... ids)
-{
-    return dim_ids(ids...);
-}
-
-/** @brief Bundles a transform with its read/write dimension routing.
- *
- *  Structural NTTP — pure aggregate with defaulted ==.
- *  Created by the transform() factory. Used by make_transform_graph().
- *
- *  Fields follow traversal data flow:
- *    - xform: the coordinate transform to apply
- *    - read_dims: which slots this transform reads from during traversal
- *    - write_dims: which slots this transform writes to during traversal
- */
-struct TransformBinding
-{
-    CoordinateTransform xform{};
-    DimIds read_dims{};
-    DimIds write_dims{};
-
-    constexpr bool operator==(const TransformBinding&) const = default;
-};
-
-/** @brief Bind a transform to its read and write dimension routing.
- *
- *  Parameter order follows traversal data flow: read (input) → write (output).
- *
- *  @param xform      The coordinate transform
- *  @param read_dims  Slots this transform reads from during traversal
- *  @param write_dims Slots this transform writes to during traversal
- *  @return TransformBinding bundling all three
- *
- *  Example:
- *    transform(make_pass_through(128), read(0), write(1))
- *    transform(make_merge(dims(8, 8)), read(1), write(0, 2))
- */
-constexpr TransformBinding transform(CoordinateTransform xform, DimIds read_dims, DimIds write_dims)
-{
-    return {xform, read_dims, write_dims};
-}
-
-void transform_error_desc_read_count_mismatch();
-void transform_error_desc_write_count_not_one();
-
-/// Bind a TensorDescriptor as an Embed transform with routing.
-/// read() count must equal desc.ndim, write() count must be 1.
-constexpr TransformBinding
-transform(const TensorDescriptor& desc, DimIds read_dims, DimIds write_dims)
-{
-    if(count_valid(read_dims) != desc.ndim)
-        transform_error_desc_read_count_mismatch();
-    if(count_valid(write_dims) != 1)
-        transform_error_desc_write_count_not_one();
-    return {make_embed(desc), read_dims, write_dims};
-}
-
-/** @brief Bundles a sub-graph with its read/write boundary routing.
- *
- *  The sub-graph's transforms are expanded inline into the parent graph
- *  during construction. read() maps to the sub-graph's inputs,
- *  write() maps to the sub-graph's outputs.
- */
-struct GraphBinding
-{
-    detail::TransformGraph graph{};
-    DimIds read_dims{};
-    DimIds write_dims{};
-
-    constexpr bool operator==(const GraphBinding&) const = default;
-};
-
-void transform_error_graph_read_count_mismatch();
-void transform_error_graph_write_count_mismatch();
-
-/// Bind a TransformGraph as a sub-graph with boundary routing.
-/// read() count must equal graph's input count, write() count must equal graph's output count.
-constexpr GraphBinding
-transform(const detail::TransformGraph& g, DimIds read_dims, DimIds write_dims)
-{
-    if(count_valid(read_dims) != g.ndim_input)
-        transform_error_graph_read_count_mismatch();
-    if(count_valid(write_dims) != g.ndim_output)
-        transform_error_graph_write_count_mismatch();
-    return {g, read_dims, write_dims};
-}
-
-} // namespace ck_tile
+} // namespace ck_tile::core::transform

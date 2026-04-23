@@ -1,23 +1,18 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/unmerge.hpp
- *  @brief TransformImpl specialization for UNMERGE (composition during traversal).
- */
-
+/// @file
+/// @brief TransformImpl specialization for UNMERGE (composition during traversal).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Split 1 base dim into N user-facing component dims.
- *
- *  Definition:  1 base dim --> N user dims   (split / expand / unflatten)
- *  Traversal:   N input --> 1 output          (COMPOSE via multiply-accumulate)
- *
- *  ndim_input = N, ndim_output = 1
- */
+// Split 1 base dim into N user-facing component dims.
+//   Definition:  1 base dim   --> N user dims   (split / expand / unflatten)
+//   Traversal:   N input      --> 1 output      (compose via multiply-accumulate)
+// ndim_input == N, ndim_output == 1.
 template <>
 struct TransformImpl<TransformType::UNMERGE>
 {
@@ -50,7 +45,7 @@ struct TransformImpl<TransformType::UNMERGE>
 
     // ── Operations ──
 
-    /** @brief Compose N input values into 1 output value via multiply-accumulate. */
+    // Compose N input values into 1 output value via multiply-accumulate.
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
@@ -62,7 +57,7 @@ struct TransformImpl<TransformType::UNMERGE>
         }
     }
 
-    /** @brief Reverse: decompose 1 flat value into N components (magic division). */
+    // Reverse: decompose 1 flat value into N components (magic division).
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
@@ -78,7 +73,7 @@ struct TransformImpl<TransformType::UNMERGE>
         input[t.ndim_input - 1] = remaining;
     }
 
-    /** @brief Check all input component indices are within [0, length). */
+    // Check all input component indices are within [0, length).
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
                                                            const index_t* input)
     {
@@ -91,7 +86,7 @@ struct TransformImpl<TransformType::UNMERGE>
         return true;
     }
 
-    /** @brief Get the length of the i-th input (component) dimension. */
+    // Get the length of the i-th input (component) dimension.
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i)
     {
@@ -100,4 +95,4 @@ struct TransformImpl<TransformType::UNMERGE>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

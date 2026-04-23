@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-namespace ck_tile {
+namespace ck_tile::core::transform {
 
 /** @brief Identifies the coordinate mapping algorithm a transform performs.
  *
@@ -39,4 +39,4 @@ enum struct TransformType : uint8_t
     UNDEFINED     ///< Sentinel for unused array slots
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform

@@ -1,27 +1,19 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/pass_through.hpp
- *  @brief TransformImpl specialization for PASS_THROUGH (identity mapping).
- */
-
+/// @file
+/// @brief TransformImpl specialization for PASS_THROUGH (identity mapping).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Identity mapping: passes a single dimension through unchanged.
- *
- *  Definition:  1 dim --> 1 dim (same value, same length)
- *  Traversal:   1 dim --> 1 dim (identity in both directions)
- *
- *  ndim_input = 1, ndim_output = 1
- */
+// Identity: 1 input dim → 1 output dim (same value, same length).
+// ndim_input == 1, ndim_output == 1.
 template <>
 struct TransformImpl<TransformType::PASS_THROUGH>
 {
-    // ── Schema ──
     struct Schema
     {
         index_t dim_length = 0;
@@ -31,40 +23,37 @@ struct TransformImpl<TransformType::PASS_THROUGH>
     };
     static_assert(sizeof(Schema) == MAX_TRANSFORM_DATA_SIZE);
 
-    // ── Schema conversion ──
     static constexpr Schema readSchema(const CoordinateTransform& t)
     {
         return bit_cast<Schema>(t.data);
     }
+
     static constexpr void writeSchema(CoordinateTransform& t, const Schema& d)
     {
         t.data = bit_cast<TransformDataBuffer>(d);
     }
 
-    // ── Operations ──
-
-    /** @brief Forward: input to output (identity). */
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& /*t*/, index_t* output, const index_t* input)
     {
         output[0] = input[0];
     }
 
-    /** @brief Reverse: identity (same as forward). */
+    // XOR is its own inverse — same operation in both directions; PassThrough
+    // is even simpler.
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& /*t*/, index_t* input, const index_t* output)
     {
         input[0] = output[0];
     }
 
-    /** @brief Always valid — identity cannot produce out-of-bounds. */
+    // Identity cannot produce out-of-bounds — always valid.
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& /*t*/,
                                                            const index_t* /*input*/)
     {
         return true;
     }
 
-    /** @brief Upper dimension length. */
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
@@ -73,4 +62,4 @@ struct TransformImpl<TransformType::PASS_THROUGH>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

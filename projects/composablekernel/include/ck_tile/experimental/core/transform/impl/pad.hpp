@@ -1,25 +1,21 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/pad.hpp
- *  @brief TransformImpl specialization for PAD (shifted mapping with bounds).
- */
-
+/// @file
+/// @brief TransformImpl specialization for PAD (shifted mapping with bounds).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief Padding transform: expands a dimension with boundary elements.
- *
- *  Definition:  1 dim (unpadded) --> 1 dim (padded, larger)
- *  Traversal:   1 input --> 1 output    (subtract left_pad to map padded
- *                                       index into the unpadded space;
- *                                       right_pad affects bounds only)
- *
- *  ndim_input = 1, ndim_output = 1
- */
+// Padding: expands a dimension with boundary elements.
+//   Definition:  1 dim (unpadded) --> 1 dim (padded, larger)
+//   Traversal:   1 input          --> 1 output  (subtract left_pad to map
+//                                                padded index into the
+//                                                unpadded space; right_pad
+//                                                affects bounds only)
+// ndim_input == 1, ndim_output == 1.
 template <>
 struct TransformImpl<TransformType::PAD>
 {
@@ -47,12 +43,9 @@ struct TransformImpl<TransformType::PAD>
 
     // ── Operations ──
 
-    /** @brief Forward: input to output by subtracting left_pad.
-     *
-     *  output = input - left_pad. The right_pad does not affect the
-     *  index mapping itself --- it only affects bounds checking in
-     *  isValidInput() and the padded length in inputLength().
-     */
+    // Forward: output = input - left_pad. right_pad does not affect the
+    // index mapping itself; it only affects bounds checking in isValidInput()
+    // and the padded length in inputLength().
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
@@ -60,7 +53,7 @@ struct TransformImpl<TransformType::PAD>
         output[0] = input[0] - d.left_pad;
     }
 
-    /** @brief Reverse: recover padded index by adding left_pad back. */
+    // Reverse: recover padded index by adding left_pad back.
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
@@ -68,16 +61,12 @@ struct TransformImpl<TransformType::PAD>
         input[0] = output[0] + d.left_pad;
     }
 
-    /** @brief Check if input index is within the valid (non-padded) range.
-     *
-     *  The padded dimension has three zones:
-     *    [0, left_pad)                         --> left padding (invalid)
-     *    [left_pad, left_pad + dim_length)     --> valid (maps to base)
-     *    [left_pad + dim_length, total)        --> right padding (invalid)
-     *
-     *  Returns false if the index falls in either padding zone.
-     *  Returns true unconditionally if skip_bounds_check is set.
-     */
+    // Padded dimension has three zones:
+    //   [0, left_pad)                       --> left padding (invalid)
+    //   [left_pad, left_pad + dim_length)   --> valid (maps to base)
+    //   [left_pad + dim_length, total)      --> right padding (invalid)
+    // Returns false if the index falls in either padding zone; returns true
+    // unconditionally if skip_bounds_check is set.
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& t,
                                                            const index_t* input)
     {
@@ -89,7 +78,7 @@ struct TransformImpl<TransformType::PAD>
         return input[0] >= d.left_pad && input[0] < d.left_pad + d.dim_length;
     }
 
-    /** @brief Upper dimension length = dim_length + left_pad + right_pad. */
+    // Upper dimension length = dim_length + left_pad + right_pad.
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t /*i*/)
     {
@@ -98,4 +87,4 @@ struct TransformImpl<TransformType::PAD>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

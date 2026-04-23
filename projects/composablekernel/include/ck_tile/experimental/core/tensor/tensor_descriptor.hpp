@@ -1,26 +1,24 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file tensor_descriptor.hpp
- *  @brief Pure metadata describing a tensor's shape and memory layout.
- *
- *  TensorDescriptor is user-facing metadata: lengths, strides, ndim,
- *  element_space_size. It knows nothing about coordinate transforms or
- *  transform graphs — those are internal implementation details.
- *
- *  A TransformGraph can be constructed FROM a descriptor via
- *  make_transform_graph(), which creates an Embed transform from the
- *  descriptor's lengths and strides.
- *
- *  TensorDescriptor is a structural NTTP (pure aggregate, defaulted ==).
- */
-
+/// @file
+/// @brief Pure metadata describing a tensor's shape and memory layout.
+///
+/// `TensorDescriptor` is user-facing vocabulary: lengths, strides, ndim,
+/// element_space_size. It knows nothing about coordinate transforms or
+/// transform graphs — those are owned by the `core::transform` module,
+/// which consumes a descriptor through `make_embed(desc)` and
+/// `transform(desc, ...)` convenience overloads.
+///
+/// `TensorDescriptor` is a structural NTTP (aggregate, defaulted `==`).
 #pragma once
 
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/container/static_array.hpp"
 #include "ck_tile/core/numeric/integer.hpp"
-namespace ck_tile {
+
+#include <type_traits>
+
+namespace ck_tile::core::tensor {
 
 /// Maximum tensor dimensions. Determines capacity of TensorDescriptor,
 /// DimIds routing arrays, Embed schema, and TransformGraph endpoints.
@@ -122,4 +120,13 @@ make_tensor_descriptor(const static_array<index_t, NDim>& lengths)
     return make_tensor_descriptor(lengths, strides);
 }
 
-} // namespace ck_tile
+// NTTP-eligibility canaries — fire at compile time on any regression that
+// breaks aggregate-ness, trivial copyability, or defaulted equality.
+static_assert(std::is_aggregate_v<TensorDescriptor>);
+static_assert(std::is_trivially_copyable_v<TensorDescriptor>);
+namespace {
+constexpr TensorDescriptor _tensor_descriptor_nttp_canary{};
+static_assert(_tensor_descriptor_nttp_canary == _tensor_descriptor_nttp_canary);
+} // namespace
+
+} // namespace ck_tile::core::tensor

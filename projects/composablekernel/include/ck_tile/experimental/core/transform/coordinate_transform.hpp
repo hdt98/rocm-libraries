@@ -31,21 +31,22 @@
 #include "ck_tile/core/numeric/integer.hpp"
 #include "ck_tile/core/utility/bit_cast.hpp"
 #include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp" // MAX_TENSOR_DIMS
-#include "ck_tile/experimental/core/tensor/transform_type.hpp"
-#include "ck_tile/experimental/core/tensor/magic_division.hpp"
+#include "ck_tile/experimental/core/transform/transform_data_buffer.hpp"
+#include "ck_tile/experimental/core/transform/transform_type.hpp"
+#include "ck_tile/experimental/core/transform/magic_division.hpp"
 
-namespace ck_tile {
+#include <type_traits>
+
+namespace ck_tile::core::transform {
+
+// Bring tensor-module vocabulary into the transform namespace so consumers
+// needn't fully qualify it. These types are owned by the tensor module —
+// the using-declarations below are re-exports, not redefinitions.
+using ck_tile::core::tensor::MAX_TENSOR_DIMS;
+using ck_tile::core::tensor::TensorDescriptor;
 
 /// Alias for dimension index arrays used in graph routing.
 using DimIds = static_array<index_t, MAX_TENSOR_DIMS>;
-
-/// Size of the opaque data buffer in CoordinateTransform.
-/// Must accommodate the largest Schema: Embed with MAX_TENSOR_DIMS (64) dimensions
-/// requires 64 dim_lengths (256B) + 64 strides (256B) + 64 magic_divs (512B) = 1024B.
-inline constexpr index_t MAX_TRANSFORM_DATA_SIZE = 1032;
-
-/// Type alias for the opaque data buffer.
-using TransformDataBuffer = static_array<uint8_t, MAX_TRANSFORM_DATA_SIZE>;
 
 /** @brief Pure data describing a single coordinate mapping.
  *
@@ -69,9 +70,18 @@ struct CoordinateTransform
     bool skip_bounds_check = false;
     bool is_bijective      = false;
 
-    TransformDataBuffer data{}; ///< Opaque — interpreted by TransformImpl via schema
+    detail::TransformDataBuffer data{}; ///< Opaque — interpreted by TransformImpl via schema
 
     constexpr bool operator==(const CoordinateTransform&) const = default;
 };
 
-} // namespace ck_tile
+// NTTP-eligibility canaries — fire at compile time on any regression that
+// breaks aggregate-ness, trivial copyability, or defaulted equality.
+static_assert(std::is_aggregate_v<CoordinateTransform>);
+static_assert(std::is_trivially_copyable_v<CoordinateTransform>);
+namespace {
+constexpr CoordinateTransform _coordinate_transform_nttp_canary{};
+static_assert(_coordinate_transform_nttp_canary == _coordinate_transform_nttp_canary);
+} // namespace
+
+} // namespace ck_tile::core::transform

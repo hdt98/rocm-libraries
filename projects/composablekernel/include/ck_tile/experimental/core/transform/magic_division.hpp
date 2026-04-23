@@ -20,7 +20,7 @@
 #include "ck_tile/core/numeric/integer.hpp"
 #include <stdint.h>
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
 /** @brief Pre-computed magic division constants for one divisor.
  *
@@ -80,4 +80,4 @@ CK_TILE_HOST_DEVICE constexpr uint32_t doMagicDiv(uint32_t dividend, MagicDivCon
     return (tmp + dividend) >> md.shift;
 }
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

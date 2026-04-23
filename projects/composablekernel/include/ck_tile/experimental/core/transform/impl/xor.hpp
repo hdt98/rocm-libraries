@@ -1,32 +1,22 @@
 // Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-
-/** @file transforms/xor.hpp
- *  @brief TransformImpl specialization for XOR (2D swizzle for LDS bank conflicts).
- */
-
+/// @file
+/// @brief TransformImpl specialization for XOR (2D swizzle for LDS bank conflicts).
+// IWYU pragma: private, include "ck_tile/experimental/core/transform/transform_impl.hpp"
 #pragma once
 
-#include "ck_tile/experimental/core/tensor/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
 
-namespace ck_tile {
+namespace ck_tile::core::transform::detail {
 
-/** @brief 2D XOR permutation for LDS bank conflict avoidance.
- *
- *  Swizzles the second dimension by XORing it with the first dimension
- *  (modulo the second dimension's length). This creates a diagonal access
- *  pattern that avoids LDS bank conflicts.
- *
- *  Definition:  2 dims --> 2 dims
- *  Traversal:   2 input --> 2 output
- *
- *  output[0] = input[0]
- *  output[1] = input[1] ^ (input[0] % length_1)
- *
- *  XOR is its own inverse — applying it twice recovers the original indices.
- *
- *  ndim_input = 2, ndim_output = 2
- */
+// 2D XOR permutation for LDS bank conflict avoidance. Swizzles the second
+// dimension by XORing it with the first dimension (modulo the second
+// dimension's length), producing a diagonal access pattern that avoids
+// LDS bank conflicts.
+//   output[0] = input[0]
+//   output[1] = input[1] ^ (input[0] % length_1)
+// XOR is its own inverse: applying twice recovers the original indices.
+// ndim_input == 2, ndim_output == 2.
 template <>
 struct TransformImpl<TransformType::XOR>
 {
@@ -53,7 +43,7 @@ struct TransformImpl<TransformType::XOR>
 
     // ── Operations ──
 
-    /** @brief Forward: swizzle dim 1 by XORing with dim 0 (mod length_1). */
+    // Forward: swizzle dim 1 by XORing with dim 0 (mod length_1).
     static CK_TILE_HOST_DEVICE constexpr void
     mapIndices(const CoordinateTransform& t, index_t* output, const index_t* input)
     {
@@ -62,7 +52,7 @@ struct TransformImpl<TransformType::XOR>
         output[1] = input[1] ^ (input[0] % d.length_1);
     }
 
-    /** @brief Reverse: XOR is self-inverse — same operation undoes itself. */
+    // Reverse: XOR is self-inverse — same operation undoes itself.
     static CK_TILE_HOST_DEVICE constexpr void
     reverseMapIndices(const CoordinateTransform& t, index_t* input, const index_t* output)
     {
@@ -71,15 +61,15 @@ struct TransformImpl<TransformType::XOR>
         input[1] = output[1] ^ (output[0] % d.length_1);
     }
 
-    /** @brief Always valid — XOR preserves index range for power-of-2 length_1
-     *  (the typical LDS use case). For non-power-of-2, results may exceed bounds. */
+    // Always valid — XOR preserves index range for power-of-2 length_1
+    // (the typical LDS use case). For non-power-of-2, results may exceed bounds.
     static CK_TILE_HOST_DEVICE constexpr bool isValidInput(const CoordinateTransform& /*t*/,
                                                            const index_t* /*input*/)
     {
         return true;
     }
 
-    /** @brief Get the length of the i-th input dimension. */
+    // Get the length of the i-th input dimension.
     static CK_TILE_HOST_DEVICE constexpr index_t inputLength(const CoordinateTransform& t,
                                                              index_t i)
     {
@@ -88,4 +78,4 @@ struct TransformImpl<TransformType::XOR>
     }
 };
 
-} // namespace ck_tile
+} // namespace ck_tile::core::transform::detail

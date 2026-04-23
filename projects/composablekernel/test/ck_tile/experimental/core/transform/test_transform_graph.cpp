@@ -9,13 +9,59 @@
  */
 
 #include "ck_tile/experimental/core/tensor/tensor_descriptor.hpp"
-#include "ck_tile/experimental/core/tensor/make_graph.hpp"
-#include "ck_tile/experimental/core/tensor/make_transform.hpp"
-#include "ck_tile/experimental/core/tensor/magic_division.hpp"
+#include "ck_tile/experimental/core/transform/coordinate_transform.hpp"
+#include "ck_tile/experimental/core/transform/magic_division.hpp"
+#include "ck_tile/experimental/core/transform/make_graph.hpp"
+#include "ck_tile/experimental/core/transform/make_transform.hpp"
+#include "ck_tile/experimental/core/transform/transform_binding.hpp"
+#include "ck_tile/experimental/core/transform/transform_graph.hpp"
+#include "ck_tile/experimental/core/transform/transform_impl.hpp"
+#include "ck_tile/experimental/core/transform/transform_type.hpp"
 
 namespace {
 
-using namespace ck_tile;
+// Targeted using-declarations (Style Guide §10.2: avoid `using namespace`).
+using ck_tile::index_t;
+using ck_tile::sequence;
+using ck_tile::static_array;
+
+using ck_tile::core::tensor::make_tensor_descriptor;
+using ck_tile::core::tensor::TensorDescriptor;
+
+using ck_tile::core::transform::calculateOffset;
+using ck_tile::core::transform::CoordinateTransform;
+using ck_tile::core::transform::dim_ids;
+using ck_tile::core::transform::DimIds;
+using ck_tile::core::transform::dims;
+using ck_tile::core::transform::inputDimLength;
+using ck_tile::core::transform::inputs;
+using ck_tile::core::transform::isGraphBijective;
+using ck_tile::core::transform::make_embed;
+using ck_tile::core::transform::make_merge;
+using ck_tile::core::transform::make_pad;
+using ck_tile::core::transform::make_pass_through;
+using ck_tile::core::transform::make_right_pad;
+using ck_tile::core::transform::make_transform_graph;
+using ck_tile::core::transform::make_unmerge;
+using ck_tile::core::transform::make_xor;
+using ck_tile::core::transform::map;
+using ck_tile::core::transform::outputs;
+using ck_tile::core::transform::read;
+using ck_tile::core::transform::reverseCalculateOffset;
+using ck_tile::core::transform::reverseMap;
+using ck_tile::core::transform::transform;
+using ck_tile::core::transform::TransformBinding;
+using ck_tile::core::transform::TransformType;
+using ck_tile::core::transform::write;
+
+// Privileged consumer: tests reach into detail for magic-division correctness
+// (Test 3) and TransformImpl bounds-checking (Tests 5, 6, 20). End users
+// should NOT depend on these — public-API tests cover the same logic
+// transitively via the traversal API (calculateOffset / map / reverseMap).
+namespace detail = ck_tile::core::transform::detail;
+using ck_tile::core::transform::detail::computeMagicDiv;
+using ck_tile::core::transform::detail::doMagicDiv;
+using ck_tile::core::transform::detail::TransformImpl;
 
 constexpr index_t
 manual_strided_offset(index_t i0, index_t i1, index_t i2, index_t s0, index_t s1, index_t s2)
@@ -208,13 +254,13 @@ static_assert(packed_2d.ndim_input == 2);
 static_assert(packed_2d.ndim_output == 1);
 static_assert(packed_2d.num_transforms == 1);
 
-static_assert(detail::calculateOffset<packed_2d>(static_array<index_t, 2>{0, 0}) == 0);
-static_assert(detail::calculateOffset<packed_2d>(static_array<index_t, 2>{3, 7}) == 31);
-static_assert(detail::calculateOffset<packed_2d>(static_array<index_t, 2>{2, 5}) == 21);
+static_assert(calculateOffset<packed_2d>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(calculateOffset<packed_2d>(static_array<index_t, 2>{3, 7}) == 31);
+static_assert(calculateOffset<packed_2d>(static_array<index_t, 2>{2, 5}) == 21);
 
 constexpr auto strided_3d = make_transform_graph(desc_strided_3d);
 static_assert(strided_3d.ndim_input == 3);
-static_assert(detail::calculateOffset<strided_3d>(static_array<index_t, 3>{2, 5, 3}) ==
+static_assert(calculateOffset<strided_3d>(static_array<index_t, 3>{2, 5, 3}) ==
               manual_strided_offset(2, 5, 3, S0, S1, S2));
 
 // ============================================================================
@@ -243,15 +289,15 @@ static_assert(gemm_lds.ndim_input == 2);
 static_assert(gemm_lds.ndim_output == 1);
 static_assert(gemm_lds.num_transforms == 3);
 
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 0}) == 0);
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{1, 0}) == 8);
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 1}) == 1);
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 8}) == 1032);
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{5, 19}) ==
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{1, 0}) == 8);
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 1}) == 1);
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{0, 8}) == 1032);
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{5, 19}) ==
               manual_strided_offset(2, 5, 3, S0, S1, S2));
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63}) ==
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63}) ==
               manual_strided_offset(7, 127, 7, S0, S1, S2));
-static_assert(detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}) ==
+static_assert(calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}) ==
               manual_strided_offset(4, 64, 0, S0, S1, S2));
 
 // ============================================================================
@@ -267,9 +313,9 @@ constexpr auto embed_only = make_transform_graph(
 
 static_assert(embed_only.ndim_input == 2);
 static_assert(embed_only.ndim_output == 1);
-static_assert(detail::calculateOffset<embed_only>(static_array<index_t, 2>{0, 0}) == 0);
-static_assert(detail::calculateOffset<embed_only>(static_array<index_t, 2>{3, 7}) == 31);
-static_assert(detail::calculateOffset<embed_only>(static_array<index_t, 2>{2, 5}) == 21);
+static_assert(calculateOffset<embed_only>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(calculateOffset<embed_only>(static_array<index_t, 2>{3, 7}) == 31);
+static_assert(calculateOffset<embed_only>(static_array<index_t, 2>{2, 5}) == 21);
 
 // ============================================================================
 // Test 14: Roundtrip — Embed + Unmerge + Merge (3-layer chain)
@@ -286,9 +332,9 @@ constexpr auto roundtrip =
 
 static_assert(roundtrip.ndim_input == 1);
 static_assert(roundtrip.ndim_output == 1);
-static_assert(detail::calculateOffset<roundtrip>(static_array<index_t, 1>{0}) == 0);
-static_assert(detail::calculateOffset<roundtrip>(static_array<index_t, 1>{19}) == 19);
-static_assert(detail::calculateOffset<roundtrip>(static_array<index_t, 1>{31}) == 31);
+static_assert(calculateOffset<roundtrip>(static_array<index_t, 1>{0}) == 0);
+static_assert(calculateOffset<roundtrip>(static_array<index_t, 1>{19}) == 19);
+static_assert(calculateOffset<roundtrip>(static_array<index_t, 1>{31}) == 31);
 
 // ============================================================================
 // Test 15: Padded dimension (Embed + Pad + PassThrough)
@@ -305,8 +351,8 @@ constexpr auto padded = make_transform_graph(
     inputs(SL_P_PADROW, SL_P_UCOL));
 
 static_assert(padded.ndim_input == 2);
-static_assert(detail::calculateOffset<padded>(static_array<index_t, 2>{0, 0}) == 0);
-static_assert(detail::calculateOffset<padded>(static_array<index_t, 2>{5, 10}) == 110);
+static_assert(calculateOffset<padded>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(calculateOffset<padded>(static_array<index_t, 2>{5, 10}) == 110);
 
 // ============================================================================
 // Test 16: Left/both-sides padding
@@ -320,12 +366,12 @@ constexpr auto padded_lr = make_transform_graph(
     transform(make_pad(10, 2, 4), read(SL_LP_PAD), write(SL_LP_BASE)),
     inputs(SL_LP_PAD));
 
-static_assert(detail::calculateOffset<padded_lr>(static_array<index_t, 1>{2}) == 0);
-static_assert(detail::calculateOffset<padded_lr>(static_array<index_t, 1>{5}) == 3);
-static_assert(detail::calculateOffset<padded_lr>(static_array<index_t, 1>{11}) == 9);
+static_assert(calculateOffset<padded_lr>(static_array<index_t, 1>{2}) == 0);
+static_assert(calculateOffset<padded_lr>(static_array<index_t, 1>{5}) == 3);
+static_assert(calculateOffset<padded_lr>(static_array<index_t, 1>{11}) == 9);
 
-static_assert(detail::reverseCalculateOffset<padded_lr>(0)[0] == 2);
-static_assert(detail::reverseCalculateOffset<padded_lr>(9)[0] == 11);
+static_assert(reverseCalculateOffset<padded_lr>(0)[0] == 2);
+static_assert(reverseCalculateOffset<padded_lr>(9)[0] == 11);
 
 // ============================================================================
 // Test 17: XOR graph (Embed + XOR)
@@ -341,9 +387,9 @@ constexpr auto xor_graph = make_transform_graph(
     inputs(SL_X_UROW, SL_X_UCOL));
 
 static_assert(xor_graph.ndim_input == 2);
-static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{2, 5}) == 23);
-static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{0, 3}) == 3);
-static_assert(detail::calculateOffset<xor_graph>(static_array<index_t, 2>{3, 0}) == 27);
+static_assert(calculateOffset<xor_graph>(static_array<index_t, 2>{2, 5}) == 23);
+static_assert(calculateOffset<xor_graph>(static_array<index_t, 2>{0, 3}) == 3);
+static_assert(calculateOffset<xor_graph>(static_array<index_t, 2>{3, 0}) == 27);
 
 // ============================================================================
 // Test 18: 3-way merge/unmerge
@@ -360,9 +406,9 @@ constexpr auto unmerged_3 = make_transform_graph(
     transform(make_merge(3, 4, 5), read(SL_3_USER), write(SL_3_A, SL_3_B, SL_3_C)),
     inputs(SL_3_USER));
 
-static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 1>{33}) == 33);
-static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 1>{59}) == 59);
-static_assert(detail::calculateOffset<unmerged_3>(static_array<index_t, 1>{0}) == 0);
+static_assert(calculateOffset<unmerged_3>(static_array<index_t, 1>{33}) == 33);
+static_assert(calculateOffset<unmerged_3>(static_array<index_t, 1>{59}) == 59);
+static_assert(calculateOffset<unmerged_3>(static_array<index_t, 1>{0}) == 0);
 
 // ============================================================================
 // Test 19: 5-way merge/unmerge
@@ -383,29 +429,29 @@ constexpr auto roundtrip_5 = make_transform_graph(
     inputs(SL_5_USER));
 
 static_assert(roundtrip_5.ndim_input == 1);
-static_assert(detail::calculateOffset<roundtrip_5>(static_array<index_t, 1>{0}) == 0);
-static_assert(detail::calculateOffset<roundtrip_5>(static_array<index_t, 1>{719}) == 719);
-static_assert(detail::calculateOffset<roundtrip_5>(static_array<index_t, 1>{360}) == 360);
+static_assert(calculateOffset<roundtrip_5>(static_array<index_t, 1>{0}) == 0);
+static_assert(calculateOffset<roundtrip_5>(static_array<index_t, 1>{719}) == 719);
+static_assert(calculateOffset<roundtrip_5>(static_array<index_t, 1>{360}) == 360);
 
 // ============================================================================
 // Test 20: Graph reversal
 // ============================================================================
 
-static_assert(detail::isGraphBijective<gemm_lds>());
-static_assert(detail::reverseCalculateOffset<gemm_lds>(2107)[0] == 5);
-static_assert(detail::reverseCalculateOffset<gemm_lds>(2107)[1] == 19);
+static_assert(isGraphBijective<gemm_lds>());
+static_assert(reverseCalculateOffset<gemm_lds>(2107)[0] == 5);
+static_assert(reverseCalculateOffset<gemm_lds>(2107)[1] == 19);
 
-constexpr index_t off_127_63 = detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63});
-static_assert(detail::reverseCalculateOffset<gemm_lds>(off_127_63)[0] == 127);
-static_assert(detail::reverseCalculateOffset<gemm_lds>(off_127_63)[1] == 63);
+constexpr index_t off_127_63 = calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63});
+static_assert(reverseCalculateOffset<gemm_lds>(off_127_63)[0] == 127);
+static_assert(reverseCalculateOffset<gemm_lds>(off_127_63)[1] == 63);
 
-static_assert(detail::isGraphBijective<embed_only>());
-static_assert(detail::reverseCalculateOffset<embed_only>(21)[0] == 2);
-static_assert(detail::reverseCalculateOffset<embed_only>(21)[1] == 5);
+static_assert(isGraphBijective<embed_only>());
+static_assert(reverseCalculateOffset<embed_only>(21)[0] == 2);
+static_assert(reverseCalculateOffset<embed_only>(21)[1] == 5);
 
-static_assert(detail::isGraphBijective<xor_graph>());
-static_assert(detail::reverseCalculateOffset<xor_graph>(23)[0] == 2);
-static_assert(detail::reverseCalculateOffset<xor_graph>(23)[1] == 5);
+static_assert(isGraphBijective<xor_graph>());
+static_assert(reverseCalculateOffset<xor_graph>(23)[0] == 2);
+static_assert(reverseCalculateOffset<xor_graph>(23)[1] == 5);
 
 // ============================================================================
 // Test 21: Non-bijective graph
@@ -413,25 +459,25 @@ static_assert(detail::reverseCalculateOffset<xor_graph>(23)[1] == 5);
 
 constexpr auto desc_non_bij  = make_tensor_descriptor(dims(4, 8), dims(1, 1));
 constexpr auto graph_non_bij = make_transform_graph(desc_non_bij);
-static_assert(!detail::isGraphBijective<graph_non_bij>());
+static_assert(!isGraphBijective<graph_non_bij>());
 
 constexpr auto desc_exact  = make_tensor_descriptor(dims(4, 8), dims(8, 1));
 constexpr auto graph_exact = make_transform_graph(desc_exact);
-static_assert(detail::isGraphBijective<graph_exact>());
+static_assert(isGraphBijective<graph_exact>());
 
 constexpr auto desc_gapped  = make_tensor_descriptor(dims(4, 8), dims(10, 1));
 constexpr auto graph_gapped = make_transform_graph(desc_gapped);
-static_assert(detail::isGraphBijective<graph_gapped>());
+static_assert(isGraphBijective<graph_gapped>());
 
 // ============================================================================
 // Test 22: inputDimLength queries
 // ============================================================================
 
-static_assert(detail::inputDimLength<gemm_lds>(0) == 128, "M dim length");
-static_assert(detail::inputDimLength<gemm_lds>(1) == 64, "K dim length");
-static_assert(detail::inputDimLength<embed_only>(0) == 4);
-static_assert(detail::inputDimLength<embed_only>(1) == 8);
-static_assert(detail::inputDimLength<padded_lr>(0) == 16);
+static_assert(inputDimLength<gemm_lds>(0) == 128, "M dim length");
+static_assert(inputDimLength<gemm_lds>(1) == 64, "K dim length");
+static_assert(inputDimLength<embed_only>(0) == 4);
+static_assert(inputDimLength<embed_only>(1) == 8);
+static_assert(inputDimLength<padded_lr>(0) == 16);
 
 // ============================================================================
 // Test 23: 64D descriptor and graph
@@ -458,7 +504,7 @@ consteval index_t test_64d_last()
 {
     static_array<index_t, 64> coord{};
     coord[63] = 1;
-    return detail::calculateOffset<graph_64d>(coord);
+    return calculateOffset<graph_64d>(coord);
 }
 static_assert(test_64d_last() == 1);
 
@@ -472,13 +518,13 @@ consteval index_t test_10d_all_ones()
     static_array<index_t, 10> coord{};
     for(index_t i = 0; i < 10; ++i)
         coord[i] = 1;
-    return detail::calculateOffset<graph_10d>(coord);
+    return calculateOffset<graph_10d>(coord);
 }
 static_assert(test_10d_all_ones() == 1023);
 
 consteval bool test_10d_reverse()
 {
-    auto result = detail::reverseCalculateOffset<graph_10d>(1023);
+    auto result = reverseCalculateOffset<graph_10d>(1023);
     for(index_t i = 0; i < 10; ++i)
         if(result[i] != 1)
             return false;
@@ -497,8 +543,8 @@ constexpr auto gemm_lds_sugar = make_transform_graph(
     transform(make_merge(K_DIV8, K_MOD8), read(SL_K_USER), write(SL_KDIV8, SL_KMOD8)),
     inputs(SL_M_USER, SL_K_USER));
 
-static_assert(detail::calculateOffset<gemm_lds_sugar>(static_array<index_t, 2>{5, 19}) ==
-              detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{5, 19}));
+static_assert(calculateOffset<gemm_lds_sugar>(static_array<index_t, 2>{5, 19}) ==
+              calculateOffset<gemm_lds>(static_array<index_t, 2>{5, 19}));
 
 // ============================================================================
 // Test 25: transform(TransformGraph) — sub-graph embedding
@@ -522,12 +568,12 @@ constexpr auto composed =
 static_assert(composed.ndim_input == 2);
 static_assert(composed.ndim_output == 1);
 
-static_assert(detail::calculateOffset<composed>(static_array<index_t, 2>{5, 19}) == 2107);
-static_assert(detail::calculateOffset<composed>(static_array<index_t, 2>{0, 0}) == 0);
-static_assert(detail::calculateOffset<composed>(static_array<index_t, 2>{127, 63}) ==
-              detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63}));
-static_assert(detail::calculateOffset<composed>(static_array<index_t, 2>{64, 32}) ==
-              detail::calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}));
+static_assert(calculateOffset<composed>(static_array<index_t, 2>{5, 19}) == 2107);
+static_assert(calculateOffset<composed>(static_array<index_t, 2>{0, 0}) == 0);
+static_assert(calculateOffset<composed>(static_array<index_t, 2>{127, 63}) ==
+              calculateOffset<gemm_lds>(static_array<index_t, 2>{127, 63}));
+static_assert(calculateOffset<composed>(static_array<index_t, 2>{64, 32}) ==
+              calculateOffset<gemm_lds>(static_array<index_t, 2>{64, 32}));
 
 } // anonymous namespace
 
