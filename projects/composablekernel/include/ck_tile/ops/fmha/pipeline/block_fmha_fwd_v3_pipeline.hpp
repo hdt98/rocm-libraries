@@ -246,8 +246,14 @@ CK_TILE_DEVICE fp16x2_t cvt_pk_fp16_f32(float a, float b)
                  : [result] "=v"(result)
                  : [a] "v"(a), [b] "v"(b));
 #else
-    asm volatile("v_cvt_pkrtz_f16_f32 %[result], %[a], %[b]"
-                 : [result] "=v"(result)
+    // v_cvt_pkrtz_f16_f32 uses Round-to-Zero which causes precision issues
+    // in FMHA softmax accumulation (P values biased low → overflow → inf).
+    // Use two scalar RNE conversions + pack instead.
+    uint32_t lo, hi;
+    asm volatile("v_cvt_f16_f32_e32 %[lo], %[a]\n"
+                 "v_cvt_f16_f32_e32 %[hi], %[b]\n"
+                 "v_pack_b32_f16 %[result], %[lo], %[hi]"
+                 : [result] "=v"(result), [lo] "=&v"(lo), [hi] "=&v"(hi)
                  : [a] "v"(a), [b] "v"(b));
 #endif
     return result;
@@ -1060,7 +1066,13 @@ struct BlockFmhaFwdV3Pipeline
             __builtin_amdgcn_s_barrier();
 
             V_lds_load(V_lds_rd_idx);
+            // Scheduling barrier: prevent the compiler from reordering fmha_alu1
+            // instructions across the V LDS load boundary. Without this, the compiler
+            // may reassign V tile destination registers to fmha_alu1 temporaries,
+            // corrupting V data before the ds_read completes (Heisenbug on gfx942 fp16).
+            __builtin_amdgcn_sched_barrier(0);
             fmha_alu1(ps_pi);
+            __builtin_amdgcn_sched_barrier(0);
 
             s_waitcnt<waitcnt_arg::kMaxVmCnt, waitcnt_arg::kMaxExpCnt, 0>();
 
