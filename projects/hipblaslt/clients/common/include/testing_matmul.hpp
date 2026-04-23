@@ -5000,6 +5000,51 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "  Multi-MT confirmed faster, proceeding" << std::endl;
             }
 
+            // === L2 Cache Persistence Hints for Shared Matrix (S17-S24) ===
+            // M-split: B is read by every sub-problem → pin B in L2.
+            // N-split: A is read by every sub-problem → pin A in L2.
+            bool l2_hints_applied = false;
+            if(arg.l2_cache_hints && subProblems.size() > 1)
+            {
+                bool timing_is_m_split = (actual_strategy == 17 || actual_strategy == 19
+                                       || actual_strategy == 21 || actual_strategy == 23);
+                void*  shared_ptr   = nullptr;
+                size_t shared_bytes = 0;
+                const char* shared_name = nullptr;
+
+                if(timing_is_m_split)
+                {
+                    shared_ptr   = dB[0].buf();
+                    shared_bytes = (size_t)N[0] * K[0] * getDataTypeSize(arg.b_type);
+                    shared_name  = "Matrix B";
+                }
+                else
+                {
+                    shared_ptr   = dA[0].buf();
+                    shared_bytes = (size_t)M[0] * K[0] * getDataTypeSize(arg.a_type);
+                    shared_name  = "Matrix A";
+                }
+
+                hipStreamAttrValue stream_attr = {};
+                stream_attr.accessPolicyWindow.base_ptr  = shared_ptr;
+                stream_attr.accessPolicyWindow.num_bytes  = shared_bytes;
+                stream_attr.accessPolicyWindow.hitRatio   = 1.0f;
+                stream_attr.accessPolicyWindow.hitProp    = hipAccessPropertyPersisting;
+                stream_attr.accessPolicyWindow.missProp   = hipAccessPropertyStreaming;
+
+                hipError_t cache_err = hipStreamSetAttribute(
+                    stream, hipStreamAttributeAccessPolicyWindow, &stream_attr);
+
+                if(cache_err == hipSuccess)
+                {
+                    l2_hints_applied = true;
+                    double size_mb = shared_bytes / (1024.0 * 1024.0);
+                    hipblaslt_cout << "\n  L2 persistence: " << shared_name
+                                  << " (" << std::fixed << std::setprecision(1) << size_mb << " MB)"
+                                  << std::endl;
+                }
+            }
+
             // Timing iterations
             auto start_time = std::chrono::high_resolution_clock::now();
             auto end_time = start_time;
@@ -5021,7 +5066,16 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             CHECK_HIP_ERROR(hipStreamSynchronize(stream));
             end_time = std::chrono::high_resolution_clock::now();
-            
+
+            // Reset L2 persistence hints so subsequent work is unaffected
+            if(l2_hints_applied)
+            {
+                hipStreamAttrValue reset_attr = {};
+                reset_attr.accessPolicyWindow.num_bytes = 0;
+                hipStreamSetAttribute(
+                    stream, hipStreamAttributeAccessPolicyWindow, &reset_attr);
+            }
+
             // Cleanup pre-created layouts
             for(size_t sp = 0; sp < spCtxs.size(); sp++)
             {
