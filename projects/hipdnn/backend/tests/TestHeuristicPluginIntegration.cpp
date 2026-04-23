@@ -807,7 +807,9 @@ TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
                 const std::string errorMsg(e.what());
                 EXPECT_NE(errorMsg.find("HEURISTIC PLUGIN ABI INCOMPLETE"), std::string::npos);
                 EXPECT_NE(errorMsg.find("Missing required symbol"), std::string::npos);
-                EXPECT_NE(errorMsg.find(pluginPath.string()), std::string::npos);
+                // Use weakly_canonical to match the path format in the error message
+                const auto canonicalPath = std::filesystem::weakly_canonical(pluginPath);
+                EXPECT_NE(errorMsg.find(canonicalPath.string()), std::string::npos);
                 throw;
             }
         },
