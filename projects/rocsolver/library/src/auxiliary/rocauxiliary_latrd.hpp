@@ -32,6 +32,17 @@
 
 #pragma once
 
+#define HIP_TRACE(call)                                                              \
+    do {                                                                             \
+        hipError_t _err = (call);                                                    \
+        hipError_t _last = hipGetLastError(); /* resets after read */                \
+        std::fprintf(stderr, "[HIP_TRACE] %s:%d  call=%-60s  ret=%s(%d)  last=%s(%d)\n", \
+            __FILE__, __LINE__, #call,                                               \
+            hipGetErrorName(_err), (int)_err,                                        \
+            hipGetErrorName(_last), (int)_last);                                     \
+        if(_err != hipSuccess) { /* std::abort(); */ }                                     \
+    } while(0)
+
 #include <cstdlib>
 #include <sstream>
 
@@ -2770,6 +2781,7 @@ __global__ void // __launch_bounds__(MAX_THDS)
             }
         }
     }
+    __syncthreads();
 
     /* // Zero W */
     /* for(I ii = tid % (MAX_THDS / 2); ii < n; ii += (MAX_THDS / 2)) */
@@ -2897,6 +2909,7 @@ __global__ void // __launch_bounds__(MAX_THDS)
         {
             pSA[(ii + j + 1) + j * ldSA] = v[ii];
         }
+        __syncthreads();
 
         //
         // Compute w = tau_j*A*v - 1/2*tau_j^2*(v'*A*v)*v
@@ -3126,7 +3139,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
         bool use_small_kernel
             = false && (n < small_switch_size) && (lmemsize_small <= props->sharedMemPerBlock);
 
-        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * k + 2 * k * k) * sizeof(T);
+        const size_t lmemsize_fused = ((256 / props->warpSize) + 1 + 5 * n + 2 * k * k) * sizeof(T);
         bool use_fused_kernel = (lmemsize_fused <= props->sharedMemPerBlock);
 
         if(!latrd_forsytrd_multi_kernel && use_small_kernel)
@@ -3137,7 +3150,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                           << std::to_string(lmemsize_small / 1024.0) << "KB" << std::endl;
             }
 
-            HIP_CHECK(hipMemsetAsync((void*)W, 0, size_W, stream));
+            HIP_TRACE(hipMemsetAsync((void*)W, 0, size_W, stream));
             rocblas_int j = 0;
             ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_small<256, T>), dim3(1, 1, batch_count),
                                     dim3(256), lmemsize_small, stream, n, k, A,
@@ -3152,7 +3165,7 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                           << std::to_string(lmemsize_fused / 1024.0) << "KB" << std::endl;
             }
 
-            HIP_CHECK(hipMemsetAsync((void*)W, 0, size_W, stream));
+            HIP_TRACE(hipMemsetAsync((void*)W, 0, size_W, stream));
             rocblas_int j = 0;
 
             /* ROCSOLVER_LAUNCH_KERNEL((latrd_lower_kernel_naive<256, T>), dim3(1, 1, batch_count), */
@@ -3161,10 +3174,10 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
             /*                         tau + j, strideP, W, shiftW, ldw, strideW, work); */
 
             rocblas_int device_id = 0;
-            HIP_CHECK(hipGetDevice(&device_id));
+            HIP_TRACE(hipGetDevice(&device_id));
             rocblas_int supports_coop_launch = 0;
-            HIP_CHECK(hipDeviceGetAttribute(&supports_coop_launch,
-                                            hipDeviceAttributeCooperativeLaunch, 0));
+            HIP_TRACE(hipDeviceGetAttribute(&supports_coop_launch,
+                                            hipDeviceAttributeCooperativeLaunch, device_id));
             if(!supports_coop_launch)
             {
                 std::cout << "::: Device does not support cooperative launch" << std::endl;
@@ -3178,9 +3191,13 @@ rocblas_status rocsolver_latrd_forsytrd_template(rocblas_handle handle,
                                   (void*)&tau[j], (void*)&strideP, (void*)&W,    (void*)&shiftW,
                                   (void*)&ldw,    (void*)&strideW, (void*)&work};
 
-            HIP_CHECK(hipLaunchCooperativeKernel(
+            hipStream_t stream2;
+            HIP_TRACE(hipStreamCreate(&stream2));
+            HIP_TRACE(hipDeviceSynchronize());
+            HIP_TRACE(hipLaunchCooperativeKernel(
                 (void*)(latrd_lower_kernel_naive<256, T, rocblas_int, S, U>),
-                dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream));
+                dim3(1, 1, batch_count), dim3(256), kernelArgs, lmemsize_fused, stream2));
+            HIP_TRACE(hipDeviceSynchronize());
 
             /* n, k, A, */
             /*                         shiftA_, lda, strideA, E + j, strideE, */
