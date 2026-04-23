@@ -839,7 +839,6 @@ namespace TensileLite
             throw std::runtime_error("Unsupported input type.");
         }
 
-<<<<<<< HEAD
 #ifdef _WIN32
         template <typename Accumulator,
                   typename MathOpAccum,
@@ -991,14 +990,8 @@ namespace TensileLite
             return multiply<Accumulator, MathOpAccum>(aVal, bVal);
         }
 
-        // Solve combinations of f16, bf16, f32 gemm problems using efficient CPU code.
-        // This versions only solves for a subset of geometries. The set of geometries
-        // supported should be extended as new bottlenecks in validation are discovered.
-        bool solveCPUFastInF32(ContractionProblemGemm const& problem,
-                               ContractionInputs const&      inputs)
-=======
+
         bool isFastPathEligible(ContractionProblemGemm const& problem)
->>>>>>> origin/develop
         {
 
             // For more precise numerical correctness with XFloat32, skip this fast path.
