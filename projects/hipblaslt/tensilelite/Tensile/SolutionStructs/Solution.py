@@ -4439,10 +4439,6 @@ class Solution(collections.abc.Mapping):
               not state["ClusterLocalRead"] and \
               not state["InnerUnroll"] >= state["LocalReadVectorWidth"] // state["MIInputPerThread"]:
             reject(state, printRejectionReason, "wider localRead only support ClusterLocalRead or (InnerUnroll > WiderLocalReadxN)")
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/develop
 
     if state["GlobalReadPerMfma"] > 1 and state["PrefetchGlobalRead"] >= 2:
       reject(state, printRejectionReason, "GlobalReadPerMfma need to be 1 if PGR>=2")
