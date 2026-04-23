@@ -1125,6 +1125,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         }
     }
 
+
     // SA3: pre-shuffle K rows for contiguous async buffer_load_dwordx4 to LDS.
     // The async load uses warp-interleaved N in LDS but contiguous DRAM access.
     // Pre-shuffle transposes (NumWarps, LaneGroups) → (LaneGroups, NumWarps) within
@@ -1154,6 +1155,28 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 shape_batch, nhead_k, shape_seqlen_k, hdim_q / kPackedSize);
         }
         std::swap(k_host, k_shuffled);
+
+        // V shuffle: same (LaneGroups, NumWarps) transpose as K.
+        // V is [B, Hkv, D, Sk_pad/2] in pk_fp4_t — identical [N, K] structure to K.
+        // Only shuffle V data, not v_descale (scale packing uses original row ordering).
+        ck_tile::HostTensor<VDataType> v_shuffled(v_host.get_lengths());
+        if(hdim_q <= 128)
+        {
+            constexpr ck_tile::index_t kLaneGroups_v = 64 / (64 / kKVector_sa3);
+            ck_tile::reference::reference_sageattn_v3_v_shuffle<
+                kLaneGroups_v, kNumWarps_sa3>(
+                v_host.data(), v_shuffled.data(),
+                shape_batch, nhead_k, hdim_v, shape_seqlen_k / kPackedSize);
+        }
+        else
+        {
+            constexpr ck_tile::index_t kLaneGroups_v = 64 / (128 / kKVector_sa3);
+            ck_tile::reference::reference_sageattn_v3_v_shuffle<
+                kLaneGroups_v, kNumWarps_sa3>(
+                v_host.data(), v_shuffled.data(),
+                shape_batch, nhead_k, hdim_v, shape_seqlen_k / kPackedSize);
+        }
+        std::swap(v_host, v_shuffled);
     }
 
     ck_tile::DeviceMem q_buf(q_host.get_element_space_size_in_bytes());
@@ -1220,6 +1243,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     q_descale_buf.ToDevice(q_descale_host.data());
     k_descale_buf.ToDevice(k_descale_host.data());
     v_descale_buf.ToDevice(v_descale_host.data());
+
     delta_s_buf.ToDevice(delta_s_host.data());
     block_scale_seqstart_q_buf.ToDevice(block_scale_seqstart_q_host.data());
     block_scale_seqstart_k_buf.ToDevice(block_scale_seqstart_k_host.data());

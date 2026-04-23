@@ -378,7 +378,7 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
     static constexpr bool AsyncCopy = AsyncCopy_;
 
     static constexpr index_t NumPrefetchK = NumPrefetchK_;
-    static constexpr index_t NumPrefetchV = NumPrefetchK_;
+    static constexpr index_t NumPrefetchV = NumPrefetchV_;
 
     static constexpr index_t NumKVLdsBuffers = max(NumPrefetchK, NumPrefetchV);
 
@@ -784,6 +784,181 @@ struct BlockFmhaPipelineQXKSVSCustomPolicy : BlockFmhaPipelineQXCustomPolicy<QLo
             make_tuple(sequence<0>{}, sequence<1>{}));
 
         return v_lds_block_desc;
+    }
+
+    // V async load: alignment for dwordx4 direct-to-LDS
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetAlignmentVAsync()
+    {
+        using VDataType = remove_cvref_t<typename Problem::VDataType>;
+#if defined(__gfx950__)
+        constexpr index_t MaxLoadSizeInBytes = 4 * 4; // dwordx4
+#else
+        constexpr index_t MaxLoadSizeInBytes = 4; // dword
+#endif
+        return MaxLoadSizeInBytes * numeric_traits<VDataType>::PackedSize / sizeof(VDataType);
+    }
+
+    // V async load: single V LDS buffer element space size (K-style layout with warp padding)
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetSingleSmemElementSpaceSizeV()
+    {
+        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN1;
+        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
+        constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
+        constexpr index_t WarpSize   = ck_tile::get_warp_size();
+
+        constexpr index_t KPack   = GetSmemKPackK<Problem>();
+        constexpr index_t KVector = GetAlignmentVAsync<Problem>();
+        constexpr index_t kPad    = KPack;
+
+        static_assert(WarpSize * KVector >= kKPerBlock &&
+                      WarpSize * KVector % kKPerBlock == 0);
+        constexpr index_t LanesPerK  = kKPerBlock / KVector;
+        constexpr index_t LaneGroups = WarpSize / LanesPerK;
+        constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
+
+        return NumIssues * NumWarps * (WarpSize * KVector + kPad);
+    }
+
+    // V async load: 3D LDS store descriptor for async_load_tile_raw
+    // BaseElementOffset: additional element-space offset from smem_ptr
+    //   (e.g., K LDS size converted to element-space units).
+    //   Required because async_load_tile_raw computes M0 from the
+    //   descriptor's built-in offset, not from the pointer.
+    template <typename Problem, index_t IBuf = 0, index_t BaseElementOffset = 0>
+    CK_TILE_HOST_DEVICE static constexpr auto
+    MakeVLdsStoreBlockDescriptor(number<IBuf> = number<0>{},
+                                 number<BaseElementOffset> = number<0>{})
+    {
+        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN1;
+        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
+        constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
+        constexpr index_t WarpSize   = ck_tile::get_warp_size();
+
+        constexpr index_t KPack   = GetSmemKPackK<Problem>();
+        constexpr index_t KVector = GetAlignmentVAsync<Problem>();
+        constexpr index_t kPad    = KPack;
+
+        static_assert(WarpSize * KVector >= kKPerBlock &&
+                      WarpSize * KVector % kKPerBlock == 0);
+        constexpr index_t LanesPerK  = kKPerBlock / KVector;
+        constexpr index_t LaneGroups = WarpSize / LanesPerK;
+        constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
+        static_assert(NumIssues == kNPerBlock * kKPerBlock / (Problem::kBlockSize * KVector));
+
+        constexpr auto v_lds_store_desc_0 = make_naive_tensor_descriptor_with_offset(
+            make_tuple(number<NumIssues>{},
+                       number<LaneGroups>{},
+                       number<NumWarps>{},
+                       number<LanesPerK>{},
+                       number<KVector>{}),
+            make_tuple(number<NumWarps * (WarpSize * KVector + kPad)>{},
+                       number<kKPerBlock>{},
+                       number<WarpSize * KVector + kPad>{},
+                       number<KVector>{},
+                       number<1>{}),
+            number<BaseElementOffset + IBuf * GetSingleSmemElementSpaceSizeV<Problem>()>{},
+            number<KVector>{},
+            number<1>{});
+
+        constexpr auto v_lds_store_desc = transform_tensor_descriptor(
+            v_lds_store_desc_0,
+            make_tuple(make_pass_through_transform(number<NumIssues>{}),
+                       make_pass_through_transform(number<NumWarps>{}),
+                       make_merge_transform(make_tuple(
+                           number<LaneGroups>{}, number<LanesPerK>{}, number<KVector>{}))),
+            make_tuple(sequence<0>{}, sequence<2>{}, sequence<1, 3, 4>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}));
+
+        return v_lds_store_desc;
+    }
+
+    // V async load: LDS load descriptor for GEMM1 reads (2D: N × K)
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeVLdsLoadBlockDescriptor()
+    {
+        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN1;
+        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
+        constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
+        constexpr index_t WarpSize   = ck_tile::get_warp_size();
+
+        constexpr index_t KPack   = GetSmemKPackK<Problem>();
+        constexpr index_t KVector = GetAlignmentVAsync<Problem>();
+        constexpr index_t kPad    = KPack;
+
+        static_assert(WarpSize * KVector >= kKPerBlock &&
+                      WarpSize * KVector % kKPerBlock == 0);
+        constexpr index_t LanesPerK  = kKPerBlock / KVector;
+        constexpr index_t LaneGroups = WarpSize / LanesPerK;
+        constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
+        constexpr index_t BufferSize = GetSingleSmemElementSpaceSizeV<Problem>();
+
+        constexpr auto v_lds_load_desc_0 =
+            make_naive_tensor_descriptor(
+                make_tuple(number<NumPrefetchV>{},
+                           number<NumIssues>{},
+                           number<NumWarps>{},
+                           number<LaneGroups>{},
+                           number<kKPerBlock / KPack>{},
+                           number<KPack>{}),
+                make_tuple(number<BufferSize>{},
+                           number<NumWarps * (WarpSize * KVector + kPad)>{},
+                           number<WarpSize * KVector + kPad>{},
+                           number<kKPerBlock>{},
+                           number<KPack>{},
+                           number<1>{}),
+                number<KPack>{},
+                number<1>{});
+
+        constexpr auto v_lds_load_desc = transform_tensor_descriptor(
+            v_lds_load_desc_0,
+            make_tuple(
+                make_merge_transform(make_tuple(number<NumPrefetchV>{},
+                                                number<NumIssues>{},
+                                                number<LaneGroups>{},
+                                                number<NumWarps>{})),
+                make_merge_transform(make_tuple(number<kKPerBlock / KPack>{}, number<KPack>{}))),
+            make_tuple(sequence<0, 1, 3, 2>{}, sequence<4, 5>{}),
+            make_tuple(sequence<0>{}, sequence<1>{}));
+
+        return v_lds_load_desc;
+    }
+
+    // V async load: contiguous DRAM distribution for pre-shuffled V
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto MakeVDramTileDistributionContiguous()
+    {
+        constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN1;
+        constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
+        constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
+        constexpr index_t WarpSize   = ck_tile::get_warp_size();
+        constexpr index_t KVector    = GetAlignmentVAsync<Problem>();
+
+        static_assert(WarpSize * KVector >= kKPerBlock &&
+                      WarpSize * KVector % kKPerBlock == 0);
+        constexpr index_t LanesPerK  = kKPerBlock / KVector;
+        constexpr index_t LaneGroups = WarpSize / LanesPerK;
+        constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
+
+        return make_static_tile_distribution(
+            tile_distribution_encoding<sequence<1>,
+                                       tuple<sequence<NumIssues, NumWarps, LaneGroups>,
+                                             sequence<LanesPerK, KVector>>,
+                                       tuple<sequence<1>, sequence<1, 2>>,
+                                       tuple<sequence<1>, sequence<2, 0>>,
+                                       sequence<1, 2>,
+                                       sequence<0, 1>>{});
+    }
+
+    // V async load: total smem size for V in bytes (separate from K)
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSizeV()
+    {
+        using VDataType = remove_cvref_t<typename Problem::VDataType>;
+        constexpr index_t single_v_bytes =
+            GetSingleSmemElementSpaceSizeV<Problem>() * sizeof(VDataType);
+        return single_v_bytes * NumPrefetchV;
     }
 
     template <typename Problem>

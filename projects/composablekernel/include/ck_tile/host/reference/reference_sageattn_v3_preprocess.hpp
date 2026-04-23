@@ -333,5 +333,46 @@ inline void reference_sageattn_v3_k_shuffle(const T* k_in,
     }
 }
 
+// V pre-shuffle for contiguous async buffer_load_dwordx4 to LDS.
+//
+// V after preprocessing is [B, Hkv, hdim_v, seqlen_k_packed] — same structure
+// as K's [B, Hkv, seqlen_k, hdim_packed]. Both are [N, K]-major with K contiguous.
+// The same (LaneGroups, NumWarps) transpose used for K applies to V:
+//   V_shuffled[n] = V_original[(n % LaneGroups) * NumWarps + n / LaneGroups]
+//
+// Template parameters: same as K shuffle (kLaneGroups, kNumWarps).
+// Data layout: V[B, H, hdim_v, seqlen_k_packed] (packed type units).
+template <int kLaneGroups, int kNumWarps, typename T>
+inline void reference_sageattn_v3_v_shuffle(const T* v_in,
+                                            T*       v_out,
+                                            int      B,
+                                            int      H,
+                                            int      hdim_v,
+                                            int      seqlen_k_packed)
+{
+    constexpr int kBlockRows = kLaneGroups * kNumWarps;
+    const int     num_blocks = hdim_v / kBlockRows;
+
+    for(int b = 0; b < B; b++)
+    {
+        for(int h = 0; h < H; h++)
+        {
+            for(int blk = 0; blk < num_blocks; blk++)
+            {
+                const int base_row = blk * kBlockRows;
+                for(int n = 0; n < kBlockRows; n++)
+                {
+                    const int src_n = (n % kLaneGroups) * kNumWarps + n / kLaneGroups;
+                    const int dst_off =
+                        ((b * H + h) * hdim_v + base_row + n) * seqlen_k_packed;
+                    const int src_off =
+                        ((b * H + h) * hdim_v + base_row + src_n) * seqlen_k_packed;
+                    std::copy(v_in + src_off, v_in + src_off + seqlen_k_packed, v_out + dst_off);
+                }
+            }
+        }
+    }
+}
+
 } // namespace reference
 } // namespace ck_tile
