@@ -202,7 +202,8 @@ TEST_F(TestHeuristicPluginResourceManager, ToStringIncludesPluginCount)
 
 TEST_F(TestHeuristicPluginResourceManager, SetHeuristicPluginPathsSucceeds)
 {
-    const std::vector<std::filesystem::path> paths = {"/tmp/test_plugins"};
+    const std::vector<std::filesystem::path> paths
+        = {std::filesystem::temp_directory_path() / "test_plugins"};
 
     EXPECT_NO_THROW(HeuristicPluginResourceManager::setHeuristicPluginPaths(
         paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
@@ -210,7 +211,9 @@ TEST_F(TestHeuristicPluginResourceManager, SetHeuristicPluginPathsSucceeds)
 
 TEST_F(TestHeuristicPluginResourceManager, GetHeuristicPluginPathsReturnsConfiguredPaths)
 {
-    const std::vector<std::filesystem::path> paths = {"/tmp/test_plugins", "/tmp/more_plugins"};
+    const std::vector<std::filesystem::path> paths
+        = {std::filesystem::temp_directory_path() / "test_plugins",
+           std::filesystem::temp_directory_path() / "more_plugins"};
 
     HeuristicPluginResourceManager::setHeuristicPluginPaths(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
