@@ -136,7 +136,9 @@ jobs:
         run: cmake --build build
 
       - name: Run tests
-        run: ctest --test-dir build --output-on-failure
+        run: |
+          export PATH="$ROCM_SDK_PATH/bin:$PATH"
+          ctest --test-dir build --output-on-failure
 
   build-linux:
     name: Linux Superbuild
