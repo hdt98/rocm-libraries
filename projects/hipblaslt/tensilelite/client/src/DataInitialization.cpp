@@ -1795,6 +1795,28 @@ namespace TensileLite
             }
         }
 
+        namespace
+        {
+            /** Maps Tensile MX scale element type to hipDataType for generateMXInput (mxDataGen). */
+            hipDataType hipMxScaleTypeForDataGenerator(rocisa::DataType mxType)
+            {
+                switch(mxType)
+                {
+                case rocisa::DataType::Float8:
+                    return HIP_R_8F_E4M3;
+                case rocisa::DataType::E5M3:
+                    return static_cast<hipDataType>(HIP_R_8F_E5M3_EXT);
+                case rocisa::DataType::E8:
+                case rocisa::DataType::MXScale:
+                case rocisa::DataType::None:
+                    return HIP_R_8F_UE8M0;
+                default:
+                    throw std::runtime_error(
+                        "initializeMXDataForFP4: unsupported MX scale element type for generateMXInput");
+                }
+            }
+        } // namespace
+
         void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
         {
             // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
@@ -1852,6 +1874,7 @@ namespace TensileLite
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
 
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                 pristineA.cpuInput.valid.get(),
                                 pristineMXScaleA.cpuInput.valid.get(),
                                 rows,
@@ -1881,6 +1904,7 @@ namespace TensileLite
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
 
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                 pristineB.cpuInput.valid.get(),
                                 pristineMXScaleB.cpuInput.valid.get(),
                                 rows,
