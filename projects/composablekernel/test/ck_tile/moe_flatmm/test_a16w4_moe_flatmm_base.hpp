@@ -5,9 +5,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstring>
 #include <memory>
 #include <tuple>
-#include <type_traits>
 
 #include "ck_tile/core.hpp"
 #include "ck_tile/host.hpp"
@@ -19,29 +19,39 @@
 #include "moe_flatmm_impl.hpp"
 #include "test_moe_flatmm_fixtures.hpp"
 
-// Base gtest fixture exercising the MoeFlatmmPipelineAGmemBGmemCRegV1 pipeline
-// (fp16 / bf16 / fp8 / bf8).
+// Base gtest fixture for the F16xMXF4FlatmmPipelineAGmemBGmemCRegV1 pipeline
+// (a16w4: bf16xfp4 / fp16xfp4). The B operand is packed-fp4 with e8m0 block
+// scales (K=32); A has no MX scale. Mirrors AITER's `a16w4_*` codegen path,
+// which uses Swiglu activation, optional expert bias, and (implicitly) the
+// MulRoutedWeight=true behavior baked into the gemm2 kernel.
 //
 // Tuple layout:
-//   <ADataType, BDataType, CDataType, FlatmmConfig, MoeKindTag>
+//   <A16W4TypeConfig, MoeKindTag>
 template <typename Tuple>
-class TestMoeFlatmmBase : public ::testing::Test
+class TestA16W4MoeFlatmmBase : public ::testing::Test
 {
     protected:
-    using ADataType    = std::tuple_element_t<0, Tuple>;
-    using BDataType    = std::tuple_element_t<1, Tuple>;
-    using CDataType    = std::tuple_element_t<2, Tuple>;
-    using FlatmmConfig = std::tuple_element_t<3, Tuple>;
-    using MoeKindTag   = std::tuple_element_t<4, Tuple>;
+    using TypeConfig = std::tuple_element_t<0, Tuple>;
+    using MoeKindTag = std::tuple_element_t<1, Tuple>;
 
-    using AccDataType = float;
-    using ALayout     = ck_tile::tensor_layout::gemm::RowMajor;
-    using BLayout     = ck_tile::tensor_layout::gemm::ColumnMajor;
-    using CLayout     = ck_tile::tensor_layout::gemm::RowMajor;
+    using ADataType   = typename TypeConfig::ADataType;
+    using BDataType   = typename TypeConfig::BDataType;
+    using CDataType   = typename TypeConfig::CDataType;
+    using AccDataType = typename TypeConfig::AccDataType;
+    using ScaleType   = ck_tile::e8m0_t;
+
+    using FlatmmConfig = A16W4_MoeFlatmmConfig16;
+
+    using ALayout = ck_tile::tensor_layout::gemm::RowMajor;
+    using BLayout = ck_tile::tensor_layout::gemm::ColumnMajor;
+    using CLayout = ck_tile::tensor_layout::gemm::RowMajor;
 
     static constexpr ck_tile::MoeFlatmmKind Kind = MoeKindTag::value;
     static constexpr bool IsInputGemm = Kind != ck_tile::MoeFlatmmKind::kFFN_gemm2;
     static constexpr bool IsGateUp    = Kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up;
+
+    static constexpr int ScaleGranularityN = 1;
+    static constexpr int ScaleGranularityK = 32;
 
     void run_test(ck_tile::index_t num_tokens,
                   ck_tile::index_t topk,
@@ -53,13 +63,11 @@ class TestMoeFlatmmBase : public ::testing::Test
             << "K (" << K << ") must be a multiple of K_Tile (" << FlatmmConfig::K_Tile << ")";
         ASSERT_EQ(N % FlatmmConfig::N_Tile, 0)
             << "N (" << N << ") must be a multiple of N_Tile (" << FlatmmConfig::N_Tile << ")";
+        ASSERT_EQ(K % ScaleGranularityK, 0);
         if constexpr(IsGateUp)
         {
             ASSERT_EQ(N % 2, 0) << "gemm1_gate_up requires even N so that outputN = N/2";
         }
-
-        constexpr int ScaleGranularityM = 1;
-        constexpr int ScaleGranularityN = 1;
 
         constexpr ck_tile::index_t MPerBlock = FlatmmConfig::M_Tile;
 
@@ -81,7 +89,6 @@ class TestMoeFlatmmBase : public ::testing::Test
                                         0,
                                         is_row_major(CLayout{}));
 
-        // Host tensors
         auto a_m_k_tensor = ck_tile::HostTensor<ADataType>(ck_tile::host_tensor_descriptor(
             IsInputGemm ? num_tokens : num_tokens * topk, K, stride_A, is_row_major(ALayout{})));
         auto b_k_n_tensor = ck_tile::HostTensor<BDataType>(
@@ -95,7 +102,20 @@ class TestMoeFlatmmBase : public ::testing::Test
         ck_tile::FillUniformDistribution<ADataType>{0.0f, 1.0f}(a_m_k_tensor);
         ck_tile::FillUniformDistribution<BDataType>{-.5f, .5f}(b_k_n_tensor);
 
-        auto b_shuffle_host = flatmm_shuffle_b<FlatmmConfig>(b_k_n_tensor);
+        // B-side MX block scales (e8m0)
+        ck_tile::HostTensor<ScaleType> scale_b(ck_tile::HostTensorDescriptor(
+            {K * experts / ScaleGranularityK, N / ScaleGranularityN},
+            {N / ScaleGranularityN, 1}));
+        ck_tile::FillUniformDistribution<ScaleType>{0.f, 1.f}(scale_b);
+
+        // Shuffle B weights and scales to match the F16xMXF4 pipeline's expected layout.
+        ck_tile::HostTensor<BDataType> b_shuffle_host(
+            ck_tile::host_tensor_descriptor(K, experts * N, stride_B, is_row_major(BLayout{})));
+        shuffle_mxfp4_weight<FlatmmConfig, Kind>(
+            b_k_n_tensor.begin(), b_shuffle_host.begin(), experts, N, K);
+
+        ck_tile::HostTensor<ScaleType> scale_b_shuffle =
+            shuffle_mxfp4_scale<FlatmmConfig, Kind>(scale_b, experts);
 
         // MoE metadata
         ck_tile::HostTensor<ck_tile::index_t> expert_ids(
@@ -106,19 +126,16 @@ class TestMoeFlatmmBase : public ::testing::Test
             ck_tile::HostTensorDescriptor({sorted_size}, {1}));
         ck_tile::HostTensor<ck_tile::index_t> max_token_id(
             ck_tile::HostTensorDescriptor({1 + sorted_tile_num}));
+        ck_tile::HostTensor<AccDataType> expert_bias(
+            ck_tile::HostTensorDescriptor({experts * N}, {1}));
 
-        ck_tile::HostTensor<AccDataType> per_token_scale(
-            ck_tile::HostTensorDescriptor({IsInputGemm ? num_tokens : M}, {1}));
-        ck_tile::HostTensor<AccDataType> per_channel_scale(
-            ck_tile::HostTensorDescriptor({N * experts}, {1}));
-
-        ck_tile::FillUniformDistribution<AccDataType>{0.f, 1.f}(per_token_scale);
-        ck_tile::FillUniformDistribution<AccDataType>{0.f, 1.f}(per_channel_scale);
         // Random non-trivial routed weights so the gemm2 path exercises the
-        // implicit MulRoutedWeight=true behavior of the MoE FlatMM kernel
-        // (kernel always multiplies by expert_weight at gemm2; the reference
-        // does the same, so any kernel that drops the multiply diverges).
+        // implicit MulRoutedWeight=true behavior of the kernel (regression
+        // coverage: any kernel that drops the routed-weight multiply will
+        // diverge from the reference).
         ck_tile::FillUniformDistribution<AccDataType>{0.0f, 1.0f}(expert_weight);
+        // Expert bias: small magnitude so swiglu's clipping limit doesn't kick in.
+        ck_tile::FillUniformDistribution<AccDataType>{-1.0f, 1.0f}(expert_bias);
 
         max_token_id.mData.assign(1 + sorted_tile_num, 0);
         max_token_id.mData[0] = valid_tile_num * MPerBlock;
@@ -151,28 +168,27 @@ class TestMoeFlatmmBase : public ::testing::Test
         ck_tile::DeviceMem b_origin_dev_buf{b_k_n_tensor.get_element_space_size_in_bytes()};
         ck_tile::DeviceMem b_shuffle_dev_buf{b_shuffle_host.get_element_space_size_in_bytes()};
         ck_tile::DeviceMem c_m_n_dev_buf{c_m_n_tensor.get_element_space_size_in_bytes()};
-
-        ck_tile::DeviceMem sorted_token_ids_dev{sorted_token_ids.get_element_space_size_in_bytes()};
-        ck_tile::DeviceMem expert_ids_dev{expert_ids.get_element_space_size_in_bytes()};
-        ck_tile::DeviceMem max_token_id_dev{max_token_id.get_element_space_size_in_bytes()};
-        ck_tile::DeviceMem expert_weight_dev{expert_weight.get_element_space_size_in_bytes()};
-        ck_tile::DeviceMem per_token_scale_dev_buf(
-            per_token_scale.get_element_space_size_in_bytes());
-        ck_tile::DeviceMem per_channel_scale_dev_buf(
-            per_channel_scale.get_element_space_size_in_bytes());
+        ck_tile::DeviceMem scale_b_shuffle_dev_buf{
+            scale_b_shuffle.get_element_space_size_in_bytes()};
+        ck_tile::DeviceMem expert_bias_dev{expert_bias.get_element_space_size_in_bytes()};
 
         a_m_k_dev_buf.ToDevice(a_m_k_tensor.data());
         b_origin_dev_buf.ToDevice(b_k_n_tensor.data());
         b_shuffle_dev_buf.ToDevice(b_shuffle_host.data());
         c_m_n_dev_buf.SetZero();
         c_m_n_tensor.SetZero();
+        scale_b_shuffle_dev_buf.ToDevice(scale_b_shuffle.data());
+        expert_bias_dev.ToDevice(expert_bias.data());
+
+        ck_tile::DeviceMem sorted_token_ids_dev{sorted_token_ids.get_element_space_size_in_bytes()};
+        ck_tile::DeviceMem expert_ids_dev{expert_ids.get_element_space_size_in_bytes()};
+        ck_tile::DeviceMem max_token_id_dev{max_token_id.get_element_space_size_in_bytes()};
+        ck_tile::DeviceMem expert_weight_dev{expert_weight.get_element_space_size_in_bytes()};
 
         sorted_token_ids_dev.ToDevice(sorted_token_ids.data());
         expert_ids_dev.ToDevice(expert_ids.data());
         max_token_id_dev.ToDevice(max_token_id.data());
         expert_weight_dev.ToDevice(expert_weight.data());
-        per_token_scale_dev_buf.ToDevice(per_token_scale.data());
-        per_channel_scale_dev_buf.ToDevice(per_channel_scale.data());
 
         const auto* p_sorted_token_ids_dev =
             static_cast<const ck_tile::index_t*>(sorted_token_ids_dev.GetDeviceBuffer());
@@ -183,14 +199,17 @@ class TestMoeFlatmmBase : public ::testing::Test
         const auto* p_sorted_expert_weight_dev =
             static_cast<const AccDataType*>(expert_weight_dev.GetDeviceBuffer());
 
-        auto per_token_scale_dev_ptr = ck_tile::FlatmmScalePointer<ScaleGranularityM>{
-            static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer())};
-        auto per_channel_scale_dev_ptr = ck_tile::FlatmmScalePointer<ScaleGranularityN>{
-            static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer())};
+        auto scale_b_shuffle_dev_ptr =
+            ck_tile::FlatmmScalePointer<ScaleGranularityN, ScaleGranularityK, ScaleType>{
+                static_cast<ScaleType*>(scale_b_shuffle_dev_buf.GetDeviceBuffer()),
+                N / ScaleGranularityN};
+        auto exp_bias_dev_ptr = ck_tile::FlatmmScalePointer<1>{
+            static_cast<float*>(expert_bias_dev.GetDeviceBuffer()), experts * N};
 
-        using MoeFlatmmArgs =
-            ck_tile::MoeFlatmmHostArgs<ck_tile::FlatmmScalePointer<ScaleGranularityM>,
-                                       ck_tile::FlatmmScalePointer<ScaleGranularityN>>;
+        using MoeFlatmmArgs = ck_tile::MoeFlatmmHostArgs<
+            ck_tile::FlatmmScalePointer<-1>,
+            ck_tile::FlatmmScalePointer<ScaleGranularityN, ScaleGranularityK, ScaleType>,
+            ck_tile::FlatmmScalePointer<1>>;
 
         MoeFlatmmArgs args{p_sorted_token_ids_dev,
                            p_sorted_expert_weight_dev,
@@ -209,24 +228,38 @@ class TestMoeFlatmmBase : public ::testing::Test
                            stride_A,
                            stride_B,
                            stride_C,
-                           per_token_scale_dev_ptr,
-                           per_channel_scale_dev_ptr};
+                           {}, // ScaleM (none for A16W4)
+                           scale_b_shuffle_dev_ptr,
+                           exp_bias_dev_ptr};
 
-        moe_gemm<FlatmmConfig,
-                 ADataType,
-                 BDataType,
-                 ck_tile::tuple<>,
-                 AccDataType,
-                 CDataType,
-                 ALayout,
-                 BLayout,
-                 ck_tile::tuple<>,
-                 CLayout,
-                 Kind>(args, ck_tile::stream_config{nullptr, false, 0, 0, 1});
+        a16w4_moe_gemm<FlatmmConfig,
+                       ADataType,
+                       BDataType,
+                       ck_tile::tuple<>,
+                       AccDataType,
+                       CDataType,
+                       ALayout,
+                       BLayout,
+                       ck_tile::tuple<>,
+                       CLayout,
+                       Kind>(args, ck_tile::stream_config{nullptr, false, 0, 0, 1});
 
         c_m_n_dev_buf.FromDevice(c_m_n_tensor.data());
 
-        // GPU-side reference
+        // Reference: A scale = 1.0 (no MX on A side), B scale lifted to fp32.
+        ck_tile::HostTensor<AccDataType> scale_a_float(
+            ck_tile::HostTensorDescriptor({1, K / ScaleGranularityK}, {1, 1}));
+        ck_tile::FillUniformDistribution<AccDataType>{1.f, 1.f}(scale_a_float);
+        ck_tile::DeviceMem scale_a_float_dev_buf(scale_a_float.get_element_space_size_in_bytes());
+        scale_a_float_dev_buf.ToDevice(scale_a_float.data());
+
+        ck_tile::HostTensor<AccDataType> scale_b_float(ck_tile::HostTensorDescriptor(
+            {K * experts / ScaleGranularityK, N / ScaleGranularityN},
+            {N / ScaleGranularityN, 1}));
+        std::copy(scale_b.begin(), scale_b.end(), scale_b_float.begin());
+        ck_tile::DeviceMem scale_b_float_dev_buf(scale_b_float.get_element_space_size_in_bytes());
+        scale_b_float_dev_buf.ToDevice(scale_b_float.data());
+
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
             ck_tile::host_tensor_descriptor(IsInputGemm ? num_tokens * topk : num_tokens,
                                             outputN,
@@ -246,7 +279,7 @@ class TestMoeFlatmmBase : public ::testing::Test
                                         BLayout,
                                         CLayout,
                                         static_cast<int>(Kind),
-                                        ck_tile::moe::MoeSilu>(
+                                        ck_tile::moe::Swiglu>(
             p_sorted_token_ids_dev,
             p_expert_ids_dev,
             p_max_token_id_dev,
@@ -263,11 +296,12 @@ class TestMoeFlatmmBase : public ::testing::Test
             stride_A,
             stride_B,
             stride_C,
+            M,
             1,
-            1,
-            K,
-            static_cast<float*>(per_token_scale_dev_buf.GetDeviceBuffer()),
-            static_cast<float*>(per_channel_scale_dev_buf.GetDeviceBuffer()));
+            ScaleGranularityK,
+            static_cast<float*>(scale_a_float_dev_buf.GetDeviceBuffer()),
+            static_cast<float*>(scale_b_float_dev_buf.GetDeviceBuffer()),
+            static_cast<float*>(expert_bias_dev.GetDeviceBuffer()));
 
         c_m_n_ref_buf->FromDevice(c_m_n_host_ref.data());
 
@@ -277,6 +311,6 @@ class TestMoeFlatmmBase : public ::testing::Test
             std::is_same_v<ADataType, ck_tile::half_t> && IsInputGemm ? 1e-3f : 1e-2f;
 
         EXPECT_TRUE(ck_tile::check_err(
-            c_m_n_tensor, c_m_n_host_ref, "MoE FlatMM result mismatch", rtol, atol));
+            c_m_n_tensor, c_m_n_host_ref, "A16W4 MoE FlatMM result mismatch", rtol, atol));
     }
 };

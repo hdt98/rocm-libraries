@@ -126,6 +126,9 @@ class TestMXMoeFlatmmBase : public ::testing::Test
         ck_tile::HostTensor<ck_tile::index_t> max_token_id(
             ck_tile::HostTensorDescriptor({1 + sorted_tile_num}));
 
+        // Random non-trivial routed weights so the gemm2 path exercises the
+        // implicit MulRoutedWeight=true behavior baked into the MoE FlatMM
+        // kernel (matches AITER's gemm2 codegen).
         ck_tile::FillUniformDistribution<AccDataType>{0.0f, 1.0f}(expert_weight);
 
         max_token_id.mData.assign(1 + sorted_tile_num, 0);

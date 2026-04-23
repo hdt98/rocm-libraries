@@ -70,7 +70,10 @@ auto calculate_rtol_atol(const ck_tile::index_t K,
     return ck_tile::make_tuple(std::max(rtol, rtol_split_k), std::max(atol, atol_split_k));
 }
 
-// Host-side pre-shuffle of MXFP4 weight tensor into the layout expected by the MX MoE pipeline.
+// Host-side pre-shuffle of MXFP4 weight tensor into the layout expected by the
+// MX/A16W4 MoE pipelines. For kFFN_gemm1_gate_up the gate and up halves of the
+// N dimension are interleaved with NLane granularity; for the other MoeKinds
+// the N dimension is left in its natural order.
 template <class FlatmmConfig, ck_tile::MoeFlatmmKind moe_kind, class IterSrc, class IterDst>
 void shuffle_mxfp4_weight(const IterSrc src, IterDst dst, int experts_cnt, int N, int K)
 {
@@ -81,31 +84,67 @@ void shuffle_mxfp4_weight(const IterSrc src, IterDst dst, int experts_cnt, int N
     int K0    = K_pk / (KLane * KPack);
     int tempk;
 
-    for(long eid = 0; eid < experts_cnt; ++eid)
+    if constexpr(moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up)
     {
-        for(int n = 0; n < N; ++n)
+        const int up_stride = N / 2 / NLane;
+
+        for(long eid = 0; eid < experts_cnt; ++eid)
         {
-            for(int k = 0; k < K_pk; ++k)
+            for(int n = 0; n < N; ++n)
             {
-                int n0 = n / NLane;
-                int n1 = n % NLane;
+                for(int k = 0; k < K_pk; ++k)
+                {
+                    int n0 = n / NLane;
+                    int n1 = n % NLane;
 
-                int k0 = k / (KLane * KPack);
-                tempk  = k % (KLane * KPack);
-                int k1 = tempk / KPack;
-                int k2 = tempk % KPack;
+                    // Interleave gate and up halves at NLane granularity.
+                    int n0_interleave =
+                        n >= N / 2 ? (n0 - up_stride) * 2 + 1 : n0 * 2;
 
-                long outputIndex = eid * N * K_pk + n0 * KPack * NLane * KLane * K0 +
-                                   k0 * KPack * NLane * KLane + k1 * KPack * NLane + n1 * KPack +
-                                   k2;
+                    int k0 = k / (KLane * KPack);
+                    tempk  = k % (KLane * KPack);
+                    int k1 = tempk / KPack;
+                    int k2 = tempk % KPack;
 
-                dst[outputIndex] = src[eid * N * K_pk + n * K_pk + k];
+                    long outputIndex = eid * N * K_pk +
+                                       n0_interleave * KPack * NLane * KLane * K0 +
+                                       k0 * KPack * NLane * KLane + k1 * KPack * NLane +
+                                       n1 * KPack + k2;
+
+                    dst[outputIndex] = src[eid * N * K_pk + n * K_pk + k];
+                }
+            }
+        }
+    }
+    else
+    {
+        for(long eid = 0; eid < experts_cnt; ++eid)
+        {
+            for(int n = 0; n < N; ++n)
+            {
+                for(int k = 0; k < K_pk; ++k)
+                {
+                    int n0 = n / NLane;
+                    int n1 = n % NLane;
+
+                    int k0 = k / (KLane * KPack);
+                    tempk  = k % (KLane * KPack);
+                    int k1 = tempk / KPack;
+                    int k2 = tempk % KPack;
+
+                    long outputIndex = eid * N * K_pk + n0 * KPack * NLane * KLane * K0 +
+                                       k0 * KPack * NLane * KLane + k1 * KPack * NLane +
+                                       n1 * KPack + k2;
+
+                    dst[outputIndex] = src[eid * N * K_pk + n * K_pk + k];
+                }
             }
         }
     }
 }
 
-// Host-side pre-shuffle of MX e8m0 block scales to match weight layout.
+// Host-side pre-shuffle of MX e8m0 block scales to match weight layout. Mirrors
+// the gate/up interleaving of shuffle_mxfp4_weight.
 template <typename FlatmmConfig, ck_tile::MoeFlatmmKind moe_kind, typename T>
 auto shuffle_mxfp4_scale(const ck_tile::HostTensor<T>& scale, int experts_cnt)
 {
@@ -125,17 +164,34 @@ auto shuffle_mxfp4_scale(const ck_tile::HostTensor<T>& scale, int experts_cnt)
     static_assert(FlatmmConfig::N_Repeat % N_Pack == 0);
     static_assert(FlatmmConfig::K_Tile % (K_Pack * K_Lane * GranularityK) == 0);
 
-    ck_tile::HostTensor<T> shfl_scale({
-        experts_cnt,
-        k_per_expert / K_Pack / K_Lane,
-        K_Pack,
-        K_Lane,
-        n_ / FlatmmConfig::N_Warp_Tile / N_Pack,
-        N_Pack,
-        FlatmmConfig::N_Warp_Tile,
-    });
-    std::copy(scale.begin(), scale.end(), shfl_scale.begin());
-    return ck_tile::reference_permute(shfl_scale, {0, 4, 1, 3, 6, 2, 5});
+    if constexpr(moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up)
+    {
+        ck_tile::HostTensor<T> shfl_scale({
+            experts_cnt,
+            k_per_expert / K_Pack / K_Lane,
+            K_Pack,
+            K_Lane,
+            N_Pack, // N_Pack = 2 = {Gate, Up}
+            n_ / FlatmmConfig::N_Warp_Tile / N_Pack,
+            FlatmmConfig::N_Warp_Tile,
+        });
+        std::copy(scale.begin(), scale.end(), shfl_scale.begin());
+        return ck_tile::reference_permute(shfl_scale, {0, 5, 1, 3, 6, 2, 4});
+    }
+    else
+    {
+        ck_tile::HostTensor<T> shfl_scale({
+            experts_cnt,
+            k_per_expert / K_Pack / K_Lane,
+            K_Pack,
+            K_Lane,
+            n_ / FlatmmConfig::N_Warp_Tile / N_Pack,
+            N_Pack,
+            FlatmmConfig::N_Warp_Tile,
+        });
+        std::copy(scale.begin(), scale.end(), shfl_scale.begin());
+        return ck_tile::reference_permute(shfl_scale, {0, 4, 1, 3, 6, 2, 5});
+    }
 }
 
 // MoE GEMM dispatch for the base MoeFlatmmPipelineAGmemBGmemCRegV1 pipeline
@@ -466,6 +522,160 @@ float mx_moe_gemm(const MoeFlatmmHostArgs& args, const ck_tile::stream_config& s
                       << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
                       << "\n"
                       << "k_batch: " << kargs.k_batch << std::endl;
+        }
+
+        ave_time = ck_tile::launch_kernel(
+            s,
+            ck_tile::make_kernel<FlatmmConfig::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs));
+        return ave_time;
+    };
+
+    BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
+    return ave_time;
+}
+
+// A16W4 MoE GEMM dispatch for the F16xMXF4FlatmmPipelineAGmemBGmemCRegV1 pipeline
+// (bf16xfp4 / fp16xfp4). A is fp16/bf16 (no MX scale), B is packed-fp4 with
+// e8m0 block scales. Mirrors AITER's `a16w4_*` codegen path.
+template <typename FlatmmConfig,
+          typename ADataType,
+          typename BDataType,
+          typename DsDatatype,
+          typename AccDataType,
+          typename CDataType,
+          typename ALayout,
+          typename BLayout,
+          typename DsLayout,
+          typename ELayout,
+          ck_tile::MoeFlatmmKind moe_kind = ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up,
+          typename CDEElementWise         = ck_tile::element_wise::PassThrough,
+          typename MoeFlatmmHostArgs>
+float a16w4_moe_gemm(const MoeFlatmmHostArgs& args, const ck_tile::stream_config& s)
+{
+    using CodegenFlatmmShape = ck_tile::TileGemmShape<
+        ck_tile::sequence<FlatmmConfig::M_Tile, FlatmmConfig::N_Tile, FlatmmConfig::K_Tile>,
+        ck_tile::sequence<FlatmmConfig::M_Warp, FlatmmConfig::N_Warp, FlatmmConfig::K_Warp>,
+        ck_tile::sequence<FlatmmConfig::M_Warp_Tile,
+                          FlatmmConfig::N_Warp_Tile,
+                          FlatmmConfig::K_Warp_Tile>>;
+
+    using TilePartitioner =
+        ck_tile::GemmSpatiallyLocalTilePartitioner<CodegenFlatmmShape,
+                                                   FlatmmConfig::TileParitionerGroupNum,
+                                                   FlatmmConfig::TileParitionerM01>;
+
+    using Traits = ck_tile::TileGemmTraits<FlatmmConfig::kPadM,
+                                           FlatmmConfig::kPadN,
+                                           FlatmmConfig::kPadK,
+                                           ALayout,
+                                           BLayout,
+                                           ELayout,
+                                           FlatmmConfig::NumWaveGroups>;
+
+    using CodegenGemmTraits = ck_tile::TileGemmUniversalTraits<FlatmmConfig::kPadM,
+                                                               FlatmmConfig::kPadN,
+                                                               FlatmmConfig::kPadK,
+                                                               FlatmmConfig::DoubleSmemBuffer,
+                                                               ALayout,
+                                                               BLayout,
+                                                               ELayout,
+                                                               FlatmmConfig::TransposeC,
+                                                               FlatmmConfig::UseStructuredSparsity,
+                                                               false,
+                                                               FlatmmConfig::NumWaveGroups,
+                                                               true>;
+
+    using ComputeDataType = ADataType;
+    static_assert(sizeof(ComputeDataType) >= sizeof(BDataType),
+                  "A16W4 MoE requires ADataType is a wider type than BDataType");
+    static_assert(std::is_same_v<BDataType, ck_tile::pk_fp4_t>,
+                  "a16w4_moe_gemm only supports BDataType = pk_fp4_t");
+
+    using GemmPipelineProblem = ck_tile::GemmPipelineProblem<ComputeDataType,
+                                                             ComputeDataType,
+                                                             AccDataType,
+                                                             CodegenFlatmmShape,
+                                                             Traits>;
+
+    using BaseGemmPipeline = ck_tile::BaseFlatmmPipelineAGmemBGmemCRegV1<GemmPipelineProblem>;
+
+    const ck_tile::index_t k_grain     = args.k_batch * FlatmmConfig::K_Tile;
+    const ck_tile::index_t K_split     = (args.K + k_grain - 1) / k_grain * FlatmmConfig::K_Tile;
+    const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(K_split);
+    const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
+    const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
+    float ave_time{0};
+
+    const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {
+        constexpr bool has_hot_loop_v = has_hot_loop_.value;
+        constexpr auto tail_number_v  = tail_number_.value;
+        constexpr auto scheduler      = FlatmmConfig::Scheduler;
+
+        using CodegenPipelineProblem =
+            ck_tile::F16xMXF4FlatmmPipelineProblem<ADataType,
+                                                   BDataType,
+                                                   AccDataType,
+                                                   CodegenFlatmmShape,
+                                                   CodegenGemmTraits,
+                                                   scheduler,
+                                                   has_hot_loop_v,
+                                                   tail_number_v>;
+
+        constexpr int BlockedXDLN_PerWarp = 2; // determined by scale shuffle pattern
+
+        using GemmEpilogue = ck_tile::CShuffleEpilogue<
+            ck_tile::CShuffleEpilogueProblem<ComputeDataType,
+                                             ComputeDataType,
+                                             DsDatatype,
+                                             AccDataType,
+                                             CDataType,
+                                             DsLayout,
+                                             ELayout,
+                                             CDEElementWise,
+                                             TilePartitioner::MPerBlock,
+                                             TilePartitioner::NPerBlock,
+                                             FlatmmConfig::M_Warp,
+                                             FlatmmConfig::N_Warp,
+                                             FlatmmConfig::M_Warp_Tile,
+                                             FlatmmConfig::N_Warp_Tile,
+                                             FlatmmConfig::K_Warp_Tile,
+                                             CodegenPipelineProblem::TransposeC,
+                                             FlatmmConfig::NumWaveGroups,
+                                             false,
+                                             1,
+                                             BlockedXDLN_PerWarp>>;
+
+        using CodegenFlatmmPipeline =
+            ck_tile::F16xMXF4FlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
+
+        // AITER pairs Swiglu with the F16xMXF4 path; matches a16w4 example.
+        using FusedAct = ck_tile::moe::Swiglu;
+
+        using Kernel = ck_tile::MoeFlatmmKernel<TilePartitioner,
+                                                CodegenFlatmmPipeline,
+                                                GemmEpilogue,
+                                                moe_kind,
+                                                FusedAct>;
+
+        auto kargs = Kernel::MakeKernelArgs(args);
+
+        const dim3 grids      = Kernel::GridSize(kargs);
+        constexpr dim3 blocks = Kernel::BlockSize();
+
+        if(!Kernel::IsSupportedArgument(kargs))
+        {
+            throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");
+        }
+
+        if(s.log_level_ > 0)
+        {
+            std::cout << "Launching kernel " << Kernel::GetName() << "\n"
+                      << "Shape: " << CodegenFlatmmShape::GetName() << "\n"
+                      << "problem: " << CodegenPipelineProblem::GetName() << "\n"
+                      << "pipeline: " << CodegenFlatmmPipeline::GetName() << "\n"
+                      << "grid: {" << grids.x << ", " << grids.y << ", " << grids.z << "}"
+                      << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
+                      << "\nk_batch: " << kargs.k_batch << std::endl;
         }
 
         ave_time = ck_tile::launch_kernel(

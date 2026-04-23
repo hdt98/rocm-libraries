@@ -1,0 +1,41 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
+
+#include <gtest/gtest.h>
+
+#include "test_a16w4_moe_flatmm_base.hpp"
+
+// A16W4 MoE FlatMM bf16xfp4 on gfx950 (F16xMXF4FlatmmPipelineAGmemBGmemCRegV1).
+// Mirrors AITER's `a16w4_gfx950` codegen path (bf16 activation, pk_fp4 weights
+// with K=32 MX block scales, bf16 output, Swiglu activation, expert bias).
+// Covers gemm1_gate_up (mlp1) and gemm2 (mlp2) MoeKinds; gemm1_gate_only is
+// not part of AITER's A16W4 dispatch and is omitted here as well.
+// clang-format off
+using BF16FP4Types = ::testing::Types<
+    std::tuple<A16W4_GemmTypeConfig_bf16xfp4, GateUp>,
+    std::tuple<A16W4_GemmTypeConfig_bf16xfp4, Gemm2>>;
+// clang-format on
+
+template <typename Tuple>
+class TestA16W4MoeFlatmmBF16FP4 : public TestA16W4MoeFlatmmBase<Tuple>
+{
+};
+
+TYPED_TEST_SUITE(TestA16W4MoeFlatmmBF16FP4, BF16FP4Types);
+
+// N must be at least 2 * N_Tile = 512 because gate_up uses outputN = N/2 and
+// outputN has to remain a multiple of N_Tile.
+TYPED_TEST(TestA16W4MoeFlatmmBF16FP4, SmallMNK)
+{
+    this->run_test(/*num_tokens=*/16, /*topk=*/2, /*experts=*/2, /*N=*/512, /*K=*/256);
+}
+
+TYPED_TEST(TestA16W4MoeFlatmmBF16FP4, MediumMNK)
+{
+    this->run_test(/*num_tokens=*/32, /*topk=*/2, /*experts=*/4, /*N=*/512, /*K=*/512);
+}
+
+TYPED_TEST(TestA16W4MoeFlatmmBF16FP4, LargeMNK)
+{
+    this->run_test(/*num_tokens=*/32, /*topk=*/2, /*experts=*/4, /*N=*/1024, /*K=*/768);
+}

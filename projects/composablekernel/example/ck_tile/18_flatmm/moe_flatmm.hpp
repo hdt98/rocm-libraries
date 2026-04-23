@@ -189,6 +189,57 @@ struct MXGemmTypeConfig_fp8xfp4
     using CDataType   = ck_tile::half_t;
 };
 
+// Tile config for A16W4 MoE (bf16xfp4 / fp16xfp4). Matches AITER's gfx950
+// `a16w4_*` kernel set: N_Warp_Tile=16, K_Warp_Tile=32 (the bf16 reads are
+// 2 bytes wide), N_Warp=4. K_Tile=256 keeps two MX (K=32) blocks per K_Lane.
+struct A16W4_MoeFlatmmConfig16
+{
+    static constexpr ck_tile::index_t M_Tile = 32;
+    static constexpr ck_tile::index_t N_Tile = 256;
+    static constexpr ck_tile::index_t K_Tile = 256;
+
+    static constexpr ck_tile::index_t M_Warp = 1;
+    static constexpr ck_tile::index_t N_Warp = 4;
+    static constexpr ck_tile::index_t K_Warp = 1;
+
+    static constexpr ck_tile::index_t M_Warp_Tile = 16;
+    static constexpr ck_tile::index_t N_Warp_Tile = 16;
+    static constexpr ck_tile::index_t K_Warp_Tile = 32;
+
+    static constexpr bool kPadM = false;
+    static constexpr bool kPadN = false;
+    static constexpr bool kPadK = false;
+
+    static constexpr bool TransposeC            = false;
+    static constexpr bool UseStructuredSparsity = false;
+
+    static constexpr int kBlockPerCu                = 1;
+    static constexpr int TileParitionerGroupNum     = 8;
+    static constexpr int TileParitionerM01          = 4;
+    static constexpr auto Scheduler                 = ck_tile::GemmPipelineScheduler::Default;
+    static constexpr ck_tile::index_t NumWaveGroups = 1;
+    static constexpr bool DoubleSmemBuffer          = false;
+
+    static constexpr int N_Repeat          = N_Tile / N_Warp_Tile / N_Warp;
+    static constexpr bool TiledMMAPermuteN = false;
+};
+
+struct A16W4_GemmTypeConfig_bf16xfp4
+{
+    using ADataType   = ck_tile::bfloat16_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::bfloat16_t;
+};
+
+struct A16W4_GemmTypeConfig_fp16xfp4
+{
+    using ADataType   = ck_tile::half_t;
+    using BDataType   = ck_tile::pk_fp4_t;
+    using AccDataType = float;
+    using CDataType   = ck_tile::half_t;
+};
+
 auto create_args(int argc, char* argv[])
 {
     ck_tile::ArgParser arg_parser;

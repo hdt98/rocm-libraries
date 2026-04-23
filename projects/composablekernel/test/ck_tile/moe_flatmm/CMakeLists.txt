@@ -14,9 +14,11 @@ if(GPU_TARGETS MATCHES "gfx95")
     # Base-pipeline dtype tests share a single fixture; MX tests share another.
     # Each executable instantiates its kernel set directly (per_test_direct) so
     # there's no generated instance machinery.
-    foreach(DTYPE fp16 bf16 fp8 bf8 fp4fp4 fp8fp4)
+    foreach(DTYPE fp16 bf16 fp8 bf8 fp4fp4 fp8fp4 bf16fp4 fp16fp4)
         if(DTYPE MATCHES "fp4fp4|fp8fp4")
             set(TEST_SRC test_mx_moe_flatmm_${DTYPE}.cpp)
+        elseif(DTYPE MATCHES "bf16fp4|fp16fp4")
+            set(TEST_SRC test_a16w4_moe_flatmm_${DTYPE}.cpp)
         else()
             set(TEST_SRC test_moe_flatmm_${DTYPE}.cpp)
         endif()
@@ -39,6 +41,8 @@ if(GPU_TARGETS MATCHES "gfx95")
         test_tile_moe_flatmm_bf8
         test_tile_moe_flatmm_fp4fp4
         test_tile_moe_flatmm_fp8fp4
+        test_tile_moe_flatmm_bf16fp4
+        test_tile_moe_flatmm_fp16fp4
     )
 else()
     message(DEBUG "Skipping ck_tile moe_flatmm tests for current target")
