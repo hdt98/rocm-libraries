@@ -527,12 +527,11 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSort
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
-        // Copy sorted engine IDs
-        const size_t count = std::min(*numEngines, d->sortedEngineIds.size());
-        std::copy_n(d->sortedEngineIds.begin(), count, engineIds);
-        *numEngines = count;
+        // Copy sorted engine IDs (clip to actual available count)
+        *numEngines = std::min(*numEngines, d->sortedEngineIds.size());
+        std::copy_n(d->sortedEngineIds.begin(), *numEngines, engineIds);
 
-        CONFIG_LOG(HIPDNN_SEV_INFO, "GetSortedEngineIds: returned %zu engines", count);
+        CONFIG_LOG(HIPDNN_SEV_INFO, "GetSortedEngineIds: returned %zu engines", *numEngines);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
