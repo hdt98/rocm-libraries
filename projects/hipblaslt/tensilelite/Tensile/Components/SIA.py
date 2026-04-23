@@ -26,12 +26,7 @@ from rocisa.base import Item
 from rocisa.code import Module, TextBlock
 from rocisa.container import DSModifiers, HolderContainer, replaceHolder
 
-<<<<<<< HEAD
-from rocisa.instruction import SWaitCnt, SWaitAlu, DSStoreB128, DSStoreB64, DSStoreB32, \
-                               DSStoreInstruction, DSStoreB256, DSStoreB192
-=======
 from rocisa.instruction import SWaitCnt, SWaitAlu, DSStoreB128, DSStoreB64, DSStoreB32, TensorLoadToLds
->>>>>>> origin/develop
 
 from ..Common import roundUp, print2
 from ..Component import SIA
