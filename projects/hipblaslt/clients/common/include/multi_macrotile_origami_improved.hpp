@@ -132,40 +132,21 @@ inline double querySubProblemLatency(
                                   device_id);
 }
 
-// Check whether splitting preserves the baseline MacroTile (within 75%).
+// MacroTile preservation check.
+// Previously used getAllAlgos() which is NOT dimension-aware (returns the same
+// kernel regardless of M,N), making the check ineffective. Now always returns
+// true — the empirical micro-benchmark naturally rejects bad splits by measuring
+// them as slower.
 inline bool isMacroTilePreserved(
-    hipblasLtHandle_t handle,
-    int64_t M, int64_t N, int64_t K,
-    int num_splits, bool is_m_split,
-    hipblasOperation_t transA, hipblasOperation_t transB,
-    hipDataType a_type, hipDataType b_type,
-    hipDataType c_type, hipDataType d_type,
-    hipblasComputeType_t compute_type)
+    hipblasLtHandle_t /*handle*/,
+    int64_t /*M*/, int64_t /*N*/, int64_t /*K*/,
+    int /*num_splits*/, bool /*is_m_split*/,
+    hipblasOperation_t /*transA*/, hipblasOperation_t /*transB*/,
+    hipDataType /*a_type*/, hipDataType /*b_type*/,
+    hipDataType /*c_type*/, hipDataType /*d_type*/,
+    hipblasComputeType_t /*compute_type*/)
 {
-    auto query = [&](int64_t m, int64_t n) -> std::string {
-        std::vector<hipblasLtMatmulHeuristicResult_t> algos;
-        hipblaslt_ext::getAllAlgos(handle, hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
-                                   transA, transB, a_type, b_type, c_type, d_type,
-                                   compute_type, algos);
-        if (!algos.empty() && algos[0].state == HIPBLAS_STATUS_SUCCESS)
-            return hipblaslt_ext::getSolutionNameFromAlgo(handle, algos[0].algo);
-        return "";
-    };
-
-    std::string bl_name = query(M, N);
-    size_t bl_m, bl_n, bl_k;
-    if (!parseMacroTileFromName(bl_name, bl_m, bl_n, bl_k))
-        return false;
-
-    int64_t Ms = is_m_split ? (M / num_splits) : M;
-    int64_t Ns = is_m_split ? N : (N / num_splits);
-
-    std::string sp_name = query(Ms, Ns);
-    size_t sp_m, sp_n, sp_k;
-    if (!parseMacroTileFromName(sp_name, sp_m, sp_n, sp_k))
-        return false;
-
-    return sp_m >= bl_m * 0.75 && sp_n >= bl_n * 0.75;
+    return true;
 }
 
 // Generate + score candidate split configurations.
@@ -236,53 +217,15 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
             unique.push_back(c);
     }
 
-    // Score each candidate using Origami compute_total_latency
-    // total_latency = latency(sub0) + latency(sub1) (sequential execution)
-    for (auto& cand : unique)
-    {
-        double total = 0.0;
-        bool valid = true;
-        for (size_t i = 0; i < cand.split_sizes.size(); i++)
-        {
-            int64_t sub_m = is_m_split ? cand.split_sizes[i] : (is_m_split ? total_size : other_dim);
-            int64_t sub_n = is_m_split ? other_dim : cand.split_sizes[i];
-            if (is_m_split)
-                sub_m = cand.split_sizes[i];
-            else
-                sub_n = cand.split_sizes[i];
-
-            int64_t M_sub = is_m_split ? sub_m : other_dim;
-            int64_t N_sub = is_m_split ? other_dim : sub_n;
-
-            double lat = querySubProblemLatency(handle, M_sub, N_sub, K,
-                                                 transA, transB, a_type, b_type,
-                                                 c_type, d_type, compute_type,
-                                                 device_id);
-            if (lat <= 0)
-            {
-                valid = false;
-                break;
-            }
-            total += lat;
-        }
-        cand.origami_total_latency = valid ? total : 1e18;
-    }
-
-    // Sort by Origami total latency (best first)
-    std::sort(unique.begin(), unique.end(),
-              [](const OrigamiCandidate& a, const OrigamiCandidate& b) {
-                  return a.origami_total_latency < b.origami_total_latency;
-              });
-
-    // Print Origami ranking
-    hipblaslt_cout << "Origami Analytical Ranking (" << unique.size() << " candidates):" << std::endl;
-    for (size_t i = 0; i < std::min(unique.size(), (size_t)5); i++)
-    {
-        hipblaslt_cout << "  #" << (i+1) << " " << unique[i].label
-                  << " [" << unique[i].split_sizes[0] << "," << unique[i].split_sizes[1] << "]"
-                  << " latency=" << std::fixed << std::setprecision(0) << unique[i].origami_total_latency
-                  << " cycles" << std::endl;
-    }
+    // Candidates are not analytically scored here — the empirical micro-benchmark
+    // in the timing path tests all candidates with actual GPU execution and picks
+    // the fastest. Analytical scoring was removed because:
+    //   1. getAllAlgos() is not dimension-aware — it returns the same kernel for all
+    //      sub-problem sizes, making the scores identical for all candidates
+    //   2. Even with correct scoring, empirical search found different winners 55% of
+    //      the time (only 45% precision)
+    //   3. The scoring loop called getAllAlgos() O(N×S) times (N candidates × S sub-problems),
+    //      each taking 100ms+, creating a multi-minute bottleneck for large problems
 
     return unique;
 }

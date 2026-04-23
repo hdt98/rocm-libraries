@@ -4750,45 +4750,36 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         auto& cand = candidates[ci];
 
-                        // Build sub-problems for this candidate
-                        auto cand_subs = splitGemmProblem(
-                            M[0], N[0], K[0],
-                            lda[0], ldb[0], ldc[0], ldd[0], lde[0],
-                            transA, transB,
-                            arg.a_type, arg.b_type, arg.c_type, arg.d_type,
-                            Taux, Tbias,
-                            is_m_split ? 17 : 18,
-                            (int)cand.split_sizes.size(),
-                            macrotile_m, macrotile_n,
-                            handle, arg.compute_type);
-
-                        // Override the uniform split sizes with our candidate sizes
-                        if(cand_subs.size() == cand.split_sizes.size())
+                        // Build sub-problems directly from candidate split sizes
+                        // (avoids re-calling splitGemmProblem which re-triggers the
+                        // entire Origami scoring pipeline — the O(N²) bottleneck)
+                        std::vector<GemmSubProblem> cand_subs(cand.split_sizes.size());
                         {
                             int64_t offset = 0;
-                            for(size_t s = 0; s < cand_subs.size(); s++)
+                            for(size_t s = 0; s < cand.split_sizes.size(); s++)
                             {
-                                int64_t new_size = cand.split_sizes[s];
-                                cand_subs[s].m_size = is_m_split ? new_size : M[0];
-                                cand_subs[s].n_size = is_m_split ? N[0] : new_size;
+                                auto& sub = cand_subs[s];
+                                int64_t sz = cand.split_sizes[s];
+                                sub = GemmSubProblem{};
                                 if(is_m_split)
                                 {
-                                    cand_subs[s].m_offset = offset;
-                                    cand_subs[s].offset_A_bytes = calculateOffsetA(offset, 0, lda[0], transA, arg.a_type);
-                                    cand_subs[s].offset_B_bytes = 0;
-                                    cand_subs[s].offset_C_bytes = calculateOffsetCD(offset, 0, ldc[0], arg.c_type);
-                                    cand_subs[s].offset_D_bytes = calculateOffsetCD(offset, 0, ldd[0], arg.d_type);
-                                    offset += new_size;
+                                    sub.m_size = sz; sub.n_size = N[0]; sub.k_size = K[0];
+                                    sub.m_offset = offset; sub.n_offset = 0;
+                                    sub.offset_A_bytes = calculateOffsetA(offset, 0, lda[0], transA, arg.a_type);
+                                    sub.offset_B_bytes = 0;
+                                    sub.offset_C_bytes = calculateOffsetCD(offset, 0, ldc[0], arg.c_type);
+                                    sub.offset_D_bytes = calculateOffsetCD(offset, 0, ldd[0], arg.d_type);
                                 }
                                 else
                                 {
-                                    cand_subs[s].n_offset = offset;
-                                    cand_subs[s].offset_A_bytes = 0;
-                                    cand_subs[s].offset_B_bytes = calculateOffsetB(offset, 0, ldb[0], transB, arg.b_type);
-                                    cand_subs[s].offset_C_bytes = calculateOffsetCD(0, offset, ldc[0], arg.c_type);
-                                    cand_subs[s].offset_D_bytes = calculateOffsetCD(0, offset, ldd[0], arg.d_type);
-                                    offset += new_size;
+                                    sub.m_size = M[0]; sub.n_size = sz; sub.k_size = K[0];
+                                    sub.m_offset = 0; sub.n_offset = offset;
+                                    sub.offset_A_bytes = 0;
+                                    sub.offset_B_bytes = calculateOffsetB(offset, 0, ldb[0], transB, arg.b_type);
+                                    sub.offset_C_bytes = calculateOffsetCD(0, offset, ldc[0], arg.c_type);
+                                    sub.offset_D_bytes = calculateOffsetCD(0, offset, ldd[0], arg.d_type);
                                 }
+                                offset += sz;
                             }
                         }
 
