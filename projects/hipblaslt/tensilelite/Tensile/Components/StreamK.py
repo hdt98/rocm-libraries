@@ -178,18 +178,11 @@ class StreamK(Component):
         # Always reset pointers to handle odd-exit case which moves LRO to the upper bank
         if kernel["PrefetchGlobalRead"]: # not self.prefetchAcrossPersistent
             module.add(writer.localReadResetOffsets(kernel, tPA))
-<<<<<<< HEAD
-            if kernel["ProblemType"]["MXBlockA"]:
-              module.add(writer.localReadResetOffsets(kernel, tPA["MX"]))
-=======
             if kernel["ProblemType"]["MXBlockA"] and "MX" in tPA:
                 module.add(writer.localReadResetOffsets(kernel, tPA["MX"]))
             if kernel["ProblemType"]["MXBlockB"] and "MX" in tPB:
                 module.add(writer.localReadResetOffsets(kernel, tPB["MX"]))
->>>>>>> origin/develop
             module.add(writer.localReadResetOffsets(kernel, tPB))
-            if kernel["ProblemType"]["MXBlockB"]:
-              module.add(writer.localReadResetOffsets(kernel, tPB["MX"]))
 
         module.addComment0("StreamK calculate tile idx and map to WG")
 
@@ -293,11 +286,7 @@ class StreamK(Component):
         tc = tP["tensorChar"]
         depthU = self._depthUForTc(kernel, tc)
         # StreamK partial tile - offset to tile start index
-<<<<<<< HEAD
-        module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=_DepthU, comment="StreamK tile start offset"))
-=======
         module.add(SMulI32(dst=sgpr(sTmp), src0=sgpr("StreamKLocalStart"), src1=depthU, comment="StreamK tile start offset"))
->>>>>>> origin/develop
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(sTmp), sgpr(sTmp+1), sgpr(sTmp), strideL, comment="StreamK tile start offset"))
         # Overflow check removed
@@ -373,23 +362,10 @@ class StreamK(Component):
         module = Module("StreamK Common graAddresses")
 
         tc = tP["tensorChar"]
-<<<<<<< HEAD
-        _DepthU = kernel["_DepthU%s" % tc]
-        # swizzle
-        if (tP["isSwizzled"] and tc == 'A'):
-            _DepthU = (_DepthU * 16)
-        elif (tP["isSwizzled"] and tc == 'B'):
-            _DepthU = (_DepthU * 16)
-
-        # StreamK partial tile - offset to tile start index
-        tmpOffset = writer.sgprPool.checkOut(2, "skStartOffset")
-        module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(_DepthU * tP["bpe"]), comment="StreamK tile start offset"))
-=======
         depthU = self._depthUForTc(kernel, tc)
         # StreamK partial tile - offset to tile start index
         tmpOffset = writer.sgprPool.checkOut(2, "skStartOffset")
         module.add(SMulI32(dst=sgpr(tmpOffset), src0=sgpr("StreamKLocalStart"), src1=int(depthU * tP["bpe"]), comment="StreamK tile start offset"))
->>>>>>> origin/develop
         strideL = writer.strideRef(tc, kernel["ProblemType"]["IndicesSummation"][0])
         module.add(writer.s_mul_u64_u32(sgpr(tmpOffset), sgpr(tmpOffset+1), sgpr(tmpOffset), strideL, "StreamK tile start offset"))
         # Overflow check removed
