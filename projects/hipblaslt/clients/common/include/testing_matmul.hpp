@@ -4737,214 +4737,25 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             CHECK_HIP_ERROR(hipStreamSynchronize(stream));
 
-            // === ORIGAMI EMPIRICAL MICRO-BENCHMARK ===
-            // For S17/S18, test multiple candidate split ratios with actual execution
-            // and re-split using the winning ratio
+            // Split selection is purely analytical: splitGemmProblem already
+            // returned the Origami-latency-optimal partition via
+            // computeOrigamiOptimizedSplitsWithHandle (dimension-aware heuristic +
+            // Origami compute_total_latency scoring).  No sub-problem kernels are
+            // executed before the timed loop.
             if((actual_strategy >= 17 && actual_strategy <= 24) && subProblems.size() > 1)
             {
                 auto& candidates = getOrigamiCandidates();
-                if(candidates.size() > 1)
+                if(!candidates.empty())
                 {
-                    hipblaslt_cout << "\n=== Origami Empirical Split Search ===" << std::endl;
-                    hipblaslt_cout << "Testing " << candidates.size() << " candidate split ratios..." << std::endl;
-
-                    bool is_m_split = (actual_strategy == 17 || actual_strategy == 19 || actual_strategy == 21 || actual_strategy == 23);
-                    double best_time_us = 1e18;
-                    int best_idx = 0;
-
-                    for(size_t ci = 0; ci < candidates.size(); ci++)
+                    hipblaslt_cout << "\nUsing Origami-analytical best split: "
+                                  << candidates[0].label << " [";
+                    for(size_t j = 0; j < candidates[0].split_sizes.size(); j++)
                     {
-                        auto& cand = candidates[ci];
-
-                        // Build sub-problems directly from candidate split sizes
-                        // (avoids re-calling splitGemmProblem which re-triggers the
-                        // entire Origami scoring pipeline — the O(N²) bottleneck)
-                        std::vector<GemmSubProblem> cand_subs(cand.split_sizes.size());
-                        {
-                            int64_t offset = 0;
-                            for(size_t s = 0; s < cand.split_sizes.size(); s++)
-                            {
-                                auto& sub = cand_subs[s];
-                                int64_t sz = cand.split_sizes[s];
-                                sub = GemmSubProblem{};
-                                if(is_m_split)
-                                {
-                                    sub.m_size = sz; sub.n_size = N[0]; sub.k_size = K[0];
-                                    sub.m_offset = offset; sub.n_offset = 0;
-                                    sub.offset_A_bytes = calculateOffsetA(offset, 0, lda[0], transA, arg.a_type);
-                                    sub.offset_B_bytes = 0;
-                                    sub.offset_C_bytes = calculateOffsetCD(offset, 0, ldc[0], arg.c_type);
-                                    sub.offset_D_bytes = calculateOffsetCD(offset, 0, ldd[0], arg.d_type);
-                                }
-                                else
-                                {
-                                    sub.m_size = M[0]; sub.n_size = sz; sub.k_size = K[0];
-                                    sub.m_offset = 0; sub.n_offset = offset;
-                                    sub.offset_A_bytes = 0;
-                                    sub.offset_B_bytes = calculateOffsetB(offset, 0, ldb[0], transB, arg.b_type);
-                                    sub.offset_C_bytes = calculateOffsetCD(0, offset, ldc[0], arg.c_type);
-                                    sub.offset_D_bytes = calculateOffsetCD(0, offset, ldd[0], arg.d_type);
-                                }
-                                offset += sz;
-                            }
-                        }
-
-                        // Pre-create contexts for this candidate
-                        std::vector<SubProblemContext> cand_ctxs(cand_subs.size());
-                        bool all_valid = true;
-                        for(size_t s = 0; s < cand_subs.size(); s++)
-                        {
-                            auto& sub = cand_subs[s];
-                            auto& ctx = cand_ctxs[s];
-                            int64_t rA = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                            int64_t cA = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                            hipblasLtMatrixLayoutCreate(&ctx.matA, arg.a_type, rA, cA, lda[0]);
-                            int64_t rB = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                            int64_t cB = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                            hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, rB, cB, ldb[0]);
-                            hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                            hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-                            hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
-                            ctx.owns_matmul_desc = true;
-                            hipblasLtMatmulHeuristicResult_t h; int r = 0;
-                            hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
-                            ctx.valid = (r > 0);
-                            if(ctx.valid) ctx.algo = h.algo; else all_valid = false;
-                            ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                            ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                            ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                            ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-                        }
-
-                        if(!all_valid)
-                        {
-                            for(auto& ctx : cand_ctxs)
-                            { hipblasLtMatrixLayoutDestroy(ctx.matA); hipblasLtMatrixLayoutDestroy(ctx.matB);
-                              hipblasLtMatrixLayoutDestroy(ctx.matC); hipblasLtMatrixLayoutDestroy(ctx.matD); }
-                            continue;
-                        }
-
-                        // Micro-benchmark: 1 iteration (reduced from 3 for speed;
-                        // empirical data shows 1 iteration is sufficient for
-                        // relative ranking of candidates)
-                        auto t0 = std::chrono::high_resolution_clock::now();
-                        for(int mi = 0; mi < 1; mi++)
-                        {
-                            for(auto& ctx : cand_ctxs)
-                            {
-                                if(!ctx.valid) continue;
-                                hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                               ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                               &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                               ctx.D_ptr, ctx.matD,
-                                               &ctx.algo, *dWorkspace, workspace_size, stream);
-                            }
-                        }
-                        CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                        auto t1 = std::chrono::high_resolution_clock::now();
-                        double cand_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / 1.0;
-
-                        hipblaslt_cout << "  " << cand.label << " [" << cand.split_sizes[0]
-                                      << "," << cand.split_sizes[1] << "]: " << std::fixed
-                                      << std::setprecision(1) << cand_us << " us" << std::endl;
-
-                        if(cand_us < best_time_us)
-                        {
-                            best_time_us = cand_us;
-                            best_idx = (int)ci;
-                        }
-
-                        for(auto& ctx : cand_ctxs)
-                        { hipblasLtMatrixLayoutDestroy(ctx.matA); hipblasLtMatrixLayoutDestroy(ctx.matB);
-                          hipblasLtMatrixLayoutDestroy(ctx.matC); hipblasLtMatrixLayoutDestroy(ctx.matD); }
+                        if(j) hipblaslt_cout << ",";
+                        hipblaslt_cout << candidates[0].split_sizes[j];
                     }
-
-                    hipblaslt_cout << "  Winner: " << candidates[best_idx].label
-                                  << " [" << candidates[best_idx].split_sizes[0] << ","
-                                  << candidates[best_idx].split_sizes[1] << "]" << std::endl;
-
-                    // If winner differs from current (uniform), re-split with winning ratio
-                    if(best_idx != 0)
-                    {
-                        auto& winner = candidates[best_idx];
-                        hipblaslt_cout << "  Re-splitting with winning ratio..." << std::endl;
-
-                        // Cleanup old contexts
-                        for(auto& ctx : spCtxs)
-                        { hipblasLtMatrixLayoutDestroy(ctx.matA); hipblasLtMatrixLayoutDestroy(ctx.matB);
-                          hipblasLtMatrixLayoutDestroy(ctx.matC); hipblasLtMatrixLayoutDestroy(ctx.matD); }
-
-                        // Rebuild sub-problems with winning split
-                        int64_t offset = 0;
-                        for(size_t s = 0; s < subProblems.size() && s < winner.split_sizes.size(); s++)
-                        {
-                            int64_t new_size = winner.split_sizes[s];
-                            subProblems[s].m_size = is_m_split ? new_size : M[0];
-                            subProblems[s].n_size = is_m_split ? N[0] : new_size;
-                            if(is_m_split)
-                            {
-                                subProblems[s].m_offset = offset;
-                                subProblems[s].offset_A_bytes = calculateOffsetA(offset, 0, lda[0], transA, arg.a_type);
-                                subProblems[s].offset_B_bytes = 0;
-                                subProblems[s].offset_C_bytes = calculateOffsetCD(offset, 0, ldc[0], arg.c_type);
-                                subProblems[s].offset_D_bytes = calculateOffsetCD(offset, 0, ldd[0], arg.d_type);
-                            }
-                            else
-                            {
-                                subProblems[s].n_offset = offset;
-                                subProblems[s].offset_A_bytes = 0;
-                                subProblems[s].offset_B_bytes = calculateOffsetB(offset, 0, ldb[0], transB, arg.b_type);
-                                subProblems[s].offset_C_bytes = calculateOffsetCD(0, offset, ldc[0], arg.c_type);
-                                subProblems[s].offset_D_bytes = calculateOffsetCD(0, offset, ldd[0], arg.d_type);
-                            }
-                            offset += new_size;
-                        }
-
-                        // Rebuild pre-created contexts
-                        spCtxs.resize(subProblems.size());
-                        for(size_t sp = 0; sp < subProblems.size(); sp++)
-                        {
-                            const auto& sub = subProblems[sp];
-                            auto& ctx = spCtxs[sp];
-                            int64_t rA = transA == HIPBLAS_OP_N ? sub.m_size : sub.k_size;
-                            int64_t cA = transA == HIPBLAS_OP_N ? sub.k_size : sub.m_size;
-                            hipblasLtMatrixLayoutCreate(&ctx.matA, arg.a_type, rA, cA, lda[0]);
-                            int64_t rB = transB == HIPBLAS_OP_N ? sub.k_size : sub.n_size;
-                            int64_t cB = transB == HIPBLAS_OP_N ? sub.n_size : sub.k_size;
-                            hipblasLtMatrixLayoutCreate(&ctx.matB, arg.b_type, rB, cB, ldb[0]);
-                            hipblasLtMatrixLayoutCreate(&ctx.matC, arg.c_type, sub.m_size, sub.n_size, ldc[0]);
-                            hipblasLtMatrixLayoutCreate(&ctx.matD, arg.d_type, sub.m_size, sub.n_size, ldd[0]);
-                            hipblasLtMatmulDescCreate(&ctx.matmul_desc, arg.compute_type, arg.scale_type);
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_A_EXT, &TciA, sizeof(void*));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_COMPUTE_INPUT_TYPE_B_EXT, &TciB, sizeof(void*));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
-                            hipblasLtMatmulDescSetAttribute(ctx.matmul_desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
-                            ctx.owns_matmul_desc = true;
-                            hipblasLtMatmulHeuristicResult_t h; int r = 0;
-                            hipblasLtMatmulAlgoGetHeuristic(handle, ctx.matmul_desc, ctx.matA, ctx.matB, ctx.matC, ctx.matD, pref, 1, &h, &r);
-                            ctx.valid = (r > 0);
-                            if(ctx.valid) {
-                                ctx.algo = h.algo;
-                                try {
-                                    auto sn = hipblaslt_ext::getSolutionNameFromAlgo(handle, h.algo);
-                                    int* si = (int*)h.algo.data;
-                                    auto p = sn.find("MT");
-                                    hipblaslt_cout << "  Rebuilt[" << sp << "] " << sub.m_size << "x" << sub.n_size
-                                                  << " → sol=" << *si << " " << sn.substr(p, p!=std::string::npos?15:0) << std::endl;
-                                } catch(...) {}
-                            }
-                            ctx.A_ptr = static_cast<char*>(dA[0].buf()) + sub.offset_A_bytes;
-                            ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
-                            ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
-                            ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
-                        }
-                    }
-
-                    hipblaslt_cout << "=== Origami Search Complete ===" << std::endl;
+                    hipblaslt_cout << "] (latency=" << std::fixed << std::setprecision(0)
+                                  << candidates[0].origami_total_latency << " cycles)" << std::endl;
                 }
             }
 

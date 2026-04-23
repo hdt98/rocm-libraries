@@ -105,7 +105,10 @@ inline double computeOrigamiLatency(
     }
 }
 
-// Query the heuristic for a sub-problem and get its MacroTile + Origami latency
+// Query the dimension-aware heuristic for a sub-problem, extract its
+// MacroTile from the solution name, and return the Origami analytical latency.
+// Uses hipblasLtMatmulAlgoGetHeuristic (dimension-aware, fast) instead of
+// getAllAlgos (dimension-blind, slow O(N) library scan).
 inline double querySubProblemLatency(
     hipblasLtHandle_t handle,
     int64_t M, int64_t N, int64_t K,
@@ -115,21 +118,52 @@ inline double querySubProblemLatency(
     hipblasComputeType_t compute_type,
     int device_id)
 {
-    std::vector<hipblasLtMatmulHeuristicResult_t> algos;
-    hipblaslt_ext::getAllAlgos(handle, hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
-                               transA, transB, a_type, b_type, c_type, d_type,
-                               compute_type, algos);
-    if (algos.empty() || algos[0].state != HIPBLAS_STATUS_SUCCESS)
-        return -1.0;
+    int64_t A_rows = (transA == HIPBLAS_OP_N) ? M : K;
+    int64_t A_cols = (transA == HIPBLAS_OP_N) ? K : M;
+    int64_t B_rows = (transB == HIPBLAS_OP_N) ? K : N;
+    int64_t B_cols = (transB == HIPBLAS_OP_N) ? N : K;
 
-    std::string sol_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, algos[0].algo);
-    size_t mt_m, mt_n, mt_k;
-    if (!parseMacroTileFromName(sol_name, mt_m, mt_n, mt_k))
-        return -1.0;
+    hipblasLtMatrixLayout_t matA, matB, matC, matD;
+    hipblasLtMatrixLayoutCreate(&matA, a_type, A_rows, A_cols, A_rows);
+    hipblasLtMatrixLayoutCreate(&matB, b_type, B_rows, B_cols, B_rows);
+    hipblasLtMatrixLayoutCreate(&matC, c_type, M, N, M);
+    hipblasLtMatrixLayoutCreate(&matD, d_type, M, N, M);
 
-    return computeOrigamiLatency(M, N, K, mt_m, mt_n, mt_k,
-                                  transA, transB, a_type, b_type, c_type, d_type,
-                                  device_id);
+    hipblasLtMatmulDesc_t desc;
+    hipblasLtMatmulDescCreate(&desc, compute_type, HIP_R_32F);
+    hipblasLtMatmulDescSetAttribute(desc, HIPBLASLT_MATMUL_DESC_TRANSA, &transA, sizeof(int32_t));
+    hipblasLtMatmulDescSetAttribute(desc, HIPBLASLT_MATMUL_DESC_TRANSB, &transB, sizeof(int32_t));
+
+    hipblasLtMatmulPreference_t pref;
+    hipblasLtMatmulPreferenceCreate(&pref);
+
+    hipblasLtMatmulHeuristicResult_t heur;
+    int ret = 0;
+    hipblasLtMatmulAlgoGetHeuristic(handle, desc, matA, matB, matC, matD, pref, 1, &heur, &ret);
+
+    double latency = -1.0;
+    if (ret > 0)
+    {
+        try {
+            std::string sol_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur.algo);
+            size_t mt_m, mt_n, mt_k;
+            if (parseMacroTileFromName(sol_name, mt_m, mt_n, mt_k))
+            {
+                latency = computeOrigamiLatency(M, N, K, mt_m, mt_n, mt_k,
+                                                transA, transB, a_type, b_type,
+                                                c_type, d_type, device_id);
+            }
+        } catch (...) {}
+    }
+
+    hipblasLtMatmulPreferenceDestroy(pref);
+    hipblasLtMatmulDescDestroy(desc);
+    hipblasLtMatrixLayoutDestroy(matD);
+    hipblasLtMatrixLayoutDestroy(matC);
+    hipblasLtMatrixLayoutDestroy(matB);
+    hipblasLtMatrixLayoutDestroy(matA);
+
+    return latency;
 }
 
 // MacroTile preservation check.
@@ -389,6 +423,51 @@ inline std::vector<int64_t> computeOrigamiOptimizedSplitsWithHandle(
                                            handle, other_dim, K, is_m_split,
                                            transA, transB, a_type, b_type, c_type, d_type,
                                            compute_type, device_id);
+    }
+
+    // Score any unscored candidates (3-way and XCD generators don't score
+    // during generation; standard/brute-force already scored above).
+    for (auto& cand : cands)
+    {
+        if (cand.origami_total_latency != 0.0)
+            continue;
+        double total = 0.0;
+        bool   valid = true;
+        for (size_t i = 0; i < cand.split_sizes.size(); i++)
+        {
+            int64_t M_sub = is_m_split ? cand.split_sizes[i] : M;
+            int64_t N_sub = is_m_split ? N : cand.split_sizes[i];
+
+            double lat = querySubProblemLatency(handle, M_sub, N_sub, K,
+                                                transA, transB, a_type, b_type,
+                                                c_type, d_type, compute_type,
+                                                device_id);
+            if (lat <= 0) { valid = false; break; }
+            total += lat;
+        }
+        cand.origami_total_latency = valid ? total : 1e18;
+    }
+
+    // Sort all candidates by total analytical latency (best first).
+    std::sort(cands.begin(), cands.end(),
+              [](const OrigamiCandidate& a, const OrigamiCandidate& b) {
+                  return a.origami_total_latency < b.origami_total_latency;
+              });
+
+    if (!cands.empty())
+    {
+        hipblaslt_cout << "Origami Analytical Ranking (" << cands.size() << " candidates, all paths):" << std::endl;
+        for (size_t i = 0; i < std::min(cands.size(), (size_t)5); i++)
+        {
+            hipblaslt_cout << "  #" << (i+1) << " " << cands[i].label << " [";
+            for (size_t j = 0; j < cands[i].split_sizes.size(); j++)
+            {
+                if (j) hipblaslt_cout << ",";
+                hipblaslt_cout << cands[i].split_sizes[j];
+            }
+            hipblaslt_cout << "] latency=" << std::fixed << std::setprecision(0)
+                          << cands[i].origami_total_latency << " cycles" << std::endl;
+        }
     }
 
     getOrigamiCandidates() = cands;
