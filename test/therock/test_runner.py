@@ -50,7 +50,7 @@ AMDGPU_FAMILIES = os.getenv("AMDGPU_FAMILIES")
 COMPONENT_DIR_MAPPING = {
     "miopen": "MIOpen",
     "rocblas": "rocblas",
-    "rocblas-multigpu": "rocblas",  # Map multi-GPU variant to same component
+    "rocblas-multigpu": "rocblas", # Map multi-GPU variant to same component
     "rocrand": "rocRAND",
     "hiprand": "hipRAND",
     "rocthrust": "rocthrust",
@@ -152,7 +152,10 @@ def get_available_gpu_suite_tests():
     """
     if args.multigpu:
         TEST_COMPONENT = TEST_COMPONENT.split("-")[0]
-    test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
+        test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
+    else:
+        test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
+
     if not test_dir.exists() or not test_dir.is_dir():
         print(f"Error: Test directory does not exist: {test_dir}", file=sys.stderr)
         sys.exit(1)
