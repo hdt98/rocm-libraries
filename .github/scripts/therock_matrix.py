@@ -63,6 +63,7 @@ project_map = {
         "cmake_options": [
             "-DTHEROCK_ENABLE_HIPKERNELPROVIDER=ON",
             "-DHIP_KERNEL_PROVIDER_ENABLE=ON",
+            "-DHIPDNN_ENABLE_SDPA=ON",
         ],
         "projects_to_test": ["hipkernelprovider"],
     },
@@ -95,6 +96,7 @@ additional_options = {
             "-DHIP_KERNEL_PROVIDER_ENABLE=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
             "-DTHEROCK_ENABLE_HIPDNN_SAMPLES=ON",
+            "-DHIPDNN_ENABLE_SDPA=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
         ],
         "projects_to_test": [
