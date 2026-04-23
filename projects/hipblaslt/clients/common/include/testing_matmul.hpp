@@ -4822,9 +4822,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                             continue;
                         }
 
-                        // Micro-benchmark: 3 iterations
+                        // Micro-benchmark: 1 iteration (reduced from 3 for speed;
+                        // empirical data shows 1 iteration is sufficient for
+                        // relative ranking of candidates)
                         auto t0 = std::chrono::high_resolution_clock::now();
-                        for(int mi = 0; mi < 3; mi++)
+                        for(int mi = 0; mi < 1; mi++)
                         {
                             for(auto& ctx : cand_ctxs)
                             {
@@ -4838,7 +4840,7 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         CHECK_HIP_ERROR(hipStreamSynchronize(stream));
                         auto t1 = std::chrono::high_resolution_clock::now();
-                        double cand_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / 3.0;
+                        double cand_us = std::chrono::duration<double, std::micro>(t1 - t0).count() / 1.0;
 
                         hipblaslt_cout << "  " << cand.label << " [" << cand.split_sizes[0]
                                       << "," << cand.split_sizes[1] << "]: " << std::fixed
