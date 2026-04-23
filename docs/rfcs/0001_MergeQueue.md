@@ -19,10 +19,9 @@
   - [4.8 Opt-in / extension](#48-opt-in--extension)
   - [4.9 Implementation constraints](#49-implementation-constraints)
 - [5. Open-Source Contributor Policy](#5-open-source-contributor-policy)
-- [6. Rollout](#6-rollout)
-- [7. Validation](#7-validation)
+- [6. Validation](#6-validation)
+- [7. Rollout](#7-rollout)
 - [8. Risks](#8-risks)
-- [9. Future Work](#9-future-work)
 - [Appendix A: Prototype reference](#appendix-a-prototype-reference)
 
 ## 1. Executive Summary
@@ -51,9 +50,9 @@ We desire an automated system that serializes with concurrent queues, is cheap t
 
 ### Non-Goals
 - Replacing existing CI workflows.
-- Batched merges (`batch_size > 1`) — deferred.
+- Batched merges (`batch_size > 1`).
 - Release or feature branches — `develop` only.
-- A priority lane for short-running PRs — uniform 3-minute poll for everyone in v1; deferred to [§9](#9-future-work).
+- Priority labels to skip to the front of the queue — potentially future work.
 
 ### Prerequisites
 
@@ -231,12 +230,18 @@ A PR moves through three observable states. Every transition is captured in the 
 
 Two GitHub Actions workflows drive these transitions:
 
-1. **Command handler** *(event-driven, `issue_comment`)*. On `/merge`, validates eligibility (see [§4.4](#44-permissions)), confirms maintainer-edits is enabled for fork PRs (see [§5](#5-open-source-contributor-policy)), computes the queue set from the PR's changed paths via the rule in [§4.2](#42-path--queue-mapping), applies `mq:queued` and one `mq:<queue>` label per queue, and posts the status comment (see [§4.3](#43-data-model)). On `/dequeue`, removes all `mq:*` labels. This is the only workflow that assigns membership labels. The handler is idempotent — if the PR already carries `mq:queued` or `mq:active`, a second `/merge` is acknowledged as a no-op so concurrent invocations don't post duplicate status comments.
+1. **Command handler** *(event-driven, `issue_comment`)*. On `/merge`, validates eligibility (see [§4.4](#44-permissions)), checks the PR has at least one approving review, confirms maintainer-edits is enabled for fork PRs (see [§5](#5-open-source-contributor-policy)), computes the queue set from the PR's changed paths via the rule in [§4.2](#42-path--queue-mapping), applies `mq:queued` and one `mq:<queue>` label per queue, and posts the status comment (see [§4.3](#43-data-model)). On `/dequeue`, removes all `mq:*` labels. This is the only workflow that assigns membership labels. The handler is idempotent — if the PR already carries `mq:queued` or `mq:active`, a second `/merge` is acknowledged as a no-op so concurrent invocations don't post duplicate status comments.
 2. **Processor** *(scheduled, every 3 minutes)*. Activates the head PR of each queue (`mq:queued` → `mq:active`, then merges `develop` into the PR branch and records the resulting head SHA in the status comment's JSON), and on the next cycle evaluates CI to either squash-merge or eject. The same cycle ejects if the PR's current head SHA no longer matches the recorded `active_sha` — i.e., the author pushed since the last cycle. Both squash-merge and eject also clear all `mq:*` labels, so terminal PRs disappear from the discovery search on the next cycle (parallel to `/dequeue`'s cleanup). Algorithm in [§4.6](#46-per-cycle-algorithm).
 
 After ejection, the author addresses the reported cause and re-enqueues with `/merge`.
 
+#### Branch protection integration
+
+Once the queue has matured through the hipDNN rollout, a `merge-queue/managed` GitHub status check will serve as the enforcement path (see [§7](#7-rollout)). Initially non-blocking, it can be promoted to a required check on `develop` to make the queue the enforced merge path for opted-in components without affecting other subprojects. The design of this check is future work.
+
 ### 4.6 Per-cycle algorithm
+
+*The following is functional pseudocode illustrating the algorithm's logic and sequencing. It is not intended as a literal implementation.*
 
 ```
 # ALL_QUEUES is the fixed set of six queue names defined in §4.1.
@@ -314,28 +319,19 @@ There is no per-project file. Removing the entry (and your queue from other entr
 
 ### 4.9 Implementation constraints
 
-The state-transition logic is structured as a pure function over queue state, separated from the GitHub-API I/O layer so the algorithm can be exercised against synthetic snapshots without any GitHub interaction (enabling the testing in [§7](#7-validation)). All writes go through `GITHUB_TOKEN` with workflow-scoped permissions; no branch-protection bypass. File layout, language, and library choices follow the existing repo conventions and are not normative here.
+Each processor cycle will follow a read → decide → execute structure. First, queue state is fetched from GitHub (PR labels, enqueue timestamps, head SHAs, CI status). That snapshot is passed to a pure decision function that returns the set of actions to take — squash, activate, eject, wait — without performing any I/O itself. Finally, those actions are dispatched back to GitHub. Keeping the decision layer pure means tests can construct any queue state as plain data and call the function directly, with no mocks or network access required. All writes go through `GITHUB_TOKEN` with workflow-scoped permissions.
 
 ## 5. Open-Source Contributor Policy
 
 **Policy.** External contributors may use `/merge` on their own PRs. The safeguards that apply to any merge — required reviewer approvals and required CI checks — apply unchanged.
 
-**Why this works without extra queue logic.** GitHub's branch protection rules apply to the merge API by default — bypass requires explicit per-actor configuration ([GitHub docs: protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)) which the queue bot is not granted. So `develop`'s required `TheRock CI Summary` check and CODEOWNER reviews (see prereqs in [§3](#3-goals-non-goals-and-prerequisites)) must pass before any squash-merge succeeds — regardless of who or what calls the API. Branch protection is the safety net; the queue is the serializer.
+**Why this works without extra queue logic.** GitHub's branch protection rules apply to the merge API by default — bypass requires explicit per-actor configuration ([GitHub docs: protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)). If the bot account is granted bypass rights, the implementation must check that all required statuses have passed before squash-merging; otherwise branch protection enforces this automatically. `develop`'s required `TheRock CI Summary` check and CODEOWNER reviews (see prereqs in [§3](#3-goals-non-goals-and-prerequisites)) serve as the gate.
 
-**Defense-in-depth.** The command handler should also reject `/merge` on a PR that has not yet been approved, so an unapproved PR doesn't sit in the queue burning processor cycles only to fail at the squash. This is a small check at enqueue time, not a replacement for branch protection. (See Phase 2 in [§6](#6-rollout).)
+**Defense-in-depth.** The command handler should also reject `/merge` on a PR that has not yet been approved, so an unapproved PR doesn't sit in the queue burning processor cycles only to fail at the squash. This is a small check at enqueue time, not a replacement for branch protection. (See Phase 2 in [§7](#7-rollout).)
 
 **Fork PRs.** The processor pushes the `develop`-merge to the PR branch, which for fork PRs requires the author to have **Allow edits by maintainers** enabled (the GitHub default; authors can disable it — see [GitHub docs](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork)). The handler enforces this at `/merge` time and rejects with a clear message if disabled. If the contributor cannot or will not enable maintainer-edits, a maintainer may manually merge the PR after deeming it safe — the queue is opt-in, not the only path.
 
-## 6. Rollout
-
-| Phase | What                                                                                                                                                                                                                                  |
-|-------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1     | Optional. hipDNN-ecosystem opt-in only. No branch-protection changes. Prerequisite: per-commit and fork-dogfood validation in [§7](#7-validation) is clean.                                                                            |
-| 2     | Add the `merge-queue/managed` status check as **non-blocking**. The queue bot posts it on every PR — pending until queue squash-merge for opted-in paths, immediate success ("skipped — no managed paths") otherwise. Reviewers use it to nudge contributors toward `/merge` before promotion. Also enable the at-enqueue approval pre-check so unapproved PRs don't burn processor cycles. (Branch protection on `develop` already requires reviewer approvals and CI checks; no changes there.) |
-| 3     | Promote `merge-queue/managed` to a **required** status check on `develop`. Path scoping lives in the bot, so branch protection stays one rule and other subprojects feel no friction. Repository admins (gardeners) retain bypass via GitHub's standard admin-override; this is an expected escape hatch for emergencies, not a routine path. (See [§8](#8-risks) for related concerns.) |
-| 4     | Extend opt-in to other rocm-libraries subprojects on request.                                                                                                                                                                         |
-
-## 7. Validation
+## 6. Validation
 
 Two layers of testing — per-commit on the queue's source, and end-to-end on a fork repo before any production exposure.
 
@@ -348,34 +344,34 @@ Because the state-transition logic is separated from GitHub I/O (see [§4.9](#49
 
 ### Fork dogfood
 
-Before promoting to Phase 1, implement and validate against a fork of `rocm-libraries`. Synthetic PRs against the fork exercise the full handler + processor flow on real GitHub APIs, demonstrating the invariants above and edge cases that aren't visible to the algorithm in isolation:
+Implement and validate against a fork of `rocm-libraries`. Synthetic PRs against the fork exercise the full handler + processor flow on real GitHub APIs, demonstrating the invariants above and edge cases that aren't visible to the algorithm in isolation:
 
 - merge conflict during activation
 - CI failure during evaluation
 - simultaneous `/merge` on the same PR
 - author push between activation and squash
 
-Promote to Phase 1 when invariants and edge cases pass cleanly.
+## 7. Rollout
+
+| Phase | What |
+|-------|------|
+| 0     | Fork dogfood — implement and validate on a fork, covering all invariants and edge cases in [§6](#6-validation). |
+| 1     | Commit to rocm-libraries with hipDNN-ecosystem opt-in only. No branch-protection changes.                                           |
+| 2     | Add `merge-queue/managed` as **non-blocking** (see [§4.5](#45-pr-lifecycle)). Enable the at-enqueue approval pre-check. |
+| 3     | Promote `merge-queue/managed` to a **required** status check on `develop`. Admins retain bypass as an emergency escape hatch. (See [§8](#8-risks).) |
+| 4     | Extend opt-in to other rocm-libraries subprojects on request.                                                   |
 
 ## 8. Risks
 
-- **3-minute poll** is slow at low load. Acceptable; revisit if it pinches.
-- **Head-of-line stalls.** Cross-queue blocking means a slow core PR at the front of every queue holds up everything else. Mitigated by `/dequeue` (see [§4.5](#45-pr-lifecycle)) and reviewer discipline on core PRs.
-- **Maintenance debt.** Custom in-repo Python is a maintenance cost compared to a hosted service. Accepted; revisit if the scripts grow beyond a single maintainer's head.
-- **Serialization throughput — wall-clock end-to-end CI for a coupled change can comfortably exceed 6 hours.** Three contributing factors:
-  - *Per-job timeouts.* Build jobs are bounded at 30 minutes ([`therock-ci-linux.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-ci-linux.yml), `timeout-minutes: 30`); individual test-component jobs are bounded at 210 minutes / 3.5 hours ([`therock-test-component.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-test-component.yml), `timeout-minutes: 210`), with sharded matrices spanning multiple GPU architectures (`gfx942`, `gfx90a`, `gfx1201`, `gfx1100`, `gfx1030`) and OS targets.
-  - *Per-cycle setup overhead.* Pulling `ghcr.io/rocm/therock_build_manylinux_x86_64`, restoring caches, and fanning out the matrix is fixed per attempt and not amortizable across queue cycles.
+- **3-minute poll** is slow at low load. Revisit if necessary.
+- **Head-of-line stalls.** Cross-queue blocking means a slow core PR at the front of every queue holds up everything else.
+- **Serialization throughput — wall-clock end-to-end CI for a PR can comfortably exceed several hours.** Three contributing factors:
+  - *Per-job timeouts.* Build jobs are bounded at 30 minutes ([`therock-ci-linux.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-ci-linux.yml), `timeout-minutes: 30`); individual test-component jobs are bounded at 210 minutes / 3.5 hours ([`therock-test-component.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-test-component.yml), `timeout-minutes: 210`).
+  - *Per-cycle setup overhead.* Machine acquisition, cache restoration, and matrix fan-out are fixed per attempt and not amortizable across queue cycles. Runner availability can itself be a bottleneck, adding significant wall-clock time before a job even starts.
   - *n × CI drain time.* Intersecting PRs (e.g. two provider PRs sharing `integration-tests`) merge one at a time, each waiting for a full CI cycle; a queue of *n* intersecting PRs takes roughly *n × CI time* to drain.
-
-  Batch merging (see [§9](#9-future-work)) is the primary mitigation; until then, reviewers should be aware that queuing order matters and core PRs at the head will block the entire ecosystem for one full CI cycle.
-
-- **No CI retries — flakes are terminal.** The processor treats any failed required check as a real failure (`any_required_check_failed → eject`). On a heterogeneous GPU matrix, transient hardware/runner failures eject otherwise-good PRs and force a manual `/merge` re-enqueue, paying another full CI cycle. This compounds with the throughput risk above: every flake-induced eject is another *n × CI* penalty. Mitigations to consider before Phase 3: a bounded retry on eject (e.g. retry once before ejecting), or a `/merge --ignore-flake <check-name>` escape hatch.
+- **No CI retries — flakes are terminal.** The processor treats any failed required check as a real failure (`any_required_check_failed → eject`). On a heterogeneous GPU matrix, transient hardware/runner failures eject otherwise-good PRs and force a manual `/merge` re-enqueue, paying another full CI cycle. This compounds with the throughput risk above: every flake-induced eject is another *n × CI* penalty.
 - **Surprise auto-eject** when an author pushes new commits mid-queue. Detection happens on the next processor cycle (up to 3 minutes after the push), so feedback is not instant — the eject comment must be explicit about why and how to re-enqueue.
-
-## 9. Future Work
-
-Batch merging (`batch_size > 1`), a priority lane for short-running PRs, retry-on-flake heuristics, and extending opt-in beyond the hipDNN ecosystem.
 
 ## Appendix A: Prototype reference
 
-A working prototype implementing a near-cousin of this design lives at <https://github.com/SamuelReeder/rocm-libraries/tree/develop/.github>. It is intentionally underspecified here — the design above is the source of truth, and the prototype will be reshaped to match it before adoption.
+A working prototype implementing a functionaly resemblance of this design lives at <https://github.com/SamuelReeder/rocm-libraries/tree/develop/.github>. However, this RFC is the source of truth, and the prototype will be reshaped to match these specifications before adoption.
