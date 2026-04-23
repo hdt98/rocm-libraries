@@ -37,7 +37,7 @@ jobs:
 
           # Check if any trigger label is present
           TRIGGER='${{ env.TRIGGER_LABELS }}'
-          MATCH=$(echo "$PR_LABELS" | jq -e --argjson trigger "$TRIGGER" \
+          MATCH=$(echo "$PR_LABELS" | jq --argjson trigger "$TRIGGER" \
             '[.[] | select(. as $l | $trigger | index($l))] | length > 0')
 
           if [ "$MATCH" = "true" ]; then
