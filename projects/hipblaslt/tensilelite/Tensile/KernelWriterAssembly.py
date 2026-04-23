@@ -9135,7 +9135,7 @@ class KernelWriterAssembly(KernelWriter):
                         comment="incLower <- ?"))
             imod.add(SCSelectB32(dst=sgpr(incUpper), src0=sgpr("WrapU%s+1"%tc), src1=0,
                         comment="incUpper <- ?"))
-            imod.add(self.incrementSrd(tP["MX"], sgpr(incLower), sgpr(incUpper)))
+            imod.addModuleAsFlatItems(self.incrementSrd(tP["MX"], sgpr(incLower), sgpr(incUpper)))
 
           if kernel["ProblemType"]["Sparse"]:
             if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) :
@@ -9168,13 +9168,12 @@ class KernelWriterAssembly(KernelWriter):
             imod.addModuleAsFlatItems(self.incrementSrd(tP, sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), sgpr(incUpper)))
         else:
           incUpper = 0 # GRO is positive for loop unroll
-<<<<<<< HEAD
           srcGRInc = sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx))
           if tc in ('A', 'B'):
             useConstSgprGlobalReadIncs = self.states.a.useConstSgprGlobalReadIncs if tc == 'A' else self.states.b.useConstSgprGlobalReadIncs
             if useConstSgprGlobalReadIncs:
               srcGRInc = "GlobalReadIncs%s"%tc
-          imod.add(self.incrementSrd(tP, srcGRInc, hex(incUpper)))
+          imod.addModuleAsFlatItems(self.incrementSrd(tP, srcGRInc, hex(incUpper)))
 
         if "MX" in tP:
           tc = tP["MX"]["tensorChar"]
@@ -9184,17 +9183,14 @@ class KernelWriterAssembly(KernelWriter):
               incUpper = tmpSgprInfo.idx
               # GRO may be negative for other summation if stride-other < stride-unroll or if mirror dim.
               imod.add(SAShiftRightI32(dst=sgpr(incUpper), shiftHex=31, src=sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), comment="sign-extend"))
-              imod.add(self.incrementSrd(tP["MX"], sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), sgpr(incUpper)))
+              imod.addModuleAsFlatItems(self.incrementSrd(tP["MX"], sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), sgpr(incUpper)))
           else:
             incUpper = 0 # GRO is positive for loop unroll
             srcGRInc = sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx))
             useConstSgprGlobalReadIncs = self.states.mxsa.useConstSgprGlobalReadIncs if tc == 'MXSA' else self.states.mxsb.useConstSgprGlobalReadIncs
             if useConstSgprGlobalReadIncs:
               srcGRInc = "GlobalReadIncs%s"%tc
-            imod.add(self.incrementSrd(tP["MX"], srcGRInc, hex(incUpper)))
-=======
-          imod.addModuleAsFlatItems(self.incrementSrd(tP, sgpr("GlobalReadIncs%s+%u"%(tc,loopIdx)), hex(incUpper)))
->>>>>>> origin/develop
+            imod.addModuleAsFlatItems(self.incrementSrd(tP["MX"], srcGRInc, hex(incUpper)))
 
         if kernel["ProblemType"]["Sparse"]:
           if (kernel["ProblemType"]["Sparse"] == 2 and tP["isB"]) or (kernel["ProblemType"]["Sparse"] == 1 and tP["isA"]) :
@@ -14702,39 +14698,12 @@ class KernelWriterAssembly(KernelWriter):
           return rv
         elif bpl==64 and not lds:
           rv = Module("emulated _buffer_load_b512")
-<<<<<<< HEAD
-          # +0.25
-          dst = vgpr(destVgpr, rpv//4)
-          rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
-                                soffset=soffset, mubuf=mubuf, comment=comment))
-          mubuf2 = MUBUFModifiers(offen=True, offset12=int(offset + bpl/4), glc=glc, slc=slc, nt=nt, lds=lds)
-          dst2 = destVgpr + "+" + str(int(rpv//4)) if isinstance(destVgpr, str) else int(destVgpr + int(rpv//4))
-
-          dst = vgpr(dst2, rpv//4)
-          rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
-                                soffset=soffset, mubuf=mubuf2, comment=comment))
-          #+0.5
-          mubuf3 = MUBUFModifiers(offen=True, offset12=int(offset + bpl/2), glc=glc, slc=slc, nt=nt, lds=lds)
-          dst3 = destVgpr + "+" + str(int(rpv//2)) if isinstance(destVgpr, str) else int(destVgpr + int(rpv//2))
-
-          dst = vgpr(dst3, rpv//4)
-          rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
-                                soffset=soffset, mubuf=mubuf3, comment=comment))
-          #+0.75
-          mubuf4 = MUBUFModifiers(offen=True, offset12= int(offset + 3*bpl/4), glc=glc, slc=slc, nt=nt, lds=lds)
-          dst4 = destVgpr + "+" + str(3*int(rpv//4)) if isinstance(destVgpr, str) else int(destVgpr + 3*int(rpv//4))
-
-          dst = vgpr(dst4, rpv//4)
-          rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
-                                soffset=soffset, mubuf=mubuf4, comment=comment))
-=======
           quarter_rpv = int(rpv//4)
           for i in range(4):
             mubuf_n = MUBUFModifiers(offen=True, offset12=int(offset + i*bpl/4), glc=glc, slc=slc, nt=nt, lds=lds)
             dst = vgpr(_vgprOffset(destVgpr, i*quarter_rpv), quarter_rpv)
             rv.add(BufferLoadB128(dst=dst, vaddr=addr0, saddr=addr1, \
                                   soffset=soffset, mubuf=mubuf_n, comment=comment))
->>>>>>> origin/develop
         else:
           assert 0, "%s\nchooseGlobalRead: bad bpl %u"%(self.states.kernelName,bpl)
 
