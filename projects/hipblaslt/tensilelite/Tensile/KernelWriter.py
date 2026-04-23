@@ -3175,9 +3175,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if doReadB:
             localReads.addComment1("local read increment b")
             localReads.add(self.localReadInc(kernel, iui, tensorParametersB))
-          if doReadMXSB:
-            localReads.addComment1("local read increment mxsb")
-            localReads.add(self.localReadInc(kernel, iui, tensorParametersB["MX"]))
 
       if not isLastLoop:
         if kernel["PrefetchGlobalRead"]:
@@ -5082,10 +5079,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["ProblemType"]["MXBlockB"]:
             bufIdxMXSB = (bufIdxDTV if kernel["DirectToVgprMXSB"] else bufIdx) // self.states.numReadsIterCoalescedMXSB
           bufIdxB = (bufIdxDTV if kernel["DirectToVgprB"] else bufIdx) // self.states.numReadsIterCoalescedB
-          if kernel["ProblemType"]["MXBlockA"]:
-            bufIdxMXSA = (bufIdxDTV if kernel["DirectToVgprMXSA"] else bufIdx) // self.states.numReadsIterCoalescedMXSA
-          if kernel["ProblemType"]["MXBlockB"]:
-            bufIdxMXSB = (bufIdxDTV if kernel["DirectToVgprMXSB"] else bufIdx) // self.states.numReadsIterCoalescedMXSB
           if mValue < mEnd and mValue % self.states.numReadsIterCoalescedA == 0:
             # Reading 16-bit data from LDS requires packing when ECC enabled
             module.addComment1("local read a")
@@ -5093,33 +5086,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
             module.add(localReadCodeA)
             if not kernel["UseF32XEmulation"]:
               pack[0].add(packCodeA)
-          if kernel["ProblemType"]["MXBlockA"]:
-            if mValue < mEnd and mValue % self.states.numReadsIterCoalescedMXSA == 0:
-              # Reading 16-bit data from LDS requires packing when ECC enabled
-              module.addComment1("local read maxa")
-              localReadCodeMXSA, packCodeMXSA, _ = self.localReadDo(kernel, bufIdxMXSA*self.states.numIterPerCoalescedReadMXSA, iui*self.states.numIterPerCoalescedReadMXSA, 0, tensorParametersA["MX"])
-              module.add(localReadCodeMXSA)
-              pack[0].add(packCodeMXSA)
-          if kernel["ProblemType"]["MXBlockB"]:
-            if mValue < mEnd and mValue % self.states.numReadsIterCoalescedMXSB == 0:
-              # Reading 16-bit data from LDS requires packing when ECC enabled
-              module.addComment1("local read maxb")
-              localReadCodeMXSB, packCodeMXSB, _ = self.localReadDo(kernel, bufIdxMXSB*self.states.numIterPerCoalescedReadMXSB, iui*self.states.numIterPerCoalescedReadMXSB, 0, tensorParametersB["MX"])
-              module.add(localReadCodeMXSB)
-              pack[0].add(packCodeMXSB)
-          if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-            if mValue*self.states.numIterPerCoalescedReadMetadata < mEnd:
-              module.addComment1("local read metadata")
-              localReadCodeM, packCodeM, packPreM = self.localReadDo(kernel, bufIdx*self.states.numIterPerCoalescedReadMetadata, iui*self.states.numReadsIterCoalescedMetadata, 0, tPM)
-              module.add(localReadCodeM)
-              pack[0].add(packPreM)
-              pack[0].add(packCodeM)
-          if mValue < mEnd and mValue % self.states.numReadsIterCoalescedB == 0:
-            module.addComment1("local read b")
-            localReadCodeB, packCodeB, packPreB = self.localReadDo(kernel, bufIdxB*self.states.numIterPerCoalescedReadB, iui*self.states.numIterPerCoalescedReadB, 0, tensorParametersB)
-            module.add(localReadCodeB)
-            if not kernel["UseF32XEmulation"]:
-              pack[0].add(packCodeB)
           if kernel["ProblemType"]["MXBlockA"]:
             if mValue < mEnd and mValue % self.states.numReadsIterCoalescedMXSA == 0:
               # Reading 16-bit data from LDS requires packing when ECC enabled
@@ -5136,6 +5102,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
               module.add(localReadCodeMXSB)
               pack[0].add(packPreMXSB)
               pack[0].add(packCodeMXSB)
+          if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+            if mValue*self.states.numIterPerCoalescedReadMetadata < mEnd:
+              module.addComment1("local read metadata")
+              localReadCodeM, packCodeM, packPreM = self.localReadDo(kernel, bufIdx*self.states.numIterPerCoalescedReadMetadata, iui*self.states.numReadsIterCoalescedMetadata, 0, tPM)
+              module.add(localReadCodeM)
+              pack[0].add(packPreM)
+              pack[0].add(packCodeM)
+          if mValue < mEnd and mValue % self.states.numReadsIterCoalescedB == 0:
+            module.addComment1("local read b")
+            localReadCodeB, packCodeB, packPreB = self.localReadDo(kernel, bufIdxB*self.states.numIterPerCoalescedReadB, iui*self.states.numIterPerCoalescedReadB, 0, tensorParametersB)
+            module.add(localReadCodeB)
+            if not kernel["UseF32XEmulation"]:
+              pack[0].add(packCodeB)
           if kernel["UseF32XEmulation"]:
             # Gather A, B conversion code based on scheduling order
             if len(packPreA.flatitems()) or len(packPreB.flatitems()):
@@ -5178,16 +5157,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if mValue < mEnd and mValue % self.states.numReadsIterCoalescedB == 0:
             module.addComment1("local read inc b")
             module.add(self.localReadInc(kernel, iuiParam, tensorParametersB))
-          if kernel["ProblemType"]["MXBlockA"]:
-            iuiParam = iui + tailLoopInnerUnroll * mValue//self.states.numReadsIterCoalescedMXSA
-            if mValue < mEnd and mValue % self.states.numReadsIterCoalescedMXSA == 0:
-              module.addComment1("local read inc mxsa")
-              module.add(self.localReadInc(kernel, iuiParam, tensorParametersA["MX"]))
-          if kernel["ProblemType"]["MXBlockB"]:
-            iuiParam = iui + tailLoopInnerUnroll * mValue//self.states.numReadsIterCoalescedMXSB
-            if mValue < mEnd and mValue % self.states.numReadsIterCoalescedMXSB == 0:
-              module.addComment1("local read inc mxsb")
-              module.add(self.localReadInc(kernel, iuiParam, tensorParametersB["MX"]))
         module.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, -1, 0, "4wait for local read"))
         self.states.SubTileIdx = (self.states.SubTileIdx + 1) % kernel["numSubTiles"]
 
