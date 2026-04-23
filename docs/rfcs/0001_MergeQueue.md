@@ -26,7 +26,7 @@
 
 ## 1. Executive Summary
 
-This RFC proposes a custom, in-repo merge queue for rocm-libraries that serializes merges across coupled components on `develop`. Each opted-in component gets its own FIFO queue. A PR enters the queue of every component its changes could affect, and merges only when it is at the head of all of them. Authors trigger the queue with a `/merge` PR comment; an in-repo workflow squash-merges PRs as they reach the front.
+This RFC proposes a custom, in-repo **federated** merge queue for rocm-libraries on `develop`: per-component FIFO queues that interconnect along the dependency graph, rather than a single global queue serializing everything. A PR enters the queue of every component its changes could affect, and merges only when it is at the head of all of them. Authors trigger the queue with a `/merge` PR comment; an in-repo workflow squash-merges PRs as they reach the front.
 
 Initial scope is the hipDNN ecosystem: `hipdnn` core, four providers (`miopen-provider`, `hipblaslt-provider`, `hip-kernel-provider`, `fusilli-provider`), and `integration-tests`. The queue is opt-in — other rocm-libraries subprojects are unaffected — starts optional (no branch-protection changes), and is designed so any project can join later by adding centralized config entries.
 
@@ -77,9 +77,9 @@ Each PR enters zero or more queues based on the paths it touches. A PR merges on
 
 ### 4.2 Path → Queue mapping
 
-**Membership rule.** A PR enters its own queue plus the queue of every downstream component — those that depend on it and could break if it changes. This serializes the PR with any in-flight work in components it could affect.
+**Membership rule.** A PR enters its own queue plus the queue of every downstream component its changes could break.
 
-**Dependency graph.** All providers depend on `hipdnn` core; `integration-tests` depends on every provider:
+**Dependency graph.** All providers depend on `hipdnn` core. Integration-tests consume hipDNN's headers directly, and reach providers only through hipDNN's stable plugin interface:
 
 ```
                ┌── miopen-provider ─────┐
@@ -89,7 +89,7 @@ hipdnn (core) ─┤                        ├──► integration-tests
                └── fusilli-provider ────┘
 ```
 
-Applying the membership rule to this DAG produces the membership matrix below. Paths outside this graph (other rocm-libraries projects) are not opted in and enter no queues.
+The plugin interface decouples providers from integration-tests: a provider's changes are bounded by the plugin contract, so even coupled provider changes are unlikely to break integration-tests — though a contract violation could still cause a regression. Provider PRs therefore enter only their own queue. Paths outside this graph (other rocm-libraries projects) are not opted in and enter no queues.
 
 #### Membership at a glance
 
@@ -100,19 +100,19 @@ Applying the membership rule to this DAG produces the membership matrix below. P
 PR touches          │ hipdnn │ provider │ provider  │  provider  │ provider │    tests    │
 ────────────────────┼────────┼──────────┼───────────┼────────────┼──────────┼─────────────┤
 hipdnn core         │   ●    │    ●     │     ●     │     ●      │    ●     │      ●      │
-miopen-provider     │   ·    │    ●     │     ·     │     ·      │    ·     │      ●      │
-hipblaslt-provider  │   ·    │    ·     │     ●     │     ·      │    ·     │      ●      │
-hip-kernel-provider │   ·    │    ·     │     ·     │     ●      │    ·     │      ●      │
-fusilli-provider    │   ·    │    ·     │     ·     │     ·      │    ●     │      ●      │
+miopen-provider     │   ·    │    ●     │     ·     │     ·      │    ·     │      ·      │
+hipblaslt-provider  │   ·    │    ·     │     ●     │     ·      │    ·     │      ·      │
+hip-kernel-provider │   ·    │    ·     │     ·     │     ●      │    ·     │      ·      │
+fusilli-provider    │   ·    │    ·     │     ·     │     ·      │    ●     │      ·      │
 integration-tests   │   ·    │    ·     │     ·     │     ·      │    ·     │      ●      │
 ────────────────────┴────────┴──────────┴───────────┴────────────┴──────────┴─────────────┘
    ● = PR enters this queue     · = PR does not enter this queue
 ```
 
-Three patterns follow directly from the DAG:
+Three patterns follow:
 
-- The `hipdnn core` row is fully marked — core is upstream of everything, so a core PR is gated by every other in-flight PR in the ecosystem.
-- Each provider row has exactly two marks — its own queue and `integration-tests`. Providers serialize with each other only through the shared `integration-tests` queue.
+- The `hipdnn core` row is fully marked — core sits upstream of every component and could break any of them.
+- Each provider row has a single mark — provider PRs serialize only with other PRs in their own provider queue. The plugin interface decouples them from integration-tests.
 - The `integration-tests` row has a single mark — it has no downstream components.
 
 A PR editing both `projects/hipdnn/api/foo.h` and `dnn-providers/miopen-provider/src/bar.cpp` enters all six queues — core's row is a superset of every provider's row.
@@ -129,7 +129,7 @@ T₀ — all four enqueued
   hipblaslt-provider  │ A      → C
   hip-kernel-provider │ A
   fusilli-provider    │ A
-  integration-tests   │ A → B  → C  → D
+  integration-tests   │ A           → D
 
   A is at the head of every queue → A merges next.
 
@@ -137,31 +137,16 @@ T₁ — after A merges
 
   miopen-provider     │ B
   hipblaslt-provider  │ C
-  integration-tests   │ B → C → D
-
-  B is at the head of {miopen-provider, integration-tests} → B merges next.
-  C is at the head of hipblaslt-provider but blocked by B in integration-tests.
-  D is blocked behind B and C in integration-tests.
-
-T₂ — after B merges
-
-  hipblaslt-provider  │ C
-  integration-tests   │ C → D
-
-  C is at the head of {hipblaslt-provider, integration-tests} → C merges next.
-  D is still blocked by C in integration-tests.
-
-T₃ — after C merges
-
   integration-tests   │ D
 
-  D is at the head of integration-tests (its only queue) → D merges.
+  B, C, and D each sit at the head of their only queue and share no queues
+  with each other → all three merge in parallel.
 ```
 
 Two takeaways:
 
-- **B and C never run in parallel** even though they touch different providers — they share `integration-tests`, so the integration suite serializes them. No cross-entry into each other's provider queues needed; the shared queue is sufficient.
-- **If a second core PR E were enqueued at T₂**, it would join the tail of *every* queue — including `integration-tests` where C and D still sit — and would have to wait for both to clear before merging. Core is never allowed to overtake an in-flight provider or integration-tests PR.
+- **B, C, and D run in parallel.** Provider PRs don't enter `integration-tests`, so they neither block each other nor block integration-test work. The plugin contract is enforced by per-PR CI, not by queue serialization.
+- **If a second core PR E were enqueued at T₁**, it would join the tail of *every* queue and wait for B, C, and D to clear before merging. Core is never allowed to overtake an in-flight provider or integration-tests PR.
 
 ### 4.3 Data model
 
@@ -179,7 +164,7 @@ A hidden marker plus a JSON header carries the fields the processor needs across
 
 ```html
 <!-- mq-status -->
-<!-- mq-meta: {"schema":1,"enqueued_at":"2026-04-22T15:23:14Z","queues":["miopen-provider","integration-tests"],"active_sha":"a1b2c3d"} -->
+<!-- mq-meta: {"schema":1,"enqueued_at":"2026-04-22T15:23:14Z","queues":["miopen-provider"],"active_sha":"a1b2c3d"} -->
 ```
 
 Other state (queue position, CI status, eject reason) is *not* persisted in the JSON — it's recomputed each cycle from labels and the live queue picture, then rendered into the visible body. Example queued-state body for a miopen-provider PR:
@@ -189,12 +174,11 @@ Other state (queue position, CI status, eject reason) is *not* persisted in the 
 
 Enqueued by @samuel-reeder at 2026-04-22 15:23 UTC.
 
-This PR touches `dnn-providers/miopen-provider/**`, entering 2 queues:
+This PR touches `dnn-providers/miopen-provider/**`, entering 1 queue:
 
-| Queue               | Position | Blocked by   |
-| ------------------- | -------- | ------------ |
-| `miopen-provider`   | 2 of 3   | #4521        |
-| `integration-tests` | 3 of 5   | #4521, #4523 |
+| Queue             | Position | Blocked by |
+| ----------------- | -------- | ---------- |
+| `miopen-provider` | 2 of 3   | #4521      |
 
 Comment `/dequeue` to leave the queue. Processor runs every 3 minutes.
 
@@ -309,9 +293,9 @@ Crash-safety follows from the single concurrency group ([§4.7](#47-cadence-and-
 
 To opt in a new component, two edits to the centralized `PATH_TO_QUEUES` config:
 
-1. **Add your path entry.** Map your path prefix to a list of queues: your own queue, plus the queue of every component downstream of you (the membership rule from [§4.2](#42-path--queue-mapping)). For example, a new provider whose only downstream component is `integration-tests`:
+1. **Add your path entry.** Map your path prefix to a list of queues: your own queue, plus the queue of every downstream component your changes could break (the membership rule from [§4.2](#42-path--queue-mapping)). For example, a new provider that reaches integration-tests only through hipDNN's plugin interface enters only its own queue:
    ```python
-   "dnn-providers/new-provider/": ["new-provider", "integration-tests"],
+   "dnn-providers/new-provider/": ["new-provider"],
    ```
 2. **Update entries of components upstream of you.** Any component that lists you as downstream must add your queue to its list. For hipDNN core (upstream of all providers), add `"new-provider"` to the `projects/hipdnn/` entry so that core PRs serialize with the new provider.
 
@@ -368,7 +352,7 @@ Implement and validate against a fork of `rocm-libraries`. Synthetic PRs against
 - **Serialization throughput — wall-clock end-to-end CI for a PR can comfortably exceed several hours.** Three contributing factors:
   - *Per-job timeouts.* Build jobs are bounded at 30 minutes ([`therock-ci-linux.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-ci-linux.yml), `timeout-minutes: 30`); individual test-component jobs are bounded at 210 minutes / 3.5 hours ([`therock-test-component.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-test-component.yml), `timeout-minutes: 210`).
   - *Per-cycle setup overhead.* Machine acquisition, cache restoration, and matrix fan-out are fixed per attempt and not amortizable across queue cycles. Runner availability can itself be a bottleneck, adding significant wall-clock time before a job even starts.
-  - *n × CI drain time.* Intersecting PRs (e.g. two provider PRs sharing `integration-tests`) merge one at a time, each waiting for a full CI cycle; a queue of *n* intersecting PRs takes roughly *n × CI time* to drain.
+  - *n × CI drain time.* Intersecting PRs (e.g. multiple core PRs in succession, or any PR queued behind a core PR in a shared queue) merge one at a time, each waiting for a full CI cycle; a queue of *n* intersecting PRs takes roughly *n × CI time* to drain.
 - **No CI retries — flakes are terminal.** The processor treats any failed required check as a real failure (`any_required_check_failed → eject`). On a heterogeneous GPU matrix, transient hardware/runner failures eject otherwise-good PRs and force a manual `/merge` re-enqueue, paying another full CI cycle. This compounds with the throughput risk above: every flake-induced eject is another *n × CI* penalty.
 - **Surprise auto-eject** when an author pushes new commits mid-queue. Detection happens on the next processor cycle (up to 3 minutes after the push), so feedback is not instant — the eject comment must be explicit about why and how to re-enqueue.
 
