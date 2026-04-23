@@ -598,8 +598,6 @@ def main(
         backend: Backend configuration from config["Backend"] (defaults to {})
         buildOnly: If True, generate and build kernels but skip benchmarking.
     """
-    getClientExecutablePath()
-
     if config is None:
         print(f'No config specified in {globalParameters["ConfigPath"]}, built client only')
         return
