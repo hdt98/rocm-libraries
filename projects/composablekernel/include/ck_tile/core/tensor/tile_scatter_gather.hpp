@@ -783,7 +783,11 @@ struct tile_scatter_gather
                 const auto lds_coord =
                     make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
 
-                // Calculate SMEM address using typed pointer arithmetic
+                // Calculate SMEM address using typed pointer arithmetic.
+                // Strict-aliasing: see matching note in tile_window.hpp. The LDS
+                // region was sized via lds_padded_sizeof<LdsDataType>(), so it
+                // is a valid array of lds_padded_element<LdsDataType>; the leaf
+                // access goes through &padded_base[i].value (LdsDataType lvalue).
                 auto* padded_base =
                     reinterpret_cast<CK_TILE_LDS_ADDR lds_padded_element<LdsDataType>*>(
                         lds_base_ptr);

@@ -13,33 +13,34 @@ template <index_t pk_size>
 struct pk_fp6_t
 {
     static constexpr index_t num_bits_elem = 6;
-    using element_type                     = int32_t; // element storage fundamental type
+    using element_type                     = uint32_t; // element storage fundamental type
     static constexpr index_t packed_size   = pk_size;
     static constexpr index_t num_bits_vec_elem =
         sizeof(element_type) * 8; // 32-bit uint for storage
     static_assert((packed_size * num_bits_elem) % num_bits_vec_elem == 0,
                   "Packed elements must fit exactly into the element storage.");
     static constexpr index_t vector_size = (packed_size * num_bits_elem) / num_bits_vec_elem;
-    element_type data_[vector_size]; // packed data
+    element_type data_[vector_size]{}; // packed data, value-initialized to all zeros
     using type = pk_fp6_t<packed_size>;
 
-    CK_TILE_HOST_DEVICE constexpr pk_fp6_t() : data_{element_type{}} {}
+    CK_TILE_HOST_DEVICE constexpr pk_fp6_t() = default;
 
     CK_TILE_HOST_DEVICE constexpr explicit pk_fp6_t(int value)
     {
+        const element_type v = static_cast<element_type>(value);
         for(size_t i = 0; i < vector_size; ++i)
         {
-            data_[i] = value;
+            data_[i] = v;
         }
     }
     CK_TILE_HOST_DEVICE void pack(const int32_t x, const index_t i)
     {
-        int32_t bits         = static_cast<int32_t>(x) & 0x3F;
-        const int bit_pos    = i * num_bits_elem;
-        const int arr_index  = bit_pos / num_bits_vec_elem;
-        const int bit_offset = bit_pos % num_bits_vec_elem;
-        const int overhang   = bit_offset + num_bits_elem - num_bits_vec_elem;
-        int32_t old_value    = data_[arr_index];
+        element_type bits      = static_cast<element_type>(x) & 0x3Fu;
+        const int bit_pos      = i * num_bits_elem;
+        const int arr_index    = bit_pos / num_bits_vec_elem;
+        const int bit_offset   = bit_pos % num_bits_vec_elem;
+        const int overhang     = bit_offset + num_bits_elem - num_bits_vec_elem;
+        element_type old_value = data_[arr_index];
 
         // insert bits into the current 32-bit block
         old_value |= (bits << bit_offset);
@@ -48,7 +49,7 @@ struct pk_fp6_t
         // if it crosses into the next block, shift the remainder
         if(overhang > 0 && (arr_index + 1) < vector_size)
         {
-            int32_t next_value = data_[arr_index + 1];
+            element_type next_value = data_[arr_index + 1];
             next_value |= (bits >> (num_bits_elem - overhang));
             data_[arr_index + 1] = next_value;
         }
@@ -62,19 +63,21 @@ struct pk_fp6_t
         const int bit_offset = bit_pos % num_bits_vec_elem;
         const int overhang   = bit_offset + num_bits_elem - num_bits_vec_elem;
 
-        uint32_t bits = static_cast<uint32_t>(pk.data_[arr_idx]) >> bit_offset;
+        uint32_t bits = pk.data_[arr_idx] >> bit_offset;
         if(overhang > 0 && (arr_idx + 1) < vector_size)
         {
-            bits |= (static_cast<uint32_t>(pk.data_[arr_idx + 1]) & ((1u << overhang) - 1))
-                    << (num_bits_elem - overhang);
+            bits |= (pk.data_[arr_idx + 1] & ((1u << overhang) - 1)) << (num_bits_elem - overhang);
         }
 
-        return static_cast<int32_t>(bits & 0x3F);
+        return static_cast<int32_t>(bits & 0x3Fu);
     }
 
     CK_TILE_HOST_DEVICE int32_t unpack(const index_t i) const { return unpack(*this, i); }
 
-    CK_TILE_HOST_DEVICE int32_t operator[](index_t i) const { return data_[i]; }
+    CK_TILE_HOST_DEVICE int32_t operator[](index_t i) const
+    {
+        return static_cast<int32_t>(data_[i]);
+    }
 
     CK_TILE_HOST_DEVICE static float fp6_e2m3_to_float(int32_t fp6_bits)
     {
@@ -102,20 +105,76 @@ struct pk_fp6_t
         return sign == 1 ? -1 * result : result;
     }
 
+    // Closed-form round-to-nearest float -> E2M3 (1 sign / 2 exp / 3 mant,
+    // bias=1). Saturates to +/- max representable (7.5) for overflow and
+    // non-finite inputs (E2M3 has no inf/nan encodings).
     CK_TILE_HOST static int32_t float_to_fp6_e2m3(float val)
     {
-        int32_t best   = 0;
-        float best_err = 1e30f;
-        for(int32_t i = 0; i < 64; i++)
+        constexpr int32_t kSatMag = 0x1F; // exp=3, mant=7 -> 7.5
+
+        const uint32_t sign = std::signbit(val) ? 1u : 0u;
+
+        if(!std::isfinite(val))
         {
-            float err = std::fabs(val - fp6_e2m3_to_float(i));
-            if(err < best_err)
+            return static_cast<int32_t>((sign << 5) | kSatMag);
+        }
+
+        const float mag = std::fabs(val);
+
+        // Saturate to the largest representable magnitude.
+        if(mag >= 7.5f)
+        {
+            return static_cast<int32_t>((sign << 5) | kSatMag);
+        }
+
+        uint32_t exp_bits;
+        uint32_t mant_bits;
+
+        if(mag < 1.0f)
+        {
+            // Subnormal range: value = mant/8.
+            const float scaled = mag * 8.0f;
+            const uint32_t m   = static_cast<uint32_t>(std::floor(scaled + 0.5f));
+            if(m >= 8u)
             {
-                best     = i;
-                best_err = err;
+                // Rounded up into the smallest normal (1.0).
+                exp_bits  = 1u;
+                mant_bits = 0u;
+            }
+            else
+            {
+                exp_bits  = 0u;
+                mant_bits = m;
             }
         }
-        return best;
+        else
+        {
+            // Normal range: value = (1 + mant/8) * 2^(exp-1), exp in [1,3].
+            int e = static_cast<int>(std::floor(std::log2(mag))) + 1;
+            if(e < 1)
+                e = 1;
+            if(e > 3)
+                e = 3;
+            const float scale = std::exp2f(static_cast<float>(e - 1));
+            int m             = static_cast<int>(std::floor((mag / scale - 1.0f) * 8.0f + 0.5f));
+
+            // Mantissa overflow -> bump exponent.
+            if(m >= 8)
+            {
+                m = 0;
+                ++e;
+                if(e > 3)
+                {
+                    return static_cast<int32_t>((sign << 5) | kSatMag);
+                }
+            }
+            if(m < 0)
+                m = 0;
+            exp_bits  = static_cast<uint32_t>(e);
+            mant_bits = static_cast<uint32_t>(m);
+        }
+
+        return static_cast<int32_t>((sign << 5) | (exp_bits << 3) | mant_bits);
     }
 };
 

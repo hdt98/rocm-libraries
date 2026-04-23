@@ -630,7 +630,13 @@ struct tile_window_with_static_distribution
                 const auto lds_coord =
                     make_tensor_coordinate(tensor_descriptor, lds_bottom_tensor_thread_idx);
 
-                // Calculate SMEM address using typed pointer arithmetic
+                // Calculate SMEM address using typed pointer arithmetic.
+                // Strict-aliasing: the LDS region pointed to by lds_base_ptr was
+                // sized via lds_padded_sizeof<LdsDataType>() at the kernel level
+                // (see GetSmemSizeA/B in the policy), so it is a valid array of
+                // lds_padded_element<LdsDataType>. The leaf load/store goes
+                // through &padded_base[i].value, which is in the permitted
+                // aliasing set for LdsDataType.
                 auto* padded_base =
                     reinterpret_cast<CK_TILE_LDS_ADDR lds_padded_element<LdsDataType>*>(
                         lds_base_ptr);

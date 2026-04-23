@@ -388,9 +388,13 @@ struct MXGemmKernel : UniversalGemmKernel<TilePartitioner_, MXGemmPipeline_, Epi
         const int total_work_tile_cnt =
             amd_wave_read_first_lane(TilePartitioner::GridSize(kargs.M, kargs.N));
 
-        // Allocate shared memory for ping pong buffers
-        __shared__ char smem_ptr_ping[GetSmemPingSize()];
-        __shared__ char smem_ptr_pong[GetSmemPongSize()];
+        // Allocate shared memory for ping pong buffers.
+        // alignas(16): MXFP6 path reinterprets this LDS base as
+        // lds_padded_element<pk_fp6x16_t>* (16-byte stride). Make the
+        // alignment contract explicit instead of relying on the AMDGPU
+        // default LDS symbol alignment.
+        alignas(16) __shared__ char smem_ptr_ping[GetSmemPingSize()];
+        alignas(16) __shared__ char smem_ptr_pong[GetSmemPongSize()];
 
         // Support both persistent and non-persistent modes
         do

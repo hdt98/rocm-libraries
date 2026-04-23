@@ -4,6 +4,7 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/core/tensor/lds_padding.hpp"
 #include "ck_tile/ops/common.hpp"
 
 namespace ck_tile {

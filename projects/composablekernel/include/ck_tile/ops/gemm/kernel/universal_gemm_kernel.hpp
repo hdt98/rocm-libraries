@@ -1205,7 +1205,10 @@ struct UniversalGemmKernel
         }
 
         // allocate LDS
-        __shared__ char smem_ptr[GetSmemSize()];
+        // alignas(16): MXFP6 path reinterprets this LDS base as
+        // lds_padded_element<pk_fp6x16_t>* (16-byte stride). Make the
+        // alignment contract explicit.
+        alignas(16) __shared__ char smem_ptr[GetSmemSize()];
 
         RunGemm(
             as_ptr, bs_ptr, kargs.ds_ptr, e_ptr, smem_ptr, kargs, splitk_batch_offset, i_m, i_n);
@@ -1287,7 +1290,10 @@ struct UniversalGemmKernel
             }
 
             // allocate LDS
-            __shared__ char smem_ptr[GetSmemSize()];
+            // alignas(16): MXFP6 path reinterprets this LDS base as
+            // lds_padded_element<pk_fp6x16_t>* (16-byte stride). Make the
+            // alignment contract explicit.
+            alignas(16) __shared__ char smem_ptr[GetSmemSize()];
             // Run the GEMM
 
             RunGemm(as_ptr,
