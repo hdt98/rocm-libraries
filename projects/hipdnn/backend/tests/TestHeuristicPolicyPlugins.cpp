@@ -36,13 +36,48 @@ using namespace hipdnn_backend::plugin;
 namespace
 {
 // Helper to get the plugin directory for tests
-// Tests binaries are in build/bin/, plugins are in build/lib/hipdnn_plugins/heuristics/
+// Tests binaries are in build/bin/, plugins could be in:
+// - build/lib/hipdnn_plugins/heuristics/ (Linux/Unix)
+// - build/bin/hipdnn_plugins/heuristics/ (Windows DLLs)
 std::filesystem::path getTestPluginDirectory()
 {
-    // Get the directory containing the test binary, then navigate to heuristic plugins directory
-    // Test binary is in build/bin/, plugins are in build/lib/hipdnn_plugins/heuristics/
+    // First, check for environment variable override
+    const auto envPath = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_PLUGIN_DIR");
+    if(!envPath.empty())
+    {
+        return {envPath};
+    }
+
+    // Get the directory containing the test binary
     const auto testBinDir = hipdnn_backend::platform_utilities::getCurrentModuleDirectory();
-    return testBinDir.parent_path() / "lib" / "hipdnn_plugins" / "heuristics";
+    const auto buildRoot = testBinDir.parent_path();
+
+    // Try multiple possible locations
+    const std::vector<std::filesystem::path> candidatePaths = {
+        buildRoot / "lib" / "hipdnn_plugins" / "heuristics", // Linux/Unix
+        buildRoot / "bin" / "hipdnn_plugins" / "heuristics", // Windows DLLs
+        buildRoot / "lib64" / "hipdnn_plugins" / "heuristics", // lib64 systems
+    };
+
+    // Return the first path that exists and contains plugin files
+    for(const auto& path : candidatePaths)
+    {
+        if(std::filesystem::exists(path))
+        {
+            // Check if directory contains any .so or .dll files
+            for(const auto& entry : std::filesystem::directory_iterator(path))
+            {
+                const auto ext = entry.path().extension();
+                if(ext == ".so" || ext == ".dll" || ext == ".dylib")
+                {
+                    return path;
+                }
+            }
+        }
+    }
+
+    // Fallback to original behavior (lib)
+    return buildRoot / "lib" / "hipdnn_plugins" / "heuristics";
 }
 } // anonymous namespace
 

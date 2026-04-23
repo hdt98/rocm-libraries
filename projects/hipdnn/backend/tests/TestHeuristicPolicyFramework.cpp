@@ -19,6 +19,8 @@
 #include "heuristics/SelectionHeuristic.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+
 #include <gtest/gtest.h>
 
 using namespace hipdnn_backend;
@@ -139,16 +141,16 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
 TEST_F(TestHeuristicPolicyFramework, EnvironmentVariablePolicyOrderIsRespected)
 {
     // Set environment variable
-    setenv("HIPDNN_HEURISTIC_POLICY_ORDER",
-           "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config",
-           1);
+    hipdnn_data_sdk::utilities::setEnv(
+        "HIPDNN_HEURISTIC_POLICY_ORDER",
+        "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config");
 
     // Create a descriptor and check resolved order
     auto graph = std::make_shared<GraphDescriptor>();
     // Note: This is a simplified test - full integration would require a valid graph
 
     // Clean up
-    unsetenv("HIPDNN_HEURISTIC_POLICY_ORDER");
+    hipdnn_data_sdk::utilities::unsetEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
 }
 
 // ========== Policy Behavior Tests ==========
