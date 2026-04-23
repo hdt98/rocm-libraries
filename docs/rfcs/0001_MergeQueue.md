@@ -28,7 +28,7 @@
 
 This RFC proposes a custom, in-repo **federated** merge queue for rocm-libraries on `develop`: per-component FIFO queues that interconnect along the dependency graph, rather than a single global queue serializing everything. A PR enters the queue of every component its changes could affect, and merges only when it is at the head of all of them. Authors trigger the queue with a `/merge` PR comment; an in-repo workflow squash-merges PRs as they reach the front.
 
-Initial scope is the hipDNN ecosystem: `hipdnn` core, four providers (`miopen-provider`, `hipblaslt-provider`, `hip-kernel-provider`, `fusilli-provider`), and `integration-tests`. The queue is opt-in — other rocm-libraries subprojects are unaffected — starts optional (no branch-protection changes), and is designed so any project can join later by adding centralized config entries.
+Initial scope is the hipDNN ecosystem: `hipdnn` core, four providers (`miopen-provider`, `hipblaslt-provider`, `hip-kernel-provider`, `fusilli-provider`), and `integration-tests`. The queue is opt-in (other rocm-libraries subprojects are unaffected) and starts optional, with no branch-protection changes; any project can join later by adding centralized config entries.
 
 ## 2. Problem Statement
 
@@ -112,7 +112,7 @@ integration-tests   │   ·    │    ·     │     ·     │     ·      │
 Three patterns follow:
 
 - The `hipdnn core` row is fully marked — core sits upstream of every component and could break any of them.
-- Each provider row has a single mark — provider PRs serialize only with other PRs in their own provider queue. The plugin interface decouples them from integration-tests.
+- Each provider row has a single mark — its own queue, no others. The plugin interface decouples it from integration-tests.
 - The `integration-tests` row has a single mark — it has no downstream components.
 
 A PR editing both `projects/hipdnn/api/foo.h` and `dnn-providers/miopen-provider/src/bar.cpp` enters all six queues — core's row is a superset of every provider's row.
@@ -145,7 +145,7 @@ T₁ — after A merges
 
 Two takeaways:
 
-- **B, C, and D run in parallel.** Provider PRs don't enter `integration-tests`, so they neither block each other nor block integration-test work. The plugin contract is enforced by per-PR CI, not by queue serialization.
+- **B, C, and D run in parallel.** Provider PRs don't enter `integration-tests`, so they neither block each other nor block integration-test work. They're still serialized within their own provider queue; the design just doesn't *also* serialize them through integration-tests, trusting the plugin contract to hold.
 - **If a second core PR E were enqueued at T₁**, it would join the tail of *every* queue and wait for B, C, and D to clear before merging. Core is never allowed to overtake an in-flight provider or integration-tests PR.
 
 ### 4.3 Data model
@@ -254,8 +254,8 @@ process_cycle():
     # 4. For each ready PR, advance its state machine.
     for pr in ready:
         if "mq:active" not in pr.labels:
-            # 4a. Activate: rebase against develop, record the resulting SHA,
-            #     then wait one cycle for CI.
+            # 4a. Activate: merge develop into the branch, record the resulting
+            #     SHA, then wait one cycle for CI.
             result = merge_develop_into(pr.branch, author=BOT_USER)
             if result.is_conflict:
                 eject(pr, reason="merge conflict with develop")
@@ -278,7 +278,7 @@ process_cycle():
 A few invariants worth calling out:
 
 - **No persistent processor state.** Every cycle starts from `search_prs(...)` and rebuilds `members` from scratch. If a cycle crashes mid-flight, the next cycle reconstructs the same picture from labels and the status comment's hidden JSON. State lives in the PR, not in the runner.
-- **Activation and evaluation never happen in the same cycle.** Step 4a ends with `continue`, so a freshly activated PR is evaluated only by step 4b on the *next* cycle — CI sees the rebased tip before the queue acts on its result.
+- **Activation and evaluation never happen in the same cycle.** Step 4a ends with `continue`, so a freshly activated PR is evaluated only by step 4b on the *next* cycle — CI sees the post-merge tip before the queue acts on its result.
 - **Per-queue FIFO is enforced by sort, not by a stored cursor.** The head of each queue is always the open PR with the oldest `enqueued_at` in that queue's member list — no separate "current head" pointer to fall out of sync.
 
 Crash-safety follows from the single concurrency group ([§4.7](#47-cadence-and-concurrency)) plus per-step idempotency. Activation does three writes — the `develop`-merge, the `active_sha` update, and the `mq:queued` → `mq:active` flip — and each is individually idempotent: re-merging `develop` after a successful merge is a no-op (or fast-forward), the `active_sha` write overwrites, and the label flip is idempotent on each side. A crash between any two writes leaves the PR in a state where the next cycle treats it as not-yet-activated and re-runs activation, converging to the same end state.
@@ -358,4 +358,4 @@ Implement and validate against a fork of `rocm-libraries`. Synthetic PRs against
 
 ## Appendix A: Prototype reference
 
-A working prototype implementing a functionaly resemblance of this design lives at <https://github.com/SamuelReeder/rocm-libraries/tree/develop/.github>. However, this RFC is the source of truth, and the prototype will be reshaped to match these specifications before adoption.
+A working prototype implementing a functional resemblance of this design lives at <https://github.com/SamuelReeder/rocm-libraries/tree/develop/.github>. However, this RFC is the source of truth, and the prototype will be reshaped to match these specifications before adoption.
