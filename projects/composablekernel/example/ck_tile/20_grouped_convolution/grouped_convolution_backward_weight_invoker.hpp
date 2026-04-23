@@ -56,9 +56,9 @@ struct GroupedConvolutionBackwardWeightInvoker
                                                                  WeiLayout,
                                                                  DsLayout,
                                                                  OutLayout,
-                                                                 ConvConfig::VectorSizeA,
-                                                                 ConvConfig::VectorSizeB,
-                                                                 ConvConfig::VectorSizeC,
+                                                                 1,
+                                                                 1,
+                                                                 1,
                                                                  ConvConfig::NumGroupsToMerge>;
 
         using TilePartitioner =

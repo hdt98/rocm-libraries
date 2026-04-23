@@ -70,8 +70,8 @@ template <typename PrecType>
 struct ConvConfigComputeV3 : public ConvConfigBase
 {
     // Compute V3 only support Intrawave scheduler
-    static constexpr ck_tile::index_t M_Tile = 16;
-    static constexpr ck_tile::index_t N_Tile = 64;
+    static constexpr ck_tile::index_t M_Tile = 128;
+    static constexpr ck_tile::index_t N_Tile = 128;
     static constexpr ck_tile::index_t K_Tile = 64;
 
     static constexpr ck_tile::index_t M_Warp = 1;
