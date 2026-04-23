@@ -79,7 +79,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, kAsyncKBuffers, 1>;
 
-    static constexpr bool kUseAsyncVLoad = kUseAsyncKLoad && (kAsyncKBuffers > 1);
+    // V async disabled when masking: the K_next prefetch advances k_dram_block_window
+    // before the mask check, causing an off-by-kN0 error in edge tile detection at
+    // high occupancy. TODO: fix by saving K origin before advancing.
+    static constexpr bool kUseAsyncVLoad =
+        kUseAsyncKLoad && (kAsyncKBuffers > 1) && !FmhaMask::IsMasking;
     static constexpr index_t k1_loops_static = BlockFmhaShape::kN0 / BlockFmhaShape::kK1;
     using AsyncVPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, 1, k1_loops_static>;
@@ -203,11 +207,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 {
                     constexpr index_t k_smem = AsyncKPolicy::template GetSmemSizeKV<Problem>();
                     constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
-                    // Add padding: buffer_load_dwordx4 lds writes 64*16=1024
-                    // bytes per warp at M0+TID*16, which may extend beyond
-                    // the element-space-based allocation for packed types.
-                    constexpr index_t kPad = 1024;
-                    return k_smem + v_smem + kPad;
+                    return k_smem + v_smem;
                 }
                 else
                     return AsyncKPolicy::template GetSmemSizeKV<Problem>() +
