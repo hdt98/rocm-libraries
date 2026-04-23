@@ -129,17 +129,14 @@ jobs:
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET" \
             -DENABLE_CLANG_FORMAT=OFF \
-            -DENABLE_CLANG_TIDY=OFF
+            -DENABLE_CLANG_TIDY=OFF \
+            -DROCM_LIBS_ENABLE_ROOT_CTEST=ON
 
       - name: Build
         run: cmake --build build
 
-      # TODO: Enable unit tests when ready (no GPU required for unit tests)
-      # - name: Run unit tests
-      #   run: |
-      #     cmake --build build --target hipdnn-unit-check
-      #     cmake --build build --target miopen-provider-unit-check
-      #     cmake --build build --target hipblaslt-provider-unit-check
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   build-linux:
     name: Linux Superbuild
@@ -200,17 +197,14 @@ jobs:
             -DCMAKE_PROGRAM_PATH="$ROCM_SDK_PATH/lib/llvm/bin" \
             -DGPU_TARGETS="$GPU_TARGET" \
             -DENABLE_CLANG_FORMAT=OFF \
-            -DENABLE_CLANG_TIDY=OFF
+            -DENABLE_CLANG_TIDY=OFF \
+            -DROCM_LIBS_ENABLE_ROOT_CTEST=ON
 
       - name: Build
         run: cmake --build build
 
-      # TODO: Enable unit tests when ready (no GPU required for unit tests)
-      # - name: Run unit tests
-      #   run: |
-      #     cmake --build build --target hipdnn-unit-check
-      #     cmake --build build --target miopen-provider-unit-check
-      #     cmake --build build --target hipblaslt-provider-unit-check
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   summary:
     name: hipDNN Superbuild Summary
