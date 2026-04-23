@@ -608,20 +608,20 @@ struct DeviceGroupedGemm_Wmma_Multi_ABD_Fixed_NK
         {
             const auto& gk = arg.gemm_desc_kernel_arg_[i];
             const KernelArgument a{gk.p_as_grid,
-                                    gk.p_bs_grid,
-                                    gk.p_ds_grid,
-                                    static_cast<EDataType*>(gk.p_e_grid),
-                                    gk.M,
-                                    gk.N,
-                                    gk.K,
-                                    gk.StrideAs,
-                                    gk.StrideBs,
-                                    gk.StrideDs,
-                                    gk.StrideE,
-                                    arg.k_batch_,
-                                    arg.a_element_op_,
-                                    arg.b_element_op_,
-                                    arg.c_element_op_};
+                                   gk.p_bs_grid,
+                                   gk.p_ds_grid,
+                                   static_cast<EDataType*>(gk.p_e_grid),
+                                   gk.M,
+                                   gk.N,
+                                   gk.K,
+                                   gk.StrideAs,
+                                   gk.StrideBs,
+                                   gk.StrideDs,
+                                   gk.StrideE,
+                                   arg.k_batch_,
+                                   arg.a_element_op_,
+                                   arg.b_element_op_,
+                                   arg.c_element_op_};
 
             if(ck::is_gfx12_supported() && !GridwiseGemm::CheckValidityAWaveTransfer(a.M, a.K))
             {
