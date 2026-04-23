@@ -24,8 +24,8 @@ SharedLibrary::SharedLibrary(const std::filesystem::path& libraryPath)
 }
 
 SharedLibrary::SharedLibrary(SharedLibrary&& other) noexcept
-    : _libraryHandle(other._libraryHandle)
-    , _libraryPath(std::move(other._libraryPath))
+    : _libraryPath(std::move(other._libraryPath))
+    , _libraryHandle(other._libraryHandle)
 {
     other._libraryHandle = nullptr;
     other._libraryPath.clear();

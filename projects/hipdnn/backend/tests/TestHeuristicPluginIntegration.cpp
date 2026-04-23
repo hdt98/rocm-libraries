@@ -812,10 +812,10 @@ TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
                 // Error text uses SharedLibrary's weakly_canonical path; on Windows the string can
                 // differ in drive-letter case or separators from a fresh weakly_canonical(pluginPath).
                 const auto canonicalPath = std::filesystem::weakly_canonical(pluginPath);
-                static constexpr std::string_view kPluginPrefix{"Plugin: "};
-                const auto prefixPos = errorMsg.find(kPluginPrefix);
+                static constexpr std::string_view K_PLUGIN_PREFIX{"Plugin: "};
+                const auto prefixPos = errorMsg.find(K_PLUGIN_PREFIX);
                 ASSERT_NE(prefixPos, std::string::npos);
-                const auto pathStart = prefixPos + kPluginPrefix.size();
+                const auto pathStart = prefixPos + K_PLUGIN_PREFIX.size();
                 const auto pathEnd = errorMsg.find('\n', pathStart);
                 ASSERT_NE(pathEnd, std::string::npos);
                 const std::filesystem::path pluginPathInMessage(
