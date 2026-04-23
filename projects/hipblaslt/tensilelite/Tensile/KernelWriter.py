@@ -3062,8 +3062,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-        doReadMXSA = 1 if u == 0 else 0
-        doReadMXSB = 1 if u == 0 else 0
       # reads for next loop
       doNext = uNext > localWriteEndIter
       doReadA = doReadA or (hasLiveLdsData and doNext)
@@ -3766,8 +3764,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         doReadMXSB = 1 if u == 0 else 0
         doReadB = 1 if u == 0 else 0
         doReadM = 1 if u == 0 else 0
-        doReadMXSA = 1 if u == 0 else 0
-        doReadMXSB = 1 if u == 0 else 0
 
       # reads for next loop
       doNext = uNext > localWriteEndIter
@@ -5465,10 +5461,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.tailloopInNll = kernel["TailloopInNll"]
     # remove staggerU code for the following cases
     # - tailloopInNll (cannot support staggerU)
-    # - StreamK + MX (not enough sgpr)
+    # - StreamK + MX (not enough sgpr. gfx950 only for now)
     self.states.staggerUCode = True
     if self.states.tailloopInNll or \
-       ((kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"])):
+       ((kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and kernel["ISA"][:2] == (9, 5)):
       self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
@@ -5716,11 +5712,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.numReadsIterCoalescedMXSA  = 1
     self.states.numIterPerCoalescedReadMXSA = max(1, self.states.numReadsIterCoalescedMXSA // kernel["InnerUnroll"])
     self.states.numReadsIterCoalescedMXSB  = 1
-    self.states.numIterPerCoalescedReadMXSB = max(1, self.states.numReadsIterCoalescedMXSB // kernel["InnerUnroll"])
-
-    self.states.numReadsIterCoalescedMXSA  = 1
-    self.states.numReadsIterCoalescedMXSB  = 1
-    self.states.numIterPerCoalescedReadMXSA = max(1, self.states.numReadsIterCoalescedMXSA // kernel["InnerUnroll"])
     self.states.numIterPerCoalescedReadMXSB = max(1, self.states.numReadsIterCoalescedMXSB // kernel["InnerUnroll"])
 
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
@@ -6444,11 +6435,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     ####################################
     # num vgprs: local read addresses
     self.states.a.numVgprLocalReadAddr = 1 * self.states.rpla
-    if kernel["ProblemType"]["MXBlockA"]:
-      self.states.mxsa.numVgprLocalReadAddr = 1 * self.states.rpla
     self.states.b.numVgprLocalReadAddr = 1 * self.states.rpla
-    if kernel["ProblemType"]["MXBlockB"]:
-      self.states.mxsb.numVgprLocalReadAddr = 1 * self.states.rpla
     self.states.m.numVgprLocalReadAddr = 1 * self.states.rpla
     if kernel["ProblemType"]["MXBlockA"]:
       self.states.mxsa.numVgprLocalReadAddr = 1 * self.states.rpla
@@ -6575,14 +6562,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if kernel["StoreSwapAddr"]:
       if self.states.a.numVgprLocalReadAddr > 0:
         self.states.a.numVgprLocalReadSwapAddr = 1
-      if kernel["ProblemType"]["MXBlockA"]:
-        if self.states.mxsa.numVgprLocalReadAddr > 0:
-          self.states.mxsa.numVgprLocalReadSwapAddr = 1
       if self.states.b.numVgprLocalReadAddr > 0:
         self.states.b.numVgprLocalReadSwapAddr = 1
-      if kernel["ProblemType"]["MXBlockB"]:
-        if self.states.mxsb.numVgprLocalReadAddr > 0:
-          self.states.mxsb.numVgprLocalReadSwapAddr = 1
       if self.states.m.numVgprLocalReadAddr > 0:
         self.states.m.numVgprLocalReadSwapAddr = 1
       if kernel["ProblemType"]["MXBlockA"] and (self.states.mxsa.numVgprLocalReadAddr > 0):
