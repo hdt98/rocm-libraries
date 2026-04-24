@@ -27,6 +27,13 @@ from codegen.cpp_symbol_map import (
 )
 from codegen.utils import check_duplicates_and_paddings, if_, indent, update_file
 
+# Architecture trait for kernels requiring global_load_lds (CDNA3+).
+# Only used for GLOBAL_LOAD_LDS variants; all other kernels are arch-agnostic.
+CDNA3_PLUS_ARCH = ArchTrait(
+    "cdna3_plus",
+    preprocessor_check="defined(__gfx94__) || defined(__gfx950__)",
+)
+
 DTYPE_BITS = {
     "fp32": 32,
     "fp16": 16,
@@ -36,6 +43,10 @@ DTYPE_BITS = {
     "fp8fp32": 8,
     "bf8": 8,
 }
+
+# Element size in bytes per dtype, used by the auto-generated dispatcher to
+# decide kv_load_mode per-arm (total KV cache bytes vs INT32_MAX).
+DTYPE_BYTES = {k: v // 8 for k, v in DTYPE_BITS.items()}
 
 K0_MAX_SUBMAX_MAP = {32: 32, 64: 64, 96: 128, 128: 128, 256: 256}
 
@@ -49,6 +60,10 @@ KV_MEMORY_LAYOUT_ENUM_MAP = {
 KV_LOOKUP_TABLE_ENUM_MAP = {
     "vllm": "ck_tile::BlockAttentionKVCacheLookupTableEnum::VLLM_BLOCK_TABLE_2D",
     "sglang": "ck_tile::BlockAttentionKVCacheLookupTableEnum::SGLANG_PAGE_TABLE_1D",
+}
+KV_LOAD_MODE_ENUM_MAP = {
+    False: "ck_tile::BlockAttentionKVCacheLoadModeEnum::BUFFER_LOAD",
+    True: "ck_tile::BlockAttentionKVCacheLoadModeEnum::GLOBAL_LOAD_LDS",
 }
 
 
@@ -68,7 +83,7 @@ FMHA_FWD_KERNEL_HEADER = """// SPDX-License-Identifier: MIT
 FMHA_FWD_KERNEL_BODY_TEMPLATE = """
 #include <iostream>
 
-#if !defined(__HIP_DEVICE_COMPILE__) || ({F_arch.preprocessor_check})
+#if !defined(__HIP_DEVICE_COMPILE__) || ({F_compile_guard})
 
 using fmha_dtype = {F_dtype};
 
@@ -96,7 +111,8 @@ using fmha_trait = ck_tile::TileFmhaBatchPrefillTraits<{F_spad},
                                                     {F_sink},
                                                     {F_page_size},
                                                     {F_kv_memory_layout},
-                                                    {F_kv_lookup_table}>;
+                                                    {F_kv_lookup_table},
+                                                    {F_kv_load_mode}>;
 
 using fmha_variant = ck_tile::ComposedAttention<{F_logits} * ck_tile::LOGITS_SOFT_CAP, CK_TILE_FMHA_FWD_FAST_EXP2>;
 
@@ -133,7 +149,7 @@ using fmha_epilogue =
 using fmha_kernel = {F_kernel}<fmha_pipeline, fmha_epilogue>;
 
 using trait = fmha_fwd_batch_prefill_traits_<{F_hdim}, {F_dtype}, {F_mode},{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout},
-                        {F_pipeline_enum}, {F_logits}, fmha_mask, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, false, false, {F_sink}, {F_page_size}, {F_kv_memory_layout}, {F_kv_lookup_table}>;
+                        {F_pipeline_enum}, {F_logits}, fmha_mask, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, false, false, {F_sink}, {F_page_size}, {F_kv_memory_layout}, {F_kv_lookup_table}, {F_kv_load_mode}>;
 
 template<>
 float fmha_batch_prefill_<trait, {F_arch.tag}>(const ck_tile::stream_config& s, fmha_batch_prefill_args a)
@@ -147,7 +163,7 @@ float fmha_batch_prefill_<trait, {F_arch.tag}>(const ck_tile::stream_config& s, 
     return ck_tile::launch_kernel(s, ck_tile::make_kernel<kBlockPerCu, {F_kernel_attr}>(k_{{}}, grids, blocks, 0, kargs));
 }}
 
-#endif // !defined(__HIP_DEVICE_COMPILE__) || ({F_arch.preprocessor_check})
+#endif // !defined(__HIP_DEVICE_COMPILE__) || ({F_compile_guard})
 """
 
 FMHA_FWD_API_FILENAME = "fmha_batch_prefill_api.cpp"
@@ -233,6 +249,7 @@ FMHA_FWD_API_PER_ARCH = """{F_if}({F_arch.device_name_check}) {{
 """
 
 FMHA_FWD_API_PER_DTYPE = """{F_if}(t.data_type.compare(\"{F_dtype}\") == 0) {{
+    constexpr int kElementBytes = {F_element_bytes};
 {F_hdim_case}
 }}
 """
@@ -243,8 +260,8 @@ FMHA_FWD_API_PER_HDIM_CASE = """{F_if}(t.hdim_q <= {F_hdim} && t.hdim_v <= {F_hd
 """
 
 FMHA_FWD_API_INNER_DISPATCH = """{F_if}((t.is_group_mode == {F_mode}) && (t.is_v_rowmajor == {F_vlayout}) && (t.has_logits_soft_cap == {F_logits}) && ({F_mask_check}) && (t.bias_type == {F_bias_check}) && (t.has_lse == {F_lse})  && (t.has_dropout == {F_dropout}) && (t.qscale_type == {F_qscale_check}) && (t.has_sink == {F_sink}) &&
-        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}) && ({F_constraint}) && (t.kv_memory_layout == {F_kv_memory_layout}) && (t.kv_lookup_table == {F_kv_lookup_table}) && (t.page_size == {F_page_size})) {{
-    using trait_ = fmha_fwd_batch_prefill_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, false, false, {F_sink}, {F_page_size}, {F_kv_memory_layout}, {F_kv_lookup_table}>;
+        ({F_scheck}) && ({F_skcheck}) && ({F_dcheck}) && ({F_dvcheck}) && ({F_constraint}) && (t.kv_memory_layout == {F_kv_memory_layout}) && (t.kv_lookup_table == {F_kv_lookup_table}) && (t.page_size == {F_page_size}) && (fmha_batch_prefill_select_kv_load_mode(a.page_block_size, {F_bn0}, a.num_total_pages, a.batch_stride_k, kElementBytes) == {F_kv_load_mode})) {{
+    using trait_ = fmha_fwd_batch_prefill_traits_<{F_hdim}, {F_dtype}, {F_mode}, {F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout}, {F_pipeline_enum}, {F_logits}, {F_mask}, {F_bias}, {F_lse}, {F_dropout}, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, false, false, {F_sink}, {F_page_size}, {F_kv_memory_layout}, {F_kv_lookup_table}, {F_kv_load_mode}>;
     return fmha_batch_prefill_<trait_, {F_arch.tag}>(s, a);
 }}
 """
@@ -294,12 +311,14 @@ class FmhaFwdApiTrait:
     kv_memory_layout: str
     kv_lookup_table: str
     page_size: int = 1  # page block size
+    use_global_load: bool = False  # use global_load_lds_* for >2GB KV cache
 
     @property
     def name(self) -> str:
         return (
             f"{self.hdim}-{self.dtype}-{self.mode}-{self.bm0}-{self.bn0}-{self.bk0}-{self.bn0}-{self.bk1}-{self.bk0max}-"
             + f"{self.vlayout}-{self.logits}-{self.mask}-{self.bias}-{self.lse}-{self.dropout}-{self.qscale}-{self.spad}-{self.skpad}-{self.dpad}-{self.dvpad}-{self.kv_memory_layout}-{self.kv_lookup_table}-ps{self.page_size}"
+            + ("-gload" if self.use_global_load else "-bload")
         )
 
     @property
@@ -567,6 +586,7 @@ class FmhaFwdApiPool:
                             ],
                             F_page_size=trait.page_size,
                             F_sink=BOOL_MAP[trait.sink],
+                            F_kv_load_mode=KV_LOAD_MODE_ENUM_MAP[trait.use_global_load],
                         )
                     per_hdim_case += FMHA_FWD_API_PER_HDIM_CASE.format(
                         F_if=if_(i_hdim),
@@ -575,7 +595,7 @@ class FmhaFwdApiPool:
                         F_inner_dispatch=indent(inners),
                     )
                 per_dtypes += FMHA_FWD_API_PER_DTYPE.format(
-                    F_if=if_(i_dtype), F_dtype=dtype, F_hdim_case=indent(per_hdim_case)
+                    F_if=if_(i_dtype), F_dtype=dtype, F_element_bytes=DTYPE_BYTES[dtype], F_hdim_case=indent(per_hdim_case)
                 )
             per_arch += FMHA_FWD_API_PER_ARCH.format(
                 F_if=if_(i_arch),
@@ -630,6 +650,7 @@ class FmhaFwdKernel:
     F_pipeline: FmhaFwdPipeline
     mask_impl: str
     F_page_size: int = 1  # page block size
+    F_use_global_load: bool = False  # use global_load_lds_* for >2GB KV cache
 
     _KERNEL_HEADER: ClassVar[str] = FMHA_FWD_KERNEL_HEADER
     _KERNEL_BODY_TEMPLATE: ClassVar[str] = FMHA_FWD_KERNEL_BODY_TEMPLATE
@@ -700,6 +721,10 @@ class FmhaFwdKernel:
             F_pipeline_problem=self._get_cpp_pipeline_problem_name(self.F_pipeline.tag),
             F_page_size=self.F_page_size,
             F_sink=BOOL_MAP[self.F_pipeline.F_sink],
+            F_kv_load_mode=KV_LOAD_MODE_ENUM_MAP[self.F_use_global_load],
+            F_compile_guard=CDNA3_PLUS_ARCH.preprocessor_check
+            if self.F_use_global_load
+            else self.F_arch.preprocessor_check,
             # NOTE: V3 used to set kernel_attr<true> (no-packed-fp32-ops) to prevent
             # the compiler from generating v_pk_mul_f32 for scalar FP32 ops, which
             # competes with MFMA for VALU slots (+2-4% pertensor). However, the
@@ -716,6 +741,7 @@ class FmhaFwdKernel:
         # TODO: we don't encode idx here
         return (
             f"fmha_batch_prefill_d{self.F_hdim}_{self.F_dtype}_{self.F_mode}_ps{self.F_page_size}_"
+            + ("gload_" if self.F_use_global_load else "bload_")
             + self.F_tile.name
             + "_"
             + self.F_pipeline.name
@@ -754,6 +780,7 @@ class FmhaFwdKernel:
             kv_memory_layout=self.F_pipeline.F_kv_memory_layout,
             kv_lookup_table=self.F_pipeline.F_kv_lookup_table,
             page_size=self.F_page_size,
+            use_global_load=self.F_use_global_load,
         )
 
 
@@ -787,6 +814,7 @@ def create_kernel(
     problem_ctx: ProblemContext,
     kernel_ctx: KernelContext,
     page_size: int,
+    use_global_load: bool = False,
 ) -> FmhaFwdKernel:
     return FmhaFwdKernel(
         F_arch=arch,
@@ -797,6 +825,7 @@ def create_kernel(
         F_pipeline=kernel_ctx.pipeline,
         mask_impl=kernel_ctx.mask_impl,
         F_page_size=page_size,
+        F_use_global_load=use_global_load,
     )
 
 
@@ -1152,6 +1181,22 @@ def get_fwd_blobs(
 
                     api_pool.register_traits(k.api_trait())
                     gen.append(k)
+
+                    # For page_size < kN0 (tile.F_bn0), also generate a GLOBAL_LOAD_LDS
+                    # variant for >2GB KV cache support. The default (BUFFER_LOAD) uses SRD
+                    # buffer_load (fast, <2GB). GLOBAL_LOAD_LDS uses global_load_lds_*
+                    # (slower, handles >2GB).
+                    # V3 pipeline uses LDS double-buffering exclusively and does not
+                    # support the GLOBAL_LOAD_LDS path.
+                    if page_size < tile.F_bn0 and pipeline.tag != "qr_async_trload_v3":
+                        k_global_load = create_kernel(
+                            factory.arch, problem_ctx, kernel_ctx, page_size,
+                            use_global_load=True,
+                        )
+                        if kernel_filter != "" and not fnmatch.fnmatch(k_global_load.name, kernel_filter):
+                            continue
+                        api_pool.register_traits(k_global_load.api_trait())
+                        gen.append(k_global_load)
 
     return (api_pool, gen)
 
