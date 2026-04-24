@@ -1355,9 +1355,9 @@ class ActivationInline:
         raise RuntimeError("Unrecognized data type %s."%self.dataType)
     elif (activationType == 'clippedrelu'):
       if (self.dataType.isSingle() or self.dataType.isHalf() or self.dataType.isDouble()):
-        kStr += (padSpacesStr + "value = (value > alpha) ? min(value, beta) : min(0.0, beta);\n")
+        kStr += (padSpacesStr + "value = (value > alpha) ? std::min(value, beta) : std::min(decltype(beta)(0), beta);\n")
       elif self.dataType.isInt32():
-        kStr += (padSpacesStr + "value = (value > alpha) ? min(value, beta) : min(0, beta);\n")
+        kStr += (padSpacesStr + "value = (value > alpha) ? std::min(value, beta) : std::min(0, beta);\n")
     elif (activationType == 'exp'):
       kStr += (asm + " // Exp\n")
       module = activation.getExpModule(self.dataType, 0, 0)
@@ -1385,9 +1385,9 @@ class ActivationInline:
         raise RuntimeError("Unsupported data type %s."%ptrStr)
     elif (activationType == 'relu'):
       if (self.dataType.isSingle() or self.dataType.isHalf() or self.dataType.isDouble()):
-        kStr += (padSpacesStr + "value = max(0.0, value);\n")
+        kStr += (padSpacesStr + "value = std::max(decltype(value)(0), value);\n")
       elif self.dataType.isInt32():
-        kStr += (padSpacesStr + "value = max(0, value);\n")
+        kStr += (padSpacesStr + "value = std::max(0, value);\n")
       else:
         raise RuntimeError("Unsupported data type %s."%ptrStr)
     elif (activationType == 'sigmoid'):
@@ -1427,7 +1427,7 @@ class ActivationInline:
       kStr += addSpace(asm, ": \"+v\"(value) : \"s\"(alpha)\n")
       kStr += self.getRequiredRegStr(asm, activation.vgprCounter, activation.sgprCounter)
     elif (activationType == 'clamp'):
-      kStr += (padSpacesStr + "value = max(alpha, min(value, beta));\n")
+      kStr += (padSpacesStr + "value = std::max(alpha, std::min(value, beta));\n")  # clamp
     else:
       if (activationType != 'none'):
         raise RuntimeError("Unrecognized type %s."%activationType)

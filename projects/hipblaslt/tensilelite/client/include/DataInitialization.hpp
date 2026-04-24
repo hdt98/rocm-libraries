@@ -2792,7 +2792,7 @@ namespace TensileLite
         {
             float val = useCos ? cos(idx) : sin(idx);
             if(useAbs)
-                val = abs(val);
+                val = std::fabs(val);
             return val;
         }
 
@@ -2801,7 +2801,7 @@ namespace TensileLite
         {
             double val = useCos ? cos(idx) : sin(idx);
             if(useAbs)
-                val = abs(val);
+                val = std::fabs(val);
             return val;
         }
 
