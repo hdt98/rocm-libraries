@@ -162,7 +162,7 @@ inline hipError_t transform_impl(InputIterator     input,
 /// In this example a device-level transform operation is performed on an array of
 /// integer values (<tt>short</tt>s are transformed into <tt>int</tt>s).
 ///
-/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_search.cpp).
+/// The full example is [on GitHub](https://github.com/ROCm/rocm-libraries/tree/develop/projects/rocprim/example/rocprim/device/example_device_transform.cpp).
 ///
 /// \code{.cpp}
 /// #include <rocprim/rocprim.hpp>
