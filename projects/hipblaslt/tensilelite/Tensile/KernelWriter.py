@@ -6232,7 +6232,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.states.mxsa.numVgprValuPerBlock = 0
         # MX scale registers are consumed by local-read and wmma paths; avoid
         # emitting unresolved vgprValuMXSA symbols when integer division rounds to 0.
-        if self.states.mxsa.numVgprValuPerBlock == 0 and not (kernel["DirectToVgprMXSA"] and not (self.states.packDTVA or self.states.convDTVA)):
+        elif self.states.mxsa.numVgprValuPerBlock == 0:
           self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"]
         self.states.mxsa.numVgprValu = self.states.mxsa.numVgprValuPerBlock * valuBlocksA
         if self.states.lrvwTileMXSA > 1:
@@ -6248,7 +6248,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           self.states.mxsb.numVgprValuPerBlock = 0
         # MX scale registers are consumed by local-read and wmma paths; avoid
         # emitting unresolved vgprValuMXSB symbols when integer division rounds to 0.
-        if self.states.mxsb.numVgprValuPerBlock == 0 and not (kernel["DirectToVgprMXSB"] and not (self.states.packDTVB or self.states.convDTVB)):
+        elif self.states.mxsb.numVgprValuPerBlock == 0:
           self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"]
         self.states.mxsb.numVgprValu = self.states.mxsb.numVgprValuPerBlock * valuBlocksB
         if self.states.lrvwTileMXSB > 1:
