@@ -62,3 +62,27 @@ target_compile_options(hipdnn_gpu_ref_tests
 clang_tidy_check(hipdnn_gpu_ref_tests)
 
 add_unit_test_target(hipdnn_gpu_ref_tests ${CMAKE_CURRENT_BINARY_DIR})
+
+add_executable(hipdnn_gpu_ref_slow_tests
+    gpu_ref/main.cpp
+    gpu_ref/TestGpuFpReferenceConvolutionSlow.cpp
+    gpu_ref/TestGpuFpReferenceDgradSlow.cpp
+    gpu_ref/TestGpuFpReferenceWgradSlow.cpp
+)
+
+target_link_libraries(hipdnn_gpu_ref_slow_tests
+    PRIVATE
+        hipdnn_gpu_ref
+        hipdnn_test_sdk
+        hipdnn_plugin_sdk
+        GTest::gtest
+        Threads::Threads
+        hip::host
+)
+
+target_compile_options(hipdnn_gpu_ref_slow_tests
+    PRIVATE ${INTEGRATION_TESTS_WARNING_COMPILE_OPTIONS})
+
+clang_tidy_check(hipdnn_gpu_ref_slow_tests)
+
+add_integration_test_target(hipdnn_gpu_ref_slow_tests ${CMAKE_CURRENT_BINARY_DIR} LABELS slow)
