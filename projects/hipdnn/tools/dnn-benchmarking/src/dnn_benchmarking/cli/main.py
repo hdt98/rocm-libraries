@@ -448,10 +448,8 @@ def run_benchmark_suite(
             print(flush=True)  # end the "graph_name..." line before verbose block
             reporter.print_verbose_graph_result(gr, config)
         else:
-            counts = gr.count_by_status()
-            reporter.print_suite_graph_result(
-                counts.passed, counts.failed, counts.skipped, counts.errored
-            )
+            print(flush=True)  # end the "graph_name..." line
+            reporter.print_suite_per_engine_results(gr.results)
 
     metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
     suite_result = SuiteResult(metadata=metadata, graphs=graph_results)

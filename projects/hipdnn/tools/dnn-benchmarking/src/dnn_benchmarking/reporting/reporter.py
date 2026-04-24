@@ -5,7 +5,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Optional, TextIO
+from typing import Any, List, Optional, TextIO
 
 from ..config.benchmark_config import ABTestConfig, BenchmarkConfig, SuiteConfig
 from .statistics import BenchmarkStats, CombinedBenchmarkStats
@@ -458,6 +458,22 @@ class Reporter:
             f"{skipped} skipped, {errored} errored"
         )
 
+    def print_suite_per_engine_results(
+        self, results: List[ProviderEngineResult]
+    ) -> None:
+        """Print one indented result line per engine with name and outcome.
+
+        Format:
+          miopen_winograd       passed
+          miopen_implicit_gemm  failed
+        """
+        if not results:
+            return
+        max_name_len = max(len(pe.provider) for pe in results)
+        for pe in results:
+            outcome = self._pe_outcome(pe)
+            self._print(f"  {pe.provider:<{max_name_len}}  {outcome}")
+
     def print_suite_graph_error(self, graph_name: str, error: str) -> None:
         """Print inline error on the same line as the graph start, then newline.
 
@@ -484,6 +500,17 @@ class Reporter:
     def print_suite_footer(self) -> None:
         """Print suite footer."""
         self._print_line("=")
+
+    @staticmethod
+    def _pe_outcome(pe: ProviderEngineResult) -> str:
+        """Derive a short outcome label for a ProviderEngineResult."""
+        if pe.status == "success":
+            if pe.correctness is not None and pe.correctness.tolerance_match is False:
+                return "failed"
+            return "passed"
+        if pe.status == "skipped":
+            return "skipped"
+        return "errored"
 
     def print_verbose_graph_result(
         self, graph_result: GraphResult, suite_config: SuiteConfig
