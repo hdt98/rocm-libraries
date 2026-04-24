@@ -141,6 +141,8 @@ def processKernelSource(kernelWriterAssembly, data, outOptions, splitGSU, kernel
     header = kernelWriter.getHeaderFileString(kernel)
     objFilename = kernel._state.get("codeObjectFile", None)
     pgr = int(kernel["PrefetchGlobalRead"])
+    if kernel["GenerateROCasm"] and kernel["UseROCasmMainLoop"]:
+        printExit("GenerateROCasm and UseROCasmMainLoop are mutually exclusive. Use one or the other.")
     rocasm_kernel = None
     if kernel["UseROCasmMainLoop"]:
         rocasm_kernel = {
@@ -417,22 +419,72 @@ def _generateROCasmMainloop(src: str, mainloopPath: Path, tiled: bool = False) -
 
     return src
 
-def _useROCasmMainloop(src: str, kernel: dict) -> str:
+
+def _buildSourceMapFromBlock(block, mainloop_func) -> list:
+    """Build source map entries from a Block and its originating function.
+
+    Extracts the Python source lines from the function body and pairs
+    each one with the corresponding emitted assembly from the Block's ops.
+    """
+    import inspect
+    from rocasm.source_map import SourceMapping
+
+    # Get the Python source lines from the function body.
+    # Skip the function def, docstring, Block construction, and alias preamble.
+    # The body starts at the first line containing a rocasm instruction call
+    # (label, s_waitcnt, Acc[...] =, ds_read, etc.)
+    func_source = inspect.getsource(mainloop_func)
+    all_lines = func_source.splitlines()
+
+    # Find the body: starts at the first label() or instruction call,
+    # ends before "return block"
+    body_lines = []
+    in_body = False
+    for line in all_lines:
+        stripped = line.strip()
+        if not in_body and stripped.startswith("label("):
+            in_body = True
+        if in_body:
+            if stripped == "return block":
+                break
+            body_lines.append(stripped)
+
+    # Get assembly text from each op in the Block
+    ops = block._ops
+    asm_lines = [str(op.rocisa_inst).strip() for op in ops]
+
+    # Build source map entries — pair positionally
+    entries = []
+    n = min(len(body_lines), len(asm_lines))
+    for i in range(n):
+        entries.append(SourceMapping(
+            asm_index=i,
+            asm_text=asm_lines[i],
+            python_index=i,
+            python_text=body_lines[i],
+        ))
+
+    return entries
+
+
+def _useROCasmMainloop(src: str, kernel: dict) -> tuple[str, object, object]:
     """Replace the main loop in src using a registered rocasm module.
 
     Looks up a matching rocasm mainloop function from the registry,
     calls it to get a Block, emits assembly, and splices the result
     into src between label_LoopBeginL: and label_LoopEndL:.
 
-    If no registered module matches, or if the labels are not found,
-    returns src unchanged.
+    Returns ``(modified_src, block, mainloop_func)`` so the caller can
+    build a source map from the Block and the function's source code.
+    If no registered module matches or labels are missing, returns
+    ``(src, None, None)`` (source unchanged).
     """
     # Trigger auto-discovery of user rocasm modules
     import Tensile.ROCasmMainloops  # noqa: F401
 
     mainloop_func = lookup_rocasm_mainloop(kernel)
     if mainloop_func is None:
-        return src
+        return src, None, None
 
     begin_marker = "label_LoopBeginL:"
     end_marker = "label_LoopEndL:"
@@ -441,7 +493,7 @@ def _useROCasmMainloop(src: str, kernel: dict) -> str:
     end_idx = src.find(end_marker)
 
     if begin_idx == -1 or end_idx == -1:
-        return src
+        return src, None, None
 
     # Find the start of the line containing label_LoopBeginL:
     line_start = src.rfind("\n", 0, begin_idx)
@@ -456,7 +508,7 @@ def _useROCasmMainloop(src: str, kernel: dict) -> str:
 
     block = mainloop_func()
     user_main_loop = block.emit()
-    return prefix + user_main_loop + suffix
+    return prefix + user_main_loop + suffix, block, mainloop_func
 
 def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
     if result.err:
@@ -477,7 +529,12 @@ def writeAssembly(asmPath: Union[Path, str], result: KernelCodeGenResult):
             ti = rocisa.rocIsa.getInstance()
             ti.init(isa, "amdclang++")
             ti.setKernel(isa, wfsize)
-            src = _useROCasmMainloop(src, result.useROCasmMainLoop)
+            src, block, mainloop_func = _useROCasmMainloop(src, result.useROCasmMainLoop)
+            if block is not None:
+                from rocasm.source_map import MainloopSourceMap
+                map_path = Path(asmPath) / f"{result.name}_mainloop.map.json"
+                entries = _buildSourceMapFromBlock(block, mainloop_func)
+                MainloopSourceMap(entries=entries).to_json(map_path)
         f.write(src)
 
     minResult = KernelMinResult(result.err, result.cuoccupancy, result.pgr, result.mathclk)

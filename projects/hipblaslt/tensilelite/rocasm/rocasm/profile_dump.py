@@ -84,6 +84,29 @@ def main(argv: list[str] | None = None):
                         help="Output file (default: stdout)")
     args = parser.parse_args(argv)
 
+    # Staleness check: if the source map is newer than the ATT trace,
+    # the kernel was rebuilt but not re-profiled. The profile data would
+    # be from the old schedule applied to the new Python positions — wrong.
+    map_path = Path(args.map)
+    if args.att_json:
+        att_path = Path(args.att_json)
+    else:
+        # Find the code.json inside the ATT directory
+        att_dir = Path(args.att_dir)
+        ui_dirs = list(att_dir.glob("ui_output_agent_*"))
+        att_path = (ui_dirs[0] / "code.json") if ui_dirs else (att_dir / "code.json")
+
+    if map_path.exists() and att_path.exists():
+        if map_path.stat().st_mtime > att_path.stat().st_mtime:
+            print(
+                f"Error: source map ({map_path.name}) is newer than ATT trace "
+                f"({att_path.name}).\n"
+                f"The kernel was rebuilt but not re-profiled. Re-run rocprofv3 "
+                f"before generating the profile dump.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     if args.att_json:
         att = ATTProfile.from_code_json(args.att_json)
     else:

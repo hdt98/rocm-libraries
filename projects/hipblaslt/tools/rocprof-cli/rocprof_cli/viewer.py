@@ -27,6 +27,29 @@ from rocprof_cli.loader import (
 )
 
 
+class WarningBar(Static):
+    """Warning bar shown at the bottom when files are out of sync."""
+
+    DEFAULT_CSS = """
+    WarningBar {
+        height: 1;
+        dock: bottom;
+        background: #af5f00;
+        color: #ffffff;
+        text-style: bold;
+        padding: 0 1;
+        display: none;
+    }
+    """
+
+    def show_warning(self, message: str):
+        self.update(f" ⚠ {message}")
+        self.display = True
+
+    def hide_warning(self):
+        self.display = False
+
+
 class AsmPanel(Static):
     """Bottom panel showing assembly text for the selected line."""
 
@@ -139,11 +162,13 @@ class ProfileViewer(App):
         yield Header()
         yield ListView(id="code-list")
         yield AsmPanel(id="asm-panel")
+        yield WarningBar(id="warning-bar")
         yield Footer()
 
     def on_mount(self) -> None:
         self._load_profile()
         self._render_lines()
+        self._check_staleness()
 
         # Jump to start line
         if self.start_line > 0:
@@ -181,12 +206,30 @@ class ProfileViewer(App):
             self._line_items.append((item, line))
             list_view.append(item)
 
+    def _check_staleness(self) -> None:
+        """Check if the source map is newer than the profile data.
+
+        If .map.json is newer than profile.txt, the kernel was rebuilt
+        but the profiler wasn't re-run — the profile data is stale.
+        """
+        warning = self.query_one("#warning-bar", WarningBar)
+        if self.map_path and self.map_path.exists() and self.profile_path.exists():
+            map_mtime = self.map_path.stat().st_mtime
+            profile_mtime = self.profile_path.stat().st_mtime
+            if map_mtime > profile_mtime:
+                warning.show_warning(
+                    "Profile data is stale: source map is newer than profile.txt. "
+                    "Re-run profiler and profile_dump.")
+                return
+        warning.hide_warning()
+
     def _check_reload(self) -> None:
         """Poll for file changes in watch mode."""
         if self.profile_data and self.profile_data.has_changed(self.profile_path):
             old_index = self.query_one("#code-list", ListView).index
             self._load_profile()
             self._render_lines()
+            self._check_staleness()
             # Restore scroll position
             list_view = self.query_one("#code-list", ListView)
             if old_index is not None and old_index < len(self._line_items):

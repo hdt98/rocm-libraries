@@ -103,6 +103,10 @@ class TestMainCLI:
         _, _, _, sm = asm_to_rocasm(MAINLOOP_ASM.read_text(), symbols)
         map_path = tmp_path / "test.map.json"
         MainloopSourceMap(entries=sm).to_json(map_path)
+        # Set map mtime older than code.json to avoid staleness error
+        import os
+        code_mtime = os.path.getmtime(CODE_JSON)
+        os.utime(map_path, (code_mtime - 1, code_mtime - 1))
 
         main(["--att-json", str(CODE_JSON),
               "--map", str(map_path),
@@ -113,3 +117,18 @@ class TestMainCLI:
         lines = [l for l in content.strip().splitlines()
                  if not l.startswith("#")]
         assert len(lines) == 216
+
+    def test_staleness_error(self, tmp_path):
+        """CLI errors if source map is newer than ATT trace."""
+        import os
+        # Build a source map JSON fixture
+        symbols = parse_set_directives(SET_DIRECTIVES.read_text())
+        _, _, _, sm = asm_to_rocasm(MAINLOOP_ASM.read_text(), symbols)
+        map_path = tmp_path / "test.map.json"
+        MainloopSourceMap(entries=sm).to_json(map_path)
+        # map is freshly written, so it's newer than CODE_JSON fixture → error
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--att-json", str(CODE_JSON),
+                  "--map", str(map_path),
+                  "-o", str(tmp_path / "out.txt")])
+        assert exc_info.value.code == 1
