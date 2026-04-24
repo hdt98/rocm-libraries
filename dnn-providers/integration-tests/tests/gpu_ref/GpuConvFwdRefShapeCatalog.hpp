@@ -5,6 +5,8 @@
 
 #include "GpuConvFwdRefTestFixture.hpp"
 
+#include <stdexcept>
+
 // ============================================================================
 // Shape Catalog — centralized forward convolution shapes, categorized by size.
 // Each function is kept separate for easy future splitting into tiers.
@@ -14,13 +16,29 @@ namespace gpu_conv_fwd_ref_test
 {
 
 // Returns copies of the given cases with channel-last layout set.
-// Uses NHWC for 4D (2D conv) and NDHWC for 5D (3D conv).
+// 3D (NWC) for 1D conv, 4D (NHWC) for 2D conv, 5D (NDHWC) for 3D conv.
 // Points to the static TensorLayout constants which have program lifetime.
 inline std::vector<ConvFwdShapeCase> withChannelLastLayout(std::vector<ConvFwdShapeCase> cases)
 {
     for(auto& tc : cases)
     {
-        tc.layout = (tc.xDims.size() == 5) ? &TensorLayout::NDHWC : &TensorLayout::NHWC;
+        if(tc.xDims.size() == 5)
+        {
+            tc.layout = &TensorLayout::NDHWC;
+        }
+        else if(tc.xDims.size() == 4)
+        {
+            tc.layout = &TensorLayout::NHWC;
+        }
+        else if(tc.xDims.size() == 3)
+        {
+            tc.layout = &TensorLayout::NLC;
+        }
+        else
+        {
+            throw std::invalid_argument("Unsupported tensor rank for channel-last layout: "
+                                        + std::to_string(tc.xDims.size()));
+        }
     }
     return cases;
 }

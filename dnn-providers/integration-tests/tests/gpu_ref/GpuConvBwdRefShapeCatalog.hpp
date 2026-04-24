@@ -5,6 +5,8 @@
 
 #include "GpuConvBwdRefTestFixture.hpp"
 
+#include <stdexcept>
+
 // ============================================================================
 // Shape Catalog — centralized convolution shapes for dgrad tests.
 // Each function is kept separate for easy future splitting into tiers.
@@ -14,6 +16,7 @@ namespace gpu_conv_bwd_ref_test
 {
 
 // Returns copies of the given cases with channel-last layout set.
+// 3D (NLC) for 1D conv, 4D (NHWC) for 2D conv, 5D (NDHWC) for 3D conv.
 inline std::vector<ConvBwdShapeCase> withChannelLastLayout(std::vector<ConvBwdShapeCase> cases)
 {
     for(auto& tc : cases)
@@ -26,9 +29,14 @@ inline std::vector<ConvBwdShapeCase> withChannelLastLayout(std::vector<ConvBwdSh
         {
             tc.layout = &TensorLayout::NHWC;
         }
-        else
+        else if(tc.xDims.size() == 3)
         {
             tc.layout = &TensorLayout::NLC;
+        }
+        else
+        {
+            throw std::invalid_argument("Unsupported tensor rank for channel-last layout: "
+                                        + std::to_string(tc.xDims.size()));
         }
     }
     return cases;
