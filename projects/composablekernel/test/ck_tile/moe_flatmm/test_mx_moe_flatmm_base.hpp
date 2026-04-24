@@ -15,8 +15,8 @@
 #include "ck_tile/host/reference/reference_moe_gemm.hpp"
 #include "ck_tile/ops/moe_flatmm.hpp"
 
-#include "moe_flatmm.hpp"
-#include "moe_flatmm_impl.hpp"
+#include "test_moe_flatmm_configs.hpp"
+#include "test_moe_flatmm_dispatch.hpp"
 #include "test_moe_flatmm_fixtures.hpp"
 
 // Base gtest fixture for the F8xMXF4FlatmmPipelineAGmemBGmemCRegV1 pipeline

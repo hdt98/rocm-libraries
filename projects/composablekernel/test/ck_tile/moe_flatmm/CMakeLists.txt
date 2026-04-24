@@ -9,8 +9,6 @@ if(CK_USE_OCP_FP8)
 endif()
 
 if(GPU_TARGETS MATCHES "gfx95")
-    set(MOE_FLATMM_EXAMPLE_DIR ${CMAKE_SOURCE_DIR}/example/ck_tile/18_flatmm)
-
     # Base-pipeline dtype tests share a single fixture; MX tests share another.
     # Each executable instantiates its kernel set directly (per_test_direct) so
     # there's no generated instance machinery.
@@ -24,10 +22,7 @@ if(GPU_TARGETS MATCHES "gfx95")
         endif()
 
         add_gtest_executable(test_tile_moe_flatmm_${DTYPE} ${TEST_SRC})
-        target_include_directories(test_tile_moe_flatmm_${DTYPE} PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${MOE_FLATMM_EXAMPLE_DIR}
-        )
+        target_include_directories(test_tile_moe_flatmm_${DTYPE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_options(test_tile_moe_flatmm_${DTYPE}
                                PRIVATE ${TEST_MOE_FLATMM_COMPILE_OPTIONS})
     endforeach()
