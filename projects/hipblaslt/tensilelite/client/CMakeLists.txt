@@ -31,21 +31,21 @@ if(amd_smi_FOUND)
 endif()
 
 foreach(target tensilelite-client cpu-gemm-driver)
-    target_link_libraries(${target} PRIVATE ${COMMON_CLIENT_LIBS})
-
+    target_link_libraries(${target} PRIVATE
+        ${COMMON_CLIENT_LIBS}
+        $<TARGET_NAME_IF_EXISTS:roc::hipblaslt>
+    )
     target_include_directories(${target} BEFORE PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/../../library/include"
         "${PROJECT_BINARY_DIR}/library/include"
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_compile_definitions(${target} PRIVATE TENSILE_DEFAULT_SERIALIZATION)
-
     set_target_properties(${target} PROPERTIES
         CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
     )
-
     if(HIPBLASLT_ENABLE_ASAN)
         hipblaslt_target_configure_sanitizers(${target} PRIVATE)
     endif()
