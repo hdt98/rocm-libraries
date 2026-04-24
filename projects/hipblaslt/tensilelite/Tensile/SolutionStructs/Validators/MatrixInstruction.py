@@ -194,15 +194,16 @@ def validateMIParameters(
 
     ptype = solution["ProblemType"]
     isSparse = ptype.get("Sparse", 0)
+    isX = solution.get("EnableF32XdlMathOp", False)
     miDataType = DataType(
         ptype["DataType"]
-        if not solution.get("EnableF32XdlMathOp", False)
+        if not isX
         else ptype["F32XdlMathOp"]
     )
 
     # For MFMA validation, determine the key based on MAC data types
-    macDataTypeA = ptype.get("MacDataTypeA", miDataType)
-    macDataTypeB = ptype.get("MacDataTypeB", miDataType)
+    macDataTypeA = ptype.get("MacDataTypeA", miDataType) if not isX else miDataType
+    macDataTypeB = ptype.get("MacDataTypeB", miDataType) if not isX else miDataType
 
     # If both MAC types are the same, use doubled character key; otherwise use combined key
     if macDataTypeA == macDataTypeB:
