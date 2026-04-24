@@ -343,22 +343,58 @@ This is why `pow2-8k [8192,2048]` wins 47% of all benchmarks — it gives both s
 
 ## 8. Benchmark Results Summary (MI350X, gfx950)
 
+**728 verified data points** across all 4 transpose layouts (NN, TN, NT, TT), FP16, K=8192, M/N from 1024 to 32768, with ≥3s cold + ≥3s hot iterations per measurement.
+
 | Metric | Value |
 |--------|-------|
-| Problems tested | 716 |
-| **Win rate (>2% gain)** | **65% (466/716)** |
-| Loss rate (>2% loss) | 11% (77/716) |
-| Best gain | **+64.6%** |
-| Worst loss | -58.4% |
-| Average gain (all) | **+8.4%** |
-| Average gain (wins) | **+14.7%** |
-| **Large problems (8K-16K) win rate** | **78% (306/393)** |
+| Data points | 728 (all verified, max norm = 5.08e-05) |
+| Wins (>+2%) | 151 (21%) |
+| Neutral (±2%) | 311 (43%) |
+| Losses (>-2%) | 266 (37%) |
+| Best gain | **+35.4%** (9216×9216, TN, MT256x224x64 baseline) |
+| Worst loss | -25.4% (8192×2048, TT) |
 
-See `COMPREHENSIVE_BENCHMARK_RESULTS.md` for the full 716-problem benchmark table with MacroTile annotations.
+### By Layout
+
+| Layout | Win Rate | Avg Gain | Best Case |
+|--------|----------|----------|-----------|
+| **NN** | **25%** | **+0.5%** | MT256x240x64 → +10.3% avg (66% win) |
+| **TN** | **25%** | -0.5% | MT256x224x64 → +35.4% gain |
+| NT | 19% | -0.9% | Modest gains only |
+| TT | 14% | -3.2% | Generally loses |
+
+### By Baseline MacroTile (NN Layout)
+
+| Baseline MT | Win Rate | Avg Gain |
+|-------------|----------|----------|
+| MT256x240x64 | **66%** | **+10.3%** |
+| MT256x208x64 | **57%** | **+3.9%** |
+| MT256x224x64 | 35% | +2.3% |
+| MT256x256x64 | 11% | -2.6% |
+
+**The single strongest predictor of Multi-MT success is the baseline MacroTile: if it's MT256x240x64, enable Multi-MT; if it's MT256x256x64, don't.**
+
+See `COMPREHENSIVE_BENCHMARK_RESULTS.md` for the full dataset with per-point origami latency, workgroup counts, and verification results.
 
 ---
 
-## 9. Removed Code
+## 9. Empirical Search Optimization (O(N²) → O(N))
+
+The original empirical search had a critical bottleneck causing 4+ hour hangs. Fixed by:
+
+| Change | Impact |
+|--------|--------|
+| Removed O(N²) `getAllAlgos()` scoring | Hours → seconds |
+| Removed overly-aggressive same-MT guard | Allowed valid splits to proceed |
+| Reduced candidates 7 → 4 | 43% fewer GPU trials |
+| Reduced micro-bench iterations 3 → 1 | 67% less per-candidate time |
+| Direct sub-problem construction | Eliminated pipeline re-entry |
+
+**Result:** Any problem size completes in < 2 seconds (FP16).
+
+---
+
+## 10. Removed Code
 
 The following were removed during cleanup to simplify the codebase:
 
