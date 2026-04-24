@@ -328,7 +328,8 @@ struct BlockFmhaFwdV3Pipeline
     static constexpr ck_tile::index_t kQKHeaddim    = BlockFmhaShape::kQKHeaddim;
     static constexpr ck_tile::index_t kSubQKHeaddim = BlockFmhaShape::kSubQKHeaddim;
 
-    static_assert(kQKHeaddim == 128 && kSubQKHeaddim == 128, "only supports hdim=hdim_v=128");
+    static_assert((kQKHeaddim == 64 || kQKHeaddim == 128) && kSubQKHeaddim == kQKHeaddim,
+                  "only supports hdim=hdim_v=64 or 128");
 
     static constexpr bool kIsGroupMode      = Problem::kIsGroupMode;
     static constexpr bool kPadSeqLenQ       = Problem::kPadSeqLenQ;
