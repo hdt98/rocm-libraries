@@ -96,35 +96,35 @@ std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
 {
     return {
         // === GKB=1 control (deterministic — no AtomicAdd) ===
-        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},  // [0]  GKB=1
-        {1, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [1]  GKB=1
-        {1, 64, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},   // [2]  GKB=1
+        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}, // [0]  GKB=1
+        {1, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [1]  GKB=1
+        {1, 64, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},  // [2]  GKB=1
 
         // === GKB=2 (should be DETERMINISTIC — commutativity) ===
         // Verified PASS with 10 seeds on gfx908.
-        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},  // [3]  GKB=2 verified
-        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [4]  GKB=2 verified
-        {2, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},   // [5]  GKB=2 verified
-        {16, 64, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},  // [6]  GKB=2 verified
-        {8, 32, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // [7]  GKB=2 verified
-        {4, 128, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // [8]  GKB=1 or 2
-        {2, 128, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},  // [9]  GKB=1 or 2
+        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // [3]  GKB=2 verified
+        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [4]  GKB=2 verified
+        {2, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [5]  GKB=2 verified
+        {16, 64, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // [6]  GKB=2 verified
+        {8, 32, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [7]  GKB=2 verified
+        {4, 128, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [8]  GKB=1 or 2
+        {2, 128, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1}, // [9]  GKB=1 or 2
 
         // === GKB=3 (should be NON-DETERMINISTIC — non-associativity) ===
         // N must be divisible by 3. Using H=W=16 for FP16 compatibility.
-        {3, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [10] expect GKB=3
-        {3, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [11] expect GKB=3
-        {6, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [12] expect GKB=3 or 6
-        {3, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},   // [13] expect GKB=3
-        {9, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [14] expect GKB=3 or 9
+        {3, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [10] expect GKB=3
+        {3, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [11] expect GKB=3
+        {6, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [12] expect GKB=3 or 6
+        {3, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [13] expect GKB=3
+        {9, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [14] expect GKB=3 or 9
 
         // === GKB=4+ (should be NON-DETERMINISTIC — non-associativity) ===
         // Known FAIL configs from previous 156-test run.
-        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},   // [15] GKB=4 verified
-        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [16] GKB=4 verified
-        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // [17] GKB=8 verified
-        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [18] GKB=10 verified
-        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // [19] GKB=4 verified
+        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [15] GKB=4 verified
+        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [16] GKB=4 verified
+        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [17] GKB=8 verified
+        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [18] GKB=10 verified
+        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [19] GKB=4 verified
     };
 }
 
@@ -143,8 +143,8 @@ protected:
         std::cout << "PRNG seed: " << 12345678 << std::endl;
         std::cout << "Testing configuration: " << config << std::endl;
         std::cout << "Data type: " << (sizeof(T) == 4 ? "FP32" : "FP16") << std::endl;
-        std::cout << "Seeds: " << NUM_INPUT_SEEDS << " x Iterations: " << NUM_ITERATIONS
-                  << " = " << NUM_INPUT_SEEDS * NUM_ITERATIONS << " kernel runs" << std::endl;
+        std::cout << "Seeds: " << NUM_INPUT_SEEDS << " x Iterations: " << NUM_ITERATIONS << " = "
+                  << NUM_INPUT_SEEDS * NUM_ITERATIONS << " kernel runs" << std::endl;
 
         auto& handle = get_handle();
 
@@ -175,16 +175,14 @@ protected:
         // Print output spatial dims for GKB calculation context
         const auto Ho = output_desc.GetLengths()[2];
         const auto Wo = output_desc.GetLengths()[3];
-        std::cout << "Output dims: Ho=" << Ho << " Wo=" << Wo
-                  << " N*Ho*Wo=" << config.N * Ho * Wo << std::endl;
+        std::cout << "Output dims: Ho=" << Ho << " Wo=" << Wo << " N*Ho*Wo=" << config.N * Ho * Wo
+                  << std::endl;
 
         // Initialize tensors (WrW: input and output are "inputs", weights is "output")
-        input.generate([](auto...) {
-            return prng::gen_A_to_B(static_cast<T>(-0.1), static_cast<T>(0.1));
-        });
-        output.generate([](auto...) {
-            return prng::gen_A_to_B(static_cast<T>(-0.01), static_cast<T>(0.1));
-        });
+        input.generate(
+            [](auto...) { return prng::gen_A_to_B(static_cast<T>(-0.1), static_cast<T>(0.1)); });
+        output.generate(
+            [](auto...) { return prng::gen_A_to_B(static_cast<T>(-0.01), static_cast<T>(0.1)); });
         std::fill(weights.begin(), weights.end(), T{0});
 
         auto in_dev  = handle.Write(input.data);
@@ -285,8 +283,8 @@ protected:
                         {
                             std::cout << "  seed " << seed << ": MISMATCH at iteration " << i
                                       << ", element " << j << "/" << reference.size()
-                                      << ": ref=" << reference[j]
-                                      << " cur=" << current[j] << std::endl;
+                                      << ": ref=" << reference[j] << " cur=" << current[j]
+                                      << std::endl;
                         }
                         match = false;
                         mismatch_count++;
@@ -324,8 +322,7 @@ protected:
 // ============================================================================
 
 using GPU_WrwXdl_FP32 =
-    GPU_WrwXdlDeterminism<float,
-                          miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
+    GPU_WrwXdlDeterminism<float, miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
 
 TEST_P(GPU_WrwXdl_FP32, DeterministicTest) { this->RunTest(); };
 
@@ -338,8 +335,7 @@ INSTANTIATE_TEST_SUITE_P(GKBThreshold,
 // ============================================================================
 
 using GPU_WrwXdl_FP16 =
-    GPU_WrwXdlDeterminism<half_float::half,
-                          miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
+    GPU_WrwXdlDeterminism<half_float::half, miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
 
 TEST_P(GPU_WrwXdl_FP16, DeterministicTest) { this->RunTest(); };
 
