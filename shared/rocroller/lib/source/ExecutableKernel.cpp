@@ -9,6 +9,7 @@
 #endif /* ROCROLLER_USE_HIP */
 
 #include <rocRoller/Utilities/Error.hpp>
+#include <rocRoller/Utilities/Settings.hpp>
 
 #include <rocRoller/Assemblers/Assembler.hpp>
 #include <rocRoller/Context.hpp>
