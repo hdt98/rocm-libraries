@@ -57,7 +57,10 @@ namespace rocisa
     {
         if(isa[0] == 12)
         {
-            return std::make_shared<SrdUpperValue12XX>(SrdUpperValue12XX::staticInit());
+            if(isa[1] == 5)
+                return std::make_shared<SrdUpperValue125X>(SrdUpperValue125X::staticInit());
+            else
+                return std::make_shared<SrdUpperValue12XX>(SrdUpperValue12XX::staticInit());
         }
         else if(isa[0] == 11)
         {
@@ -91,7 +94,9 @@ namespace rocisa
            {"bf16", 2},
            {"f16", 2},
            {"f32", 4},
+           {"f32c", 8},
            {"f64", 8},
+           {"f64c", 16},
            {"pkf16", 4},
            {"struct", 8}};
 } // namespace rocisa

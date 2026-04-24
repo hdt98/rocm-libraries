@@ -1,4 +1,4 @@
-// Copyright (C) 2016 - 2022 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (C) 2016 - 2025 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -39,6 +39,7 @@
 #include "../../shared/sys_mem.h"
 #include "../../shared/work_queue.h"
 #include "../hipfft_params.h"
+#include "../hipfftw_helper.h"
 #include "hipfft/hipfft.h"
 #include "hipfft_accuracy_test.h"
 
@@ -71,12 +72,6 @@ std::string hipfftw_token_for_functional_test;
 
 // Transform parameters for manual test:
 hipfft_params manual_params;
-
-// Host memory limitation for tests (GiB):
-size_t ramgb;
-
-// Device memory limitation for tests (GiB):
-size_t vramgb;
 
 // Allow skipping tests if there is a runtime error
 bool skip_runtime_fails;
@@ -129,7 +124,7 @@ void init_gtest_flags()
     std::swap(temp_list_tests, testing::GTEST_FLAG(list_tests));
 
     // move stdout to devnull
-#ifdef WIN32
+#ifdef _WIN32
     int stdout_fd   = _fileno(stdout);
     int devnull     = _open("NUL", _O_WRONLY);
     int stdout_copy = _dup(stdout_fd);
@@ -144,7 +139,7 @@ void init_gtest_flags()
     (void)RUN_ALL_TESTS();
 
     // put stdout back
-#ifdef WIN32
+#ifdef _WIN32
     _dup2(stdout_copy, stdout_fd);
     _close(stdout_copy);
     _close(devnull);
@@ -160,12 +155,18 @@ void init_gtest_flags()
 void precompile_test_kernels(const std::string& precompile_file)
 {
     std::cout << "precompiling test kernels...\n";
-    WorkQueue<std::string> tokenQueue;
 
     init_gtest_flags();
 
-    std::vector<std::string> tokens;
-    auto                     ut = testing::UnitTest::GetInstance();
+    enum class lib_under_test
+    {
+        HIPFFT,
+        HIPFFTW
+    };
+
+    std::map<lib_under_test, std::vector<std::string>> tokens;
+
+    auto ut = testing::UnitTest::GetInstance();
     for(int ts_index = 0; ts_index < ut->total_test_suite_count(); ++ts_index)
     {
         const auto ts = ut->GetTestSuite(ts_index);
@@ -196,66 +197,97 @@ void precompile_test_kernels(const std::string& precompile_file)
                     continue;
                 name.replace(idx, end - idx, "1");
 
-                tokens.emplace_back(std::move(name));
+                if(name.find("hipfftw") != std::string::npos)
+                    tokens[lib_under_test::HIPFFTW].emplace_back(std::move(name));
+                else
+                    tokens[lib_under_test::HIPFFT].emplace_back(std::move(name));
             }
         }
     }
 
     std::random_device dev;
     std::mt19937       dist(dev());
-    std::shuffle(tokens.begin(), tokens.end(), dist);
-    auto precompile_begin = std::chrono::steady_clock::now();
-    std::cout << "precompiling kernels for " << tokens.size() << " tokens...\n";
-
-    for(auto&& t : tokens)
-        tokenQueue.push(std::move(t));
-
-    EnvironmentSetTemp       env_compile_only{"ROCFFT_INTERNAL_COMPILE_ONLY", "1"};
-    const size_t             NUM_THREADS = rocfft_concurrency();
-    std::vector<std::thread> threads;
-    for(size_t i = 0; i < NUM_THREADS; ++i)
+    auto               precompile_begin = std::chrono::steady_clock::now();
+    std::cout << "precompiling kernels for "
+              << std::accumulate(tokens.begin(),
+                                 tokens.end(),
+                                 static_cast<size_t>(0),
+                                 [](size_t acc, const decltype(tokens)::value_type& tok) {
+                                     return acc + tok.second.size();
+                                 })
+              << " tokens...\n";
+    EnvironmentSetTemp env_compile_only{"ROCFFT_INTERNAL_COMPILE_ONLY", "1"};
+    const size_t       NUM_THREADS = rocfft_concurrency();
+    for(auto& pair : tokens)
     {
-        threads.emplace_back([&tokenQueue]() {
-            for(;;)
-            {
-                std::string token{tokenQueue.pop()};
-                if(token.empty())
-                    break;
+        const auto             lib       = pair.first;
+        auto&                  lib_token = pair.second;
+        WorkQueue<std::string> tokenQueue;
+        std::shuffle(lib_token.begin(), lib_token.end(), dist);
+        for(auto&& t : lib_token)
+            tokenQueue.push(std::move(t));
 
-                try
+        std::vector<std::thread> threads;
+        for(size_t i = 0; i < NUM_THREADS; ++i)
+        {
+            threads.emplace_back([&tokenQueue, lib]() {
+                for(;;)
                 {
-                    hipfft_params params;
-                    params.from_token(token);
-                    params.validate();
-                    params.create_plan();
-                    if(params.is_forward())
+                    std::string token{tokenQueue.pop()};
+                    if(token.empty())
+                        break;
+
+                    try
                     {
-                        hipfft_params inverse_params;
-                        inverse_params.inverse_from_forward(params);
-                        inverse_params.validate();
-                        inverse_params.create_plan();
+                        switch(lib)
+                        {
+                        case(lib_under_test::HIPFFT):
+                        {
+                            hipfft_params params;
+                            params.from_token(token);
+                            params.validate();
+                            params.create_plan();
+                            if(params.is_forward())
+                            {
+                                hipfft_params inverse_params;
+                                inverse_params.inverse_from_forward(params);
+                                inverse_params.validate();
+                                inverse_params.create_plan();
+                            }
+                        }
+                        break;
+                        case(lib_under_test::HIPFFTW):
+                        {
+                            create_hipfftw_plan_from_token_using_temp_io(token, verbose);
+                        }
+                        break;
+                        default:
+                            throw std::runtime_error(
+                                "unexpected lib encountered in precompile_test_kernels");
+                            break;
+                        }
+                    }
+                    catch(fft_params::work_buffer_alloc_failure&)
+                    {
+                        continue;
+                    }
+                    catch(std::exception& e)
+                    {
+                        // failed to create a plan, abort
+                        //
+                        // we could continue on, but the test should just
+                        // fail later anyway in the same way.  so report
+                        // which token failed early and get out
+                        throw std::runtime_error(token + " plan creation failure: " + e.what());
                     }
                 }
-                catch(fft_params::work_buffer_alloc_failure&)
-                {
-                    continue;
-                }
-                catch(std::exception& e)
-                {
-                    // failed to create a plan, abort
-                    //
-                    // we could continue on, but the test should just
-                    // fail later anyway in the same way.  so report
-                    // which token failed early and get out
-                    throw std::runtime_error(token + " plan creation failure: " + e.what());
-                }
-            }
-        });
-        // insert empty tokens to tell threads to stop
-        tokenQueue.push({});
+            });
+            // insert empty tokens to tell threads to stop
+            tokenQueue.push({});
+        }
+        for(auto& t : threads)
+            t.join();
     }
-    for(auto& t : threads)
-        t.join();
 
     auto                                      precompile_end = std::chrono::steady_clock::now();
     std::chrono::duration<double, std::milli> precompile_ms  = precompile_end - precompile_begin;
@@ -265,9 +297,13 @@ void precompile_test_kernels(const std::string& precompile_file)
 
 int main(int argc, char* argv[])
 {
+    // Unless specified otherwise by the user, no limit on host/device memory usage
+    // (see corresponding default values)
+    size_t ramgb_limit, vramgb_limit;
+
     CLI::App app{
         "\n"
-        "hipFFT Runtime Test command line options\n"
+        "hipFFT/hipFFTW Runtime Test command line options\n"
         "NB: input parameters are row-major.\n"
         "\n"
         "FFTW accuracy test cases are named using these identifiers:\n"
@@ -357,8 +393,11 @@ int main(int argc, char* argv[])
         ->check(CLI::NonNegativeNumber);
     app.add_option("--mp_launch",
                    mp_launch,
-                   "Command line prefix to launch multi-process transforms, e.g. \"mpirun --np 4 "
-                   "/path/to/hipfft_mpi_worker\"")
+                   "Command line prefix to launch multi-process transforms, e.g. \n"
+                   "\"mpirun --np 4 /path/to/hipfft_mpi_worker\"\n"
+                   "NOTE: embedded quotes must be used for all command arguments that contain "
+                   "space character(s). For instance,\n"
+                   "\"mpirun --np 4 \\\"/path with spaces/to/hipfft_mpi_worker\\\"\"")
         ->default_val("")
         ->each([&](const std::string&) {
             if(mp_lib == fft_params::fft_mp_lib_none)
@@ -434,23 +473,24 @@ int main(int argc, char* argv[])
         ->default_val(0);
     non_token->add_option("--ioffset", manual_params.ioffset, "Input offset");
     non_token->add_option("--ooffset", manual_params.ooffset, "Output offset");
-    non_token->add_option("--isize", manual_params.isize, "Logical size of input buffer");
-    non_token->add_option("--osize", manual_params.osize, "Logical size of output buffer");
-    non_token->add_option(
-        "--scalefactor", manual_params.scale_factor, "Scale factor to apply to output");
+    app.add_option("--isize", manual_params.isize, "Logical size of input buffer");
+    app.add_option("--osize", manual_params.osize, "Logical size of output buffer");
     // Default value is set in fft_params.h based on if device-side PRNG was enabled.
-    non_token->add_option("-g, --inputGen",
-                          manual_params.igen,
-                          "Input data generation:\n0) PRNG sequence (device)\n"
-                          "1) PRNG sequence (host)\n"
-                          "2) linearly-spaced sequence (device)\n"
-                          "3) linearly-spaced sequence (host)");
+    app.add_option("-g, --inputGen",
+                   manual_params.igen,
+                   "Input data generation:\n0) PRNG sequence (device)\n"
+                   "1) PRNG sequence (host)\n"
+                   "2) linearly-spaced sequence (device)\n"
+                   "3) linearly-spaced sequence (host)");
+    app.add_option("--scalefactor", manual_params.scale_factor, "Scale factor to apply to output");
     const auto* opt_version = app.add_flag(
         "--version",
         "Print queryable version information from the hipfft library's backend (and return)");
-    app.add_option("--R", ramgb, "RAM limit in GiB for tests")
-        ->default_val(host_memory::singleton().get_total_gbytes());
-    app.add_option("--V", vramgb, "VRAM limit in GiB for tests")->default_val(0);
+    app.add_option("--R", ramgb_limit, "RAM limit in GiB for tests")
+        ->default_val(system_memory::singleton().get_total_gbytes());
+    app.add_option("--V", vramgb_limit, "VRAM limit in GiB for tests (per device)")
+        ->default_val(DivRoundingUp(
+            device_memory_accountant::singleton().get_max_total_mem_on_devices(), ONE_GiB));
     app.add_option("--half_epsilon", half_epsilon)->default_val(9.77e-4);
     app.add_option("--single_epsilon", single_epsilon)->default_val(3.75e-5);
     app.add_option("--double_epsilon", double_epsilon)->default_val(1e-15);
@@ -593,9 +633,25 @@ int main(int argc, char* argv[])
     fftwf_plan_with_nthreads(rocfft_concurrency());
 #endif
 
-    // Set host memory limit from command-line options
-    host_memory::singleton().set_limit_gbytes(ramgb);
-    std::cout << "Host memory limit: " << ramgb << " GiB" << std::endl;
+    system_memory::singleton().set_limit_bytes(ramgb_limit * ONE_GiB);
+    std::cout << "Refraining from using more than "
+              << byte_size_to_str(system_memory::singleton().get_limit_bytes())
+              << " of system memory." << std::endl;
+    device_memory_accountant::singleton().set_limit_bytes_for_all_devices(vramgb_limit * ONE_GiB);
+    std::cout << "Refraining from using more than ";
+    for(size_t dev_id = 0; dev_id < device_memory_accountant::singleton().num_devices(); dev_id++)
+    {
+        if(device_memory_accountant::singleton().num_devices() > 1)
+            std::cout << "\n\t";
+        std::cout << byte_size_to_str(
+            device_memory_accountant::singleton().get_limit_bytes_on_device(dev_id))
+                  << " of device memory";
+        if(device_memory_accountant::singleton().num_devices() > 1)
+            std::cout << " for device ID " << dev_id;
+        std::cout << (dev_id == device_memory_accountant::singleton().num_devices() - 1 ? "."
+                                                                                        : ";");
+    }
+    std::cout << std::endl;
 
     if(use_fftw_wisdom)
     {

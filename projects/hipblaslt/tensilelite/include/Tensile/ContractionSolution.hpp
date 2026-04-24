@@ -27,6 +27,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
@@ -42,7 +43,8 @@
 #include <Tensile/Task.hpp>
 #include <Tensile/Utils.hpp>
 
-#include <origami/streamk.hpp>
+#include "origami/origami.hpp"
+#include "origami/streamk.hpp"
 
 #define TENSILE_COMMON_KERNEL_ARGS_SIZE 16
 
@@ -142,6 +144,7 @@ namespace TensileLite
         bool sourceKernel = false;
 
         int    globalAccumulation       = 0;
+        int    adaptiveGemmGSUA         = 0;
         size_t workspaceSizePerElemC    = 0;
         size_t workspaceSizePerElemBias = 0;
 
@@ -162,14 +165,36 @@ namespace TensileLite
 
         int nonTemporalA = 0;
         int nonTemporalB = 0;
+
+        int customMainLoopScheduling = 0;
+
+        int NonTemporalD = 0;
+        int WaveSeparateGlobalReadA = 0;
+        int WaveSeparateGlobalReadB = 0;
+        int UnrollLoopSwapGlobalReadOrder = 0;
+        bool DirectToVgprA = false;
+        bool DirectToVgprB = false;
+        int NumLoadsCoalescedA = 0;
+        int NumLoadsCoalescedB = 0;
+        int VectorWidthA = 1;
+        int VectorWidthB = 1;
+        int LocalSplitU = 1;
+        bool DirectToLdsA = false;
+        bool DirectToLdsB = false;
+
+        std::array<int, 2> waveGroup;
     };
 
     struct StreamKSettings
     {
-        origami::streamk::reduction_type reduction = origami::streamk::reduction_type::Tree;
-        size_t grid = 0;
+        origami::reduction_t reduction = origami::reduction_t::tree;
+        size_t               grid      = 0;
     };
 
+    struct GSUSettings
+    {
+        size_t globalAccumulation = 0;
+    };
     /**
      * Represents a single kernel or set of kernels that can perform a single
      * tensor contraction.
@@ -180,18 +205,24 @@ namespace TensileLite
     class ContractionSolution : public Solution
     {
     public:
-        using Problem       = ContractionProblemGemm;
-        using Inputs        = ContractionInputs;
-        using GroupedInputs = ContractionGroupedInputs;
-        using ParamsCache  = CacheMap<std::pair<int32_t, uint32_t>, Problem>;
+        using Problem             = ContractionProblemGemm;
+        using Inputs              = ContractionInputs;
+        using GroupedInputs       = ContractionGroupedInputs;
+        using WGMParamsCache      = CacheMap<std::tuple<int32_t, size_t, size_t>, Problem>;
+        using StaggerUParamsCache = CacheMap<std::tuple<size_t, size_t, size_t>, Problem>;
 
         /**
-         * Indicate a solution is equally or estimatedly matched.
+         * Indicate a solution's matching type
          */
         enum class MatchingTag
         {
-            Equal,
-            Estimated
+            Equal, // EqualityMatching
+            Range, // RangeMatching
+            FreeSize, // FreeSizeMatching
+            GridBased, // GridBasedMatching
+            Prediction, // PredictionMatching
+            Experimental, // ExperimentalStreamK or ExperimentalMLP
+            Others, // Default
         };
 
         static std::string Type()
@@ -216,7 +247,21 @@ namespace TensileLite
         {
             return kernelName;
         }
+
         virtual bool isFallbackForHW(Hardware const&) const;
+
+        bool isStreamK() const
+        {
+            return sizeMapping.streamK > 0;
+        }
+
+        /**
+         * @brief Returns the string representation of the solution's matching type.
+         *
+         * This tag is used to identify or categorize the solution for matching purposes.
+         * @return A string representing the matching type of the solution.
+         */
+        virtual std::string matchingTag() const;
 
         //! Estimates based on problem size, solution tile, and  machine hardware
         //! charz:
@@ -279,7 +324,9 @@ namespace TensileLite
          * Calculate required workspace size.
          */
         size_t requiredWorkspaceSize(Problem const& problem, Hardware const& hardware) const;
-        size_t requiredWorkspaceSizeGsu(Problem const& problem, Hardware const& hardware, size_t gsu) const;
+        size_t requiredWorkspaceSizeGsu(Problem const&  problem,
+                                        Hardware const& hardware,
+                                        size_t          gsu) const;
         size_t requiredWorkspaceSizeGroupedGemm(std::vector<Problem> const& problems,
                                                 Hardware const&             hardware) const;
         size_t requiredHostSizeGroupedGemmSingle(Problem const&  problem,
@@ -287,17 +334,24 @@ namespace TensileLite
 
         size_t requiredSynchronizerSize(Problem const& problem, Hardware const& hardware) const;
 
-        void calculateGrid(dim3& workGroupSize,
-                           dim3& numWorkGroups,
-                           ContractionSolution::Problem const& problem) const;
-        origami::streamk::reduction_type getSKReduction(Problem const& problem, Hardware const& hardware) const;
-        size_t getSKGrid(Problem const& problem, Hardware const& hardware, size_t tiles, origami::streamk::reduction_type& reductionStrat) const;
-        size_t partialTileSize(size_t skGrid) const;
+        void                 calculateGrid(dim3&                               workGroupSize,
+                                           dim3&                               numWorkGroups,
+                                           ContractionSolution::Problem const& problem) const;
+        origami::reduction_t getSKReduction(Problem const& problem, Hardware const& hardware) const;
+        size_t               getSKGrid(Problem const&       problem,
+                                       Hardware const&      hardware,
+                                       size_t               tiles,
+                                       origami::reduction_t reductionStrat) const;
+        size_t               partialTileSize(size_t skGrid) const;
 
         static float computeGranularity(float x);
 
-        Granularities computeGranularities(
-            Hardware const& hardware, double M, double N, double K, double NumBatches, uint32_t autoGsuVal) const;
+        Granularities computeGranularities(Hardware const& hardware,
+                                           double          M,
+                                           double          N,
+                                           double          K,
+                                           double          NumBatches,
+                                           uint32_t        autoGsuVal) const;
 
         StaticPerformanceModel staticPerformanceModel(double M,
                                                       double N,
@@ -385,8 +439,12 @@ namespace TensileLite
                         uint32_t                            numWorkGroups,
                         Hardware const*                     hardware,
                         const ContractionProblemParameters& param,
-                        int32_t                             defaultWGM,
-                        uint32_t                            defaultWGMXCC,
+                        int32_t                             autoWGM,
+                        size_t                              autoWGMXCC,
+                        size_t                              autoWGMXCCCHUNK,
+                        size_t                              autoStaggerUMapping,
+                        size_t                              autoStaggerU,
+                        size_t                              autoStaggerUStrideShift,
                         uint32_t                            autoGsuVal) const;
 
         template <typename KA>
@@ -395,13 +453,14 @@ namespace TensileLite
                                                       TensileLite::dim3&          numWorkGroups,
                                                       TensileLite::dim3&          numWorkItems,
                                                       KA&                         h_args,
-                                                      uint32_t                    autoGsuVal) const;
+                                                      uint32_t                    gsu) const;
 
         template <bool T_Debug>
         KernelInvocation generateSingleCall(Problem const&           problem,
                                             ContractionInputs const& inputs,
                                             Hardware const&          hardware,
-                                            StreamKSettings const&   sk) const;
+                                            StreamKSettings const&   sk,
+                                            GSUSettings const&       gsuSettings) const;
 
         template <bool T_Debug, typename KA>
         KernelInvocation generateSingleCallGroupedGemm(std::vector<Problem> const& problems,
@@ -491,7 +550,8 @@ namespace TensileLite
             rocisa::DataType cType                     = rocisa::DataType::Float;
             rocisa::DataType dType                     = rocisa::DataType::Float;
             rocisa::DataType eType                     = rocisa::DataType::Float;
-            rocisa::DataType computeInputType          = rocisa::DataType::Float;
+            rocisa::DataType computeInputTypeA         = rocisa::DataType::Float;
+            rocisa::DataType computeInputTypeB         = rocisa::DataType::Float;
             rocisa::DataType computeType               = rocisa::DataType::Float;
             rocisa::DataType f32XdlMathOp              = rocisa::DataType::Float;
             rocisa::DataType activationComputeDataType = rocisa::DataType::Float;
@@ -520,6 +580,11 @@ namespace TensileLite
             bool supportDeviceUserArguments = false;
             bool swizzleTensorA             = false;
             bool swizzleTensorB             = false;
+            int  metadataLayout             = 0;
+            int  mxBlockA                   = 0;
+            int  mxBlockB                   = 0;
+            rocisa::DataType mxTypeA        = rocisa::DataType::E8;
+            rocisa::DataType mxTypeB        = rocisa::DataType::E8;
         };
 
         struct LinearModel
@@ -536,7 +601,10 @@ namespace TensileLite
         bool                         debugKernel     = false;
         bool                         kernelArgsLog   = false;
         mutable int                  isFallbackCUSol = -1; // -1:unset, 0:false, 1:true
-        mutable ParamsCache paramsCache = ParamsCache(std::make_pair(0,0));
+        mutable WGMParamsCache       wgmParamsCache
+            = WGMParamsCache(std::make_tuple(INT32_MAX, SIZE_MAX, SIZE_MAX));
+        mutable StaggerUParamsCache staggerUParamsCache
+            = StaggerUParamsCache(std::make_tuple(SIZE_MAX, SIZE_MAX, SIZE_MAX));
 
         std::shared_ptr<Predicates::Predicate<Task>> taskPredicate
             = std::make_shared<Predicates::True<Task>>();
@@ -559,17 +627,27 @@ namespace TensileLite
         int32_t               libraryLogicIndex = -1;
         std::map<int, double> ideals;
         LinearModel           linearModel;
-        MatchingTag           tag{MatchingTag::Estimated};
+        MatchingTag           tag{MatchingTag::Others};
 
         uint32_t magicNumberAlg1(uint32_t x, uint32_t* magicShift) const;
         uint32_t magicNumberAlg2(uint32_t x, uint32_t* magicShift) const;
         uint32_t magicNumber(int magicDivAlg, uint32_t x, uint32_t* magicShift) const;
         uint32_t smallMagicNumber(uint32_t x) const;
 
-        std::pair<int32_t, uint32_t> calculateAutoWGM(Problem const&  problem, 
-                                                      Hardware const* hardware, 
-                                                      uint32_t        skgrid) const;
+        std::tuple<int32_t, size_t, size_t> calculateAutoWGM(Problem const&  problem,
+                                                             Hardware const* hardware,
+                                                             uint32_t        skgrid) const;
+        std::tuple<size_t, size_t, size_t>  calculateAutoStaggerU(Problem const&  problem,
+                                                                  Hardware const* hardware,
+                                                                  uint32_t        skgrid,
+                                                                  int32_t         autoWGM) const;
         uint32_t calculateAutoGSU(Problem const& problem, Hardware const* hardware) const;
+
+        double calculateDimensionM(Problem const&  problem) const;
+        double calculateDimensionN(Problem const&  problem) const;
+        double calculateNumBatches(Problem const&  problem) const;
+        SizeMapping getSizeMapping(void) const {return sizeMapping;};
+        origami::data_type_t getOrigamiDatatype(Problem const&  problem) const;
     };
 
     template <typename TAct>

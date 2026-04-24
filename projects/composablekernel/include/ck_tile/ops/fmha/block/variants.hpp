@@ -19,6 +19,9 @@
 #define CK_TILE_ATTENTION_USE_SOFTSIGN_ASM 0
 #endif
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 namespace internal {
 __device__ inline float
@@ -162,6 +165,17 @@ struct StandardAttention
     {
         return !params.impl_mask.IsOutOfBound(qo_idx, kv_idx);
     }
+
+    template <typename Params>
+    __device__ __forceinline__ bool LogitsSinkMask(const Params& params,
+                                                   [[maybe_unused]] uint32_t batch_idx,
+                                                   uint32_t qo_idx,
+                                                   uint32_t kv_idx,
+                                                   [[maybe_unused]] uint32_t qo_head_idx,
+                                                   [[maybe_unused]] uint32_t kv_head_idx) const
+    {
+        return !params.impl_mask.IsOutOfSinkBound(qo_idx, kv_idx);
+    }
 };
 
 template <bool UseExp2 = false>
@@ -223,6 +237,17 @@ struct LogitsSoftCap
                                                [[maybe_unused]] uint32_t kv_head_idx) const
     {
         return !params.impl_mask.IsOutOfBound(qo_idx, kv_idx);
+    }
+
+    template <typename Params>
+    __device__ __forceinline__ bool LogitsSinkMask(const Params& params,
+                                                   [[maybe_unused]] uint32_t batch_idx,
+                                                   uint32_t qo_idx,
+                                                   uint32_t kv_idx,
+                                                   [[maybe_unused]] uint32_t qo_head_idx,
+                                                   [[maybe_unused]] uint32_t kv_head_idx) const
+    {
+        return !params.impl_mask.IsOutOfSinkBound(qo_idx, kv_idx);
     }
 };
 
@@ -297,6 +322,19 @@ struct ComposedAttention
     {
         return !params.impl_mask.IsOutOfBound(qo_idx, kv_idx);
     }
+
+    template <typename Params>
+    __device__ __forceinline__ bool LogitsSinkMask(const Params& params,
+                                                   [[maybe_unused]] uint32_t batch_idx,
+                                                   uint32_t qo_idx,
+                                                   uint32_t kv_idx,
+                                                   [[maybe_unused]] uint32_t qo_head_idx,
+                                                   [[maybe_unused]] uint32_t kv_head_idx) const
+    {
+        return !params.impl_mask.IsOutOfSinkBound(qo_idx, kv_idx);
+    }
 };
 
 } // namespace ck_tile
+
+#pragma clang diagnostic pop

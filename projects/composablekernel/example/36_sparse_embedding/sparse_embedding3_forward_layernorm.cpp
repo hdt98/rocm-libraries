@@ -19,6 +19,9 @@
 #include "ck/library/utility/host_tensor_generator.hpp"
 #include "ck/library/reference_tensor_operation/cpu/reference_sparse_embedding3_forward_layernorm.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 using ::ck::DeviceMem;
 using ::ck::HostTensorDescriptor;
 using ::ck::Tensor;
@@ -56,7 +59,7 @@ template<> struct emb_kernel<ck::half_t, 8192> { using kernel_type = DeviceInsta
 
 int main(int argc, char* argv[])
 {
-    bool time_kernel = true;
+    bool time_kernel = false;
 
     ck::index_t num_rows          = 65536;
     constexpr auto dims           = ck::Sequence<256, 512, 768, 1024, 1536, 2048, 4096, 8192>{};
@@ -218,3 +221,4 @@ int main(int argc, char* argv[])
 
     return 0;
 }
+#pragma clang diagnostic pop

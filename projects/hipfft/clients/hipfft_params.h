@@ -161,19 +161,12 @@ public:
     // will be provided with externally-managed work area(s):
     static std::vector<gpubuf> externally_managed_workareas;
 
-    size_t auto_allocated_extra_vram_footprint() const
+    static std::vector<size_t> externally_managed_extra_vram_footprint()
     {
-        return std::accumulate(auto_allocated_worksizes.begin(),
-                               auto_allocated_worksizes.end(),
-                               static_cast<size_t>(0));
-    }
-
-    static size_t externally_managed_extra_vram_footprint()
-    {
-        return std::accumulate(externally_managed_workareas.begin(),
-                               externally_managed_workareas.end(),
-                               static_cast<size_t>(0),
-                               [](size_t total, const gpubuf& buf) { return total + buf.size(); });
+        std::vector<size_t> footprint;
+        for(const auto& buf : externally_managed_workareas)
+            footprint.push_back(buf.size());
+        return footprint;
     }
 
     bool is_preventing_auto_allocation_at_generation() const
@@ -213,9 +206,24 @@ public:
         xt_output.reset();
     }
 
-    size_t vram_footprint() override
+    std::vector<size_t> vram_footprint() override
     {
-        size_t val = fft_params::vram_footprint();
+        auto footprint = fft_params::io_vram_footprint();
+
+        auto add_work_footprint = [&footprint, this]() {
+            // io footprint has numbers for all devices, but work
+            // footprint might be smaller in length due to fewer
+            // devices being used
+            for(size_t i = 0; i < auto_allocated_worksizes.size(); ++i)
+            {
+                footprint[i] += auto_allocated_worksizes[i];
+            }
+            for(size_t i = 0; i < externally_managed_workareas.size(); ++i)
+            {
+                footprint[i] += externally_managed_workareas[i].size();
+            }
+        };
+
         // auto-allocated plans fail here if not enough VRAM, skip these tests
         try
         {
@@ -226,15 +234,14 @@ public:
         }
         catch(fft_params::work_buffer_alloc_failure& e)
         {
-            val += auto_allocated_extra_vram_footprint();
-            val += externally_managed_extra_vram_footprint();
+            add_work_footprint();
             std::stringstream msg;
-            msg << "Plan work buffer size (" << val << " bytes raw data) too large for device";
+            msg << "Plan work buffer size (" << byte_sizes_to_str(footprint)
+                << " bytes raw data) too large for device";
             throw ROCFFT_SKIP{msg.str()};
         }
-        val += auto_allocated_extra_vram_footprint();
-        val += externally_managed_extra_vram_footprint();
-        return val;
+        add_work_footprint();
+        return footprint;
     }
 
     fft_status setup_structs()
@@ -331,8 +338,8 @@ public:
 
         try
         {
-            (void)get_ionembed<int>();
-            (void)get_ionembed<long long int>();
+            (void)get_advanced_layout_args<int>();
+            (void)get_advanced_layout_args<long long int>();
         }
         catch(const ionembed_exception& e)
         {
@@ -426,7 +433,11 @@ public:
         // case failed.
         if(ret == HIPFFT_ALLOC_FAILED)
         {
-            if(!final_attempt_at_plan_creation && externally_managed_extra_vram_footprint() > 0)
+            bool has_external_footprint
+                = std::any_of(externally_managed_workareas.begin(),
+                              externally_managed_workareas.end(),
+                              [](const gpubuf& buf) { return buf.size() > 0; });
+            if(!final_attempt_at_plan_creation && has_external_footprint)
             {
                 final_attempt_at_plan_creation = true;
                 // device allocation(s) in externally_managed_workareas might be
@@ -439,8 +450,7 @@ public:
             {
                 throw fft_params::work_buffer_alloc_failure(
                     "plan create failed due to allocation failure",
-                    externally_managed_extra_vram_footprint()
-                        + auto_allocated_extra_vram_footprint());
+                    sum(externally_managed_extra_vram_footprint()) + sum(auto_allocated_worksizes));
             }
         }
 
@@ -836,10 +846,10 @@ public:
     }
 
     // call the hipFFT APIs to distribute data to multiple GPUs
-    void multi_gpu_prepare(std::vector<hostbuf>& cpu_input,
-                           std::vector<gpubuf>&  ibuffer,
-                           std::vector<void*>&   pibuffer,
-                           std::vector<void*>&   pobuffer) override
+    void multi_gpu_prepare(std::vector<hostbuf>& /* unused */,
+                           std::vector<gpubuf>& ibuffer,
+                           std::vector<void*>&  pibuffer,
+                           std::vector<void*>&  pobuffer) override
     {
         if(multiGPU <= 1)
             return;
@@ -919,9 +929,9 @@ public:
     }
 
     // call the hipFFT APIs to gather the data back from the multiple GPUs
-    virtual void multi_gpu_finalize(std::vector<hostbuf>& gpu_output,
-                                    std::vector<gpubuf>&  obuffer,
-                                    std::vector<void*>&   pobuffer) override
+    void multi_gpu_finalize(std::vector<hostbuf>& /* unused*/,
+                            std::vector<gpubuf>& obuffer,
+                            std::vector<void*>&  pobuffer) override
     {
         if(multiGPU <= 1)
             return;
@@ -1040,32 +1050,34 @@ private:
         }
         case CREATE_MAKE_PLAN_MANY:
         {
-            auto ionembed = get_ionembed<int>();
+            auto layout_args = get_advanced_layout_args<int>();
             if(plan == INVALID_PLAN_HANDLE)
-                ret = hipfftEstimateMany(dim(),
-                                         int_length.data(),
-                                         const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                                         ionembed.get_elementary_stride(fft_io::fft_io_in),
-                                         idist,
-                                         const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                                         ionembed.get_elementary_stride(fft_io::fft_io_out),
-                                         odist,
-                                         *hipfft_transform_type,
-                                         nbatch,
-                                         worksize_estimate.data());
+                ret = hipfftEstimateMany(
+                    dim(),
+                    int_length.data(),
+                    const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+                    layout_args.istride_arg,
+                    layout_args.idist_arg,
+                    const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+                    layout_args.ostride_arg,
+                    layout_args.odist_arg,
+                    *hipfft_transform_type,
+                    nbatch,
+                    worksize_estimate.data());
             else
-                ret = hipfftGetSizeMany(plan,
-                                        dim(),
-                                        int_length.data(),
-                                        const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                                        ionembed.get_elementary_stride(fft_io::fft_io_in),
-                                        idist,
-                                        const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                                        ionembed.get_elementary_stride(fft_io::fft_io_out),
-                                        odist,
-                                        *hipfft_transform_type,
-                                        nbatch,
-                                        worksize_estimate.data());
+                ret = hipfftGetSizeMany(
+                    plan,
+                    dim(),
+                    int_length.data(),
+                    const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+                    layout_args.istride_arg,
+                    layout_args.idist_arg,
+                    const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+                    layout_args.ostride_arg,
+                    layout_args.odist_arg,
+                    *hipfft_transform_type,
+                    nbatch,
+                    worksize_estimate.data());
             break;
         }
         case CREATE_MAKE_PLAN_MANY64:
@@ -1080,17 +1092,18 @@ private:
             }
             else
             {
-                auto ionembed = get_ionembed<long long int>();
-                ret           = hipfftGetSizeMany64(
+                auto layout_args = get_advanced_layout_args<long long int>();
+                ret              = hipfftGetSizeMany64(
                     plan,
                     dim(),
                     ll_length.data(),
-                    const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                    ionembed.get_elementary_stride(fft_io::fft_io_in),
-                    idist,
-                    const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                    ionembed.get_elementary_stride(fft_io::fft_io_out),
-                    odist,
+                    const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+                    layout_args.istride_arg,
+                    layout_args.idist_arg,
+                    const_cast<long long int*>(
+                        layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+                    layout_args.ostride_arg,
+                    layout_args.odist_arg,
                     *hipfft_transform_type,
                     nbatch,
                     worksize_estimate.data());
@@ -1110,18 +1123,19 @@ private:
             else
             {
                 auto executionType = get_xt_api_execution_type();
-                auto ionembed      = get_ionembed<long long int>();
+                auto layout_args   = get_advanced_layout_args<long long int>();
                 ret                = hipfftXtGetSizeMany(
                     plan,
                     dim(),
                     ll_length.data(),
-                    const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                    ionembed.get_elementary_stride(fft_io::fft_io_in),
-                    idist,
+                    const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+                    layout_args.istride_arg,
+                    layout_args.idist_arg,
                     inputType,
-                    const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                    ionembed.get_elementary_stride(fft_io::fft_io_out),
-                    odist,
+                    const_cast<long long int*>(
+                        layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+                    layout_args.ostride_arg,
+                    layout_args.odist_arg,
                     outputType,
                     nbatch,
                     worksize_estimate.data(),
@@ -1294,18 +1308,19 @@ private:
     }
     hipfftResult_t create_plan_many()
     {
-        auto ionembed = get_ionembed<int>();
-        auto ret      = hipfftPlanMany(&plan,
-                                  dim(),
-                                  int_length.data(),
-                                  const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                                  ionembed.get_elementary_stride(fft_io::fft_io_in),
-                                  idist,
-                                  const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                                  ionembed.get_elementary_stride(fft_io::fft_io_out),
-                                  odist,
-                                  *hipfft_transform_type,
-                                  nbatch);
+        auto layout_args = get_advanced_layout_args<int>();
+        auto ret
+            = hipfftPlanMany(&plan,
+                             dim(),
+                             int_length.data(),
+                             const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+                             layout_args.istride_arg,
+                             layout_args.idist_arg,
+                             const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+                             layout_args.ostride_arg,
+                             layout_args.odist_arg,
+                             *hipfft_transform_type,
+                             nbatch);
         return ret;
     }
 
@@ -1458,19 +1473,21 @@ private:
                                                ? tmp_worksize.data()
                                                : auto_allocated_worksizes.data();
 
-        auto ionembed = get_ionembed<int>();
-        return hipfftMakePlanMany(plan,
-                                  dim(),
-                                  int_length.data(),
-                                  const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-                                  ionembed.get_elementary_stride(fft_io::fft_io_in),
-                                  idist,
-                                  const_cast<int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-                                  ionembed.get_elementary_stride(fft_io::fft_io_out),
-                                  odist,
-                                  *hipfft_transform_type,
-                                  nbatch,
-                                  worksize_ptr);
+        auto layout_args = get_advanced_layout_args<int>();
+
+        return hipfftMakePlanMany(
+            plan,
+            dim(),
+            int_length.data(),
+            const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+            layout_args.istride_arg,
+            layout_args.idist_arg,
+            const_cast<int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+            layout_args.ostride_arg,
+            layout_args.odist_arg,
+            *hipfft_transform_type,
+            nbatch,
+            worksize_ptr);
     }
 
     hipfftResult_t create_make_plan_many64()
@@ -1484,17 +1501,17 @@ private:
         size_t*             worksize_ptr = is_preventing_auto_allocation_at_generation()
                                                ? tmp_worksize.data()
                                                : auto_allocated_worksizes.data();
-        auto                ionembed     = get_ionembed<long long int>();
+        auto                layout_args  = get_advanced_layout_args<long long int>();
         return hipfftMakePlanMany64(
             plan,
             dim(),
             ll_length.data(),
-            const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-            ionembed.get_elementary_stride(fft_io::fft_io_in),
-            idist,
-            const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-            ionembed.get_elementary_stride(fft_io::fft_io_out),
-            odist,
+            const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+            layout_args.istride_arg,
+            layout_args.idist_arg,
+            const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+            layout_args.ostride_arg,
+            layout_args.odist_arg,
             *hipfft_transform_type,
             nbatch,
             worksize_ptr);
@@ -1535,18 +1552,18 @@ private:
                                                 ? tmp_worksize.data()
                                                 : auto_allocated_worksizes.data();
         auto                executionType = get_xt_api_execution_type();
-        auto                ionembed      = get_ionembed<long long int>();
+        auto                layout_args   = get_advanced_layout_args<long long int>();
         return hipfftXtMakePlanMany(
             plan,
             dim(),
             ll_length.data(),
-            const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_in)),
-            ionembed.get_elementary_stride(fft_io::fft_io_in),
-            idist,
+            const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_in)),
+            layout_args.istride_arg,
+            layout_args.idist_arg,
             inputType,
-            const_cast<long long int*>(ionembed.get_nembed(fft_io::fft_io_out)),
-            ionembed.get_elementary_stride(fft_io::fft_io_out),
-            odist,
+            const_cast<long long int*>(layout_args.io_nembed.get_nembed(fft_io::fft_io_out)),
+            layout_args.ostride_arg,
+            layout_args.odist_arg,
             outputType,
             nbatch,
             worksize_ptr,
@@ -1558,39 +1575,70 @@ private:
     size_t get_num_used_gpus() const
     {
         return multiGPU > 1 ? multiGPU : 1;
-    };
+    }
 
     template <
         typename T,
         std::enable_if_t<std::is_same_v<T, int> || std::is_same_v<T, long long int>, bool> = true>
-    hipfft_ionembed_t<T> get_ionembed()
+    struct advanced_layout_args
     {
-        // Allow nullptr to be use ~50% of the time it can be used to enable testing thereof.
+        hipfft_ionembed_t<T> io_nembed;
+        T                    istride_arg, ostride_arg, idist_arg, odist_arg;
+    };
+
+    template <typename T>
+    advanced_layout_args<T> get_advanced_layout_args()
+    {
+        // Allow nullptr to be used for inembed and onembed ~50% of the time it can be
+        // used to ensure testing thereof.
         // (using a hash of the token as "random" variable to avoid dependencies on
         // externally-defined variables and repeatability)
         std::hash<std::string> hasher;
         // NOTES:
         // - hipFFT requires (inembed == nullptr) == (onembed == nullptr);
         // - {i,o}stride are ignored if (inembed == nullptr) && (onembed == nullptr).
-        //   (That is accounted for by the hipfft_ionembed_t<T> objects)
+        //   (That is accounted for by the constructor of hipfft_ionembed_t<T> objects)
         // - {i,o}dist are ignored if (inembed == nullptr) && (onembed == nullptr).
-        //   (That is NOT accounted for by the hipfft_ionembed_t<T> objects which is unaware
-        //    of intended distances)
+        //   (That is NOT accounted for by the constructor of hipfft_ionembed_t<T> objects
+        //    which is unaware of intended distances)
+        auto       tmp = token();
         const bool use_nullptr_for_default_nembed
             = idist
                   == default_distance(transform_type, placement, fft_io::fft_io_in, length, nbatch)
               && odist
                      == default_distance(
                          transform_type, placement, fft_io::fft_io_out, length, nbatch)
-              && hasher(token()) % 2 == 1;
+              && hasher(tmp) % 2 == 1;
 
-        return hipfft_ionembed_t<T>(istride,
-                                    ostride,
-                                    length,
-                                    transform_type,
-                                    placement,
-                                    use_nullptr_for_default_nembed,
-                                    use_nullptr_for_default_nembed);
+        advanced_layout_args<T> ret;
+        ret.io_nembed = hipfft_ionembed_t<T>(istride,
+                                             ostride,
+                                             length,
+                                             transform_type,
+                                             placement,
+                                             use_nullptr_for_default_nembed,
+                                             use_nullptr_for_default_nembed);
+        if(!ret.io_nembed.get_nembed(fft_io::fft_io_in)
+           && !ret.io_nembed.get_nembed(fft_io::fft_io_out))
+        {
+            // istride, ostride, idist, and odist arguments are supposed to be *ignored*
+            // by hipFFT if inembed and onembed arguments are both null.
+            // --> use completely arbitrary (positive) values to test that behavior
+            std::uniform_int_distribution<T> positive_int_distr(1, std::numeric_limits<T>::max());
+            std::mt19937                     prng(hasher(tmp));
+            ret.istride_arg = positive_int_distr(prng);
+            ret.ostride_arg = positive_int_distr(prng);
+            ret.idist_arg   = positive_int_distr(prng);
+            ret.odist_arg   = positive_int_distr(prng);
+        }
+        else
+        {
+            ret.istride_arg = ret.io_nembed.get_elementary_stride(fft_io::fft_io_in);
+            ret.ostride_arg = ret.io_nembed.get_elementary_stride(fft_io::fft_io_out);
+            ret.idist_arg   = idist;
+            ret.odist_arg   = odist;
+        }
+        return ret;
     }
 };
 

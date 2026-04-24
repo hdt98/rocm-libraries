@@ -1,6 +1,6 @@
 /*! \file */
 /* ************************************************************************
- * Copyright (C) 2018-2025 Advanced Micro Devices, Inc. All rights Reserved.
+ * Copyright (C) 2018-2026 Advanced Micro Devices, Inc. All rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -110,6 +110,7 @@ namespace rocsparse
     ROCSPARSE_DEVICE_ILF void csrmvt_general_device(bool                 skip_diag,
                                                     bool                 conj,
                                                     J                    m,
+                                                    J                    size_y,
                                                     T                    alpha,
                                                     const I*             csr_row_ptr_begin,
                                                     const I*             csr_row_ptr_end,
@@ -139,7 +140,7 @@ namespace rocsparse
                     if(col != row)
                     {
                         const A val = rocsparse::conj_val(csr_val[j], conj);
-                        rocsparse::atomic_add(&y[col], row_val * val);
+                        rocsparse::atomic_add(y, col, size_y, row_val * val);
                     }
                 }
             }
@@ -157,7 +158,7 @@ namespace rocsparse
                     const J col = csr_col_ind[j] - idx_base;
 
                     const A val = rocsparse::conj_val(csr_val[j], conj);
-                    rocsparse::atomic_add(&y[col], row_val * val);
+                    rocsparse::atomic_add(y, col, size_y, row_val * val);
                 }
             }
         }
@@ -223,6 +224,7 @@ namespace rocsparse
               typename Z,
               typename T>
     ROCSPARSE_DEVICE_ILF void csrmvn_adaptive_device(bool                 conj,
+                                                     J                    m,
                                                      I                    nnz,
                                                      const I*             row_blocks,
                                                      uint32_t*            wg_flags,
@@ -286,7 +288,7 @@ namespace rocsparse
             // In a nutshell, the idea is to use all of the threads to stream the matrix
             // values into the local memory in a fast, coalesced manner. After that, the
             // per-row reductions are done out of the local memory, which is designed
-            // to handle non-coalsced accesses.
+            // to handle non-coalesced accesses.
 
             // The best method for reducing the local memory values depends on the number
             // of rows. The SC'14 paper discusses a CSR-Scalar style reduction where
@@ -356,7 +358,7 @@ namespace rocsparse
                 if(local_row < stop_row)
                 {
                     // This is dangerous -- will infinite loop if your last value is within
-                    // numThreadsForRed of MAX_UINT. Noticable performance gain to avoid a
+                    // numThreadsForRed of MAX_UINT. Noticeable performance gain to avoid a
                     // long induction variable here, though.
                     for(J local_cur_val = local_first_val + threadInBlock;
                         local_cur_val < local_last_val;
@@ -520,7 +522,7 @@ namespace rocsparse
             // the values still left in y will be added in using the atomic_add.
             //
             // Our solution is to have the first workgroup in one of these long-rows cases
-            // properly initaizlie the output vector. All the other workgroups working on this
+            // properly initialize the output vector. All the other workgroups working on this
             // row will spin-loop until that workgroup finishes its work.
 
             // First, figure out which workgroup you are in the row.
@@ -606,7 +608,7 @@ namespace rocsparse
                     wg_flags[gid] ^= 1U;
                 }
 
-                rocsparse::atomic_add(y + row, partialSums[0]);
+                rocsparse::atomic_add(y, row, m, partialSums[0]);
             }
         }
     }
@@ -1037,7 +1039,7 @@ namespace rocsparse
         // (iterating over the row as needed for rows with length > WG size).
         // This means that we can more easily process everything with Vector that we would otherwise have done
         // with Longrows - which, in turn, means we can guarantee result reproducibility simply by avoiding Longrows
-        // use (-> no non-determinstic atomics), just set the bin threshold for Longrows to "infinity" (or "32").
+        // use (-> no non-deterministic atomics), just set the bin threshold for Longrows to "infinity" (or "32").
         T       temp_sum = static_cast<T>(0);
         const I vecStart = csr_row_ptr[row] - idx_base;
         const I vecEnd   = csr_row_ptr[row + 1] - idx_base;
@@ -1093,6 +1095,7 @@ namespace rocsparse
               typename Z,
               typename T>
     ROCSPARSE_DEVICE_ILF void csrmvn_lrb_long_rows_device(bool                 conj,
+                                                          J                    m,
                                                           I                    nnz,
                                                           uint32_t*            wg_flags,
                                                           const J*             rows_bins,
@@ -1231,7 +1234,7 @@ namespace rocsparse
                 }
             }
 
-            rocsparse::atomic_add((y + row), extra_sum);
+            rocsparse::atomic_add(y, row, m, extra_sum);
         }
     }
 }

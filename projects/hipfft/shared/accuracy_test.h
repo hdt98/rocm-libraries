@@ -38,6 +38,7 @@
 #include "gpubuf.h"
 #include "rocfft_against_fftw.h"
 #include "sys_mem.h"
+#include "test_callbacks.h"
 #include "test_params.h"
 
 extern int  verbose;
@@ -66,54 +67,40 @@ template <class Tparams>
 inline void check_problem_fits_device_memory(Tparams& params, const int verbose)
 {
 
-    size_t vram_avail = 0;
-
-    if(vramgb == 0)
+    int  dev_id     = hipInvalidDeviceId;
+    auto hip_status = hipGetDevice(&dev_id);
+    if(hip_status != hipSuccess || dev_id == hipInvalidDeviceId)
     {
-        // Check free and total available memory:
-        size_t free       = 0;
-        size_t total      = 0;
-        auto   hip_status = hipMemGetInfo(&free, &total);
-        if(hip_status != hipSuccess || total == 0)
+        ++n_hip_failures;
+        std::stringstream ss;
+        ss << "hipGetDevice failed with error code " << hip_status << " reporting device ID "
+           << dev_id;
+        if(skip_runtime_fails)
         {
-            ++n_hip_failures;
-            std::stringstream ss;
-            if(total == 0)
-                ss << "hipMemGetInfo claims there there isn't any vram";
-            else
-                ss << "hipMemGetInfo failure with error " << hip_status;
-            if(skip_runtime_fails)
-            {
-                throw ROCFFT_SKIP{ss.str()};
-            }
-            else
-            {
-                throw ROCFFT_FAIL{ss.str()};
-            }
+            throw ROCFFT_SKIP{ss.str()};
         }
-        vram_avail = total;
+        else
+        {
+            throw ROCFFT_FAIL{ss.str()};
+        }
     }
-    else
-    {
-        vram_avail = vramgb * ONE_GiB;
-    }
+    const auto vram_avail = device_memory_accountant::singleton().get_usable_bytes_all_devices();
 
     // First try a quick estimation of vram footprint, to speed up skipping tests
     // that are too large to fit in the gpu (no plan created with the rocFFT backend)
-    const auto raw_vram_footprint
-        = params.fft_params_vram_footprint() + twiddle_table_vram_footprint(params);
+    const auto io_vram_footprint = params.io_vram_footprint();
 
-    if(!vram_fits_problem(raw_vram_footprint, vram_avail))
+    if(!vram_fits_problem(io_vram_footprint, vram_avail))
     {
         std::stringstream ss;
-        ss << "Raw problem size (" << bytes_to_GiB(raw_vram_footprint)
-           << " GiB) raw data too large for device";
+        ss << "Raw problem size (" << byte_sizes_to_str(io_vram_footprint)
+           << ") exceeds usable memory on some device (" << byte_sizes_to_str(vram_avail) << ")";
         throw ROCFFT_SKIP{ss.str()};
     }
 
     if(verbose > 2)
     {
-        std::cout << "Raw problem size: " << raw_vram_footprint << std::endl;
+        std::cout << "Raw problem size: " << byte_sizes_to_str(io_vram_footprint) << std::endl;
     }
 
     // If it passed the quick estimation test, go for the more
@@ -127,14 +114,14 @@ inline void check_problem_fits_device_memory(Tparams& params, const int verbose)
             std::cout << "Problem raw data won't fit on device; skipped." << std::endl;
         }
         std::stringstream ss;
-        ss << "Problem size (" << bytes_to_GiB(vram_footprint)
-           << " GiB) raw data too large for device";
+        ss << "Problem size (" << byte_sizes_to_str(vram_footprint)
+           << ") exceeds usable memory on some device (" << byte_sizes_to_str(vram_avail) << ")";
         throw ROCFFT_SKIP{ss.str()};
     }
 }
 
 template <typename Tfloat>
-bool fftw_plan_uses_bluestein(const typename fftw_trait<Tfloat>::fftw_plan_type& cpu_plan)
+bool fftw_plan_uses_bluestein(const fftw_plan_wrapper_t<Tfloat>& cpu_plan)
 {
 #ifdef FFTW_HAVE_SPRINT_PLAN
     char*       print_plan_c_str = fftw_sprint_plan<Tfloat>(cpu_plan);
@@ -161,21 +148,6 @@ public:
     }
 };
 
-struct callback_test_data
-{
-    // scalar to modify the input/output with
-    double scalar;
-};
-
-void* get_load_callback_host(fft_array_type itype,
-                             fft_precision  precision,
-                             bool           round_trip_inverse);
-void  apply_load_callback(const fft_params& params, std::vector<hostbuf>& input);
-void  apply_store_callback(const fft_params& params, std::vector<hostbuf>& output);
-void* get_store_callback_host(fft_array_type otype,
-                              fft_precision  precision,
-                              bool           round_trip_inverse);
-
 static auto allocate_cpu_fft_buffer(const fft_precision        precision,
                                     const fft_array_type       type,
                                     const std::vector<size_t>& size)
@@ -188,11 +160,11 @@ static auto allocate_cpu_fft_buffer(const fft_precision        precision,
 }
 
 template <typename Tfloat>
-inline void execute_cpu_fft(fft_params&                                  params,
-                            fft_params&                                  contiguous_params,
-                            typename fftw_trait<Tfloat>::fftw_plan_type& cpu_plan,
-                            std::vector<hostbuf>&                        cpu_input,
-                            std::vector<hostbuf>&                        cpu_output)
+inline void execute_cpu_fft(fft_params&                  params,
+                            fft_params&                  contiguous_params,
+                            fftw_plan_wrapper_t<Tfloat>& cpu_plan,
+                            std::vector<hostbuf>&        cpu_input,
+                            std::vector<hostbuf>&        cpu_output)
 {
     // CPU output might not be allocated already for us, if FFTW never
     // needed an output buffer during planning
@@ -218,11 +190,9 @@ inline void execute_cpu_fft(fft_params&                                  params,
     apply_load_callback(params, *input_ptr);
     params.apply_host_load_ops(*input_ptr);
     fftw_run<Tfloat>(contiguous_params.transform_type, cpu_plan, *input_ptr, cpu_output);
-    // clean up
-    fftw_destroy_plan_type(cpu_plan);
     // ask FFTW to fully clean up, since it tries to cache plan details
+    cpu_plan.reset();
     fftw_cleanup();
-    cpu_plan = nullptr;
     params.apply_host_store_ops(cpu_output);
     apply_store_callback(params, cpu_output);
 }
@@ -247,167 +217,30 @@ inline void execute_gpu_fft(Tparams&              params,
 
     if(params.run_callbacks)
     {
-        auto add_load_cb = [&]() {
-            void* load_cb_host
-                = get_load_callback_host(params.itype, params.precision, round_trip_inverse);
-
-            callback_test_data load_cb_data_host;
-
-            if(round_trip_inverse)
+        auto runtime_err_handler = [&](const std::string& msg) {
+            ++n_hip_failures;
+            if(skip_runtime_fails)
             {
-                load_cb_data_host.scalar = params.store_cb_scalar;
+                throw ROCFFT_SKIP{msg};
             }
             else
             {
-                load_cb_data_host.scalar = params.load_cb_scalar;
+                throw ROCFFT_FAIL{msg};
             }
-
-            auto& load_cb_data_dev = all_cb_data.emplace_back();
-            auto  hip_status       = load_cb_data_dev.alloc(sizeof(callback_test_data));
-            if(hip_status != hipSuccess)
-            {
-                ++n_hip_failures;
-                std::stringstream ss;
-                ss << "Error occurred when allocating device memory for loading callback";
-                if(skip_runtime_fails)
-                {
-                    throw ROCFFT_SKIP{ss.str()};
-                }
-                else
-                {
-                    throw ROCFFT_FAIL{ss.str()};
-                }
-            }
-            hip_status = hipMemcpy(load_cb_data_dev.data(),
-                                   &load_cb_data_host,
-                                   sizeof(callback_test_data),
-                                   hipMemcpyHostToDevice);
-            if(hip_status != hipSuccess)
-            {
-                ++n_hip_failures;
-                std::stringstream ss;
-                ss << "Error occurred when copying data to device for loading callback";
-                if(skip_runtime_fails)
-                {
-                    throw ROCFFT_SKIP{ss.str()};
-                }
-                else
-                {
-                    throw ROCFFT_FAIL{ss.str()};
-                }
-            }
-            load_cb_func.push_back(load_cb_host);
-            load_cb_data.push_back(load_cb_data_dev.data());
         };
 
-        if(params.ifields.empty())
-        {
-            // for library-decomposed multi-GPU, one cb for each device
-            if(params.multiGPU > 1)
-            {
-                for(int i = 0; i < static_cast<int>(params.multiGPU); ++i)
-                {
-                    rocfft_scoped_device dev(i);
-                    add_load_cb();
-                }
-            }
-            else
-            {
-                // load cb for current HIP device
-                add_load_cb();
-            }
-        }
-        else
-        {
-            for(size_t i = 0; i < params.ifields.front().bricks.size(); ++i)
-            {
-                // load cb for this brick's device
-                rocfft_scoped_device dev(params.ifields.front().bricks[i].device);
-                add_load_cb();
-            }
-        }
-
-        auto add_store_cb = [&]() {
-            void* store_cb_host
-                = get_store_callback_host(params.otype, params.precision, round_trip_inverse);
-
-            callback_test_data store_cb_data_host;
-
-            if(round_trip_inverse)
-            {
-                store_cb_data_host.scalar = params.load_cb_scalar;
-            }
-            else
-            {
-                store_cb_data_host.scalar = params.store_cb_scalar;
-            }
-
-            auto& store_cb_data_dev = all_cb_data.emplace_back();
-            auto  hip_status        = store_cb_data_dev.alloc(sizeof(callback_test_data));
-            if(hip_status != hipSuccess)
-            {
-                ++n_hip_failures;
-                std::stringstream ss;
-                ss << "Error occurred when allocating device memory for storing callback";
-                if(skip_runtime_fails)
-                {
-                    throw ROCFFT_SKIP{ss.str()};
-                }
-                else
-                {
-                    throw ROCFFT_FAIL{ss.str()};
-                }
-            }
-
-            hip_status = hipMemcpy(store_cb_data_dev.data(),
-                                   &store_cb_data_host,
-                                   sizeof(callback_test_data),
-                                   hipMemcpyHostToDevice);
-            if(hip_status != hipSuccess)
-            {
-                ++n_hip_failures;
-                std::stringstream ss;
-                ss << "Error occurred when copying data to device for storing callback";
-                if(skip_runtime_fails)
-                {
-                    throw ROCFFT_SKIP{ss.str()};
-                }
-                else
-                {
-                    throw ROCFFT_FAIL{ss.str()};
-                }
-            }
-
-            store_cb_func.push_back(store_cb_host);
-            store_cb_data.push_back(store_cb_data_dev.data());
-        };
-
-        if(params.ofields.empty())
-        {
-            // for library-decomposed multi-GPU, one cb for each device
-            if(params.multiGPU > 1)
-            {
-                for(int i = 0; i < static_cast<int>(params.multiGPU); ++i)
-                {
-                    rocfft_scoped_device dev(i);
-                    add_store_cb();
-                }
-            }
-            else
-            {
-                // store cb for current HIP device
-                add_store_cb();
-            }
-        }
-        else
-        {
-            for(size_t i = 0; i < params.ofields.front().bricks.size(); ++i)
-            {
-                // store cb for this brick's device
-                rocfft_scoped_device dev(params.ofields.front().bricks[i].device);
-                add_store_cb();
-            }
-        }
+        get_rank_load_callbacks(params,
+                                load_cb_func,
+                                load_cb_data,
+                                runtime_err_handler,
+                                round_trip_inverse,
+                                all_cb_data);
+        get_rank_store_callbacks(params,
+                                 store_cb_func,
+                                 store_cb_data,
+                                 runtime_err_handler,
+                                 round_trip_inverse,
+                                 all_cb_data);
 
         auto fft_status
             = params.set_callbacks(&load_cb_func, &load_cb_data, &store_cb_func, &store_cb_data);
@@ -857,14 +690,7 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
     }
     ASSERT_EQ(plan_status, fft_status_success) << "plan creation failed";
 
-    fft_params contiguous_params;
-    contiguous_params.length         = params.length;
-    contiguous_params.precision      = params.precision;
-    contiguous_params.placement      = fft_placement_notinplace;
-    contiguous_params.transform_type = params.transform_type;
-    contiguous_params.nbatch         = params.nbatch;
-    contiguous_params.itype          = contiguous_itype(params.transform_type);
-    contiguous_params.otype          = contiguous_otype(contiguous_params.transform_type);
+    auto contiguous_params = params.make_params_for_reference_cpu();
 
     contiguous_params.validate();
 
@@ -889,14 +715,14 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
             std::stringstream ss;
             if(hip_status == hipErrorOutOfMemory)
             {
-                ss << "Input buffer size (" << bytes_to_GiB(ibuffer_sizes[i])
-                   << " GiB) raw data too large for device";
+                ss << "Input buffer size (" << byte_size_to_str(ibuffer_sizes[i])
+                   << ") raw data too large for device";
             }
             else
             {
                 ss << "hipMalloc failure for input buffer " << i << " size " << ibuffer_sizes[i]
-                   << "(" << bytes_to_GiB(ibuffer_sizes[i]) << " GiB)"
-                   << " with code " << hipError_to_string(hip_status);
+                   << "(" << byte_size_to_str(ibuffer_sizes[i]) << ") with code "
+                   << hipError_to_string(hip_status);
             }
             ++n_hip_failures;
             if(skip_runtime_fails)
@@ -1021,7 +847,8 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
 
     // Create FFTW plan - this may write to input, but that's fine
     // since there's nothing in there right now
-    typename fftw_trait<Tfloat>::fftw_plan_type cpu_plan = nullptr;
+    fftw_plan_wrapper_t<Tfloat> cpu_plan = fftw_trait<Tfloat>::make_wrapper(nullptr);
+
     if(run_fftw)
     {
         // Normally, we would want to defer allocation of CPU output
@@ -1056,7 +883,6 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
     {
         gpu_input_data = allocate_host_buffer(params.precision, params.itype, ibuffer_sizes_elems);
 
-#ifdef USE_HIPRAND
         if(!is_host_gen)
         {
             // generate the input directly on the gpu
@@ -1066,6 +892,7 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
             if(params.itype != contiguous_params.itype
                || params.istride != contiguous_params.istride
                || params.idist != contiguous_params.idist
+               || params.ioffset != contiguous_params.ioffset
                || params.isize != contiguous_params.isize)
             {
                 // Copy input to CPU
@@ -1132,7 +959,6 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
             }
         }
 
-#endif
         if(is_host_gen)
         {
             params.compute_input(gpu_input_data);
@@ -1140,6 +966,7 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
             if(params.itype != contiguous_params.itype
                || params.istride != contiguous_params.istride
                || params.idist != contiguous_params.idist
+               || params.ioffset != contiguous_params.ioffset
                || params.isize != contiguous_params.isize)
             {
                 // Copy input to CPU and make input contiguous
@@ -1204,7 +1031,8 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
         std::vector<hostbuf>* gpu_input = &cpu_input;
 
         if(params.itype != contiguous_params.itype || params.istride != contiguous_params.istride
-           || params.idist != contiguous_params.idist || params.isize != contiguous_params.isize)
+           || params.idist != contiguous_params.idist || params.isize != contiguous_params.isize
+           || params.ioffset != contiguous_params.ioffset)
         {
             copy_buffers(cpu_input,
                          gpu_input_data,
@@ -1217,7 +1045,7 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
                          params.itype,
                          params.istride,
                          params.idist,
-                         {0},
+                         contiguous_params.ioffset,
                          params.ioffset);
             gpu_input = &gpu_input_data;
         }
@@ -1299,8 +1127,8 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
                 ++n_hip_failures;
                 std::stringstream ss;
                 ss << "hipMalloc failure for output buffer " << i << " size " << obuffer_sizes[i]
-                   << "(" << bytes_to_GiB(obuffer_sizes[i]) << " GiB)"
-                   << " with code " << hipError_to_string(hip_status);
+                   << "(" << byte_size_to_str(obuffer_sizes[i]) << ") with code "
+                   << hipError_to_string(hip_status);
                 if(skip_runtime_fails)
                 {
                     throw ROCFFT_SKIP{ss.str()};
@@ -1341,7 +1169,6 @@ inline void fft_vs_reference_impl(Tparams& params, bool round_trip)
     {
         pobuffer[i] = obuffer->at(i).data();
     }
-
     // scatter data out to multi-GPUs if this is a multi-GPU test
     params.multi_gpu_prepare(cpu_input, ibuffer, pibuffer, pobuffer);
 
