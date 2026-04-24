@@ -639,7 +639,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
                             constexpr auto ikxdl = Number<kmn_xdl[Number<0>{}]>{};
                             constexpr auto imxdl = Number<kmn_xdl[Number<1>{}]>{};
                             constexpr auto inxdl = Number<kmn_xdl[Number<2>{}]>{};
-                            constexpr auto kxdl  = ikxdl + k0 * Number<KXdlPack>{};
+                            constexpr auto kxdl  = ikxdl + k0 * KXdlPack;
 
                             vector_type<ComputeTypeA, KPack> a_thread_vec;
                             vector_type<ComputeTypeB, KPack> b_thread_vec;
@@ -841,7 +841,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
                         constexpr auto ikxdl = Number<kmn_xdl[Number<0>{}]>{};
                         constexpr auto imxdl = Number<kmn_xdl[Number<1>{}]>{};
                         constexpr auto inxdl = Number<kmn_xdl[Number<2>{}]>{};
-                        constexpr auto kxdl  = ikxdl + k0 * Number<KXdlPack>{};
+                        constexpr auto kxdl  = ikxdl + k0 * KXdlPack;
 
                         vector_type<ComputeTypeA, KPack> a_thread_vec;
                         vector_type<ComputeTypeB, KPack> b_thread_vec;
@@ -981,7 +981,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
                         constexpr auto ikxdl = Number<kmn_xdl[Number<0>{}]>{};
                         constexpr auto imxdl = Number<kmn_xdl[Number<1>{}]>{};
                         constexpr auto inxdl = Number<kmn_xdl[Number<2>{}]>{};
-                        constexpr auto kxdl  = ikxdl + k0 * Number<KXdlPack>{};
+                        constexpr auto kxdl  = ikxdl + k0 * KXdlPack;
 
                         vector_type<ComputeTypeA, KPack> a_thread_vec;
                         vector_type<ComputeTypeB, KPack> b_thread_vec;
@@ -1071,7 +1071,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_nbs_v3<BlockGemmPipelineScheduler::In
                         constexpr auto ikxdl = Number<kmn_xdl[Number<0>{}]>{};
                         constexpr auto imxdl = Number<kmn_xdl[Number<1>{}]>{};
                         constexpr auto inxdl = Number<kmn_xdl[Number<2>{}]>{};
-                        constexpr auto kxdl  = ikxdl + k0 * Number<KXdlPack>{};
+                        constexpr auto kxdl  = ikxdl + k0 * KXdlPack;
 
                         vector_type<ComputeTypeA, KPack> a_thread_vec;
                         vector_type<ComputeTypeB, KPack> b_thread_vec;

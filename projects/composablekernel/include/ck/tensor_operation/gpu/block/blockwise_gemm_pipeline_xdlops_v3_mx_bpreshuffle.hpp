@@ -621,14 +621,14 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                     b_blockwise_copy.MoveSrcSliceWindow(b_grid_desc, b_block_copy_step);
 
                     static_for<0, MRepeat, 1>{}([&](auto m0) {
-                        constexpr auto im_major = m0 / Number<MXdlPack>{};
-                        constexpr auto im_minor = m0 % Number<MXdlPack>{};
+                        constexpr auto im_major = m0 / MXdlPack;
+                        constexpr auto im_minor = m0 % MXdlPack;
                         static_for<0, KRepeat, 1>{}([&](auto k0) {
-                            constexpr auto ik_major = k0 / Number<KXdlPack>{};
-                            constexpr auto ik_minor = k0 % Number<KXdlPack>{};
+                            constexpr auto ik_major = k0 / KXdlPack;
+                            constexpr auto ik_minor = k0 % KXdlPack;
                             static_for<0, NRepeat, 1>{}([&](auto n0) {
-                                constexpr auto in_major = n0 / Number<NXdlPack>{};
-                                constexpr auto in_minor = n0 % Number<NXdlPack>{};
+                                constexpr auto in_major = n0 / NXdlPack;
+                                constexpr auto in_minor = n0 % NXdlPack;
 
                                 constexpr index_t a_scale_offset =
                                     a_scale_thread_desc.CalculateOffset(
@@ -810,14 +810,14 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
             });
 
             static_for<0, MRepeat, 1>{}([&](auto m0) {
-                constexpr auto im_major = m0 / Number<MXdlPack>{};
-                constexpr auto im_minor = m0 % Number<MXdlPack>{};
+                constexpr auto im_major = m0 / MXdlPack;
+                constexpr auto im_minor = m0 % MXdlPack;
                 static_for<0, KRepeat, 1>{}([&](auto k0) {
-                    constexpr auto ik_major = k0 / Number<KXdlPack>{};
-                    constexpr auto ik_minor = k0 % Number<KXdlPack>{};
+                    constexpr auto ik_major = k0 / KXdlPack;
+                    constexpr auto ik_minor = k0 % KXdlPack;
                     static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        constexpr auto in_major = n0 / Number<NXdlPack>{};
-                        constexpr auto in_minor = n0 % Number<NXdlPack>{};
+                        constexpr auto in_major = n0 / NXdlPack;
+                        constexpr auto in_minor = n0 % NXdlPack;
 
                         constexpr index_t a_scale_offset =
                             a_scale_thread_desc.CalculateOffset(make_tuple(im_major, ik_major, I0));
@@ -928,14 +928,14 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
             });
 
             static_for<0, MRepeat, 1>{}([&](auto m0) {
-                constexpr auto im_major = m0 / Number<MXdlPack>{};
-                constexpr auto im_minor = m0 % Number<MXdlPack>{};
+                constexpr auto im_major = m0 / MXdlPack;
+                constexpr auto im_minor = m0 % MXdlPack;
                 static_for<0, KRepeat, 1>{}([&](auto k0) {
-                    constexpr auto ik_major = k0 / Number<KXdlPack>{};
-                    constexpr auto ik_minor = k0 % Number<KXdlPack>{};
+                    constexpr auto ik_major = k0 / KXdlPack;
+                    constexpr auto ik_minor = k0 % KXdlPack;
                     static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        constexpr auto in_major = n0 / Number<NXdlPack>{};
-                        constexpr auto in_minor = n0 % Number<NXdlPack>{};
+                        constexpr auto in_major = n0 / NXdlPack;
+                        constexpr auto in_minor = n0 % NXdlPack;
 
                         constexpr index_t a_scale_offset =
                             a_scale_thread_desc.CalculateOffset(make_tuple(im_major, ik_major, I0));
@@ -1046,14 +1046,14 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
         else if constexpr(TailNum == TailNumber::Odd)
         {
             static_for<0, MRepeat, 1>{}([&](auto m0) {
-                constexpr auto im_major = m0 / Number<MXdlPack>{};
-                constexpr auto im_minor = m0 % Number<MXdlPack>{};
+                constexpr auto im_major = m0 / MXdlPack;
+                constexpr auto im_minor = m0 % MXdlPack;
                 static_for<0, KRepeat, 1>{}([&](auto k0) {
-                    constexpr auto ik_major = k0 / Number<KXdlPack>{};
-                    constexpr auto ik_minor = k0 % Number<KXdlPack>{};
+                    constexpr auto ik_major = k0 / KXdlPack;
+                    constexpr auto ik_minor = k0 % KXdlPack;
                     static_for<0, NRepeat, 1>{}([&](auto n0) {
-                        constexpr auto in_major = n0 / Number<NXdlPack>{};
-                        constexpr auto in_minor = n0 % Number<NXdlPack>{};
+                        constexpr auto in_major = n0 / NXdlPack;
+                        constexpr auto in_minor = n0 % NXdlPack;
 
                         constexpr index_t a_scale_offset =
                             a_scale_thread_desc.CalculateOffset(make_tuple(im_major, ik_major, I0));

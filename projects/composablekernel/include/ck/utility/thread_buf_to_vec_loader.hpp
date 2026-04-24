@@ -120,7 +120,7 @@ struct IndexEval<index_expression::Mod<L, R>, ik>
  * @code
  *   // Load from buffer using index expressions Ik (the loop index) and Number<5>
  *   using Loader = thread_buf_to_vec_loader<VecType, BufType, DescType, float,
- *                                            index_expression::Ik, Number<5>>;
+ *                                            index_expression::Ik, index_expression::Number<5>>;
  *   Loader loader{thread_vec, thread_buf};
  *   loader(Number<3>{});  // Loads at offset computed by evaluating expressions with ik=3
  * @endcode
