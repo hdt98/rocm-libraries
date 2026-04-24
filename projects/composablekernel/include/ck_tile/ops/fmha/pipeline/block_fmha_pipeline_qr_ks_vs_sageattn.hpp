@@ -87,8 +87,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     static constexpr index_t k1_loops_static = BlockFmhaShape::kN0 / BlockFmhaShape::kK1;
     using AsyncVPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, 1, k1_loops_static>;
-    using AsyncVSinglePolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
-        true, true, 1, 1>;
 
     static_assert(Problem::QScaleEnum == BlockAttentionQuantScaleEnum::SAGEATTN_V3,
                   "BlockFmhaPipelineQRKSVSSageAttn requires QScaleEnum == SAGEATTN_V3");
@@ -205,9 +203,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             {
                 if constexpr(kUseAsyncVLoad)
                 {
-                    constexpr index_t k_smem = AsyncKPolicy::template GetSmemSizeKV<Problem>();
+                    constexpr index_t k_async_bytes =
+                        AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
+                        sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
                     constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
-                    return k_smem + v_smem;
+                    return k_async_bytes + v_smem;
                 }
                 else
                     return AsyncKPolicy::template GetSmemSizeKV<Problem>() +
@@ -353,19 +353,23 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         // V tile in LDS — offset past K LDS when K/V are separated
         auto* v_lds_ptr = [&]() {
             if constexpr(kUseAsyncKLoad && kAsyncKBuffers > 1)
-                return reinterpret_cast<VDataType*>(static_cast<char*>(smem_ptr) +
-                    AsyncKPolicy::template GetSmemSizeKV<Problem>());
+            {
+                constexpr index_t k_async_bytes =
+                    AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
+                    sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
+                return reinterpret_cast<VDataType*>(
+                    static_cast<char*>(smem_ptr) + k_async_bytes);
+            }
             else
                 return reinterpret_cast<VDataType*>(smem_ptr);
         }();
 
-        // V async LDS store: use v_lds_ptr as base with BaseElementOffset=0.
-        // async_load_tile_raw computes M0 from the descriptor's built-in offset
-        // (not from p_data_), so we pass the v_lds_ptr byte offset as
-        // BaseElementOffset to make M0 point to the correct LDS region.
-        // v_lds_ptr is at byte offset GetSmemSizeKV from smem base.
+        // V async LDS store: BaseElementOffset encodes V's absolute LDS position.
+        // async_load_tile_raw computes M0 from the descriptor's built-in offset,
+        // so BaseElementOffset must skip past the entire K async LDS region.
         constexpr index_t kVLdsBaseElementOffset =
-            AsyncKPolicy::template GetSmemSizeKV<Problem>();
+            AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
+            AsyncKPolicy::NumKVLdsBuffers;
         auto make_v_store_window = [&](auto ibuf) {
             constexpr auto v_store_desc =
                 AsyncVPolicy::template MakeVLdsStoreBlockDescriptor<Problem>(
@@ -546,6 +550,19 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 // V async prologue: load k1 sub-tiles into pair A (buf 0,1)
                 if constexpr(kUseAsyncVLoad)
                 {
+                    // Zero-fill V LDS: async store leaves gaps between warps
+                    // (warp stride 2080 > 64 lanes × 16 bytes = 1024 per warp).
+                    // V load descriptor reads through these gaps, so they must
+                    // contain valid data (zeros).
+                    {
+                        constexpr index_t v_lds_total =
+                            AsyncVPolicy::template GetSmemSizeV<Problem>();
+                        auto* vp = reinterpret_cast<uint32_t*>(v_lds_ptr);
+                        const index_t tid = get_thread_id();
+                        for(index_t i = tid; i < v_lds_total / 4; i += kBlockSize)
+                            vp[i] = 0;
+                        __builtin_amdgcn_s_barrier();
+                    }
                     static_for<0, k1_loops, 1>{}([&](auto i_k1) {
                         async_load_tile_raw(
                             make_v_store_window(i_k1),
