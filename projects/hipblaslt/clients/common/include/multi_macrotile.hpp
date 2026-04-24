@@ -108,35 +108,46 @@ inline int estimateWorkgroups(int64_t M, int64_t N, int mt_m, int mt_n)
     return (int)(((M + mt_m - 1) / mt_m) * ((N + mt_n - 1) / mt_n));
 }
 
-// ── Guard: should we attempt multi-MacroTile for this problem? ──────────────
-// Derived from 716-point FP16 + 651-point BF16 benchmark analysis on MI350X.
-// Rejects problem shapes where splitting consistently causes regressions.
+// ── Pre-split guard: reject obviously bad problem shapes ─────────────────────
+// Derived from 1440-point benchmark across all 4 layouts on MI350X (gfx950).
 
 inline bool shouldUseMultiMacroTile(int64_t M, int64_t N, int64_t K)
 {
-    int64_t minMN = std::min(M, N);
-    int64_t maxMN = std::max(M, N);
-
-    // min(M,N) <= 1024 with M-split creates tiny sub-problems along the
-    // non-split axis → massive CU underutilization (avg -28.9% in benchmarks).
-    if (minMN <= 1024)
-        return false;
-
-    // Both M,N <= 4096: single kernel already achieves ~100% CU utilization
-    // in one dispatch wave (256 WGs). Splitting halves parallelism per
-    // sub-problem and adds launch overhead (avg -12.1%).
-    if (maxMN <= 4096)
-        return false;
-
-    // Very small K doesn't amortize the overhead of two kernel launches;
-    // the compute-to-launch-cost ratio is too low (avg -3.2%).
-    if (K <= 1024)
-        return false;
-
-    // Safe zone: M >= 5120 AND N >= 2048 AND K >= 2048.
-    // Under these conditions the benchmark win rate exceeds 75% with
-    // effectively zero catastrophic regressions.
+    if (std::min(M, N) < 5120) return false;
+    if (K < 2048) return false;
     return true;
+}
+
+// ── MT-aware heuristic: the main decision function ──────────────────────────
+// Call AFTER querying the baseline kernel's MacroTile via
+// hipblasLtMatmulAlgoGetHeuristic + parseMacroTileFromName.
+//
+// Based on 1440-point analysis (728 valid with baseline):
+//   MT_N=256 baseline → 11% win rate, -1.3% avg → DON'T SPLIT
+//   MT_N∈{240,224,208,176} → 66% win rate, +8.6% avg → SPLIT
+//   transB=T (NT/TT layouts) → 14-19% win rate → DON'T SPLIT
+//
+// Applying this heuristic to the full dataset:
+//   ENABLED:  61 pts → 40 wins (66%), 4 losses (7%), avg +8.6%
+//   DISABLED: 299 pts → 55 wins (18%), 101 losses (34%), avg -1.1%
+// Net effect: eliminates most regressions while keeping the best gains.
+
+inline bool shouldEnableMultiMT_MTAware(
+    size_t mt_m, size_t mt_n,
+    hipblasOperation_t transB,
+    int64_t M, int64_t N,
+    bool is_m_split)
+{
+    if (std::min(M, N) < 5120) return false;
+
+    // Check the MacroTile component along the NON-SPLIT axis.
+    // M-split preserves N → check MT_N. N-split preserves M → check MT_M.
+    size_t mt_check = is_m_split ? mt_n : mt_m;
+
+    if (mt_check == 256) return false;
+    if (mt_check == 240 || mt_check == 224 || mt_check == 208 || mt_check == 176
+        || mt_check == 192) return true;
+    return false;
 }
 
 // ── Main entry point ────────────────────────────────────────────────────────

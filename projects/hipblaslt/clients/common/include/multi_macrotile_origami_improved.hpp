@@ -226,12 +226,11 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
     }
     else
     {
-        // Generate only the highest-impact candidates to minimize empirical search time.
-        // From 1370+ benchmarks: pow2 splits win 47%, uniform 15%, asym 29%.
-        // pow2-8k [8192,rem] and pow2-2k [2048,rem] alone cover 75%+ of all wins.
+        const int NUM_CUS = 256;
+
         add((total_size / 2 / mt) * mt, "uniform-50/50");
 
-        // Power-of-2 first piece: most common winners
+        // Power-of-2 first piece
         for (int64_t p = 2048; p < total_size; p *= 2)
         {
             int64_t rem = total_size - p;
@@ -239,8 +238,38 @@ inline std::vector<OrigamiCandidate> generateOrigamiCandidates(
                 add(p, "pow2-" + std::to_string(p/1024) + "k");
         }
 
-        // One asymmetric candidate (40/60 was most common asym winner)
+        // One asymmetric candidate
         add(((int64_t)(total_size * 0.40) / mt) * mt, "asym-40/60");
+
+        // Wave-aligned candidates: find split points where BOTH sub-problems
+        // produce workgroup counts that divide evenly into 256 CUs (zero tail waste).
+        // This eliminates dispatch wave tail effects for both sub-problems.
+        //
+        // For M-split with MT_M=256, MT_N varies per sub-problem but we use
+        // mt (the passed macrotile_size) as approximation.
+        // WG count for sub = ceil(sub_size/mt) * ceil(other_dim/mt_other).
+        // We want: ceil(s1/MT_M) * N_tiles mod NUM_CUS == 0 for both pieces.
+        {
+            int64_t mt_m = 256; // dominant MT_M on gfx950
+            // N-tiles is constant across M-split sub-problems
+            int64_t n_tiles = (other_dim + mt - 1) / mt;
+
+            if (n_tiles > 0)
+            {
+                // We need ceil(s1/mt_m) * n_tiles mod 256 == 0
+                // → ceil(s1/mt_m) mod (256 / gcd(n_tiles, 256)) == 0
+                int64_t g = std::__gcd(n_tiles, (int64_t)NUM_CUS);
+                int64_t m_tiles_step = NUM_CUS / g; // ceil(s1/mt_m) must be multiple of this
+
+                // Generate candidates at each wave-aligned boundary
+                for (int64_t m_tiles = m_tiles_step; m_tiles * mt_m < total_size; m_tiles += m_tiles_step)
+                {
+                    int64_t s1 = m_tiles * mt_m;
+                    if (s1 >= min_sub && (total_size - s1) >= min_sub)
+                        add(s1, "wave-" + std::to_string(m_tiles) + "mt");
+                }
+            }
+        }
     }
 
     // Deduplicate by s1

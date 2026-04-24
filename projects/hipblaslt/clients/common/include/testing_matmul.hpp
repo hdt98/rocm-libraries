@@ -4477,8 +4477,24 @@ void testing_matmul_with_bias(const Arguments& arg,
             CHECK_HIP_ERROR(hipGetDeviceProperties(&deviceProps, 0));
             int num_CUs = deviceProps.multiProcessorCount;
 
-            // Automatic strategy selection if strategy is 0 (Auto)
-            int actual_strategy = (arg.split_strategy == 0) ? 17 : arg.split_strategy;
+            // Automatic strategy selection:
+            // - strategy 0 (Auto): pick axis based on transpose layout
+            //     NN/TN (transB=N): M-split (17) — baseline often gets suboptimal MT_N
+            //     NT/TT (transB=T): N-split (18) — baseline N-dimension may be suboptimal
+            // - strategy 17/18: use as specified
+            int actual_strategy;
+            if (arg.split_strategy == 0)
+            {
+                actual_strategy = (transB == HIPBLAS_OP_N) ? 17 : 18;
+                hipblaslt_cout << "Auto-selected strategy " << actual_strategy
+                              << " (" << (actual_strategy == 17 ? "M-split" : "N-split")
+                              << ") for trans" << (transA == HIPBLAS_OP_N ? "N" : "T")
+                              << (transB == HIPBLAS_OP_N ? "N" : "T") << " layout" << std::endl;
+            }
+            else
+            {
+                actual_strategy = arg.split_strategy;
+            }
 
             // Check if multi-MacroTile should be used for this problem
             if (!shouldUseMultiMacroTile(M[0], N[0], K[0]))
@@ -4587,6 +4603,23 @@ void testing_matmul_with_bias(const Arguments& arg,
                     double bl_origami = computeOrigamiLatency(M[0], N[0], K[0], bl_mt_m, bl_mt_n, bl_mt_k,
                                                               transA, transB, arg.a_type, arg.b_type, arg.c_type, arg.d_type, device_id);
                     hipblaslt_cout << "  Baseline origami_latency: " << std::fixed << std::setprecision(0) << bl_origami << " cycles" << std::endl;
+
+                    // === MT-AWARE HEURISTIC CHECK ===
+                    bool is_m_split_actual = (actual_strategy == 17 || actual_strategy == 19 || actual_strategy == 21 || actual_strategy == 23);
+                    if (!shouldEnableMultiMT_MTAware(bl_mt_m, bl_mt_n, transB, M[0], N[0], is_m_split_actual))
+                    {
+                        hipblaslt_cout << "  Heuristic: DISABLED (MT=" << bl_mt_m << "x" << bl_mt_n
+                                      << ", " << (is_m_split_actual ? "M-split" : "N-split")
+                                      << ", trans=" << (transA == HIPBLAS_OP_N ? "N" : "T")
+                                      << (transB == HIPBLAS_OP_N ? "N" : "T")
+                                      << ") — baseline MT along split-preserved axis is already optimal" << std::endl;
+                    }
+                    else
+                    {
+                        hipblaslt_cout << "  Heuristic: ENABLED (MT=" << bl_mt_m << "x" << bl_mt_n
+                                      << ", " << (is_m_split_actual ? "M-split" : "N-split")
+                                      << ") — suboptimal MT detected, splitting should help" << std::endl;
+                    }
                 }
                 hipblasLtMatrixLayoutDestroy(q_matA); hipblasLtMatrixLayoutDestroy(q_matB);
                 hipblasLtMatrixLayoutDestroy(q_matC); hipblasLtMatrixLayoutDestroy(q_matD);
