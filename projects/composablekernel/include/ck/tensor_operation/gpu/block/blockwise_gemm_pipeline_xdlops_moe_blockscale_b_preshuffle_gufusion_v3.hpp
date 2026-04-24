@@ -898,7 +898,8 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v3<
                                                               ComputeDataType,
                                                               decltype(n0),
                                                               Number<0>,
-                                                              decltype(k0), index_expression::Ik>{
+                                                              decltype(k0),
+                                                              index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I0]};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
                                                                 decltype(b_thread_bufs_up[I0]),
@@ -1063,7 +1064,8 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v3<
                                                               ComputeDataType,
                                                               decltype(n0),
                                                               Number<0>,
-                                                              decltype(k0), index_expression::Ik>{
+                                                              decltype(k0),
+                                                              index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I1]};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
                                                                 decltype(b_thread_bufs_up[I1]),
@@ -1183,7 +1185,8 @@ struct BlockwiseGemmXdlops_pipeline_moe_blockscale_bpreshuffle_gufusion_v3<
                                                               ComputeDataType,
                                                               decltype(n0),
                                                               Number<0>,
-                                                              decltype(k0), index_expression::Ik>{
+                                                              decltype(k0),
+                                                              index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I0]};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
                                                                 decltype(b_thread_bufs_up[I0]),

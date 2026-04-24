@@ -299,7 +299,7 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
                         Number<0>,
                         Number<0>,
                         index_expression::Add<index_expression::Ik, decltype(k)>>{a_thread_vec,
-                                                                                a_thread_buf};
+                                                                                  a_thread_buf};
                     auto loadB = thread_buf_to_vec_loader<
                         decltype(b_thread_vec),
                         decltype(b_thread_buf),
@@ -309,7 +309,7 @@ struct BlockwiseGemmDpp_ak0mak1_bk0nbk1_m0n0m1n1m2n2
                         Number<0>,
                         Number<0>,
                         index_expression::Add<index_expression::Ik, decltype(k)>>{b_thread_vec,
-                                                                                b_thread_buf};
+                                                                                  b_thread_buf};
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
 
