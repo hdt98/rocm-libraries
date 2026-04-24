@@ -11998,11 +11998,12 @@ class KernelWriterAssembly(KernelWriter):
               offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (matrixInstK)
             elif tc == "Metadata":
               lrvw = kernel["LocalReadVectorWidth%s"%tc] // 8
+              wlr = max(lrvw//kernel["MIInputPerThreadMetadata"], 1)
               if lrvw < kernel["MIInputPerThreadMetadata"]:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"]*lrvw//kernel["MIInputPerThreadMetadata"]) // 4
                 if kernel["WavefrontSize"] == 32:
                   offsetInc *= 2
-              elif (self.states.localReadDoCntMetadata)%(lrvw//kernel["MIInputPerThreadMetadata"]):
+              elif (self.states.localReadDoCntMetadata)%(wlr):
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * kernel["MIInputPerThreadMetadata"]
               else:
                 offsetInc = (kernel["MacroTile%s"%tP["tensorChar"]] + LdsPad) * (kernel["MatrixInstK"] * wlr - (kernel["MIInputPerThreadMetadata"] * (wlr - 1)))
