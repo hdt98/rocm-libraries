@@ -350,7 +350,7 @@ TYPED_TEST(RocprimDeviceSortTests, SortKeyValue)
             if (is_apu && test_utils::get_total_system_memory(true) <= test_utils::minimum_memory_required_bytes
                 && size >= (1 << 20))
             {
-                std::cout << "Insufficient APU sytstem memory. Skipping test for size = " << size << std::endl;
+                std::cout << "Insufficient APU system memory. Skipping test for size = " << size << std::endl;
                 GTEST_SKIP();
             }
 

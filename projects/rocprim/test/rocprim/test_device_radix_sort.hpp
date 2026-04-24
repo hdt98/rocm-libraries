@@ -1318,7 +1318,7 @@ inline void sort_keys_large_sizes()
         if (is_apu && test_utils::get_total_system_memory(true) <= test_utils::minimum_memory_required_bytes
             && size >= (size_t{1} << 33))
         {
-            std::cout << "Insufficient APU sytstem memory. Skipping test for size = " << size << std::endl;
+            std::cout << "Insufficient APU system memory. Skipping test for size = " << size << std::endl;
             break;
         }
 
@@ -1330,9 +1330,11 @@ inline void sort_keys_large_sizes()
         }
 
         // Generate data
-        std::vector<key_type> keys_input(size);
-        std::iota(keys_input.begin(), keys_input.end(), 0);
-        d_keys.store(keys_input);
+        {
+            std::vector<key_type> keys_input(size);
+            std::iota(keys_input.begin(), keys_input.end(), 0);
+            d_keys.store(keys_input);
+        }
 
         size_t temporary_storage_bytes = 0;
         HIP_CHECK(rocprim::radix_sort_keys(nullptr,
