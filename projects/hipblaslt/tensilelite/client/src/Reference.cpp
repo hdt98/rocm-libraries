@@ -413,6 +413,7 @@ namespace TensileLite
 #ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
 #endif // #ifdef TENSILE_USE_FP4
+            ;
             }
             return DataInitialization::getValue<Accumulator, InitMode::Zero>();
         }
