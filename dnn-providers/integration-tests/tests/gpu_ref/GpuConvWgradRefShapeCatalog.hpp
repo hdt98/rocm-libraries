@@ -98,7 +98,7 @@ inline std::vector<ConvWgradShapeCase> getMedium2dWgradCases()
     };
 }
 
-// Large 2D shapes: stress tests matching real workloads, fp32 only
+// Large 2D shapes: stress tests matching real workloads
 inline std::vector<ConvWgradShapeCase> getLarge2dWgradCases()
 {
     return {

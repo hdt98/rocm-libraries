@@ -848,12 +848,6 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                          [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
                              return info.param.tag;
                          });
-INSTANTIATE_TEST_SUITE_P(Medium3d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(getMedium3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
 
 // fp32 NCW: 1D shapes
 INSTANTIATE_TEST_SUITE_P(Small1d,
@@ -918,12 +912,6 @@ INSTANTIATE_TEST_SUITE_P(Nhwc2dSmall,
 INSTANTIATE_TEST_SUITE_P(Ndhwc3dSmall,
                          TestGpuConvFwdRefShapesFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Ndhwc3dMedium,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(withChannelLastLayout(getMedium3dConvCases())),
                          [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
                              return info.param.tag;
                          });

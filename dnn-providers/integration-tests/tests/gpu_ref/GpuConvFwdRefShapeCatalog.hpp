@@ -16,7 +16,7 @@ namespace gpu_conv_fwd_ref_test
 {
 
 // Returns copies of the given cases with channel-last layout set.
-// 3D (NWC) for 1D conv, 4D (NHWC) for 2D conv, 5D (NDHWC) for 3D conv.
+// 3D (NLC) for 1D conv, 4D (NHWC) for 2D conv, 5D (NDHWC) for 3D conv.
 // Points to the static TensorLayout constants which have program lifetime.
 inline std::vector<ConvFwdShapeCase> withChannelLastLayout(std::vector<ConvFwdShapeCase> cases)
 {
@@ -99,7 +99,7 @@ inline std::vector<ConvFwdShapeCase> getMedium2dConvCases()
     };
 }
 
-// Large 2D shapes: stress tests matching real workloads, fp32 only
+// Large 2D shapes: stress tests matching real workloads
 inline std::vector<ConvFwdShapeCase> getLarge2dConvCases()
 {
     return {

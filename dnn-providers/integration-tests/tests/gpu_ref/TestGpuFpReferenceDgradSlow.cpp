@@ -63,6 +63,12 @@ INSTANTIATE_TEST_SUITE_P(Medium2d,
                          [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
                              return info.param.tag;
                          });
+INSTANTIATE_TEST_SUITE_P(Large2d,
+                         TestGpuConvBwdRefShapesFp16,
+                         ::testing::ValuesIn(getLarge2dDgradCases()),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 INSTANTIATE_TEST_SUITE_P(Medium1d,
                          TestGpuConvBwdRefShapesFp16,
                          ::testing::ValuesIn(getMedium1dDgradCases()),
@@ -83,15 +89,33 @@ INSTANTIATE_TEST_SUITE_P(Medium2d,
                          [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
                              return info.param.tag;
                          });
+INSTANTIATE_TEST_SUITE_P(Medium1d,
+                         TestGpuConvBwdRefShapesBfp16,
+                         ::testing::ValuesIn(getMedium1dDgradCases()),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
+INSTANTIATE_TEST_SUITE_P(Medium3d,
+                         TestGpuConvBwdRefShapesBfp16,
+                         ::testing::ValuesIn(getMedium3dDgradCases()),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 
 // ============================================================================
-// Channel-last (NLC/NHWC/NDHWC) — medium shapes
+// Channel-last (NLC/NHWC/NDHWC) — medium/large shapes
 // ============================================================================
 
 // fp32
 INSTANTIATE_TEST_SUITE_P(Nhwc2dMedium,
                          TestGpuConvBwdRefShapesFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium2dDgradCases())),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
+INSTANTIATE_TEST_SUITE_P(Nhwc2dLarge,
+                         TestGpuConvBwdRefShapesFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLarge2dDgradCases())),
                          [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
                              return info.param.tag;
                          });
@@ -115,6 +139,12 @@ INSTANTIATE_TEST_SUITE_P(Nhwc2dMedium,
                          [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
                              return info.param.tag;
                          });
+INSTANTIATE_TEST_SUITE_P(Nhwc2dLarge,
+                         TestGpuConvBwdRefShapesFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLarge2dDgradCases())),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 INSTANTIATE_TEST_SUITE_P(Nlc1dMedium,
                          TestGpuConvBwdRefShapesFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium1dDgradCases())),
@@ -138,6 +168,12 @@ INSTANTIATE_TEST_SUITE_P(Nhwc2dMedium,
 INSTANTIATE_TEST_SUITE_P(Nlc1dMedium,
                          TestGpuConvBwdRefShapesBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium1dDgradCases())),
+                         [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
+INSTANTIATE_TEST_SUITE_P(Ndhwc3dMedium,
+                         TestGpuConvBwdRefShapesBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getMedium3dDgradCases())),
                          [](const ::testing::TestParamInfo<ConvBwdShapeCase>& info) {
                              return info.param.tag;
                          });

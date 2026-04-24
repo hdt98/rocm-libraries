@@ -77,7 +77,7 @@ inline std::vector<ConvBwdShapeCase> getMedium2dDgradCases()
     };
 }
 
-// Large 2D shapes: stress tests, fp32 only
+// Large 2D shapes: stress tests matching real workloads
 inline std::vector<ConvBwdShapeCase> getLarge2dDgradCases()
 {
     return {
