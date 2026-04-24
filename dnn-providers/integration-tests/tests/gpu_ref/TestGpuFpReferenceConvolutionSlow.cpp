@@ -1,7 +1,7 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include "GpuConvFwdRefTestFixture.hpp"
+#include "GpuConvFwdRefShapeCatalog.hpp"
 
 using namespace gpu_conv_fwd_ref_test;
 

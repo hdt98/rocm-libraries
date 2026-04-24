@@ -1,7 +1,7 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
-#include "GpuConvWgradRefTestFixture.hpp"
+#include "GpuConvWgradRefShapeCatalog.hpp"
 
 #include <cstdint>
 #include <stdexcept>
