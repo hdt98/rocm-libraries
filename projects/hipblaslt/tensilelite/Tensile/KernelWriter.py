@@ -3917,12 +3917,19 @@ class KernelWriter(metaclass=abc.ABCMeta):
             vlcntVal = kernel["PrefetchGlobalRead"] - 1 if kernel["PrefetchGlobalRead"] >= 2 else 0
             waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, vlcntVal, -1, -1, \
                                       "wait for previous set of global reads"))
+          elif kernel["enableTDMA"] and kernel["enableTDMB"]:
+            # TDM case: tensor_load_to_lds instructions (issued in prior iter) write to LDS via the
+            # tensor counter. A s_wait_tensorcnt 0 is required before the barrier to guarantee all
+            # TDM stores to LDS have landed before other waves read from that LDS buffer.
+            waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, 0, -1, -1, \
+                                      "wait for TDM global reads"))
           # (no local write code. Global read wait for DirectToLds is already done)
           if not kernel["NoLdsWriteCode"]:
             waitLWCode.add(self._wait(kernel, tensorParametersA, tensorParametersB, -1, 0, -1, "3wait for local write"))
           skipForceWaitcnt0 = False
-          if kernel["DirectToVgprA"] or kernel["DirectToVgprB"] or kernel["DirectToLdsA"] or kernel["DirectToLdsB"]:
-            # DTVA/B or DTLA/B case, skip generating force waitcnt0
+          if kernel["DirectToVgprA"] or kernel["DirectToVgprB"] or kernel["DirectToLdsA"] or kernel["DirectToLdsB"] or \
+             (kernel["enableTDMA"] and kernel["enableTDMB"]):
+            # DTVA/B, DTLA/B, or TDM case: global read wait is handled above, skip force waitcnt0
             skipForceWaitcnt0 = True
           syncCode.add(self._syncThreads(kernel, "PGR, and wait until LW done to sync LDS%u"%(self.states.ldsBarrierTokenIdx), skipForceWaitcnt0=skipForceWaitcnt0, memoryToken=self.states.ldsBarrierTokenIdx))
           # swap barrier token
