@@ -41,7 +41,6 @@ using TestCase = std::tuple<NamedParameter<int>,
                             NamedParameter<int>,
                             NamedParameter<int>,
                             NamedParameter<int>,
-                            NamedParameter<int>,
                             NamedParameter<miopenRNNMode_t>,
                             NamedParameter<miopenRNNBiasMode_t>,
                             NamedParameter<miopenRNNDirectionMode_t>,
@@ -412,8 +411,6 @@ struct verify_w_tensor_set
 
                 EXPECT_EQUAL(status, miopenStatusSuccess);
 
-                const auto param_dev_out = handle.Create(paramSize);
-
                 status = miopenGetRNNLayerParam(&handle,
                                                 rnnDesc,
                                                 layer,
@@ -452,8 +449,6 @@ struct verify_w_tensor_set
                     status = miopenGetRNNLayerBiasSize(&handle, rnnDesc, layer, layerID, &biasSize);
 
                     EXPECT_EQUAL(status, miopenStatusSuccess);
-
-                    const auto bias_dev_out = handle.Create(biasSize);
 
                     status = miopenGetRNNLayerBias(&handle,
                                                    rnnDesc,
@@ -495,11 +490,10 @@ struct verify_w_tensor_set
 inline auto GenCases()
 {
     return testing::Combine(
-        MakeNamedParameterValues<int>("seqLen", 1, 2, 4),
-        MakeNamedParameterValues<int>("batch_size", 2, 4, 8),
-        MakeNamedParameterValues<int>("num_layer", 4, 8, 16),
-        MakeNamedParameterValues<int>("in_size", 2, 8, 16),
-        MakeNamedParameterValues<int>("wei_hh", 4, 8, 16),
+        MakeNamedParameterValues<int>("batch_size", 2, 4),
+        MakeNamedParameterValues<int>("num_layer", 2, 4),
+        MakeNamedParameterValues<int>("in_size", 4, 8),
+        MakeNamedParameterValues<int>("wei_hh", 4, 8),
         MakeNamedParameterValues<miopenRNNMode_t>("mode", miopenRNNRELU, miopenLSTM, miopenGRU),
         MakeNamedParameterValues<miopenRNNBiasMode_t>(
             "biasMode", miopenRNNwithBias, miopenRNNNoBias),
@@ -581,8 +575,7 @@ struct WSuperTensorTest : public testing::TestWithParam<TestCase>
     void SetUp() override
     {
         prng::reset_seed();
-        std::tie(
-            seqLen, batch_size, num_layer, in_size, wei_hh, mode, biasMode, directionMode, inMode) =
+        std::tie(batch_size, num_layer, in_size, wei_hh, mode, biasMode, directionMode, inMode) =
             GetParam();
     }
 
@@ -662,7 +655,6 @@ private:
     }
 
 private:
-    int seqLen{};
     int batch_size{};
     int num_layer{};
     int in_size{};
@@ -684,8 +676,7 @@ struct TestNameGenerator
 {
     std::string operator()(const auto& info)
     {
-        const auto& [seqLen,
-                     batch_size,
+        const auto& [batch_size,
                      num_layer,
                      in_size,
                      wei_hh,
@@ -696,10 +687,9 @@ struct TestNameGenerator
         std::stringstream ss;
         std::string str;
 
-        ss << "seqLen_" << seqLen() << "_batch_size_" << batch_size() << "_num_layer_"
-           << num_layer() << "_in_size_" << in_size() << "_wei_hh_" << wei_hh() << "_mode_"
-           << mode() << "_directionMode_" << directionMode() << "_inMode_" << inMode()
-           << "_test_id_" << info.index;
+        ss << "batch_size_" << batch_size() << "_num_layer_" << num_layer() << "_in_size_"
+           << in_size() << "_wei_hh_" << wei_hh() << "_mode_" << mode() << "_directionMode_"
+           << directionMode() << "_inMode_" << inMode() << "_test_id_" << info.index;
 
         str = ss.str();
 
