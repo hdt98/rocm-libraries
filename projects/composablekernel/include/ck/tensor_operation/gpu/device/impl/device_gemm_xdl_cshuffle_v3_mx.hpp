@@ -435,27 +435,34 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                 GridwiseGemm::BlockwiseGemmPipe::HotLoopInstList::Print();
             }
 
-            if(typename GridwiseGemm::GemmPartitioner(arg).AreDescriptorsSmallerThan2GB())
+            if constexpr(std::is_same<ADataType, ck::f4x2_pk_t>::value)
             {
-                return RunImpSinglePartition<GridwiseGemm>(arg, stream_config);
+                if(typename GridwiseGemm::GemmPartitioner(arg).AreDescriptorsSmallerThan2GB())
+                {
+                    return RunImpSinglePartition<GridwiseGemm>(arg, stream_config);
+                }
+                else
+                {
+                    if(is_same<CLayout, tensor_layout::gemm::ColumnMajor>::value ||
+                       is_same<ALayout, tensor_layout::gemm::ColumnMajor>::value)
+                    {
+                        throw std::runtime_error("Large tensors that exceed 2GB are only supported "
+                                                 "for RowMajor layout.");
+                    }
+
+                    auto sub_arguments = GridwiseGemm::partition_gemm_problem(arg);
+                    return std::accumulate(sub_arguments.begin(),
+                                           sub_arguments.end(),
+                                           0,
+                                           [&](float sum, const auto& sub_arg) {
+                                               return sum + RunImpSinglePartition<GridwiseGemm>(
+                                                                sub_arg, stream_config);
+                                           });
+                }
             }
             else
             {
-                if(is_same<CLayout, tensor_layout::gemm::ColumnMajor>::value ||
-                   is_same<ALayout, tensor_layout::gemm::ColumnMajor>::value)
-                {
-                    throw std::runtime_error(
-                        "Large tensors that exceed 2GB are only supported for RowMajor layout.");
-                }
-
-                auto sub_arguments = GridwiseGemm::partition_gemm_problem(arg);
-                return std::accumulate(sub_arguments.begin(),
-                                       sub_arguments.end(),
-                                       0,
-                                       [&](float sum, const auto& sub_arg) {
-                                           return sum + RunImpSinglePartition<GridwiseGemm>(
-                                                            sub_arg, stream_config);
-                                       });
+                return RunImpSinglePartition<GridwiseGemm>(arg, stream_config);
             }
         }
 
