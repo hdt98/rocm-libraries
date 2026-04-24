@@ -240,34 +240,6 @@ class ScheduleInfo:
         self.nllZeroDscnt = nllZeroDscnt
         self.mfmaReorder = mfmaReorder
         self.snopCode = snopCode
-        self._disabledPasses: dict[cmsv.ValidatorPass, str] = {}
-
-    def disableValidationPass(self, pass_id: cmsv.ValidatorPass, reason: str) -> None:
-        """Disable a specific validator pass for this schedule.
-
-        Args:
-            pass_id: The ValidatorPass enum member to disable.
-            reason:  Mandatory explanation of why this pass is being disabled.
-        """
-        if not isinstance(pass_id, cmsv.ValidatorPass):
-            raise TypeError(f"pass_id must be a ValidatorPass enum member, got {type(pass_id).__name__}")
-        if not isinstance(reason, str) or not reason.strip():
-            raise ValueError("Reason for disabling pass must be a non-empty string")
-        self._disabledPasses[pass_id] = reason
-
-    def disableValidation(self, reason: str) -> None:
-        """Disable all validator passes for this schedule."""
-        for pass_id in cmsv.ValidatorPass:
-            self.disableValidationPass(pass_id, reason)
-
-    def reasonForDisablingValidationPass(self, pass_id: cmsv.ValidatorPass) -> Optional[str]:
-        """Return the reason this pass was disabled, or None if it is enabled.
-
-        Raises TypeError if pass_id is not a ValidatorPass enum member.
-        """
-        if not isinstance(pass_id, cmsv.ValidatorPass):
-            raise TypeError(f"pass_id must be a ValidatorPass enum member, got {type(pass_id).__name__}")
-        return self._disabledPasses.get(pass_id)
 
     def pretty_print(self):
         print("{")
@@ -5697,63 +5669,6 @@ def _get_schedule_224x320x64_16bit(kernel, useLDSTr, TLDS):
 #   LWA = NumLoadsA, LWB = NumLoadsB (1 ds_store per global read)
 #   LRA/sub = MIWaveTileA, LRB/sub = MIWaveTileB (with LRVW=16, bf16)
 #
-# ---------------------------------------------------------------------------
-# CMS validator coverage on gfx1151
-# ---------------------------------------------------------------------------
-# The CMS validator was written for CDNA 4 MFMA kernels with DirectToLds=1.
-# Its timeline passes embed quad-cycle timings from the CDNA 4 ISA (section
-# 7.6) and its Timeline constructor hard-asserts DTL=1 and a specific LR
-# suffix layout. None of that holds for gfx1151 (RDNA 3.5, WMMA, DTL=0).
-#
-# Rather than disabling validation wholesale, each gfx1151 schedule opts
-# out of only the passes that embed CDNA-specific assumptions via the
-# granular ``disableValidationPass`` API. VERIFY_ASCENDING_ORDER — which
-# only checks that instruction-index sequences are non-decreasing — is
-# truly ISA-agnostic and remains enabled. It catches real CMS-authoring
-# bugs regardless of which GPU the schedule targets.
-#
-# VERIFY_CORRECT_NUMBER_OF_INSTRUCTIONS is disabled for gfx1151: it
-# compares the CMS-authored instruction list against the kernel writer's
-# idMap, which is built from wave/ISA-specific load counts. The counts
-# baked into the current CMS schedule data were authored for CDNA wave64
-# and do not match gfx1151's wave32 kernel expansion. Re-enabling this
-# pass requires calibrating the CMS counts to wave32.
-#
-# VERIFY_SCC_OVERLAP is disabled because its constraint shape was derived
-# from CDNA scalar instruction clusters and has not yet been audited
-# against RDNA 3.5 wave32 scalar semantics.
-#
-# As the validator grows WMMA support, individual passes can be re-enabled
-# by removing their entry from _disable_cdna4_only_passes_for_gfx1151.
-################################################################################
-
-
-def _disable_cdna4_only_passes_for_gfx1151(schedule_info: ScheduleInfo) -> None:
-    """Disable validator passes that do not apply to gfx1151 (RDNA 3.5 WMMA).
-
-    Leaves VERIFY_ASCENDING_ORDER enabled so gfx1151 schedules still get
-    real structural coverage (non-decreasing vmfmaIndex sequences).
-
-    See the block comment above for rationale.
-    """
-    cdna4_only = (
-        cmsv.ValidatorPass.VERIFY_CORRECT_NUMBER_OF_INSTRUCTIONS,
-        cmsv.ValidatorPass.VERIFY_SCC_OVERLAP,
-        cmsv.ValidatorPass.ADD_LOCAL_READ_CONSTRAINTS,
-        cmsv.ValidatorPass.ADD_PACK_CONSTRAINTS,
-        cmsv.ValidatorPass.ADD_GR_NOT_TOO_EARLY_CONSTRAINTS,
-        cmsv.ValidatorPass.ADD_GR_FINISH_BEFORE_LR_CONSTRAINTS,
-    )
-    reasons = {
-        cmsv.ValidatorPass.VERIFY_CORRECT_NUMBER_OF_INSTRUCTIONS:
-            "CMS instruction counts were authored for CDNA wave64; not yet calibrated for RDNA 3.5 wave32 kernel expansion",
-        cmsv.ValidatorPass.VERIFY_SCC_OVERLAP:
-            "SCC-overlap check uses CDNA scalar semantics; not yet audited for RDNA 3.5 wave32",
-    }
-    timeline_reason = "CDNA 4 quad-cycle timing (ISA section 7.6) does not apply to RDNA 3.5 WMMA"
-    for pass_id in cdna4_only:
-        schedule_info.disableValidationPass(pass_id, reasons.get(pass_id, timeline_reason))
-
 @RegisterSchedule(
     tile_config=TileConfig(96, 128, 32, 2, 1, 0, False, 0, 0,
                            isa=(11, 5, 1), wavefront_size=32),
@@ -5814,7 +5729,6 @@ def _get_schedule_96x128x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -5877,7 +5791,6 @@ def _get_schedule_128x96x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -5940,7 +5853,6 @@ def _get_schedule_192x64x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6004,7 +5916,6 @@ def _get_schedule_64x192x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6079,7 +5990,6 @@ def _get_schedule_32x128x64_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6157,7 +6067,6 @@ def _get_schedule_96x128x64_plr0_14_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6227,7 +6136,6 @@ def _get_schedule_128x64x64_plr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6309,7 +6217,6 @@ def _get_schedule_128x80x64_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6377,7 +6284,6 @@ def _get_schedule_128x80x64_pgr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6434,7 +6340,6 @@ def _get_schedule_64x128x32_14_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6491,7 +6396,6 @@ def _get_schedule_128x64x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6548,7 +6452,6 @@ def _get_schedule_64x128x32_22_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6628,7 +6531,6 @@ def _get_schedule_96x96x32_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6699,7 +6601,6 @@ def _get_schedule_64x64x32_22_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6787,7 +6688,6 @@ def _get_schedule_16x16x128_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6871,7 +6771,6 @@ def _get_schedule_32x16x128_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -6938,7 +6837,6 @@ def _get_schedule_128x96x64_plr0_41_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7001,7 +6899,6 @@ def _get_schedule_96x128x64_plr0_14_16bit_gfx1151_tn(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7060,7 +6957,6 @@ def _get_schedule_128x112x32_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[25]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7123,7 +7019,6 @@ def _get_schedule_128x80x64_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7196,7 +7091,6 @@ def _get_schedule_128x80x64_pgr1_plr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7261,7 +7155,6 @@ def _get_schedule_80x128x64_pgr2_plr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7331,7 +7224,6 @@ def _get_schedule_80x128x64_pgr2_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[37]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7391,7 +7283,6 @@ def _get_schedule_64x224x32_pgr2_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[25]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7451,7 +7342,6 @@ def _get_schedule_128x64x32_pgr2_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[14]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7512,7 +7402,6 @@ def _get_schedule_128x48x32_pgr2_plr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[5]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7583,7 +7472,6 @@ def _get_schedule_64x32x64_pgr2_plr1_16bit_gfx1151(kernel, useLDSTr, TLDS):
         optSchedule['LRSB'] = [[1]]
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7637,7 +7525,6 @@ def _get_schedule_128x96x32_pgr1_plr0_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7705,7 +7592,6 @@ def _get_schedule_128x96x64_pgr2_plr0_22_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7769,7 +7655,6 @@ def _get_schedule_128x64x64_pgr2_plr0_22_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
@@ -7833,7 +7718,6 @@ def _get_schedule_128x64x64_pgr1_plr0_22_16bit_gfx1151(kernel, useLDSTr, TLDS):
     }
 
     opt1 = ScheduleInfo(1, numMfma, optSchedule, syncCode, nglshift, nllshift)
-    _disable_cdna4_only_passes_for_gfx1151(opt1)
     return True, opt1
 
 
