@@ -797,11 +797,15 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         {
             constexpr long_index_t TwoGB = (long_index_t{1} << 31);
 
-            const bool is_A_descriptor_smaller_than_2GB = (M_ * StrideA_) <= TwoGB;
-            const bool is_C_descriptor_smaller_than_2GB = (M_ * StrideC_) <= TwoGB;
-            bool are_Ds_descriptors_smaller_than_2GB    = true;
+            const bool is_A_descriptor_smaller_than_2GB =
+                (M_ * StrideA_ * sizeof(ADataType)) <= TwoGB;
+            const bool is_C_descriptor_smaller_than_2GB =
+                (M_ * StrideC_ * sizeof(CDataType)) <= TwoGB;
+            bool are_Ds_descriptors_smaller_than_2GB = true;
             static_for<0, NumDTensor, 1>{}([&](auto i) {
-                are_Ds_descriptors_smaller_than_2GB &= (M_ * StrideDs_[i]) <= TwoGB;
+                using DDataType_ = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
+                are_Ds_descriptors_smaller_than_2GB &=
+                    (M_ * StrideDs_[i] * sizeof(DDataType_)) <= TwoGB;
             });
 
             return is_A_descriptor_smaller_than_2GB && is_C_descriptor_smaller_than_2GB &&
@@ -813,8 +817,8 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
                                        CDataType* p_c_grid_left) const
         {
             auto [M_left, M_right] = [&] {
-                constexpr index_t BatchSize = 256;
-                index_t left                = (M_ / 2 + BatchSize - 1) / BatchSize * BatchSize;
+                constexpr index_t PartitionSize = 256;
+                index_t left = ck::math::integer_least_multiple(M_ / 2, PartitionSize);
                 return std::make_tuple(left, M_ - left);
             }();
 

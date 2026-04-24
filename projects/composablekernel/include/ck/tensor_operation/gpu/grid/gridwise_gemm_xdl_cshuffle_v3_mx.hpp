@@ -814,7 +814,10 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
 
         GemmPartitioner() = default;
         GemmPartitioner(const Argument& arg)
-            : M_{arg.M}, StrideA_{arg.StrideA}, StrideC_{arg.StrideC}
+            : M_{arg.M},
+              StrideA_{arg.StrideA},
+              StrideScaleA_(arg.StrideScaleA),
+              StrideC_{arg.StrideC}
         {
         }
 
@@ -822,8 +825,10 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
         {
             constexpr long_index_t TwoGB = long_index_t{1} << 31;
 
-            const bool is_A_descriptor_smaller_than_2GB = (M_ * StrideA_) <= TwoGB;
-            const bool is_C_descriptor_smaller_than_2GB = (M_ * StrideC_) <= TwoGB;
+            const bool is_A_descriptor_smaller_than_2GB =
+                (M_ * StrideA_ * sizeof(ADataType)) <= TwoGB;
+            const bool is_C_descriptor_smaller_than_2GB =
+                (M_ * StrideC_ * sizeof(CDataType)) <= TwoGB;
 
             return is_A_descriptor_smaller_than_2GB && is_C_descriptor_smaller_than_2GB;
         }
@@ -833,8 +838,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                        CDataType* p_c_grid_left) const
         {
             auto [M_left, M_right] = [&] {
-                constexpr index_t BatchSize = 256;
-                index_t left                = (M_ / 2 + BatchSize - 1) / BatchSize * BatchSize;
+                constexpr index_t PartitionSize = 256;
+                index_t left = ck::math::integer_least_multiple(M_ / 2, PartitionSize);
                 return std::make_tuple(left, M_ - left);
             }();
 
@@ -845,7 +850,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
 
             const index_t a_right_offset       = M_left * StrideA_;
             const index_t c_right_offset       = M_left * StrideC_;
-            const index_t a_scale_right_offset = M_left * StrideScaleA_;
+            const index_t a_scale_right_offset = M_left * StrideScaleA_ / sizeof(AScaleDataType);
 
             return ck::make_tuple(conv_to_gemm_transformer_left,
                                   conv_to_gemm_transformer_right,
@@ -889,10 +894,10 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
                                                 c_grid_ptr,
                                                 tensorSplitter.M_,
                                                 arg.N,
-                                                arg.K,
-                                                arg.StrideA,
+                                                arg.K * APackedSize,
+                                                arg.StrideA * APackedSize,
                                                 arg.StrideScaleA,
-                                                arg.StrideB,
+                                                arg.StrideB * BPackedSize,
                                                 arg.StrideScaleB,
                                                 arg.StrideC,
                                                 arg.KBatch,
@@ -920,6 +925,8 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
 
                 a_grid_ptrs_queue.push(a_grid_ptr);
                 a_grid_ptrs_queue.push(a_grid_right_ptr);
+                a_scale_grid_ptrs_queue.push(a_scale_grid_ptr);
+                a_scale_grid_ptrs_queue.push(a_scale_grid_right_ptr);
                 c_grid_ptrs_queue.push(c_grid_ptr);
                 c_grid_ptrs_queue.push(c_grid_right_ptr);
             }
@@ -927,6 +934,7 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
             tensors.pop();
             a_grid_ptrs_queue.pop();
             c_grid_ptrs_queue.pop();
+            a_scale_grid_ptrs_queue.pop();
         }
 
         return subArguments;
