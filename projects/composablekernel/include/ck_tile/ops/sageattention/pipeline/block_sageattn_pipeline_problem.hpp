@@ -20,7 +20,7 @@ template <typename QDataType_,
           typename BlockSageAttnShape_,
           bool kIsGroupMode_,
           typename AttentionVariant_,
-          typename FmhaMask_,
+          typename AttnMask_,
           typename Traits_>
 struct BlockSageAttnPipelineProblem
 {
@@ -34,7 +34,7 @@ struct BlockSageAttnPipelineProblem
     using ODataType           = remove_cvref_t<ODataType_>;
     using BlockSageAttnShape  = remove_cvref_t<BlockSageAttnShape_>;
     using AttentionVariant    = remove_cvref_t<AttentionVariant_>;
-    using FmhaMask            = remove_cvref_t<FmhaMask_>;
+    using AttnMask            = remove_cvref_t<AttnMask_>;
     using Traits              = remove_cvref_t<Traits_>;
 
     static constexpr index_t kNumGemm0Warps = BlockSageAttnShape::NumGemm0Warps;

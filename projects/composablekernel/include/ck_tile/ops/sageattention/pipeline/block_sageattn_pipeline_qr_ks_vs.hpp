@@ -38,7 +38,7 @@ struct BlockSageAttentionPipelineQRKSVS
     using OaccDataType     = remove_cvref_t<typename Problem::OaccDataType>;
     using ODataType        = remove_cvref_t<typename Problem::ODataType>;
     using AttentionVariant = remove_cvref_t<typename Problem::AttentionVariant>;
-    using FmhaMask         = remove_cvref_t<typename Problem::FmhaMask>;
+    using AttnMask         = remove_cvref_t<typename Problem::AttnMask>;
 
     using BlockSageAttnShape         = remove_cvref_t<typename Problem::BlockSageAttnShape>;
     using VLayout                    = remove_cvref_t<typename BlockSageAttnShape::VLayout>;
@@ -148,7 +148,7 @@ struct BlockSageAttentionPipelineQRKSVS
                const SAccElementFunction& s_acc_element_func,
                const PComputeElementFunction& p_compute_element_func,
                const OAccElementFunction& o_acc_element_func,
-               FmhaMask mask,
+               AttnMask mask,
                PositionEncoding /*position_encoding*/,
                float scale_s,
                const AttentionVariant& variant,
@@ -241,7 +241,7 @@ struct BlockSageAttentionPipelineQRKSVS
         const auto num_total_loop = integer_divide_ceil(seqlen_k_end - seqlen_k_start, kN0);
 
         // check early exit if no work to do
-        if constexpr(FmhaMask::IsMasking || kPadSeqLenK)
+        if constexpr(AttnMask::IsMasking || kPadSeqLenK)
         {
             if(num_total_loop <= 0)
             {
@@ -580,7 +580,7 @@ struct BlockSageAttentionPipelineQRKSVS
                 s_acc = tile_elementwise_in(s_acc_element_func_, s_acc);
             }
             // STAGE 2, scale_s, mask, softmax
-            if constexpr(kPadSeqLenK || FmhaMask::IsMasking)
+            if constexpr(kPadSeqLenK || AttnMask::IsMasking)
             {
                 const auto k_origin      = k_dram_block_window.get_window_origin();
                 bool need_perpixel_check = mask.IsEdgeTile(q_origin.at(number<0>{}),
@@ -627,7 +627,7 @@ struct BlockSageAttentionPipelineQRKSVS
                 s.get_tile_distribution()); // Pcompute{j}
 
             static const auto get_validated_m = [](SMPLComputeDataType raw_m) {
-                if constexpr(FmhaMask::IsMasking)
+                if constexpr(AttnMask::IsMasking)
                 {
                     return raw_m == -numeric<SMPLComputeDataType>::infinity()
                                ? type_convert<SMPLComputeDataType>(0.f)
@@ -795,7 +795,7 @@ struct BlockSageAttentionPipelineQRKSVS
             const auto tmp       = [&]() {
                 // When masking, the denominator can be zero; guard the normalization
                 // so we do not divide by zero after a fully masked row.
-                if constexpr(FmhaMask::IsMasking)
+                if constexpr(AttnMask::IsMasking)
                 {
                     return l[i_idx] == 0.f ? 0.f : 1 / l[i_idx];
                 }
@@ -823,7 +823,7 @@ struct BlockSageAttentionPipelineQRKSVS
     operator()(const QDramBlockWindowTmp& q_dram_block_window_tmp, // M0*K0 tile
                const KDramBlockWindowTmp& k_dram_block_window_tmp, // N0*K0 tile
                const VDramBlockWindowTmp& v_dram_block_window_tmp, // N1*K1 tile
-               FmhaMask mask,
+               AttnMask mask,
                PositionEncoding position_encoding,
                float scale_s,
                const AttentionVariant& variant,

@@ -23,7 +23,8 @@ ops = []
 for importer, module_name, _ in pkgutil.iter_modules(codegen.ops.__path__):
     full_module_name = "%s.%s" % (codegen.ops.__name__, module_name)
     ops.append(importer.find_spec(module_name).loader.load_module(module_name))
-unwanted_prefix = "fmha_"
+# Strip "sageattn_" so module sageattn_fwd registers as CLI key "fwd".
+unwanted_prefix = "sageattn_"
 handlers = dict(
     [
         (
@@ -85,7 +86,7 @@ def list_blobs(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         prog="generate",
-        description="gen API for CK fmha kernel",
+        description="Generate SageAttention CK_tile kernel/API blobs.",
     )
     parser.add_argument(
         "--targets",
@@ -94,13 +95,11 @@ if __name__ == "__main__":
         help="list of GPU targets, separated by comma.",
     )
     parser.add_argument(
-        "-d",
-        "--direction",  # we keep 'direction' option for backward compatibility
         "-a",
         "--api",
         default="fwd",
         required=False,
-        help="supply API(s) to generate (default: fwd). separated by comma.",
+        help="Codegen API key(s), comma-separated (e.g. fwd -> module codegen.ops.sageattn_fwd).",
     )
     parser.add_argument(
         "-o",
@@ -133,28 +132,21 @@ if __name__ == "__main__":
         "--receipt",
         default=0,
         required=False,
-        help="codegen receipt. 0: generate only 8xhdim coverage\n"
-        + "  1: generate more instance to cover all hdim\n"
-        + "  2: Only generate instance for Flash attention integration\n"
-        + "  4: Only generate instance for PyTorch integration\n"
-        + "  100-199: Only generate instance for Aiter(mha_fwd) integration\n"
-        + "  200-299: Only generate instance for Aiter(mha_varlen_fwd) integration\n"
-        + "  300-399: Only generate instance for Aiter(mha_bwd) integration\n"
-        + "  400-499: Only generate instance for Aiter(mha_varlen_bwd) integration\n"
-        + "  600-699: Only generate instance for aiter::mha_fwd && aiter::mha_fwd_splitkv && aiter::mha_bwd C++ api integration",
+        help="Codegen receipt index. SageAttention forward currently uses receipt 0 only; "
+        "the value is passed through to ops (see get_product in sageattn_fwd.py).",
     )
 
     parser.add_argument(
         "--optdim",
         default="-1",
         required=False,
-        help="only optimize the hdim in the list. separated by comma. -1 is the default choice"
-        + "eg. --optdim=32,64,128,256",
+        help="only optimize the hdim in the list. separated by comma. -1 is the default choice. "
+        "e.g. --optdim=32,64,128,256",
     )
 
     args = parser.parse_args()
     targets = args.targets.split(",")
-    api_list = args.direction.split(",")
+    api_list = args.api.split(",")
     filter_list = args.filter.split(",")
     filter_list.extend([""] * (len(api_list) - len(filter_list)))
     optdim_list = [int(hdim) for hdim in args.optdim.split(",")]

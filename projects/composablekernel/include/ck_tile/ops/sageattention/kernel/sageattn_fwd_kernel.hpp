@@ -52,8 +52,8 @@ struct SageAttnFwdKernel
     static constexpr bool kSkipMinSeqlenQ = SageAttnPipeline::Problem::kSkipMinSeqlenQ;
 
     using AttentionVariant = ck_tile::remove_cvref_t<typename SageAttnPipeline::AttentionVariant>;
-    using FmhaMask         = ck_tile::remove_cvref_t<typename SageAttnPipeline::FmhaMask>;
-    static constexpr bool kHasMask = FmhaMask::IsMasking;
+    using AttnMask         = ck_tile::remove_cvref_t<typename SageAttnPipeline::AttnMask>;
+    static constexpr bool kHasMask = AttnMask::IsMasking;
 
     static constexpr bool kUseAsyncCopy = SageAttnPipeline::Policy::AsyncCopy;
 
@@ -793,9 +793,9 @@ struct SageAttnFwdKernel
         /// FIXME: Before C++20, capturing structured binding variables are not supported.
         /// Remove following copy capture of the 'i_nhead' if in C++20
 
-        FmhaMask mask = [&]() {
+        AttnMask mask = [&]() {
             if constexpr(kHasMask)
-                return ck_tile::make_generic_attention_mask_from_lr_window<FmhaMask>(
+                return ck_tile::make_generic_attention_mask_from_lr_window<AttnMask>(
                     kargs.window_size_left,
                     kargs.window_size_right,
                     0,
@@ -803,7 +803,7 @@ struct SageAttnFwdKernel
                     kargs.seqlen_k,
                     kargs.mask_type == GenericAttentionMaskEnum::MASK_FROM_TOP_LEFT);
             else
-                return FmhaMask{kargs.seqlen_q, kargs.seqlen_k};
+                return AttnMask{kargs.seqlen_q, kargs.seqlen_k};
         }();
 
         // WA i_batch capture structure binding before c++20
@@ -826,7 +826,7 @@ struct SageAttnFwdKernel
             }();
 
             // logits_soft_cap is always disabled, use standard attention params
-            return ck_tile::StandardAttentionParams<FmhaMask>{mask, scale_s};
+            return ck_tile::StandardAttentionParams<AttnMask>{mask, scale_s};
         }();
 
         BlockIndices block_indices{i_batch, i_nhead, i_nhead / kargs.nhead_ratio_qk};

@@ -15,9 +15,9 @@ _MASK_SIMPLIFIED_MAP = {
 }
 
 _MASK_MAP = {
-    "no": "FmhaMasks::NoMask",
-    "causal": "FmhaMasks::CausalMask",
-    "generic": "FmhaMasks::GenericMask",
+    "no": "SageAttnMasks::NoMask",
+    "causal": "SageAttnMasks::CausalMask",
+    "generic": "SageAttnMasks::GenericMask",
 }
 
 

@@ -59,18 +59,18 @@ SAGEATTN_FWD_KERNEL_BODY_TEMPLATE = """
 
 #if !defined(__HIP_DEVICE_COMPILE__) || ({F_arch.preprocessor_check})
 
-using fmha_dtype = {F_dtype};
+using sageattn_dtype = {F_dtype};
 
-using fmha_block_tile = ck_tile::sequence<{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}>;
+using sageattn_block_tile = ck_tile::sequence<{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}>;
 
-using fmha_shape = ck_tile::TileSageAttnShape<fmha_block_tile,
+using sageattn_shape = ck_tile::TileSageAttnShape<sageattn_block_tile,
                                           ck_tile::sequence<{F_rm0}, {F_rn0}, {F_rk0}>,
                                           ck_tile::sequence<{F_wm0}, {F_wn0}, {F_wk0}>,
                                           ck_tile::sequence<{F_rm1}, {F_rn1}, {F_rk1}>,
                                           ck_tile::sequence<{F_wm1}, {F_wn1}, {F_wk1}>,
                                           {F_vlayout}>;
 
-using fmha_traits = ck_tile::TileSageAttnTraits<{F_spad},
+using sageattn_traits = ck_tile::TileSageAttnTraits<{F_spad},
                                             {F_skpad},
                                             {F_dpad},
                                             {F_dvpad},
@@ -78,43 +78,43 @@ using fmha_traits = ck_tile::TileSageAttnTraits<{F_spad},
                                         {F_occupancy},
                                         {F_skip}>;
 
-using fmha_variant = ck_tile::ComposedAttention<false * ck_tile::LOGITS_SOFT_CAP, true>;
+using sageattn_variant = ck_tile::ComposedAttention<false * ck_tile::LOGITS_SOFT_CAP, true>;
 
-using fmha_mask = {F_mask};
+using sageattn_mask_type = {F_mask};
 
-using fmha_pipeline_problem = ck_tile::BlockSageAttnPipelineProblem<
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::QDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::KDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::VDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::SaccDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::SMPLComputeDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::PDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::OaccDataType,
-    typename SageAttentionFwdTypeConfig<fmha_dtype>::ODataType,
-    fmha_shape,
+using sageattn_pipeline_problem = ck_tile::BlockSageAttnPipelineProblem<
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::QDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::KDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::VDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::SaccDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::SMPLComputeDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::PDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::OaccDataType,
+    typename SageAttentionFwdTypeConfig<sageattn_dtype>::ODataType,
+    sageattn_shape,
     {F_mode},
-    fmha_variant,
-    fmha_mask,
-    fmha_traits>;
+    sageattn_variant,
+    sageattn_mask_type,
+    sageattn_traits>;
 
-using fmha_pipeline = {F_pipeline}<
-    fmha_pipeline_problem>;
+using sageattn_pipeline = {F_pipeline}<
+    sageattn_pipeline_problem>;
 
-using fmha_epilogue =
-    ck_tile::Default2DEpilogue<ck_tile::Default2DEpilogueProblem<typename SageAttentionFwdTypeConfig<fmha_dtype>::OaccDataType,
-                               typename SageAttentionFwdTypeConfig<fmha_dtype>::ODataType,
+using sageattn_epilogue =
+    ck_tile::Default2DEpilogue<ck_tile::Default2DEpilogueProblem<typename SageAttentionFwdTypeConfig<sageattn_dtype>::OaccDataType,
+                               typename SageAttentionFwdTypeConfig<sageattn_dtype>::ODataType,
                                {F_spad}, {F_dvpad}>>;
 
-using fmha_kernel = {F_kernel}<fmha_pipeline, fmha_epilogue>;
+using sageattn_kernel = {F_kernel}<sageattn_pipeline, sageattn_epilogue>;
 
 
 using trait = sageattn_fwd_traits_<{F_hdim}, {F_dtype}, {F_mode},{F_bm0}, {F_bn0}, {F_bk0}, {F_bn1}, {F_bk1}, {F_bk0max}, {F_vlayout},
-                        {F_pipeline_enum}, fmha_mask, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}>;
+                        {F_pipeline_enum}, sageattn_mask_type, {F_qscale}, {F_spad}, {F_skpad}, {F_dpad}, {F_dvpad}, {F_skip}>;
 
 template<>
 float sageattn_fwd_<trait, {F_arch.tag}>(const ck_tile::stream_config& s, sageattn_fwd_args a)
 {{
-    using k_ = fmha_kernel;
+    using k_ = sageattn_kernel;
     if(s.log_level_ > 0)
         std::cout << ", {F_kname}" << std::flush;
     auto [kargs, grids] = {F_kargs_creator}<k_>(a);

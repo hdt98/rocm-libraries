@@ -25,7 +25,7 @@ list(JOIN INST_TARGETS , SAGEATTN_TARGETS_ARG)
 set(SAGEATTN_FWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
   --targets ${SAGEATTN_TARGETS_ARG}
-  --api sageattn_fwd
+  --api fwd
   --optdim 128
 )
 

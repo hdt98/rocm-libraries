@@ -112,7 +112,7 @@ struct SageAttentionFwdTypeConfig<SageAttentionFwdI4Fp8Bf16>
     using ODataType           = ck_tile::bf16_t;
 };
 
-struct FmhaMasks
+struct SageAttnMasks
 {
     using NoMask      = ck_tile::GenericAttentionMask<false>;
     using GenericMask = ck_tile::GenericAttentionMask<true, true>;
@@ -335,8 +335,8 @@ template <ck_tile::index_t HDim_,
           ck_tile::index_t kK1_,
           ck_tile::index_t kK0BlockLength_,
           bool kIsVLayoutRowMajor_,
-          ck_tile::BlockSageAttnPipelineEnum FmhaPipelineEnum_,
-          typename FmhaMask_,
+          ck_tile::BlockSageAttnPipelineEnum SageAttnPipelineEnum_,
+          typename AttnMask_,
           ck_tile::BlockSageAttentionQuantScaleEnum QScaleEnum_,
           bool kPadS_,
           bool kPadSK_,
@@ -355,8 +355,8 @@ struct sageattn_fwd_traits_
     static constexpr ck_tile::index_t kK1            = kK1_;
     static constexpr ck_tile::index_t kK0BlockLength = kK0BlockLength_;
     static constexpr bool kIsVLayoutRowMajor         = kIsVLayoutRowMajor_;
-    static constexpr auto FmhaPipelineEnum           = FmhaPipelineEnum_;
-    using FmhaMask                                   = ck_tile::remove_cvref_t<FmhaMask_>;
+    static constexpr auto SageAttnPipelineEnum       = SageAttnPipelineEnum_;
+    using AttnMask                                   = ck_tile::remove_cvref_t<AttnMask_>;
     static constexpr auto QScaleEnum                 = QScaleEnum_;
     static constexpr bool kPadS                      = kPadS_;
     static constexpr bool kPadSK                     = kPadSK_;

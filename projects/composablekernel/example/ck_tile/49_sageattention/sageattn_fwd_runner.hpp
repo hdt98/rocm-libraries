@@ -21,6 +21,12 @@
 #include <utility>
 #include <vector>
 
+template <typename... Args>
+inline void dump_sageattn_fwd_json_results(Args&&... args)
+{
+    dump_fmha_fwd_json_results(std::forward<Args>(args)...);
+}
+
 enum class fwd_result
 {
     success,
@@ -164,15 +170,8 @@ fwd_result sageattn_fwd_run(mode_enum mode,
         }
     }
 
-#if 0
-    std::cout << "seqlen_qs: " << seqlen_qs << std::endl;
-    std::cout << "seqlen_ks: " << seqlen_ks << std::endl;
-    std::cout << "seqlen_qpads: " << seqlen_qpads << std::endl;
-    std::cout << "seqlen_kpads: " << seqlen_kpads << std::endl;
-#endif
-
     if(scale_s == .0f)
-        scale_s = 1.0 / ck_tile::sqrt(static_cast<float>(hdim_q)); // TODO: q ? v ?
+        scale_s = 1.0f / ck_tile::sqrt(static_cast<float>(hdim_q)); // TODO: q ? v ?
 
     mask_info mask =
         mask_info::decode(mask_str, seqlen_qs[0], seqlen_ks[0]); // TODO: we don't need x/y anymore
@@ -773,13 +772,13 @@ fwd_result sageattn_fwd_run(mode_enum mode,
     };
 
     // Run main SageAttention forward kernel
-    sageattn_fwd_traits fmha_traits;
-    init_traits(fmha_traits);
+    sageattn_fwd_traits sageattn_traits;
+    init_traits(sageattn_traits);
 
-    sageattn_fwd_args fmha_args;
-    init_args(fmha_args);
+    sageattn_fwd_args sageattn_args;
+    init_args(sageattn_args);
 
-    const float ave_time = sageattn_fwd(fmha_traits, fmha_args, stream_config);
+    const float ave_time = sageattn_fwd(sageattn_traits, sageattn_args, stream_config);
     if(ave_time < 0.0f)
     {
         std::cout << ", not supported yet" << std::flush << std::endl;
@@ -1015,7 +1014,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
             if(mask.type == mask_enum::no_mask)
             {
                 ck_tile::reference_batched_masking<SaccDataType>(
-                    s_host_ref, FmhaMasks::NoMask{real_seqlen_q, real_seqlen_k});
+                    s_host_ref, SageAttnMasks::NoMask{real_seqlen_q, real_seqlen_k});
             }
             else if(mask.type == mask_enum::window_generic)
             {
@@ -1023,7 +1022,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                 // window_generic maps to MASK_GENERIC, so is_top_left is false (not the default).
                 ck_tile::reference_batched_masking<SaccDataType>(
                     s_host_ref,
-                    ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
+                    ck_tile::make_generic_attention_mask_from_lr_window<SageAttnMasks::GenericMask>(
                         mask.left, mask.right, 0, real_seqlen_q, real_seqlen_k, false));
             }
             else
@@ -1033,23 +1032,23 @@ fwd_result sageattn_fwd_run(mode_enum mode,
                 if(mask.left < 0)
                     ck_tile::reference_batched_masking<SaccDataType>(
                         s_host_ref,
-                        ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::CausalMask>(
-                            mask.left,
-                            mask.right,
-                            0,
-                            real_seqlen_q,
-                            real_seqlen_k,
-                            mask.type == mask_enum::mask_top_left));
+                        ck_tile::make_generic_attention_mask_from_lr_window<
+                            SageAttnMasks::CausalMask>(mask.left,
+                                                       mask.right,
+                                                       0,
+                                                       real_seqlen_q,
+                                                       real_seqlen_k,
+                                                       mask.type == mask_enum::mask_top_left));
                 else
                     ck_tile::reference_batched_masking<SaccDataType>(
                         s_host_ref,
-                        ck_tile::make_generic_attention_mask_from_lr_window<FmhaMasks::GenericMask>(
-                            mask.left,
-                            mask.right,
-                            0,
-                            real_seqlen_q,
-                            real_seqlen_k,
-                            mask.type == mask_enum::mask_top_left));
+                        ck_tile::make_generic_attention_mask_from_lr_window<
+                            SageAttnMasks::GenericMask>(mask.left,
+                                                        mask.right,
+                                                        0,
+                                                        real_seqlen_q,
+                                                        real_seqlen_k,
+                                                        mask.type == mask_enum::mask_top_left));
             }
             const ck_tile::HostTensor<SaccDataType> masked_s_host_ref = s_host_ref;
             ck_tile::reference_batched_softmax<SMPLComputeDataType, SMPLComputeDataType, PDataType>(
@@ -1122,7 +1121,7 @@ fwd_result sageattn_fwd_run(mode_enum mode,
 
     if(json)
     {
-        dump_fmha_fwd_json_results(
+        dump_sageattn_fwd_json_results(
             *json,
             data_type,
             mode == mode_enum::batch ? "batch" : "group",
