@@ -350,8 +350,14 @@ struct MIOpenBatchNormBwdSpatialHIPImpl<0, FpType, FpPrecType, FpAccumType>
 template <typename FpType, typename FpPrecType, typename FpAccumType>
 struct MIOpenBatchNormBwdSpatialHIPImpl<1, FpType, FpPrecType, FpAccumType>
 {
-    static constexpr unsigned int read_size  = mio_config::layout_nhwc ? 1 : 4;
-    static constexpr unsigned int write_size = mio_config::layout_nhwc ? 1 : 2;
+    // For NCHW layout, the read/write loops process flattened NHW positions with vectorized
+    // memory accesses. When HW is not a multiple of the vector size, the last access in a
+    // channel crosses into the next channel's memory, corrupting results with data computed
+    // using the wrong channel's statistics. Fall back to scalar access when HW is not aligned.
+    static constexpr unsigned int read_size =
+        (!mio_config::layout_nhwc && mio_bn_config::hw % 4 == 0) ? 4 : 1;
+    static constexpr unsigned int write_size =
+        (!mio_config::layout_nhwc && mio_bn_config::hw % 2 == 0) ? 2 : 1;
 
     using fp_read_vec_type       = typename mapped_vector_type<FpType, read_size>::type;
     using fp_prec_read_vec_type  = typename mapped_vector_type<FpPrecType, read_size>::type;
