@@ -55,9 +55,10 @@ We desire an automated system that serializes with concurrent queues, is cheap t
 
 ### Prerequisites
 
-One external precondition the queue depends on:
+Two external preconditions the queue depends on:
 
 - **`develop` branch protection enforces required reviewer approvals and required CI checks.** Per-component reviewer ownership is already declared in [`.github/CODEOWNERS`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/CODEOWNERS); the required check is `TheRock CI Summary` ([`.github/workflows/therock-ci.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-ci.yml)). The queue serializes; it does not authorize or bypass — see [§5](#5-open-source-contributor-policy) for why this is sufficient even for external contributors.
+- **The processor pushes the `develop`-merge using a GitHub App installation token** (a separate identity from `GITHUB_TOKEN`). Push events made with `GITHUB_TOKEN` do not re-trigger workflows ([GitHub docs](https://docs.github.com/en/actions/security-for-github-actions/security-guides/automatic-token-authentication#using-the-github_token-in-a-workflow)), so without this `pull_request: synchronize` would not fire on the post-merge tip and CI evaluation would read pre-activation results — defeating the queue's whole purpose. The token is held in repo secrets; rotation policy is part of the App's lifecycle (see [§8](#8-risks)). Only the push uses this token; see [§4.9](#49-implementation-constraints) for the full token split.
 
 ## 4. Design
 
@@ -123,7 +124,7 @@ A PR editing both `projects/hipdnn/api/foo.h` and `dnn-providers/miopen-provider
 
 #### Worked example: five PRs across four time-steps
 
-Four PRs are enqueued at T₀ — A (core), B (miopen-provider), C (hipblaslt-provider), D (integration-tests). A second core PR, E, is enqueued mid-flight at T₁ to demonstrate how core serializes behind in-flight downstream work. Heads shown leftmost; `→` is "behind".
+Four PRs are enqueued at T₀ — A (core), B (miopen-provider), C (hipblaslt-provider), D (integration-tests). A second core PR, E, is enqueued mid-flight at T₁ to demonstrate how core serializes behind in-flight downstream work. Heads shown leftmost; `→` is "behind". Each step represents one full activation cycle — the head PR is activated (`mq:queued` → `mq:active`, `develop` merged in), CI runs, and the result is evaluated next cycle. T₀→T₃ compresses these for readability; in wall-clock terms each step is at minimum one CI cycle.
 
 ```
 T₀ — A, B, C, D enqueued
@@ -186,9 +187,9 @@ Queue state lives in the following PR-attached primitives, each chosen so that i
 
 - **Membership labels.** One `mq:<queue>` label per queue the PR belongs to. Set at enqueue time; immutable so long as the PR remains in the queue.
 - **State labels.** Either `mq:queued` (waiting at some position in one or more queues) or `mq:active` (at the head of all its queues; CI cycle in progress).
-- **Issue timeline.** GitHub records every label application as a timeline event with a timestamp. The processor reads it once per cycle for the FIFO sort key — the timestamp of the most recent `github-actions[bot]`-applied `mq:queued` event.
+- **Issue timeline.** GitHub records every label application as a timeline event with a timestamp. The processor reads it once per cycle for the FIFO sort key — the timestamp of the most recent `github-actions[bot]`-applied `mq:queued` event. If a recently-enqueued PR's timeline event is not yet visible to the processor's same-cycle read (timeline events are eventually consistent), the PR is deferred to the next cycle rather than treated as missing — its position is bounded by one cycle of latency, well within FIFO tolerance.
 - **Activation marker.** A `merge-queue/active` commit status, created by the bot on the head SHA when the PR transitions to `mq:active`. The binding check is "does the *current* head SHA carry a `merge-queue/active` status whose `creator.login` is `github-actions[bot]`?" — a force-push or new commit produces a new head SHA which lacks the bot's status, naturally invalidating the activation. The `creator` filter matters because GitHub does not scope status creation by context: anyone with `statuses: write` can post a status with the same name. The lookup ignores statuses from other principals, so a maintainer or external app posting a competing `merge-queue/active` status under their own identity does not satisfy the activation check. (Distinct from the future `merge-queue/managed` required check in [§4.5](#45-pr-lifecycle); `managed` enforces queue routing on `develop`, `active` binds activation to a specific commit.)
-- **Status comment.** A single bot-posted comment that renders the human-readable status block. A hidden `<!-- mq-status -->` marker lets the processor find and edit its own comment in place rather than posting a fresh one on every state change. The comment is a UI surface only; the processor reads no state from it.
+- **Status comment.** A single bot-posted comment that renders the human-readable status block. A hidden `<!-- rocm-mq-status -->` marker lets the processor find and edit its own comment in place rather than posting a fresh one on every state change. The comment is a UI surface only; the processor reads no state from it.
 
 The processor reconstructs the full queue picture on every cycle by issuing one label-filtered API search per queue. A PR labelled `mq:hipdnn` *and* `mq:miopen-provider` is returned by both searches and appears in both queues' member lists.
 
@@ -197,7 +198,7 @@ The processor reconstructs the full queue picture on every cycle by issuing one 
 The comment carries the marker and a human-readable body:
 
 ```html
-<!-- mq-status -->
+<!-- rocm-mq-status -->
 ```
 
 Derived state (queue position, CI status, eject reason) is recomputed each cycle from labels + the live queue picture and rendered into the visible body. Example queued-state body for a miopen-provider PR:
@@ -238,9 +239,12 @@ This protects against (a) accidental edits by repo maintainers, (b) other automa
 | ----------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | Add any `mq:*` label                                        | Triage+                       | **Eject.** Real-time audit fires; clears all `mq:*` labels, removes activation status, posts comment.          |
 | Remove any `mq:*` label                                     | Triage+                       | **Eject.** Same path — clear remaining `mq:*` labels, post comment.                                            |
-| Edit, delete, or plant a duplicate of the status comment    | Comment author / Maintain+ / Sibling workflow | **No-op for correctness; possible UI degradation.** The comment is a UI surface, so no merge decision is affected. If the bot's marker-lookup picks a non-bot comment (sibling workflow planting `<!-- mq-status -->`, or a maintainer crafting one), status updates may land on the wrong comment until labels clear. Accepted as UI-only degradation. |
+| Edit, delete, or plant a duplicate of the status comment    | Comment author / Maintain+ / Sibling workflow | **No-op for correctness; possible UI degradation.** The comment is a UI surface, so no merge decision is affected. If the bot's marker-lookup picks a non-bot comment (sibling workflow planting `<!-- rocm-mq-status -->`, or a maintainer crafting one), status updates may land on the wrong comment until labels clear. Accepted as UI-only degradation. |
 | Plant a competing `merge-queue/active` status               | Anyone with `statuses: write` | **No-op.** The bot's lookup filters by `creator.login == github-actions[bot]`, so a status created by a maintainer's PAT or an external app is ignored. (A *sibling workflow* posting via `GITHUB_TOKEN` shares the bot's identity — covered by the workflow-trust boundary in [§8](#8-risks).) |
 | Force-push / new commit on the PR branch                    | PR author                     | **Eject (next cycle).** New head SHA has no `merge-queue/active` status — covered in [§4.5](#45-pr-lifecycle). |
+| Change PR base branch away from `develop`                   | PR author / Maintain+         | **Eject.** Handler subscribes to `pull_request_target: [edited]`; detects `base.ref` change. Without this, the squash would silently target a non-`develop` branch. |
+| Convert PR to draft                                         | PR author / Maintain+         | **Eject.** Required checks may pause on drafts, stranding `mq:active` indefinitely. Handler subscribes to `pull_request_target: [converted_to_draft]`. |
+| Close-then-reopen with `mq:*` labels still applied          | PR author                     | **Eject; require fresh `/merge`.** Stale labels carry an `enqueued_at` from the prior lifecycle. The audit's `reopened` trigger catches this. |
 | Manually invoke `/merge` without eligibility                | Anyone who can comment        | **Rejected at handler.** Eligibility check in [§4.4](#44-permissions).                                         |
 | Concurrent `/merge` from multiple commenters                | Anyone                        | **Idempotent.** Handler short-circuits if PR already carries `mq:queued` or `mq:active`.                       |
 | Spoof the bot identity (compromised token / app key)        | Workflow runner               | **Out of scope.** Compromised runner has the bot's authority; documented as a [§8](#8-risks) risk.             |
@@ -249,7 +253,7 @@ The matrix walks single-action tampers; combined sequences within a single windo
 
 #### Real-time tamper audit
 
-The audit is implemented as a second job inside `mq-handler.yml` — the same workflow that handles `/merge` and `/dequeue`. Collapsing both into one file keeps every event-reactive queue-state mutator in one place. The handler workflow declares two triggers: `issue_comment: [created]` for commands, and `pull_request_target: [labeled, unlabeled, opened, reopened]` for the audit. Jobs dispatch on `github.event_name`. The audit job is gated to events whose `label.name` starts with `mq:`. If `event.sender.login == "github-actions[bot]"` (and `user.type == "Bot"` — see identity-check note below), the job is a no-op. Otherwise it clears all `mq:*` labels on the PR, removes the `merge-queue/active` commit status if present, and posts a comment naming the actor and explaining the eject. The `opened`/`reopened` triggers catch PRs created with `mq:*` labels pre-applied (e.g., copied from a template or branched from a PR fork).
+The audit is implemented as a second job inside `mq-handler.yml` — the same workflow that handles `/merge` and `/dequeue`. Collapsing both into one file keeps every event-reactive queue-state mutator in one place. The handler workflow declares two triggers: `issue_comment: [created]` for commands, and `pull_request_target: [labeled, unlabeled, opened, reopened, edited, converted_to_draft]` for the audit. Jobs dispatch on `github.event_name`. The audit job is gated to label events whose `label.name` starts with `mq:`, plus base-ref changes (from `[edited]`) and draft conversions (from `[converted_to_draft]`) on PRs carrying any `mq:*` label. If `event.sender.login == "github-actions[bot]"` (and `user.type == "Bot"` — see identity-check note below), the job is a no-op. Otherwise it clears all `mq:*` labels on the PR, removes the `merge-queue/active` commit status if present, and posts a comment explaining the eject. The comment text distinguishes labels-at-open ("`mq:*` labels were applied at PR creation time, which the queue does not allow — use `/merge` to enqueue cleanly") from post-open tampering ("user @X applied/removed `mq:*` labels manually; queue state cleared. Re-enqueue with `/merge`"). Labels are repo-scoped, so the at-open case is always an intentional API-time application (e.g. `gh pr create --label`), never inheritance from a template or fork.
 
 **Why `pull_request_target` is safe here.** The standard `pull_request_target` risk (running untrusted PR code with the upstream's full token) requires checking out PR code, which the audit never does — it reads only event-payload fields and calls GitHub APIs. This is the same pattern the existing `.github/workflows/labeler.yml` uses for fork-PR labelling. The audit's trust scope matches the cron processor, which already exercises full upstream authority on fork PRs (squash-merge, `develop`-merge, label and status writes), so this adds no new privilege boundary. Required hygiene for `mq-handler.yml`: pass event-payload strings via env vars rather than `${{ }}`-interpolating into shell; declare a minimal `permissions:` block (`pull-requests: write`, `issues: write`, `statuses: write`, `contents: read`); set `concurrency: mq-handler-${{ github.event.pull_request.number }}` to serialize per-PR; and treat the workflow file itself as security-sensitive under `.github/` branch protection and CODEOWNERS.
 
@@ -263,14 +267,15 @@ Independently of the labeller, the processor performs one verification every cyc
 
 #### Identity-check robustness
 
-The "actor is the bot" check must not rely on a `login` string compare alone. It additionally verifies `user.type == "Bot"` (and ideally pins the App slug) so a coincidentally-named user account or a different installed App with similar attribution cannot impersonate the bot identity. Separately, `triage` permission is broader than label management: it also lets a user dismiss reviews and re-request changes. The [§4.4](#44-permissions) eligibility check for `/merge` therefore cannot trust the `author_association` field from the issue-comment event payload (which may be stale or report `CONTRIBUTOR`/`NONE` for users who do hold write access); it must call `repos.getCollaboratorPermissionLevel` live to verify write-access at the moment the command is issued.
+The "actor is the bot" check must not rely on a `login` string compare alone. It additionally verifies `user.type == "Bot"` **and** pins the App slug (or the App ID, which is immutable) so a coincidentally-named user account, a fork of the GitHub Actions bot, or a separately-installed App with similar attribution cannot impersonate the bot identity — `login == "github-actions[bot]" && type == "Bot"` is satisfied by every Actions-style install on the repo, and slug-pinning is the only thing that disambiguates them. This is a must, not an ideal: every other tamper defence rests on it. The corresponding eligibility check for `/merge` lives in [§4.4](#44-permissions); see there for why `author_association` from the issue-comment payload is not trustworthy.
 
 `mq:*` is a reserved label namespace; CONTRIBUTING will document that maintainers should not apply or remove these labels by hand.
 
 ### 4.4 Permissions
 
-- `/merge`: PR author **or** any user with write/maintain/admin on the repo. The PR-author allowance is what makes the queue usable for external contributors on their own PRs (see [§5](#5-open-source-contributor-policy)). The handler verifies write-access by calling `repos.getCollaboratorPermissionLevel` live at the moment the command is issued — not by trusting `author_association` from the issue-comment payload, which can be stale or report `CONTRIBUTOR`/`NONE` for users who do hold write access (see [§4.3.1](#431-tamper-resistance)).
+- `/merge`: PR author **or** any user with write/maintain/admin on the repo. The PR-author allowance is what makes the queue usable for external contributors on their own PRs (see [§5](#5-open-source-contributor-policy)). The handler verifies write-access by calling `repos.getCollaboratorPermissionLevel` live at the moment the command is issued — *not* by trusting `author_association` from the issue-comment payload, which can be stale or report `CONTRIBUTOR`/`NONE` for users who do hold write access. This live check is load-bearing because `triage` permission is broader than label management — it also lets a user dismiss reviews and re-request changes — so the simpler "did a triage user comment?" shortcut would over-grant.
 - `/dequeue`: PR author or any write-access user (verified the same way).
+- **`/merge` on a PR that touches no opted-in component path is rejected at the handler.** With an empty queue set, applying labels would still satisfy a vacuous head-of-all-queues check and produce an instant squash. The handler computes the queue set first and posts a comment ("This PR doesn't touch any opted-in component path; merge it manually after CI passes") instead of enqueuing.
 - The squash-merge is performed via GitHub's merge API by `github-actions[bot]`. Branch-protection rules on `develop` apply unchanged (see [§5](#5-open-source-contributor-policy)).
 
 ### 4.5 PR lifecycle
@@ -293,18 +298,24 @@ A PR moves through three observable states. Every transition is captured in the 
                           └── external mq:* edit ────► eject
 ```
 
+Solid arrows are processor-driven (next cycle). The `external mq:* edit → eject` arrows are handler-driven (real-time, on `pull_request_target: [labeled, unlabeled, edited, converted_to_draft]`).
+
 Two GitHub Actions workflows drive these transitions:
 
 1. **Command handler + tamper audit** *(event-driven, `mq-handler.yml`)*. Two jobs in one workflow file, dispatched on `github.event_name`:
-   - On `issue_comment: [created]` matching `/merge`: validates eligibility (see [§4.4](#44-permissions)), checks the PR has at least one approving review, confirms maintainer-edits is enabled for fork PRs (see [§5](#5-open-source-contributor-policy)), computes the queue set from the PR's changed paths via the rule in [§4.2](#42-path--queue-mapping), applies `mq:queued` and one `mq:<queue>` label per queue, and posts the status comment (see [§4.3](#43-data-model)). On `/dequeue`, removes all `mq:*` labels. This is the only workflow that assigns membership labels. The handler is idempotent — if the PR already carries `mq:queued` or `mq:active`, a second `/merge` is acknowledged as a no-op so concurrent invocations don't post duplicate status comments.
-   - On `pull_request_target: [labeled, unlabeled, opened, reopened]` for `mq:*` labels: runs the real-time tamper audit (see [§4.3.1](#431-tamper-resistance)) — eject if the actor is not `github-actions[bot]`.
+   - On `issue_comment: [created]` matching `/merge`: validates eligibility (see [§4.4](#44-permissions)), checks the PR has at least one approving review, confirms maintainer-edits is enabled for fork PRs (see [§5](#5-open-source-contributor-policy)), computes the queue set from the PR's changed paths via the rule in [§4.2](#42-path--queue-mapping), applies `mq:queued` and one `mq:<queue>` label per queue, and posts the status comment (see [§4.3](#43-data-model)). PRs with an empty queue set are rejected with a comment instead of enqueued (see [§4.4](#44-permissions)). On `/dequeue`, removes all `mq:*` labels. This is the only workflow that assigns membership labels. The handler is idempotent — if the PR already carries `mq:queued` or `mq:active`, a second `/merge` is acknowledged as a no-op so concurrent invocations don't post duplicate status comments.
+   - On `pull_request_target: [labeled, unlabeled, opened, reopened, edited, converted_to_draft]` for `mq:*` labels (and base-ref / draft changes on PRs already carrying `mq:*`): runs the real-time tamper audit (see [§4.3.1](#431-tamper-resistance)) — eject if the actor is not `github-actions[bot]`.
 2. **Processor** *(scheduled, every 3 minutes, `mq-processor.yml`)*. Activates the head PR of each queue (`mq:queued` → `mq:active`, then merges `develop` into the PR branch and creates a `merge-queue/active` commit status on the resulting head SHA — see [§4.3](#43-data-model)), and on the next cycle evaluates CI to either squash-merge or eject. The cycle's headship check verifies that the PR's current head SHA still carries the `merge-queue/active` status; if a new commit was pushed in between, the new head SHA lacks the status and the PR is ejected. Both squash-merge and eject clear all `mq:*` labels and remove the activation status, so terminal PRs disappear from the discovery search on the next cycle (parallel to `/dequeue`'s cleanup). Algorithm in [§4.6](#46-per-cycle-algorithm).
 
 After ejection, the author addresses the reported cause and re-enqueues with `/merge`.
 
+#### Squash-merge author
+
+The squash is created by `github-actions[bot]` via the merge API. The squash commit's `author` is preserved as the original PR author (the merge API's default behaviour); the `committer` is the bot.
+
 #### Branch protection integration
 
-Once the queue has matured through its initial rollout (see [§7](#7-rollout)), a `merge-queue/managed` GitHub status check will serve as the enforcement path. Initially non-blocking, it can be promoted to a required check on `develop` to make the queue the enforced merge path for opted-in components without affecting other subprojects. The design of this check is future work.
+A `merge-queue/managed` GitHub status check serves as the enforcement path, promoted to required after the rollout in [§7](#7-rollout). A lightweight handler on `pull_request: [opened, synchronize, reopened]` posts the check on every PR's head SHA: `pending` for PRs touching opted-in component paths, and `success` for PRs touching no opted-in path — required-check semantics treat a missing check as blocking, so non-opted-in PRs must be explicitly marked `success` rather than skipped. The processor flips opted-in PRs from `pending` to `success` immediately before the squash API call. Once the check is required on `develop`, branch protection rejects any merge to `develop` for opted-in components except the queue's bot-driven squash, while non-opted-in PRs merge freely. (Distinct from the per-cycle `merge-queue/active` status from [§4.3](#43-data-model), which binds activation to a specific commit; `managed` enforces queue routing on `develop`.)
 
 ### 4.6 Per-cycle algorithm
 
@@ -318,7 +329,9 @@ process_cycle():
     #    scoped to open PRs (terminal PRs have their mq:* labels cleared on
     #    squash-merge or eject; is:open is defense-in-depth against any leak).
     #    A PR labeled mq:hipdnn AND mq:miopen-provider is returned by both
-    #    searches and appears in both members lists.
+    #    searches and appears in both members lists. PRs with no mq:<queue>
+    #    label (e.g., rejected at the handler for touching no opted-in path,
+    #    §4.4) are not returned by any search and never enter the algorithm.
     members = {q: [] for q in ALL_QUEUES}
     for q in ALL_QUEUES:
         for pr in search_prs(query=f"is:pr is:open label:mq:{q}"):
@@ -347,13 +360,18 @@ process_cycle():
     # 5. For each ready PR, advance its state machine.
     for pr in ready:
         if "mq:active" not in pr.labels:
-            # 5a. Activate: merge develop into the branch, create the
-            #     merge-queue/active commit status on the resulting SHA,
-            #     then wait one cycle for CI.
+            # 5a. Activate: merge develop into the branch (pushed via the
+            #     App-token credential from §3 so CI re-triggers), create the
+            #     merge-queue/active commit status on the resulting SHA, then
+            #     wait one cycle for CI. Three terminal outcomes from the merge
+            #     step — see §4.9 for the no-op / transient / race handling
+            #     that lives below this layer.
             result = merge_develop_into(pr.branch, author=BOT_USER)
             if result.is_conflict:
                 eject(pr, reason="merge conflict with develop")
                 continue
+            if not result.ok:
+                continue                              # deferred — retry next cycle
             mark_active(result.head_sha)              # creates merge-queue/active commit status
             set_labels(pr, add="mq:active", remove="mq:queued")
             update_status_comment(pr)                 # rewrite visible body for new state
@@ -365,10 +383,10 @@ process_cycle():
             # status), or mq:active was applied externally without an activation
             # status — both are unsafe to merge.
             eject(pr, reason="activation invalid (branch updated or label tampered)")
-        elif all_required_checks_passed(pr):
-            squash_merge(pr, sha=pr.head.sha)         # API call fails if HEAD has moved
-        elif any_required_check_failed(pr):
-            eject(pr, reason=failed_check_name(pr))
+        elif all_required_checks_passed(pr):          # queries develop's branch protection
+            squash_merge(pr, sha=pr.head.sha)         # each cycle, so newly-required
+        elif any_required_check_failed(pr):           # checks are observed without a
+            eject(pr, reason=failed_check_name(pr))   # code change.
         else:
             pass                                      # checks still pending; retry next cycle
 ```
@@ -379,12 +397,13 @@ A few invariants worth calling out:
 - **Label tampering is handled out-of-band by the audit job** (see [§4.3.1](#431-tamper-resistance)), not by the processor. The processor's only checks are algorithmic (merge conflict at activation, CI verdict, activation-status presence at evaluation) — it has no tamper-detection logic of its own.
 - **Activation and evaluation never happen in the same cycle.** Step 5a ends with `continue`, so a freshly activated PR is evaluated only by step 5b on the *next* cycle — CI sees the post-merge tip before the queue acts on its result.
 - **Per-queue FIFO is enforced by sort, not by a stored cursor.** The head of each queue is always the open PR with the oldest `enqueued_at` in that queue's member list — no separate "current head" pointer to fall out of sync.
+- **Activation order within a single cycle is unspecified across disjoint queue sets.** When step 4 returns multiple ready PRs whose `pr.queues` sets do not intersect, they are activated in arbitrary order — correctness is unaffected because their CI cycles are independent. The queue's safety guarantee is bounded by opt-in: it serializes correctly within the opted-in set; PRs touching only non-opted-in paths are not coordinated by this design at all.
 
 Crash-safety follows from the single concurrency group ([§4.7](#47-cadence-and-concurrency)) plus per-step idempotency. Activation does three writes — the `develop`-merge, the `merge-queue/active` status creation, and the `mq:queued` → `mq:active` label flip — and each is individually idempotent: re-merging `develop` after a successful merge is a no-op (or fast-forward), creating a commit status on the same SHA with the same context overwrites, and the label flip is idempotent on each side. A crash between any two writes leaves the PR in a state where the next cycle treats it as not-yet-activated and re-runs activation, converging to the same end state.
 
 ### 4.7 Cadence and concurrency
 
-- 3-minute processor cron. Single concurrency group; no overlap, no cancellation.
+- 3-minute processor cron. Single concurrency group named `mq-processor`, with `cancel-in-progress: false` — no overlap, no cancellation.
 - One PR processed per queue per cycle. No batching.
 - The `merge-queue/active` commit status is created *on* the SHA produced by the bot's `develop`-merge, so subsequent cycles' presence checks compare against the post-merge tip and the bot's own merge commit doesn't trigger an eject.
 
@@ -405,9 +424,13 @@ Concrete example — opting in a new provider in the hipDNN ecosystem:
 
 There is no per-project file. Removing the entry (and your queue from other entries) opts a project out cleanly. The initial opt-in set is hipDNN core + four providers + integration-tests; other rocm-libraries projects are explicitly out of scope for v1.
 
+A required CI step on PRs that modify `PATH_TO_QUEUES` validates the config: every queue name appearing in any list must exist as its own path entry, and every entry whose component is upstream of another must list that downstream's queue. This catches the silent-skew failure where step 2 above is forgotten — a missing upstream entry would let upstream PRs merge without serializing against the new component.
+
 ### 4.9 Implementation constraints
 
-Each processor cycle will follow a read → decide → execute structure. First, queue state is fetched from GitHub (PR labels, enqueue timestamps, head SHAs, CI status). That snapshot is passed to a pure decision function that returns the set of actions to take — squash, activate, eject, wait — without performing any I/O itself. Finally, those actions are dispatched back to GitHub. Keeping the decision layer pure means tests can construct any queue state as plain data and call the function directly, with no mocks or network access required. All writes go through `GITHUB_TOKEN` with workflow-scoped permissions.
+Each processor cycle will follow a read → decide → execute structure. First, queue state is fetched from GitHub (PR labels, enqueue timestamps, head SHAs, CI status). That snapshot is passed to a pure decision function that returns the set of actions to take — squash, activate, eject, wait — without performing any I/O itself. Finally, those actions are dispatched back to GitHub. Keeping the decision layer pure means tests can construct any queue state as plain data and call the function directly, with no mocks or network access required. All writes go through `GITHUB_TOKEN` with workflow-scoped permissions, except the `develop`-merge push which uses the App installation token from [§3](#3-goals-non-goals-and-prerequisites).
+
+The activation merge step absorbs the messy details of the GitHub merges API so the algorithm in [§4.6](#46-per-cycle-algorithm) stays clean. It treats a successful merge and a no-op merge (PR branch already contains `develop`) the same way — both yield a head SHA the bot can stamp the activation status on. Transient API errors and secondary rate-limits are retried internally with backoff before being surfaced as a deferred result that the next cycle re-attempts. Immediately before stamping the activation status, the step re-reads the PR's head SHA to catch the race where the author pushed between the merge and now; if so, it defers rather than blessing a SHA the PR has already moved past. Only true merge conflicts surface as conflict for the algorithm to eject on.
 
 ## 5. Open-Source Contributor Policy
 
@@ -416,6 +439,8 @@ Each processor cycle will follow a read → decide → execute structure. First,
 **Why this works without extra queue logic.** GitHub's branch protection rules apply to the merge API by default — bypass requires explicit per-actor configuration ([GitHub docs: protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)). If the bot account is granted bypass rights, the implementation must check that all required statuses have passed before squash-merging; otherwise branch protection enforces this automatically. `develop`'s required `TheRock CI Summary` check and CODEOWNER reviews (see prereqs in [§3](#3-goals-non-goals-and-prerequisites)) serve as the gate.
 
 **Defense-in-depth.** The command handler must reject `/merge` on a PR that has not yet been approved, so an unapproved PR doesn't sit in the queue burning processor cycles only to fail at the squash. This is a small check at enqueue time, not a replacement for branch protection. Enabled from Phase 1 of [§7](#7-rollout).
+
+**Approval revocation between enqueue and squash.** A required reviewer dismissing approval after the PR is enqueued causes branch protection to reject the squash API call; the processor catches the failure and ejects with reason `"approval revoked"`. Bot-bypass on `develop` would let the squash succeed despite the dismissal and is incompatible with this property — it must not be enabled.
 
 **Fork PRs.** The processor pushes the `develop`-merge to the PR branch, which for fork PRs requires the author to have **Allow edits by maintainers** enabled (the GitHub default; authors can disable it — see [GitHub docs](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork)). The handler enforces this at `/merge` time and rejects with a clear message if disabled. If the contributor cannot or will not enable maintainer-edits, a maintainer may manually merge the PR after deeming it safe — the queue is opt-in, not the only path.
 
@@ -459,6 +484,8 @@ Implement and validate against a fork of `rocm-libraries`. Synthetic PRs against
   - *n × CI drain time.* Intersecting PRs (e.g. multiple core PRs in succession, an integration-tests PR queued behind providers, or any provider PR queued behind a core or integration-tests PR) merge one at a time, each waiting for a full CI cycle; a queue of *n* intersecting PRs takes roughly *n × CI time* to drain.
 - **No CI retries — flakes are terminal.** The processor treats any failed required check as a real failure (`any_required_check_failed → eject`). On a heterogeneous GPU matrix, transient hardware/runner failures eject otherwise-good PRs and force a manual `/merge` re-enqueue, paying another full CI cycle. This compounds with the throughput risk above: every flake-induced eject is another *n × CI* penalty.
 - **Surprise auto-eject** when an author pushes new commits mid-queue. Detection happens on the next processor cycle (up to 3 minutes after the push), so feedback is not instant — the eject comment must be explicit about why and how to re-enqueue.
-- **Compromised workflow runner.** The tamper-resistance design in [§4.3.1](#431-tamper-resistance) assumes the bot's identity is trustworthy. A compromised `GITHUB_TOKEN` or GitHub App key gives an attacker the same authority as the merge queue itself; the same applies to a sibling workflow in the repo that posts as `github-actions[bot]` — for example, posting a `merge-queue/active` status under that identity would satisfy the bot's activation check. `mq-handler.yml`, `mq-processor.yml`, and any scripts they consume must remain protected by branch protection on the workflow path (already standard for `develop`), and any other workflow that uses `statuses: write` should be reviewed for accidental or deliberate use of merge-queue contexts.
+- **Compromised workflow runner.** The tamper-resistance design in [§4.3.1](#431-tamper-resistance) assumes the bot's identity is trustworthy. A compromised `GITHUB_TOKEN` or GitHub App key gives an attacker the same authority as the merge queue itself; the same applies to a sibling workflow in the repo that posts as `github-actions[bot]` — for example, posting a `merge-queue/active` status under that identity would satisfy the bot's activation check. `mq-handler.yml`, `mq-processor.yml`, and any scripts they consume must remain protected by branch protection on the workflow path (already standard for `develop`), and any other workflow that uses `statuses: write` should be reviewed for accidental or deliberate use of merge-queue contexts. The App installation token used for the `develop`-merge push (see [§3](#3-goals-non-goals-and-prerequisites)) has a wider blast radius than `GITHUB_TOKEN`: it does not auto-rotate at workflow end, its installation scope can span more permissions than a per-workflow token, and a leaked App private key compromises every repo the App is installed on. Rotation policy and least-privilege scoping must accompany the App's setup.
+- **Self-bootstrapping via workflow or required-check edit.** A PR modifying the queue's own logic or the workflows that feed `develop`'s required checks could otherwise merge through the queue itself, letting a single approval ship a change that weakens the queue's own gates. The handler rejects `/merge` on PRs whose changed-files set intersects: `.github/workflows/mq-*.yml`, the queue's source directory, `.github/workflows/therock-ci.yml`, the test workflows it transitively invokes, and any branch-protection-as-code config. Such PRs require manual maintainer merge after explicit review. CODEOWNER review on these paths mitigates but is not equivalent — a single CODEOWNER approval can ship a CI-disabling PR through the queue, e.g. turning `TheRock CI Summary` into a no-op so the queue's `all_required_checks_passed` is satisfied trivially.
+- **API rate-limit budget.** Discovery does 6 `search_prs` per cycle × 480 cycles/day ≈ 2.9K search calls/day; per-PR timeline + commit-status reads add ~2 calls per active PR per cycle. Comfortably under GitHub's 5K/hr REST and 30/min secondary search limits at expected volumes (≤30 active PRs across all queues). If volume grows materially, batching via GraphQL (one query for many PRs) is the next step.
+- **No metrics in v1.** Queue depth, time-in-queue, eject reasons, processor cycle duration, and missed audit events are not exported. Operational visibility relies on the status comment, eject comments, and Actions run history. If failure modes prove hard to debug in practice, a follow-up adds a metrics export.
 - **Silent dequeue from a dropped audit event.** The real-time audit on `pull_request_target: [unlabeled]` is the *only* mechanism for catching `mq:*` label removals — once a label is gone, the processor's discovery (`search_prs(label:mq:<queue>)`) doesn't return the PR at all. If GitHub Actions is degraded, an audit job hits a transient API failure, or the workflow is rate-limited, an `unlabeled` event can be missed and the PR is silently dequeued with no detection or notification. The author has to notice their PR didn't merge and re-`/merge` themselves. If this becomes a real failure mode, defence-in-depth is available: the processor could read the issue timeline once per cycle for each PR currently in the discovery set and eject any whose most recent `mq:*` label change wasn't applied by `github-actions[bot]`. This catches *additions* the audit missed (the new label brings the PR into discovery scope) but still can't catch *removals* (the PR is no longer in scope). Not implemented in v1; the failure mode is rare and the author-re-`/merge` recovery path is acceptable.
-
