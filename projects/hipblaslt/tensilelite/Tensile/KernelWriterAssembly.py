@@ -5768,7 +5768,7 @@ class KernelWriterAssembly(KernelWriter):
         imod.add(self.moduleVgprMacroG2LA)
 
     if numG2LB > 0:
-      imod.add(RegSet("v", "vgprG2LB_BASE", vgprBase + numG2LA + numG2LMXSA))
+      imod.add(RegSet("v", "vgprG2LB_BASE", vgprBase + numG2LA))
       if kernel["DirectToLdsB"] and kernel["NonDTLTailLoopB"]:
         imod.add(RegSet("v", "vgprG2LB", "vgprG2LB_BASE", 0))
       else:
