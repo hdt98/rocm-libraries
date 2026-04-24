@@ -112,8 +112,15 @@ inline std::pair<std::vector<HeuristicPolicyInfo>, Error>
         size_t pluginVersionLen = 0;
         size_t apiVersionLen = 0;
 
-        status = detail::hipdnnBackend()->getHeuristicPolicyInfo(
-            handle, i, &info.policyId, nullptr, &policyNameLen, nullptr, &pluginVersionLen, nullptr, &apiVersionLen);
+        status = detail::hipdnnBackend()->getHeuristicPolicyInfo(handle,
+                                                                 i,
+                                                                 &info.policyId,
+                                                                 nullptr,
+                                                                 &policyNameLen,
+                                                                 nullptr,
+                                                                 &pluginVersionLen,
+                                                                 nullptr,
+                                                                 &apiVersionLen);
 
         if(status != HIPDNN_STATUS_SUCCESS)
         {
@@ -161,7 +168,8 @@ inline std::pair<std::vector<HeuristicPolicyInfo>, Error>
 using heuristic_policy_info = HeuristicPolicyInfo;
 
 /// @brief snake_case alias for getLoadedHeuristicPolicyInfos()
-inline auto get_loaded_heuristic_policy_infos(hipdnnHandle_t h) // NOLINT(readability-identifier-naming)
+inline auto
+    get_loaded_heuristic_policy_infos(hipdnnHandle_t h) // NOLINT(readability-identifier-naming)
 {
     return getLoadedHeuristicPolicyInfos(h);
 }

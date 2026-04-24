@@ -88,7 +88,8 @@ TEST_F(HeuristicPolicyEnumerationTest, NullHandleReturnsError)
 
     EXPECT_TRUE(err.is_bad());
     EXPECT_TRUE(policies.empty());
-    EXPECT_NE(err.get_message().find("null"), std::string::npos) << "Error should mention null handle";
+    EXPECT_NE(err.get_message().find("null"), std::string::npos)
+        << "Error should mention null handle";
 }
 
 // ========== snake_case Alias Tests ==========
@@ -166,7 +167,8 @@ TEST_F(HeuristicPolicyEnumerationTest, VersionStringsAreValid)
         EXPECT_NO_THROW({
             const hipdnn_data_sdk::utilities::Version pluginVer{policy.pluginVersion};
             const hipdnn_data_sdk::utilities::Version apiVer{policy.apiVersion};
-        }) << "Version strings should be parseable for policy " << policy.policyName;
+        }) << "Version strings should be parseable for policy "
+           << policy.policyName;
     }
 }
 
@@ -210,10 +212,9 @@ TEST_F(HeuristicPolicyEnumerationTest, EnumerationCanBeLogged)
     std::cout << "Loaded " << policies.size() << " heuristic policies:\n";
     for(const auto& policy : policies)
     {
-        std::cout << "  - " << policy.policyName
-                  << " (ID: " << policy.policyId
-                  << ", Version: " << policy.pluginVersion
-                  << ", API: " << policy.apiVersion << ")" << std::endl;
+        std::cout << "  - " << policy.policyName << " (ID: " << policy.policyId
+                  << ", Version: " << policy.pluginVersion << ", API: " << policy.apiVersion << ")"
+                  << std::endl;
     }
 
     SUCCEED();

@@ -32,10 +32,10 @@ hipdnn_flatbuffers_sdk::data_objects::DevicePropertiesT queryDeviceProperties()
     }
 
     // Populate DevicePropertiesT
-    devProps.device_id              = currentDevice;
-    devProps.multi_processor_count  = hipProps.multiProcessorCount;
-    devProps.total_global_mem       = hipProps.totalGlobalMem;
-    devProps.architecture_name      = hipProps.gcnArchName;
+    devProps.device_id = currentDevice;
+    devProps.multi_processor_count = hipProps.multiProcessorCount;
+    devProps.total_global_mem = hipProps.totalGlobalMem;
+    devProps.architecture_name = hipProps.gcnArchName;
 
     return devProps;
 }

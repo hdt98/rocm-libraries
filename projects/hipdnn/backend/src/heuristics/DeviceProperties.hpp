@@ -55,7 +55,7 @@ inline hipdnnPluginConstData_t
     wrapSerializedDeviceProperties(const std::vector<uint8_t>& serializedBuffer)
 {
     hipdnnPluginConstData_t wrapper;
-    wrapper.ptr  = serializedBuffer.data();
+    wrapper.ptr = serializedBuffer.data();
     wrapper.size = serializedBuffer.size();
     return wrapper;
 }
