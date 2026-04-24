@@ -31,34 +31,36 @@ void heuristic_params_t::merge_with(const heuristic_params_t& other) {
   weight_tile_total    = other.weight_tile_total;
 
   // Empirical constants
-  main_memory_load_latency            = other.main_memory_load_latency;
-  occupancy_decay_base                = other.occupancy_decay_base;
-  mall_depth_sq                       = other.mall_depth_sq;
-  mall_cold_floor                     = other.mall_cold_floor;
-  l2_depth_sq                         = other.l2_depth_sq;
-  l2_cold_floor                       = other.l2_cold_floor;
-  l2_pollution_penalty                = other.l2_pollution_penalty;
-  l2_amp_ceiling_batched              = other.l2_amp_ceiling_batched;
-  l2_amp_ceiling_k_split              = other.l2_amp_ceiling_k_split;
-  l2_amp_ceiling_skinny               = other.l2_amp_ceiling_skinny;
-  l2_depth_penalty                    = other.l2_depth_penalty;
-  l1_hit_rate_ceiling_skinny          = other.l1_hit_rate_ceiling_skinny;
-  epilogue_cycles_per_acc_read        = other.epilogue_cycles_per_acc_read;
-  epilogue_acc_read_parallelism       = other.epilogue_acc_read_parallelism;
-  epilogue_cycles_per_bounds_check    = other.epilogue_cycles_per_bounds_check;
-  epilogue_scalar_store_penalty       = other.epilogue_scalar_store_penalty;
-  epilogue_threads_per_wave           = other.epilogue_threads_per_wave;
-  epilogue_bytes_per_vectorized_store = other.epilogue_bytes_per_vectorized_store;
-  epilogue_cache_line_bytes           = other.epilogue_cache_line_bytes;
-  epilogue_workspace_bytes_per_elem   = other.epilogue_workspace_bytes_per_elem;
-  epilogue_salu_overhead              = other.epilogue_salu_overhead;
-  epilogue_l_barrier                  = other.epilogue_l_barrier;
-  epilogue_l_smem                     = other.epilogue_l_smem;
-  epilogue_k_padding_penalty          = other.epilogue_k_padding_penalty;
-  postgsu_compute_bytes               = other.postgsu_compute_bytes;
-  postgsu_kernel_launch_overhead      = other.postgsu_kernel_launch_overhead;
-  postgsu_threads_per_wg              = other.postgsu_threads_per_wg;
-  postgsu_wavefront_size              = other.postgsu_wavefront_size;
+  main_memory_load_latency         = other.main_memory_load_latency;
+  occupancy_decay_base             = other.occupancy_decay_base;
+  mall_depth_sq                    = other.mall_depth_sq;
+  mall_cold_floor                  = other.mall_cold_floor;
+  l2_depth_sq                      = other.l2_depth_sq;
+  l2_cold_floor                    = other.l2_cold_floor;
+  l2_pollution_penalty             = other.l2_pollution_penalty;
+  l2_amp_ceiling_batched           = other.l2_amp_ceiling_batched;
+  l2_amp_ceiling_k_split           = other.l2_amp_ceiling_k_split;
+  l2_amp_ceiling_skinny            = other.l2_amp_ceiling_skinny;
+  l2_depth_penalty                 = other.l2_depth_penalty;
+  l1_hit_rate_ceiling_skinny       = other.l1_hit_rate_ceiling_skinny;
+  epilogue_cycles_per_acc_read     = other.epilogue_cycles_per_acc_read;
+  epilogue_acc_read_parallelism    = other.epilogue_acc_read_parallelism;
+  epilogue_cycles_per_bounds_check = other.epilogue_cycles_per_bounds_check;
+  epilogue_scalar_store_penalty    = other.epilogue_scalar_store_penalty;
+  epilogue_salu_overhead           = other.epilogue_salu_overhead;
+  epilogue_l_barrier               = other.epilogue_l_barrier;
+  epilogue_l_smem                  = other.epilogue_l_smem;
+  epilogue_store_drain_cycles      = other.epilogue_store_drain_cycles;
+  epilogue_k_padding_penalty       = other.epilogue_k_padding_penalty;
+  postgsu_kernel_launch_overhead   = other.postgsu_kernel_launch_overhead;
+
+  // Per-VW dampening + per-VW efficiency + edge-padding penalty
+  vw_dampening_exponent = other.vw_dampening_exponent;
+  vw_efficiency_short   = other.vw_efficiency_short;
+  vw_efficiency_float   = other.vw_efficiency_float;
+  vw_efficiency_float2  = other.vw_efficiency_float2;
+  vw_efficiency_float4  = other.vw_efficiency_float4;
+  edge_padding_penalty  = other.edge_padding_penalty;
 
   // Main loop efficiency
   main_loop_efficiency = other.main_loop_efficiency;
@@ -127,6 +129,12 @@ heuristics_database_t& heuristics_database_t::get_instance() {
   static heuristics_database_t instance;
   return instance;
 }
+
+void heuristics_database_t::set_default_params(const heuristic_params_t& params) {
+  default_params_ = params;
+}
+
+heuristic_params_t heuristics_database_t::get_default_params() const { return default_params_; }
 
 /**
  * @brief Apply TF32 emulation heuristics based on runtime arithmetic intensity.
@@ -278,21 +286,7 @@ bool heuristics_database_t::has_hand_optimized_entry(hardware_t::architecture_t 
 
 void heuristics_database_t::initialize_defaults() {
   // ========================================================================
-  // HEURISTIC 1: Problematic tile configuration (MT64x32x32)
-  // ========================================================================
-  {
-    auto key    = make_tile_key(64, 32, 32, transpose_t::N, transpose_t::N);
-    key.a_dtype = data_type_t::BFloat16;
-    key.b_dtype = data_type_t::BFloat16;
-
-    heuristic_params_t params;
-    params.weight_tile_total = 10.0;
-
-    add_entry(key, params);
-  }
-
-  // ========================================================================
-  // HEURISTIC 2: CMS Kernel Efficiencies (gfx950, BF16)
+  // HEURISTIC 1: CMS Kernel Efficiencies (gfx950, BF16)
   // ========================================================================
   {
     // BF16 NT configurations

@@ -10,6 +10,7 @@
 #include <nanobind/stl/vector.h>
 #include "origami/gemm.hpp"
 #include "origami/hardware.hpp"
+#include "origami/heuristics.hpp"
 #include "origami/origami.hpp"
 #include "origami/streamk.hpp"
 #include "origami/types.hpp"
@@ -133,6 +134,68 @@ NB_MODULE(origami, m) {
       .def_rw("global_split_u_coalesced", &origami::tensile_params_t::global_split_u_coalesced)
       .def_rw("global_split_u_wgm_round_robin",
               &origami::tensile_params_t::global_split_u_wgm_round_robin);
+
+  nanobind::class_<origami::heuristic_params_t>(m, "heuristic_params_t")
+      .def(nanobind::init<>())
+      .def_rw("weight_mem_l2", &origami::heuristic_params_t::weight_mem_l2)
+      .def_rw("weight_mem_mall", &origami::heuristic_params_t::weight_mem_mall)
+      .def_rw("weight_mem_dram", &origami::heuristic_params_t::weight_mem_dram)
+      .def_rw("weight_compute", &origami::heuristic_params_t::weight_compute)
+      .def_rw("weight_memory", &origami::heuristic_params_t::weight_memory)
+      .def_rw("weight_wg_setup", &origami::heuristic_params_t::weight_wg_setup)
+      .def_rw("weight_prologue", &origami::heuristic_params_t::weight_prologue)
+      .def_rw("weight_epilogue", &origami::heuristic_params_t::weight_epilogue)
+      .def_rw("weight_loop_overhead", &origami::heuristic_params_t::weight_loop_overhead)
+      .def_rw("weight_tile_total", &origami::heuristic_params_t::weight_tile_total)
+      .def_rw("main_memory_load_latency", &origami::heuristic_params_t::main_memory_load_latency)
+      .def_rw("occupancy_decay_base", &origami::heuristic_params_t::occupancy_decay_base)
+      .def_rw("mall_depth_sq", &origami::heuristic_params_t::mall_depth_sq)
+      .def_rw("mall_cold_floor", &origami::heuristic_params_t::mall_cold_floor)
+      .def_rw("l2_depth_sq", &origami::heuristic_params_t::l2_depth_sq)
+      .def_rw("l2_cold_floor", &origami::heuristic_params_t::l2_cold_floor)
+      .def_rw("l2_pollution_penalty", &origami::heuristic_params_t::l2_pollution_penalty)
+      .def_rw("l2_amp_ceiling_batched", &origami::heuristic_params_t::l2_amp_ceiling_batched)
+      .def_rw("l2_amp_ceiling_k_split", &origami::heuristic_params_t::l2_amp_ceiling_k_split)
+      .def_rw("l2_amp_ceiling_skinny", &origami::heuristic_params_t::l2_amp_ceiling_skinny)
+      .def_rw("l2_depth_penalty", &origami::heuristic_params_t::l2_depth_penalty)
+      .def_rw("l1_hit_rate_ceiling_skinny",
+              &origami::heuristic_params_t::l1_hit_rate_ceiling_skinny)
+      .def_rw("epilogue_cycles_per_acc_read",
+              &origami::heuristic_params_t::epilogue_cycles_per_acc_read)
+      .def_rw("epilogue_acc_read_parallelism",
+              &origami::heuristic_params_t::epilogue_acc_read_parallelism)
+      .def_rw("epilogue_cycles_per_bounds_check",
+              &origami::heuristic_params_t::epilogue_cycles_per_bounds_check)
+      .def_rw("epilogue_scalar_store_penalty",
+              &origami::heuristic_params_t::epilogue_scalar_store_penalty)
+      .def_rw("epilogue_salu_overhead", &origami::heuristic_params_t::epilogue_salu_overhead)
+      .def_rw("epilogue_l_barrier", &origami::heuristic_params_t::epilogue_l_barrier)
+      .def_rw("epilogue_l_smem", &origami::heuristic_params_t::epilogue_l_smem)
+      .def_rw("epilogue_store_drain_cycles",
+              &origami::heuristic_params_t::epilogue_store_drain_cycles)
+      .def_rw("epilogue_k_padding_penalty",
+              &origami::heuristic_params_t::epilogue_k_padding_penalty)
+      .def_rw("postgsu_kernel_launch_overhead",
+              &origami::heuristic_params_t::postgsu_kernel_launch_overhead)
+      .def_rw("vw_dampening_exponent", &origami::heuristic_params_t::vw_dampening_exponent)
+      .def_rw("vw_efficiency_short",   &origami::heuristic_params_t::vw_efficiency_short)
+      .def_rw("vw_efficiency_float",   &origami::heuristic_params_t::vw_efficiency_float)
+      .def_rw("vw_efficiency_float2",  &origami::heuristic_params_t::vw_efficiency_float2)
+      .def_rw("vw_efficiency_float4",  &origami::heuristic_params_t::vw_efficiency_float4)
+      .def_rw("edge_padding_penalty",  &origami::heuristic_params_t::edge_padding_penalty)
+      .def_rw("main_loop_efficiency", &origami::heuristic_params_t::main_loop_efficiency);
+
+  m.def(
+      "set_default_heuristic_params",
+      [](const origami::heuristic_params_t& p) {
+        origami::heuristics_database_t::get_instance().set_default_params(p);
+      },
+      "Override the default heuristic params used by all subsequent rank_configs/"
+      "compute_total_latency calls. Not thread-safe.");
+  m.def(
+      "get_default_heuristic_params",
+      []() { return origami::heuristics_database_t::get_instance().get_default_params(); },
+      "Read a copy of the current default heuristic params.");
 
   nanobind::class_<origami::config_t>(m, "config_t")
       .def(nanobind::init<>())
@@ -302,9 +365,6 @@ NB_MODULE(origami, m) {
   m.def("calculate_output_utilization",
         &origami::calculate_output_utilization,
         "Calculate the output utilization ratio");
-  m.def("round_elements_to_128B",
-        &origami::round_elements_to_128B,
-        "Round elements to 128B alignment");
   m.def("predict_workgroup_mapping",
         &origami::predict_workgroup_mapping,
         "Fast WGM prediction based on last-XCD L2 cost minimization");
@@ -328,7 +388,8 @@ NB_MODULE(origami, m) {
         "Count unique tiles for an entire timestep (all XCDs combined)");
   m.def("estimate_cache_hit_rates",
         &origami::estimate_cache_hit_rates,
-        "Estimate MALL and L2 hit rates using two-timestep analytical model");
+        "Estimate per-operand L1/L2/MALL hit rates: returns (H_l1_A, H_l1_B, H_l2_A, H_l2_B, "
+        "H_mall_A, H_mall_B)");
   m.def("compute_number_matrix_instructions",
         &origami::compute_number_matrix_instructions,
         "Compute the number of matrix instructions required");
@@ -394,9 +455,8 @@ NB_MODULE(origami, m) {
         origami::context_t context(problem, hardware, config);
         return origami::estimate_cache_hit_rates(problem, hardware, config, context);
       },
-      "Estimate per-operand cache hit rates as "
-      "(H_mem_l1_A, H_mem_l1_B, H_mem_l2_A, H_mem_l2_B, H_mem_mall_A, H_mem_mall_B) "
-      "using the analytical model (auto-creates context)");
+      "Estimate per-operand L1/L2/MALL hit rates: returns (H_l1_A, H_l1_B, H_l2_A, H_l2_B, "
+      "H_mall_A, H_mall_B) (auto-creates context)");
   m.def(
       "compute_memory_latency",
       [](const origami::problem_t& problem,

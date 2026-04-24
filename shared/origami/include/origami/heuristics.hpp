@@ -48,40 +48,51 @@ struct heuristic_defaults_t {
   static constexpr double WEIGHT_COMPUTE       = 1.0;
   static constexpr double WEIGHT_MEMORY        = 1.0;
   static constexpr double WEIGHT_WG_SETUP      = 1.0;
-  static constexpr double WEIGHT_PROLOGUE      = 1.5;
-  static constexpr double WEIGHT_EPILOGUE      = 2.0;
-  static constexpr double WEIGHT_LOOP_OVERHEAD = 500.0;
+  static constexpr double WEIGHT_PROLOGUE      = 1.89;
+  static constexpr double WEIGHT_EPILOGUE      = 1.0;
+  static constexpr double WEIGHT_LOOP_OVERHEAD = 593.84;
   static constexpr double WEIGHT_TILE_TOTAL    = 1.0;
 
   // Empirical Constants
-  static constexpr double MAIN_MEMORY_LOAD_LATENCY         = 200.0;
-  static constexpr double OCCUPANCY_DECAY_BASE             = 0.95;
-  static constexpr double MALL_DEPTH_SQ                    = 2.0;
-  static constexpr double MALL_COLD_FLOOR                  = 0.85;
-  static constexpr double L2_DEPTH_SQ                      = 4.0;
-  static constexpr double L2_COLD_FLOOR                    = 0.75;
-  static constexpr double L2_POLLUTION_PENALTY             = 0.7;
-  static constexpr double L2_AMP_CEILING_BATCHED           = 0.9;
-  static constexpr double L2_AMP_CEILING_K_SPLIT           = 0.4;
-  static constexpr double L2_AMP_CEILING_SKINNY            = 0.6;
-  static constexpr double L2_DEPTH_PENALTY                 = 0.9;
-  static constexpr double L1_HIT_RATE_CEILING_SKINNY       = 0.7;
+  static constexpr double MAIN_MEMORY_LOAD_LATENCY         = 202.56;
+  static constexpr double OCCUPANCY_DECAY_BASE             = 0.88;
+  static constexpr double MALL_DEPTH_SQ                    = 2.20;
+  static constexpr double MALL_COLD_FLOOR                  = 0.60;
+  static constexpr double L2_DEPTH_SQ                      = 4.61;
+  static constexpr double L2_COLD_FLOOR                    = 0.94;
+  static constexpr double L2_POLLUTION_PENALTY             = 0.49;
+  static constexpr double L2_AMP_CEILING_BATCHED           = 0.95;
+  static constexpr double L2_AMP_CEILING_K_SPLIT           = 0.43;
+  static constexpr double L2_AMP_CEILING_SKINNY            = 0.68;
+  static constexpr double L2_DEPTH_PENALTY                 = 0.93;
+  static constexpr double L1_HIT_RATE_CEILING_SKINNY       = 0.57;
   static constexpr double EPILOGUE_CYCLES_PER_ACC_READ     = 8.0;
-  static constexpr double EPILOGUE_ACC_READ_PARALLELISM    = 0.9;
+  static constexpr double EPILOGUE_ACC_READ_PARALLELISM    = 0.99;
   static constexpr double EPILOGUE_CYCLES_PER_BOUNDS_CHECK = 6.0;
-  static constexpr double EPILOGUE_SCALAR_STORE_PENALTY    = 1.1;
-  static constexpr size_t EPILOGUE_THREADS_PER_WAVE        = 64;
-  static constexpr size_t EPILOGUE_BYTES_PER_VECTORIZED_STORE = 16;  // buffer_store_dwordx4
-  static constexpr size_t EPILOGUE_CACHE_LINE_BYTES         = 128;
-  static constexpr size_t EPILOGUE_WORKSPACE_BYTES_PER_ELEM = 4;
-  static constexpr double EPILOGUE_SALU_OVERHEAD            = 35.0;
-  static constexpr double EPILOGUE_L_BARRIER                = 100.0;
+  static constexpr double EPILOGUE_SCALAR_STORE_PENALTY    = 0.85;
+  static constexpr double EPILOGUE_SALU_OVERHEAD           = 45.50;
+  static constexpr double EPILOGUE_L_BARRIER               = 100.0;
   static constexpr double EPILOGUE_L_SMEM = 900.0;  // s_load_dword(glc) cross-XCD flag poll
-  static constexpr double EPILOGUE_K_PADDING_PENALTY     = 50000.0;
-  static constexpr size_t POSTGSU_COMPUTE_BYTES          = 4;  // workspace partials stored as f32
-  static constexpr double POSTGSU_KERNEL_LAUNCH_OVERHEAD = 12000.0;
-  static constexpr size_t POSTGSU_THREADS_PER_WG         = 256;
-  static constexpr size_t POSTGSU_WAVEFRONT_SIZE         = 64;
+  static constexpr double EPILOGUE_STORE_DRAIN_CYCLES    = 1.27;
+  static constexpr double EPILOGUE_K_PADDING_PENALTY     = 35200.79;
+  static constexpr double POSTGSU_KERNEL_LAUNCH_OVERHEAD = 15205.43;
+
+  static constexpr double VW_DAMPENING_EXPONENT = 1.25;
+
+  // Per-VW achievable-fraction-of-peak coefficients. The per-level BW arrays
+  // (l2_bw_read[vw], mall_bw_read[vw], hbm_bw_read[vw]) carry microbench-fitted
+  // peaks; real GEMMs at higher VW often miss those peaks because of register
+  // pressure / scheduling. These factors scale the BW per VW. Default 1.0 =
+  // trust the peak; <1.0 = penalize a VW that misses its peak in practice.
+  static constexpr double VW_EFFICIENCY_SHORT  = 1.09;
+  static constexpr double VW_EFFICIENCY_FLOAT  = 0.81;
+  static constexpr double VW_EFFICIENCY_FLOAT2 = 1.20;
+  static constexpr double VW_EFFICIENCY_FLOAT4 = 0.95;
+
+  // Multiplicative penalty for tiles whose M- or N-edge tile wastes >50%
+  // of MT_M / MT_N. 0.0 = neutral. The penalty scales linearly with the
+  // wasted fraction in the worst-edge dimension.
+  static constexpr double EDGE_PADDING_PENALTY = 0.04;
 
   // Main Loop Efficiency
   static constexpr double MAIN_LOOP_EFFICIENCY = 1.0;
@@ -126,20 +137,19 @@ struct heuristic_params_t {
   double epilogue_acc_read_parallelism    = heuristic_defaults_t::EPILOGUE_ACC_READ_PARALLELISM;
   double epilogue_cycles_per_bounds_check = heuristic_defaults_t::EPILOGUE_CYCLES_PER_BOUNDS_CHECK;
   double epilogue_scalar_store_penalty    = heuristic_defaults_t::EPILOGUE_SCALAR_STORE_PENALTY;
-  size_t epilogue_threads_per_wave        = heuristic_defaults_t::EPILOGUE_THREADS_PER_WAVE;
-  size_t epilogue_bytes_per_vectorized_store =
-      heuristic_defaults_t::EPILOGUE_BYTES_PER_VECTORIZED_STORE;
-  size_t epilogue_cache_line_bytes = heuristic_defaults_t::EPILOGUE_CACHE_LINE_BYTES;
-  size_t epilogue_workspace_bytes_per_elem =
-      heuristic_defaults_t::EPILOGUE_WORKSPACE_BYTES_PER_ELEM;
-  double epilogue_salu_overhead         = heuristic_defaults_t::EPILOGUE_SALU_OVERHEAD;
-  double epilogue_l_barrier             = heuristic_defaults_t::EPILOGUE_L_BARRIER;
-  double epilogue_l_smem                = heuristic_defaults_t::EPILOGUE_L_SMEM;
-  double epilogue_k_padding_penalty     = heuristic_defaults_t::EPILOGUE_K_PADDING_PENALTY;
-  size_t postgsu_compute_bytes          = heuristic_defaults_t::POSTGSU_COMPUTE_BYTES;
-  double postgsu_kernel_launch_overhead = heuristic_defaults_t::POSTGSU_KERNEL_LAUNCH_OVERHEAD;
-  size_t postgsu_threads_per_wg         = heuristic_defaults_t::POSTGSU_THREADS_PER_WG;
-  size_t postgsu_wavefront_size         = heuristic_defaults_t::POSTGSU_WAVEFRONT_SIZE;
+  double epilogue_salu_overhead           = heuristic_defaults_t::EPILOGUE_SALU_OVERHEAD;
+  double epilogue_l_barrier               = heuristic_defaults_t::EPILOGUE_L_BARRIER;
+  double epilogue_l_smem                  = heuristic_defaults_t::EPILOGUE_L_SMEM;
+  double epilogue_store_drain_cycles      = heuristic_defaults_t::EPILOGUE_STORE_DRAIN_CYCLES;
+  double epilogue_k_padding_penalty       = heuristic_defaults_t::EPILOGUE_K_PADDING_PENALTY;
+  double postgsu_kernel_launch_overhead   = heuristic_defaults_t::POSTGSU_KERNEL_LAUNCH_OVERHEAD;
+
+  double vw_dampening_exponent = heuristic_defaults_t::VW_DAMPENING_EXPONENT;
+  double vw_efficiency_short   = heuristic_defaults_t::VW_EFFICIENCY_SHORT;
+  double vw_efficiency_float   = heuristic_defaults_t::VW_EFFICIENCY_FLOAT;
+  double vw_efficiency_float2  = heuristic_defaults_t::VW_EFFICIENCY_FLOAT2;
+  double vw_efficiency_float4  = heuristic_defaults_t::VW_EFFICIENCY_FLOAT4;
+  double edge_padding_penalty  = heuristic_defaults_t::EDGE_PADDING_PENALTY;
 
   // === Main Loop Efficiency ===
   double main_loop_efficiency = heuristic_defaults_t::MAIN_LOOP_EFFICIENCY;
@@ -288,6 +298,16 @@ class heuristics_database_t {
    * @brief Get the global heuristics database instance.
    */
   static heuristics_database_t& get_instance();
+
+  /**
+   * @brief Override the default heuristic params used as the lookup base.
+   */
+  void set_default_params(const heuristic_params_t& params);
+
+  /**
+   * @brief Read the current default params (a copy).
+   */
+  heuristic_params_t get_default_params() const;
 
  private:
   heuristics_database_t();  // Private constructor for singleton

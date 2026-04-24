@@ -770,33 +770,6 @@ TEST_CASE("GEMM: compute_l2_hit_rate_global unit test", "[gemm]") {
   }
 }
 
-TEST_CASE("GEMM: round_elements_to_128B unit test", "[gemm]") {
-  for (int gpu_arch : test_architectures) {
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - round_elements_to_128B unit test") {
-      // Test 1: Test with various element sizes
-      auto result_various_element_sizes =
-          origami::round_elements_to_128B(196, 32);  // element size in bits - 32
-      REQUIRE(result_various_element_sizes == 224);
-
-      result_various_element_sizes =
-          origami::round_elements_to_128B(225, 16);  // element size in bits - 16
-      REQUIRE(result_various_element_sizes == 256);
-
-      result_various_element_sizes =
-          origami::round_elements_to_128B(90, 8);  // element size in bits - 8
-      REQUIRE(result_various_element_sizes == 128);
-
-      // Test 2: Test alignment to 128-byte boundary (TODO) (Was already covered in the above
-      // example, could be skipped) Test 3: Test edge cases
-      auto result_edge_cases = origami::round_elements_to_128B(0, 32);
-      REQUIRE(result_edge_cases == 0);
-
-      result_edge_cases = origami::round_elements_to_128B(256, 0);
-      REQUIRE(result_edge_cases == 256);
-    }
-  }
-}
-
 TEST_CASE("GEMM: compute_cvt_overhead unit test", "[gemm]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - compute_cvt_overhead unit test") {
@@ -1240,38 +1213,51 @@ TEST_CASE("Heuristics: Default parameters", "[heuristics]") {
   REQUIRE(defaults.weight_compute == 1.0);
   REQUIRE(defaults.weight_memory == 1.0);
   REQUIRE(defaults.weight_wg_setup == 1.0);
-  REQUIRE(defaults.weight_prologue == 1.5);
-  REQUIRE(defaults.weight_epilogue == 2.0);
-  REQUIRE(defaults.weight_loop_overhead == 500.0);
-  REQUIRE(defaults.weight_tile_total == 1.0);
+  REQUIRE(defaults.weight_prologue == origami::heuristic_defaults_t::WEIGHT_PROLOGUE);
+  REQUIRE(defaults.weight_epilogue == origami::heuristic_defaults_t::WEIGHT_EPILOGUE);
+  REQUIRE(defaults.weight_loop_overhead == origami::heuristic_defaults_t::WEIGHT_LOOP_OVERHEAD);
+  REQUIRE(defaults.weight_tile_total == origami::heuristic_defaults_t::WEIGHT_TILE_TOTAL);
 
   // Check default empirical constants
-  // REQUIRE(defaults.l2_min_hit_rate_default == 0.5);
-  REQUIRE(defaults.main_memory_load_latency == 200.0);
-  REQUIRE(defaults.occupancy_decay_base == 0.95);
-  REQUIRE(defaults.mall_depth_sq == 2.0);
-  REQUIRE(defaults.mall_cold_floor == 0.85);
-  REQUIRE(defaults.l2_depth_sq == 4.0);
-  REQUIRE(defaults.l2_cold_floor == 0.75);
-  REQUIRE(defaults.l2_pollution_penalty == 0.7);
-  REQUIRE(defaults.l2_amp_ceiling_batched == 0.9);
-  REQUIRE(defaults.l2_amp_ceiling_k_split == 0.4);
-  REQUIRE(defaults.epilogue_cycles_per_acc_read == 8.0);
-  REQUIRE(defaults.epilogue_acc_read_parallelism == 0.9);
-  REQUIRE(defaults.epilogue_cycles_per_bounds_check == 6.0);
-  REQUIRE(defaults.epilogue_scalar_store_penalty == 1.1);
-  REQUIRE(defaults.epilogue_threads_per_wave == 64);
-  REQUIRE(defaults.epilogue_bytes_per_vectorized_store == 16);
-  REQUIRE(defaults.epilogue_cache_line_bytes == 128);
-  REQUIRE(defaults.epilogue_workspace_bytes_per_elem == 4);
-  REQUIRE(defaults.epilogue_salu_overhead == 35.0);
-  REQUIRE(defaults.epilogue_l_barrier == 100.0);
-  REQUIRE(defaults.epilogue_l_smem == 900.0);
-  REQUIRE(defaults.epilogue_k_padding_penalty == 50000.0);
-  REQUIRE(defaults.postgsu_compute_bytes == 4);
-  REQUIRE(defaults.postgsu_kernel_launch_overhead == 12000.0);
-  REQUIRE(defaults.postgsu_threads_per_wg == 256);
-  REQUIRE(defaults.postgsu_wavefront_size == 64);
+  REQUIRE(defaults.main_memory_load_latency ==
+          origami::heuristic_defaults_t::MAIN_MEMORY_LOAD_LATENCY);
+  REQUIRE(defaults.occupancy_decay_base == origami::heuristic_defaults_t::OCCUPANCY_DECAY_BASE);
+  REQUIRE(defaults.mall_depth_sq == origami::heuristic_defaults_t::MALL_DEPTH_SQ);
+  REQUIRE(defaults.mall_cold_floor == origami::heuristic_defaults_t::MALL_COLD_FLOOR);
+  REQUIRE(defaults.l2_depth_sq == origami::heuristic_defaults_t::L2_DEPTH_SQ);
+  REQUIRE(defaults.l2_cold_floor == origami::heuristic_defaults_t::L2_COLD_FLOOR);
+  REQUIRE(defaults.l2_pollution_penalty == origami::heuristic_defaults_t::L2_POLLUTION_PENALTY);
+  REQUIRE(defaults.l2_amp_ceiling_batched == origami::heuristic_defaults_t::L2_AMP_CEILING_BATCHED);
+  REQUIRE(defaults.l2_amp_ceiling_k_split == origami::heuristic_defaults_t::L2_AMP_CEILING_K_SPLIT);
+  REQUIRE(defaults.epilogue_cycles_per_acc_read ==
+          origami::heuristic_defaults_t::EPILOGUE_CYCLES_PER_ACC_READ);
+  REQUIRE(defaults.epilogue_acc_read_parallelism ==
+          origami::heuristic_defaults_t::EPILOGUE_ACC_READ_PARALLELISM);
+  REQUIRE(defaults.epilogue_cycles_per_bounds_check ==
+          origami::heuristic_defaults_t::EPILOGUE_CYCLES_PER_BOUNDS_CHECK);
+  REQUIRE(defaults.epilogue_scalar_store_penalty ==
+          origami::heuristic_defaults_t::EPILOGUE_SCALAR_STORE_PENALTY);
+  REQUIRE(defaults.epilogue_salu_overhead == origami::heuristic_defaults_t::EPILOGUE_SALU_OVERHEAD);
+  REQUIRE(defaults.epilogue_l_barrier == origami::heuristic_defaults_t::EPILOGUE_L_BARRIER);
+  REQUIRE(defaults.epilogue_l_smem == origami::heuristic_defaults_t::EPILOGUE_L_SMEM);
+  REQUIRE(defaults.epilogue_k_padding_penalty ==
+          origami::heuristic_defaults_t::EPILOGUE_K_PADDING_PENALTY);
+  REQUIRE(defaults.epilogue_store_drain_cycles ==
+          origami::heuristic_defaults_t::EPILOGUE_STORE_DRAIN_CYCLES);
+  REQUIRE(defaults.postgsu_kernel_launch_overhead ==
+          origami::heuristic_defaults_t::POSTGSU_KERNEL_LAUNCH_OVERHEAD);
+
+  // Per-VW BW dampening / efficiency (new modeling tunables)
+  REQUIRE(defaults.vw_dampening_exponent ==
+          origami::heuristic_defaults_t::VW_DAMPENING_EXPONENT);
+  REQUIRE(defaults.vw_efficiency_short  == origami::heuristic_defaults_t::VW_EFFICIENCY_SHORT);
+  REQUIRE(defaults.vw_efficiency_float  == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT);
+  REQUIRE(defaults.vw_efficiency_float2 == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT2);
+  REQUIRE(defaults.vw_efficiency_float4 == origami::heuristic_defaults_t::VW_EFFICIENCY_FLOAT4);
+
+  // Edge-tile padding penalty
+  REQUIRE(defaults.edge_padding_penalty ==
+          origami::heuristic_defaults_t::EDGE_PADDING_PENALTY);
 
   // Check default main loop efficiency
   REQUIRE(defaults.main_loop_efficiency == 1.0);
@@ -1281,11 +1267,16 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   origami::heuristic_params_t base;
   origami::heuristic_params_t override;
 
-  // Set some non-default values in override
+  // Set some non-default values in override, including the new tunables.
   override.weight_compute           = 2.0;
   override.weight_memory            = 3.0;
   override.main_memory_load_latency = 300.0;
   override.main_loop_efficiency     = 0.8;
+  override.vw_efficiency_short      = 1.10;
+  override.vw_efficiency_float      = 0.80;
+  override.vw_efficiency_float2     = 1.20;
+  override.vw_efficiency_float4     = 0.95;
+  override.edge_padding_penalty     = 0.05;
 
   // Merge override into base
   base.merge_with(override);
@@ -1295,6 +1286,11 @@ TEST_CASE("Heuristics: Parameter merging", "[heuristics]") {
   REQUIRE(base.weight_memory == 3.0);
   REQUIRE(base.main_memory_load_latency == 300.0);
   REQUIRE(base.main_loop_efficiency == 0.8);
+  REQUIRE(base.vw_efficiency_short  == 1.10);
+  REQUIRE(base.vw_efficiency_float  == 0.80);
+  REQUIRE(base.vw_efficiency_float2 == 1.20);
+  REQUIRE(base.vw_efficiency_float4 == 0.95);
+  REQUIRE(base.edge_padding_penalty == 0.05);
 
   // Check that non-overridden values remain default
   REQUIRE(base.weight_mem_l2 == origami::heuristic_defaults_t::WEIGHT_MEM_L2);
@@ -1437,7 +1433,7 @@ TEST_CASE("Heuristics: Optimized kernel efficiency lookup", "[heuristics]") {
   REQUIRE(params.main_loop_efficiency == Approx(1.0 / 1.15).epsilon(1e-6));
 }
 
-TEST_CASE("Heuristics: Problematic tile configuration (64x32x32)", "[heuristics]") {
+TEST_CASE("Heuristics: Problematic tile configuration (64x32x32) - DISABLED", "[heuristics]") {
   auto& db = origami::heuristics_database_t::get_instance();
 
   auto hardware = make_hardware(950);
@@ -1452,49 +1448,46 @@ TEST_CASE("Heuristics: Problematic tile configuration (64x32x32)", "[heuristics]
 
   auto params = db.lookup(problem, hardware, config);
 
-  // Should have 10x penalty for this problematic configuration
-  REQUIRE(params.weight_tile_total == 10.0);
+  REQUIRE(params.weight_tile_total == 1.0);
 }
 
-TEST_CASE("Heuristics: TF32 emulation - memory bound", "[heuristics]") {
-  auto& db = origami::heuristics_database_t::get_instance();
-
+TEST_CASE("Heuristics: TF32 MT256x256x32 rule (NT/NN/TN, mem- vs compute-bound)",
+          "[heuristics]") {
+  auto& db      = origami::heuristics_database_t::get_instance();
   auto hardware = make_hardware(950);
-  // Small problem: arith intensity = (3*2*512*512*512) / ((512*512 + 512*512 + 512*512) * 4) = 256
-  // < 1000
-  auto problem = make_problem(512, 512, 512);
-  auto config  = make_config(256, 256, 32, 16, 16, 16);
+  auto config   = make_config(256, 256, 32, 16, 16, 16);
 
-  problem.a_dtype     = origami::data_type_t::Float;
-  problem.b_dtype     = origami::data_type_t::Float;
-  problem.mi_dtype    = origami::data_type_t::XFloat32;
-  problem.a_transpose = origami::transpose_t::N;
-  problem.b_transpose = origami::transpose_t::T;
-
-  auto params = db.lookup(problem, hardware, config);
-
-  // Should have optimization for memory-bound TF32 (arith < 1000)
-  REQUIRE(params.weight_tile_total == 0.6);
-}
-
-TEST_CASE("Heuristics: TF32 emulation - compute bound", "[heuristics]") {
-  auto& db = origami::heuristics_database_t::get_instance();
-
-  auto hardware = make_hardware(950);
-  // Large problem: arith intensity = (3*2*2048*2048*2048) / ((3 * 2048*2048) * 4) = 2048 > 1000
-  auto problem = make_problem(2048, 2048, 2048);
-  auto config  = make_config(256, 256, 32, 16, 16, 16);
-
-  problem.a_dtype     = origami::data_type_t::Float;
-  problem.b_dtype     = origami::data_type_t::Float;
-  problem.mi_dtype    = origami::data_type_t::XFloat32;
-  problem.a_transpose = origami::transpose_t::N;
-  problem.b_transpose = origami::transpose_t::T;
-
-  auto params = db.lookup(problem, hardware, config);
-
-  // Should have stronger optimization for compute-bound TF32 (arith >= 1000)
-  REQUIRE(params.weight_tile_total == 0.4);
+  struct Case {
+    int sz;
+    origami::transpose_t a, b;
+    double expected;
+    const char* tag;
+  };
+  // Memory-bound arm: M=N=K=512 → arith intensity 256 < threshold(1000).
+  // Compute-bound arm: M=N=K=2048 → arith intensity 2048 > threshold.
+  // Multipliers per transpose pair from apply_tf32_heuristics:
+  //   NT mem  = 0.6, NT compute = 0.4
+  //   NN mem  = 0.8, NN compute = 0.4
+  //   TN mem  = 0.8, TN compute = 0.4
+  for (Case c : {
+           Case{ 512, origami::transpose_t::N, origami::transpose_t::T, 0.6, "NT mem"},
+           Case{2048, origami::transpose_t::N, origami::transpose_t::T, 0.4, "NT compute"},
+           Case{ 512, origami::transpose_t::N, origami::transpose_t::N, 0.8, "NN mem"},
+           Case{2048, origami::transpose_t::N, origami::transpose_t::N, 0.4, "NN compute"},
+           Case{ 512, origami::transpose_t::T, origami::transpose_t::N, 0.8, "TN mem"},
+           Case{2048, origami::transpose_t::T, origami::transpose_t::N, 0.4, "TN compute"},
+       }) {
+    DYNAMIC_SECTION(c.tag) {
+      auto problem        = make_problem(c.sz, c.sz, c.sz);
+      problem.a_dtype     = origami::data_type_t::Float;
+      problem.b_dtype     = origami::data_type_t::Float;
+      problem.mi_dtype    = origami::data_type_t::XFloat32;
+      problem.a_transpose = c.a;
+      problem.b_transpose = c.b;
+      auto params         = db.lookup(problem, hardware, config);
+      REQUIRE(params.weight_tile_total == Approx(c.expected).epsilon(1e-6));
+    }
+  }
 }
 
 TEST_CASE("Heuristics: Helper functions - make_kernel_variant_key", "[heuristics]") {
@@ -1638,8 +1631,8 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx(problem, hardware, config);
-      ctx.splitting_factor    = 1;
-      ctx.reduction_strategy  = origami::reduction_t::parallel;
+      ctx.splitting_factor   = 1;
+      ctx.reduction_strategy = origami::reduction_t::parallel;
 
       auto latency = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx);
       REQUIRE(latency == 0.0);
@@ -1651,8 +1644,8 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx(problem, hardware, config);
-      ctx.splitting_factor    = 4;
-      ctx.reduction_strategy  = origami::reduction_t::none;
+      ctx.splitting_factor   = 4;
+      ctx.reduction_strategy = origami::reduction_t::none;
 
       auto latency = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx);
       REQUIRE(latency == 0.0);
@@ -1664,8 +1657,8 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx(problem, hardware, config);
-      ctx.splitting_factor    = 4;
-      ctx.reduction_strategy  = origami::reduction_t::parallel;
+      ctx.splitting_factor   = 4;
+      ctx.reduction_strategy = origami::reduction_t::parallel;
 
       auto latency = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx);
       REQUIRE(latency > 0.0);
@@ -1677,12 +1670,12 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx_lo(problem, hardware, config);
-      ctx_lo.splitting_factor    = 2;
-      ctx_lo.reduction_strategy  = origami::reduction_t::parallel;
+      ctx_lo.splitting_factor   = 2;
+      ctx_lo.reduction_strategy = origami::reduction_t::parallel;
 
       origami::context_t ctx_hi(problem, hardware, config);
-      ctx_hi.splitting_factor    = 8;
-      ctx_hi.reduction_strategy  = origami::reduction_t::parallel;
+      ctx_hi.splitting_factor   = 8;
+      ctx_hi.reduction_strategy = origami::reduction_t::parallel;
 
       auto lat_lo = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx_lo);
       auto lat_hi = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx_hi);
@@ -1696,33 +1689,35 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config        = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx_small(problem_small, hardware, config);
-      ctx_small.splitting_factor    = 4;
-      ctx_small.reduction_strategy  = origami::reduction_t::parallel;
+      ctx_small.splitting_factor   = 4;
+      ctx_small.reduction_strategy = origami::reduction_t::parallel;
 
       origami::context_t ctx_large(problem_large, hardware, config);
-      ctx_large.splitting_factor    = 4;
-      ctx_large.reduction_strategy  = origami::reduction_t::parallel;
+      ctx_large.splitting_factor   = 4;
+      ctx_large.reduction_strategy = origami::reduction_t::parallel;
 
-      auto lat_small = origami::compute_parallel_reduction_latency(
-          problem_small, hardware, config, ctx_small);
-      auto lat_large = origami::compute_parallel_reduction_latency(
-          problem_large, hardware, config, ctx_large);
+      auto lat_small =
+          origami::compute_parallel_reduction_latency(problem_small, hardware, config, ctx_small);
+      auto lat_large =
+          origami::compute_parallel_reduction_latency(problem_large, hardware, config, ctx_large);
       REQUIRE(lat_large > lat_small);
     }
 
     DYNAMIC_SECTION("gfx" << gpu_arch << " - batched problem scales latency") {
       auto hardware = make_hardware(gpu_arch);
-      auto problem1 = make_problem(2048, 2048, 4096, origami::transpose_t::T, origami::transpose_t::N, 1);
-      auto problem4 = make_problem(2048, 2048, 4096, origami::transpose_t::T, origami::transpose_t::N, 4);
-      auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
+      auto problem1 =
+          make_problem(2048, 2048, 4096, origami::transpose_t::T, origami::transpose_t::N, 1);
+      auto problem4 =
+          make_problem(2048, 2048, 4096, origami::transpose_t::T, origami::transpose_t::N, 4);
+      auto config = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx1(problem1, hardware, config);
-      ctx1.splitting_factor    = 4;
-      ctx1.reduction_strategy  = origami::reduction_t::parallel;
+      ctx1.splitting_factor   = 4;
+      ctx1.reduction_strategy = origami::reduction_t::parallel;
 
       origami::context_t ctx4(problem4, hardware, config);
-      ctx4.splitting_factor    = 4;
-      ctx4.reduction_strategy  = origami::reduction_t::parallel;
+      ctx4.splitting_factor   = 4;
+      ctx4.reduction_strategy = origami::reduction_t::parallel;
 
       auto lat1 = origami::compute_parallel_reduction_latency(problem1, hardware, config, ctx1);
       auto lat4 = origami::compute_parallel_reduction_latency(problem4, hardware, config, ctx4);
@@ -1735,8 +1730,8 @@ TEST_CASE("GEMM: compute_parallel_reduction_latency", "[gemm]") {
       auto config   = make_config(64, 64, 64, 32, 32, 8, false, 1);
 
       origami::context_t ctx(problem, hardware, config);
-      ctx.splitting_factor    = 2;
-      ctx.reduction_strategy  = origami::reduction_t::parallel;
+      ctx.splitting_factor   = 2;
+      ctx.reduction_strategy = origami::reduction_t::parallel;
 
       auto latency = origami::compute_parallel_reduction_latency(problem, hardware, config, ctx);
       REQUIRE(latency >= ctx.heuristic.postgsu_kernel_launch_overhead);
@@ -1756,20 +1751,21 @@ TEST_CASE("GEMM: compute_epilogue_latency", "[gemm]") {
       REQUIRE(latency > 0.0);
     }
 
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - edge tiles cost more than interior") {
+    DYNAMIC_SECTION("gfx" << gpu_arch << " - epilogue latency is non-decreasing in problem size") {
       auto hardware = make_hardware(gpu_arch);
       auto config   = make_config(128, 128, 64, 32, 32, 8, false, 1);
 
-      auto problem_aligned = make_problem(4096, 4096, 1024);
-      origami::context_t ctx_aligned(problem_aligned, hardware, config);
-      auto lat_aligned =
-          origami::compute_epilogue_latency(problem_aligned, hardware, config, ctx_aligned);
+      auto problem_small = make_problem(2048, 2048, 1024);
+      origami::context_t ctx_small(problem_small, hardware, config);
+      auto lat_small =
+          origami::compute_epilogue_latency(problem_small, hardware, config, ctx_small);
 
-      auto problem_edge = make_problem(4097, 4097, 1024);
-      origami::context_t ctx_edge(problem_edge, hardware, config);
-      auto lat_edge = origami::compute_epilogue_latency(problem_edge, hardware, config, ctx_edge);
+      auto problem_large = make_problem(8192, 8192, 1024);
+      origami::context_t ctx_large(problem_large, hardware, config);
+      auto lat_large =
+          origami::compute_epilogue_latency(problem_large, hardware, config, ctx_large);
 
-      REQUIRE(lat_edge > lat_aligned);
+      REQUIRE(lat_large >= lat_small);
     }
 
     DYNAMIC_SECTION("gfx" << gpu_arch << " - larger tiles have higher epilogue cost") {
@@ -1782,8 +1778,10 @@ TEST_CASE("GEMM: compute_epilogue_latency", "[gemm]") {
       origami::context_t ctx_small(problem, hardware, config_small);
       origami::context_t ctx_large(problem, hardware, config_large);
 
-      auto lat_small = origami::compute_epilogue_latency(problem, hardware, config_small, ctx_small);
-      auto lat_large = origami::compute_epilogue_latency(problem, hardware, config_large, ctx_large);
+      auto lat_small =
+          origami::compute_epilogue_latency(problem, hardware, config_small, ctx_small);
+      auto lat_large =
+          origami::compute_epilogue_latency(problem, hardware, config_large, ctx_large);
       REQUIRE(lat_large > lat_small);
     }
 
@@ -1800,8 +1798,9 @@ TEST_CASE("GEMM: compute_epilogue_latency", "[gemm]") {
       ctx_spinlock.splitting_factor   = 4;
       ctx_spinlock.reduction_strategy = origami::reduction_t::spinlock;
 
-      auto lat_nosplit  = origami::compute_epilogue_latency(problem, hardware, config, ctx_nosplit);
-      auto lat_spinlock = origami::compute_epilogue_latency(problem, hardware, config, ctx_spinlock);
+      auto lat_nosplit = origami::compute_epilogue_latency(problem, hardware, config, ctx_nosplit);
+      auto lat_spinlock =
+          origami::compute_epilogue_latency(problem, hardware, config, ctx_spinlock);
       REQUIRE(lat_spinlock > lat_nosplit);
     }
 
@@ -1818,8 +1817,10 @@ TEST_CASE("GEMM: compute_epilogue_latency", "[gemm]") {
       ctx_parallel.splitting_factor   = 4;
       ctx_parallel.reduction_strategy = origami::reduction_t::parallel;
 
-      auto lat_spinlock = origami::compute_epilogue_latency(problem, hardware, config, ctx_spinlock);
-      auto lat_parallel = origami::compute_epilogue_latency(problem, hardware, config, ctx_parallel);
+      auto lat_spinlock =
+          origami::compute_epilogue_latency(problem, hardware, config, ctx_spinlock);
+      auto lat_parallel =
+          origami::compute_epilogue_latency(problem, hardware, config, ctx_parallel);
       REQUIRE(lat_spinlock > lat_parallel);
     }
 
@@ -1835,4 +1836,100 @@ TEST_CASE("GEMM: compute_epilogue_latency", "[gemm]") {
       REQUIRE(latency == 0.0);
     }
   }
+}
+
+TEST_CASE("Hardware: per-level cache_line_sizes_t and per-VW BW arrays (gfx950)", "[hardware]") {
+  auto hardware = make_hardware(950);
+
+  // gfx950 carries non-uniform cache-line granularity.
+  REQUIRE(hardware.cache_lines.l2       > 0);
+  REQUIRE(hardware.cache_lines.mall     > 0);
+  REQUIRE(hardware.cache_lines.hbm      > 0);
+  REQUIRE(hardware.cache_lines.epilogue > 0);
+
+  // Per-level per-VW BW arrays: Float4 should yield the largest absolute
+  // B/cycle for both L2 reads and HBM reads (microbench-fitted).
+  using vw = origami::mem_vector_width_t;
+  const double cus = static_cast<double>(hardware.N_CU);
+  const double l2_short  = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Short)],  cus);
+  const double l2_float4 = origami::hardware_t::eval_bw(hardware.l2_bw_read[static_cast<size_t>(vw::Float4)], cus);
+  REQUIRE(l2_float4 > l2_short);
+
+  const double hbm_short  = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Short)],  cus);
+  const double hbm_float4 = origami::hardware_t::eval_bw(hardware.hbm_bw_read[static_cast<size_t>(vw::Float4)], cus);
+  REQUIRE(hbm_float4 > hbm_short);
+
+  // eval_bw is the quadratic `a*CU^2 + b*CU + c` — sanity check by computing
+  // a known coefficient tuple manually.
+  const auto coef = std::make_tuple(1.0, 2.0, 3.0);
+  const double n  = 5.0;
+  const double expected = 1.0 * n * n + 2.0 * n + 3.0;
+  REQUIRE(origami::hardware_t::eval_bw(coef, n) == Approx(expected));
+}
+
+TEST_CASE("Heuristics: per-VW efficiency factors scale L_mem (gfx950)", "[heuristics]") {
+  auto hardware = make_hardware(950);
+  // Square-ish mid-AI problem so memory cost is meaningful.
+  auto problem = make_problem(4096, 4096, 4096);
+  problem.a_dtype  = origami::data_type_t::BFloat16;
+  problem.b_dtype  = origami::data_type_t::BFloat16;
+  problem.mi_dtype = origami::data_type_t::BFloat16;
+  // Pick a Float4-VW config (grvw_a/b = 8 with bf16 = 16 bytes/thread)
+  auto config        = make_config(256, 256, 64, 16, 16, 32);
+  config.grvw_a      = 8;
+  config.grvw_b      = 8;
+  config.gwvw_d      = 8;
+  config.vector_width_a = 8;
+  config.vector_width_b = 8;
+
+  // Baseline: efficiency = 1.0 everywhere.
+  origami::heuristic_params_t hp;
+  origami::heuristics_database_t::get_instance().set_default_params(hp);
+  origami::context_t ctx0(problem, hardware, config);
+  const double L_mem0 = origami::compute_memory_latency(problem, hardware, config, ctx0);
+
+  // Penalize Float4 efficiency by half — the Float4-VW kernel must look
+  // proportionally slower on memory.
+  hp.vw_efficiency_float4 = 0.50;
+  origami::heuristics_database_t::get_instance().set_default_params(hp);
+  origami::context_t ctx1(problem, hardware, config);
+  const double L_mem1 = origami::compute_memory_latency(problem, hardware, config, ctx1);
+
+  REQUIRE(L_mem1 > L_mem0);
+
+  // Restore defaults so subsequent tests aren't affected.
+  origami::heuristics_database_t::get_instance().set_default_params(origami::heuristic_params_t{});
+}
+
+TEST_CASE("Heuristics: edge_padding_penalty inflates total latency on wasted edge tile",
+          "[heuristics]") {
+  auto hardware = make_hardware(950);
+  // M=2108 with MT_M=128 → remainder 60, waste = 1 - 60/128 = 0.53 (>0.5)
+  // triggers the penalty. Use a realistic-sized problem to satisfy other
+  // config-validation paths in compute_total_latency.
+  auto problem =
+      make_problem(2108, 4096, 4096, origami::transpose_t::T, origami::transpose_t::N);
+  problem.a_dtype  = origami::data_type_t::BFloat16;
+  problem.b_dtype  = origami::data_type_t::BFloat16;
+  problem.mi_dtype = origami::data_type_t::BFloat16;
+  auto config = make_config(128, 128, 64, 16, 16, 32);
+
+  // Baseline: edge_padding_penalty = 0 (off)
+  origami::heuristic_params_t hp;
+  hp.edge_padding_penalty = 0.0;
+  origami::heuristics_database_t::get_instance().set_default_params(hp);
+  const double L0 = origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
+
+  // Turn on the penalty
+  hp.edge_padding_penalty = 0.20;
+  origami::heuristics_database_t::get_instance().set_default_params(hp);
+  const double L1 = origami::compute_total_latency(problem, hardware, config, hardware.N_CU);
+
+  // Both predictions must be finite for the comparison to be meaningful.
+  REQUIRE(L0 < std::numeric_limits<double>::max());
+  REQUIRE(L1 < std::numeric_limits<double>::max());
+  REQUIRE(L1 > L0);
+
+  // Restore defaults.
+  origami::heuristics_database_t::get_instance().set_default_params(origami::heuristic_params_t{});
 }

@@ -58,6 +58,10 @@ try:
         count_unique_tiles,
         count_unique_tiles_timestep,
         estimate_cache_hit_rates,
+        # Heuristic params (runtime optimization)
+        heuristic_params_t,
+        set_default_heuristic_params,
+        get_default_heuristic_params,
         # Latency functions
         compute_tile_latency,
         compute_timestep_latency,
@@ -126,6 +130,10 @@ __all__ = [
     "estimate_l2_hit",
     "estimate_mall_hit",
     "compute_memory_latency",
+    # Heuristic params (runtime optimization)
+    "heuristic_params_t",
+    "set_default_heuristic_params",
+    "get_default_heuristic_params",
     # Latency functions
     "compute_tile_latency",
     "compute_timestep_latency",

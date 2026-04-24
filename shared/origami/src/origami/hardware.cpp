@@ -33,7 +33,9 @@ hardware_t::hardware_t(architecture_t arch,
     , compute_clock_ghz(compute_clock_ghz)
     , parallel_mi_cu(parallel_mi_cu)
     , mem_bw_per_wg_coefficients(mem_bw_per_wg_coefficients)
-    , NUM_XCD(NUM_XCD) {}
+    , NUM_XCD(NUM_XCD) {
+  init_per_level_bw();
+}
 
 hardware_t::hardware_t(architecture_t arch,
                        size_t N_CU,
@@ -43,7 +45,7 @@ hardware_t::hardware_t(architecture_t arch,
                        size_t L2_capacity,
                        double compute_clock_ghz,
                        double memory_clock_ghz)
-   : hardware_t(
+    : hardware_t(
           arch,
           N_CU,
           lds_capacity,
@@ -71,7 +73,15 @@ hardware_t::hardware_t(const hardware_t& other)
     , compute_clock_ghz(other.compute_clock_ghz)
     , parallel_mi_cu(other.parallel_mi_cu)
     , mem_bw_per_wg_coefficients(other.mem_bw_per_wg_coefficients)
-    , NUM_XCD(other.NUM_XCD) {}
+    , NUM_XCD(other.NUM_XCD)
+    , cache_line_bytes(other.cache_line_bytes)
+    , l2_bw_read(other.l2_bw_read)
+    , l2_bw_write(other.l2_bw_write)
+    , mall_bw_read(other.mall_bw_read)
+    , mall_bw_write(other.mall_bw_write)
+    , hbm_bw_read(other.hbm_bw_read)
+    , hbm_bw_write(other.hbm_bw_write)
+    , uses_absolute_bw(other.uses_absolute_bw) {}
 
 hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties,
                                                    size_t num_xcds_override) {
@@ -82,10 +92,8 @@ hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties,
         std::string("Attempting to retrieve hardware constants for unsupported architecture: ") +
         std::string(arch_name));
   }
-  auto constants  = get_arch_constants(arch_enum);
-  auto num_xcds   = (num_xcds_override > 0)
-                      ? num_xcds_override
-                      : get_default_num_xcds(arch_enum);
+  auto constants = get_arch_constants(arch_enum);
+  auto num_xcds  = (num_xcds_override > 0) ? num_xcds_override : get_default_num_xcds(arch_enum);
   return hardware_t(arch_enum,
                     properties.multiProcessorCount,
                     properties.sharedMemPerBlock,
@@ -104,8 +112,9 @@ hardware_t hardware_t::get_hardware_for_device(int deviceId) {
   size_t num_xcds = 0;
 #if HIP_VERSION_MAJOR >= 7
   int queried_xccs = 0;
-  if (hipDeviceGetAttribute(&queried_xccs, hipDeviceAttributeNumberOfXccs, deviceId) == hipSuccess
-      && queried_xccs > 0) {
+  if (hipDeviceGetAttribute(&queried_xccs, hipDeviceAttributeNumberOfXccs, deviceId) ==
+          hipSuccess &&
+      queried_xccs > 0) {
     num_xcds = static_cast<size_t>(queried_xccs);
   }
 #endif
@@ -143,9 +152,9 @@ bool hardware_t::is_hardware_supported(hipDeviceProp_t properties) {
 size_t hardware_t::get_default_num_xcds(architecture_t arch) {
   // Do NOT add new architectures here — see declaration in hardware.hpp.
   switch (arch) {
-    case architecture_t::gfx90a:  return 1;
-    case architecture_t::gfx942:  return 8;
-    case architecture_t::gfx950:  return 8;
+    case architecture_t::gfx90a: return 1;
+    case architecture_t::gfx942: return 8;
+    case architecture_t::gfx950: return 8;
     case architecture_t::gfx1201: return 1;
     case architecture_t::gfx1100: return 1;
     case architecture_t::gfx1150: return 1;
@@ -276,6 +285,64 @@ dim3_t hardware_t::get_recommended_matrix_instruction(data_type_t mi_input_type)
   }
 
   return best_dim;
+}
+
+void hardware_t::init_per_level_bw() {
+  if (arch == architecture_t::gfx950) {
+    uses_absolute_bw = true;
+    cache_lines      = {64, 128, 128, 64};
+    cache_line_bytes = cache_lines.l2;
+
+    constexpr double L2_PEAK    = 7045.0;
+    constexpr double MALL_PEAK  = 3273.0;
+    constexpr double HBM_R_PEAK = 3035.0;
+    constexpr double HBM_W_PEAK = 2090.0;
+
+    auto scale = [](bw_coef_t c, double s) -> bw_coef_t {
+      return std::make_tuple(std::get<0>(c) * s, std::get<1>(c) * s, std::get<2>(c) * s);
+    };
+
+    hbm_bw_read = {{scale({-1.245e-05, 6.447e-03, 0.0}, HBM_R_PEAK),
+                    scale({-1.791e-05, 7.970e-03, 0.0}, HBM_R_PEAK),
+                    scale({-1.417e-05, 7.401e-03, 0.0}, HBM_R_PEAK),
+                    scale({-1.923e-05, 8.752e-03, 0.0}, HBM_R_PEAK)}};
+
+    hbm_bw_write = {{scale({-1.176e-05, 5.946e-03, 0.0}, HBM_W_PEAK),
+                     scale({-2.492e-05, 9.843e-03, 0.0}, HBM_W_PEAK),
+                     scale({-2.655e-05, 1.026e-02, 0.0}, HBM_W_PEAK),
+                     scale({-2.667e-05, 1.033e-02, 0.0}, HBM_W_PEAK)}};
+
+    l2_bw_read  = {{scale({0.0, 6.783e-04, 0.0}, L2_PEAK),
+                    scale({0.0, 1.311e-03, 0.0}, L2_PEAK),
+                    scale({0.0, 2.198e-03, 0.0}, L2_PEAK),
+                    scale({0.0, 3.906e-03, 0.0}, L2_PEAK)}};
+    l2_bw_write = {{scale({0.0, 2.202e-03, 0.0}, L2_PEAK),
+                    scale({0.0, 2.455e-03, 0.0}, L2_PEAK),
+                    scale({0.0, 2.604e-03, 0.0}, L2_PEAK),
+                    scale({0.0, 3.906e-03, 0.0}, L2_PEAK)}};
+
+    mall_bw_read  = {{scale({0.0, 5.355e-04, 0.0}, MALL_PEAK),
+                      scale({0.0, 1.078e-03, 0.0}, MALL_PEAK),
+                      scale({0.0, 2.091e-03, 0.0}, MALL_PEAK),
+                      scale({0.0, 3.906e-03, 0.0}, MALL_PEAK)}};
+    mall_bw_write = {{scale({0.0, 3.216e-03, 0.0}, MALL_PEAK),
+                      scale({0.0, 3.709e-03, 0.0}, MALL_PEAK),
+                      scale({0.0, 3.641e-03, 0.0}, MALL_PEAK),
+                      scale({0.0, 3.906e-03, 0.0}, MALL_PEAK)}};
+  } else {
+    cache_lines      = {128, 128, 128, 128};
+    cache_line_bytes = cache_lines.l2;
+    auto fill        = [&]() -> bw_coef_array_t {
+      auto c = mem_bw_per_wg_coefficients;
+      return {{c, c, c, c}};
+    };
+    l2_bw_read    = fill();
+    l2_bw_write   = fill();
+    mall_bw_read  = fill();
+    mall_bw_write = fill();
+    hbm_bw_read   = fill();
+    hbm_bw_write  = fill();
+  }
 }
 
 }  // namespace origami

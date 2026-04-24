@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -146,17 +147,13 @@ class hardware_t {
    */
   static constexpr architecture_constants get_arch_constants(architecture_t arch) {
     switch (arch) {
+        // clang-format off
       case architecture_t::gfx90a:
         return {5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
       case architecture_t::gfx942:
         return {17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
-      case architecture_t::gfx950:
-        return {17,
-                1.21875121875121875122 * 7,
-                6,
-                4,
-                std::make_tuple(-0.000013, 0.007070, 0.027355),
-                1.5};
+      case architecture_t::gfx950: 
+        return {8, 0, 0, 4, std::make_tuple(0, 0, 0), 0.7895};
       case architecture_t::gfx1201:
         return {5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
       case architecture_t::gfx1100:
@@ -176,7 +173,9 @@ class hardware_t {
       case architecture_t::gfx1250:
         // TODO: Update this, but for now using gfx950 values
         return {17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
-      default: return {0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
+      default: 
+        return {0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
+        // clang-format on
     }
   }
 
@@ -469,6 +468,39 @@ class hardware_t {
   std::tuple<double, double, double>
       mem_bw_per_wg_coefficients;  ///< Memory bandwidth coefficients per workgroup
   size_t NUM_XCD;                  ///< Number of XCDs (XGMI Complex Die)
+
+  struct cache_line_sizes_t {
+    size_t l2       = 128;
+    size_t mall     = 128;
+    size_t hbm      = 128;
+    size_t epilogue = 128;
+  };
+  cache_line_sizes_t cache_lines;
+
+  size_t cache_line_bytes = 128;
+
+  using bw_coef_t       = std::tuple<double, double, double>;
+  using bw_coef_array_t = std::array<bw_coef_t, static_cast<size_t>(mem_vector_width_t::Count)>;
+
+  bw_coef_array_t l2_bw_read;
+  bw_coef_array_t l2_bw_write;
+  bw_coef_array_t mall_bw_read;
+  bw_coef_array_t mall_bw_write;
+  bw_coef_array_t hbm_bw_read;
+  bw_coef_array_t hbm_bw_write;
+
+  /// True when init_per_level_bw populated the per-VW BW arrays with distinct
+  /// per-VW microbench fits (rather than replicating one fractional coefficient).
+  /// Consumers should branch on this flag instead of arch identity so a future
+  /// arch with its own per-VW fits gets the absolute-BW path automatically.
+  bool uses_absolute_bw = false;
+
+  static double eval_bw(const bw_coef_t& coef, double CUs) {
+    double bw = std::get<0>(coef) * CUs * CUs + std::get<1>(coef) * CUs + std::get<2>(coef);
+    return std::max(bw, 0.0);
+  }
+
+  void init_per_level_bw();
 
   /**
    * @brief Construct hardware_t with explicit parameters.

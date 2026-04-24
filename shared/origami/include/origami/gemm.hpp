@@ -99,6 +99,18 @@ struct context_t {
 double calculate_work_utilization(const problem_t& problem, const config_t& config);
 
 /**
+ * @brief Per-operand layout used by the cache-line-aware load model.
+ */
+struct operand_cache_layout_t {
+  double element_bytes     = 0.0;
+  size_t leading_dim       = 0;
+  size_t contiguous_extent = 0;
+  size_t tile_output_span  = 0;
+  size_t tile_k_span       = 0;
+  bool k_is_contiguous     = false;
+};
+
+/**
  * @brief calculate the output utilization which is the ratio of the useful problem volume to the
  * total scheduled volume.
  *
@@ -110,16 +122,6 @@ double calculate_work_utilization(const problem_t& problem, const config_t& conf
 double calculate_output_utilization(const problem_t& problem,
                                     const config_t& config,
                                     size_t vector_elems);
-
-/**
- * @brief This function rounds the number of elements up to the smallest value whose total size
- * (given the element bit-width) is an exact multiple of a 128-byte memory transaction.
- *
- * @param elements Macro tile dimension
- * @param element_size_bits size in bits
- * @return size_t
- */
-size_t round_elements_to_128B(size_t elements, size_t element_size_bits);
 
 /**
  * @brief Fast WGM prediction based on last-XCD L2 working set minimization.

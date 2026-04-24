@@ -227,6 +227,11 @@ enum class transpose_t {
 };
 
 /**
+ * @brief Memory vector width categories for BW coefficient indexing.
+ */
+enum class mem_vector_width_t : size_t { Short, Float, Float2, Float4, Count };
+
+/**
  * @brief A compact 3-D dimension triple (M, N, K).
  *
  * Provides convenient accessors for common GEMM tiling parameters
@@ -409,9 +414,9 @@ struct tensile_params_t {
   bool swizzle_b = false;
 
   /// Workgroup mapping XCC parameters
-  int workgroup_mapping_xcc = 1;
-  int workgroup_mapping_xcc_group = 0;
-  bool global_split_u_coalesced = false;
+  int workgroup_mapping_xcc           = 1;
+  int workgroup_mapping_xcc_group     = 0;
+  bool global_split_u_coalesced       = false;
   bool global_split_u_wgm_round_robin = false;
 
   constexpr bool operator==(const tensile_params_t& o) const noexcept {
@@ -625,6 +630,10 @@ struct problem_t {
   /// MX block size.
   std::size_t a_mx_block_size = 0;
   std::size_t b_mx_block_size = 0;
+
+  /// Leading dimensions (in elements). 0 = use default (contiguous extent).
+  std::size_t a_leading_dim = 0;
+  std::size_t b_leading_dim = 0;
 };
 
 /**
