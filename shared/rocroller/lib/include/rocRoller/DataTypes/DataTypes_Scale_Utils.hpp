@@ -127,11 +127,11 @@ namespace rocRoller
         if(scale == 0x00)
             return 0.0f;
         if(scale == nan_encoding)
-            return 0x7FA3D000; // Quiet NaN as per spec
+            return std::numeric_limits<float>::quiet_NaN(); // Quiet NaN as per spec
 
         uint32_t exponent = (scale >> e5m3MantBits) & ((1u << e5m3ExpBits) - 1);
         uint32_t mantissa = scale & ((1u << e5m3MantBits) - 1);
-        float    result;
+        float    result   = 0.0f;
         float    baseFrac = mantissa / std::ldexp(1.0f, e5m3MantBits);
         if(exponent == 0)
         {
