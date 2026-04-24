@@ -11674,8 +11674,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # Enable local write if not DTL or using nonDTL loads in tail loop
     if (not kernel["DirectToLds%s"%tc]) or \
-       (((tP["isA"] and kernel["NonDTLTailLoopA"]) or \
-        (tP["isB"] and kernel["NonDTLTailLoopB"])) and self.states.inTailLoop):
+       ((tc in ("A","B","MXSA","MXSB") and kernel["NonDTLTailLoop%s"%tc]) and self.states.inTailLoop):
       # Skip local write if DTVA or DTVB
       if not ((tP["isA"] or tP["isB"]) and kernel["DirectToVgpr%s"%tc]):
         localWriteBody(tP)

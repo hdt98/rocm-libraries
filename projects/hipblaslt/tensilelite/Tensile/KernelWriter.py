@@ -4884,7 +4884,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           #TODO: To handle KRS with MX
           if "MX" in tensorParameters1st:
             module.addComment1("Update M0 for DTLDS")
-            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"], skipWait=True)
+            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters1st["MX"], skipWait=skip2ndWaitForDtl)
             module.add(replaceHolder(moduleTmp, 0))
             module.addComment1("Tail global read MXS%s"%tc1)
             if tailLoopOpt1st and (globalReadMode1st == 2):
@@ -4894,7 +4894,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
           if "MX" in tensorParameters2nd:
             module.addComment1("Update M0 for DTLDS")
-            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"], skipWait=True)
+            moduleTmp = self.directToLdsM0Update(kernel, 1, tensorParameters2nd["MX"], skipWait=skip2ndWaitForDtl)
             module.add(replaceHolder(moduleTmp, 0))
             module.addComment1("Tail global read MXS%s"%tc2)
             if tailLoopOpt2nd and (globalReadMode2nd == 2):
