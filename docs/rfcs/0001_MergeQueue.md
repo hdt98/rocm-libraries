@@ -41,7 +41,7 @@ We desire an automated system that serializes with concurrent queues, is cheap t
 ## 3. Goals, Non-Goals, and Prerequisites
 
 ### Goals
-- One FIFO queue per component: `hipdnn`, four providers, `integration-tests`.
+- One FIFO queue per opted-in component. (Initial scope is the hipDNN ecosystem; see [§4.1](#41-queues).)
 - Cross-blocking that follows dependencies (see [§4.2](#42-path--queue-mapping)). A PR is blocked by every PR ahead of it in any queue it belongs to.
 - Opt-in per project. Subprojects outside the hipDNN ecosystem are unaffected unless they opt in.
 - `develop` is the only managed target branch.
@@ -64,7 +64,7 @@ One external precondition the queue depends on:
 
 ### 4.1 Queues
 
-Six FIFO queues, one per component:
+Each opted-in component gets one FIFO queue. The initial scope is the hipDNN ecosystem, with six queues:
 
 - `hipdnn`
 - `miopen-provider`
@@ -72,6 +72,8 @@ Six FIFO queues, one per component:
 - `hip-kernel-provider`
 - `fusilli-provider`
 - `integration-tests`
+
+Other rocm-libraries subprojects opt in by adding entries to the centralized config (see [§4.8](#48-opt-in--extension)); they have no queue otherwise.
 
 Each PR enters zero or more queues based on the paths it touches. A PR merges only when at the head of **every** queue it belongs to.
 
@@ -306,14 +308,14 @@ After ejection, the author addresses the reported cause and re-enqueues with `/m
 
 #### Branch protection integration
 
-Once the queue has matured through the hipDNN rollout, a `merge-queue/managed` GitHub status check will serve as the enforcement path (see [§7](#7-rollout)). Initially non-blocking, it can be promoted to a required check on `develop` to make the queue the enforced merge path for opted-in components without affecting other subprojects. The design of this check is future work.
+Once the queue has matured through its initial rollout (see [§7](#7-rollout)), a `merge-queue/managed` GitHub status check will serve as the enforcement path. Initially non-blocking, it can be promoted to a required check on `develop` to make the queue the enforced merge path for opted-in components without affecting other subprojects. The design of this check is future work.
 
 ### 4.6 Per-cycle algorithm
 
 *The following is functional pseudocode illustrating the algorithm's logic and sequencing. It is not intended as a literal implementation.*
 
 ```
-# ALL_QUEUES is the fixed set of six queue names defined in §4.1.
+# ALL_QUEUES is the set of opted-in queue names from §4.1 (six in the initial scope).
 
 process_cycle():
     # 1. Discover: rebuild each queue by searching for its membership label,
@@ -396,13 +398,18 @@ Crash-safety follows from the single concurrency group ([§4.7](#47-cadence-and-
 
 ### 4.8 Opt-in / extension
 
-To opt in a new component, two edits to the centralized `PATH_TO_QUEUES` config:
+Any component (in or outside the hipDNN ecosystem) opts in by editing the centralized `PATH_TO_QUEUES` config:
 
-1. **Add your path entry.** Map your path prefix to a list of queues: your own queue, plus the queue of every downstream component your changes could break (the membership rule from [§4.2](#42-path--queue-mapping)). For example, a new provider — like the existing four — has nothing downstream of it, so it enters only its own queue:
+1. **Add a path entry for your component.** Map your path prefix to a list of queues: your own queue, plus the queue of every downstream component your changes could break (the membership rule from [§4.2](#42-path--queue-mapping)). A *leaf* component (nothing downstream) lists only its own queue; an upstream component lists every downstream queue too.
+2. **Update entries of components upstream of you.** Any existing entry that names a component you're downstream of must add your queue to its list, so upstream PRs serialize with you.
+
+Concrete example — opting in a new provider in the hipDNN ecosystem:
+
+1. Add the new provider's path entry. Providers are leaves of the dependency graph (nothing downstream of them), so it enters only its own queue:
    ```python
    "dnn-providers/new-provider/": ["new-provider"],
    ```
-2. **Update entries of components upstream of you.** Any component that lists you as downstream must add your queue to its list. Both `hipdnn` core and `integration-tests` are upstream of every provider, so add `"new-provider"` to both their `PATH_TO_QUEUES` entries — that way core and integration-test PRs serialize with the new provider.
+2. Add `"new-provider"` to the `projects/hipdnn/` and `dnn-providers/integration-tests/` entries — both are upstream of every provider, so their PRs need to serialize against the new one.
 
 There is no per-project file. Removing the entry (and your queue from other entries) opts a project out cleanly. The initial opt-in set is hipDNN core + four providers + integration-tests; other rocm-libraries projects are explicitly out of scope for v1.
 
@@ -453,7 +460,7 @@ Implement and validate against a fork of `rocm-libraries`. Synthetic PRs against
 ## 8. Risks
 
 - **3-minute poll** is slow at low load. Revisit if necessary.
-- **Head-of-line stalls.** Cross-queue blocking means a slow core or integration-tests PR at the front of multiple queues holds up downstream work.
+- **Head-of-line stalls.** Cross-queue blocking means a slow upstream PR at the front of multiple queues holds up downstream work.
 - **Serialization throughput — wall-clock end-to-end CI for a PR can comfortably exceed several hours.** Three contributing factors:
   - *Per-job timeouts.* Build jobs are bounded at 30 minutes ([`therock-ci-linux.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-ci-linux.yml), `timeout-minutes: 30`); individual test-component jobs are bounded at 210 minutes / 3.5 hours ([`therock-test-component.yml`](https://github.com/ROCm/rocm-libraries/blob/develop/.github/workflows/therock-test-component.yml), `timeout-minutes: 210`).
   - *Per-cycle setup overhead.* Machine acquisition, cache restoration, and matrix fan-out are fixed per attempt and not amortizable across queue cycles. Runner availability can itself be a bottleneck, adding significant wall-clock time before a job even starts.
