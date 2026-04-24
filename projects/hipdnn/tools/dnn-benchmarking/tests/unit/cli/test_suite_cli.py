@@ -440,9 +440,10 @@ class TestRunSuiteWorkflow:
 
     @patch("dnn_benchmarking.cli.main.run_graph_all_providers")
     @patch("dnn_benchmarking.cli.main.collect_environment_info")
+    @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=True)
     @patch.dict(sys.modules, {"hipdnn_frontend": _mock_hipdnn()})
     def test_json_output_written_when_output_specified(
-        self, mock_env: MagicMock, mock_run: MagicMock
+        self, mock_gpu: MagicMock, mock_env: MagicMock, mock_run: MagicMock
     ) -> None:
         """The orchestrator writes JSON to --output path when specified."""
         mock_env.return_value = {
@@ -473,9 +474,10 @@ class TestRunSuiteWorkflow:
 
     @patch("dnn_benchmarking.cli.main.run_graph_all_providers")
     @patch("dnn_benchmarking.cli.main.collect_environment_info")
+    @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=True)
     @patch.dict(sys.modules, {"hipdnn_frontend": _mock_hipdnn()})
     def test_no_json_output_when_output_not_specified(
-        self, mock_env: MagicMock, mock_run: MagicMock
+        self, mock_gpu: MagicMock, mock_env: MagicMock, mock_run: MagicMock
     ) -> None:
         """The orchestrator does not write JSON when --output is not specified."""
         mock_env.return_value = {
@@ -769,9 +771,11 @@ class TestValidationStartupGate:
     @patch("dnn_benchmarking.cli.main.ReferenceProviderRegistry")
     @patch("dnn_benchmarking.cli.main.run_graph_all_providers")
     @patch("dnn_benchmarking.cli.main.collect_environment_info")
+    @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=True)
     @patch.dict(sys.modules, {"hipdnn_frontend": _mock_hipdnn()})
     def test_available_reference_provider_proceeds_to_graph_iteration(
         self,
+        mock_gpu: MagicMock,
         mock_env: MagicMock,
         mock_run: MagicMock,
         mock_registry: MagicMock,
@@ -851,3 +855,66 @@ class TestValidationStartupGate:
 
         assert result == 0
         mock_run.assert_called_once()
+
+
+class TestNoGpuDetected:
+    """_orchestrate_suite_cli and run_ab_test return 1 when no GPU is detected."""
+
+    @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=False)
+    @patch("dnn_benchmarking.cli.main.run_graph_all_providers")
+    def test_orchestrate_returns_one_when_no_gpu(
+        self, mock_run: MagicMock, mock_gpu: MagicMock
+    ) -> None:
+        from dnn_benchmarking.cli.main import _orchestrate_suite_cli
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph = Path(tmpdir) / "g.json"
+            graph.write_text(json.dumps({"name": "g", "nodes": [], "tensors": []}))
+            result = _orchestrate_suite_cli(
+                graph_paths=[graph],
+                config=SuiteConfig(),
+                output_path=None,
+                plugin_path=None,
+            )
+
+        assert result == 1
+        mock_run.assert_not_called()
+
+    @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=False)
+    def test_run_ab_test_returns_one_when_no_gpu(self, mock_gpu: MagicMock) -> None:
+        import json
+        import tempfile
+
+        from dnn_benchmarking.cli.main import run_ab_test
+        from dnn_benchmarking.config.benchmark_config import ABTestConfig, BenchmarkConfig
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            graph = Path(tmpdir) / "g.json"
+            graph.write_text(
+                json.dumps(
+                    {
+                        "name": "g",
+                        "nodes": [
+                            {
+                                "op_type": "ConvolutionForward",
+                                "inputs": {},
+                                "outputs": {"y": 1},
+                            }
+                        ],
+                        "tensors": [
+                            {
+                                "uid": 1,
+                                "dims": [1, 3, 4, 4],
+                                "strides": [48, 16, 4, 1],
+                                "data_type": "FLOAT",
+                                "is_virtual": False,
+                            }
+                        ],
+                    }
+                )
+            )
+            config = BenchmarkConfig(graph_path=graph, engine_id=1)
+            ab_config = ABTestConfig(a_id=1, b_id=2)
+            result = run_ab_test(config, ab_config)
+
+        assert result == 1

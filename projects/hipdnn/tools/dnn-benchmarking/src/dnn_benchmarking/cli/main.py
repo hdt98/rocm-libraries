@@ -33,6 +33,28 @@ from ..validation.reference_provider import ReferenceProviderRegistry
 from .parser import create_parser
 
 
+def _gpu_is_available() -> bool:
+    """Return True if at least one ROCm/CUDA GPU is visible to the process."""
+    try:
+        import torch
+
+        return torch.cuda.is_available()
+    except ImportError:
+        pass
+    # Fallback: check for ROCm devices via the hip runtime
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["rocm-smi", "--showid"],
+            capture_output=True,
+            timeout=5,
+        )
+        return result.returncode == 0
+    except Exception:
+        pass
+    return False
+
 
 def run_pytorch_benchmark(
     config: BenchmarkConfig,
@@ -159,6 +181,12 @@ def run_ab_test(
         loader.validate(graph_json)
 
         graph_name = loader.get_graph_name(graph_json)
+
+        if not _gpu_is_available():
+            reporter.print_error(
+                "No GPU detected. hipDNN requires an AMD GPU with ROCm support."
+            )
+            return 1
 
         # Print header
         reporter.print_ab_header(config, ab_config, graph_name)
@@ -372,6 +400,12 @@ def _orchestrate_suite_cli(
                 "(check that its dependencies are installed)."
             )
             return 1
+
+    if not _gpu_is_available():
+        reporter.print_error(
+            "No GPU detected. hipDNN requires an AMD GPU with ROCm support."
+        )
+        return 1
 
     reporter.print_suite_header(total, tarball_source=tarball_source)
 
