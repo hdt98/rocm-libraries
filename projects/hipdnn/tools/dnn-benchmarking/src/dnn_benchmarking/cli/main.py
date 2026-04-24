@@ -462,6 +462,34 @@ def run_benchmark_suite(
     return suite_result
 
 
+def _orchestrate_suite_cli(
+    graph_paths: List[Path],
+    config: SuiteConfig,
+    output_path: Optional[Path],
+    plugin_path: Optional[Path],
+    tarball_source: Optional[str] = None,
+) -> int:
+    """Run the benchmark suite CLI workflow and return an exit code.
+
+    Delegates to run_benchmark_suite for all side effects (validation gate,
+    GPU check, console output). Writes JSON output if output_path is given.
+
+    Returns:
+        0 on success, 1 on setup/execution error, 2 on correctness failure.
+    """
+    suite_result = run_benchmark_suite(
+        graph_paths=graph_paths,
+        config=config,
+        plugin_path=plugin_path,
+        tarball_source=tarball_source,
+    )
+    if suite_result is None:
+        return 1
+    if output_path is not None:
+        suite_result.save_json(str(output_path))
+    return _suite_exit_code(suite_result)
+
+
 def main() -> int:
     """CLI entry point.
 
@@ -475,10 +503,7 @@ def main() -> int:
 
     # Resolve --graph: tarball, glob, or single file.
     from ..graph.resolver import is_tarball as _is_tarball
-    import glob as _glob
-    _looks_like_tarball = _is_tarball(args.graph) or any(
-        _is_tarball(p) for p in _glob.glob(args.graph, recursive=True)
-    )
+    _looks_like_tarball = _is_tarball(args.graph)
     if _looks_like_tarball:
         print(f"Extracting {args.graph}...", file=sys.stderr, flush=True)
     try:
@@ -624,17 +649,13 @@ def main() -> int:
             print(f"Suite configuration error: {e}", file=sys.stderr)
             return 1
 
-        suite_result = run_benchmark_suite(
+        return _orchestrate_suite_cli(
             graph_paths=[Path(p) for p in resolved_files],
             config=suite_config,
+            output_path=args.output,
             plugin_path=args.plugin_path,
             tarball_source=tarball_source,
         )
-        if suite_result is None:
-            return 1
-        if args.output is not None:
-            suite_result.save_json(str(args.output))
-        return _suite_exit_code(suite_result)
     finally:
         for td in _tmpdirs:
             td.cleanup()

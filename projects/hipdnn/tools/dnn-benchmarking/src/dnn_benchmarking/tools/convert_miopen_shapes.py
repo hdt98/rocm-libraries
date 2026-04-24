@@ -172,12 +172,23 @@ class _ConvParams:
             pad_d = _int(args, "--pad_d", 0)
             stride_d = _int(args, "--conv_stride_d", 1)
             dil_d = _int(args, "--dilation_d", 1)
+        C = _int(args, "-c", 1)
+        K = _int(args, "-k", 1)
+        groups = _int(args, "-g", 1)
+        if C % groups != 0:
+            raise ValueError(
+                f"Invalid convolution: C={C} is not divisible by groups={groups}"
+            )
+        if K % groups != 0:
+            raise ValueError(
+                f"Invalid convolution: K={K} is not divisible by groups={groups}"
+            )
         return cls(
             N=_int(args, "-n", 1),
-            C=_int(args, "-c", 1),
+            C=C,
             H=_int(args, "-H", 1),
             W=_int(args, "-W", 1),
-            K=_int(args, "-k", 1),
+            K=K,
             R=_int(args, "-y", 1),
             S=_int(args, "-x", 1),
             pad_h=_int(args, "-p", 0),
@@ -186,7 +197,7 @@ class _ConvParams:
             stride_w=_int(args, "-v", 1),
             dil_h=_int(args, "-l", 1),
             dil_w=_int(args, "-j", 1),
-            groups=_int(args, "-g", 1),
+            groups=groups,
             F=_int(args, "-F", 1),
             spatial_dim=spatial_dim,
             in_layout=args.get("--in_layout", "NCHW"),
@@ -404,7 +415,6 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
                     "scale_tensor_uid": 2,
                     "bias_tensor_uid": 3,
                     "epsilon_tensor_uid": 4,
-                    "peer_stats_tensor_uid": [],
                 },
                 "outputs": {"y_tensor_uid": 5},
             }
@@ -433,7 +443,6 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
                     "mean_tensor_uid": 3,
                     "inv_variance_tensor_uid": 4,
                     "scale_tensor_uid": 5,
-                    "peer_stats_tensor_uid": [],
                 },
                 "outputs": {
                     "dx_tensor_uid": 6,

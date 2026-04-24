@@ -107,7 +107,7 @@ class TestGraphValidator:
         """Test that nodes missing required fields are rejected."""
         validator = GraphValidator()
 
-        # BatchnormBackwardAttributes without peer_stats_tensor_uid
+        # BatchnormBackwardAttributes without dx_tensor_uid output
         graph_json = {
             "tensors": [],
             "nodes": [
@@ -120,10 +120,9 @@ class TestGraphValidator:
                         "mean_tensor_uid": 3,
                         "inv_variance_tensor_uid": 4,
                         "scale_tensor_uid": 5,
-                        # peer_stats_tensor_uid intentionally omitted
                     },
                     "outputs": {
-                        "dx_tensor_uid": 6,
+                        # dx_tensor_uid intentionally omitted
                         "dscale_tensor_uid": 7,
                         "dbias_tensor_uid": 8,
                     },
@@ -131,7 +130,7 @@ class TestGraphValidator:
             ]
         }
 
-        with pytest.raises(GraphLoadError, match="peer_stats_tensor_uid"):
+        with pytest.raises(GraphLoadError, match="dx_tensor_uid"):
             validator.validate(graph_json)
 
     def test_rejects_missing_field_conv_fwd(self) -> None:

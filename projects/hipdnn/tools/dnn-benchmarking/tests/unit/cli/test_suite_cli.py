@@ -309,27 +309,45 @@ class TestRunSuiteWorkflow:
         paths = []
         for i in range(count):
             p = tmpdir / f"graph_{i}.json"
+            x_uid = 1 + i * 10
+            w_uid = 2 + i * 10
+            y_uid = 100 + i
             p.write_text(
                 json.dumps(
                     {
                         "name": f"graph_{i}",
                         "nodes": [
                             {
-                                "op_type": "ConvolutionForward",
-                                "inputs": {},
-                                "outputs": {"y": 100 + i},
+                                "type": "ConvolutionFwdAttributes",
+                                "name": "conv",
+                                "inputs": {"x_tensor_uid": x_uid, "w_tensor_uid": w_uid},
+                                "outputs": {"y_tensor_uid": y_uid},
+                                "parameters": {
+                                    "conv_mode": "CROSS_CORRELATION",
+                                    "pre_padding": [0, 0],
+                                    "post_padding": [0, 0],
+                                    "stride": [1, 1],
+                                    "dilation": [1, 1],
+                                },
                             }
                         ],
                         "tensors": [
                             {
-                                "uid": 1 + i * 10,
+                                "uid": x_uid,
                                 "dims": [1, 3, 4, 4],
                                 "strides": [48, 16, 4, 1],
                                 "data_type": "FLOAT",
                                 "is_virtual": False,
                             },
                             {
-                                "uid": 100 + i,
+                                "uid": w_uid,
+                                "dims": [3, 3, 1, 1],
+                                "strides": [3, 1, 1, 1],
+                                "data_type": "FLOAT",
+                                "is_virtual": False,
+                            },
+                            {
+                                "uid": y_uid,
                                 "dims": [1, 3, 4, 4],
                                 "strides": [48, 16, 4, 1],
                                 "data_type": "FLOAT",
@@ -822,9 +840,17 @@ class TestValidationStartupGate:
                         "name": "g",
                         "nodes": [
                             {
-                                "op_type": "ConvolutionForward",
-                                "inputs": {},
-                                "outputs": {"y": 100},
+                                "type": "ConvolutionFwdAttributes",
+                                "name": "conv",
+                                "inputs": {"x_tensor_uid": 1, "w_tensor_uid": 2},
+                                "outputs": {"y_tensor_uid": 100},
+                                "parameters": {
+                                    "conv_mode": "CROSS_CORRELATION",
+                                    "pre_padding": [0, 0],
+                                    "post_padding": [0, 0],
+                                    "stride": [1, 1],
+                                    "dilation": [1, 1],
+                                },
                             }
                         ],
                         "tensors": [
@@ -832,6 +858,13 @@ class TestValidationStartupGate:
                                 "uid": 1,
                                 "dims": [1, 3, 4, 4],
                                 "strides": [48, 16, 4, 1],
+                                "data_type": "FLOAT",
+                                "is_virtual": False,
+                            },
+                            {
+                                "uid": 2,
+                                "dims": [3, 3, 1, 1],
+                                "strides": [3, 1, 1, 1],
                                 "data_type": "FLOAT",
                                 "is_virtual": False,
                             },
@@ -896,9 +929,17 @@ class TestNoGpuDetected:
                         "name": "g",
                         "nodes": [
                             {
-                                "op_type": "ConvolutionForward",
-                                "inputs": {},
-                                "outputs": {"y": 1},
+                                "type": "ConvolutionFwdAttributes",
+                                "name": "conv",
+                                "inputs": {"x_tensor_uid": 1, "w_tensor_uid": 2},
+                                "outputs": {"y_tensor_uid": 3},
+                                "parameters": {
+                                    "conv_mode": "CROSS_CORRELATION",
+                                    "pre_padding": [0, 0],
+                                    "post_padding": [0, 0],
+                                    "stride": [1, 1],
+                                    "dilation": [1, 1],
+                                },
                             }
                         ],
                         "tensors": [
@@ -908,7 +949,21 @@ class TestNoGpuDetected:
                                 "strides": [48, 16, 4, 1],
                                 "data_type": "FLOAT",
                                 "is_virtual": False,
-                            }
+                            },
+                            {
+                                "uid": 2,
+                                "dims": [3, 3, 1, 1],
+                                "strides": [3, 1, 1, 1],
+                                "data_type": "FLOAT",
+                                "is_virtual": False,
+                            },
+                            {
+                                "uid": 3,
+                                "dims": [1, 3, 4, 4],
+                                "strides": [48, 16, 4, 1],
+                                "data_type": "FLOAT",
+                                "is_virtual": False,
+                            },
                         ],
                     }
                 )

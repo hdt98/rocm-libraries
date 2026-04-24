@@ -58,6 +58,23 @@ class TestConvOutDim:
         # floor((16 + 0 - 1*(1-1) - 1) / 2 + 1) = floor(15/2 + 1) = 8
         assert _conv_out_dim(16, 0, 1, 1, 2) == 8
 
+    def test_with_dilation(self) -> None:
+        # floor((16 + 0 - 2*(3-1) - 1) / 1 + 1) = floor((16 - 4 - 1)/1 + 1) = 12
+        assert _conv_out_dim(16, 0, 2, 3, 1) == 12
+
+    def test_stride_and_pad_combined(self) -> None:
+        # floor((16 + 2 - 1*(3-1) - 1) / 2 + 1) = floor(15/2 + 1) = 8
+        assert _conv_out_dim(16, 1, 1, 3, 2) == 8
+
+    def test_kernel_larger_than_input_with_pad(self) -> None:
+        # Input 3, kernel 5, pad 2, dil 1, stride 1:
+        # floor((3 + 4 - 1*(5-1) - 1) / 1 + 1) = floor(2/1 + 1) = 3
+        assert _conv_out_dim(3, 2, 1, 5, 1) == 3
+
+    def test_kernel_equal_input_no_pad(self) -> None:
+        # floor((4 + 0 - 1*(4-1) - 1) / 1 + 1) = floor(0/1 + 1) = 1
+        assert _conv_out_dim(4, 0, 1, 4, 1) == 1
+
 
 class TestIsFlag:
     """Tests for _is_flag helper."""

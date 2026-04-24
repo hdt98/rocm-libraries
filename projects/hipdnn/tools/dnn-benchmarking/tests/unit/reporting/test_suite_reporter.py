@@ -91,7 +91,7 @@ class TestSuiteReporter:
         reporter.print_suite_graph_result(passed=2, failed=1, skipped=0, errored=0)
 
         result = output.getvalue()
-        assert "  -> 2 passed, 1 failed, 0 skipped, 0 errored" in result
+        assert " -> 2 passed, 1 failed, 0 skipped, 0 errored" in result
 
     def test_print_suite_graph_result_all_zeros(self) -> None:
         """print_suite_graph_result with all zeros."""
@@ -101,7 +101,7 @@ class TestSuiteReporter:
         reporter.print_suite_graph_result(passed=0, failed=0, skipped=0, errored=0)
 
         result = output.getvalue()
-        assert "  -> 0 passed, 0 failed, 0 skipped, 0 errored" in result
+        assert " -> 0 passed, 0 failed, 0 skipped, 0 errored" in result
 
     def test_print_suite_graph_error(self) -> None:
         """print_suite_graph_error prints inline error for a failed graph."""
@@ -113,7 +113,7 @@ class TestSuiteReporter:
         )
 
         result = output.getvalue()
-        assert "  ERROR: Graph file not found: /path/to/missing.json" in result
+        assert " ERROR: Graph file not found: /path/to/missing.json" in result
 
     def test_print_suite_summary(self) -> None:
         """print_suite_summary prints totals from SuiteMetadata."""

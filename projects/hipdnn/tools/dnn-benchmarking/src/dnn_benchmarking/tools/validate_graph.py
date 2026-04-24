@@ -31,6 +31,12 @@ def main() -> int:
         all_tmpdirs.extend(tmpdirs)
         if resolved:
             all_paths.extend(Path(p) for p in resolved)
+        elif tmpdirs:
+            # A tarball was opened but contained no JSON files.
+            print(
+                f"Warning: tarball '{arg}' contains no .json files",
+                file=sys.stderr,
+            )
         else:
             print(f"Warning: no files found for '{arg}'", file=sys.stderr)
 

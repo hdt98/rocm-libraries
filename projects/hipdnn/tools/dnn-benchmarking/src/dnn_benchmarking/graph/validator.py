@@ -73,7 +73,6 @@ _REQUIRED_NODE_FIELDS: Dict[str, List[Tuple[str, str]]] = {
         ("inputs", "scale_tensor_uid"),
         ("inputs", "bias_tensor_uid"),
         ("inputs", "epsilon_tensor_uid"),
-        ("inputs", "peer_stats_tensor_uid"),
         ("outputs", "y_tensor_uid"),
     ],
     "BatchnormBackwardAttributes": [
@@ -82,7 +81,6 @@ _REQUIRED_NODE_FIELDS: Dict[str, List[Tuple[str, str]]] = {
         ("inputs", "mean_tensor_uid"),
         ("inputs", "inv_variance_tensor_uid"),
         ("inputs", "scale_tensor_uid"),
-        ("inputs", "peer_stats_tensor_uid"),
         ("outputs", "dx_tensor_uid"),
         ("outputs", "dscale_tensor_uid"),
         ("outputs", "dbias_tensor_uid"),
@@ -113,8 +111,9 @@ class GraphValidator:
 
         Raises:
             GraphLoadError: If required top-level keys are missing, the graph
-                            contains no operation nodes, or any node is missing
-                            required fields.
+                            contains no operation nodes, any node is missing
+                            required fields, or a node references an unknown
+                            tensor UID.
         """
         missing_keys = [k for k in _REQUIRED_TOP_LEVEL_KEYS if k not in graph_json]
         if missing_keys:
@@ -126,35 +125,58 @@ class GraphValidator:
         if not nodes:
             raise GraphLoadError("Graph contains no operation nodes")
 
-        for node in nodes:
-            self._validate_node_fields(node)
+        known_uids: Set[int] = {t["uid"] for t in graph_json["tensors"] if "uid" in t}
 
-    def _validate_node_fields(self, node: Dict[str, Any]) -> None:
+        for node in nodes:
+            self._validate_node_fields(node, known_uids)
+
+    def _validate_node_fields(self, node: Dict[str, Any], known_uids: Set[int]) -> None:
         """Check that a node has all required fields for its type.
 
         Args:
             node: A single node dictionary from graph JSON.
+            known_uids: Set of tensor UIDs declared in the graph's tensors list.
 
         Raises:
-            GraphLoadError: If a required field is missing.
+            GraphLoadError: If a required field is missing or references an
+                unknown tensor UID, or if the node type is not in
+                SUPPORTED_NODE_TYPES.
         """
         node_type = node.get("type", "")
+        node_name = node.get("name", node_type)
+
+        if node_type not in self._supported_types:
+            raise GraphLoadError(
+                f"Node '{node_name}' has unknown type '{node_type}'. "
+                f"Supported types: {', '.join(sorted(self._supported_types))}"
+            )
+
         required = _REQUIRED_NODE_FIELDS.get(node_type)
         if required is None:
-            # Unknown type — let hipDNN backend report the error at build time.
+            # Supported type with no field requirements (e.g. PointwiseAttributes).
             return
 
-        node_name = node.get("name", node_type)
         missing = []
+        bad_uids = []
         for section, key in required:
             container = node.get(section, {})
             if key not in container:
                 missing.append(f"{section}.{key}")
+            else:
+                uid = container[key]
+                if isinstance(uid, int) and uid not in known_uids:
+                    bad_uids.append(f"{section}.{key}={uid}")
 
         if missing:
             raise GraphLoadError(
                 f"Node '{node_name}' ({node_type}) is missing required fields: "
                 + ", ".join(missing)
+            )
+
+        if bad_uids:
+            raise GraphLoadError(
+                f"Node '{node_name}' ({node_type}) references unknown tensor UID(s): "
+                + ", ".join(bad_uids)
             )
 
     def get_supported_types(self) -> Set[str]:

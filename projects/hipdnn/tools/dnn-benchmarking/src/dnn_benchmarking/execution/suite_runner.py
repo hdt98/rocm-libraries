@@ -89,8 +89,8 @@ def _get_reference_provider(
 
     Returns:
         ReferenceProvider instance if available and supports the graph,
-        None otherwise. Caller distinguishes "not requested" from
-        "requested but unsupported" via ``config.reference_provider``.
+        None if validation was not requested (``config.reference_provider``
+        is ``"none"``) or if the provider is unavailable/unsupported.
     """
     if config.reference_provider == "none":
         return None
