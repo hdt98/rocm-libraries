@@ -343,11 +343,15 @@ template <typename T, typename Func>
 __device__ T
     trig_float(size_t idx, size_t M, size_t N, size_t lda, size_t stride, Func func)
 {
+    // M_PI is not part of ISO C/C++ and is not defined by <cmath> on Windows (MSVC CRT / clang-cl)
+    // unless _USE_MATH_DEFINES is set before the first <math.h>/<cmath> include. Use a local
+    // constexpr instead so this translation unit builds on all platforms without macro gymnastics.
+    constexpr double two_pi = 6.28318530717958647692528676655900576;
     auto calc = [&](size_t k) {
         auto b = k / stride;
         auto j = (k - b * stride) / lda;
         auto i = (k - b * stride) - j * lda;
-        return fmod(double(i + j * M + b * M * N), 2 * M_PI);
+        return fmod(double(i + j * M + b * M * N), two_pi);
     };
 
 #if defined(HIPBLASLT_USE_FP4)
