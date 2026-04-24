@@ -703,62 +703,56 @@ namespace MatrixMultiplyTest
         WMMAF4TestGFX1250,
         ::testing::Combine(
             ::testing::Values(GPUArchTargetGFX1250Rev1),
-                           ::testing::Values(/*std::pair<std::string, std::string>("N", "N"),
-                                             std::pair<std::string, std::string>("N", "T"),*/
-                                             std::pair<std::string, std::string>("T", "N")/*,
-                                             std::pair<std::string, std::string>("T", "T")*/)));
+            // TODO: implement transpose support for v_wmma_f32_32x16x128_f4, then re-enable other transposition cases.
+            ::testing::Values(std::pair<std::string, std::string>("T", "N"))));
 
     INSTANTIATE_TEST_SUITE_P(
         MatrixMultiply1250Rev1,
         WMMAF4ScaledTestGFX1250,
-        filterValidDataTypeScaleTypeParams<WMMAF4ScaledTestGFX1250::ParamType>(
-          ::testing::Combine(
+        filterValidDataTypeScaleTypeParams<WMMAF4ScaledTestGFX1250::ParamType>(::testing::Combine(
             ::testing::Values(GPUArchTargetGFX1250Rev1),
-                               ::testing::Combine(
-                               ::testing::Values(rocRoller::DataType::FP4),
-                               ::testing::Values(rocRoller::DataType::FP4),
-                               ::testing::Values(rocRoller::DataType::E8M0,
-                                                 rocRoller::DataType::E5M3,
-                                                 rocRoller::DataType::E4M3),
-                               ::testing::Values(rocRoller::DataType::E8M0,
-                                                 rocRoller::DataType::E5M3,
-                                                 rocRoller::DataType::E4M3),
-                               ::testing::Values(/*scaleBlockSize*/ 16, 32),
-                               // mxDataGenerator does not work when fast-moving dim is not multiple of scale-block size.
-                               ::testing::Values(/*std::pair<std::string, std::string>("N", "N"),
-                                                 std::pair<std::string, std::string>("N", "T"),*/
-                                                 std::pair<std::string, std::string>("T", "N")/*,
-                                                 std::pair<std::string, std::string>("T", "T")*/)))));
+            ::testing::Combine(
+                ::testing::Values(rocRoller::DataType::FP4),
+                ::testing::Values(rocRoller::DataType::FP4),
+                ::testing::Values(rocRoller::DataType::E8M0,
+                                  rocRoller::DataType::E5M3,
+                                  rocRoller::DataType::E4M3),
+                ::testing::Values(rocRoller::DataType::E8M0,
+                                  rocRoller::DataType::E5M3,
+                                  rocRoller::DataType::E4M3),
+                ::testing::Values(/*scaleBlockSize*/ 16, 32),
+                // TODO: mxDataGenerator does not work when fast-moving dim is not multiple
+                // of scale-block size (the case for non-TN cases).
+                ::testing::Values(std::pair<std::string, std::string>("T", "N"))))));
 
     INSTANTIATE_TEST_SUITE_P(
         MatrixMultiply1250,
         MixedWMMAF8F6F4ScaledTestGFX1250,
-        filterValidDataTypeScaleTypeParams<MixedWMMAF8F6F4ScaledTestGFX1250::ParamType>(
-          ::testing::Combine(
+        filterValidDataTypeScaleTypeParams<
+            MixedWMMAF8F6F4ScaledTestGFX1250::ParamType>(::testing::Combine(
             ::testing::Values(GPUArchTargetGFX1250Rev0, GPUArchTargetGFX1250Rev1),
-            ::testing::Combine(::testing::Values(rocRoller::DataType::FP8,
-                                                 rocRoller::DataType::BF8,
-                                                 rocRoller::DataType::FP6,
-                                                 rocRoller::DataType::BF6,
-                                                 rocRoller::DataType::FP4),
-                               ::testing::Values(rocRoller::DataType::FP8,
-                                                 rocRoller::DataType::BF8,
-                                                 rocRoller::DataType::FP6,
-                                                 rocRoller::DataType::BF6,
-                                                 rocRoller::DataType::FP4),
-                               ::testing::Values(rocRoller::DataType::E8M0,
-                                                 rocRoller::DataType::E5M3,
-                                                 rocRoller::DataType::E4M3),
-                               ::testing::Values(rocRoller::DataType::E8M0,
-                                                 rocRoller::DataType::E5M3,
-                                                 rocRoller::DataType::E4M3),
-                               ::testing::Values(/*waveK*/ 128),
-                               ::testing::Values(/*scaleBlockSize*/ 16, 32),
-                               // mxDataGenerator does not work when fast-moving dim is not multiple of scale-block size.
-                               ::testing::Values(/*std::pair<std::string, std::string>("N", "N"),
-                                                 std::pair<std::string, std::string>("N", "T"),*/
-                                                 std::pair<std::string, std::string>("T", "N")/*,
-                                                 std::pair<std::string, std::string>("T", "T")*/)))));
+            ::testing::Combine(
+                ::testing::Values(rocRoller::DataType::FP8,
+                                  rocRoller::DataType::BF8,
+                                  rocRoller::DataType::FP6,
+                                  rocRoller::DataType::BF6,
+                                  rocRoller::DataType::FP4),
+                ::testing::Values(rocRoller::DataType::FP8,
+                                  rocRoller::DataType::BF8,
+                                  rocRoller::DataType::FP6,
+                                  rocRoller::DataType::BF6,
+                                  rocRoller::DataType::FP4),
+                ::testing::Values(rocRoller::DataType::E8M0,
+                                  rocRoller::DataType::E5M3,
+                                  rocRoller::DataType::E4M3),
+                ::testing::Values(rocRoller::DataType::E8M0,
+                                  rocRoller::DataType::E5M3,
+                                  rocRoller::DataType::E4M3),
+                ::testing::Values(/*waveK*/ 128),
+                ::testing::Values(/*scaleBlockSize*/ 16, 32),
+                // TODO: mxDataGenerator does not work when fast-moving dim is not multiple
+                // of scale-block size (the case for non-TN cases).
+                ::testing::Values(std::pair<std::string, std::string>("T", "N"))))));
 
     INSTANTIATE_TEST_SUITE_P(MatrixMultiplyABCWMMA1250,
                              ABCWMMATestGFX1250,
