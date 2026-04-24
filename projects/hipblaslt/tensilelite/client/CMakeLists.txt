@@ -5,10 +5,22 @@ add_executable(tensilelite-client "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 
 add_executable(cpu-gemm-driver "${CMAKE_CURRENT_SOURCE_DIR}/cpu_gemm_driver.cpp")
 
+if(NOT DEFINED hipblas_target)
+    if(HIPBLASLT_ENABLE_HIPBLAS_DIRECT)
+        set(hipblas_target hipblas)
+    else()
+        set(hipblas_target hipblas-common)
+    endif()
+endif()
+if(NOT ROCM_LIBS_SUPERBUILD AND NOT TARGET roc::${hipblas_target})
+    find_package(${hipblas_target} REQUIRED)
+endif()
+
 set(COMMON_CLIENT_LIBS
     hip::device
     hip::host
     tensilelite::tensilelite-host
+    roc::${hipblas_target}
     rocisa::rocisa-cpp
     OpenMP::OpenMP_CXX
 )
@@ -39,6 +51,10 @@ foreach(target tensilelite-client cpu-gemm-driver)
         "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
     target_compile_definitions(${target} PRIVATE TENSILE_DEFAULT_SERIALIZATION)
+
+    if(HIPBLASLT_ENABLE_HIPBLAS_DIRECT)
+	target_compile_definitions(${target} PRIVATE LEGACY_HIPBLAS_DIRECT)
+    endif()
 
     set_target_properties(${target} PROPERTIES
         CXX_STANDARD 20
