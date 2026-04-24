@@ -214,7 +214,7 @@ TEST_F(HeuristicPolicyEnumerationTest, EnumerationCanBeLogged)
     {
         std::cout << "  - " << policy.policyName << " (ID: " << policy.policyId
                   << ", Version: " << policy.pluginVersion << ", API: " << policy.apiVersion << ")"
-                  << std::endl;
+                  << '\n';
     }
 
     SUCCEED();
