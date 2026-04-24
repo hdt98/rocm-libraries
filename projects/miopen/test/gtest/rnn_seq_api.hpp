@@ -257,9 +257,9 @@ struct verify_rnn_api_base
 
         auto& samplesLen = input.desc.GetSequenceLengthsVector();
         ss << " --seq_len_array ";
-        for(int i = 0; i < inLens[0]; i++)
+        for(auto i = 0ULL; i < inLens[0]; i++)
         {
-            if(i < inLens[0] - 1)
+            if(i < inLens[0] - 1ULL)
             {
                 ss << samplesLen.at(i) << ",";
             }
@@ -1642,7 +1642,7 @@ protected:
 
         if(!seqLenArray.empty())
         {
-            if(seqLenArray.size() < batchSize)
+            if(seqLenArray.size() < static_cast<size_t>(batchSize))
             {
 
                 int padding_val = 0;
@@ -1660,7 +1660,7 @@ protected:
             }
             size_t seq_max_element = *std::max_element(seqLenArray.begin(), seqLenArray.end());
 
-            if(seqLength < seq_max_element)
+            if(static_cast<size_t>(seqLength) < seq_max_element)
                 GTEST_FAIL() << "Incorrect input, seq_lens elements should be smaller or equal "
                                 "to seqLength"
                              << std::endl;
@@ -1677,7 +1677,7 @@ protected:
     {
         if(!this->seqLenArray.empty())
         {
-            if(this->seqLenArray.size() != this->batchSize)
+            if(this->seqLenArray.size() != static_cast<size_t>(this->batchSize))
                 return true;
 
             bool is_seqLength_is_max_seq =
@@ -1702,7 +1702,7 @@ protected:
         if((this->rnnMode != 2) && (!this->nocx || !this->nocy))
             return false;
 
-        if(this->seqLenArray.size() > this->batchSize)
+        if(this->seqLenArray.size() > static_cast<size_t>(this->batchSize))
             return false;
 
         if(this->biasMode && this->nohx)
