@@ -31,6 +31,7 @@
 #include <miopen/miopen.h>
 
 #include "gtest_common.hpp"
+#include "gtest_desc_guard.hpp"
 #include "test_parameter_name_generator.hpp"
 #include "verify.hpp"
 
@@ -583,22 +584,9 @@ struct WSuperTensorTest : public testing::TestWithParam<TestCase>
         std::tie(
             seqLen, batch_size, num_layer, in_size, wei_hh, mode, biasMode, directionMode, inMode) =
             GetParam();
-
-        auto status = miopenCreateRNNDescriptor(&rnnDesc);
-        EXPECT_EQ(status, miopenStatusSuccess);
-
-        status = miopenCreateTensorDescriptor(&inputTensor);
-        EXPECT_EQ(status, miopenStatusSuccess);
-
-        status = miopenCreateTensorDescriptor(&weightTensor);
-        EXPECT_EQ(status, miopenStatusSuccess);
-
-        status = miopenCreateTensorDescriptor(&paramTensor);
-        EXPECT_EQ(status, miopenStatusSuccess);
-
-        status = miopenCreateTensorDescriptor(&biasTensor);
-        EXPECT_EQ(status, miopenStatusSuccess);
     }
+
+    void TearDown() override { DestroyDropoutDesc(); }
 
     void Run()
     {
@@ -608,6 +596,10 @@ struct WSuperTensorTest : public testing::TestWithParam<TestCase>
         }
 
         const std::array<int, 2> in_lens{{batch_size, in_size}};
+
+        // miopenSetRNNDescriptor overwrites the descriptor via copy assignment,
+        // leaking the internal DropoutDescriptor allocated by miopenCreateRNNDescriptor.
+        DestroyDropoutDesc();
 
         auto status = miopenSetRNNDescriptor(
             rnnDesc, wei_hh, num_layer, inMode, directionMode, mode, biasMode, algo, dataType);
@@ -621,6 +613,25 @@ struct WSuperTensorTest : public testing::TestWithParam<TestCase>
 
         Verify<verify_w_tensor_set>();
         Verify<verify_w_tensor_get>();
+    }
+
+    void DestroyDropoutDesc()
+    {
+        miopenDropoutDescriptor_t dropDesc = nullptr;
+        miopenGetRNNDescriptor_V2(rnnDesc,
+                                  nullptr,
+                                  nullptr,
+                                  &dropDesc,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr,
+                                  nullptr);
+        if(dropDesc != nullptr)
+        {
+            miopenDestroyDropoutDescriptor(dropDesc);
+        }
     }
 
 private:
@@ -660,13 +671,13 @@ private:
     miopenRNNBiasMode_t biasMode{};
     miopenRNNDirectionMode_t directionMode{};
     miopenRNNInputMode_t inMode{};
-    miopenRNNDescriptor_t rnnDesc{};
+    RNNDescGuard rnnDesc;
     miopenRNNAlgo_t algo{miopenRNNdefault};
     miopenDataType_t dataType{miopenFloat};
-    miopenTensorDescriptor_t inputTensor{};
-    miopenTensorDescriptor_t weightTensor{};
-    miopenTensorDescriptor_t paramTensor{};
-    miopenTensorDescriptor_t biasTensor{};
+    TensorDescGuard inputTensor;
+    TensorDescGuard weightTensor;
+    TensorDescGuard paramTensor;
+    TensorDescGuard biasTensor;
 };
 
 struct TestNameGenerator
