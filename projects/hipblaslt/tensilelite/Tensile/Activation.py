@@ -1350,7 +1350,7 @@ class ActivationInline:
         kStr += (padSpacesStr + "%s.s = %s.s & 0x7fff;\n"%(unionName, unionName))
         kStr += (padSpacesStr + "value = %s.f;\n"%unionName)
       elif (self.dataType.isSingle() or self.dataType.isDouble() or self.dataType.isInt32()):
-        kStr += (padSpacesStr + "value = abs(value);\n")
+        kStr += (padSpacesStr + "value = (value < decltype(value)(0)) ? -value : value;\n")
       else:
         raise RuntimeError("Unrecognized data type %s."%self.dataType)
     elif (activationType == 'clippedrelu'):
