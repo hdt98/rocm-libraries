@@ -103,10 +103,10 @@ public:
         return hipdnnStatus_t::HIPDNN_STATUS_NOT_INITIALIZED;
     }
 
-    hipdnnStatus_t backendCreateAndDeserializeJsonGraphExt(
-        hipdnnBackendDescriptor_t* /*descriptor*/,
-        const char* /*jsonGraph*/,
-        size_t /*jsonByteSize*/) override
+    hipdnnStatus_t
+        backendCreateAndDeserializeJsonGraphExt(hipdnnBackendDescriptor_t* /*descriptor*/,
+                                                const char* /*jsonGraph*/,
+                                                size_t /*jsonByteSize*/) override
     {
         return hipdnnStatus_t::HIPDNN_STATUS_NOT_INITIALIZED;
     }

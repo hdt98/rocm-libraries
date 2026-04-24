@@ -133,8 +133,9 @@ public:
             descriptor, requestedByteSize, graphByteSize, serializedJsonGraph);
     }
 
-    hipdnnStatus_t backendCreateAndDeserializeJsonGraphExt(
-        hipdnnBackendDescriptor_t* descriptor, const char* jsonGraph, size_t jsonByteSize) override
+    hipdnnStatus_t backendCreateAndDeserializeJsonGraphExt(hipdnnBackendDescriptor_t* descriptor,
+                                                           const char* jsonGraph,
+                                                           size_t jsonByteSize) override
     {
         return hipdnnBackendCreateAndDeserializeJsonGraph_ext(descriptor, jsonGraph, jsonByteSize);
     }
