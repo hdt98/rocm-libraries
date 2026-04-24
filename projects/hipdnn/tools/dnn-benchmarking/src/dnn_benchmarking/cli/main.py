@@ -368,17 +368,18 @@ def _suite_exit_code(suite_result: SuiteResult) -> int:
     return 0
 
 
-def _orchestrate_suite_cli(
+def run_benchmark_suite(
     graph_paths: List[Path],
     config: SuiteConfig,
-    output_path: Optional[Path],
     plugin_path: Optional[Path],
     tarball_source: Optional[str] = None,
-) -> int:
-    """CLI orchestration wrapper around run_suite().
+) -> Optional[SuiteResult]:
+    """Run the benchmark suite and return the aggregated result.
 
-    Owns all side effects: validation startup gate, hipdnn import, console
-    output via Reporter, and JSON export. Returns the CLI exit code.
+    Owns all side effects: validation startup gate, hipdnn import, and console
+    output via Reporter. Returns None if a fatal setup error occurred (error
+    already printed). JSON export and exit code derivation are the caller's
+    responsibility.
     """
     reporter = Reporter()
     total = len(graph_paths)
@@ -393,22 +394,23 @@ def _orchestrate_suite_cli(
             reporter.print_error(
                 f"Reference provider '{config.reference_provider}' is not registered."
             )
-            return 1
+            return None
         if not ref.is_available():
             reporter.print_error(
                 f"Reference provider '{config.reference_provider}' is not available "
                 "(check that its dependencies are installed)."
             )
-            return 1
+            return None
 
     if not _gpu_is_available():
         reporter.print_error(
             "No GPU detected. hipDNN requires an AMD GPU with ROCm support."
         )
-        return 1
+        return None
 
     reporter.print_suite_header(total, tarball_source=tarball_source)
 
+    reporter.print_hipdnn_init_start()
     try:
         import hipdnn_frontend as hipdnn
 
@@ -416,15 +418,20 @@ def _orchestrate_suite_cli(
             hipdnn.set_engine_plugin_paths([str(plugin_path)])
         handle = hipdnn.Handle()
     except ImportError:
+        reporter.print_hipdnn_init_newline()
         reporter.print_error(
             "hipdnn_frontend not available. Install hipDNN Python bindings first."
         )
-        return 1
+        return None
 
-    suite_result = run_suite(graph_paths, config, handle)
+    reporter.print_hipdnn_init_done()
+    reporter.print_running_benchmark(total)
 
-    for i, gr in enumerate(suite_result.graphs, start=1):
-        reporter.print_suite_graph_start(i, total, gr.graph_name)
+    graph_results: List[GraphResult] = []
+    for i, graph_path in enumerate(graph_paths, start=1):
+        reporter.print_suite_graph_start(i, total, graph_path.stem)
+        gr = _run_one_graph(graph_path, config, handle)
+        graph_results.append(gr)
         # Pre-execution graph errors come back as a single "unknown" provider
         # entry with an error message and no timing data; surface those via
         # the dedicated graph-error printer so they read like load failures.
@@ -437,9 +444,8 @@ def _orchestrate_suite_cli(
             reporter.print_suite_graph_error(
                 gr.graph_name, gr.results[0].error_message or "unknown error"
             )
-            continue
-
-        if config.verbose:
+        elif config.verbose:
+            print(flush=True)  # end the "graph_name..." line before verbose block
             reporter.print_verbose_graph_result(gr, config)
         else:
             counts = gr.count_by_status()
@@ -447,13 +453,13 @@ def _orchestrate_suite_cli(
                 counts.passed, counts.failed, counts.skipped, counts.errored
             )
 
-    if output_path is not None:
-        suite_result.save_json(str(output_path))
+    metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
+    suite_result = SuiteResult(metadata=metadata, graphs=graph_results)
 
     reporter.print_suite_summary(suite_result.metadata)
     reporter.print_suite_footer()
 
-    return _suite_exit_code(suite_result)
+    return suite_result
 
 
 def main() -> int:
@@ -468,6 +474,13 @@ def main() -> int:
     gpu_backend = "none" if args.no_kernel_timing else "auto"
 
     # Resolve --graph: tarball, glob, or single file.
+    from ..graph.resolver import is_tarball as _is_tarball
+    import glob as _glob
+    _looks_like_tarball = _is_tarball(args.graph) or any(
+        _is_tarball(p) for p in _glob.glob(args.graph, recursive=True)
+    )
+    if _looks_like_tarball:
+        print(f"Extracting {args.graph}...", file=sys.stderr, flush=True)
     try:
         _tmpdirs, resolved_files, tarball_source = resolve_graph_files(args.graph)
     except GraphLoadError as e:
@@ -611,13 +624,17 @@ def main() -> int:
             print(f"Suite configuration error: {e}", file=sys.stderr)
             return 1
 
-        return _orchestrate_suite_cli(
+        suite_result = run_benchmark_suite(
             graph_paths=[Path(p) for p in resolved_files],
             config=suite_config,
-            output_path=args.output,
             plugin_path=args.plugin_path,
             tarball_source=tarball_source,
         )
+        if suite_result is None:
+            return 1
+        if args.output is not None:
+            suite_result.save_json(str(args.output))
+        return _suite_exit_code(suite_result)
     finally:
         for td in _tmpdirs:
             td.cleanup()

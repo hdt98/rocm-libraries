@@ -412,6 +412,22 @@ class Reporter:
 
     # Suite Methods
 
+    def print_hipdnn_init_start(self) -> None:
+        """Print hipDNN initialization start (no trailing newline)."""
+        print("Initializing hipDNN...", end="", flush=True, file=self._output)
+
+    def print_hipdnn_init_done(self) -> None:
+        """Print hipDNN initialization completion on the same line."""
+        print(" done", flush=True, file=self._output)
+
+    def print_hipdnn_init_newline(self) -> None:
+        """End the hipDNN init line (used before printing an error)."""
+        print(flush=True, file=self._output)
+
+    def print_running_benchmark(self, total: int) -> None:
+        """Print running benchmark status line."""
+        self._print(f"Running benchmark on {total} file(s)...")
+
     def print_suite_header(
         self, total_graphs: int, tarball_source: Optional[str] = None
     ) -> None:
@@ -424,30 +440,30 @@ class Reporter:
         self._print("")
 
     def print_suite_graph_start(self, index: int, total: int, graph_name: str) -> None:
-        """Print per-graph progress line at start.
+        """Print per-graph progress line at start (no trailing newline).
 
         Format: [1/3] graph_name...
         """
-        self._print(f"[{index}/{total}] {graph_name}...")
+        print(f"[{index}/{total}] {graph_name}...", end="", flush=True, file=self._output)
 
     def print_suite_graph_result(
         self, passed: int, failed: int, skipped: int, errored: int
     ) -> None:
-        """Print per-graph result summary line.
+        """Print per-graph result summary on the same line as the start.
 
-        Format:   -> 2 passed, 1 failed, 0 skipped, 0 errored
+        Format: [1/3] graph_name... -> 1 passed, 0 failed, 0 skipped, 0 errored
         """
         self._print(
-            f"  -> {passed} passed, {failed} failed, "
+            f" -> {passed} passed, {failed} failed, "
             f"{skipped} skipped, {errored} errored"
         )
 
     def print_suite_graph_error(self, graph_name: str, error: str) -> None:
-        """Print inline error when a graph fails to load/execute.
+        """Print inline error on the same line as the graph start, then newline.
 
         Prints error then continues (caller must not abort).
         """
-        self._print(f"  ERROR: {error}")
+        self._print(f" ERROR: {error}")
 
     def print_suite_summary(self, metadata: SuiteMetadata) -> None:
         """Print suite execution summary from suite metadata.

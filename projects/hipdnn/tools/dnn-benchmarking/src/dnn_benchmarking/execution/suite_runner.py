@@ -92,6 +92,9 @@ def _get_reference_provider(
         None otherwise. Caller distinguishes "not requested" from
         "requested but unsupported" via ``config.reference_provider``.
     """
+    if config.reference_provider == "none":
+        return None
+
     try:
         provider = ReferenceProviderRegistry.get_provider(config.reference_provider)
     except ValueError:
