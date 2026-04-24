@@ -36,6 +36,7 @@
 #include <Tensile/ContractionSolution_fwd.hpp>
 
 #include <Tensile/TensorDescriptor.hpp>
+#include <Tensile/TensorOps.hpp>
 #include <Tensile/Utils.hpp>
 
 namespace TensileLite
@@ -88,12 +89,12 @@ namespace TensileLite
             return m_wgm;
         }
 
-        void setWGMXCC(uint16_t wgmxcc)
+        void setWGMXCC(int16_t wgmxcc)
         {
             m_wgmxcc = wgmxcc;
         }
 
-        uint16_t wgmxcc() const
+        int16_t wgmxcc() const
         {
             return m_wgmxcc;
         }
@@ -159,7 +160,7 @@ namespace TensileLite
         bool             m_gsuc           = false; // default value
         bool             m_gsuwgmrr       = false; // default value
         int16_t          m_wgm            = 0; // default value
-        uint16_t         m_wgmxcc         = 0; // default value
+        int16_t          m_wgmxcc         = 0; // default value
         int16_t          m_wgmxccg        = 0; // default value
         rocisa::DataType m_biasType       = rocisa::DataType::None;
         int              m_factorDim      = 0;
@@ -168,9 +169,9 @@ namespace TensileLite
     };
 
     /**
- * \addtogroup Problem
- * @{
- */
+     * \addtogroup Problem
+     * @{
+     */
     class TENSILE_API ContractionProblemGemm;
 
     struct ConstantDescriptor
@@ -245,14 +246,24 @@ namespace TensileLite
             return m_f32XdlMathOp;
         }
 
-        void setComputeInputType(rocisa::DataType value)
+        void setComputeInputTypeA(rocisa::DataType value)
         {
-            m_computeInputType = value;
+            m_computeInputTypeA = value;
         }
 
-        rocisa::DataType computeInputType() const
+        rocisa::DataType computeInputTypeA() const
         {
-            return m_computeInputType;
+            return m_computeInputTypeA;
+        }
+
+        void setComputeInputTypeB(rocisa::DataType value)
+        {
+            m_computeInputTypeB = value;
+        }
+
+        rocisa::DataType computeInputTypeB() const
+        {
+            return m_computeInputTypeB;
         }
 
         void setUseDeviceUserArguments(bool use)
@@ -274,17 +285,18 @@ namespace TensileLite
         size_t m_workspaceSizeGroupedGemm = std::numeric_limits<size_t>::max();
 
         rocisa::DataType m_f32XdlMathOp;
-        rocisa::DataType m_computeInputType;
+        rocisa::DataType m_computeInputTypeA;
+        rocisa::DataType m_computeInputTypeB;
 
         bool m_useDeviceUserArguments = false;
     };
 
     /**
- * Describes a tensor contraction in by using TensorDescriptor objects for
- * each input or output tensor as well as indices describing transposes,
- * summations, etc. This is decoupled from any particular pointers, which
- * are provided in ContractionInputs objects.
- */
+     * Describes a tensor contraction in by using TensorDescriptor objects for
+     * each input or output tensor as well as indices describing transposes,
+     * summations, etc. This is decoupled from any particular pointers, which
+     * are provided in ContractionInputs objects.
+     */
     class ContractionProblemGemm : public ContractionProblem
     {
     public:
@@ -305,6 +317,8 @@ namespace TensileLite
             Synchronizer  = 12,
             AMAXD         = 13,
             COMPRESSED    = 14,
+            MXSA          = 15,
+            MXSB          = 16,
             TENSOR_COUNT
         };
 
@@ -324,8 +338,8 @@ namespace TensileLite
             : ContractionProblem(ContractionProblemGemm::TENSOR::TENSOR_COUNT){};
 
         /**
-   * Represents a pair of free indices in a tensor contraction.
-   */
+         * Represents a pair of free indices in a tensor contraction.
+         */
         struct FreeIndex
         {
             bool   isA; //< True=index is in A; False=index is in B
@@ -336,8 +350,8 @@ namespace TensileLite
         using FreeIndices = std::vector<FreeIndex>;
 
         /**
-   * Represents a batched index in a tensor contraction.
-   */
+         * Represents a batched index in a tensor contraction.
+         */
         struct BatchIndex
         {
             size_t a, b, c, d;
@@ -345,8 +359,8 @@ namespace TensileLite
         using BatchIndices = std::vector<BatchIndex>;
 
         /**
-   * Represents a bound (or summed) index in a tensor contraction.
-   */
+        * Represents a bound (or summed) index in a tensor contraction.
+        */
         struct BoundIndex
         {
             BoundIndex(size_t xa = 0, size_t xb = 0, bool aMirror = false, bool bMirror = false)
@@ -362,9 +376,9 @@ namespace TensileLite
         virtual std::string description() const;
 
         /**
-   * Create a ContractionProblemGemm representing a batched GEMM, specifying
-   * strides between matrices.
-   */
+        * Create a ContractionProblemGemm representing a batched GEMM, specifying
+        * strides between matrices.
+        */
         static ContractionProblemGemm GEMM_Strides(bool             transA,
                                                    bool             transB,
                                                    rocisa::DataType aType,
@@ -386,9 +400,9 @@ namespace TensileLite
                                                    double           beta);
 
         /**
-   * Create a ContractionProblemGemm representing a batched SGEMM, with
-   * leading dimensions, but no strides.
-   */
+         * Create a ContractionProblemGemm representing a batched SGEMM, with
+         * leading dimensions, but no strides.
+         */
         static ContractionProblemGemm GEMM(bool   transA,
                                            bool   transB,
                                            size_t m,
@@ -402,9 +416,9 @@ namespace TensileLite
                                            size_t batchCount);
 
         /**
-   * Create a ContractionProblemGemm representing a batched SGEMM, with
-   * leading dimensions, but no strides.
-   */
+         * Create a ContractionProblemGemm representing a batched SGEMM, with
+         * leading dimensions, but no strides.
+         */
         static ContractionProblemGemm GEMM(bool   transA,
                                            bool   transB,
                                            size_t m,
@@ -421,97 +435,108 @@ namespace TensileLite
                                            size_t batchCount);
 
         /**
-   * Create a ContractionProblemGemm representing a batched GEMM based on the
-   * dimensions of each of the tensors.
-   */
+         * Create a ContractionProblemGemm representing a batched GEMM based on the
+         * dimensions of each of the tensors.
+         */
         static ContractionProblemGemm GEMM(bool                    transA,
                                            bool                    transB,
                                            TensorDescriptor const& a,
+                                           TensorOps const&        aOps,
                                            TensorDescriptor const& b,
+                                           TensorOps const&        bOps,
                                            TensorDescriptor const& c,
+                                           TensorOps const&        cOps,
                                            TensorDescriptor const& d,
+                                           TensorOps const&        dOps,
                                            double                  beta);
 
         /**
-   * Converts an identifier such as `Contraction_l_AlikC_Bjlk_Cijk_Dijk`
-   * into a set of indices and operations.
-   */
+         * Converts an identifier such as `Contraction_l_AlikC_Bjlk_Cijk_Dijk`
+         * into a set of indices and operations.
+         */
         static void IdentifierToIndices(std::string const& identifier,
                                         FreeIndices&       freeIndices,
                                         BatchIndices&      batchIndices,
                                         BoundIndices&      boundIndices,
-                                        std::vector<bool>& isComplex);
+                                        TensorOps&         aOps,
+                                        TensorOps&         bOps,
+                                        TensorOps&         cOps,
+                                        TensorOps&         dOps);
 
         /**
-   * Create a ContractionProblemGemm from a definition of each index, the
-   * size of each index, the strides of each tensor, and any operations.
-   *
-   * @param freeIndices  Free indices
-   * @param batchIndices Batch indices
-   * @param boundIndices Bound indices
-   * @param indexSizes   Size of each index, in the order of appearance in
-   *                     the D tensor.
-   *
-   * @param aType    Data type of A
-   * @param aStrides Strides of A
-   * @param aOps     Operations to apply to A as it is read
-   *
-   * @param bType    Data type of B
-   * @param bStrides Strides of B
-   * @param bOps     Operations to apply to B as it is read
-   *
-   * @param cType    Data type of C
-   * @param cStrides Strides of C
-   * @param cOps     Operations to apply to C as it is read
-   *
-   * @param dType    Data type of D
-   * @param dStrides Strides of D
-   * @param dOps     Operations to apply to D as it is read
-   *
-   * @param beta Representative value of beta. Is only used to possibly
-   *             select a more efficient kernel if we know that
-   *             `beta == 0` or `beta == 1`.
-   */
+         * Create a ContractionProblemGemm from a definition of each index, the
+         * size of each index, the strides of each tensor, and any operations.
+         *
+         * @param freeIndices  Free indices
+         * @param batchIndices Batch indices
+         * @param boundIndices Bound indices
+         * @param indexSizes   Size of each index, in the order of appearance in
+         *                     the D tensor.
+         *
+         * @param aType    Data type of A
+         * @param aStrides Strides of A
+         * @param aOps     Operations to apply to A as it is read
+         *
+         * @param bType    Data type of B
+         * @param bStrides Strides of B
+         * @param bOps     Operations to apply to B as it is read
+         *
+         * @param cType    Data type of C
+         * @param cStrides Strides of C
+         * @param cOps     Operations to apply to C as it is read
+         *
+         * @param dType    Data type of D
+         * @param dStrides Strides of D
+         * @param dOps     Operations to apply to D as it is read
+         *
+         * @param beta Representative value of beta. Is only used to possibly
+         *             select a more efficient kernel if we know that
+         *             `beta == 0` or `beta == 1`.
+         */
         static ContractionProblemGemm FromIndexSizes(FreeIndices const&         freeIndices,
                                                      BatchIndices const&        batchIndices,
                                                      BoundIndices const&        boundIndices,
                                                      std::vector<size_t> const& indexSizes,
                                                      rocisa::DataType           aType,
                                                      std::vector<size_t> const& aStrides,
+                                                     TensorOps const&           aOps,
                                                      rocisa::DataType           bType,
                                                      std::vector<size_t> const& bStrides,
+                                                     TensorOps const&           bOps,
                                                      rocisa::DataType           cType,
                                                      std::vector<size_t> const& cStrides,
+                                                     TensorOps const&           cOps,
                                                      rocisa::DataType           dType,
                                                      std::vector<size_t> const& dStrides,
+                                                     TensorOps const&           dOps,
                                                      double                     beta);
 
         /**
-   * Create a ContractionProblemGemm based on an operation identifier such as
-   * `Contraction_l_AlikC_Bjlk_Cijk_Dijk` and individual index sizes.
-   *
-   * @param operationIdentifier String that represents this exact
-   *                            operation in terms of transposes, data
-   *                            types, and operations.
-   * @param indexSizes   Size of each index, in the order of appearance in
-   *                     the D tensor.
-   *
-   * @param aType    Data type of A
-   * @param aStrides Strides of A
-   *
-   * @param bType    Data type of B
-   * @param bStrides Strides of B
-   *
-   * @param cType    Data type of C
-   * @param cStrides Strides of C
-   *
-   * @param dType    Data type of D
-   * @param dStrides Strides of D
-   *
-   * @param beta Representative value of beta. Is only used to possibly
-   *             select a more efficient kernel if we know that
-   *             `beta == 0` or `beta == 1`.
-   */
+         * Create a ContractionProblemGemm based on an operation identifier such as
+         * `Contraction_l_AlikC_Bjlk_Cijk_Dijk` and individual index sizes.
+         *
+         * @param operationIdentifier String that represents this exact
+         *                            operation in terms of transposes, data
+         *                            types, and operations.
+         * @param indexSizes   Size of each index, in the order of appearance in
+         *                     the D tensor.
+         *
+         * @param aType    Data type of A
+         * @param aStrides Strides of A
+         *
+         * @param bType    Data type of B
+         * @param bStrides Strides of B
+         *
+         * @param cType    Data type of C
+         * @param cStrides Strides of C
+         *
+         * @param dType    Data type of D
+         * @param dStrides Strides of D
+         *
+         * @param beta Representative value of beta. Is only used to possibly
+         *             select a more efficient kernel if we know that
+         *             `beta == 0` or `beta == 1`.
+         */
         static ContractionProblemGemm FromIndexSizes(std::string const&         operationIdentifier,
                                                      std::vector<size_t> const& indexSizes,
                                                      rocisa::DataType           aType,
@@ -544,7 +569,30 @@ namespace TensileLite
                                BatchIndices const&     batchIndices,
                                BoundIndices const&     boundIndices,
                                double                  beta,
-                               size_t                  workspaceSize = 0);
+                               size_t                  workspaceSize = 0
+                               );
+
+        ContractionProblemGemm(TensorDescriptor const& a,
+                               TensorDescriptor const& b,
+                               TensorDescriptor const& c,
+                               TensorDescriptor const& d,
+                               TensorDescriptor const& e,
+                               TensorDescriptor const& bias,
+                               TensorDescriptor const& scaleA,
+                               TensorDescriptor const& scaleB,
+                               TensorDescriptor const& scaleC,
+                               TensorDescriptor const& scaleD,
+                               TensorDescriptor const& scaleAlphaVec,
+                               FreeIndices const&      freeIndices,
+                               BatchIndices const&     batchIndices,
+                               BoundIndices const&     boundIndices,
+                               double                  beta,
+                               TensorOps const&        aOps,
+                               TensorOps const&        bOps,
+                               TensorOps const&        cOps,
+                               TensorOps const&        dOps,
+                               size_t                  workspaceSize = 0
+                               );
 
         //! Returns size given original index assignment (in range
         //! 0..NumIndicesC+boundSizes)
@@ -635,7 +683,7 @@ namespace TensileLite
             return m_betaType;
         }
 
-        size_t computeTypeElementSize() const
+        float computeTypeElementSize() const
         {
             return DataTypeInfo::Get(m_betaType).elementSize;
         }
@@ -881,15 +929,21 @@ namespace TensileLite
             return m_highPrecisionAccumulate;
         }
 
-        void setSparse(int value)
+        void setSparse(int value, int layout)
         {
             m_sparse = value;
+            m_metadataLayout = layout;
             normalizeSparse();
         }
 
         int sparse() const
         {
             return m_sparse;
+        }
+
+        int metadataLayout() const
+        {
+            return m_metadataLayout;
         }
 
         void setKernelLanguage(KernelLanguage value)
@@ -994,6 +1048,30 @@ namespace TensileLite
             return m_maxProblemSize;
         }
 
+        void setMXScaleA(rocisa::DataType mxType, int mxBlock, std::vector<size_t> saStride = {});
+
+        size_t mxBlockA() const
+        {
+            return m_mxBlockA;
+        }
+
+        rocisa::DataType mxTypeA() const
+        {
+            return m_mxTypeA;
+        }
+
+        void setMXScaleB(rocisa::DataType mxType, int mxBlock, std::vector<size_t> sbStride = {});
+
+        size_t mxBlockB() const
+        {
+            return m_mxBlockB;
+        }
+
+        rocisa::DataType mxTypeB() const
+        {
+            return m_mxTypeB;
+        }
+
         bool swizzleTensorA() const
         {
             return m_swizzleTensorA;
@@ -1073,6 +1151,30 @@ namespace TensileLite
         {
             return m_tensors[ContractionProblemGemm::TENSOR::AMAXD];
         }
+        TensorOps const& aOps() const
+        {
+            return m_aOps;
+        }
+        TensorOps const& bOps() const
+        {
+            return m_bOps;
+        }
+        TensorOps const& cOps() const
+        {
+            return m_cOps;
+        }
+        TensorOps const& dOps() const
+        {
+            return m_dOps;
+        }
+        TensorDescriptor const& mxsa() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSA];
+        }
+        TensorDescriptor const& mxsb() const
+        {
+            return m_tensors[ContractionProblemGemm::TENSOR::MXSB];
+        }
         FreeIndices const& freeIndicesA() const
         {
             return m_freeIndicesA;
@@ -1146,6 +1248,7 @@ namespace TensileLite
 
         size_t getNumTiles(SizeMapping const& sizeMapping, size_t gsu) const;
         size_t getItersPerTile(SizeMapping const& sizeMapping) const;
+        size_t getAccumulation(Hardware const& hardware, SizeMapping const& sizeMapping, size_t gsu) const;
 
         void checkPersistentKernelEligibility(ContractionSolution const& solution,
                                               Hardware const&            hardware);
@@ -1200,7 +1303,8 @@ namespace TensileLite
                                  rocisa::DataType               typeD,
                                  rocisa::DataType               typeAlpha,
                                  rocisa::DataType               typeBeta,
-                                 rocisa::DataType               typeComputeInput,
+                                 rocisa::DataType               typeComputeInputA,
+                                 rocisa::DataType               typeComputeInputB,
                                  rocisa::DataType               typeCompute,
                                  double                         alpha,
                                  double                         beta,
@@ -1212,6 +1316,11 @@ namespace TensileLite
                                  size_t                         maxWorkspaceBytes);
 
     private:
+        TensorOps        m_aOps;
+        TensorOps        m_bOps;
+        TensorOps        m_cOps;
+        TensorOps        m_dOps;
+
         std::string m_sumNames;
         std::string m_operationIdentifier;
 
@@ -1237,6 +1346,11 @@ namespace TensileLite
         ActivationType   m_activationType          = ActivationType::None;
         bool             m_activationNoGuard       = false;
         int              m_sparse                  = 0;
+        int              m_metadataLayout          = 0;
+        int              m_mxBlockA                = 0;
+        int              m_mxBlockB                = 0;
+        rocisa::DataType m_mxTypeA                 = rocisa::DataType::None;
+        rocisa::DataType m_mxTypeB                 = rocisa::DataType::None;
 
         KernelLanguage    m_kernelLanguage    = KernelLanguage::Any;
         PerformanceMetric m_performanceMetric = PerformanceMetric::DeviceEfficiency;
@@ -1340,7 +1454,9 @@ namespace TensileLite
                           void*                _ws,
                           void*                _Synchronizer,
                           unsigned char const* _metadata,
-                          void const*          _compressed);
+                          void const*          _compressed,
+                          void const*          _mxsa,
+                          void const*          _mxsb);
 
         ContractionInputs(void const*     _a,
                           void const*     _b,
@@ -1369,6 +1485,8 @@ namespace TensileLite
         void const* scaleC        = nullptr;
         void const* scaleD        = nullptr;
         void const* scaleAlphaVec = nullptr;
+        void const* mxsa          = nullptr;
+        void const* mxsb          = nullptr;
 
         unsigned char const* metadata = nullptr;
         void const* compressed        = nullptr;
@@ -1422,6 +1540,6 @@ namespace TensileLite
                                          ContractionProblemGemm::BoundIndex& bound);
 
     /**
- * @}
- */
+     * @}
+     */
 } // namespace TensileLite

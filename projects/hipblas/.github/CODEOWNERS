@@ -1,8 +1,8 @@
-* @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
+* @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli
 # Documentation files
-docs/* @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
-*.md @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
-*.rst @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
-.readthedocs.yaml @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
+docs/* @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli
+*.md @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli
+*.rst @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli
+.readthedocs.yaml @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli
 # Header directory for Doxygen documentation
-library/include/* @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @daineAMD @bragadeesh @NaveenElumalaiAMD @rkamd
+library/include/* @ROCm/rocm-documentation @amcamd @TorreZuk @mahmoodw @bragadeesh @NaveenElumalaiAMD @evedovelli

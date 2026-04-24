@@ -24,9 +24,10 @@ Optional:
 * [GoogleTest](https://github.com/google/googletest)
   * Required only for tests. Building tests is on by default.
   * This is automatically downloaded and built by the CMake script.
-* [Google Benchmark](https://github.com/google/benchmark)
+* [AMD SMI](https://github.com/ROCm/amdsmi)
   * Required only for benchmarks. Building benchmarks is off by default.
-  * This is automatically downloaded and built by the CMake script.
+* [Mold](https://github.com/rui314/mold)
+  * Optional for building. Used if installed to speed up building.
 
 ## Build and install
 
@@ -42,9 +43,9 @@ You can build and install rocPRIM on Linux or Windows.
 
   # Configure rocPRIM, setup options for your system.
   # Build options:
-  #   ONLY_INSTALL - OFF by default, If this flag is on, the build ignore the BUILD_* flags
-  #   BUILD_TEST - OFF by default,
-  #   BUILD_EXAMPLE - OFF by default,
+  #   ONLY_INSTALL - OFF by default. If this flag is on, the build ignores the BUILD_* flags.
+  #   BUILD_TEST - OFF by default.
+  #   BUILD_EXAMPLE - OFF by default.
   #   BUILD_BENCHMARK - OFF by default.
   #   BENCHMARK_CONFIG_TUNING - OFF by default. The purpose of this flag to find the best kernel config parameters.
   #     At ON the compilation time can be increased significantly.
@@ -60,11 +61,12 @@ You can build and install rocPRIM on Linux or Windows.
   # ! IMPORTANT !
   # Set C++ compiler to HIP-clang. You can do it by adding 'CXX=<path-to-compiler>'
   # before 'cmake' or setting cmake option 'CMAKE_CXX_COMPILER' to path to the compiler.
-  # Using HIP-clang:
+  #
+  # The package and install scripts require Make, but otherwise passing -GNinja is recommended for faster building.
   [CXX=hipcc] cmake -DBUILD_BENCHMARK=ON ../.
 
   # Build
-  make -j4
+  make -j4 # or `ninja`
 
   # Optionally, run tests if they're enabled.
   ctest --output-on-failure

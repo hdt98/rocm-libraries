@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -60,12 +60,12 @@ struct FmhaBwdDQDKDVKernel
     using VGradDataType    = ck_tile::remove_cvref_t<typename FmhaPipeline::VGradDataType>;
     using BiasGradDataType = ck_tile::remove_cvref_t<typename FmhaPipeline::BiasGradDataType>;
 
-    static constexpr bool kIsGroupMode = FmhaPipeline::kIsGroupMode;
-    static constexpr bool kPadHeadDimQ = FmhaPipeline::kPadHeadDimQ;
-    static constexpr bool kPadHeadDimV = FmhaPipeline::kPadHeadDimV;
-    static constexpr auto BiasEnum     = FmhaPipeline::BiasEnum;
-    static constexpr bool kHasBiasGrad = FmhaPipeline::kHasBiasGrad;
-    using FmhaMask                     = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
+    static constexpr bool kIsGroupMode    = FmhaPipeline::kIsGroupMode;
+    static constexpr index_t kPadHeadDimQ = FmhaPipeline::kPadHeadDimQ;
+    static constexpr index_t kPadHeadDimV = FmhaPipeline::kPadHeadDimV;
+    static constexpr auto BiasEnum        = FmhaPipeline::BiasEnum;
+    static constexpr bool kHasBiasGrad    = FmhaPipeline::kHasBiasGrad;
+    using FmhaMask                    = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaMask>;
     using FmhaDropout                 = ck_tile::remove_cvref_t<typename FmhaPipeline::FmhaDropout>;
     static constexpr bool kHasMask    = FmhaMask::IsMasking;
     static constexpr bool kHasDropout = FmhaDropout::IsDropout;
@@ -79,9 +79,12 @@ struct FmhaBwdDQDKDVKernel
 #else
     static constexpr bool kIsAvailable = !kUseTrLoad;
 #endif
+    static constexpr bool kUsePersistent =
+        kIsDeterministic && !kIsGroupMode && !kUseQrQtrDorPipeline;
 
     // clang-format off
     template <typename T> struct t2s;
+    template <> struct t2s<float> { static constexpr const char * name = "fp32"; };
     template <> struct t2s<ck_tile::fp16_t> { static constexpr const char * name = "fp16"; };
     template <> struct t2s<ck_tile::bf16_t> { static constexpr const char * name = "bf16"; };
     // clang-format on
@@ -100,8 +103,8 @@ struct FmhaBwdDQDKDVKernel
         #define _TS_  std::to_string
         auto pn = [&] () {
             std::string n;
-            if (kPadHeadDimQ) n += "d";
-            if (kPadHeadDimV) n += "dv";
+            if (kPadHeadDimQ) n += "d" + _TS_(kPadHeadDimQ);
+            if (kPadHeadDimV) n += "dv"+ _TS_(kPadHeadDimV);
             return n.empty() ? n : std::string("p") + n; }();
         return
             _SS_("fmha_bwd_d") + _TS_(bfs::kQKHeaddim) + "_" + _SS_(t2s<QDataType>::name) +
@@ -117,11 +120,48 @@ struct FmhaBwdDQDKDVKernel
             ("maxq" + _TS_(kMaxSeqLenQ)) +
             (pn.empty() ? "_npad" : "_" + pn) +
             (BiasEnum == BlockAttentionBiasEnum::NO_BIAS ? _SS_("_nbias") : (_SS_("_") + BlockAttentionBiasEnumToStr<BiasEnum>::name)) +
-            (kHasBiasGrad ? "_dbias" : "_ndbias") + (kHasMask ? "_" + _SS_(FmhaMask::name) : "_nmask") + (kHasDropout ? "_dropout" : "_ndropout" ) +
+            (kHasBiasGrad ? "_dbias" : "_ndbias") + (kHasMask ? "_" + _SS_(FmhaMask::name) : "_nmask") + (kHasDropout ? gwt0::at(ck_tile::number<0>{}) == 16? "_dropout_wg16":"_dropout_wg32" : "_ndropout" ) +
             (kIsStoreRandval ? "_storerandval" : "" ) + (kIsDeterministic ? "_deterministic" : "_ndeterministic" ) + (kUseTrLoad ? "_trload" : "_ntrload");
         #undef _SS_
         #undef _TS_
         // clang-format on
+    }
+    CK_TILE_HOST static index_t
+    GetDqAccSplits(index_t batch_size_, index_t nhead_, index_t seqlen_k_)
+    {
+        // Be consistent with convert_dq kernel, though qrqtrdor pipeline doesn't use persistent
+        static constexpr bool kUsePersistent__ = kIsDeterministic && !kIsGroupMode;
+        if constexpr(kUsePersistent__)
+        {
+            const index_t dqdqkdv_workers = get_num_cus();
+            const index_t jobs_per_head =
+                integer_divide_ceil(seqlen_k_, FmhaPipeline::BlockFmhaShape::kN0);
+            const index_t total_jobs      = batch_size_ * nhead_ * jobs_per_head;
+            const index_t jobs_per_worker = integer_divide_ceil(total_jobs, dqdqkdv_workers);
+            if(jobs_per_head % jobs_per_worker == 0)
+                return jobs_per_head / jobs_per_worker;
+            else if(jobs_per_worker % jobs_per_head == 0)
+                return 1;
+            else
+                return 1 + integer_divide_ceil(jobs_per_head - 1, jobs_per_worker);
+        }
+        else if constexpr(kIsDeterministic)
+            return integer_divide_ceil(seqlen_k_, FmhaPipeline::BlockFmhaShape::kN0);
+        else
+            return 1;
+    }
+    CK_TILE_HOST static constexpr bool NeedsZeroDqAcc()
+    {
+        // Be consistent with convert_dq kernel, though qrqtrdor pipeline doesn't use persistent
+        constexpr bool kUsePersistent__ = kIsDeterministic && !kIsGroupMode;
+
+        // non-deterministic adn persistent kernels use atomic-add to write dq
+        if constexpr(kUsePersistent__ || !kIsDeterministic)
+            return true;
+
+        // Some block may be skipped with causal mask and dq are not set to zeros
+        // In these cases we need to zero out it first
+        return kHasMask;
     }
 
     template <ck_tile::index_t I> // to avoid duplicated base class prblem, introduce an template
@@ -170,7 +210,7 @@ struct FmhaBwdDQDKDVKernel
         ck_tile::index_t nhead_stride_v;
         ck_tile::index_t nhead_stride_do;
         ck_tile::index_t nhead_stride_lsed;
-        ck_tile::index_t nhead_stride_dq_acc;
+        ck_tile::long_index_t nhead_stride_dq_acc;
         ck_tile::index_t nhead_stride_dk;
         ck_tile::index_t nhead_stride_dv;
     };
@@ -274,6 +314,7 @@ struct FmhaBwdDQDKDVKernel
     struct FmhaBwdDeterministicKargs
     {
         ck_tile::index_t split_stride_dq_acc = 0;
+        ck_tile::index_t batch; // used for persistent kernel implementation
     };
 
     struct FmhaBwdBatchModeKargs
@@ -293,7 +334,7 @@ struct FmhaBwdDQDKDVKernel
         ck_tile::index_t batch_stride_v;
         ck_tile::index_t batch_stride_do;
         ck_tile::index_t batch_stride_lsed;
-        ck_tile::index_t batch_stride_dq_acc;
+        ck_tile::long_index_t batch_stride_dq_acc;
         ck_tile::index_t batch_stride_dk;
         ck_tile::index_t batch_stride_dv;
     };
@@ -312,7 +353,10 @@ struct FmhaBwdDQDKDVKernel
     {
         const int32_t* seqstart_q_ptr;
         const int32_t* seqstart_k_ptr;
-        const int32_t* seqlen_k_ptr;
+        const int32_t* seqlen_q_ptr;    // per-batch actual length [batch]
+        const int32_t* seqlen_k_ptr;    // per-batch actual length [batch]
+        const int32_t* cu_seqlen_q_ptr; // cumulative seqlen [batch+1], optional
+        const int32_t* cu_seqlen_k_ptr; // cumulative seqlen [batch+1], optional
     };
 
     using Kargs = std::conditional_t<kIsGroupMode, FmhaBwdGroupModeKargs, FmhaBwdBatchModeKargs>;
@@ -351,6 +395,7 @@ struct FmhaBwdDQDKDVKernel
                   void* dq_acc_ptr, // can be dq_acc_ptr for qrqtrdor pipeline
                   ck_tile::index_t seqlen_q,
                   ck_tile::index_t seqlen_k,
+                  ck_tile::index_t batch,
                   ck_tile::index_t hdim_q,
                   ck_tile::index_t hdim_v,
                   ck_tile::index_t num_head_q,
@@ -373,7 +418,7 @@ struct FmhaBwdDQDKDVKernel
                   ck_tile::index_t nhead_stride_randval,
                   ck_tile::index_t nhead_stride_do,
                   ck_tile::index_t nhead_stride_lsed,
-                  ck_tile::index_t nhead_stride_dq_acc,
+                  ck_tile::long_index_t nhead_stride_dq_acc,
                   ck_tile::index_t nhead_stride_dk,
                   ck_tile::index_t nhead_stride_dv,
                   ck_tile::index_t nhead_stride_dbias,
@@ -384,7 +429,7 @@ struct FmhaBwdDQDKDVKernel
                   ck_tile::index_t batch_stride_randval,
                   ck_tile::index_t batch_stride_do,
                   ck_tile::index_t batch_stride_lsed,
-                  ck_tile::index_t batch_stride_dq_acc,
+                  ck_tile::long_index_t batch_stride_dq_acc,
                   ck_tile::index_t batch_stride_dk,
                   ck_tile::index_t batch_stride_dv,
                   ck_tile::index_t batch_stride_dbias,
@@ -496,9 +541,10 @@ struct FmhaBwdDQDKDVKernel
         }
 
         if constexpr(kIsDeterministic && !kUseQrQtrDorPipeline)
-        {
             kargs.split_stride_dq_acc = split_stride_dq_acc;
-        }
+
+        if constexpr(kUsePersistent)
+            kargs.batch = batch;
 
         return kargs;
     }
@@ -519,7 +565,11 @@ struct FmhaBwdDQDKDVKernel
                   void* dq_acc_ptr,
                   const void* seqstart_q_ptr,
                   const void* seqstart_k_ptr,
+                  const void* seqlen_q_ptr,
                   const void* seqlen_k_ptr,
+                  const void* cu_seqlen_q_ptr,
+                  const void* cu_seqlen_k_ptr,
+                  ck_tile::index_t batch,
                   ck_tile::index_t hdim_q,
                   ck_tile::index_t hdim_v,
                   ck_tile::index_t num_head_q,
@@ -542,7 +592,7 @@ struct FmhaBwdDQDKDVKernel
                   ck_tile::index_t nhead_stride_randval,
                   ck_tile::index_t nhead_stride_do,
                   ck_tile::index_t nhead_stride_lsed,
-                  ck_tile::index_t nhead_stride_dq_acc,
+                  ck_tile::long_index_t nhead_stride_dq_acc,
                   ck_tile::index_t nhead_stride_dk,
                   ck_tile::index_t nhead_stride_dv,
                   ck_tile::index_t nhead_stride_dbias,
@@ -593,7 +643,10 @@ struct FmhaBwdDQDKDVKernel
                     {},                // placeholder for deterministic
                     reinterpret_cast<const int32_t*>(seqstart_q_ptr),
                     reinterpret_cast<const int32_t*>(seqstart_k_ptr),
-                    reinterpret_cast<const int32_t*>(seqlen_k_ptr)};
+                    reinterpret_cast<const int32_t*>(seqlen_q_ptr),
+                    reinterpret_cast<const int32_t*>(seqlen_k_ptr),
+                    reinterpret_cast<const int32_t*>(cu_seqlen_q_ptr),
+                    reinterpret_cast<const int32_t*>(cu_seqlen_k_ptr)};
 
         if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS)
         {
@@ -642,9 +695,9 @@ struct FmhaBwdDQDKDVKernel
             }
         }
         if constexpr(kIsDeterministic)
-        {
             kargs.split_stride_dq_acc = split_stride_dq_acc;
-        }
+        if constexpr(kUsePersistent)
+            kargs.batch = batch;
 
         return kargs;
     }
@@ -652,22 +705,25 @@ struct FmhaBwdDQDKDVKernel
     CK_TILE_HOST static constexpr auto
     GridSize(ck_tile::index_t batch_size_, ck_tile::index_t nhead_, ck_tile::index_t seqlen_k_)
     {
-        return dim3(
-            kUseQrQtrDorPipeline ? 1 : ck_tile::integer_divide_ceil(seqlen_k_, FmhaPipeline::kN0),
-            nhead_,
-            batch_size_);
+        const index_t jobs_per_head =
+            kUseQrQtrDorPipeline ? 1 : integer_divide_ceil(seqlen_k_, FmhaPipeline::kN0);
+        if constexpr(kUsePersistent)
+            return dim3(get_num_cus(), 1, 1);
+        else
+            return dim3(jobs_per_head, nhead_, batch_size_);
     }
 
-    CK_TILE_DEVICE static constexpr auto GetTileIndex()
+    CK_TILE_HOST static dim3 BlockSize()
     {
-        const index_t i_block = blockIdx.x;
-        const index_t i_nhead = blockIdx.y;
-        const index_t i_batch = blockIdx.z;
-
-        return ck_tile::make_tuple(i_block, i_nhead, i_batch);
+        if(is_wave32())
+        {
+            return dim3(kBlockSize / 2);
+        }
+        else
+        {
+            return dim3(kBlockSize);
+        }
     }
-
-    CK_TILE_HOST static constexpr auto BlockSize() { return dim3(kBlockSize); }
 
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize()
     {
@@ -679,18 +735,66 @@ struct FmhaBwdDQDKDVKernel
     CK_TILE_DEVICE void operator()(Kargs kargs) const
     {
         if constexpr(kIsAvailable)
-            run_(std::move(kargs));
+        {
+            if constexpr(!kUsePersistent)
+            {
+                run_(std::move(kargs), blockIdx, blockIdx.x);
+            }
+            else
+            {
+                static_assert(!kUseQrQtrDorPipeline,
+                              "Persistent kernel is not compatible with QR/QTR/DOR pipeline");
+                const index_t worker_id  = blockIdx.x;
+                const index_t worker_num = gridDim.x;
+
+                const index_t jobs_per_head =
+                    integer_divide_ceil(kargs.seqlen_k, FmhaPipeline::kN0);
+                const index_t total_heads     = kargs.batch * kargs.num_head_q;
+                const index_t total_jobs      = jobs_per_head * total_heads;
+                const index_t jobs_per_worker = integer_divide_ceil(total_jobs, worker_num);
+
+                const index_t begin_job_id = worker_id * jobs_per_worker;
+                if(begin_job_id >= total_jobs)
+                    return; // worker_id exceeds total jobs, exit early
+                const index_t end_job_id = min((worker_id + 1) * jobs_per_worker, total_jobs);
+
+                // 0,1,2,3,4,5 ==> 0,5,1,4,2,3 for load balance in triangular mask case
+                constexpr auto tile_n_interleave = [](index_t x, index_t n) {
+                    if constexpr(kHasMask == false)
+                        return x;
+                    else
+                        return x % 2 == 0 ? (x / 2) : (n - 1 - x / 2);
+                };
+
+                index_t job_id  = begin_job_id;
+                index_t i_split = integer_divide_ceil(job_id % jobs_per_head, jobs_per_worker);
+                do
+                { // loop over jobs assigned to this worker
+                    const index_t i_head_flatten = job_id / jobs_per_head;
+                    const index_t i_tile_n_      = job_id % jobs_per_head;
+                    const index_t i_tile_n       = tile_n_interleave(i_tile_n_, jobs_per_head);
+                    const index_t i_batch        = i_head_flatten / kargs.num_head_q;
+                    const index_t i_nhead        = i_head_flatten % kargs.num_head_q;
+
+                    if(i_tile_n_ == 0) // reset dq_acc writing idx when starting a new head
+                        i_split = 0;
+                    run_(kargs, dim3(i_tile_n, i_nhead, i_batch), i_split);
+                } while(++job_id < end_job_id);
+            }
+        }
     }
 
-    CK_TILE_DEVICE void run_(Kargs kargs) const
+    CK_TILE_DEVICE void run_(Kargs kargs, const dim3& tile_index, const index_t i_split) const
     {
         // allocate LDS
         __shared__ char smem_ptr[GetSmemSize()];
 
         // divide problem
-        const auto [i_tile_n, i_nhead, i_batch] = GetTileIndex();
+        const index_t i_tile_n = tile_index.x;
+        const index_t i_nhead  = tile_index.y;
+        const index_t i_batch  = tile_index.z;
 
-        const index_t i_n0 = __builtin_amdgcn_readfirstlane(i_tile_n * FmhaPipeline::kN0);
+        const index_t i_n0 = amd_wave_read_first_lane(i_tile_n * FmhaPipeline::kN0);
 
         long_index_t batch_offset_q       = 0;
         long_index_t batch_offset_k       = 0;
@@ -735,10 +839,29 @@ struct FmhaBwdDQDKDVKernel
                 batch_offset_randval = query_start * kargs.stride_randval;
             }
 
-            // get real # queries & # keys under group mode
-            const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
-            kargs.seqlen_q = adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
-            if(kargs.seqlen_k_ptr != nullptr)
+            // Priority: cu_seqlen_q_ptr > seqlen_q_ptr > physical_seqlen_q
+            if(kargs.cu_seqlen_q_ptr != nullptr)
+            {
+                kargs.seqlen_q =
+                    kargs.cu_seqlen_q_ptr[i_batch + 1] - kargs.cu_seqlen_q_ptr[i_batch];
+            }
+            else
+            {
+                // get real # queries & # keys under group mode
+                const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
+                const ck_tile::index_t physical_seqlen_q =
+                    adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
+                kargs.seqlen_q =
+                    kargs.seqlen_q_ptr ? kargs.seqlen_q_ptr[i_batch] : physical_seqlen_q;
+            }
+
+            // Priority: cu_seqlen_k_ptr > seqlen_k_ptr > seqstart_k
+            if(kargs.cu_seqlen_k_ptr != nullptr)
+            {
+                kargs.seqlen_k =
+                    kargs.cu_seqlen_k_ptr[i_batch + 1] - kargs.cu_seqlen_k_ptr[i_batch];
+            }
+            else if(kargs.seqlen_k_ptr != nullptr)
             {
                 kargs.seqlen_k = kargs.seqlen_k_ptr[i_batch];
             }
@@ -746,6 +869,12 @@ struct FmhaBwdDQDKDVKernel
             {
                 const auto adjusted_seqstart_k_ptr = kargs.seqstart_k_ptr + i_batch;
                 kargs.seqlen_k = adjusted_seqstart_k_ptr[1] - adjusted_seqstart_k_ptr[0];
+            }
+
+            // skip if logical lengths are zero
+            if(kargs.seqlen_q == 0 && kargs.seqlen_k == 0)
+            {
+                return;
             }
 
             // # of required blocks is different in each groups, terminate unnecessary blocks
@@ -815,7 +944,7 @@ struct FmhaBwdDQDKDVKernel
         const auto q_dram = pad_tensor_view(
             q_dram_naive,
             make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kQKHeaddim>{}),
-            sequence<false, kPadHeadDimQ>{});
+            sequence<false, (kPadHeadDimQ > 0)>{});
 
         const auto k_dram_naive = make_naive_tensor_view<address_space_enum::global>(
             k_ptr,
@@ -826,7 +955,7 @@ struct FmhaBwdDQDKDVKernel
         const auto k_dram = pad_tensor_view(
             k_dram_naive,
             make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kQKHeaddim>{}),
-            sequence<false, kPadHeadDimQ>{});
+            sequence<false, (kPadHeadDimQ > 0)>{});
 
         const auto v_dram = [&]() {
             const auto v_dram_naive = make_naive_tensor_view<address_space_enum::global>(
@@ -838,7 +967,7 @@ struct FmhaBwdDQDKDVKernel
             return pad_tensor_view(
                 v_dram_naive,
                 make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kVHeaddim>{}),
-                sequence<false, kPadHeadDimV>{});
+                sequence<false, (kPadHeadDimV > 0)>{});
         }();
 
         // lse and d should be fine to read unpaded data as they are not on the reduction dimension
@@ -857,7 +986,7 @@ struct FmhaBwdDQDKDVKernel
         const auto do_dram = pad_tensor_view(
             do_dram_naive,
             make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kVHeaddim>{}),
-            sequence<false, kPadHeadDimV>{});
+            sequence<false, (kPadHeadDimV > 0)>{});
 
         auto q_dram_window = make_tile_window(
             q_dram,
@@ -879,21 +1008,21 @@ struct FmhaBwdDQDKDVKernel
             make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kVHeaddim>{}),
             {0, 0});
 
-        auto dq_dram_window = [&, i_tile_n_ = i_tile_n, i_nhead_ = i_nhead]() {
+        auto dq_dram_window = [&, i_nhead_ = i_nhead]() {
             constexpr bool kUseKSplit = !kUseQrQtrDorPipeline && kIsDeterministic;
             using DType = std::conditional_t<kUseQrQtrDorPipeline, QGradDataType, AccDataType>;
 
             auto dq_acc_ptr = reinterpret_cast<DType*>(kargs.dq_acc_ptr) + [&]() {
                 if constexpr(kUseKSplit)
                     return static_cast<long_index_t>(i_nhead_) * kargs.nhead_stride_dq_acc +
-                           static_cast<long_index_t>(i_tile_n_) * kargs.split_stride_dq_acc +
+                           static_cast<long_index_t>(i_split) * kargs.split_stride_dq_acc +
                            batch_offset_dq_acc;
                 else
                     return static_cast<long_index_t>(i_nhead_) * kargs.nhead_stride_dq_acc +
                            batch_offset_dq_acc;
             }();
 
-            constexpr auto DstInMemOp = conditional_expr<kUseKSplit>(
+            constexpr auto DstInMemOp = conditional_expr<(kUseKSplit && !kUsePersistent)>(
                 memory_operation_enum::set, memory_operation_enum::atomic_add);
             const auto dq_acc_dram_naive =
                 make_naive_tensor_view<address_space_enum::global, DstInMemOp>(
@@ -905,7 +1034,7 @@ struct FmhaBwdDQDKDVKernel
             const auto dq_acc_dram = pad_tensor_view(
                 dq_acc_dram_naive,
                 make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kQKHeaddim>{}),
-                sequence<false, kPadHeadDimQ>{});
+                sequence<false, (kPadHeadDimQ > 0)>{});
             return make_tile_window(
                 dq_acc_dram,
                 make_tuple(number<FmhaPipeline::kM0>{}, number<FmhaPipeline::kQKHeaddim>{}),
@@ -1089,7 +1218,7 @@ struct FmhaBwdDQDKDVKernel
             return pad_tensor_view(
                 dk_dram_naive,
                 make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kQKHeaddim>{}),
-                sequence<false, kPadHeadDimQ>{});
+                sequence<false, (kPadHeadDimQ > 0)>{});
         }();
 
         auto dv_dram = [&]() {
@@ -1103,7 +1232,7 @@ struct FmhaBwdDQDKDVKernel
             return pad_tensor_view(
                 dv_dram_naive,
                 make_tuple(number<FmhaPipeline::kN0>{}, number<FmhaPipeline::kVHeaddim>{}),
-                sequence<false, kPadHeadDimV>{});
+                sequence<false, (kPadHeadDimV > 0)>{});
         }();
 
         auto dk_dram_window = make_tile_window(
@@ -1135,6 +1264,21 @@ struct FmhaBwdDQDKDVKernel
                                                              rp_undrop,
                                                              scale_rp_undrop,
                                                              dropout);
+
+#if defined(__gfx11__) || defined(__gfx12__)
+            // Workaround for a compiler bug (SWDEV-559729): v_wmma instructions can be incorrectly
+            // placed in divergent branches used to store padded tensors (when some lanes are
+            // inactive due to padding). Inline asm with dummy dependencies on VGPRs of the tensors
+            // prevents the compiler doing this.
+            if constexpr(kPadHeadDimQ > 0)
+            {
+                impl::insert_dummy_dep(dk_acc_tile.get_thread_buffer());
+            }
+            if constexpr(kPadHeadDimV > 0)
+            {
+                impl::insert_dummy_dep(dv_acc_tile.get_thread_buffer());
+            }
+#endif
 
             KGradEpiloguePipeline{}(dk_dram_window, dk_acc_tile, nullptr);
             VGradEpiloguePipeline{}(dv_dram_window, dv_acc_tile, nullptr);
@@ -1180,6 +1324,7 @@ struct FmhaBwdOGradDotOKernel
     using DDataType     = ck_tile::remove_cvref_t<typename FmhaBwdOGradDotO::DDataType>;
     using ODataType     = ck_tile::remove_cvref_t<typename FmhaBwdOGradDotO::ODataType>;
     using OGradDataType = ck_tile::remove_cvref_t<typename FmhaBwdOGradDotO::OGradDataType>;
+    using LSEDataType   = ck_tile::remove_cvref_t<typename FmhaBwdOGradDotO::LSEDataType>;
 
     static constexpr bool kIsGroupMode = FmhaBwdOGradDotO::kIsGroupMode;
     static constexpr bool kPadSeqLenQ  = FmhaBwdOGradDotO::kPadSeqLenQ;
@@ -1187,6 +1332,7 @@ struct FmhaBwdOGradDotOKernel
 
     // clang-format off
     template <typename T> struct t2s;
+    template <> struct t2s<float> { static constexpr const char * name = "fp32"; };
     template <> struct t2s<ck_tile::fp16_t> { static constexpr const char * name = "fp16"; };
     template <> struct t2s<ck_tile::bf16_t> { static constexpr const char * name = "bf16"; };
     // clang-format on
@@ -1205,7 +1351,7 @@ struct FmhaBwdOGradDotOKernel
             return n.empty() ? n : std::string("p") + n; }();
         return
             _SS_("fmha_bwd_dot_do_o_d") + _TS_(kVHeaddim) + "_" + _SS_(t2s<ODataType>::name) +
-            "_" + (kIsGroupMode ? "group" : "batch") + "_" +
+            "_b" + _TS_(kM0) + "_" + (kIsGroupMode ? "group" : "batch") + "_" +
             ("o" + _TS_(kBlockPerCu)) + (pn.empty() ? "_npad" : "_" + pn);
         #undef _SS_
         #undef _TS_
@@ -1220,30 +1366,38 @@ struct FmhaBwdOGradDotOKernel
         const void* o_ptr;
         const void* do_ptr;
         void* d_ptr;
+        const void* lse_ptr; // log-sum-exp from forward pass, shape [batch, nhead, seqlen_q]
+        const LSEDataType* sink_ptr; // sink scores, shape [batch, nhead]; nullptr disables sink
+        LSEDataType* d_sink_ptr; // sink gradient output, shape [nhead]; nullptr disables sink grad
 
         float p_undrop;
 
         ck_tile::index_t seqlen_q;
         ck_tile::index_t hdim_v;
+        ck_tile::index_t nhead; // used to index sink_ptr / d_sink_ptr
 
         ck_tile::index_t stride_do;
         ck_tile::index_t stride_o;
 
         ck_tile::index_t nhead_stride_do;
         ck_tile::index_t nhead_stride_o;
-        ck_tile::index_t nhead_stride_d;
+        // LSE and D always share the same layout; this stride covers both.
+        ck_tile::index_t nhead_stride_lsed;
     };
 
     struct FmhaBwdOGradDotOBatchModeKargs : FmhaBwdOGradDotOCommonKargs
     {
         ck_tile::index_t batch_stride_do;
         ck_tile::index_t batch_stride_o;
-        ck_tile::index_t batch_stride_d;
+        // LSE and D always share the same layout; this stride covers both.
+        ck_tile::index_t batch_stride_lsed;
     };
 
     struct FmhaBwdOGradDotOGroupModeKargs : FmhaBwdOGradDotOCommonKargs
     {
         const int32_t* seqstart_q_ptr;
+        const int32_t* seqlen_q_ptr;    // per-batch actual length [batch]
+        const int32_t* cu_seqlen_q_ptr; // cumulative seqlen [batch+1], optional
     };
 
     using Kargs = std::
@@ -1254,32 +1408,40 @@ struct FmhaBwdOGradDotOKernel
     MakeKargs(const void* o_ptr,
               const void* do_ptr,
               void* d_ptr,
+              const void* lse_ptr,
+              const void* sink_ptr,
+              void* d_sink_ptr,
               float p_undrop,
               ck_tile::index_t seqlen_q,
               ck_tile::index_t hdim_v,
+              ck_tile::index_t nhead,
               ck_tile::index_t stride_do,
               ck_tile::index_t stride_o,
               ck_tile::index_t nhead_stride_do,
               ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t nhead_stride_d,
+              ck_tile::index_t nhead_stride_lsed,
               ck_tile::index_t batch_stride_do,
               ck_tile::index_t batch_stride_o,
-              ck_tile::index_t batch_stride_d)
+              ck_tile::index_t batch_stride_lsed)
     {
         Kargs kargs{{o_ptr,
                      do_ptr,
                      d_ptr,
+                     lse_ptr,
+                     reinterpret_cast<const LSEDataType*>(sink_ptr),
+                     reinterpret_cast<LSEDataType*>(d_sink_ptr),
                      p_undrop,
                      seqlen_q,
                      hdim_v,
+                     nhead,
                      stride_do,
                      stride_o,
                      nhead_stride_do,
                      nhead_stride_o,
-                     nhead_stride_d},
+                     nhead_stride_lsed},
                     batch_stride_do,
                     batch_stride_o,
-                    batch_stride_d};
+                    batch_stride_lsed};
 
         return kargs;
     }
@@ -1289,27 +1451,39 @@ struct FmhaBwdOGradDotOKernel
     MakeKargs(const void* o_ptr,
               const void* do_ptr,
               void* d_ptr,
+              const void* lse_ptr,
+              const void* sink_ptr,
+              void* d_sink_ptr,
               float p_undrop,
               const void* seqstart_q_ptr,
+              const void* seqlen_q_ptr,
+              const void* cu_seqlen_q_ptr,
               ck_tile::index_t hdim_v,
+              ck_tile::index_t nhead,
               ck_tile::index_t stride_do,
               ck_tile::index_t stride_o,
               ck_tile::index_t nhead_stride_do,
               ck_tile::index_t nhead_stride_o,
-              ck_tile::index_t nhead_stride_d)
+              ck_tile::index_t nhead_stride_lsed)
     {
         Kargs kargs{{o_ptr,
                      do_ptr,
                      d_ptr,
+                     lse_ptr,
+                     reinterpret_cast<const LSEDataType*>(sink_ptr),
+                     reinterpret_cast<LSEDataType*>(d_sink_ptr),
                      p_undrop,
                      -1, // seqlen will be updated by another pointer
                      hdim_v,
+                     nhead,
                      stride_do,
                      stride_o,
                      nhead_stride_do,
                      nhead_stride_o,
-                     nhead_stride_d},
-                    reinterpret_cast<const int32_t*>(seqstart_q_ptr)};
+                     nhead_stride_lsed},
+                    reinterpret_cast<const int32_t*>(seqstart_q_ptr),
+                    reinterpret_cast<const int32_t*>(seqlen_q_ptr),
+                    reinterpret_cast<const int32_t*>(cu_seqlen_q_ptr)};
 
         return kargs;
     }
@@ -1329,7 +1503,7 @@ struct FmhaBwdOGradDotOKernel
         return ck_tile::make_tuple(i_block, i_nhead, i_batch);
     }
 
-    CK_TILE_HOST static constexpr auto BlockSize() { return dim3(kBlockSize); }
+    CK_TILE_HOST static dim3 BlockSize() { return dim3(kBlockSize); }
 
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize() { return 0; }
 
@@ -1338,24 +1512,38 @@ struct FmhaBwdOGradDotOKernel
         // divide problem
         const auto [i_tile_m, i_nhead, i_batch] = GetTileIndex();
 
-        const index_t i_m0 = __builtin_amdgcn_readfirstlane(i_tile_m * kM0);
+        const index_t i_m0 = amd_wave_read_first_lane(i_tile_m * kM0);
 
-        long_index_t batch_offset_o  = 0;
-        long_index_t batch_offset_do = 0;
-        long_index_t batch_offset_d  = 0;
+        long_index_t batch_offset_o    = 0;
+        long_index_t batch_offset_do   = 0;
+        long_index_t batch_offset_lsed = 0;
 
         if constexpr(kIsGroupMode)
         {
             // get starting offset for each batch
             const long_index_t query_start = kargs.seqstart_q_ptr[i_batch];
 
-            batch_offset_o  = query_start * kargs.stride_o;
-            batch_offset_do = query_start * kargs.stride_do;
-            batch_offset_d  = query_start;
+            batch_offset_o    = query_start * kargs.stride_o;
+            batch_offset_do   = query_start * kargs.stride_do;
+            batch_offset_lsed = query_start;
 
-            // get real # queries & # keys under group mode
-            const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
-            kargs.seqlen_q = adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
+            // Priority: cu_seqlen_q_ptr > seqlen_q_ptr > physical_seqlen_q
+            if(kargs.cu_seqlen_q_ptr != nullptr)
+            {
+                kargs.seqlen_q =
+                    kargs.cu_seqlen_q_ptr[i_batch + 1] - kargs.cu_seqlen_q_ptr[i_batch];
+            }
+            else
+            {
+                // get real # queries & # keys under group mode
+                const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
+                const ck_tile::index_t physical_seqlen_q =
+                    adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
+                kargs.seqlen_q = kargs.seqlen_q_ptr
+                                     ? static_cast<ck_tile::index_t>(kargs.seqlen_q_ptr[i_batch])
+                                     : physical_seqlen_q;
+            }
+
             // # of required blocks is different in each groups, terminate unnecessary blocks
             // earlier
             if(kargs.seqlen_q <= i_m0)
@@ -1365,10 +1553,19 @@ struct FmhaBwdOGradDotOKernel
         }
         else
         {
-            batch_offset_o  = static_cast<long_index_t>(i_batch) * kargs.batch_stride_o;
-            batch_offset_do = static_cast<long_index_t>(i_batch) * kargs.batch_stride_do;
-            batch_offset_d  = static_cast<long_index_t>(i_batch) * kargs.batch_stride_d;
+            batch_offset_o    = static_cast<long_index_t>(i_batch) * kargs.batch_stride_o;
+            batch_offset_do   = static_cast<long_index_t>(i_batch) * kargs.batch_stride_do;
+            batch_offset_lsed = static_cast<long_index_t>(i_batch) * kargs.batch_stride_lsed;
         }
+
+        // Read per-head sink score and convert to log2 domain so the pipeline can use exp2.
+        // Pre-multiply by log2e so that exp2(sink_value - log2e*lse) == exp(raw_sink - lse).
+        // -inf is left unchanged (log2e * -inf == -inf) to keep P_sink -> 0 when sink is disabled.
+        const LSEDataType sink_value =
+            kargs.sink_ptr != nullptr
+                ? log2e_v<LSEDataType> *
+                      kargs.sink_ptr[static_cast<long_index_t>(i_batch) * kargs.nhead + i_nhead]
+                : -numeric<LSEDataType>::infinity();
 
         // for simplicity, batch stride we just modify the pointer
         const ODataType* o_ptr = reinterpret_cast<const ODataType*>(kargs.o_ptr) +
@@ -1377,9 +1574,13 @@ struct FmhaBwdOGradDotOKernel
         const OGradDataType* do_ptr = reinterpret_cast<const OGradDataType*>(kargs.do_ptr) +
                                       static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_do +
                                       batch_offset_do;
+        const LSEDataType* lse_ptr = reinterpret_cast<const LSEDataType*>(kargs.lse_ptr) +
+                                     static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_lsed +
+                                     batch_offset_lsed;
+
         DDataType* d_ptr = reinterpret_cast<DDataType*>(kargs.d_ptr) +
-                           static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_d +
-                           batch_offset_d;
+                           static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_lsed +
+                           batch_offset_lsed;
 
         // O/dO/D DRAM and DRAM window
         const auto o_dram = [&]() {
@@ -1413,13 +1614,31 @@ struct FmhaBwdOGradDotOKernel
 
         auto o_dram_window =
             make_tile_window(o_dram, make_tuple(number<kM0>{}, number<kVHeaddim>{}), {i_m0, 0});
-
         auto do_dram_window =
             make_tile_window(do_dram, make_tuple(number<kM0>{}, number<kVHeaddim>{}), {i_m0, 0});
-
         auto d_dram_window = make_tile_window(d_dram, make_tuple(number<kM0>{}), {i_m0});
 
-        FmhaBwdOGradDotO{}(o_dram_window, do_dram_window, d_dram_window, kargs.p_undrop);
+        // nullptr when sink grad is disabled; the pipeline checks this to skip the sink path
+        LSEDataType* atomic_sink_grad_ptr =
+            kargs.d_sink_ptr == nullptr ? nullptr : kargs.d_sink_ptr + i_nhead;
+
+        // lse_ptr is always valid (also needed by the main bwd kernel).
+        // The actual load happens inside the pipeline only when atomic_sink_grad_ptr != nullptr.
+        auto lse_dram = [&]() {
+            const auto lse_dram_naive = make_naive_tensor_view_packed<address_space_enum::global>(
+                lse_ptr, make_tuple(kargs.seqlen_q), number<1>{});
+            return pad_tensor_view(
+                lse_dram_naive, make_tuple(number<kM0>{}), sequence<kPadSeqLenQ>{});
+        }();
+        auto lse_dram_window = make_tile_window(lse_dram, make_tuple(number<kM0>{}), {i_m0});
+
+        FmhaBwdOGradDotO{}(o_dram_window,
+                           do_dram_window,
+                           lse_dram_window,
+                           d_dram_window,
+                           sink_value,
+                           kargs.p_undrop,
+                           atomic_sink_grad_ptr);
     }
 };
 
@@ -1440,9 +1659,11 @@ struct FmhaBwdConvertQGradKernel
     static constexpr bool kPadSeqLenQ      = FmhaBwdConvertQGrad::kPadSeqLenQ;
     static constexpr bool kPadHeadDimQ     = FmhaBwdConvertQGrad::kPadHeadDimQ;
     static constexpr bool kIsDeterministic = FmhaBwdConvertQGrad::kIsDeterministic;
+    static constexpr bool kUsePersistent   = kIsDeterministic && !kIsGroupMode;
 
     // clang-format off
     template <typename T> struct t2s;
+    template <> struct t2s<float> { static constexpr const char * name = "fp32"; };
     template <> struct t2s<ck_tile::fp16_t> { static constexpr const char * name = "fp16"; };
     template <> struct t2s<ck_tile::bf16_t> { static constexpr const char * name = "bf16"; };
     // clang-format on
@@ -1492,12 +1713,15 @@ struct FmhaBwdConvertQGradKernel
         ck_tile::index_t stride_dq;
         ck_tile::index_t stride_dq_acc;
         ck_tile::index_t nhead_stride_dq;
-        ck_tile::index_t nhead_stride_dq_acc;
+        ck_tile::long_index_t nhead_stride_dq_acc;
     };
 
     struct FmhaBwdConvertQGradDeterministicKargs
     {
-        ck_tile::index_t split_stride_dq_acc = 0;
+        index_t split_stride_dq_acc = 0;
+        index_t dqdqkdv_workers     = 0; // 0 for not using persistent kernel
+        index_t batch_size          = 0; // for nsplits calc of persistent kernel
+        index_t nhead               = 0; // for nsplits calc of persistent kernel
     };
 
     struct FmhaBwdConvertQGradBatchModeKargs
@@ -1507,7 +1731,7 @@ struct FmhaBwdConvertQGradKernel
                              FmhaBwdConvertQGradEmptyKargs<0>>
     {
         ck_tile::index_t batch_stride_dq;
-        ck_tile::index_t batch_stride_dq_acc;
+        ck_tile::long_index_t batch_stride_dq_acc;
     };
 
     struct FmhaBwdConvertQGradGroupModeKargs
@@ -1518,6 +1742,10 @@ struct FmhaBwdConvertQGradKernel
     {
         const int32_t* seqstart_q_ptr;
         const int32_t* seqstart_k_ptr;
+        const int32_t* seqlen_q_ptr;    // per-batch actual length [batch]
+        const int32_t* seqlen_k_ptr;    // per-batch actual length [batch]
+        const int32_t* cu_seqlen_q_ptr; // cumulative seqlen [batch+1], optional
+        const int32_t* cu_seqlen_k_ptr; // cumulative seqlen [batch+1], optional
     };
 
     using Kargs = std::conditional_t<kIsGroupMode,
@@ -1534,10 +1762,12 @@ struct FmhaBwdConvertQGradKernel
               ck_tile::index_t stride_dq,
               ck_tile::index_t stride_dq_acc,
               ck_tile::index_t nhead_stride_dq,
-              ck_tile::index_t nhead_stride_dq_acc,
+              ck_tile::long_index_t nhead_stride_dq_acc,
               ck_tile::index_t batch_stride_dq,
-              ck_tile::index_t batch_stride_dq_acc,
-              ck_tile::index_t split_stride_dq_acc)
+              ck_tile::long_index_t batch_stride_dq_acc,
+              ck_tile::index_t split_stride_dq_acc,
+              ck_tile::index_t batch_size,
+              ck_tile::index_t nhead)
     {
         Kargs kargs{{dq_acc_ptr,
                      dq_ptr,
@@ -1555,6 +1785,12 @@ struct FmhaBwdConvertQGradKernel
         if constexpr(kIsDeterministic)
         {
             kargs.split_stride_dq_acc = split_stride_dq_acc;
+            if constexpr(kUsePersistent)
+            {
+                kargs.dqdqkdv_workers = get_num_cus();
+                kargs.batch_size      = batch_size;
+                kargs.nhead           = nhead;
+            }
         }
 
         return kargs;
@@ -1566,11 +1802,15 @@ struct FmhaBwdConvertQGradKernel
               void* dq_ptr,
               const void* seqstart_q_ptr,
               const void* seqstart_k_ptr,
+              const void* seqlen_q_ptr,
+              const void* seqlen_k_ptr,
+              const void* cu_seqlen_q_ptr,
+              const void* cu_seqlen_k_ptr,
               ck_tile::index_t hdim_q,
               ck_tile::index_t stride_dq,
               ck_tile::index_t stride_dq_acc,
               ck_tile::index_t nhead_stride_dq,
-              ck_tile::index_t nhead_stride_dq_acc,
+              ck_tile::long_index_t nhead_stride_dq_acc,
               ck_tile::index_t split_stride_dq_acc)
     {
         Kargs kargs{{dq_acc_ptr,
@@ -1584,7 +1824,11 @@ struct FmhaBwdConvertQGradKernel
                      nhead_stride_dq_acc},
                     {},
                     reinterpret_cast<const int32_t*>(seqstart_q_ptr),
-                    reinterpret_cast<const int32_t*>(seqstart_k_ptr)};
+                    reinterpret_cast<const int32_t*>(seqstart_k_ptr),
+                    reinterpret_cast<const int32_t*>(seqlen_q_ptr),
+                    reinterpret_cast<const int32_t*>(seqlen_k_ptr),
+                    reinterpret_cast<const int32_t*>(cu_seqlen_q_ptr),
+                    reinterpret_cast<const int32_t*>(cu_seqlen_k_ptr)};
 
         if constexpr(kIsDeterministic)
         {
@@ -1609,7 +1853,7 @@ struct FmhaBwdConvertQGradKernel
         return ck_tile::make_tuple(i_block, i_nhead, i_batch);
     }
 
-    CK_TILE_HOST static constexpr auto BlockSize() { return dim3(kBlockSize); }
+    CK_TILE_HOST static dim3 BlockSize() { return dim3(kBlockSize); }
 
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize() { return 0; }
 
@@ -1618,7 +1862,7 @@ struct FmhaBwdConvertQGradKernel
         // divide problem
         const auto [i_tile_m, i_nhead, i_batch] = GetTileIndex();
 
-        const index_t i_m0 = __builtin_amdgcn_readfirstlane(i_tile_m * kM0);
+        const index_t i_m0 = amd_wave_read_first_lane(i_tile_m * kM0);
 
         long_index_t batch_offset_dq     = 0;
         long_index_t batch_offset_dq_acc = 0;
@@ -1629,13 +1873,41 @@ struct FmhaBwdConvertQGradKernel
             batch_offset_dq                = query_start * kargs.stride_dq;
             batch_offset_dq_acc            = query_start * kargs.stride_dq_acc;
 
-            // get real # queries & # keys under group mode
-            const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
-            kargs.seqlen_q = adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
+            if(kargs.cu_seqlen_q_ptr != nullptr)
+            {
+                kargs.seqlen_q =
+                    kargs.cu_seqlen_q_ptr[i_batch + 1] - kargs.cu_seqlen_q_ptr[i_batch];
+            }
+            else
+            {
+                // get real # queries & # keys under group mode
+                const auto adjusted_seqstart_q_ptr = kargs.seqstart_q_ptr + i_batch;
+                const ck_tile::index_t physical_seqlen_q =
+                    adjusted_seqstart_q_ptr[1] - adjusted_seqstart_q_ptr[0];
+                kargs.seqlen_q = kargs.seqlen_q_ptr
+                                     ? static_cast<ck_tile::index_t>(kargs.seqlen_q_ptr[i_batch])
+                                     : physical_seqlen_q;
+            }
+
             if constexpr(kIsDeterministic)
             {
                 const auto adjusted_seqstart_k_ptr = kargs.seqstart_k_ptr + i_batch;
-                kargs.seqlen_k = adjusted_seqstart_k_ptr[1] - adjusted_seqstart_k_ptr[0];
+                const ck_tile::index_t physical_seqlen_k =
+                    adjusted_seqstart_k_ptr[1] - adjusted_seqstart_k_ptr[0];
+
+                // Priority: cu_seqlen_k_ptr > seqlen_k_ptr > physical_seqlen_k
+                if(kargs.cu_seqlen_k_ptr != nullptr)
+                {
+                    kargs.seqlen_k =
+                        kargs.cu_seqlen_k_ptr[i_batch + 1] - kargs.cu_seqlen_k_ptr[i_batch];
+                }
+                else
+                {
+                    kargs.seqlen_k =
+                        kargs.seqlen_k_ptr
+                            ? static_cast<ck_tile::index_t>(kargs.seqlen_k_ptr[i_batch])
+                            : physical_seqlen_k;
+                }
             }
             // # of required blocks is different in each groups, terminate unnecessary blocks
             // earlier
@@ -1654,6 +1926,27 @@ struct FmhaBwdConvertQGradKernel
         QGradDataType* dq_ptr = reinterpret_cast<QGradDataType*>(kargs.dq_ptr) +
                                 static_cast<long_index_t>(i_nhead) * kargs.nhead_stride_dq +
                                 batch_offset_dq;
+        const index_t nsplits = [&]() {
+            const index_t jobs_per_head = integer_divide_ceil(kargs.seqlen_k, kN0);
+            if constexpr(!kIsDeterministic)
+                return 1;
+            else if constexpr(!kUsePersistent)
+                return jobs_per_head;
+            else
+            {
+                const index_t total_heads = kargs.batch_size * kargs.nhead;
+                const index_t total_jobs  = jobs_per_head * total_heads;
+                const index_t jobs_per_worker =
+                    integer_divide_ceil(total_jobs, kargs.dqdqkdv_workers);
+                const index_t i_head_flatten = i_batch * kargs.nhead + i_nhead;
+
+                const index_t i_job_start     = jobs_per_head * i_head_flatten;
+                const index_t begin_worker_id = i_job_start / jobs_per_worker;
+                const index_t end_worker_id   = // inclusive
+                    (i_job_start + jobs_per_head - 1) / jobs_per_worker;
+                return end_worker_id - begin_worker_id + 1;
+            }
+        }();
 
         // dQAcc/dQ DRAM and DRAM window
         const auto dq_acc_dram = [&, i_nhead_ = i_nhead]() {
@@ -1663,8 +1956,6 @@ struct FmhaBwdConvertQGradKernel
                     reinterpret_cast<const AccDataType*>(kargs.dq_acc_ptr) +
                     static_cast<long_index_t>(i_nhead_) * (kargs.nhead_stride_dq_acc) +
                     batch_offset_dq_acc;
-
-                const index_t nsplits = ck_tile::integer_divide_ceil(kargs.seqlen_k, kN0);
 
                 auto dq_acc_dram_naive = make_naive_tensor_view<address_space_enum::global>(
                     dq_acc_ptr,
@@ -1727,7 +2018,6 @@ struct FmhaBwdConvertQGradKernel
 
         if constexpr(kIsDeterministic)
         {
-            const index_t nsplits = ck_tile::integer_divide_ceil(kargs.seqlen_k, kN0);
             FmhaBwdConvertQGrad{}(dq_acc_dram_window, dq_dram_window, nsplits);
         }
         else

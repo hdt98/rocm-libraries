@@ -1,7 +1,7 @@
 /******************************************************************************
  * Copyright (c) 2011, Duane Merrill.  All rights reserved.
  * Copyright (c) 2011-2018, NVIDIA CORPORATION.  All rights reserved.
- * Modifications Copyright (c) 2019-2020, Advanced Micro Devices, Inc.  All rights reserved.
+ * Modifications Copyright (c) 2019-2026, Advanced Micro Devices, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -29,7 +29,27 @@
 
 #include "common_test_header.hpp"
 
+#include "hipcub/util_allocator.hpp"
+#include <cstdlib>
 #include <hipcub/util_allocator.hpp>
+
+#if __has_include(<valgrind/valgrind.h>)
+    #include <valgrind/valgrind.h>
+    #define HAS_VALGRIND_H 1
+#else
+    #define HAS_VALGRIND_H 0
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+    #define IS_ASAN_BUILD 1
+#elif defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+        #define IS_ASAN_BUILD 1
+    #endif
+#endif
+#ifndef IS_ASAN_BUILD
+    #define IS_ASAN_BUILD 0
+#endif
 
 __global__
 void EmptyKernel()
@@ -39,6 +59,20 @@ void EmptyKernel()
 
 TEST(HipcubCachingDeviceAllocatorTests, Test1)
 {
+
+    // This test is very timing sensitive. Valgrind and ASAN slow down
+    // kernel execution and therefore messes up the timing of the test. 
+    // If valgrind or ASAN is being used we disable this test otherwise
+    // it will fail.
+#if HAS_VALGRIND_H
+    if (RUNNING_ON_VALGRIND) {
+        GTEST_SKIP() << "Skipping test under Valgrind";
+    }
+#endif //HAS_VALGRIND_H
+#if IS_ASAN_BUILD
+    GTEST_SKIP() << "Skipping test under ASAN";
+#endif
+
     // Get number of GPUs and current GPU
     int num_gpus;
     int initial_gpu;
@@ -68,6 +102,7 @@ TEST(HipcubCachingDeviceAllocatorTests, Test1)
         HIP_KERNEL_NAME(EmptyKernel),
         dim3(32000), dim3(256), 1024 * 8, 0
     );
+    HIP_CHECK(hipGetLastError());
 
     // Free d_999B_stream0_a
     HIP_CHECK(allocator.DeviceFree(d_999B_stream0_a));
@@ -86,6 +121,7 @@ TEST(HipcubCachingDeviceAllocatorTests, Test1)
         HIP_KERNEL_NAME(EmptyKernel),
         dim3(32000), dim3(256), 1024 * 8, 0
     );
+    HIP_CHECK(hipGetLastError());
 
     // Free d_999B_stream0_b
     HIP_CHECK(allocator.DeviceFree(d_999B_stream0_b));
@@ -106,6 +142,7 @@ TEST(HipcubCachingDeviceAllocatorTests, Test1)
         HIP_KERNEL_NAME(EmptyKernel),
         dim3(32000), dim3(256), 1024 * 8, other_stream
     );
+    HIP_CHECK(hipGetLastError());
 
     // Free d_999B_stream_other
     HIP_CHECK(allocator.DeviceFree(d_999B_stream_other_a));
@@ -141,6 +178,7 @@ TEST(HipcubCachingDeviceAllocatorTests, Test1)
         HIP_KERNEL_NAME(EmptyKernel),
         dim3(32000), dim3(256), 1024 * 8, other_stream
     );
+    HIP_CHECK(hipGetLastError());
 
     // Free d_999B_stream_other_a and d_999B_stream_other_b
     HIP_CHECK(allocator.DeviceFree(d_999B_stream_other_a));

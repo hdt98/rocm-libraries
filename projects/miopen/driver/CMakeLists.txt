@@ -39,6 +39,7 @@ add_executable(MIOpenDriver
     dm_convbfp16.cpp
     dm_convbfp8.cpp
     dm_convfp16.cpp
+    dm_convfp32.cpp
     dm_convfp8.cpp
     dm_convint8.cpp
     dm_dropout.cpp
@@ -72,7 +73,8 @@ if(WIN32)
 endif()
 add_dependencies(MIOpenDriver generate_kernels)
 target_include_directories(MIOpenDriver PRIVATE ../src/kernels)
-target_link_libraries(MIOpenDriver PRIVATE MIOpen Threads::Threads roc::rocrand nlohmann_json::nlohmann_json )
+# MIOpen_with_plugins ensures CK plugin .so's are built alongside MIOpenDriver
+target_link_libraries(MIOpenDriver PRIVATE MIOpen_with_plugins Threads::Threads roc::rocrand nlohmann_json::nlohmann_json )
 if(NOT MIOPEN_EMBED_DB STREQUAL "")
     target_link_libraries(MIOpenDriver PRIVATE $<BUILD_INTERFACE:miopen_data> )
 endif()

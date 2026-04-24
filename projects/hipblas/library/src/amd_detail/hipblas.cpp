@@ -57,7 +57,11 @@ static hipblasStatus_t hipblasDemandAlloc(rocblas_handle                   handl
                     status = hipblasConvertStatus(blas_status);
                 else
                 {
-                    status = func();
+                    blas_status = rocblas_set_device_memory_size(handle, size);
+                    if(blas_status != rocblas_status_success)
+                        status = hipblasConvertStatus(blas_status);
+                    else
+                        status = func();
                 }
             }
         }
@@ -33910,6 +33914,80 @@ try
                                                                    hipblasConvertGemmAlgo(algo),
                                                                    solution_index,
                                                                    hipblasConvertGemmFlags(flags)));
+}
+catch(...)
+{
+    return hipblas_exception_to_status();
+}
+
+// syrk_ex
+hipblasStatus_t hipblasSyrkEx(hipblasHandle_t    handle,
+                              hipblasFillMode_t  uplo,
+                              hipblasOperation_t transa,
+                              int                n,
+                              int                k,
+                              const void*        alpha,
+                              const void*        A,
+                              hipDataType        a_type,
+                              int                lda,
+                              const void*        beta,
+                              void*              C,
+                              hipDataType        c_type,
+                              int                ldc,
+                              hipDataType        compute_type)
+try
+{
+    return hipblasConvertStatus(rocblas_syrk_ex((rocblas_handle)handle,
+                                                hipblasConvertFill(uplo),
+                                                hipblasConvertOperation(transa),
+                                                n,
+                                                k,
+                                                alpha,
+                                                A,
+                                                hipblasConvertDatatype(a_type),
+                                                lda,
+                                                beta,
+                                                C,
+                                                hipblasConvertDatatype(c_type),
+                                                ldc,
+                                                hipblasConvertDatatype(compute_type)));
+}
+catch(...)
+{
+    return hipblas_exception_to_status();
+}
+
+// herk_ex
+hipblasStatus_t hipblasHerkEx(hipblasHandle_t    handle,
+                              hipblasFillMode_t  uplo,
+                              hipblasOperation_t transa,
+                              int                n,
+                              int                k,
+                              const void*        alpha,
+                              const void*        A,
+                              hipDataType        a_type,
+                              int                lda,
+                              const void*        beta,
+                              void*              C,
+                              hipDataType        c_type,
+                              int                ldc,
+                              hipDataType        compute_type)
+try
+{
+    return hipblasConvertStatus(rocblas_herk_ex((rocblas_handle)handle,
+                                                hipblasConvertFill(uplo),
+                                                hipblasConvertOperation(transa),
+                                                n,
+                                                k,
+                                                alpha,
+                                                A,
+                                                hipblasConvertDatatype(a_type),
+                                                lda,
+                                                beta,
+                                                C,
+                                                hipblasConvertDatatype(c_type),
+                                                ldc,
+                                                hipblasConvertDatatype(compute_type)));
 }
 catch(...)
 {

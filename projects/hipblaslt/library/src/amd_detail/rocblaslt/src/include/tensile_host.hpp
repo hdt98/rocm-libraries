@@ -91,6 +91,7 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                               const rocblaslt_matmul_algo& algo,
                               const Tuning*                tuning,
                               void*                        workspace,
+                              size_t                       workspaceSizeInBytes,
                               bool                         useUserArgs,
                               hipStream_t                  stream,
                               std::shared_ptr<void>        gemmData);
@@ -240,6 +241,12 @@ inline rocisa::DataType hipDataType_to_tensile_type(hipDataType type)
         return rocisa::DataType::Int8;
     case HIP_R_32I:
         return rocisa::DataType::Int32;
+    case HIP_R_4F_E2M1_EXT:
+        return rocisa::DataType::Float4;
+    case HIP_R_6F_E2M3_EXT:
+        return rocisa::DataType::Float6;
+    case HIP_R_6F_E3M2_EXT:
+        return rocisa::DataType::BFloat6;
     default:
         assert(!"hipDataType_to_tensile_type: non-supported type");
         return rocisa::DataType::None;

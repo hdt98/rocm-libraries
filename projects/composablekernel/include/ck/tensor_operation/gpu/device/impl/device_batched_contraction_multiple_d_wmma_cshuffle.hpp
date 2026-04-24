@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2018-2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -737,11 +737,6 @@ struct DeviceBatchedContractionMultipleD_Wmma_CShuffle
 
         // Batch Offset
         ComputePtrOffsetOfStridedBatch compute_ptr_offset_of_batch_;
-
-        // for checking vector load/store
-        // index_t MRaw_;
-        // index_t NRaw_;
-        // index_t KRaw_;
     };
 
     // Invoker

@@ -102,15 +102,19 @@ namespace rocisa
 
     struct FLATModifiers : public Container
     {
-        FLATModifiers(int  offset12 = 0,
-                      bool glc      = false,
-                      bool slc      = false,
-                      bool lds      = false,
-                      bool isStore  = false)
+        FLATModifiers(int        offset12 = 0,
+                      bool       glc      = false,
+                      bool       slc      = false,
+                      bool       dlc      = false,
+                      CacheScope scope    = CacheScope::SCOPE_NONE,
+                      bool       lds      = false,
+                      bool       isStore  = false)
             : Container()
             , offset12(offset12)
             , glc(glc)
             , slc(slc)
+            , dlc(dlc)
+            , scope(scope)
             , lds(lds)
             , isStore(isStore)
         {
@@ -121,6 +125,8 @@ namespace rocisa
             , offset12(other.offset12)
             , glc(other.glc)
             , slc(other.slc)
+            , dlc(other.dlc)
+            , scope(other.scope)
             , lds(other.lds)
             , isStore(other.isStore)
         {
@@ -133,7 +139,8 @@ namespace rocisa
 
         std::string toString() const override
         {
-            auto        hasGLCModifier = rocIsa::getInstance().getAsmCaps()["HasGLCModifier"];
+            auto        hasDLCModifier   = rocIsa::getInstance().getAsmCaps()["HasDLCModifier"];
+            auto        hasSCOPEModifier = rocIsa::getInstance().getAsmCaps()["HasSCOPEModifier"];
             std::string kStr;
             if(offset12 != 0)
             {
@@ -141,11 +148,19 @@ namespace rocisa
             }
             if(glc)
             {
-                kStr += " " + getGlcBitName(hasGLCModifier);
+                kStr += " " + getGlcBitName();
             }
             if(slc)
             {
-                kStr += " " + getSlcBitName(hasGLCModifier);
+                kStr += " " + getSlcBitName();
+            }
+            if(hasDLCModifier && dlc)
+            {
+                kStr += " dlc";
+            }
+            if(hasSCOPEModifier && scope != CacheScope::SCOPE_NONE)
+            {
+                kStr += " scope:" + ::rocisa::toString(scope);
             }
             if(lds)
             {
@@ -154,11 +169,13 @@ namespace rocisa
             return kStr;
         }
 
-        int  offset12;
-        bool glc;
-        bool slc;
-        bool lds;
-        bool isStore;
+        int        offset12;
+        bool       glc;
+        bool       slc;
+        bool       dlc;
+        CacheScope scope;
+        bool       lds;
+        bool       isStore;
     };
 
     struct GLOBALModifiers : public Container
@@ -190,23 +207,27 @@ namespace rocisa
             return kStr;
         }
 
-        int  offset;
+        int offset;
     };
 
     struct MUBUFModifiers : public Container
     {
-        MUBUFModifiers(bool offen    = false,
-                       int  offset12 = 0,
-                       bool glc      = false,
-                       bool slc      = false,
-                       bool nt       = false,
-                       bool lds      = false,
-                       bool isStore  = false)
+        MUBUFModifiers(bool       offen    = false,
+                       int        offset12 = 0,
+                       bool       glc      = false,
+                       bool       slc      = false,
+                       bool       dlc      = false,
+                       CacheScope scope    = CacheScope::SCOPE_NONE,
+                       bool       nt       = false,
+                       bool       lds      = false,
+                       bool       isStore  = false)
             : Container()
             , offen(offen)
             , offset12(offset12)
             , glc(glc)
             , slc(slc)
+            , dlc(dlc)
+            , scope(scope)
             , nt(nt)
             , lds(lds)
             , isStore(isStore)
@@ -219,6 +240,8 @@ namespace rocisa
             , offset12(other.offset12)
             , glc(other.glc)
             , slc(other.slc)
+            , dlc(other.dlc)
+            , scope(other.scope)
             , nt(other.nt)
             , lds(other.lds)
             , isStore(other.isStore)
@@ -232,25 +255,29 @@ namespace rocisa
 
         std::string toString() const override
         {
-            auto        hasGLCModifier = rocIsa::getInstance().getAsmCaps()["HasGLCModifier"];
-            auto        hasSLCModifier = rocIsa::getInstance().getAsmCaps()["HasSLCModifier"];
-            auto        hasNTModifier  = rocIsa::getInstance().getAsmCaps()["HasNTModifier"];
+            auto        hasDLCModifier   = rocIsa::getInstance().getAsmCaps()["HasDLCModifier"];
+            auto        hasSCOPEModifier = rocIsa::getInstance().getAsmCaps()["HasSCOPEModifier"];
+            auto        hasNTModifier    = rocIsa::getInstance().getAsmCaps()["HasNTModifier"];
             std::string kStr;
             if(offen)
             {
                 kStr += " offen offset:" + std::to_string(offset12);
             }
-            if(glc || slc || lds)
-            {
-                kStr += ",";
-            }
             if(glc)
             {
-                kStr += " " + getGlcBitName(hasGLCModifier);
+                kStr += " " + getGlcBitName();
             }
             if(slc)
             {
-                kStr += " " + getSlcBitName(hasGLCModifier);
+                kStr += " " + getSlcBitName();
+            }
+            if(hasDLCModifier && dlc)
+            {
+                kStr += " dlc";
+            }
+            if(hasSCOPEModifier && scope != CacheScope::SCOPE_NONE)
+            {
+                kStr += " scope:" + ::rocisa::toString(scope);
             }
             if(hasNTModifier && nt)
             {
@@ -263,20 +290,28 @@ namespace rocisa
             return kStr;
         }
 
-        bool offen;
-        int  offset12;
-        bool glc;
-        bool slc;
-        bool nt;
-        bool lds;
-        bool isStore;
+        bool       offen;
+        int        offset12;
+        bool       glc;
+        bool       slc;
+        bool       dlc;
+        CacheScope scope;
+        bool       nt;
+        bool       lds;
+        bool       isStore;
     };
 
     struct SMEMModifiers : public Container
     {
-        SMEMModifiers(bool glc = false, bool nv = false, int offset = 0)
+        SMEMModifiers(bool       glc    = false,
+                      bool       dlc    = false,
+                      CacheScope scope  = CacheScope::SCOPE_NONE,
+                      bool       nv     = false,
+                      int        offset = 0)
             : Container()
             , glc(glc)
+            , dlc(dlc)
+            , scope(scope)
             , nv(nv)
             , offset(offset) // 20u 21s shaes the same
         {
@@ -285,6 +320,8 @@ namespace rocisa
         SMEMModifiers(const SMEMModifiers& other)
             : Container()
             , glc(other.glc)
+            , dlc(other.dlc)
+            , scope(other.scope)
             , nv(other.nv)
             , offset(other.offset)
         {
@@ -297,14 +334,24 @@ namespace rocisa
 
         std::string toString() const override
         {
+            auto        hasDLCModifier   = rocIsa::getInstance().getAsmCaps()["HasDLCModifier"];
+            auto        hasSCOPEModifier = rocIsa::getInstance().getAsmCaps()["HasSCOPEModifier"];
             std::string kStr;
             if(offset != 0)
             {
                 kStr += " offset:" + std::to_string(offset);
             }
-            if(glc)
+            if(!hasSCOPEModifier && glc)
             {
                 kStr += " glc";
+            }
+            if(hasDLCModifier && dlc)
+            {
+                kStr += " dlc";
+            }
+            if(hasSCOPEModifier && scope != CacheScope::SCOPE_NONE)
+            {
+                kStr += " scope:" + ::rocisa::toString(scope);
             }
             if(nv)
             {
@@ -313,9 +360,11 @@ namespace rocisa
             return kStr;
         }
 
-        bool glc;
-        bool nv;
-        int  offset;
+        bool       glc;
+        bool       dlc;
+        CacheScope scope;
+        bool       nv;
+        int        offset;
     };
 
     struct SDWAModifiers : public Container
@@ -461,6 +510,43 @@ namespace rocisa
         }
     };
 
+    struct True16Modifiers : public Container
+    {
+        True16Modifiers(HighBitSel high_bit = HighBitSel::NONE)
+            : Container()
+            , high_bit(high_bit)
+        {
+        }
+
+        True16Modifiers(const int high_bit = -1)
+            : Container()
+            , high_bit(static_cast<HighBitSel>(high_bit))
+        {
+        }
+
+        True16Modifiers(const True16Modifiers& other)
+            : Container()
+            , high_bit(other.high_bit)
+        {
+        }
+
+        std::shared_ptr<Container> clone() const override
+        {
+            return std::make_shared<True16Modifiers>(*this);
+        }
+
+        std::string toString() const override
+        {
+            if(high_bit == HighBitSel::NONE)
+            {
+                return "";
+            }
+            return high_bit == HighBitSel::HIGH ? ".h" : ".l";
+        }
+
+        const HighBitSel high_bit;
+    };
+
     struct EXEC : public Container
     {
         EXEC(bool setHi = false)
@@ -557,6 +643,7 @@ namespace rocisa
     {
         std::string      name;
         std::vector<int> offsets;
+        mutable int nameIdx;
 
         RegName(const std::string& name = "", const std::vector<int>& offsets = {})
             : name(name)
@@ -594,6 +681,17 @@ namespace rocisa
                 offsets = std::move(other.offsets);
             }
             return *this;
+        }
+
+        void setNameIdx() const
+        {
+            nameIdx = rocIsa::getInstance().getVgprIdx()[name];
+        }
+
+        int getTotalIdx() const
+        {
+            setNameIdx();
+            return getTotalOffsets() + nameIdx;
         }
 
         int getTotalOffsets() const
@@ -647,10 +745,12 @@ namespace rocisa
         std::optional<RegName> regName;
         int                    regIdx;
         int                    regNum;
+        mutable  int           msb;
         bool                   isInlineAsm;
         bool                   isMinus;
         bool                   isAbs;
         bool                   isMacro;
+        bool                   isOff;
 
         RegisterContainer(const std::string&            regType,
                           const std::optional<RegName>& regName,
@@ -661,10 +761,12 @@ namespace rocisa
             , regName(std::move(regName))
             , regIdx(regIdx)
             , regNum(int(ceil(regNum)))
+            , msb(0)
             , isInlineAsm(false)
             , isMinus(false)
             , isAbs(false)
             , isMacro(false)
+            , isOff(false)
         {
         }
 
@@ -672,6 +774,7 @@ namespace rocisa
                           const std::optional<RegName>& regName,
                           bool                          isAbs,
                           bool                          isMacro,
+                          bool                          isOff,
                           int                           regIdx = 0,
                           float                         regNum = 1)
             : Container()
@@ -679,10 +782,12 @@ namespace rocisa
             , regName(std::move(regName))
             , regIdx(regIdx)
             , regNum(int(ceil(regNum)))
+            , msb(0)
             , isInlineAsm(false)
             , isMinus(false)
             , isAbs(isAbs)
             , isMacro(isMacro)
+            , isOff(isOff)
         {
         }
 
@@ -692,10 +797,12 @@ namespace rocisa
             , regName(other.regName)
             , regIdx(other.regIdx)
             , regNum(other.regNum)
+            , msb(other.msb)
             , isInlineAsm(other.isInlineAsm)
             , isMinus(other.isMinus)
             , isAbs(other.isAbs)
             , isMacro(other.isMacro)
+            , isOff(other.isOff)
         {
         }
 
@@ -715,10 +822,12 @@ namespace rocisa
             , regName(std::move(other.regName))
             , regIdx(other.regIdx)
             , regNum(other.regNum)
+            , msb(other.msb)
             , isInlineAsm(other.isInlineAsm)
             , isMinus(other.isMinus)
             , isAbs(other.isAbs)
             , isMacro(other.isMacro)
+            , isOff(other.isOff)
         {
         }
 
@@ -730,10 +839,12 @@ namespace rocisa
                 regName     = other.regName;
                 regIdx      = other.regIdx;
                 regNum      = other.regNum;
+                msb         = other.msb;
                 isInlineAsm = other.isInlineAsm;
                 isMinus     = other.isMinus;
                 isAbs       = other.isAbs;
                 isMacro     = other.isMacro;
+                isOff       = other.isOff;
             }
             return *this;
         }
@@ -746,10 +857,12 @@ namespace rocisa
                 regName     = std::move(other.regName);
                 regIdx      = other.regIdx;
                 regNum      = other.regNum;
+                msb         = other.msb;
                 isInlineAsm = other.isInlineAsm;
                 isMinus     = other.isMinus;
                 isAbs       = other.isAbs;
                 isMacro     = other.isMacro;
+                isOff       = other.isOff;
             }
             return *this;
         }
@@ -818,6 +931,11 @@ namespace rocisa
             return regType + "gpr" + regName->toString();
         }
 
+        std::string getCompleteRegName() const
+        {
+            return regName->toString();
+        }
+
         std::pair<std::shared_ptr<RegisterContainer>, std::shared_ptr<RegisterContainer>>
             splitRegContainer() const
         {
@@ -859,28 +977,51 @@ namespace rocisa
             return !(*this == other);
         }
 
+        void setMsb() const
+        {
+            if(regName)
+            {
+                msb = regName->getTotalIdx() / 256;
+            }
+            else
+            {
+                msb = regIdx / 256;
+            }
+        }
+
         std::string toString() const override
         {
+            if(isOff)
+            {
+                return "off";
+            }
+
             std::string minusStr = isMinus ? "-" : "";
             minusStr             = isAbs ? "abs(" + minusStr : minusStr;
             auto absStr          = isAbs ? ")" : "";
+            std::string msbStr = "";
+            if(rocIsa::getInstance().getAsmCaps()["HasVgprMSB"] && regType == "v")
+            {
+                setMsb();
+                if(msb > 0)
+                    msbStr = std::to_string(-256 * msb);
+            }
             if(isInlineAsm)
             {
                 return minusStr + "%" + std::to_string(regIdx) + absStr;
             }
-
             if(regName)
             {
                 std::string macroSlash = isMacro ? "\\" : "";
                 if(regNum == 1)
                 {
                     return minusStr + regType + "[" + macroSlash + regType + "gpr"
-                           + regName->toString() + "]" + absStr;
+                           + regName->toString() + msbStr + "]" + absStr;
                 }
                 else
                 {
                     return minusStr + regType + "[" + macroSlash + regType + "gpr"
-                           + regName->toString() + ":" + regType + "gpr" + regName->toString() + "+"
+                           + regName->toString() + msbStr + ":" + regType + "gpr" + regName->toString() + msbStr + "+"
                            + std::to_string(regNum - 1) + "]" + absStr;
                 }
             }
@@ -888,12 +1029,14 @@ namespace rocisa
             {
                 if(regNum == 1)
                 {
+                    if(msb > 0)
+                        return minusStr + regType + "["  + std::to_string(regIdx) + msbStr + "]" + absStr;
                     return minusStr + regType + std::to_string(regIdx) + absStr;
                 }
                 else
                 {
-                    return minusStr + regType + "[" + std::to_string(regIdx) + ":"
-                           + std::to_string(regIdx + regNum - 1) + "]" + absStr;
+                    return minusStr + regType + "[" + std::to_string(regIdx) + msbStr + ":"
+                           + std::to_string(regIdx + regNum - 1) + msbStr + "]" + absStr;
                 }
             }
         }
@@ -941,12 +1084,14 @@ namespace rocisa
         std::string holderName;
         int         holderIdx;
         int         holderType;
+        std::vector<int> holderOffsets;
 
         HolderContainer(const std::string& regType, const std::string& holderName, float regNum)
             : RegisterContainer(regType, RegName(holderName), 0, regNum)
             , holderName(holderName)
             , holderIdx(0)
             , holderType(1)
+            , holderOffsets({})
         {
         }
 
@@ -955,6 +1100,7 @@ namespace rocisa
             , holderName(regName.name)
             , holderIdx(0)
             , holderType(1)
+            , holderOffsets(regName.offsets)
         {
         }
 
@@ -963,6 +1109,7 @@ namespace rocisa
             , holderName("")
             , holderIdx(holderIdx)
             , holderType(0)
+            , holderOffsets({})
         {
         }
 
@@ -971,6 +1118,7 @@ namespace rocisa
             , holderName(other.holderName)
             , holderIdx(other.holderIdx)
             , holderType(other.holderType)
+            , holderOffsets(other.holderOffsets)
         {
         }
 
@@ -979,6 +1127,7 @@ namespace rocisa
             , holderName(std::move(other.holderName))
             , holderIdx(other.holderIdx)
             , holderType(other.holderType)
+            , holderOffsets(std::move(other.holderOffsets))
         {
         }
 
@@ -990,6 +1139,7 @@ namespace rocisa
                 holderName = other.holderName;
                 holderIdx  = other.holderIdx;
                 holderType = other.holderType;
+                holderOffsets = other.holderOffsets;
             }
             return *this;
         }
@@ -1002,6 +1152,7 @@ namespace rocisa
                 holderName = std::move(other.holderName);
                 holderIdx  = other.holderIdx;
                 holderType = other.holderType;
+                holderOffsets = std::move(other.holderOffsets);
             }
             return *this;
         }
@@ -1021,6 +1172,9 @@ namespace rocisa
             {
                 regName = std::move(RegName(holderName));
                 regName->offsets.insert(regName->offsets.begin(), num);
+                for(int offset : holderOffsets) {
+                    regName->offsets.push_back(offset);
+                }
             }
         }
 
@@ -1122,8 +1276,11 @@ namespace rocisa
     // Overloaded functions to create specific GPR containers with default regNum = 1.f
     std::shared_ptr<RegisterContainer> vgpr(const Holder& holder, float regNum = 1.f);
     std::shared_ptr<RegisterContainer> vgpr(int idx, float regNum = 1.f);
-    std::shared_ptr<RegisterContainer>
-        vgpr(const std::string& name, float regNum = 1.f, bool isMacro = false, bool isAbs = false);
+    std::shared_ptr<RegisterContainer> vgpr(const std::string& name,
+                                            float              regNum  = 1.f,
+                                            bool               isMacro = false,
+                                            bool               isAbs   = false,
+                                            bool               isOff   = false);
     std::shared_ptr<RegisterContainer> sgpr(const Holder& holder, float regNum = 1.f);
     std::shared_ptr<RegisterContainer> sgpr(int idx, float regNum = 1.f);
     std::shared_ptr<RegisterContainer>
@@ -1134,6 +1291,39 @@ namespace rocisa
     std::shared_ptr<RegisterContainer> mgpr(const Holder& holder, float regNum = 1.f);
     std::shared_ptr<RegisterContainer> mgpr(int idx, float regNum = 1.f);
     std::shared_ptr<RegisterContainer> mgpr(const std::string& name, float regNum = 1.f);
+    struct MemTokenData : public Container
+    {
+        std::vector<int> tokens;
+
+        MemTokenData(const std::vector<int>& tokens = {})
+            : Container()
+            , tokens(tokens)
+        {
+        }
+
+        MemTokenData(const MemTokenData& other)
+            : Container()
+            , tokens(other.tokens)
+        {
+        }
+
+        std::shared_ptr<Container> clone() const override
+        {
+            return std::make_shared<MemTokenData>(*this);
+        }
+
+        std::string toString() const override
+        {
+            std::string result = "mem_token:";
+            for(size_t i = 0; i < tokens.size(); ++i)
+            {
+                if(i > 0)
+                    result += ",";
+                result += " " + std::to_string(tokens[i]);
+            }
+            return result;
+        }
+    };
 
     struct ContinuousRegister
     {

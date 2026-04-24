@@ -1,5 +1,5 @@
+// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
-// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 #pragma once
 
@@ -14,6 +14,9 @@
 #include "ck_tile/core/utility/env.hpp"
 #include "ck_tile/ops/gemm/kernel/universal_gemm_kernel.hpp"
 #include "ck_tile/core/utility/type_traits.hpp"
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
 
 namespace ck_tile {
 
@@ -132,6 +135,10 @@ struct GemmKernelMultiABD
     static constexpr index_t NumBTensor = BsDataType::size();
     static constexpr index_t NumDTensor = DsDataType::size();
 
+    using ADataType = remove_cvref_t<std::tuple_element_t<0, AsDataType>>;
+    using BDataType = remove_cvref_t<std::tuple_element_t<0, BsDataType>>;
+    using DDataType = remove_cvref_t<std::tuple_element_t<0, DsDataType>>;
+
     CK_TILE_HOST static auto GetName() -> const std::string
     {
         return UniversalGemmKernel::GetName();
@@ -191,3 +198,5 @@ struct GemmKernelMultiABD
     }
 };
 } // namespace ck_tile
+
+#pragma clang diagnostic pop

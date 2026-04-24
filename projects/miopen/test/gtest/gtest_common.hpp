@@ -52,11 +52,11 @@ public:
         restore = ClearValue();
     }
 
-    ScopedEnvironment()                         = delete;
-    ScopedEnvironment(const ScopedEnvironment&) = delete;
-    ScopedEnvironment(ScopedEnvironment&&)      = delete;
+    ScopedEnvironment()                                    = delete;
+    ScopedEnvironment(const ScopedEnvironment&)            = delete;
+    ScopedEnvironment(ScopedEnvironment&&)                 = delete;
     ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
-    ScopedEnvironment& operator=(ScopedEnvironment&&) = delete;
+    ScopedEnvironment& operator=(ScopedEnvironment&&)      = delete;
 
     ~ScopedEnvironment()
     {
@@ -146,7 +146,8 @@ enum class Gpu : int
     gfx950  = 1 << 5,
     gfx103X = 1 << 6,
     gfx110X = 1 << 7,
-    gfx120X = 1 << 8,
+    gfx115X = 1 << 8,
+    gfx120X = 1 << 9,
     gfxLast = Gpu::gfx120X, // \note Change the value when adding a new device
     All     = -1
 };
@@ -188,7 +189,8 @@ struct disabled
 struct DevDescription
 {
     std::string_view name;
-    unsigned cu_cnt; // CU for gfx9, WGP for gfx10, 11, ...
+    unsigned cu_cnt;         // CU for gfx9, WGP for gfx10, 11, ...
+    unsigned wavefront_size; // Default wavefront size
 
     friend std::ostream& operator<<(std::ostream& os, const DevDescription& dd);
 };
@@ -202,7 +204,7 @@ public:
 
     // Add additional methods here if needed
     const std::string& Name() const override;
-    boost::optional<bool> Xnack() const override;
+    bool isXnackEnabled() const override;
 
 private:
     std::string name;
@@ -217,7 +219,9 @@ public:
     // Add additional methods here if needed
     const miopen::TargetProperties& GetTargetProperties() const override;
     std::size_t GetMaxComputeUnits() const override;
+    std::size_t GetWavefrontWidth() const override;
     std::size_t GetMaxMemoryAllocSize() const override;
+
     bool CooperativeLaunchSupported() const override;
 
 private:
@@ -321,7 +325,9 @@ MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_DIRECT)
 MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_GEMM)
 MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_CONV_IMPLICIT_GEMM)
 MIOPEN_LIB_ENV_VAR(MIOPEN_LOG_LEVEL)
+MIOPEN_LIB_ENV_VAR(MIOPEN_LOG_BUFFER_SIZE)
 MIOPEN_LIB_ENV_VAR(MIOPEN_FIND_ENFORCE)
+MIOPEN_LIB_ENV_VAR(MIOPEN_SKIP_ASAN_DISABLED_TESTS)
 
 // TODO: GTests using test_drive<> disabled until gtest-aware version of test/driver.hpp is built
 #define MIOPEN_ENABLE_TEST_DRIVE_WITH_GTEST 0
@@ -337,6 +343,19 @@ protected:                                                                      
                         "test/driver.hpp is built ";                                          \
     }
 #endif
+
+// Returns true if the current build has ASAN enabled and the user has NOT
+// opted in to running ASAN-disabled tests via MIOPEN_SKIP_ASAN_DISABLED_TESTS=0.
+inline bool ShouldSkipForAsan()
+{
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    if(!MIOPEN_SKIP_ASAN_DISABLED_TESTS)
+        return true; // Default to skipping if not set
+    return lib_env::value<bool>(MIOPEN_SKIP_ASAN_DISABLED_TESTS);
+#else
+    return false;
+#endif
+}
 
 /// \todo Remove workarounds
 namespace wa {
