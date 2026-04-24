@@ -117,17 +117,93 @@ class TestGraphValidator:
                     "inputs": {
                         "x_tensor_uid": 1,
                         "dy_tensor_uid": 2,
-                        "scale_tensor_uid": 3,
+                        "mean_tensor_uid": 3,
+                        "inv_variance_tensor_uid": 4,
+                        "scale_tensor_uid": 5,
                         # peer_stats_tensor_uid intentionally omitted
                     },
                     "outputs": {
-                        "dx_tensor_uid": 4,
-                        "dscale_tensor_uid": 5,
-                        "dbias_tensor_uid": 6,
+                        "dx_tensor_uid": 6,
+                        "dscale_tensor_uid": 7,
+                        "dbias_tensor_uid": 8,
                     },
                 }
             ]
         }
 
         with pytest.raises(GraphLoadError, match="peer_stats_tensor_uid"):
+            validator.validate(graph_json)
+
+    def test_rejects_missing_field_conv_fwd(self) -> None:
+        """Test that ConvolutionFwdAttributes missing w_tensor_uid is rejected."""
+        validator = GraphValidator()
+        graph_json = {
+            "tensors": [],
+            "nodes": [
+                {
+                    "type": "ConvolutionFwdAttributes",
+                    "name": "conv",
+                    "inputs": {
+                        "x_tensor_uid": 1,
+                        # w_tensor_uid intentionally omitted
+                    },
+                    "outputs": {"y_tensor_uid": 0},
+                    "parameters": {
+                        "conv_mode": "CROSS_CORRELATION",
+                        "pre_padding": [0, 0],
+                        "post_padding": [0, 0],
+                        "stride": [1, 1],
+                        "dilation": [1, 1],
+                    },
+                }
+            ],
+        }
+
+        with pytest.raises(GraphLoadError, match="w_tensor_uid"):
+            validator.validate(graph_json)
+
+    def test_rejects_missing_field_matmul(self) -> None:
+        """Test that MatmulAttributes missing b_tensor_uid is rejected."""
+        validator = GraphValidator()
+        graph_json = {
+            "tensors": [],
+            "nodes": [
+                {
+                    "type": "MatmulAttributes",
+                    "name": "matmul",
+                    "inputs": {
+                        "a_tensor_uid": 1,
+                        # b_tensor_uid intentionally omitted
+                    },
+                    "outputs": {"c_tensor_uid": 2},
+                }
+            ],
+        }
+
+        with pytest.raises(GraphLoadError, match="b_tensor_uid"):
+            validator.validate(graph_json)
+
+    def test_rejects_node_missing_entire_section(self) -> None:
+        """Test that a node with no 'inputs' section is rejected for types with required inputs."""
+        validator = GraphValidator()
+        graph_json = {
+            "tensors": [],
+            "nodes": [
+                {
+                    "type": "ConvolutionFwdAttributes",
+                    "name": "conv",
+                    # no "inputs" key at all
+                    "outputs": {"y_tensor_uid": 0},
+                    "parameters": {
+                        "conv_mode": "CROSS_CORRELATION",
+                        "pre_padding": [0, 0],
+                        "post_padding": [0, 0],
+                        "stride": [1, 1],
+                        "dilation": [1, 1],
+                    },
+                }
+            ],
+        }
+
+        with pytest.raises(GraphLoadError, match="x_tensor_uid"):
             validator.validate(graph_json)

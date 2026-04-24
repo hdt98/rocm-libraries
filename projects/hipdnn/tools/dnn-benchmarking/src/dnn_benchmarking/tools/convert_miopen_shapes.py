@@ -9,6 +9,7 @@ Usage:
 """
 
 import argparse
+import dataclasses
 import json
 import math
 import re
@@ -43,10 +44,10 @@ def _input_strides(layout: str, N: int, C: int, H: int, W: int,
                    D: Optional[int] = None) -> List[int]:
     """Return strides for an input tensor given its memory layout."""
     if D is not None:
-        if layout in ("NDHWC",):
+        if layout == "NDHWC":
             return _ndhwc_strides(N, C, D, H, W)
         return _ncdhw_strides(N, C, D, H, W)
-    if layout in ("NHWC",):
+    if layout == "NHWC":
         return _nhwc_strides(N, C, H, W)
     return _nchw_strides(N, C, H, W)
 
@@ -72,15 +73,28 @@ def _conv_out_dim(dim_in: int, pad: int, dilation: int, kernel: int,
 # MIOpen argument parsers
 # ---------------------------------------------------------------------------
 
+def _is_flag(token: str) -> bool:
+    """Return True if token looks like a CLI flag (e.g. -n, --layout).
+
+    Negative numbers like -1 or -0.5 are values, not flags.
+    """
+    if not token.startswith("-"):
+        return False
+    rest = token[1:]
+    if rest and (rest[0].isdigit() or rest[0] == "."):
+        return False
+    return True
+
+
 def _parse_args(tokens: List[str]) -> Dict[str, str]:
     """Parse a flat list of flag/value tokens into a dict."""
     result: Dict[str, str] = {}
     i = 0
     while i < len(tokens):
         tok = tokens[i]
-        if tok.startswith("-"):
-            # Check if next token is a value (doesn't start with -)
-            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
+        if _is_flag(tok):
+            # Check if next token is a value (not a flag)
+            if i + 1 < len(tokens) and not _is_flag(tokens[i + 1]):
                 result[tok] = tokens[i + 1]
                 i += 2
             else:
@@ -112,6 +126,80 @@ def _make_tensor(uid: int, name: str, dims: List[int], strides: List[int],
 
 
 # ---------------------------------------------------------------------------
+# Convolution parameter container
+# ---------------------------------------------------------------------------
+
+@dataclasses.dataclass
+class _ConvParams:
+    """Parsed convolution parameters extracted from MIOpen driver args."""
+    N: int
+    C: int
+    H: int
+    W: int
+    K: int
+    R: int
+    S: int
+    pad_h: int
+    pad_w: int
+    stride_h: int
+    stride_w: int
+    dil_h: int
+    dil_w: int
+    groups: int
+    F: int
+    spatial_dim: int
+    in_layout: str
+    out_layout: str
+    D: Optional[int] = None
+    D_f: Optional[int] = None
+    pad_d: int = 0
+    stride_d: int = 1
+    dil_d: int = 1
+
+    @classmethod
+    def from_args(cls, args: Dict[str, str]) -> "_ConvParams":
+        """Parse MIOpen convolution args into a _ConvParams instance."""
+        spatial_dim = _int(args, "--spatial_dim", 2)
+        is_3d = spatial_dim == 3
+        D: Optional[int] = None
+        D_f: Optional[int] = None
+        pad_d = 0
+        stride_d = 1
+        dil_d = 1
+        if is_3d:
+            D = _int(args, "--in_d", 1)
+            D_f = _int(args, "--fil_d", 1)
+            pad_d = _int(args, "--pad_d", 0)
+            stride_d = _int(args, "--conv_stride_d", 1)
+            dil_d = _int(args, "--dilation_d", 1)
+        return cls(
+            N=_int(args, "-n", 1),
+            C=_int(args, "-c", 1),
+            H=_int(args, "-H", 1),
+            W=_int(args, "-W", 1),
+            K=_int(args, "-k", 1),
+            R=_int(args, "-y", 1),
+            S=_int(args, "-x", 1),
+            pad_h=_int(args, "-p", 0),
+            pad_w=_int(args, "-q", 0),
+            stride_h=_int(args, "-u", 1),
+            stride_w=_int(args, "-v", 1),
+            dil_h=_int(args, "-l", 1),
+            dil_w=_int(args, "-j", 1),
+            groups=_int(args, "-g", 1),
+            F=_int(args, "-F", 1),
+            spatial_dim=spatial_dim,
+            in_layout=args.get("--in_layout", "NCHW"),
+            out_layout=args.get("--out_layout", "NCHW"),
+            D=D,
+            D_f=D_f,
+            pad_d=pad_d,
+            stride_d=stride_d,
+            dil_d=dil_d,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Convolution conversion
 # ---------------------------------------------------------------------------
 
@@ -127,80 +215,47 @@ def _conv_node_type(F: int) -> str:
     }.get(F, "ConvolutionFwdAttributes")
 
 
-def _build_conv_json(args: Dict[str, str]) -> Dict[str, Any]:
-    """Build a hipDNN JSON graph dict from parsed convbfp16 args."""
-    N = _int(args, "-n", 1)
-    C = _int(args, "-c", 1)
-    H = _int(args, "-H", 1)
-    W = _int(args, "-W", 1)
-    K = _int(args, "-k", 1)
-    R = _int(args, "-y", 1)
-    S = _int(args, "-x", 1)
-    pad_h = _int(args, "-p", 0)
-    pad_w = _int(args, "-q", 0)
-    stride_h = _int(args, "-u", 1)
-    stride_w = _int(args, "-v", 1)
-    dil_h = _int(args, "-l", 1)
-    dil_w = _int(args, "-j", 1)
-    groups = _int(args, "-g", 1)
-    F = _int(args, "-F", 1)
-    spatial_dim = _int(args, "--spatial_dim", 2)
-
-    in_layout = args.get("--in_layout", "NCHW")
-    out_layout = args.get("--out_layout", "NCHW")
-
-    is_3d = spatial_dim == 3
-    D: Optional[int] = None
-    D_f: Optional[int] = None
-    pad_d = 0
-    stride_d = 1
-    dil_d = 1
-
-    if is_3d:
-        D = _int(args, "--in_d", 1)
-        D_f = _int(args, "--fil_d", 1)
-        pad_d = _int(args, "--pad_d", 0)
-        stride_d = _int(args, "--conv_stride_d", 1)
-        dil_d = _int(args, "--dilation_d", 1)
-
-    Cg = C // groups  # channels per group for weight tensor
+def _build_conv_json(p: _ConvParams) -> Dict[str, Any]:
+    """Build a hipDNN JSON graph dict from a _ConvParams instance."""
+    is_3d = p.spatial_dim == 3
+    Cg = p.C // p.groups  # channels per group for weight tensor
 
     # Compute output spatial dims
-    H_out = _conv_out_dim(H, pad_h, dil_h, R, stride_h)
-    W_out = _conv_out_dim(W, pad_w, dil_w, S, stride_w)
+    H_out = _conv_out_dim(p.H, p.pad_h, p.dil_h, p.R, p.stride_h)
+    W_out = _conv_out_dim(p.W, p.pad_w, p.dil_w, p.S, p.stride_w)
     D_out: Optional[int] = None
-    if is_3d and D is not None and D_f is not None:
-        D_out = _conv_out_dim(D, pad_d, dil_d, D_f, stride_d)
+    if is_3d and p.D is not None and p.D_f is not None:
+        D_out = _conv_out_dim(p.D, p.pad_d, p.dil_d, p.D_f, p.stride_d)
 
     # Build dims in canonical NCHW / NCDHW order
-    if is_3d and D is not None and D_f is not None and D_out is not None:
-        x_dims = [N, C, D, H, W]
-        w_dims = [K, Cg, D_f, R, S]
-        y_dims = [N, K, D_out, H_out, W_out]
+    if is_3d and p.D is not None and p.D_f is not None and D_out is not None:
+        x_dims = [p.N, p.C, p.D, p.H, p.W]
+        w_dims = [p.K, Cg, p.D_f, p.R, p.S]
+        y_dims = [p.N, p.K, D_out, H_out, W_out]
     else:
-        x_dims = [N, C, H, W]
-        w_dims = [K, Cg, R, S]
-        y_dims = [N, K, H_out, W_out]
+        x_dims = [p.N, p.C, p.H, p.W]
+        w_dims = [p.K, Cg, p.R, p.S]
+        y_dims = [p.N, p.K, H_out, W_out]
 
-    x_strides = _input_strides(in_layout, N, C, H, W, D)
-    w_strides = _weight_strides(K, Cg, R, S, D_f)
-    y_strides = _input_strides(out_layout, N, K, H_out, W_out, D_out)
+    x_strides = _input_strides(p.in_layout, p.N, p.C, p.H, p.W, p.D)
+    w_strides = _weight_strides(p.K, Cg, p.R, p.S, p.D_f)
+    y_strides = _input_strides(p.out_layout, p.N, p.K, H_out, W_out, D_out)
 
-    node_type = _conv_node_type(F)
+    node_type = _conv_node_type(p.F)
 
-    if is_3d and D_f is not None:
-        pre_pad = [pad_d, pad_h, pad_w]
-        post_pad = [pad_d, pad_h, pad_w]
-        stride_list = [stride_d, stride_h, stride_w]
-        dil_list = [dil_d, dil_h, dil_w]
+    if is_3d and p.D_f is not None:
+        pre_pad = [p.pad_d, p.pad_h, p.pad_w]
+        post_pad = [p.pad_d, p.pad_h, p.pad_w]
+        stride_list = [p.stride_d, p.stride_h, p.stride_w]
+        dil_list = [p.dil_d, p.dil_h, p.dil_w]
     else:
-        pre_pad = [pad_h, pad_w]
-        post_pad = [pad_h, pad_w]
-        stride_list = [stride_h, stride_w]
-        dil_list = [dil_h, dil_w]
+        pre_pad = [p.pad_h, p.pad_w]
+        post_pad = [p.pad_h, p.pad_w]
+        stride_list = [p.stride_h, p.stride_w]
+        dil_list = [p.dil_h, p.dil_w]
 
     # Wire up inputs/outputs differently per direction
-    if F == 1:  # forward: x, w → y
+    if p.F == 1:  # forward: x, w → y
         tensors = [
             _make_tensor(0, "output_y", y_dims, y_strides),
             _make_tensor(1, "input_x", x_dims, x_strides),
@@ -208,7 +263,7 @@ def _build_conv_json(args: Dict[str, str]) -> Dict[str, Any]:
         ]
         node_inputs = {"x_tensor_uid": 1, "w_tensor_uid": 2}
         node_outputs = {"y_tensor_uid": 0}
-    elif F == 2:  # dgrad: dy, w → dx
+    elif p.F == 2:  # dgrad: dy, w → dx
         tensors = [
             _make_tensor(0, "output_dx", x_dims, x_strides),
             _make_tensor(1, "input_dy", y_dims, y_strides),
@@ -251,48 +306,27 @@ def _build_conv_json(args: Dict[str, str]) -> Dict[str, Any]:
     }
 
 
-def _conv_filename(prefix: str, args: Dict[str, str]) -> str:
-    N = _int(args, "-n", 1)
-    C = _int(args, "-c", 1)
-    H = _int(args, "-H", 1)
-    W = _int(args, "-W", 1)
-    K = _int(args, "-k", 1)
-    R = _int(args, "-y", 1)
-    S = _int(args, "-x", 1)
-    pad_h = _int(args, "-p", 0)
-    pad_w = _int(args, "-q", 0)
-    stride_h = _int(args, "-u", 1)
-    stride_w = _int(args, "-v", 1)
-    dil_h = _int(args, "-l", 1)
-    dil_w = _int(args, "-j", 1)
-    groups = _int(args, "-g", 1)
-    F = _int(args, "-F", 1)
-    spatial_dim = _int(args, "--spatial_dim", 2)
-    direction = _conv_direction_label(F)
+def _conv_filename(prefix: str, p: _ConvParams) -> str:
+    direction = _conv_direction_label(p.F)
 
-    if spatial_dim == 3:
-        D = _int(args, "--in_d", 1)
-        D_f = _int(args, "--fil_d", 1)
-        pad_d = _int(args, "--pad_d", 0)
-        stride_d = _int(args, "--conv_stride_d", 1)
-        dil_d = _int(args, "--dilation_d", 1)
+    if p.spatial_dim == 3 and p.D is not None and p.D_f is not None:
         name = (
             f"{prefix}_conv_{direction}"
-            f"_n{N}c{C}D{D}H{H}W{W}"
-            f"_k{K}Df{D_f}R{R}S{S}"
-            f"_pd{pad_d}p{pad_h}q{pad_w}"
-            f"_sd{stride_d}u{stride_h}v{stride_w}"
-            f"_g{groups}"
+            f"_n{p.N}c{p.C}D{p.D}H{p.H}W{p.W}"
+            f"_k{p.K}Df{p.D_f}R{p.R}S{p.S}"
+            f"_pd{p.pad_d}p{p.pad_h}q{p.pad_w}"
+            f"_sd{p.stride_d}u{p.stride_h}v{p.stride_w}"
+            f"_g{p.groups}"
         )
     else:
         name = (
             f"{prefix}_conv_{direction}"
-            f"_n{N}c{C}H{H}W{W}"
-            f"_k{K}R{R}S{S}"
-            f"_p{pad_h}q{pad_w}"
-            f"_u{stride_h}v{stride_w}"
-            f"_l{dil_h}j{dil_w}"
-            f"_g{groups}"
+            f"_n{p.N}c{p.C}H{p.H}W{p.W}"
+            f"_k{p.K}R{p.R}S{p.S}"
+            f"_p{p.pad_h}q{p.pad_w}"
+            f"_u{p.stride_h}v{p.stride_w}"
+            f"_l{p.dil_h}j{p.dil_w}"
+            f"_g{p.groups}"
         )
     return name
 
@@ -325,6 +359,7 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
         scale_strides = [C, 1, 1, 1]
 
     if forw == 1:
+        # Inference: x, mean, inv_variance, scale, bias → y
         node_type = "BatchnormInferenceAttributes"
         tensors = [
             _make_tensor(1, "input_x", x_dims, x_strides),
@@ -349,8 +384,33 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
                 "outputs": {"y_tensor_uid": 6},
             }
         ]
+    elif forw == 0:
+        # Training forward: x, scale, bias, epsilon → y
+        node_type = "BatchnormAttributes"
+        tensors = [
+            _make_tensor(1, "input_x", x_dims, x_strides),
+            _make_tensor(2, "scale", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(3, "bias", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(4, "epsilon", [1], [1], data_type="float"),
+            _make_tensor(5, "output_y", x_dims, x_strides),
+        ]
+        nodes = [
+            {
+                "name": "batchnorm_fwd_node",
+                "type": node_type,
+                "compute_data_type": "float",
+                "inputs": {
+                    "x_tensor_uid": 1,
+                    "scale_tensor_uid": 2,
+                    "bias_tensor_uid": 3,
+                    "epsilon_tensor_uid": 4,
+                    "peer_stats_tensor_uid": [],
+                },
+                "outputs": {"y_tensor_uid": 5},
+            }
+        ]
     else:
-        # Backward: dy, x, scale → dx, dscale, dbias, mean, inv_variance
+        # Backward (forw == 2): dy, x, scale → dx, dscale, dbias
         node_type = "BatchnormBackwardAttributes"
         tensors = [
             _make_tensor(1, "input_x", x_dims, x_strides),
@@ -398,7 +458,7 @@ def _bnorm_filename(prefix: str, args: Dict[str, str]) -> str:
     H = _int(args, "-H", 1)
     W = _int(args, "-W", 1)
     forw = _int(args, "--forw", 1)
-    direction = "inference" if forw == 1 else "backward"
+    direction = {1: "inference", 0: "fwd"}.get(forw, "backward")
 
     is_3d = "-D" in args
     if is_3d:
@@ -437,8 +497,9 @@ def _convert_line(operation: str, args: Dict[str, str],
                   prefix: str) -> Tuple[str, Dict[str, Any]]:
     """Convert parsed MIOpen args to (filename_stem, json_dict)."""
     if operation in ("convbfp16", "conv"):
-        graph = _build_conv_json(args)
-        name_stem = _conv_filename(prefix, args)
+        p = _ConvParams.from_args(args)
+        graph = _build_conv_json(p)
+        name_stem = _conv_filename(prefix, p)
     elif operation in ("bnormbfp16", "bnorm"):
         graph = _build_bnorm_json(args)
         name_stem = _bnorm_filename(prefix, args)
@@ -600,4 +661,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

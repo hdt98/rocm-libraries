@@ -5,10 +5,11 @@
 
 import sys
 from pathlib import Path
+from typing import List
 
-from dnn_benchmarking.cli.main import _resolve_graph_files
 from dnn_benchmarking.common.exceptions import GraphLoadError
 from dnn_benchmarking.graph.loader import GraphLoader
+from dnn_benchmarking.graph.resolver import resolve_graph_files
 
 
 def main() -> int:
@@ -18,9 +19,15 @@ def main() -> int:
         return 1
 
     all_tmpdirs = []
-    all_paths: list[Path] = []
+    all_paths: List[Path] = []
+    failed = False
     for arg in sys.argv[1:]:
-        tmpdirs, resolved, _ = _resolve_graph_files(arg)
+        try:
+            tmpdirs, resolved, _ = resolve_graph_files(arg)
+        except GraphLoadError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            failed = True
+            continue
         all_tmpdirs.extend(tmpdirs)
         if resolved:
             all_paths.extend(Path(p) for p in resolved)
@@ -34,7 +41,6 @@ def main() -> int:
         return 1
 
     loader = GraphLoader()
-    failed = False
     try:
         for path in all_paths:
             try:

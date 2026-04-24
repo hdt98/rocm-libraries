@@ -3,16 +3,14 @@
 
 """Main entry point for dnn-benchmark CLI."""
 
-import glob
 import socket
 import sys
-import tarfile
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, List, Literal, Optional, Tuple
+from typing import Any, List, Literal, Optional
 
 from ..common.exceptions import ExecutionError, GraphLoadError
+from ..graph.resolver import resolve_graph_files
 from ..config.benchmark_config import (
     ABTestConfig,
     BenchmarkConfig,
@@ -34,104 +32,6 @@ from ..reporting.suite_results import (
 from ..validation.reference_provider import ReferenceProviderRegistry
 from .parser import create_parser
 
-
-_TARBALL_SUFFIXES = {".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tar.xz"}
-
-
-def _is_tarball(path: str) -> bool:
-    """Return True if path looks like a tarball by suffix."""
-    p = path.lower()
-    return any(p.endswith(s) for s in _TARBALL_SUFFIXES)
-
-
-def _extract_tarball(tarball_path: str) -> Tuple[tempfile.TemporaryDirectory, List[str]]:
-    """Extract JSON graph files from a tarball into a temporary directory.
-
-    Args:
-        tarball_path: Path to the tarball file.
-
-    Returns:
-        Tuple of (TemporaryDirectory to keep alive, sorted list of JSON file paths).
-
-    Raises:
-        SystemExit: If the tarball cannot be opened or contains no JSON files.
-    """
-    if not Path(tarball_path).exists():
-        print(f"Tarball not found: {tarball_path}", file=sys.stderr)
-        sys.exit(1)
-    if not tarfile.is_tarfile(tarball_path):
-        print(f"Not a valid tarball: {tarball_path}", file=sys.stderr)
-        sys.exit(1)
-
-    tmpdir = tempfile.TemporaryDirectory(prefix="dnn_benchmarking_")
-    try:
-        with tarfile.open(tarball_path) as tf:
-            json_members = [m for m in tf.getmembers() if m.name.endswith(".json")]
-            if not json_members:
-                tmpdir.cleanup()
-                print(
-                    f"No .json files found in tarball: {tarball_path}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-            tf.extractall(path=tmpdir.name, members=json_members)
-    except Exception as exc:
-        tmpdir.cleanup()
-        print(f"Failed to extract tarball {tarball_path}: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    extracted = sorted(glob.glob(f"{tmpdir.name}/**/*.json", recursive=True))
-    return tmpdir, extracted
-
-
-def _resolve_graph_files(
-    graph_arg: str,
-) -> Tuple[List[tempfile.TemporaryDirectory], List[str], Optional[str]]:
-    """Resolve --graph to a list of JSON paths, extracting any tarballs found.
-
-    Handles three cases:
-    - Single tarball path: extract and return its JSON files.
-    - Glob pattern: expand, then extract any tarballs matched and collect
-      any JSON files matched directly.
-    - Single JSON file path: return as-is.
-
-    Args:
-        graph_arg: Raw --graph argument string.
-
-    Returns:
-        Tuple of (list of TemporaryDirectory objects to keep alive,
-        sorted list of resolved JSON file paths,
-        tarball_source string for reporting or None).
-    """
-    tmpdirs: List[tempfile.TemporaryDirectory] = []
-    resolved_files: List[str] = []
-    tarball_source: Optional[str] = None
-
-    # Single tarball (no glob metacharacters, suffix matches)
-    if _is_tarball(graph_arg) and not glob.has_magic(graph_arg):
-        tarball_source = graph_arg
-        tmpdir, extracted = _extract_tarball(graph_arg)
-        tmpdirs.append(tmpdir)
-        resolved_files.extend(extracted)
-        return tmpdirs, sorted(resolved_files), tarball_source
-
-    # Glob expansion (or plain path that may be a single JSON)
-    matched = sorted(glob.glob(graph_arg, recursive=True))
-    if not matched and Path(graph_arg).is_file():
-        matched = [graph_arg]
-
-    tarballs = [p for p in matched if _is_tarball(p)]
-    jsons = [p for p in matched if p.endswith(".json")]
-
-    if tarballs:
-        tarball_source = graph_arg
-        for tb in tarballs:
-            tmpdir, extracted = _extract_tarball(tb)
-            tmpdirs.append(tmpdir)
-            resolved_files.extend(extracted)
-
-    resolved_files.extend(jsons)
-    return tmpdirs, sorted(resolved_files), tarball_source
 
 
 def run_pytorch_benchmark(
@@ -534,7 +434,11 @@ def main() -> int:
     gpu_backend = "none" if args.no_kernel_timing else "auto"
 
     # Resolve --graph: tarball, glob, or single file.
-    _tmpdirs, resolved_files, tarball_source = _resolve_graph_files(args.graph)
+    try:
+        _tmpdirs, resolved_files, tarball_source = resolve_graph_files(args.graph)
+    except GraphLoadError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
     if _tmpdirs:
         print(f"Extracted {len(resolved_files)} graph(s) from {args.graph}", file=sys.stderr)
 

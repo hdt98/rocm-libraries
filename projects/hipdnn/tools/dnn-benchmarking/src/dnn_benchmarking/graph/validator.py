@@ -79,6 +79,8 @@ _REQUIRED_NODE_FIELDS: Dict[str, List[Tuple[str, str]]] = {
     "BatchnormBackwardAttributes": [
         ("inputs", "x_tensor_uid"),
         ("inputs", "dy_tensor_uid"),
+        ("inputs", "mean_tensor_uid"),
+        ("inputs", "inv_variance_tensor_uid"),
         ("inputs", "scale_tensor_uid"),
         ("inputs", "peer_stats_tensor_uid"),
         ("outputs", "dx_tensor_uid"),
