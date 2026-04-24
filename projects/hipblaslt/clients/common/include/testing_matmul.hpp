@@ -41,6 +41,7 @@
 #include "mxDataGen.hpp"
 #include "multi_macrotile.hpp"
 #include "multi_macrotile_origami_improved.hpp"
+#include "multi_macrotile_fused.hpp"
 #include "near.hpp"
 #include "norm.hpp"
 #include "unit.hpp"
@@ -4895,27 +4896,101 @@ void testing_matmul_with_bias(const Arguments& arg,
                 }
             }
 
-            // Timing iterations
+            // Timing iterations — two modes: sequential and fused (HIP Graph)
             auto start_time = std::chrono::high_resolution_clock::now();
             auto end_time = start_time;
 
-            // Sequential execution using pre-created contexts
-            for(int iter = 0; iter < timing_iters; iter++)
+            // === Mode 1: HIP Graph Fused Dispatch ===
+            // Captures all sub-problem matmuls into a graph, replays with single launch.
+            // Eliminates per-iteration host API overhead and inter-kernel CP gap.
+            bool graph_fused = false;
             {
-                for(size_t sp = 0; sp < subProblems.size(); sp++)
+                FusedGraphContext fusedCtx;
+                bool captured = captureFusedGraph(fusedCtx, handle, spCtxs,
+                                                   alpha_in[0], &(h_beta[0]),
+                                                   *dWorkspace, workspace_size, stream);
+                if (captured)
                 {
-                    if(!spCtxs[sp].valid) continue;
-                    auto& ctx = spCtxs[sp];
-                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                    ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                    &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                    ctx.D_ptr, ctx.matD,
-                                    &ctx.algo, *dWorkspace, workspace_size, stream);
+                    // Warmup the graph
+                    for (int w = 0; w < 3; w++)
+                        launchFusedGraph(fusedCtx, stream);
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+
+                    // Timed graph execution
+                    auto graph_start = std::chrono::high_resolution_clock::now();
+                    for (int iter = 0; iter < timing_iters; iter++)
+                        launchFusedGraph(fusedCtx, stream);
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    auto graph_end = std::chrono::high_resolution_clock::now();
+
+                    double graph_ms = std::chrono::duration<double, std::milli>(graph_end - graph_start).count();
+                    double graph_us = (graph_ms * 1000.0) / timing_iters;
+
+                    // Also time sequential for comparison
+                    auto seq_start = std::chrono::high_resolution_clock::now();
+                    for (int iter = 0; iter < timing_iters; iter++)
+                    {
+                        for (size_t sp = 0; sp < subProblems.size(); sp++)
+                        {
+                            if (!spCtxs[sp].valid) continue;
+                            auto& ctx = spCtxs[sp];
+                            hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
+                                            ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                            &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                            ctx.D_ptr, ctx.matD,
+                                            &ctx.algo, *dWorkspace, workspace_size, stream);
+                        }
+                    }
+                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                    auto seq_end = std::chrono::high_resolution_clock::now();
+                    double seq_ms = std::chrono::duration<double, std::milli>(seq_end - seq_start).count();
+                    double seq_us = (seq_ms * 1000.0) / timing_iters;
+
+                    // Use the faster one
+                    if (graph_us <= seq_us)
+                    {
+                        start_time = graph_start;
+                        end_time = graph_end;
+                        graph_fused = true;
+                        hipblaslt_cout << "  Fused (HIP Graph): " << std::fixed << std::setprecision(2) << graph_us
+                                      << " us vs Sequential: " << seq_us << " us → Graph wins by "
+                                      << std::setprecision(1) << ((seq_us - graph_us) / seq_us * 100) << "%" << std::endl;
+                    }
+                    else
+                    {
+                        start_time = seq_start;
+                        end_time = seq_end;
+                        hipblaslt_cout << "  Fused (HIP Graph): " << std::fixed << std::setprecision(2) << graph_us
+                                      << " us vs Sequential: " << seq_us << " us → Sequential wins by "
+                                      << std::setprecision(1) << ((graph_us - seq_us) / graph_us * 100) << "%" << std::endl;
+                    }
+                }
+                else
+                {
+                    hipblaslt_cout << "  HIP Graph capture failed, using sequential dispatch" << std::endl;
                 }
             }
 
-            CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-            end_time = std::chrono::high_resolution_clock::now();
+            // === Mode 2: Sequential fallback (if graph failed) ===
+            if (!graph_fused)
+            {
+                start_time = std::chrono::high_resolution_clock::now();
+                for(int iter = 0; iter < timing_iters; iter++)
+                {
+                    for(size_t sp = 0; sp < subProblems.size(); sp++)
+                    {
+                        if(!spCtxs[sp].valid) continue;
+                        auto& ctx = spCtxs[sp];
+                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
+                                        ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                                        &(h_beta[0]), ctx.C_ptr, ctx.matC,
+                                        ctx.D_ptr, ctx.matD,
+                                        &ctx.algo, *dWorkspace, workspace_size, stream);
+                    }
+                }
+                CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                end_time = std::chrono::high_resolution_clock::now();
+            }
 
             // Reset L2 persistence hints so subsequent work is unaffected
             if(l2_hints_applied)
