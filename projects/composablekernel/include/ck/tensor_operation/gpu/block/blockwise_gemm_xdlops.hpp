@@ -345,7 +345,7 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                         Number<0>,
                         Number<0>,
                         Number<0>,
-                        index_expression::Add<index_expression::Ik, Number<k>>>{a_thread_vec,
+                        index_expression::Add<index_expression::Ik, decltype(k)>>{a_thread_vec,
                                                                                 a_thread_buf};
                     auto loadB = thread_buf_to_vec_loader<
                         decltype(b_thread_vec),
@@ -355,7 +355,7 @@ struct BlockwiseGemmXdlops_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                         Number<0>,
                         Number<0>,
                         Number<0>,
-                        index_expression::Add<index_expression::Ik, Number<k>>>{b_thread_vec,
+                        index_expression::Add<index_expression::Ik, decltype(k)>>{b_thread_vec,
                                                                                 b_thread_buf};
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -545,7 +545,7 @@ struct BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                         Number<m0>,
                         Number<0>,
                         Number<0>,
-                        index_expression::Add<index_expression::Ik, Number<k_>>>{a_thread_vec,
+                        index_expression::Add<index_expression::Ik, decltype(k_)>>{a_thread_vec,
                                                                                  a_thread_buf};
                     auto loadB = thread_buf_to_vec_loader<
                         decltype(b_thread_vec),
@@ -555,7 +555,7 @@ struct BlockwiseGemmXdlopsInterwave_k0mk1_k0nk1_m0n0m1n1m2m3m4n2_v1
                         Number<n0>,
                         Number<0>,
                         Number<0>,
-                        index_expression::Add<index_expression::Ik, Number<k_>>>{b_thread_vec,
+                        index_expression::Add<index_expression::Ik, decltype(k_)>>{b_thread_vec,
                                                                                  b_thread_buf};
 
                     static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));

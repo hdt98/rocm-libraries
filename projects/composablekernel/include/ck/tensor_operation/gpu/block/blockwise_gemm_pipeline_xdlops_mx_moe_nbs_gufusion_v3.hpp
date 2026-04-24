@@ -760,7 +760,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                   index_expression::Ik>{
                                 b_thread_vec, b_thread_buf};
                             auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
-                                                                    decltype(b_thread_buff_up),
+                                                                    decltype(b_thread_buf_up),
                                                                     decltype(b_thread_desc_),
                                                                     ComputeTypeB,
                                                                     decltype(n0),
@@ -768,7 +768,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                     decltype(inxdl),
                                                                     decltype(kxdl),
                                                                     index_expression::Ik>{
-                                b_thread_vec, b_thread_buf_up};
+                                b_thread_vec_up, b_thread_buf_up};
 
                             static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
@@ -1028,7 +1028,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 index_expression::Ik>{b_thread_vec,
                                                                                       b_thread_buf};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
-                                                                decltype(b_thread_buff_up),
+                                                                decltype(b_thread_buf_up),
                                                                 decltype(b_thread_desc_),
                                                                 ComputeTypeB,
                                                                 decltype(n0),
@@ -1036,7 +1036,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 decltype(inxdl),
                                                                 decltype(kxdl),
                                                                 index_expression::Ik>{
-                            b_thread_vec, b_thread_buf_up};
+                            b_thread_vec_up, b_thread_buf_up};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
@@ -1216,7 +1216,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 index_expression::Ik>{b_thread_vec,
                                                                                       b_thread_buf};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
-                                                                decltype(b_thread_buff_up),
+                                                                decltype(b_thread_buf_up),
                                                                 decltype(b_thread_desc_),
                                                                 ComputeTypeB,
                                                                 decltype(n0),
@@ -1224,7 +1224,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 decltype(inxdl),
                                                                 decltype(kxdl),
                                                                 index_expression::Ik>{
-                            b_thread_vec, b_thread_buf_up};
+                            b_thread_vec_up, b_thread_buf_up};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
@@ -1331,7 +1331,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 index_expression::Ik>{b_thread_vec,
                                                                                       b_thread_buf};
                         auto loadBUp = thread_buf_to_vec_loader<decltype(b_thread_vec_up),
-                                                                decltype(b_thread_buff_up),
+                                                                decltype(b_thread_buf_up),
                                                                 decltype(b_thread_desc_),
                                                                 ComputeTypeB,
                                                                 decltype(n0),
@@ -1339,7 +1339,7 @@ struct BlockwiseGemmXdlops_pipeline_mx_moe_bns_gufusion_v3<BlockGemmPipelineSche
                                                                 decltype(inxdl),
                                                                 decltype(kxdl),
                                                                 index_expression::Ik>{
-                            b_thread_vec, b_thread_buf_up};
+                            b_thread_vec_up, b_thread_buf_up};
 
                         static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB, loadBUp));
 
