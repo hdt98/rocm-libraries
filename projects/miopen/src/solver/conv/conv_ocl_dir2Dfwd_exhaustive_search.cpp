@@ -490,7 +490,8 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
         {
             int tile_sz[3]  = {8, 16, 32};
             result.in_tile1 = tile_sz1[j];
-            if(problem.GetOutHeight() * 2 <= result.in_tile1 && result.in_tile1 > tile_sz[0])
+            if(problem.GetOutHeight() * 2 <= static_cast<size_t>(result.in_tile1) &&
+               result.in_tile1 > tile_sz[0])
             {
                 --runs_left;
                 continue;
@@ -500,7 +501,8 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
             for(int i = 0; i < n_tile0_sz; ++i)
             {
                 result.in_tile0 = tile_sz0[i];
-                if((problem.GetOutWidth() * 2 <= result.in_tile0 && result.in_tile0 > tile_sz[0]))
+                if((problem.GetOutWidth() * 2 <= static_cast<size_t>(result.in_tile0) &&
+                    result.in_tile0 > tile_sz[0]))
                 {
                     --runs_left;
                     continue;
@@ -544,7 +546,8 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                         for(int o_t = 0; o_t < n_out_tls; ++o_t)
                         {
                             result.n_out_pix_tiles = n_out_tiles_rg[o_t];
-                            if(problem.GetOutChannels() < result.n_out_pix_tiles)
+                            if(problem.GetOutChannels() <
+                               static_cast<size_t>(result.n_out_pix_tiles))
                             {
                                 --runs_left;
                                 continue;
@@ -553,7 +556,8 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                             for(int i_t = 0; i_t < n_in_tls; ++i_t)
                             {
                                 result.n_in_data_tiles = n_in_tiles_rg[i_t];
-                                if(problem.GetInChannels() < result.n_in_data_tiles)
+                                if(problem.GetInChannels() <
+                                   static_cast<size_t>(result.n_in_data_tiles))
                                 {
                                     --runs_left;
                                     continue;
@@ -563,7 +567,8 @@ ConvOclDirectFwdLegacyExhaustiveSearch::SearchImpl(const ExecutionContext& ctx,
                                 {
 
                                     result.n_stacks = n_in_stacks_sz[s];
-                                    if(result.n_stacks > problem.GetBatchSize())
+                                    if(static_cast<size_t>(result.n_stacks) >
+                                       problem.GetBatchSize())
                                     {
                                         --runs_left;
                                         continue;
