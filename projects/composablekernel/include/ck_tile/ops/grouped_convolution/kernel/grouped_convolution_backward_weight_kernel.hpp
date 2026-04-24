@@ -1065,6 +1065,7 @@ struct GroupedConvolutionBackwardWeightKernel
         __shared__ char smem_ptr[GetSmemSize()];
 
         // Group offset (blockIdx.y = group batch index)
+        const auto blockIdX       = amd_wave_read_first_lane(blockIdx.x);
         const auto blockIdY       = amd_wave_read_first_lane(blockIdx.y);
         const auto group_offset_a = amd_wave_read_first_lane(kargs.group_stride_a * blockIdY);
         const auto group_offset_b = amd_wave_read_first_lane(kargs.group_stride_b * blockIdY);
@@ -1107,7 +1108,8 @@ struct GroupedConvolutionBackwardWeightKernel
             },
             [&](index_t sk_cta_idx) {
                 RunStreamKLoop(kargs, sk_cta_idx, a_ptr, b_ptr, c_ptr, smem_ptr);
-            });
+            },
+            blockIdX);
     }
 
     /// @brief Stream-K loop: iterate over assigned K-iterations, run GEMM pipeline,
