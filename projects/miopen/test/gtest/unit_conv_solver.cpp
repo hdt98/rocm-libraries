@@ -871,6 +871,14 @@ void UnitTestConvSolverBase::SetUpImpl(const UnitTestConvSolverParams& params)
     {
         GTEST_SKIP();
     }
+    else if(params.uses_ck_dynamic_lib)
+    {
+        const auto& loader = miopen::solver::CkImplLibLoader::Get(get_handle().GetDeviceName());
+        if(!loader.IsLoaded())
+        {
+            GTEST_SKIP() << "CK dynamic library not available for " << get_handle().GetDeviceName();
+        }
+    }
 }
 
 void UnitTestConvSolverBase::RunTestImpl(const miopen::solver::conv::ConvSolverInterface& solver,
