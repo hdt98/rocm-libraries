@@ -242,7 +242,8 @@ namespace rocRoller
                         ShowValue(MAX_PAD_INTERVAL_DWORDS));
 
             const auto [bitoffset, bitwidth] = TDMInfo::PadInterval;
-            tdmExpr = bfc(Expression::literal(numDwords), tdmExpr, 0, bitoffset, bitwidth);
+            const uint32_t padIntervalValue  = numDwords > 1 ? log(numDwords) - 1u : 0;
+            tdmExpr = bfc(Expression::literal(padIntervalValue), tdmExpr, 0, bitoffset, bitwidth);
             return tdmExpr;
         }
 
