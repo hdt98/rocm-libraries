@@ -15,7 +15,6 @@ add_library(hipdnn_heuristic_config SHARED
 set_target_properties(hipdnn_heuristic_config PROPERTIES
     OUTPUT_NAME "hipdnn_heuristic_config"
     PREFIX "lib"
-    SUFFIX ".so"
     CXX_VISIBILITY_PRESET hidden
 )
 
@@ -46,6 +45,7 @@ endif()
 # Installation
 install(TARGETS hipdnn_heuristic_config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/heuristics
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/hipdnn_plugins/heuristics
     COMPONENT Runtime
 )
 
