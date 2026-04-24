@@ -1526,7 +1526,7 @@ struct Verifier
                     std::cout << "GPU data is all zeros" << std::endl;
 
                 auto idx = miopen::mismatch_idx(out_cpu, out_gpu, miopen::float_equal);
-                if(idx < miopen::range_distance(out_cpu))
+                if(idx < static_cast<size_t>(miopen::range_distance(out_cpu)))
                 {
                     std::cout << "Mismatch at " << idx << ": " << out_cpu[idx]
                               << " != " << out_gpu[idx] << std::endl;
@@ -1580,7 +1580,7 @@ struct Verifier
             // Compute gpu
             if(time)
             {
-                for(size_t i = 0; i < warmup_iter; ++i)
+                for(auto i = 0; i < warmup_iter; ++i)
                 {
                     v.gpu(xs...);
                 }
@@ -1591,7 +1591,7 @@ struct Verifier
             if(time)
             {
                 float total_time = h.GetKernelTime();
-                for(size_t i = 1; i < time_iter; ++i)
+                for(auto i = 1; i < time_iter; ++i)
                 {
                     h.ResetKernelTime();
                     v.gpu(xs...);
@@ -1683,7 +1683,7 @@ struct LSTM_test : Verifier
             }
         }
 
-        if(batchSeq.size() != seqLength)
+        if(batchSeq.size() != static_cast<size_t>(seqLength))
         {
             GTEST_SKIP() << "FAILED: Batch sequence vector length, does not match sequence length.";
         }
@@ -1787,7 +1787,7 @@ struct LSTM_test : Verifier
         miopenGetRNNParamsSize(&handle, rnnDesc, &firstInputDesc, &wei_bytes, dataType);
         auto wei_sz = int(wei_bytes / sizeof(T));
         std::vector<T> weights(wei_sz);
-        for(std::size_t i = 0; i < wei_sz; i++)
+        for(auto i = 0; i < wei_sz; i++)
         {
             weights[i] = prng::gen_descreet_uniform_sign<T>(dataScale, 100);
         }
