@@ -44,6 +44,15 @@ struct BlockFmhaPipelineProblem
     using FmhaMask              = remove_cvref_t<FmhaMask_>;
     using Traits                = remove_cvref_t<Traits_>;
 
+    // TODO: Pass scale types and granularity from FmhaFwdTypeConfig
+    using QScaleDataType = ck_tile::e8m0_t;
+    using KScaleDataType = ck_tile::e8m0_t;
+    using VScaleDataType = ck_tile::e8m0_t;
+    using PScaleDataType = ck_tile::e8m0_t;
+
+    static constexpr ck_tile::index_t kQKScaleGranularity = 32;
+    static constexpr ck_tile::index_t kVScaleGranularity  = 32;
+
     static constexpr index_t kNumGemm0Warps = BlockFmhaShape::NumGemm0Warps;
     static constexpr index_t kNumGemm1Warps = BlockFmhaShape::NumGemm1Warps;
     static constexpr index_t kBlockSize     = BlockFmhaShape::NumWarps * get_warp_size();
@@ -107,6 +116,12 @@ struct BlockFmhaBatchPrefillPipelineProblem
     static_assert(kPageBlockSize > 0, "kPageBlockSize must be positive");
     static_assert((kPageBlockSize & (kPageBlockSize - 1)) == 0,
                   "kPageBlockSize must be power of two");
+
+    // KV cache load addressing mode. GLOBAL_LOAD_LDS handles >2GB pools via
+    // 64-bit addressing; BUFFER_LOAD (default) uses SRD buffer_load for the
+    // <2GB fast path. The 2GB bound = INT32_MAX byte offset, matching CK's
+    // existing TwoGB convention.
+    static constexpr auto kKVLoadMode = Traits_::kKVLoadMode;
 
     static constexpr index_t kVectorSize  = 16 / sizeof(KDataType_); // Dwordx4
     static constexpr auto kKVMemoryLayout = Traits_::kKVMemoryLayout;

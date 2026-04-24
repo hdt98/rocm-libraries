@@ -14,6 +14,9 @@
 #include "ck_tile/host/concat.hpp"
 #include "ck_tile/ops/gemm_quant/pipeline/tile_gemm_quant_traits.hpp"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wlifetime-safety-intra-tu-suggestions"
+
 namespace ck_tile {
 
 namespace detail {
@@ -245,7 +248,7 @@ struct QuantGemmKernel
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
         // clang-format off
-        return concat('_', "gemm_quant", gemm_prec_str<ADataType, BDataType>, GemmPipeline::GetName());
+        return concat('_', "gemm_quant", gemm_prec_str<ADataType, BDataType>(), GemmPipeline::GetName());
         // clang-format on
     }
 
@@ -1328,7 +1331,8 @@ struct QuantGemmKernel
             // For RowMajor C, M is the row dimension — check M alignment here because
             // ALayout=RowMajor does not check M (it only checks K), leaving a gap for
             // the RowMajorA + RowMajorC combination.
-            if(kargs.M % TilePartitioner::MPerBlock != 0 && GemmPipeline::kPadM == false)
+            if(kargs.M % TilePartitioner::MPerBlock != 0 && GemmPipeline::kPadM == false &&
+               GemmPipeline::BlockGemmShape::NumWarps != 8)
             {
                 if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
                 {
@@ -1573,3 +1577,4 @@ struct QuantGemmKernel
 };
 
 } // namespace ck_tile
+#pragma clang diagnostic pop

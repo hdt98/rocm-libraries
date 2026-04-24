@@ -2,7 +2,21 @@
 
 Full documentation for rocPRIM is available at [https://rocm.docs.amd.com/projects/rocPRIM/en/latest/](https://rocm.docs.amd.com/projects/rocPRIM/en/latest/).
 
+## rocPRIM 4.4.0 for ROCm 7.13
+
+### Added
+
+* Added type trait definitions for `__hip_bfloat16`. This should resolve issues where this type did not work with radix-based algorithms.
+
+### Resolved issues
+
+* Fixed a silent overflow in `rocprim::device_segmented_reduce` where it could exceed the maximum number of HIP threads, resulting in missing output.
+
 ## rocPRIM 4.3.0 for ROCm 7.12
+
+### Added
+
+* Added tested examples for all algorithms.
 
 ### Optimizations
 
