@@ -26,10 +26,12 @@
 
 #pragma once
 
-#include <hipblaslt/hipblaslt.h>
 #include <stdint.h>
 #include <hip/hip_runtime.h>
-
+#include <hip/hip_bfloat16.h>
+#include <hip/library_types.h>
+#include <hipblaslt-export.h>
+#include <hipblaslt/hipblaslt-types.h>
 #include <string_view>
 #include <vector>
 
