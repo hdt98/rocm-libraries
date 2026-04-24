@@ -49,14 +49,12 @@ install(TARGETS hipdnn_heuristic_config
     COMPONENT Runtime
 )
 
-# Optionally install to build directory for testing
-if(NOT CMAKE_INSTALL_PREFIX STREQUAL CMAKE_BINARY_DIR)
-    add_custom_command(TARGET hipdnn_heuristic_config POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory
-            ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/heuristics
-        COMMAND ${CMAKE_COMMAND} -E copy
-            $<TARGET_FILE:hipdnn_heuristic_config>
-            ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/heuristics/
-        COMMENT "Copying Config plugin to build directory for testing"
-    )
-endif()
+# Copy to build directory for testing (relative to backend library location)
+add_custom_command(TARGET hipdnn_heuristic_config POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        $<TARGET_FILE_DIR:hipdnn_backend>/hipdnn_plugins/heuristics
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:hipdnn_heuristic_config>
+        $<TARGET_FILE_DIR:hipdnn_backend>/hipdnn_plugins/heuristics/
+    COMMENT "Copying Config plugin to build directory for testing"
+)
