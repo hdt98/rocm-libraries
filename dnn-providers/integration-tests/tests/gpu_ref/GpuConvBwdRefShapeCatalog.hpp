@@ -54,6 +54,10 @@ inline std::vector<ConvBwdShapeCase> getSmall2dDgradCases()
         {{1, 3, 8, 8}, {3, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 3, "Depthwise3Chan"},
         {{1, 8, 4, 4}, {16, 8, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Pointwise1x1"},
         {{1, 7, 8, 8}, {7, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "DepthwiseOdd7"},
+        // 5x5 kernel with padding (larger receptive field)
+        {{1, 2, 10, 10}, {4, 2, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 1, "Kernel5x5"},
+        // Non-square spatial dimensions
+        {{1, 2, 6, 10}, {4, 2, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "NonSquare6x10"},
         {{1, 1, 3, 3}, {1, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "SingleElement"},
     };
 }
@@ -74,6 +78,8 @@ inline std::vector<ConvBwdShapeCase> getMedium2dDgradCases()
         {{2, 256, 14, 14}, {256, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Bottleneck1x1Expand"},
         {{4, 4, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 4, "Depthwise4Chan"},
         {{8, 7, 14, 14}, {63, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "OddChanGrouped7"},
+        // Dilation=2 at medium scale
+        {{4, 32, 28, 28}, {32, 32, 3, 3}, {1, 1}, {2, 2}, {2, 2}, 1, "Dilation2MedScale"},
     };
 }
 

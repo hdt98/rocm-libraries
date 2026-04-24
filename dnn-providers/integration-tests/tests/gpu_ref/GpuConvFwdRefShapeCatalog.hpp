@@ -63,6 +63,10 @@ inline std::vector<ConvFwdShapeCase> getSmall2dConvCases()
         {{1, 8, 4, 4}, {16, 8, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Pointwise1x1"},
         // Depthwise with odd group count
         {{1, 7, 8, 8}, {7, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "DepthwiseOdd7"},
+        // 5x5 kernel with padding (larger receptive field)
+        {{1, 2, 10, 10}, {4, 2, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 1, "Kernel5x5"},
+        // Non-square spatial dimensions
+        {{1, 2, 6, 10}, {4, 2, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "NonSquare6x10"},
         // Minimum output: single element (3x3 input, 3x3 kernel)
         {{1, 1, 3, 3}, {1, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "SingleElement"},
     };
@@ -96,6 +100,8 @@ inline std::vector<ConvFwdShapeCase> getMedium2dConvCases()
         {{4, 4, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 4, "Depthwise4Chan"},
         // Odd channel count grouped (7 groups)
         {{8, 7, 14, 14}, {63, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "OddChanGrouped7"},
+        // Dilation=2 at medium scale
+        {{4, 32, 28, 28}, {32, 32, 3, 3}, {1, 1}, {2, 2}, {2, 2}, 1, "Dilation2MedScale"},
     };
 }
 
