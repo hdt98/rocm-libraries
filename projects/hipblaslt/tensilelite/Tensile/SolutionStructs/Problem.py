@@ -410,8 +410,6 @@ _defaultProblemType = {
     # =TensorContraction  requires specifying
     "OperationType": "GEMM",  # GEMM, TensorContraction, ConvolutionForward, ConvolutionBackwardData, ConvolutionBackwardWeights
     "DataType": 0,  # data types can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
-    "MacDataTypeA": 0, # A data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
-    "MacDataTypeB": 0, # B data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "DataTypeA": 0,  # A data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "DataTypeB": 0,  # B data type can specified by a variety of ways, such as "s", as listed in SolutionStructs.py::DataType
     "MacDataTypeA": 0, # A data type which is used for mac/mfma/wmma computation.
@@ -1007,11 +1005,6 @@ class ProblemType(Mapping):
     else:
       self["NumIndicesC"] = 2
 
-    if self["MXBlockA"]:
-      self["IndexAssignmentsMXSA"] = deepcopy(self["IndexAssignmentsA"])
-    if self["MXBlockB"]:
-      self["IndexAssignmentsMXSB"] = deepcopy(self["IndexAssignmentsB"])
-
     self["NumIndicesLD"] = 4
     self["IndexAssignmentsLD"][0] = self["NumIndicesC"] + 1
     for i in range(1, len(self["IndexAssignmentsLD"])):
@@ -1153,9 +1146,9 @@ class ProblemType(Mapping):
 
     if printIndexAssignmentInfo:
       print("TLUA:  %s (stridePosA(%d) <? unrollIdxA(%d)" % \
-            (state["TLUA"], strideIdxA, unrollIdxA))
+           (state["TLUA"], strideIdxA, unrollIdxA))
       print("TLUB:  %s (stridePosB(%d) <? unrollIdxB(%d)" % \
-            (state["TLUB"], strideIdxB, unrollIdxB))
+           (state["TLUB"], strideIdxB, unrollIdxB))
       print("Index01A:  %s" % state["Index01A"])
       print("Index01B:  %s" % state["Index01B"])
     #unrollDimStrideGreaterThanTileDimStrideA = TLUA = !transA = fast

@@ -764,9 +764,9 @@ class LraTileAssignmentMFMA(LraTileAssignment):
            sReg = writer.vgprPool.checkOut(1,"sReg") # remainder
 
         # get constant parameter
-        tc        = tP["tensorChar"]
-        tile01    = tP["tile01Idx"]
-        waveWidth = writer.states.kernel["WavefrontSize"]
+        tc               = tP["tensorChar"]
+        tile01           = tP["tile01Idx"]
+        waveWidth        = writer.states.kernel["WavefrontSize"]
 
         noUnrollOffset = writer.states.asmCaps["HasWMMA_V1"] or ("MXS" in tc)
         isgfx950 = kernel["ISA"][:2] == (9, 5)
@@ -847,6 +847,7 @@ class LraTileAssignmentMFMA(LraTileAssignment):
             # GFX1250 Sparse
             if writer.states.asmCaps["HasSWMMAC"] and writer.states.asmCaps["HasSWMMAC_gfx1250"] and (not isSparseTrack or tP["isM"]):
                 strideK *= 2
+
         # special case for new F8 MFMA, need to exclude wmma_v3
         elif kernel["ProblemType"]["DataType"].is8bitFloat() and kernel["MatrixInstK"] > 32 and (not writer.states.asmCaps["HasWMMA_V3"]) and (not isgfx950mx):
             if umlds:
