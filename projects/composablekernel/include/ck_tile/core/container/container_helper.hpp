@@ -224,9 +224,10 @@ container_reverse_inclusive_scan(const array<TData, NSize>& x, Reduce f, TData i
 
     TData r = init;
 
-    static_for<NSize - 1, 0, -1>{}([&](auto i) {
-        r    = f(r, x[i]);
-        y(i) = r;
+    static_for<0, NSize - 1, 1>{}([&](auto i_fwd) {
+        constexpr auto i = number<NSize - 1>{} - i_fwd;
+        r                = f(r, x[i]);
+        y(i)             = r;
     });
 
     r              = f(r, x[number<0>{}]);
@@ -244,7 +245,8 @@ container_reverse_exclusive_scan(const array<TData, NSize>& x, Reduce f, Init in
 
     TData r = init;
 
-    static_for<NSize - 1, 0, -1>{}([&](auto i) {
+    static_for<0, NSize - 1, 1>{}([&](auto i_fwd) {
+        constexpr auto i = number<NSize - 1>{} - i_fwd;
         y(i) = r;
         r    = f(r, x[i]);
     });
@@ -348,9 +350,10 @@ container_reverse_inclusive_scan(const tuple<Xs...>& x, Reduce f, TData init)
 
     TData r = init;
 
-    static_for<NSize - 1, 0, -1>{}([&](auto i) {
-        r    = f(r, x[i]);
-        y(i) = r;
+    static_for<0, NSize - 1, 1>{}([&](auto i_fwd) {
+        constexpr auto i = number<NSize - 1>{} - i_fwd;
+        r                = f(r, x[i]);
+        y(i)             = r;
     });
 
     r              = f(r, x[number<0>{}]);

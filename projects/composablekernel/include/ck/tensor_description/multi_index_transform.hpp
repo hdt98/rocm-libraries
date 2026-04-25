@@ -615,7 +615,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t carry = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i    = Number<NDimLow - 1>{} - i_fwd;
                 index_t idx_low_tmp = idx_low[i] + carry;
 
                 bool do_carry = idx_low_tmp >= idx_low_length_minus_idx_diff_low_const[i];
@@ -638,7 +639,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t borrow = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i    = Number<NDimLow - 1>{} - i_fwd;
                 index_t idx_low_tmp = idx_low[i] - borrow;
 
                 bool do_borrow = idx_low_tmp < -idx_diff_low_const[i];
@@ -661,7 +663,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t carry = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i    = Number<NDimLow - 1>{} - i_fwd;
                 index_t idx_low_tmp = idx_low[i] + carry;
 
                 bool do_carry  = idx_low_tmp >= idx_low_length_minus_idx_diff_low_const[i];
@@ -757,7 +760,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t carry = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i    = Number<NDimLow - 1>{} - i_fwd;
                 index_t idx_low_tmp = idx_low[i] + carry;
 
                 bool do_carry = idx_low_tmp >= idx_low_length_minus_idx_diff_low_const[i];
@@ -780,7 +784,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t borrow = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i             = Number<NDimLow - 1>{} - i_fwd;
                 index_t negative_idx_low_tmp = borrow - idx_low[i];
 
                 bool do_borrow = negative_idx_low_tmp > idx_diff_low_const[i];
@@ -803,7 +808,8 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             index_t carry = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i    = Number<NDimLow - 1>{} - i_fwd;
                 index_t idx_low_tmp = idx_low[i] + carry;
 
                 bool do_carry  = idx_low_tmp >= idx_low_length_minus_idx_diff_low_const[i];
@@ -884,8 +890,9 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             bool do_carry = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
-                idx_diff_low(i) = idx_diff_low_const[i] + do_carry;
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i = Number<NDimLow - 1>{} - i_fwd;
+                idx_diff_low(i)  = idx_diff_low_const[i] + do_carry;
 
                 index_t idx_low_tmp = idx_low[i] + idx_diff_low[i];
 
@@ -921,8 +928,9 @@ struct Merge_v1_carry_check
             // do not need to check the first dimension
             bool do_borrow = 0;
 
-            static_for<NDimLow - 1, 0, -1>{}([&](auto i) {
-                idx_diff_low(i) = idx_diff_low_const[i] - do_borrow;
+            static_for<0, NDimLow - 1, 1>{}([&](auto i_fwd) {
+                constexpr auto i = Number<NDimLow - 1>{} - i_fwd;
+                idx_diff_low(i)  = idx_diff_low_const[i] - do_borrow;
 
                 index_t idx_low_tmp = idx_low[i] + idx_diff_low[i];
 
@@ -1100,7 +1108,8 @@ struct Merge_v2_magic_division
 
         index_t tmp = idx_up[Number<0>{}];
 
-        static_for<NDimLow - 1, 0, -1>{}([&, this](auto i) {
+        static_for<0, NDimLow - 1, 1>{}([&, this](auto i_fwd) {
+            constexpr auto i = Number<NDimLow - 1>{} - i_fwd;
             index_t tmp2 =
                 MagicDivision::DoMagicDivision(tmp,
                                                this->low_lengths_magic_divisor_multiplier_[i],
@@ -1129,7 +1138,8 @@ struct Merge_v2_magic_division
 
         index_t tmp = idx_up_new[Number<0>{}];
 
-        static_for<NDimLow - 1, 0, -1>{}([&, this](auto i) {
+        static_for<0, NDimLow - 1, 1>{}([&, this](auto i_fwd) {
+            constexpr auto i = Number<NDimLow - 1>{} - i_fwd;
             index_t tmp2 =
                 MagicDivision::DoMagicDivision(tmp,
                                                this->low_lengths_magic_divisor_multiplier_[i],

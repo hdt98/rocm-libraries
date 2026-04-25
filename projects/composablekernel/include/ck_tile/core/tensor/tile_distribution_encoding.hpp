@@ -237,7 +237,8 @@ struct tile_distribution_encoding
 
                     index_t p_over_rh_derivative = 1;
 
-                    static_for<ndim_low - 1, -1, -1>{}([&](auto idim_low) {
+                    static_for<0, ndim_low, 1>{}([&](auto i_fwd) {
+                        constexpr auto idim_low    = number<ndim_low - 1>{} - i_fwd;
                         constexpr index_t rh_major = ps_to_rhss_major_[idim_p][idim_low];
                         constexpr index_t rh_minor = ps_to_rhss_minor_[idim_p][idim_low];
 

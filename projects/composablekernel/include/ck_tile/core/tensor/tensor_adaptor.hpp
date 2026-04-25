@@ -231,8 +231,8 @@ struct tensor_adaptor
         set_container_subset(idx_hidden, get_top_dimension_hidden_ids(), idx_top);
 
         // calculate hidden index
-        static_for<ntransform, 0, -1>{}([&](auto itran_p1) {
-            auto itran              = itran_p1 - number<1>{};
+        static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+            constexpr auto itran    = number<ntransform - 1>{} - i_fwd;
             const auto& tran        = get_transforms().at(itran);
             constexpr auto dims_low = get_lower_dimension_hidden_idss().at(itran);
             constexpr auto dims_up  = get_upper_dimension_hidden_idss().at(itran);

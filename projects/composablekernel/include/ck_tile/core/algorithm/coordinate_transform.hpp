@@ -608,7 +608,8 @@ struct merge_v2_magic_division : public base_transform<LowLengths::size(), 1>
 
         index_t tmp = idx_up[I0];
 
-        static_for<NDimLow - 1, 0, -1>{}([&, this](auto i) {
+        static_for<0, NDimLow - 1, 1>{}([&, this](auto i_fwd) {
+            constexpr auto i = number<NDimLow - 1>{} - i_fwd;
             index_t tmp2 =
                 magic_division::do_magic_division(tmp,
                                                   this->low_lengths_magic_divisor_[i][I0],
@@ -632,7 +633,8 @@ struct merge_v2_magic_division : public base_transform<LowLengths::size(), 1>
 
         index_t tmp = idx_up_new[number<0>{}];
 
-        static_for<NDimLow - 1, 0, -1>{}([&, this](auto i) {
+        static_for<0, NDimLow - 1, 1>{}([&, this](auto i_fwd) {
+            constexpr auto i = number<NDimLow - 1>{} - i_fwd;
             index_t tmp2 =
                 magic_division::do_magic_division(tmp,
                                                   this->low_lengths_magic_divisor_[i][I0],

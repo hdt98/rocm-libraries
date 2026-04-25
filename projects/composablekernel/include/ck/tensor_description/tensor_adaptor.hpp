@@ -189,8 +189,8 @@ struct TensorAdaptor
         set_container_subset(idx_hidden, GetTopDimensionHiddenIds(), idx_top);
 
         // calculate hidden index
-        static_for<ntransform, 0, -1>{}([&](auto itran_p1) {
-            auto itran              = itran_p1 - Number<1>{};
+        static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+            constexpr auto itran    = Number<ntransform - 1>{} - i_fwd;
             const auto& tran        = GetTransforms().At(itran);
             constexpr auto dims_low = GetLowerDimensionHiddenIdss().At(itran);
             constexpr auto dims_up  = GetUpperDimensionHiddenIdss().At(itran);

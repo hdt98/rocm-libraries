@@ -73,8 +73,8 @@ CK_TILE_HOST_DEVICE constexpr auto make_tensor_adaptor_coordinate(const Adaptor&
     set_container_subset(idx_hidden, top_dim_ids, idx_top);
 
     // calculate hidden index
-    static_for<ntransform, 0, -1>{}([&adaptor, &idx_hidden](auto itran_p1) {
-        auto itran              = itran_p1 - number<1>{};
+    static_for<0, ntransform, 1>{}([&adaptor, &idx_hidden](auto i_fwd) {
+        constexpr auto itran    = number<ntransform - 1>{} - i_fwd;
         const auto& tran        = adaptor.get_transforms().at(itran);
         constexpr auto dims_low = Adaptor::get_lower_dimension_hidden_idss().at(itran);
         constexpr auto dims_up  = Adaptor::get_upper_dimension_hidden_idss().at(itran);
@@ -127,7 +127,8 @@ CK_TILE_HOST_DEVICE constexpr void move_tensor_adaptor_coordinate(const Adaptor&
         set_container_subset(
             is_non_zero_diff, Adaptor::get_top_dimension_hidden_ids(), non_zero_diff_pick_top);
 
-        static_for<ntransform - 1, -1, -1>{}([&](auto itran) {
+        static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+            constexpr auto itran    = number<ntransform - 1>{} - i_fwd;
             constexpr auto dims_low = Adaptor::get_lower_dimension_hidden_idss().at(itran);
             constexpr auto dims_up  = Adaptor::get_upper_dimension_hidden_idss().at(itran);
 
@@ -152,7 +153,10 @@ CK_TILE_HOST_DEVICE constexpr void move_tensor_adaptor_coordinate(const Adaptor&
     }
     else
     {
-        static_for<ntransform - 1, -1, -1>{}([&](auto itran) { do_transforms(itran) = 1; });
+        static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+            constexpr auto itran = number<ntransform - 1>{} - i_fwd;
+            do_transforms(itran) = 1;
+        });
     }
 
     // this is what needs to be calculated
@@ -173,7 +177,8 @@ CK_TILE_HOST_DEVICE constexpr void move_tensor_adaptor_coordinate(const Adaptor&
     set_container_subset(idx_hidden, Adaptor::get_top_dimension_hidden_ids(), idx_hidden_pick_top);
 
     // update rest of hidden index
-    static_for<ntransform - 1, -1, -1>{}([&](auto itran) {
+    static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+        constexpr auto itran = number<ntransform - 1>{} - i_fwd;
         if(do_transforms[itran])
         {
             const auto& tran        = adaptor.get_transforms().at(itran);
@@ -221,8 +226,9 @@ adaptor_coordinate_is_valid_assuming_top_index_is_valid(const Adaptor& adaptor,
 
     const auto& idx_hidden = coord.get_hidden_index();
 
-    static_for<ntransform - 1, -1, -1>{}([&adaptor, &idx_hidden, &valid](auto itran) {
-        const auto tran = adaptor.get_transforms().at(itran);
+    static_for<0, ntransform, 1>{}([&adaptor, &idx_hidden, &valid](auto i_fwd) {
+        constexpr auto itran = number<ntransform - 1>{} - i_fwd;
+        const auto tran      = adaptor.get_transforms().at(itran);
 
         // check validity, only if current transformation does not always has a valid mapping
         if constexpr(!decltype(tran)::is_valid_upper_index_always_mapped_to_valid_lower_index())

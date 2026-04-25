@@ -448,8 +448,8 @@ __host__ __device__ constexpr auto make_tensor_coordinate(const TensorDesc& tens
     set_container_subset(idx_hidden, visible_dim_ids, idx_visible);
 
     // calculate hidden index
-    static_for<ntransform, 0, -1>{}([&tensor_desc, &idx_hidden](auto itran_p1) {
-        auto itran              = itran_p1 - Number<1>{};
+    static_for<0, ntransform, 1>{}([&tensor_desc, &idx_hidden](auto i_fwd) {
+        constexpr auto itran    = Number<ntransform - 1>{} - i_fwd;
         const auto& tran        = tensor_desc.GetTransforms().At(itran);
         constexpr auto dims_low = TensorDesc::GetLowerDimensionIdss().At(itran);
         constexpr auto dims_up  = TensorDesc::GetUpperDimensionIdss().At(itran);
@@ -495,7 +495,8 @@ __host__ __device__ constexpr auto make_tensor_coordinate_step(const TensorDesc&
 
     set_container_subset(is_non_zero_diff, visible_dim_ids, non_zero_diff_pick_visible);
 
-    static_for<ntransform - 1, -1, -1>{}([&](auto itran) {
+    static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+        constexpr auto itran    = Number<ntransform - 1>{} - i_fwd;
         constexpr auto dims_low = TensorDesc::GetLowerDimensionIdss().At(itran);
         constexpr auto dims_up  = TensorDesc::GetUpperDimensionIdss().At(itran);
 
@@ -559,7 +560,8 @@ __host__ __device__ constexpr void move_tensor_coordinate(const TensorDesc& tens
     set_container_subset(idx_hidden, TensorDesc::GetVisibleDimensionIds(), idx_hidden_pick_visible);
 
     // update rest of hidden index
-    static_for<ntransform - 1, -1, -1>{}([&](auto itran) {
+    static_for<0, ntransform, 1>{}([&](auto i_fwd) {
+        constexpr auto itran = Number<ntransform - 1>{} - i_fwd;
         if(coord_step.do_transforms_[itran])
         {
             const auto& tran        = tensor_desc.GetTransforms().At(itran);
@@ -594,8 +596,9 @@ coordinate_has_valid_offset_assuming_visible_index_is_valid(const TensorDesc& te
 
     const auto& idx_hidden = coord.GetHiddenIndex();
 
-    static_for<ntransform - 1, -1, -1>{}([&tensor_desc, &idx_hidden, &valid](auto itran) {
-        const auto tran = tensor_desc.GetTransforms().At(itran);
+    static_for<0, ntransform, 1>{}([&tensor_desc, &idx_hidden, &valid](auto i_fwd) {
+        constexpr auto itran = Number<ntransform - 1>{} - i_fwd;
+        const auto tran      = tensor_desc.GetTransforms().At(itran);
 
         // check validity, only if current transformation does not always has a valid mapping
         if constexpr(!decltype(tran)::IsValidUpperIndexAlwaysMappedToValidLowerIndex())
