@@ -812,13 +812,31 @@ struct HostTensor
                                      std::to_string(mDesc.get_num_of_dimension()) + "-D");
         }
 
+        // Validate dtype once before the loop to avoid repeated string comparisons
+        // and reject unrecognized values early.
+        enum class DType
+        {
+            Float,
+            Int,
+            Int8
+        };
+        DType dt;
+        if(dtype == "float")
+            dt = DType::Float;
+        else if(dtype == "int")
+            dt = DType::Int;
+        else if(dtype == "int8_t")
+            dt = DType::Int8;
+        else
+            throw std::runtime_error(std::string("save_as_text: unsupported dtype:") + dtype);
+
         const auto rows = mDesc.get_lengths()[0];
         const auto cols = mDesc.get_lengths()[1];
 
         std::ofstream file(file_name);
         if(!file.is_open())
         {
-            throw std::runtime_error(std::string("unable to open file: ") + file_name);
+            throw std::runtime_error(std::string("unable to open file:") + file_name);
         }
 
         for(std::size_t r = 0; r < rows; r++)
@@ -829,15 +847,14 @@ struct HostTensor
                     file << " ";
 
                 const auto& val = (*this)(r, c);
-                if(dtype == "int")
-                    file << type_convert<int>(val);
-                else if(dtype == "int8_t")
+                switch(dt)
+                {
+                case DType::Int: file << type_convert<int>(val); break;
+                case DType::Int8:
                     file << static_cast<int>(type_convert<ck_tile::int8_t>(val));
-                else if(dtype == "float")
-                    file << type_convert<float>(val);
-                else
-                    throw std::runtime_error(std::string("save_as_text: unsupported dtype: ") +
-                                             dtype);
+                    break;
+                case DType::Float: file << type_convert<float>(val); break;
+                }
             }
             file << "\n";
         }
