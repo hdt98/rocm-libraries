@@ -160,6 +160,14 @@ inline std::vector<ConvWgradShapeCase> getLarge1dWgradCases()
         {{8, 32, 4096}, {64, 32, 7}, {2}, {1}, {3}, 1, "Stride2LargeKernel7"},
         // 8-group on medium-long sequence
         {{16, 64, 512}, {64, 8, 5}, {1}, {1}, {2}, 8, "Grouped8Kernel5"},
+        // Odd input channels — vector alignment edge case (SWDEV-502833 pattern)
+        {{8, 5, 512}, {32, 5, 3}, {1}, {1}, {1}, 1, "OddChan5x1d"},
+        // Kernel = spatial → output length 1
+        {{4, 32, 7}, {64, 32, 7}, {1}, {1}, {0}, 1, "Output1x1d"},
+        // Large dilation on long sequence
+        {{4, 16, 2048}, {32, 16, 3}, {1}, {4}, {4}, 1, "Dilation4Long1d"},
+        // Prime output channels — non-power-of-2 K
+        {{8, 32, 256}, {127, 32, 5}, {1}, {1}, {2}, 1, "PrimeK127x1d"},
     };
 }
 
@@ -177,6 +185,18 @@ inline std::vector<ConvWgradShapeCase> getLarge2dWgradCases()
         {{4, 4, 161, 700}, {32, 1, 5, 20}, {2, 2}, {1, 1}, {0, 0}, 4, "DeepSpeechNonSquare"},
         // Non-square spatial with 2-group (79x341)
         {{8, 32, 79, 341}, {32, 16, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 2, "NonSquareGrouped2"},
+        // Odd input channels C=5 — vector alignment (SWDEV-502833)
+        {{8, 5, 56, 56}, {32, 5, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "OddChanIn5"},
+        // Asymmetric filter 5x10 (MIOpen #540)
+        {{4, 32, 79, 141}, {64, 32, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 1, "AsymFilter5x10"},
+        // Stride-2 on tiny spatial → output 1x1 (ho=wo=1)
+        {{16, 128, 2, 2}, {256, 128, 1, 1}, {2, 2}, {1, 1}, {0, 0}, 1, "Output1x1Stride2"},
+        // Prime output channels K=127
+        {{8, 64, 14, 14}, {127, 64, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "PrimeK127"},
+        // High-channel 1x1 reduction (MIOpen #2012 / SWDEV-305815)
+        {{8, 256, 14, 14}, {128, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "HiChan1x1Reduce"},
+        // Asymmetric stride (1,2) — CK edge case
+        {{8, 32, 28, 56}, {64, 32, 3, 3}, {1, 2}, {1, 1}, {1, 1}, 1, "AsymStride1x2"},
     };
 }
 
@@ -216,6 +236,14 @@ inline std::vector<ConvWgradShapeCase> getLarge3dWgradCases()
          {1, 1, 1},
          1,
          "NonCube3dLarge"},
+        // D=1 degeneracy — collapses depth to 2D-like behavior
+        {{4, 16, 1, 32, 32},
+         {32, 16, 1, 3, 3},
+         {1, 1, 1},
+         {1, 1, 1},
+         {0, 1, 1},
+         1,
+         "Degenerate3dD1"},
     };
 }
 

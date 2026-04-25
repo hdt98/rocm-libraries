@@ -3,11 +3,8 @@
 
 #include "GpuConvFwdRefShapeCatalog.hpp"
 
-#include <hipdnn_gpu_ref/detail/GpuRefHipError.hpp>
-#include <hipdnn_gpu_ref/detail/GpuRefKernelCompiler.hpp>
 #include <hipdnn_test_sdk/utilities/ConvolutionValidation.hpp>
 
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <stdexcept>
@@ -20,8 +17,10 @@ using namespace gpu_conv_fwd_ref_test;
 using Vec = std::vector<int64_t>;
 
 // ============================================================================
-// TestConvolutionValidation — direct tests for validateConvolutionParams
-// (no GPU needed, tests the standalone validation function)
+// TestConvolutionValidation — input validation error paths (CPU-only).
+// The parameterized shape tests (INSTANTIATE_TEST_SUITE_P) only run valid
+// configurations. These verify that invalid inputs (mismatched dims, zero
+// stride, negative dilation/padding) are properly rejected with exceptions.
 // ============================================================================
 
 TEST(TestConvolutionValidation, AcceptsValidParams)
@@ -158,7 +157,10 @@ TEST(TestConvolutionValidation, ThrowsOnOutputDimValueMismatch)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefValidation — validateInput throw paths (via GpuFpReferenceConvolution)
+// TestGpuConvFwdRefValidation — same validation error paths as above, but
+// exercised through the GPU code path (GpuFpReferenceConvolution::fprop).
+// Verifies that the GPU entry point rejects invalid inputs before launching
+// any kernels.
 // ============================================================================
 
 TEST(TestGpuConvFwdRefValidation, ThrowsOnInvalidDimCount)
@@ -307,11 +309,16 @@ TEST(TestGpuConvFwdRefValidation, ThrowsOnOutputDimValueMismatch)
 }
 
 // ============================================================================
-// Standalone tests (TEST, not TEST_P)
+// Standalone tests (TEST, not TEST_P).
+// These cover execution features that the parameterized shape tests do not
+// vary: asymmetric padding, alpha/beta scaling, non-packed strides, int8
+// types, TF32 mode, and mixed input/weight precision.
 // ============================================================================
 
 // ============================================================================
-// TestGpuConvFwdRefAsymPad — asymmetric (pre != post) padding tests
+// TestGpuConvFwdRefAsymPad — asymmetric padding (pre_pad != post_pad).
+// Shape tests use symmetric padding only; these verify the kernel handles
+// different pad_before vs pad_after values correctly.
 // ============================================================================
 
 TEST(TestGpuConvFwdRefAsymPadFp32, MatchesCpuRef)
@@ -336,7 +343,9 @@ TEST(TestGpuConvFwdRefAsymPadBfp16, MatchesCpuRef)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefAlphaBeta — alpha/beta scaling tests
+// TestGpuConvFwdRefAlphaBeta — alpha/beta scaling.
+// Shape tests always use alpha=1, beta=0. These verify that non-default
+// scaling (alpha!=1, beta!=0 accumulation) works correctly.
 // ============================================================================
 
 TEST(TestGpuConvFwdRefAlphaBeta, AlphaOnly)
@@ -428,8 +437,10 @@ TEST(TestGpuConvFwdRefAlphaBeta, BetaZeroSkipsRead)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefStridedFp32 — non-packed (strided) tensor tests
-// Verifies stride-based indexing with memory gaps between elements.
+// TestGpuConvFwdRefStridedFp32 — non-packed (strided) tensor memory layout.
+// Shape tests use packed (contiguous) tensors. These verify that the kernel
+// correctly handles memory gaps between elements (e.g., inter-channel or
+// inter-row stride larger than the packed stride).
 // ============================================================================
 
 TEST(TestGpuConvFwdRefStridedFp32, NonPackedInput)
@@ -540,7 +551,9 @@ TEST(TestGpuConvFwdRefStridedFp32, NonPackedWithPadding)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefInt8 — int8 input with int32 or float output
+// TestGpuConvFwdRefInt8 — int8 input with int32 or float output.
+// Shape tests only cover fp32/fp16/bfp16. These verify integer quantized
+// convolution paths (int8→int32 and int8→float).
 // ============================================================================
 
 TEST(TestGpuConvFwdRefInt8, Int8ToInt32)
@@ -623,7 +636,10 @@ TEST(TestGpuConvFwdRefInt8, Int8ToFloat)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefTf32 — TF32 truncation test
+// TestGpuConvFwdRefTf32 — TF32 truncation mode.
+// Shape tests use full-precision accumulation. This verifies that TF32
+// (10-bit mantissa truncation) produces results that differ from full
+// precision but remain within acceptable bounds.
 // ============================================================================
 
 TEST(TestGpuConvFwdRefTf32, DiffersFromNonTf32)
@@ -667,7 +683,9 @@ TEST(TestGpuConvFwdRefTf32, DiffersFromNonTf32)
 }
 
 // ============================================================================
-// TestGpuConvFwdRefMixedType — separate WEI_TYPE tests
+// TestGpuConvFwdRefMixedType — mixed input/weight precision.
+// Shape tests use the same type for input and weight tensors. These verify
+// cross-type combinations (e.g., float input × half weight).
 // ============================================================================
 
 TEST(TestGpuConvFwdRefMixedType, FloatInputHalfWeight)
@@ -694,122 +712,6 @@ TEST(TestGpuConvFwdRefMixedType, HalfInputFloatWeight)
 
     compareGpuVsCpuConvFwd<half, float, half, double>(
         xTensor, wTensor, yCpu, yGpu, {1, 1}, {1, 1}, {0, 0}, {0, 0}, 5e-2f, 1.0f);
-}
-
-// ============================================================================
-// TestGpuConvFwdRefPerformance — timing comparisons
-// ============================================================================
-
-TEST(TestGpuConvFwdRefPerformance, MediumTensorTimingComparison)
-{
-    SKIP_IF_NO_DEVICES();
-
-    const std::vector<int64_t> xDims = {2, 64, 14, 14};
-    const std::vector<int64_t> wDims = {128, 64, 3, 3};
-    const std::vector<int64_t> yDims = {2, 128, 12, 12};
-    const std::vector<int64_t> strides = {1, 1};
-    const std::vector<int64_t> dilations = {1, 1};
-    const std::vector<int64_t> padding = {0, 0};
-
-    Tensor<float> xTensor(xDims);
-    Tensor<float> wTensor(wDims);
-    Tensor<float> yCpu(yDims);
-    Tensor<float> yGpu(yDims);
-
-    const unsigned int seed = 123;
-    xTensor.fillWithRandomValues(-1.0f, 1.0f, seed);
-    wTensor.fillWithRandomValues(-1.0f, 1.0f, seed + 1);
-
-    // Warm-up run (includes HipRTC compilation on first call)
-    GpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yGpu, strides, dilations, padding);
-
-    // Time CPU
-    auto cpuStart = std::chrono::high_resolution_clock::now();
-    CpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yCpu, strides, dilations, padding);
-    auto cpuEnd = std::chrono::high_resolution_clock::now();
-    auto cpuUs = std::chrono::duration_cast<std::chrono::microseconds>(cpuEnd - cpuStart).count();
-    auto cpuMs = static_cast<double>(cpuUs) / 1000.0;
-
-    // Time GPU (kernel already compiled from warm-up)
-    hipEvent_t gpuStart = nullptr;
-    hipEvent_t gpuStop = nullptr;
-    static_cast<void>(hipEventCreate(&gpuStart));
-    static_cast<void>(hipEventCreate(&gpuStop));
-
-    static_cast<void>(hipEventRecord(gpuStart, nullptr));
-    GpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yGpu, strides, dilations, padding);
-    static_cast<void>(hipEventRecord(gpuStop, nullptr));
-    static_cast<void>(hipEventSynchronize(gpuStop));
-
-    float gpuMs = 0.0f;
-    static_cast<void>(hipEventElapsedTime(&gpuMs, gpuStart, gpuStop));
-
-    static_cast<void>(hipEventDestroy(gpuStart));
-    static_cast<void>(hipEventDestroy(gpuStop));
-
-    RecordProperty("cpu_ms", std::to_string(cpuMs));
-    RecordProperty("gpu_ms", std::to_string(static_cast<double>(gpuMs)));
-
-    assertAllClose(yCpu, yGpu, 1e-3f);
-}
-
-TEST(TestGpuConvFwdRefPerformance, DISABLED_LargeTensorTimingComparison)
-{
-    SKIP_IF_NO_DEVICES();
-
-    const std::vector<int64_t> xDims = {8, 128, 28, 28};
-    const std::vector<int64_t> wDims = {256, 128, 3, 3};
-    const std::vector<int64_t> yDims = {8, 256, 26, 26};
-    const std::vector<int64_t> strides = {1, 1};
-    const std::vector<int64_t> dilations = {1, 1};
-    const std::vector<int64_t> padding = {0, 0};
-
-    Tensor<float> xTensor(xDims);
-    Tensor<float> wTensor(wDims);
-    Tensor<float> yCpu(yDims);
-    Tensor<float> yGpu(yDims);
-
-    const unsigned int seed = 456;
-    xTensor.fillWithRandomValues(-1.0f, 1.0f, seed);
-    wTensor.fillWithRandomValues(-1.0f, 1.0f, seed + 1);
-
-    // Warm-up run
-    GpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yGpu, strides, dilations, padding);
-
-    // Time CPU
-    auto cpuStart = std::chrono::high_resolution_clock::now();
-    CpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yCpu, strides, dilations, padding);
-    auto cpuEnd = std::chrono::high_resolution_clock::now();
-    auto cpuUs = std::chrono::duration_cast<std::chrono::microseconds>(cpuEnd - cpuStart).count();
-    auto cpuMs = static_cast<double>(cpuUs) / 1000.0;
-
-    // Time GPU
-    hipEvent_t gpuStart = nullptr;
-    hipEvent_t gpuStop = nullptr;
-    static_cast<void>(hipEventCreate(&gpuStart));
-    static_cast<void>(hipEventCreate(&gpuStop));
-
-    static_cast<void>(hipEventRecord(gpuStart, nullptr));
-    GpuFpReferenceConvolution::fprop<float, float, float, float>(
-        xTensor, wTensor, yGpu, strides, dilations, padding);
-    static_cast<void>(hipEventRecord(gpuStop, nullptr));
-    static_cast<void>(hipEventSynchronize(gpuStop));
-
-    float gpuMs = 0.0f;
-    static_cast<void>(hipEventElapsedTime(&gpuMs, gpuStart, gpuStop));
-
-    static_cast<void>(hipEventDestroy(gpuStart));
-    static_cast<void>(hipEventDestroy(gpuStop));
-
-    RecordProperty("cpu_ms", std::to_string(cpuMs));
-    RecordProperty("gpu_ms", std::to_string(static_cast<double>(gpuMs)));
-
-    assertAllClose(yCpu, yGpu, 1e-2f);
 }
 
 // ============================================================================
