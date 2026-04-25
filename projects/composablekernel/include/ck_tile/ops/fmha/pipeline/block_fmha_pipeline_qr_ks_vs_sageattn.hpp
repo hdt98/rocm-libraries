@@ -64,21 +64,20 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     static constexpr bool kQLoadOnce = true;
     static_assert(kQLoadOnce == Policy::QLoadOnce);
 
-    // Async K load (HBM → LDS direct via buffer_load_dwordx4 with LDS bit).
-    // For pk_fp4_t: K must be pre-shuffled so contiguous thread access matches
-    // the warp-interleaved LDS layout expected by the GEMM.
-    // Disabled for padded configs where alignment < 4 bytes (can't do dword loads).
-    static constexpr bool kUseAsyncKLoad = !Problem::kPadHeadDimQ;
+    // SA3 always uses batch async K load (pre-shuffled K, aligned hdim).
+    static_assert(!Problem::kPadHeadDimQ,
+                  "SA3 pipeline does not support kPadHeadDimQ (hdim always aligned)");
 
-    // When async K load is active, use the async copy policy variant for K descriptors.
-    // Batch async K: use k0_loops LDS buffers so all K sub-tiles load at once.
+    // Batch async K: k0_loops LDS buffers so all K sub-tiles load at once.
     static constexpr index_t kAsyncKBuffers =
         BlockFmhaShape::kQKHeaddim / BlockFmhaShape::kK0;
     using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, kAsyncKBuffers, 1>;
 
+    // V async requires dword-aligned loads (>= 4 bytes per thread).
+    // Disabled for padded mxfp4 configs where VDataType alignment < 4.
     static constexpr bool kUseAsyncVLoad =
-        kUseAsyncKLoad && (kAsyncKBuffers > 1);
+        (numeric_traits<VDataType>::PackedSize >= 4) || !Problem::kPadSeqLenK;
     static constexpr index_t k1_loops_static = BlockFmhaShape::kN0 / BlockFmhaShape::kK1;
     using AsyncVPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, 1, k1_loops_static>;
@@ -192,27 +191,16 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
     CK_TILE_HOST_DEVICE static constexpr ck_tile::index_t GetSmemSize()
     {
-        if constexpr(kUseAsyncKLoad)
+        constexpr index_t k_async_bytes =
+            AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
+            sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
+        if constexpr(kUseAsyncVLoad)
         {
-            if constexpr(kAsyncKBuffers > 1)
-            {
-                if constexpr(kUseAsyncVLoad)
-                {
-                    constexpr index_t k_async_bytes =
-                        AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
-                        sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
-                    constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
-                    return k_async_bytes + v_smem;
-                }
-                else
-                    return AsyncKPolicy::template GetSmemSizeKV<Problem>() +
-                           Policy::template GetSmemSizeKV<Problem>();
-            }
-            else
-                return AsyncKPolicy::template GetSmemSize<Problem>();
+            constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
+            return k_async_bytes + v_smem;
         }
         else
-            return Policy::template GetSmemSize<Problem>();
+            return k_async_bytes + Policy::template GetSmemSizeKV<Problem>();
     }
 
     template <typename QDramBlockWindowTmp,
@@ -274,6 +262,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         (void)lse_dram_window_tmp;
         (void)lse_element_func;
         (void)bias_element_func;
+        (void)k_element_func;
+        (void)v_element_func;
         (void)position_encoding;
         (void)dropout;
         (void)sink_v;
@@ -319,13 +309,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         KDataType* k_lds_ptr = static_cast<KDataType*>(static_cast<void*>(
             static_cast<char*>(smem_ptr) + Policy::template GetSmemSizeQ<Problem>()));
 
-        // Baseline K LDS (used when async K load is disabled)
-        auto k_lds           = make_tensor_view<address_space_enum::lds>(
-            k_lds_ptr, Policy::template MakeKLdsBlockDescriptor<Problem>());
-        auto k_lds_window =
-            make_tile_window(k_lds, make_tuple(number<kN0>{}, number<kK0>{}), {0, 0});
-
-        // Async K LDS store/load descriptors (used when async K load is enabled)
+        // Async K LDS store/load descriptors
         constexpr auto LdsSeq = AsyncKPolicy::template GetLdsBufferSequence<Problem>();
         auto k_lds_store = generate_tuple(
             [&](auto i_buf) {
@@ -345,19 +329,12 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             AsyncKPolicy::template MakeKLdsLoadBlockDescriptor<Problem>().get_lengths(),
             {0, 0});
 
-        // V tile in LDS — offset past K LDS when K/V are separated
-        auto* v_lds_ptr = [&]() {
-            if constexpr(kUseAsyncKLoad && kAsyncKBuffers > 1)
-            {
-                constexpr index_t k_async_bytes =
-                    AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
-                    sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
-                return reinterpret_cast<VDataType*>(
-                    static_cast<char*>(smem_ptr) + k_async_bytes);
-            }
-            else
-                return reinterpret_cast<VDataType*>(smem_ptr);
-        }();
+        // V tile in LDS — offset past K async LDS region
+        constexpr index_t k_async_bytes =
+            AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
+            sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
+        auto* v_lds_ptr = reinterpret_cast<VDataType*>(
+            static_cast<char*>(smem_ptr) + k_async_bytes);
 
         // V async LDS store: BaseElementOffset encodes V's absolute LDS position.
         // async_load_tile_raw computes M0 from the descriptor's built-in offset,
@@ -380,8 +357,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             AsyncVPolicy::template GetSmemSizeV<Problem>() /
             AsyncVPolicy::NumPrefetchV;
 
-
-        // V register-staged LDS (fallback when async V is disabled)
+        // V register-staged LDS (fallback when V async alignment is insufficient)
         auto v_lds = make_tensor_view<address_space_enum::lds>(
             v_lds_ptr,
             Policy::template MakeVLdsBlockDescriptor<Problem>());
@@ -536,63 +512,39 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             k_dram_block_window.get_bottom_tensor_view(),
             k_dram_block_window.get_window_lengths(),
             k_dram_block_window.get_window_origin(),
-            [&]() {
-                if constexpr(kUseAsyncKLoad)
-                    return MakeKDramTileDistributionContiguous<Problem>();
-                else
-                    return Policy::template MakeKDramTileDistribution<Problem>();
-            }());
+            MakeKDramTileDistributionContiguous<Problem>());
 
-        // Prologue: prefetch K sub-tiles
-        auto k_block_tile = decltype(load_tile(k_dram_window)){};
-        if constexpr(kUseAsyncKLoad)
-        {
-            if constexpr(kAsyncKBuffers > 1)
-            {
-                // Batch: load all k0 sub-tiles into separate LDS buffers
-                static_for<0, k0_loops, 1>{}([&](auto i_k0) {
-                    async_load_tile_raw(
-                        k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
-                        k_dram_window);
-                    if constexpr(i_k0 < k0_loops - 1)
-                        move_tile_window(k_dram_window, {0, kK0});
-                });
-                // V async prologue: load k1 sub-tiles into pair A (buf 0,1)
-                if constexpr(kUseAsyncVLoad)
-                {
-                    // Zero-fill V LDS: async store leaves gaps between warps
-                    // (warp stride 2080 > 64 lanes × 16 bytes = 1024 per warp).
-                    // V load descriptor reads through these gaps, so they must
-                    // contain valid data (zeros).
-                    {
-                        constexpr index_t v_lds_total =
-                            AsyncVPolicy::template GetSmemSizeV<Problem>();
-                        auto* vp = reinterpret_cast<uint32_t*>(v_lds_ptr);
-                        const index_t tid = get_thread_id();
-                        for(index_t i = tid; i < v_lds_total / 4; i += kBlockSize)
-                            vp[i] = 0;
-                        __builtin_amdgcn_s_barrier();
-                    }
-                    static_for<0, k1_loops, 1>{}([&](auto i_k1) {
-                        async_load_tile_raw(
-                            make_v_store_window(i_k1),
-                            v_dram_window);
-                        if constexpr(i_k1 < k1_loops - 1)
-                            move_tile_window(v_dram_window, {0, kK1});
-                    });
-                }
-            }
-            else
-            {
-                // Single buffer: load only k0=0
-                async_load_tile_raw(
-                    k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
+        // Prologue: batch-load all K sub-tiles into separate LDS buffers
+        static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+            async_load_tile_raw(
+                k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
+                k_dram_window);
+            if constexpr(i_k0 < k0_loops - 1)
                 move_tile_window(k_dram_window, {0, kK0});
-            }
-        }
-        else
+        });
+        // V async prologue
+        if constexpr(kUseAsyncVLoad)
         {
-            k_block_tile = load_tile(k_dram_window);
+            // Zero-fill V LDS: async store leaves gaps between warps
+            // (warp stride > 64 lanes × 16 bytes = 1024 per warp).
+            // V load descriptor reads through these gaps, so they must
+            // contain valid data (zeros).
+            {
+                constexpr index_t v_lds_total =
+                    AsyncVPolicy::template GetSmemSizeV<Problem>();
+                auto* vp = reinterpret_cast<uint32_t*>(v_lds_ptr);
+                const index_t tid = get_thread_id();
+                for(index_t i = tid; i < v_lds_total / 4; i += kBlockSize)
+                    vp[i] = 0;
+                __builtin_amdgcn_s_barrier();
+            }
+            static_for<0, k1_loops, 1>{}([&](auto i_k1) {
+                async_load_tile_raw(
+                    make_v_store_window(i_k1),
+                    v_dram_window);
+                if constexpr(i_k1 < k1_loops - 1)
+                    move_tile_window(v_dram_window, {0, kK1});
+            });
         }
 
         do
@@ -605,21 +557,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             float delta_s_unique[kNIterPerWarp0];
             clear_tile(s_acc);
 
-            if constexpr(!kUseAsyncKLoad)
-            {
-                // Baseline: k_block_tile holds sub-tile[0] from prologue/prev iter
-                move_tile_window(k_dram_window, {0, kK0});
-                store_tile(k_lds_window, tile_elementwise_in(k_element_func, k_block_tile));
-                k_block_tile = load_tile(k_dram_window);
-            }
-
-            // K scale from dwordx4: kNumSGB0 int32 per k0_iter
-            // dwordx4 layout = [ki0_sg0..ki0_sgN, ki1_sg0..ki1_sgN]
-            // k_scale_arr_k0_X points into k_scale_4 at offset X*kNumSGB0
-            const int32_t* k_scale_arr_k0_0 =
-                reinterpret_cast<const int32_t*>(&k_scale_4) + 0 * kNumSGB0;
-            const int32_t* k_scale_arr_k0_1 =
-                reinterpret_cast<const int32_t*>(&k_scale_4) + 1 * kNumSGB0;
+            // V prefetch for register-staged fallback path
+            auto v_prefetch = decltype(load_tile(v_dram_window)){};
 
             // GEMM0 helper: produces Q slice + Q scale slice for sub-tile i_k0
             auto run_gemm_0 = [&](auto i_k0, const int32_t* k_scale_arr, auto& k_win) {
@@ -632,151 +571,60 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 gemm_0(s_acc, q_slice, q_scale_slice, k_win, k_scale_arr);
             };
 
-            // V prefetch — declared here so it's visible after both branches
-            auto v_prefetch = decltype(load_tile(v_dram_window)){};
+            // All K sub-tiles loaded by prologue/prev-iter
+            async_load_fence();
+            __builtin_amdgcn_s_barrier();
 
-            if constexpr(kUseAsyncKLoad)
-            {
-                if constexpr(kAsyncKBuffers > 1)
-                {
-                    // Batch: all K sub-tiles loaded by prologue/prev-iter
-                    async_load_fence();
-                    __builtin_amdgcn_s_barrier();
-
-                    // Issue delta_s loads early: GEMM0 + K_next + softmax
-                    // will hide HBM latency before delta_s is consumed
-                    {
-                        const index_t delta_s_byte_base = static_cast<index_t>(
-                            (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
-                        static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
-                            const index_t byte_offset = delta_s_byte_base +
-                                static_cast<index_t>(
-                                    (ni * kCNLane0 + lane_n) * sizeof(float));
-                            delta_s_unique[ni] = bit_cast<float>(
-                                llvm_amdgcn_raw_buffer_load_i32(
-                                    delta_s_res, byte_offset, 0, 0));
-                        });
-                    }
-                    __builtin_amdgcn_sched_barrier(0);
-
-                    // Dense GEMM0 — no intermediate stalls
-                    static_for<0, k0_loops, 1>{}([&](auto i_k0) {
-                        const int32_t* k_arr =
-                            reinterpret_cast<const int32_t*>(&k_scale_4) +
-                            i_k0 * kNumSGB0;
-                        auto k_slice = get_slice_tile(
-                            k_lds_load,
-                            sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
-                            sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
-                        run_gemm_0(number<i_k0>{}, k_arr, k_slice);
-                    });
-
-                    if constexpr(k0_loops <= 2)
-                        __builtin_amdgcn_sched_barrier(0);
-
-                    // Prefetch K_next: issue async loads right after GEMM0
-                    // ~600 VALU (softmax+GEMM1) will hide HBM latency
-                    move_tile_window(k_dram_block_window, {kN0, 0});
-                    if(i_total_loops + 1 < num_total_loop)
-                    {
-                        k_dram_window.set_window_origin(
-                            k_dram_block_window.get_window_origin());
-                        static_for<0, k0_loops, 1>{}([&](auto i_k0) {
-                            async_load_tile_raw(
-                                k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
-                                k_dram_window);
-                            if constexpr(i_k0 < k0_loops - 1)
-                                move_tile_window(k_dram_window, {0, kK0});
-                        });
-                        __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
-                    }
-
-                    if constexpr(!kUseAsyncVLoad)
-                        v_prefetch = load_tile(v_dram_window);
-                }
-                else
-                {
-                    // Serial: single-buffer, original async path
-                    async_load_fence();
-                    __builtin_amdgcn_s_barrier();
-
-                    {
-                        auto k_slice = get_slice_tile(
-                            k_lds_load,
-                            sequence<LdsSeq.at(number<0>{}) * kN0, 0>{},
-                            sequence<(LdsSeq.at(number<0>{}) + 1) * kN0, kK0>{});
-                        run_gemm_0(number<0>{}, k_scale_arr_k0_0, k_slice);
-                    }
-
-                    static_for<1, k0_loops, 1>{}([&](auto i_k0) {
-                        async_load_tile_raw(
-                            k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
-                            k_dram_window);
-                        if constexpr(i_k0 < k0_loops - 1)
-                            move_tile_window(k_dram_window, {0, kK0});
-
-                        async_load_fence();
-                        __builtin_amdgcn_s_barrier();
-
-                        const int32_t* k_arr =
-                            reinterpret_cast<const int32_t*>(&k_scale_4) +
-                            i_k0 * kNumSGB0;
-                        auto k_slice = get_slice_tile(
-                            k_lds_load,
-                            sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
-                            sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
-                        run_gemm_0(number<i_k0>{}, k_arr, k_slice);
-                    });
-
-                    if constexpr(k0_loops <= 2)
-                        __builtin_amdgcn_sched_barrier(0);
-                    v_prefetch = load_tile(v_dram_window);
-                }
-            }
-            else
-            {
-                // Baseline path: load_tile → store_tile → GEMM0
-                if constexpr(k0_loops > 2)
-                {
-                    static_for<0, k0_loops - 2, 1>{}([&](auto i_k0) {
-                        block_sync_lds();
-                        const int32_t* k_arr =
-                            reinterpret_cast<const int32_t*>(&k_scale_4) +
-                            i_k0 * kNumSGB0;
-                        run_gemm_0(number<i_k0>{}, k_arr, k_lds_window);
-                        block_sync_lds();
-                        move_tile_window(k_dram_window, {0, kK0});
-                        store_tile(k_lds_window,
-                                   tile_elementwise_in(k_element_func, k_block_tile));
-                        k_block_tile = load_tile(k_dram_window);
-                    });
-                }
-
-                v_prefetch = load_tile(v_dram_window);
-                {
-                    block_sync_lds();
-                    run_gemm_0(number<k0_loops - 2>{}, k_scale_arr_k0_0, k_lds_window);
-                    block_sync_lds();
-                    store_tile(k_lds_window,
-                               tile_elementwise_in(k_element_func, k_block_tile));
-                    block_sync_lds();
-                    run_gemm_0(number<k0_loops - 1>{}, k_scale_arr_k0_1, k_lds_window);
-                }
-            }
-
-            // For non-batch paths, load delta_s here (batch path loads after fence)
-            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
+            // Issue delta_s loads early: GEMM0 + K_next + softmax
+            // will hide HBM latency before delta_s is consumed
             {
                 const index_t delta_s_byte_base = static_cast<index_t>(
                     (seqlen_k_start + i_total_loops * kN0) * sizeof(float));
                 static_for<0, kNIterPerWarp0, 1>{}([&](auto ni) {
                     const index_t byte_offset = delta_s_byte_base +
-                        static_cast<index_t>((ni * kCNLane0 + lane_n) * sizeof(float));
+                        static_cast<index_t>(
+                            (ni * kCNLane0 + lane_n) * sizeof(float));
                     delta_s_unique[ni] = bit_cast<float>(
                         llvm_amdgcn_raw_buffer_load_i32(
                             delta_s_res, byte_offset, 0, 0));
                 });
             }
+            __builtin_amdgcn_sched_barrier(0);
+
+            // Dense GEMM0 — no intermediate stalls
+            static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+                const int32_t* k_arr =
+                    reinterpret_cast<const int32_t*>(&k_scale_4) +
+                    i_k0 * kNumSGB0;
+                auto k_slice = get_slice_tile(
+                    k_lds_load,
+                    sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
+                    sequence<(LdsSeq.at(number<i_k0>{}) + 1) * kN0, kK0>{});
+                run_gemm_0(number<i_k0>{}, k_arr, k_slice);
+            });
+
+            if constexpr(k0_loops <= 2)
+                __builtin_amdgcn_sched_barrier(0);
+
+            // Prefetch K_next: issue async loads right after GEMM0
+            // ~600 VALU (softmax+GEMM1) will hide HBM latency
+            move_tile_window(k_dram_block_window, {kN0, 0});
+            if(i_total_loops + 1 < num_total_loop)
+            {
+                k_dram_window.set_window_origin(
+                    k_dram_block_window.get_window_origin());
+                static_for<0, k0_loops, 1>{}([&](auto i_k0) {
+                    async_load_tile_raw(
+                        k_lds_store(number<LdsSeq.at(number<i_k0>{})>{}),
+                        k_dram_window);
+                    if constexpr(i_k0 < k0_loops - 1)
+                        move_tile_window(k_dram_window, {0, kK0});
+                });
+                __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
+            }
+
+            if constexpr(!kUseAsyncVLoad)
+                v_prefetch = load_tile(v_dram_window);
 
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
             s_acc = tile_elementwise_in(s_acc_element_func, s_acc);
@@ -939,11 +787,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
             if constexpr(kUseAsyncVLoad)
             {
-                // V async 2-buffer in-place with interleaved V_next:
-                // k1=0: GEMM1 reads buf 0 → V_next overwrites buf 0
-                // k1=1: GEMM1 reads buf 1 (buf 0 V_next in flight, no conflict)
-                //        → V_next overwrites buf 1
-                // MFMA compute hides V_next HBM latency.
+                // V async 2-buffer in-place with interleaved V_next
                 static_for<0, k1_loops, 1>{}([&](auto i_k1) {
                     if constexpr(i_k1 > 0)
                         block_sync_lds();
@@ -970,7 +814,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     gemm_1(o_acc, p_slice, p_scale_slice,
                            v_win, v_scale_arr);
 
-                    // V_next: buf i_k1 just read, safe to overwrite.
                     if(i_total_loops + 1 < num_total_loop)
                     {
                         move_tile_window(v_dram_window, {0, kK1});
@@ -978,15 +821,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                             make_v_store_window(i_k1), v_dram_window);
                     }
                 });
-
-                if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
-                    move_tile_window(k_dram_block_window, {kN0, 0});
             }
             else
             {
-                // V register-staged path (original)
-                // Store prefetched V
-                if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1 || k1_loops > 1)
+                // V register-staged fallback (for padded mxfp4 configs)
+                if constexpr(k1_loops > 1)
                     block_sync_lds();
                 store_tile(v_lds_window, tile_elementwise_in(v_element_func, v_prefetch));
                 move_tile_window(v_dram_window, {0, kK1});
@@ -1013,8 +852,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                         move_tile_window(v_dram_window, {0, kK1});
                     });
                 }
-                if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
-                    move_tile_window(k_dram_block_window, {kN0, 0});
                 {
                     block_sync_lds();
                     run_gemm_1_packed(number<k1_loops - 1>{});
@@ -1029,33 +866,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                     scale_block_start + i_total_loops + 1);
                 v_scale_4 = load_v_scale_dwordx4(
                     scale_block_start + i_total_loops + 1);
-            }
-
-            // Prefetch K for next iteration (non-batch paths only;
-            // batch async K is prefetched after GEMM0 above)
-            if constexpr(!kUseAsyncKLoad || kAsyncKBuffers <= 1)
-            {
-                if(i_total_loops + 1 < num_total_loop)
-                {
-                    if constexpr(kUseAsyncKLoad)
-                    {
-                        k_dram_window.set_window_origin(
-                            k_dram_block_window.get_window_origin());
-                        async_load_tile_raw(
-                            k_lds_store(LdsSeq.at(number<0>{})), k_dram_window);
-                        move_tile_window(k_dram_window, {0, kK0});
-                    }
-                    else
-                    {
-                        k_dram_window = make_tile_window(
-                            k_dram_block_window.get_bottom_tensor_view(),
-                            k_dram_block_window.get_window_lengths(),
-                            k_dram_block_window.get_window_origin(),
-                            Policy::template MakeKDramTileDistribution<Problem>());
-                        k_block_tile = load_tile(k_dram_window);
-                    }
-                    __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
-                }
             }
 
         } while(++i_total_loops < num_total_loop);
