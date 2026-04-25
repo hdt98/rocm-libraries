@@ -49,7 +49,7 @@ distributions.
 ## Building
 
 ```bash
-cd rocm-libraries-public/projects/composablekernel/build
+cd <repo-root>/projects/composablekernel/build
 
 # Build all tutorials:
 ninja tutorials

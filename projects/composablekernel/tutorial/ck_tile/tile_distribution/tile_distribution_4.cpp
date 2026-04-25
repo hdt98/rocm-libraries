@@ -172,11 +172,12 @@ struct TileDistKernel4
             {
                 printf(
                     "\n=== Tile Distribution Scenario 4: R Dimension (Inter-Warp Replicate) ===\n");
-                printf("Tile: %d x %d,  BlockSize: %d,  WarpSize: %d,  Warps: 4\n",
+                printf("Tile: %d x %d,  BlockSize: %d,  WarpSize: %d,  Warps: %d\n",
                        static_cast<int>(kM),
                        static_cast<int>(kK),
                        static_cast<int>(kBlockSize),
-                       static_cast<int>(warp_size));
+                       static_cast<int>(warp_size),
+                       static_cast<int>(kBlockSize / warp_size));
                 printf("Each thread owns: 1 row x %d cols = %d elements\n",
                        static_cast<int>(kK),
                        static_cast<int>(kBufSize));
