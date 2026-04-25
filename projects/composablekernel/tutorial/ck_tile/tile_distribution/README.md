@@ -43,8 +43,8 @@ The recommended reading order is **1 → 3 → 2 → 4** (simple to complex):
 
 Scenarios 1-3 are from
 `include/ck_tile/ops/gemm/pipeline/gemm_pipeline_agmem_bgmem_creg_v1_default_policy.hpp`.
-Scenario 4 is from
-`include/ck_tile/ops/gemm/pipeline/gemm_pipeline_ag_bg_cr_comp_tdm_default_policy.hpp`.
+Scenario 4 demonstrates the R (replicate) dimension pattern used in MX-GEMM scale-factor
+distributions.
 
 ## Building
 
