@@ -171,17 +171,27 @@ class ProfileViewer(App):
         self._check_staleness()
 
         # Jump to start line
-        if self.start_line > 0:
+        if self.start_line > 0 and self._line_items:
             list_view = self.query_one("#code-list", ListView)
             idx = min(self.start_line, len(self._line_items) - 1)
             list_view.index = idx
 
-        # Set up watch mode polling
-        if self.watch_mode:
+        # Always poll in watch mode; also poll when profile doesn't exist
+        # yet so we pick it up when it appears
+        if self.watch_mode or self.profile_data is None:
             self.set_interval(1.5, self._check_reload)
 
     def _load_profile(self) -> None:
-        """Load profile data from the flat file."""
+        """Load profile data from the flat file.
+
+        If the file doesn't exist yet, sets profile_data to None and
+        shows a warning. The watch-mode poller will pick it up when
+        it appears.
+        """
+        if not self.profile_path.exists():
+            self.profile_data = None
+            return
+
         self.profile_data = parse_profile_dump(self.profile_path)
         if self.map_path and self.map_path.exists():
             self.profile_data = load_source_map_asm(
@@ -197,6 +207,10 @@ class ProfileViewer(App):
         list_view.clear()
         self._line_items.clear()
         if not self.profile_data:
+            # No data yet — show a waiting message
+            from rich.text import Text as RichText
+            msg = RichText("  Waiting for profile data...", style="dim italic")
+            list_view.append(ListItem(CodeLine(msg)))
             return
         for i, line in enumerate(self.profile_data.lines):
             ls = style_line(line.inst_type, line.stall_per_hit, self.baselines)
@@ -211,8 +225,13 @@ class ProfileViewer(App):
 
         If .map.json is newer than profile.txt, the kernel was rebuilt
         but the profiler wasn't re-run — the profile data is stale.
+        If profile.txt doesn't exist yet, show a waiting warning.
         """
         warning = self.query_one("#warning-bar", WarningBar)
+        if self.profile_data is None:
+            warning.show_warning(
+                f"Waiting for profile data: {self.profile_path.name}")
+            return
         if self.map_path and self.map_path.exists() and self.profile_path.exists():
             map_mtime = self.map_path.stat().st_mtime
             profile_mtime = self.profile_path.stat().st_mtime
@@ -224,8 +243,22 @@ class ProfileViewer(App):
         warning.hide_warning()
 
     def _check_reload(self) -> None:
-        """Poll for file changes in watch mode."""
-        if self.profile_data and self.profile_data.has_changed(self.profile_path):
+        """Poll for file changes in watch mode.
+
+        Also handles the case where profile.txt didn't exist at startup
+        but has now appeared.
+        """
+        if self.profile_data is None:
+            # Profile didn't exist at startup — check if it appeared
+            if self.profile_path.exists():
+                self._load_profile()
+                self._render_lines()
+                self._check_staleness()
+                self.sub_title = f"loaded — {self.profile_path.name}"
+                self.set_timer(3.0, self._reset_subtitle)
+            return
+
+        if self.profile_data.has_changed(self.profile_path):
             old_index = self.query_one("#code-list", ListView).index
             self._load_profile()
             self._render_lines()
