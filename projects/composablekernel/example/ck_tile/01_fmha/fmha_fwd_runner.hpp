@@ -5,18 +5,16 @@
 
 #include "ck_tile/host.hpp"
 #include "ck_tile/ref/naive_attention.hpp"
+#include "ck_tile/host/reference/reference_sageattn_v3_preprocess.hpp"
 #include "fmha_fwd.hpp"
-#include "fmha_fwd_head_grouping.hpp"
 #include "utils.hpp"
 #include "ck_tile/utility/json_dump.hpp"
 
 #include <array>
-#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <cmath>
 #include <numeric>
-#include <optional>
 #include <ostream>
 #include <string>
 #include <tuple>
@@ -97,6 +95,22 @@ auto get_elimit<FmhaFwdMxFp8>(std::string /*init_method*/)
 
 template <>
 auto get_elimit<FmhaFwdMxFp4>(std::string /*init_method*/)
+{
+    double rtol = 1e-1;
+    double atol = 2.6e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
+template <>
+auto get_elimit<FmhaFwdSageAttnV3>(std::string /*init_method*/)
+{
+    double rtol = 1e-1;
+    double atol = 2.6e-1;
+    return ck_tile::make_tuple(rtol, atol);
+}
+
+template <>
+auto get_elimit<FmhaFwdSageAttnV3Fp16>(std::string /*init_method*/)
 {
     double rtol = 1e-1;
     double atol = 2.6e-1;
@@ -248,12 +262,20 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         uint32_t seed,
                         int do_validation,
                         int init_sink_value,
+                        float p_scale_factor,
                         const ck_tile::stream_config& stream_config,
                         std::optional<std::string> json = std::nullopt)
 {
     using TypeConfig = FmhaFwdTypeConfig<DataTypeConfig>;
 
-    constexpr bool is_mx = ck_tile::is_any_of<DataTypeConfig, FmhaFwdMxFp8, FmhaFwdMxFp4>::value;
+    constexpr bool is_mx =
+        ck_tile::is_any_of<DataTypeConfig,
+                           FmhaFwdMxFp8,
+                           FmhaFwdMxFp4,
+                           FmhaFwdSageAttnV3,
+                           FmhaFwdSageAttnV3Fp16>::value;
+    constexpr bool is_sageattnv3 =
+        ck_tile::is_any_of<DataTypeConfig, FmhaFwdSageAttnV3, FmhaFwdSageAttnV3Fp16>::value;
 
     using QDataType             = typename TypeConfig::QDataType;
     using KDataType             = typename TypeConfig::KDataType;
@@ -300,6 +322,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
             return "mxfp8";
         else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdMxFp4>)
             return "mxfp4";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3>)
+            return "sageattnv3";
+        else if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdSageAttnV3Fp16>)
+            return "sageattnv3fp16";
         else
             static_assert(false);
     }();
@@ -324,10 +350,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
         hdim_q =
             ck_tile::integer_least_multiple(hdim_q, ck_tile::numeric_traits<KDataType>::PackedSize);
     }
-    if(is_mx && !seqlen_kpads.empty() && seqlen_kpads[0] > 0)
+    if((is_mx || is_sageattnv3) && !seqlen_kpads.empty() && seqlen_kpads[0] > 0)
     {
         std::cerr
-            << "seqlen_kpads is not supported with MX types. ignoring the 'seqlen_kpads' option"
+            << "seqlen_kpads is not supported with MX/SageAttnV3 types. ignoring the "
+               "'seqlen_kpads' option"
             << std::endl;
         seqlen_kpads = {-1};
     }
@@ -387,7 +414,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
 
 #if(!(CK_TILE_FMHA_FWD_APPENDKV_API || CK_TILE_FMHA_FWD_SPLITKV_API || \
-      CK_TILE_FMHA_FWD_PAGEDKV_API || CK_TILE_FMHA_FWD_BATCH_PREFILL_API))
+      CK_TILE_FMHA_FWD_PAGEDKV_API))
     if(0 < page_block_size)
     {
         std::cerr << "paged-kvcache is not supported. ignoring the 'page_block_size' option"
@@ -395,11 +422,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
         page_block_size = 0;
     }
 #endif
-    // batch_prefill supports flexible page sizes (not just multiples of 128)
-    const bool need_128_aligned_page =
-        (CK_TILE_FMHA_FWD_APPENDKV_API || CK_TILE_FMHA_FWD_SPLITKV_API ||
-         CK_TILE_FMHA_FWD_PAGEDKV_API);
-    if(need_128_aligned_page && 0 < page_block_size && !(page_block_size % 128 == 0))
+    if(!(page_block_size % 128 == 0))
     {
         std::cerr << "only paged-kvcache block size divisible by 128 are currently supported"
                   << std::endl;
@@ -518,20 +541,36 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
     quant_scale_info qscale = quant_scale_info::decode(qscale_str);
 
-    if(is_mx && qscale.type != quant_scale_enum::mx)
+    if(is_mx && !is_sageattnv3 && qscale.type != quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str must be 'mx' for MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    else if(!is_mx && qscale.type == quant_scale_enum::mx)
+    else if(is_sageattnv3 && qscale.type != quant_scale_enum::sageattnv3)
+    {
+        std::cerr << "The value of qscale_str must be 'sageattnv3' for SageAttnV3 data type"
+                  << std::endl;
+        return fwd_result::invalid_args;
+    }
+    else if(!is_mx && !is_sageattnv3 && qscale.type == quant_scale_enum::mx)
     {
         std::cerr << "The value of qscale_str cannot be 'mx' for non-MX data types" << std::endl;
         return fwd_result::invalid_args;
     }
-    if(is_mx && is_v_rowmajor)
+    if((is_mx || is_sageattnv3) && is_v_rowmajor)
     {
-        std::cerr << "The value of is_v_rowmajor must be 'false' for MX data types" << std::endl;
+        std::cerr << "The value of is_v_rowmajor must be 'false' for MX/SageAttnV3 data types"
+                  << std::endl;
         return fwd_result::invalid_args;
+    }
+    if(is_sageattnv3 && mode == mode_enum::group)
+    {
+        return fwd_result::no_instance;
+    }
+    if(is_sageattnv3 && !((hdim_q == 128 && hdim_v == 128) || (hdim_q == 256 && hdim_v == 256)))
+    {
+        // SA3 only has kernels for hdim=128 and hdim=256; other shapes have no applicable instance
+        return fwd_result::no_instance;
     }
 
     if(p_drop < 0.0f || p_drop > 1.0f)
@@ -616,7 +655,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 block_scale_seqstart_q_host.push_back(i_block_scale_q);
                 block_scale_seqstart_k_host.push_back(i_block_scale_k);
             }
-            else if(qscale.type == quant_scale_enum::mx)
+            else if(qscale.type == quant_scale_enum::mx ||
+                    qscale.type == quant_scale_enum::sageattnv3)
             {
                 i_seqstart_v_scale +=
                     ck_tile::integer_divide_ceil(real_seqlen_k, kVScaleGranularity);
@@ -744,6 +784,16 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                         shape_seqlen_q,
                                                                         hdim_v}
                                       : std::array<ck_tile::index_t, 5>{1, 1, 1, 1, 1});
+
+    // SA3: delta_s = Q_mean @ K^T, shape [batch, nhead, num_q_blocks, seqlen_k]
+    // kM0 = 64 matches the FMHA pipeline Q tile size
+    constexpr ck_tile::index_t kM0_sa3 = 64;
+    const ck_tile::index_t num_q_blocks_sa3 =
+        ck_tile::integer_divide_ceil(shape_seqlen_q, kM0_sa3);
+    ck_tile::HostTensor<float> delta_s_host(
+        is_sageattnv3
+            ? std::array<ck_tile::index_t, 4>{shape_batch, nhead, num_q_blocks_sa3, shape_seqlen_k}
+            : std::array<ck_tile::index_t, 4>{1, 1, 1, 1});
 
     const ck_tile::index_t hdim_q_scale = ck_tile::integer_divide_ceil(hdim_q, kQKScaleGranularity);
     const ck_tile::index_t shape_seqlen_v_scale = seqstart_v_scale_host.back();
@@ -944,6 +994,206 @@ fwd_result fmha_fwd_run(mode_enum mode,
         ck_tile::FillUniformDistributionIntegerValue<SMPLComputeDataType>{30.f, 60.f, next_seed()}(
             sink_host);
     }
+    if constexpr(is_sageattnv3)
+    {
+        // delta_s = Q_mean @ K^T, small random values matching typical scale of attention scores
+        ck_tile::FillUniformDistribution<float>{-0.5f, 0.5f, next_seed()}(delta_s_host);
+    }
+
+    // SA3 OPSEL: repack K/V scale from [batch, nhead_k, seqlen, cols] e8m0
+    //   to [batch, nhead_k, num_block_pairs, 2_k_groups, 4] int32
+    // Parameters depend on MFMA tile shape:
+    //   d<=128: 32x32x64  → kK0=64,  kCNLane=32, kABScaleKLane=2, kNIterPerWarp=4
+    //   d>128:  16x16x128 → kK0=128, kCNLane=16, kABScaleKLane=4, kNIterPerWarp=8
+    constexpr ck_tile::index_t kN0_sa3 = 128;
+
+    ck_tile::index_t k_scale_packed_size_per_head = 0;
+    ck_tile::index_t v_scale_packed_size_per_head = 0;
+    std::vector<int32_t> k_scale_packed_host;
+    std::vector<int32_t> v_scale_packed_host;
+
+    if constexpr(is_sageattnv3)
+    {
+        const ck_tile::index_t kK0_sa3 = (hdim_q <= 128) ? 64 : 128;
+        const ck_tile::index_t kCNLane_sa3 = (hdim_q <= 128) ? 32 : 16;
+        const ck_tile::index_t kABScaleKLane = kK0_sa3 / 32;
+        const ck_tile::index_t kNIterPerWarp = kN0_sa3 / kCNLane_sa3;
+
+        const ck_tile::index_t num_k_blocks =
+            ck_tile::integer_divide_ceil(shape_seqlen_k, kN0_sa3);
+        const ck_tile::index_t k0_loops =
+            ck_tile::integer_divide_ceil(hdim_q, kK0_sa3);
+        constexpr ck_tile::index_t kScaleRepeatB = 4;
+        const ck_tile::index_t kNumScaleGroups = kNIterPerWarp / kScaleRepeatB;
+        const ck_tile::index_t kScalePerBlock = k0_loops * kNumScaleGroups;
+
+        k_scale_packed_size_per_head = num_k_blocks * kABScaleKLane * kScalePerBlock;
+        k_scale_packed_host.resize(shape_batch * nhead_k * k_scale_packed_size_per_head, 0);
+
+        for(ck_tile::index_t b = 0; b < shape_batch; b++)
+        {
+            for(ck_tile::index_t h = 0; h < nhead_k; h++)
+            {
+                for(ck_tile::index_t block = 0; block < num_k_blocks; block++)
+                {
+                    for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
+                    {
+                        for(ck_tile::index_t ki = 0; ki < k0_loops; ki++)
+                        {
+                            ck_tile::index_t col = ki * kABScaleKLane + kg;
+                            for(ck_tile::index_t sg = 0; sg < kNumScaleGroups; sg++)
+                            {
+                                int32_t packed = 0;
+                                for(ck_tile::index_t si = 0; si < kScaleRepeatB; si++)
+                                {
+                                    ck_tile::index_t ni = sg * kScaleRepeatB + si;
+                                    ck_tile::index_t row =
+                                        block * kN0_sa3 + ni * kCNLane_sa3;
+                                    uint8_t byte_val = 0;
+                                    if(row < shape_seqlen_k && col < hdim_q_scale)
+                                    {
+                                        byte_val = ck_tile::bit_cast<uint8_t>(
+                                            i_perm ? k_descale_host(b, h, row, col)
+                                                   : k_descale_host(b, row, h, col));
+                                    }
+                                    packed |=
+                                        static_cast<int32_t>(byte_val) << (si * 8);
+                                }
+                                ck_tile::index_t dst_idx =
+                                    (b * nhead_k + h) * k_scale_packed_size_per_head +
+                                    block * (kABScaleKLane * kScalePerBlock) +
+                                    kg * kScalePerBlock +
+                                    ki * kNumScaleGroups + sg;
+                                k_scale_packed_host[dst_idx] = packed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // V scale repack: V is column-major, scale is [hdim_v, seqlen_k/gran]
+        // GEMM1: B=V, N=hdim_v, K=seqlen_k_per_block
+        const ck_tile::index_t kK1_sa3 = (hdim_q <= 128) ? 64 : 128;
+        const ck_tile::index_t kNIterPerWarp_V = hdim_v / kCNLane_sa3;
+        const ck_tile::index_t kNumScaleGroups_V = kNIterPerWarp_V / kScaleRepeatB;
+        const ck_tile::index_t k1_loops =
+            ck_tile::integer_divide_ceil(kN0_sa3, kK1_sa3);
+        const ck_tile::index_t kScalePerBlock_V = k1_loops * kNumScaleGroups_V;
+
+        v_scale_packed_size_per_head =
+            num_k_blocks * kABScaleKLane * kScalePerBlock_V;
+        v_scale_packed_host.resize(
+            shape_batch * nhead_k * v_scale_packed_size_per_head, 0);
+
+        for(ck_tile::index_t b = 0; b < shape_batch; b++)
+        {
+            for(ck_tile::index_t h = 0; h < nhead_k; h++)
+            {
+                for(ck_tile::index_t block = 0; block < num_k_blocks; block++)
+                {
+                    for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
+                    {
+                        for(ck_tile::index_t ki = 0; ki < k1_loops; ki++)
+                        {
+                            ck_tile::index_t v_scale_col_base =
+                                block * (kK1_sa3 / kVScaleGranularity);
+                            ck_tile::index_t v_col =
+                                v_scale_col_base + ki * kABScaleKLane + kg;
+                            for(ck_tile::index_t sg = 0;
+                                sg < kNumScaleGroups_V; sg++)
+                            {
+                                int32_t packed = 0;
+                                for(ck_tile::index_t si = 0;
+                                    si < kScaleRepeatB; si++)
+                                {
+                                    ck_tile::index_t ni =
+                                        sg * kScaleRepeatB + si;
+                                    ck_tile::index_t v_row =
+                                        ni * kCNLane_sa3;
+                                    uint8_t byte_val = 0;
+                                    if(v_row < hdim_v &&
+                                       v_col < shape_seqlen_v_scale)
+                                    {
+                                        byte_val = ck_tile::bit_cast<uint8_t>(
+                                            i_perm
+                                                ? v_descale_host(b, h, v_row, v_col)
+                                                : v_descale_host(
+                                                      b, v_row, h, v_col));
+                                    }
+                                    packed |= static_cast<int32_t>(byte_val)
+                                              << (si * 8);
+                                }
+                                ck_tile::index_t dst_idx =
+                                    (b * nhead_k + h) *
+                                        v_scale_packed_size_per_head +
+                                    block *
+                                        (kABScaleKLane * kScalePerBlock_V) +
+                                    kg * kScalePerBlock_V +
+                                    ki * kNumScaleGroups_V + sg;
+                                v_scale_packed_host[dst_idx] = packed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    // SA3: pre-shuffle K rows for contiguous async buffer_load_dwordx4 to LDS.
+    // The async load uses warp-interleaved N in LDS but contiguous DRAM access.
+    // Pre-shuffle transposes (NumWarps, LaneGroups) → (LaneGroups, NumWarps) within
+    // each block of (LaneGroups * NumWarps) rows.
+    // Parameters depend on MFMA tile shape which varies with hdim:
+    //   d=128: 32x32x64  → kK1=64,  LanesPerK=4, LaneGroups=16, BlockRows=64
+    //   d=256: 16x16x128 → kK1=128, LanesPerK=8, LaneGroups=8,  BlockRows=32
+    if constexpr(is_sageattnv3)
+    {
+        constexpr ck_tile::index_t kPackedSize =
+            ck_tile::numeric_traits<KDataType>::PackedSize;
+        constexpr ck_tile::index_t kNumWarps_sa3 = 4;
+        constexpr ck_tile::index_t kKVector_sa3  = 16 / sizeof(KDataType);
+        ck_tile::HostTensor<KDataType> k_shuffled(k_host.get_lengths());
+        if(hdim_q <= 128)
+        {
+            constexpr ck_tile::index_t kLaneGroups = 64 / (64 / kKVector_sa3); // =16
+            ck_tile::reference::reference_sageattn_v3_k_shuffle<kLaneGroups, kNumWarps_sa3>(
+                k_host.data(), k_shuffled.data(),
+                shape_batch, nhead_k, shape_seqlen_k, hdim_q / kPackedSize);
+        }
+        else
+        {
+            constexpr ck_tile::index_t kLaneGroups = 64 / (128 / kKVector_sa3); // =8
+            ck_tile::reference::reference_sageattn_v3_k_shuffle<kLaneGroups, kNumWarps_sa3>(
+                k_host.data(), k_shuffled.data(),
+                shape_batch, nhead_k, shape_seqlen_k, hdim_q / kPackedSize);
+        }
+        std::swap(k_host, k_shuffled);
+
+        // V shuffle: same (LaneGroups, NumWarps) transpose as K.
+        // V is [B, Hkv, D, Sk_pad/2] in pk_fp4_t — identical [N, K] structure to K.
+        // Only shuffle V data, not v_descale (scale packing uses original row ordering).
+        ck_tile::HostTensor<VDataType> v_shuffled(v_host.get_lengths());
+        if(hdim_q <= 128)
+        {
+            constexpr ck_tile::index_t kLaneGroups_v = 64 / (64 / kKVector_sa3);
+            ck_tile::reference::reference_sageattn_v3_v_shuffle<
+                kLaneGroups_v, kNumWarps_sa3>(
+                v_host.data(), v_shuffled.data(),
+                shape_batch, nhead_k, hdim_v, shape_seqlen_k / kPackedSize);
+        }
+        else
+        {
+            constexpr ck_tile::index_t kLaneGroups_v = 64 / (128 / kKVector_sa3);
+            ck_tile::reference::reference_sageattn_v3_v_shuffle<
+                kLaneGroups_v, kNumWarps_sa3>(
+                v_host.data(), v_shuffled.data(),
+                shape_batch, nhead_k, hdim_v, shape_seqlen_k / kPackedSize);
+        }
+        std::swap(v_host, v_shuffled);
+    }
+
     ck_tile::DeviceMem q_buf(q_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem k_buf(k_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem v_buf(v_host.get_element_space_size_in_bytes());
@@ -954,6 +1204,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem q_descale_buf(q_descale_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem k_descale_buf(k_descale_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem v_descale_buf(v_descale_host.get_element_space_size_in_bytes());
+    ck_tile::DeviceMem delta_s_buf(delta_s_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem block_scale_seqstart_q_buf(block_scale_seqstart_q_host.size() *
                                                   sizeof(int32_t));
     ck_tile::DeviceMem block_scale_seqstart_k_buf(block_scale_seqstart_k_host.size() *
@@ -976,10 +1227,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem seqlen_q_buf(has_group_q_padding ? seqlen_qs.size() * sizeof(int32_t) : 0);
     // Buffers for key/value per-sequence logical (unpadded) lengths (used in batch mode with
     // kvcache or group mode with padding enabled)
-    // batch_prefill (group+kvcache) also needs per-batch seqlen_k for VLLM_BLOCK_TABLE_2D
-    const bool need_seqlen_k_buf = (mode == mode_enum::batch && use_kvcache) ||
-                                   has_group_k_padding || (mode == mode_enum::group && use_kvcache);
-    ck_tile::DeviceMem seqlen_k_buf(need_seqlen_k_buf ? seqlen_ks.size() * sizeof(int32_t) : 0);
+    ck_tile::DeviceMem seqlen_k_buf((mode == mode_enum::batch && use_kvcache) || has_group_k_padding
+                                        ? seqlen_ks.size() * sizeof(int32_t)
+                                        : 0);
     ck_tile::DeviceMem cu_seqlen_q_buf(cuq_cum.empty() ? 0
                                                        : cuq_cum.size() * sizeof(ck_tile::index_t));
     ck_tile::DeviceMem cu_seqlen_kv_buf(
@@ -995,6 +1245,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     ck_tile::DeviceMem block_table_buf(block_table_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem cache_batch_idx_buf(cache_batch_idx_host.get_element_space_size_in_bytes());
 
+    ck_tile::DeviceMem k_scale_packed_buf(k_scale_packed_host.size() * sizeof(int32_t));
+    ck_tile::DeviceMem v_scale_packed_buf(v_scale_packed_host.size() * sizeof(int32_t));
+
     q_buf.ToDevice(q_host.data());
     k_buf.ToDevice(k_host.data());
     v_buf.ToDevice(v_host.data());
@@ -1005,6 +1258,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
     q_descale_buf.ToDevice(q_descale_host.data());
     k_descale_buf.ToDevice(k_descale_host.data());
     v_descale_buf.ToDevice(v_descale_host.data());
+
+    delta_s_buf.ToDevice(delta_s_host.data());
     block_scale_seqstart_q_buf.ToDevice(block_scale_seqstart_q_host.data());
     block_scale_seqstart_k_buf.ToDevice(block_scale_seqstart_k_host.data());
     scale_seqstart_v_buf.ToDevice(seqstart_v_scale_host.data());
@@ -1018,7 +1273,9 @@ fwd_result fmha_fwd_run(mode_enum mode,
     cu_seqlen_q_buf.ToDevice(cuq_cum.empty() ? nullptr : cuq_cum.data());
     cu_seqlen_kv_buf.ToDevice(cukv_cum.empty() ? nullptr : cukv_cum.data());
     seqlen_q_buf.ToDevice(has_group_q_padding ? seqlen_qs.data() : nullptr);
-    seqlen_k_buf.ToDevice(need_seqlen_k_buf ? seqlen_ks.data() : nullptr);
+    seqlen_k_buf.ToDevice((mode == mode_enum::batch && use_kvcache) || has_group_k_padding
+                              ? seqlen_ks.data()
+                              : nullptr);
     cache_seqlen_k_buf.ToDevice(need_append_kvcache ? cache_seqlen_ks.data() : nullptr);
     rotary_cos_buf.ToDevice(rotary_cos_host.data());
     rotary_sin_buf.ToDevice(rotary_sin_host.data());
@@ -1027,6 +1284,10 @@ fwd_result fmha_fwd_run(mode_enum mode,
     alibi_slope_buf.ToDevice(alibi_slope_host.data());
     block_table_buf.ToDevice(block_table_host.data());
     cache_batch_idx_buf.ToDevice(cache_batch_idx_host.data());
+    if(!k_scale_packed_host.empty())
+        k_scale_packed_buf.ToDevice(k_scale_packed_host.data());
+    if(!v_scale_packed_host.empty())
+        v_scale_packed_buf.ToDevice(v_scale_packed_host.data());
 
     // clang-format off
     auto layout_str = [&](bool permute){
@@ -1149,17 +1410,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
             {
                 traits.use_pagedkv = (0 < page_block_size);
             }
-            else if constexpr(std::is_same_v<fmha_batch_prefill_traits,
-                                             std::decay_t<decltype(traits)>>)
-            {
-                traits.has_dropout = (p_drop > 0.0f);
-                traits.qscale_type = qscale.type;
-                traits.kv_memory_layout =
-                    ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::LINEAR_LAYOUT;
-                traits.kv_lookup_table =
-                    ck_tile::BlockAttentionKVCacheLookupTableEnum::VLLM_BLOCK_TABLE_2D;
-                traits.page_size = page_block_size;
-            }
         }
     };
 
@@ -1255,11 +1505,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
         args.hdim_v   = hdim_v;
         args.nhead_q  = nhead;
         args.nhead_k  = nhead_k;
-        if constexpr(std::is_same_v<fmha_fwd_args, std::decay_t<decltype(args)>>)
-        {
-            args.num_head_q_total = nhead;
-            args.head_start       = 0;
-        }
 
         args.stride_q       = stride_q;
         args.stride_k       = stride_k;
@@ -1363,7 +1608,8 @@ fwd_result fmha_fwd_run(mode_enum mode,
                     args.block_scale_size_q  = block_scale_size_q_;
                     args.block_scale_size_kv = block_scale_size_kv_;
                 }
-                else if(qscale.type == quant_scale_enum::mx)
+                else if(qscale.type == quant_scale_enum::mx ||
+                        qscale.type == quant_scale_enum::sageattnv3)
                 {
                     args.q_descale_ptr = q_descale_buf.GetDeviceBuffer();
                     args.k_descale_ptr = k_descale_buf.GetDeviceBuffer();
@@ -1388,6 +1634,33 @@ fwd_result fmha_fwd_run(mode_enum mode,
                         args.batch_stride_q_descale = (nhead * shape_seqlen_q * hdim_q_scale);
                         args.batch_stride_k_descale = (nhead_k * shape_seqlen_k * hdim_q_scale);
                         args.batch_stride_v_descale = (nhead_k * hdim_v * shape_seqlen_v_scale);
+                    }
+
+                    // SA3: fill delta_s fields (no-op for plain MX types)
+                    if constexpr(is_sageattnv3)
+                    {
+                        args.delta_s_ptr      = delta_s_buf.GetDeviceBuffer();
+                        args.p_scale_factor   = p_scale_factor;
+                        // delta_s layout: [batch, nhead, num_q_blocks, seqlen_k]
+                        args.stride_delta_s         = shape_seqlen_k;
+                        args.q_block_stride_delta_s = shape_seqlen_k;
+                        args.nhead_stride_delta_s   = num_q_blocks_sa3 * shape_seqlen_k;
+                        args.batch_stride_delta_s   = nhead * num_q_blocks_sa3 * shape_seqlen_k;
+
+                        // Packed K/V scale for dwordx4 OPSEL
+                        if(!k_scale_packed_host.empty())
+                        {
+                            args.k_scale_packed_ptr = static_cast<const int32_t*>(
+                                k_scale_packed_buf.GetDeviceBuffer());
+                            args.v_scale_packed_ptr = static_cast<const int32_t*>(
+                                v_scale_packed_buf.GetDeviceBuffer());
+                            args.nhead_stride_k_scale_packed = k_scale_packed_size_per_head;
+                            args.nhead_stride_v_scale_packed = v_scale_packed_size_per_head;
+                            args.batch_stride_k_scale_packed =
+                                nhead_k * k_scale_packed_size_per_head;
+                            args.batch_stride_v_scale_packed =
+                                nhead_k * v_scale_packed_size_per_head;
+                        }
                     }
                 }
 
@@ -1512,67 +1785,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
                          ? seqlen_k_buf.GetDeviceBuffer()
                          : nullptr);
             }
-            else if constexpr(std::is_same_v<fmha_batch_prefill_args, std::decay_t<decltype(args)>>)
-            {
-                // Fields already set by the outer else block above:
-                //   bias_ptr, lse_ptr, o_ptr, seqlen_k, max_seqlen_q, scale_s,
-                //   logits_soft_cap, stride_bias/o, nhead/batch stride for bias/lse/o,
-                //   window_size_left/right, sink_size, mask_type.
-
-                // scale_p/scale_o: batch_prefill-specific fields absent from fmha_fwd_args.
-                args.scale_p = 1.f;
-                args.scale_o = 1.f;
-
-                // Dropout fields: the outer fmha_fwd_args branch sets these; set them here
-                // for batch_prefill since it takes a separate inner branch.
-                args.rand_val_ptr         = randval_buf.GetDeviceBuffer();
-                args.stride_randval       = stride_randval;
-                args.nhead_stride_randval = nhead_stride_randval;
-                args.batch_stride_randval = batch_stride_randval;
-                args.p_drop               = p_drop;
-                args.s_randval            = s_randval;
-                if(drop_prefs)
-                    args.drop_seed_offset = std::make_pair(drop_seed_buf.GetDeviceBuffer(),
-                                                           drop_offset_buf.GetDeviceBuffer());
-                else
-                    args.drop_seed_offset = std::make_pair(drop_seed, drop_offset);
-
-                // Paged KV: LINEAR_LAYOUT + VLLM_BLOCK_TABLE_2D
-                // block_table_buf: [batch, max_blocks_per_seq] of physical page ids
-                // seqlen_k_buf: [batch] of per-batch seqlen_k values
-                args.num_total_pages = max_num_page_blocks;
-                args.page_block_size = page_block_size;
-                args.kv_memory_layout =
-                    ck_tile::BlockAttentionKVCacheMemoryLayoutEnum::LINEAR_LAYOUT;
-                args.kv_lookup_table =
-                    ck_tile::BlockAttentionKVCacheLookupTableEnum::VLLM_BLOCK_TABLE_2D;
-                args.kv_indptr                = nullptr;
-                args.kv_page_indices          = block_table_buf.GetDeviceBuffer();
-                args.kv_last_page_lens        = nullptr;
-                args.seqlen_k_ptr             = seqlen_k_buf.GetDeviceBuffer();
-                args.batch_stride_block_table = batch_stride_block_table;
-
-                // group mode required: seqstart_q is prefix-sum of per-batch seqlen_q
-                args.seqstart_q_ptr = seqstart_q_buf.GetDeviceBuffer();
-
-                // batch_prefill LINEAR_LAYOUT strides for runner's K layout
-                // [max_num_page_blocks, nhead_k, page_block_size, hdim]:
-                //   stride_k       = hdim_q           (token stride within one head's page slice)
-                //   nhead_stride_k = page_block_size * hdim_q  (head stride)
-                //   batch_stride_k = nhead_k * page_block_size * hdim_q  (page stride, already set)
-                args.stride_k       = hdim_q;
-                args.nhead_stride_k = page_block_size * hdim_q;
-                // V is row-major, same layout convention
-                args.stride_v       = hdim_v;
-                args.nhead_stride_v = page_block_size * hdim_v;
-
-                // descale: not used for fp16/bf16
-                args.q_descale_ptr                  = nullptr;
-                args.k_descale_ptr                  = nullptr;
-                args.v_descale_ptr                  = nullptr;
-                args.nblock_stride_kv_block_descale = 0;
-                args.nhead_stride_kv_block_descale  = 0;
-            }
         }
     };
 
@@ -1599,21 +1811,6 @@ fwd_result fmha_fwd_run(mode_enum mode,
     }
 
     auto run_fwd = [&](const ck_tile::stream_config& sc) {
-#if CK_TILE_FMHA_FWD_BATCH_PREFILL_API
-        // batch_prefill: group mode + paged KV, tested against the same CPU reference
-        if(1 == num_splits && use_kvcache && mode == mode_enum::group)
-        {
-            fmha_batch_prefill_traits bp_traits;
-            init_traits(bp_traits);
-
-            fmha_batch_prefill_args bp_args;
-            init_args(bp_args);
-
-            const float ave_time = fmha_batch_prefill(bp_traits, bp_args, sc);
-            if(ave_time >= 0.0f)
-                return ave_time;
-        }
-#endif // CK_TILE_FMHA_FWD_BATCH_PREFILL_API
 #if CK_TILE_FMHA_FWD_PAGEDKV_API
         if(1 == num_splits && use_kvcache)
         {
@@ -1653,87 +1850,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
-
-    float fwd_ave_time = -1.0f;
-#if CK_TILE_FMHA_ENABLE_HEAD_GROUPING
-    const bool allow_head_grouping = !i_perm && !use_kvcache && (num_splits <= 1) &&
-                                     !need_append_kvcache &&
-                                     (mode == mode_enum::batch || mode == mode_enum::group);
-
-    if(allow_head_grouping)
-    {
-        if(fmha_fwd_head_grouping::disabled_by_env())
-        {
-            if(fmha_fwd_head_grouping::log_enabled())
-                std::cout << "[LLC Head Grouping] disabled by env" << std::endl;
-        }
-        else
-        {
-            const auto group_size_opt =
-                fmha_fwd_head_grouping::get_head_group_size(nhead,
-                                                            nhead_k,
-                                                            batch,
-                                                            max_seqlen_k,
-                                                            hdim_q,
-                                                            hdim_v,
-                                                            sizeof(KDataType),
-                                                            sizeof(VDataType));
-
-            if(group_size_opt.has_value() && group_size_opt.value() < nhead)
-            {
-                if(fmha_fwd_head_grouping::log_enabled())
-                {
-                    const std::string arch = ck_tile::get_device_name();
-                    const size_t llc_bytes = fmha_fwd_head_grouping::get_llc_cache_bytes(arch);
-                    const ck_tile::index_t gqa_ratio = (nhead_k > 0 ? (nhead / nhead_k) : 1);
-                    const ck_tile::index_t group_sz  = group_size_opt.value();
-                    const ck_tile::index_t n_groups = ck_tile::integer_divide_ceil(nhead, group_sz);
-                    std::cout << "[LLC Head Grouping] enabled" << std::endl;
-                    std::cout << "[LLC Head Grouping] arch=" << (arch.empty() ? "unknown" : arch)
-                              << " llc_mb=" << (llc_bytes / (1024ull * 1024ull))
-                              << " nhead_q=" << nhead << " nhead_k=" << nhead_k
-                              << " gqa_ratio=" << gqa_ratio << " group_size=" << group_sz
-                              << " groups=" << n_groups << std::endl;
-                }
-                fmha_fwd_traits fmha_traits;
-                init_traits(fmha_traits);
-
-                fmha_fwd_args fmha_args;
-                init_args(fmha_args);
-
-                fwd_ave_time = fmha_fwd_head_grouping::run_fwd_head_grouped<QDataType,
-                                                                            KDataType,
-                                                                            VDataType,
-                                                                            ODataType,
-                                                                            BiasDataType,
-                                                                            LSEDataType,
-                                                                            RandValOutputDataType>(
-                    stream_config,
-                    fmha_traits,
-                    fmha_args,
-                    nhead,
-                    nhead_k,
-                    group_size_opt.value(),
-                    qscale.type == quant_scale_enum::blockscale,
-                    [&](const auto& traits, auto& args, const auto& sc) {
-                        return fmha_fwd(traits, args, sc);
-                    });
-            }
-            else if(fmha_fwd_head_grouping::log_enabled())
-            {
-                std::cout << "[LLC Head Grouping] skipped (group_size not set or >= nhead)"
-                          << std::endl;
-            }
-        }
-    }
-    else if(fmha_fwd_head_grouping::log_enabled())
-    {
-        std::cout << "[LLC Head Grouping] disabled by conditions/layout" << std::endl;
-    }
-#endif
-
-    if(fwd_ave_time < 0.0f)
-        fwd_ave_time = run_fwd(stream_config);
+    const float fwd_ave_time = run_fwd(stream_config);
     if(fwd_ave_time < 0.0f)
     {
         std::cout << ", not supported yet" << std::flush << std::endl;
@@ -1839,6 +1956,11 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 scale_o_host = v_descale_host(0) / scale_p_host;
             }
         }
+        else if constexpr(is_sageattnv3)
+        {
+            scale_p_host = p_scale_factor;
+            scale_o_host = 1.0f / p_scale_factor;
+        }
 
         auto p_compute_element_func = [&]() {
             if constexpr(supports_qscale)
@@ -1934,8 +2056,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 q_host_ref.ForEach([&](auto& self, auto i) { self(i) = q_host_ref_ro(i); });
             }
 #endif
-#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API || \
-    CK_TILE_FMHA_FWD_BATCH_PREFILL_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
             if(0 < page_block_size)
             {
                 // clang-format off
@@ -1986,8 +2107,7 @@ fwd_result fmha_fwd_run(mode_enum mode,
                 });
             }
 #endif
-#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API || \
-    CK_TILE_FMHA_FWD_BATCH_PREFILL_API
+#if CK_TILE_FMHA_FWD_SPLITKV_API || CK_TILE_FMHA_FWD_PAGEDKV_API
             if(0 < page_block_size)
             {
                 if(is_v_rowmajor)
@@ -2090,6 +2210,26 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                                                      ck_tile::identity{},
                                                                      ck_tile::identity{},
                                                                      ck_tile::scales(scale_s_host));
+
+                // SA3: add delta_s correction to s_host_ref
+                if constexpr(is_sageattnv3)
+                {
+                    // s_host_ref shape: [nhead, real_seqlen_q, real_seqlen_k]
+                    // delta_s layout:   [batch, nhead, num_q_blocks, seqlen_k]
+                    const ck_tile::index_t ds_batch_offset =
+                        b_idx * nhead * num_q_blocks_sa3 * shape_seqlen_k;
+                    s_host_ref.ForEach([&](auto& self, auto idx) {
+                        const ck_tile::index_t h_idx  = idx[0];
+                        const ck_tile::index_t q_idx  = idx[1];
+                        const ck_tile::index_t k_idx  = idx[2];
+                        const ck_tile::index_t qi_blk = q_idx / kM0_sa3;
+                        const ck_tile::index_t ds_off = ds_batch_offset +
+                                                         h_idx * num_q_blocks_sa3 * shape_seqlen_k +
+                                                         qi_blk * shape_seqlen_k + key_offset + k_idx;
+                        self(idx) += static_cast<SMPLComputeDataType>(
+                            delta_s_host.data()[ds_off] * scale_s_host);
+                    });
+                }
             }
             else if(qscale.type == quant_scale_enum::blockscale)
             {
@@ -2450,12 +2590,13 @@ fwd_result fmha_fwd_run(mode_enum mode,
     if(json)
     {
         const std::string qscale_name =
-            (qscale.type == quant_scale_enum::no_scale        ? "no_scale"
-             : qscale.type == quant_scale_enum::pertensor     ? "pertensor"
-             : qscale.type == quant_scale_enum::blockscale    ? "blockscale"
-             : qscale.type == quant_scale_enum::kv_blockscale ? "kv_blockscale"
-             : qscale.type == quant_scale_enum::mx            ? "mx"
-                                                              : "unknown");
+            (qscale.type == quant_scale_enum::no_scale          ? "no_scale"
+             : qscale.type == quant_scale_enum::pertensor       ? "pertensor"
+             : qscale.type == quant_scale_enum::blockscale      ? "blockscale"
+             : qscale.type == quant_scale_enum::kv_blockscale   ? "kv_blockscale"
+             : qscale.type == quant_scale_enum::mx              ? "mx"
+             : qscale.type == quant_scale_enum::sageattnv3      ? "sageattnv3"
+                                                                : "unknown");
         dump_fmha_fwd_json_results(*json,
                                    data_type,
                                    mode == mode_enum::batch ? "batch" : "group",

@@ -103,6 +103,48 @@ struct TestConfigs<FmhaFwdMxFp4>
 };
 
 template <>
+struct TestConfigs<FmhaFwdSageAttnV3>
+{
+    // SA3 supports hdim=128 and hdim=256
+    static constexpr auto HDimValues =
+        std::array{std::tuple{128, -1}, std::tuple{256, -1}};
+    static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
+    // SA3 only supports batch mode in the runner
+    static constexpr auto ModeValues        = std::array{mode_enum::batch};
+    static constexpr auto IsVRowmajorValues = std::array{false};
+    static constexpr auto qscale_str        = "sageattnv3";
+    static constexpr bool def_lse           = true;
+    static constexpr bool def_is_v_rowmajor = false;
+    static constexpr auto init_method       = "3";
+    static int adjust_seqlen(int seqlen)
+    {
+        return seqlen < 0 ? seqlen : ck_tile::integer_least_multiple(seqlen, 2);
+    }
+};
+
+template <>
+struct TestConfigs<FmhaFwdSageAttnV3Fp16>
+{
+    // SA3 fp16 output: supports hdim=128 and hdim=256
+    static constexpr auto HDimValues =
+        std::array{std::tuple{128, -1}, std::tuple{256, -1}};
+    static constexpr auto SplitKVHDimValues  = std::array<std::tuple<int, int>, 0>{};
+    static constexpr auto AppendKVHDimValues = std::array<std::tuple<int, int>, 0>{};
+    // SA3 only supports batch mode in the runner
+    static constexpr auto ModeValues        = std::array{mode_enum::batch};
+    static constexpr auto IsVRowmajorValues = std::array{false};
+    static constexpr auto qscale_str        = "sageattnv3";
+    static constexpr bool def_lse           = true;
+    static constexpr bool def_is_v_rowmajor = false;
+    static constexpr auto init_method       = "3";
+    static int adjust_seqlen(int seqlen)
+    {
+        return seqlen < 0 ? seqlen : ck_tile::integer_least_multiple(seqlen, 2);
+    }
+};
+
+template <>
 struct TestConfigs<FmhaFwdFp32>
 {
     static constexpr auto HDimValues = std::array{
@@ -163,7 +205,7 @@ const ck_tile::stream_config stream_config{
 
 #define COMMON_ARGS                                                                              \
     init_method, static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))), 1, 0, \
-        stream_config
+        6.0f, stream_config
 
 auto EnableTestIf(bool condition)
 {
@@ -296,7 +338,8 @@ TEST(TestCkTileFmhaFwd, AppendKvWithBatchEffLensShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -341,7 +384,8 @@ TEST(TestCkTileFmhaFwd, SplitKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -385,7 +429,8 @@ TEST(TestCkTileFmhaFwd, PagedKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,    // init_sink
+        6.0f, // p_scale_factor
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -600,14 +645,6 @@ TEST_P(Dropout, DataTypeConfig)
     auto [hdim_q, hdim_v]                                         = hdims;
     auto [drop_seed, drop_offset, drop_prefs]                     = drop_seed_offset_prefs;
     auto [batch, nhead, nhead_k, seqlen_q, seqlen_k, mask_str]    = dims_mask;
-
-#if CK_TILE_WORKAROUND_ROCM_7_12_FP16_DROPOUT_MISCOMPILE
-    if constexpr(std::is_same_v<DataTypeConfig, FmhaFwdFp16>)
-    {
-        if(hdim_q > 128 && mode == mode_enum::batch)
-            GTEST_SKIP() << "Skipped: fp16 dropout d256 batch — compiler bug (ROCm >= 7.12)";
-    }
-#endif
 
     auto result = fmha_fwd_run<DataTypeConfig>(mode,
                                                batch,

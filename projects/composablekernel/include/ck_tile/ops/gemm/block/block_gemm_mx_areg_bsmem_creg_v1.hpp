@@ -48,6 +48,10 @@ struct BlockGemmMxARegBSmemCRegV1
     static_assert(TargetCMPerLane % CMPerLane == 0);
     static constexpr index_t NIterPack = TargetCMPerLane / CMPerLane;
 
+    // OPSEL cycling: group ScaleRepeatB consecutive nIters to share one packed int32 scale
+    static constexpr index_t ScaleRepeatB    = min(index_t{4}, NIterPack);
+    static constexpr index_t NumScaleGroupsB = NIterPerWarp / ScaleRepeatB;
+
     // C += A * B
     template <typename CBlockTensor,
               typename ABlockTensorTmp,
@@ -80,10 +84,24 @@ struct BlockGemmMxARegBSmemCRegV1
                 MakeAScaleBlockTileDistribution());
         a_scale_block_tensor.get_thread_buffer() = a_scale_block_tensor_tmp.get_thread_buffer();
 
-        auto b_scale_block_tensor =
-            make_static_distributed_tensor<remove_cv_t<typename BScaleBlockTensorTmp::DataType>>(
-                MakeBScaleBlockTileDistribution());
-        b_scale_block_tensor.get_thread_buffer() = b_scale_block_tensor_tmp.get_thread_buffer();
+        // BScale: int32_t means pre-packed for OPSEL, e8m0_t means individual bytes
+        constexpr bool kBScaleIsPackedInt32_ =
+            std::is_same_v<remove_cv_t<typename BScaleBlockTensorTmp::DataType>, int32_t>;
+
+        [[maybe_unused]] auto b_scale_block_tensor = [&]() {
+            if constexpr(!kBScaleIsPackedInt32_)
+            {
+                auto t = make_static_distributed_tensor<
+                    remove_cv_t<typename BScaleBlockTensorTmp::DataType>>(
+                    MakeBScaleBlockTileDistribution());
+                t.get_thread_buffer() = b_scale_block_tensor_tmp.get_thread_buffer();
+                return t;
+            }
+            else
+            {
+                return 0; // unused placeholder
+            }
+        }();
 
         // Construct B-warp-window
         // Matrix B is shuffled in such a way that each lane calculates TargetCMPerLane consecutive
@@ -164,61 +182,119 @@ struct BlockGemmMxARegBSmemCRegV1
         constexpr auto b_scale_warp_y_index_zeros =
             uniform_sequence_gen_t<BScaleWarpDstr::NDimY, 0>{};
 
+        [[maybe_unused]] auto b_scale_block_tensor_opsel = [&]() {
+            if constexpr(!kBScaleIsPackedInt32_)
+            {
+                return 0; // unused
+            }
+            else
+            {
+                auto t = make_static_distributed_tensor<int32_t>(
+                    MakeBScaleBlockTileDistributionPackedInt32());
+                t.get_thread_buffer() = b_scale_block_tensor_tmp.get_thread_buffer();
+                return t;
+            }
+        }();
+
         // hot loop:
-        static_ford<sequence<KIterPerWarp, NIterPerWarp>>{}([&](auto kn) {
-            constexpr auto kIter = number<kn[number<0>{}]>{};
-            constexpr auto nIter = number<kn[number<1>{}]>{};
-            auto b_warp_window   = b_warp_window_tmp;
-            move_tile_window(
-                b_warp_window,
-                {nIter * (NPerBlock / NIterPerWarp), kIter * (KPerBlock / KIterPerWarp)});
-            // read B warp tensor from B Block window
-            const auto b_warp_tensor = load_tile(b_warp_window);
+        static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
+            int32_t b_scale_val = 0;
+            static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                auto b_warp_window = b_warp_window_tmp;
+                move_tile_window(
+                    b_warp_window,
+                    {nIter * (NPerBlock / NIterPerWarp), kIter * (KPerBlock / KIterPerWarp)});
+                const auto b_warp_tensor = load_tile(b_warp_window);
 
-            BScaleWarpTensor b_scale_warp_tensor;
-
-            b_scale_warp_tensor.get_thread_buffer() = b_scale_block_tensor.get_y_sliced_thread_data(
-                merge_sequences(sequence<nIter / NIterPack, nIter % NIterPack, kIter>{},
+                // B scale: pack ScaleRepeatB bytes into int32 for OPSEL cycling
+                if constexpr(kBScaleIsPackedInt32_)
+                {
+                    if constexpr(nIter % ScaleRepeatB == 0)
+                    {
+                        using PackedDstr = remove_cvref_t<decltype(
+                            MakeBScaleBlockTileDistributionPackedInt32())>;
+                        constexpr auto y_lens =
+                            to_sequence(PackedDstr{}.get_ys_to_d_descriptor().get_lengths());
+                        constexpr auto y_zeros =
+                            uniform_sequence_gen_t<PackedDstr::NDimY, 0>{};
+                        auto buf = b_scale_block_tensor_opsel.get_y_sliced_thread_data(
+                            merge_sequences(
+                                sequence<nIter / ScaleRepeatB, kIter>{}, y_zeros),
+                            merge_sequences(sequence<1, 1>{}, y_lens));
+                        b_scale_val = buf[number<0>{}];
+                    }
+                }
+                else if constexpr(ScaleRepeatB >= 4 && NIterPack >= 4)
+                {
+                    if constexpr(nIter % ScaleRepeatB == 0)
+                    {
+                        b_scale_val = 0;
+                        static_for<0, ScaleRepeatB, 1>{}([&](auto si) {
+                            constexpr index_t ni = nIter + si;
+                            BScaleWarpTensor bs;
+                            bs.get_thread_buffer() =
+                                b_scale_block_tensor.get_y_sliced_thread_data(
+                                    merge_sequences(
+                                        sequence<ni / NIterPack, ni % NIterPack, kIter>{},
+                                        b_scale_warp_y_index_zeros),
+                                    merge_sequences(
+                                        sequence<1, 1, 1>{}, b_scale_warp_y_lengths));
+                            uint32_t byte_val =
+                                static_cast<uint32_t>(
+                                    bit_cast<uint8_t>(bs.get_thread_buffer()[0]));
+                            b_scale_val |=
+                                static_cast<int32_t>(byte_val << (si * 8));
+                        });
+                    }
+                }
+                else
+                {
+                    BScaleWarpTensor b_scale_warp_tensor;
+                    b_scale_warp_tensor.get_thread_buffer() =
+                        b_scale_block_tensor.get_y_sliced_thread_data(
+                            merge_sequences(
+                                sequence<nIter / NIterPack, nIter % NIterPack, kIter>{},
                                 b_scale_warp_y_index_zeros),
-                merge_sequences(sequence<1, 1, 1>{}, b_scale_warp_y_lengths));
+                            merge_sequences(
+                                sequence<1, 1, 1>{}, b_scale_warp_y_lengths));
+                    b_scale_val =
+                        int32_t(b_scale_warp_tensor.get_thread_buffer()[0]);
+                }
 
-            static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
-                // read A warp tensor from A block tensor
-                AWarpTensor a_warp_tensor;
+                static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
+                    AWarpTensor a_warp_tensor;
+                    a_warp_tensor.get_thread_buffer() = a_block_tensor.get_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, kIter>{}, a_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1>{}, a_warp_y_lengths));
 
-                a_warp_tensor.get_thread_buffer() = a_block_tensor.get_y_sliced_thread_data(
-                    merge_sequences(sequence<mIter, kIter>{}, a_warp_y_index_zeros),
-                    merge_sequences(sequence<1, 1>{}, a_warp_y_lengths));
+                    AScaleWarpTensor a_scale_warp_tensor;
+                    a_scale_warp_tensor.get_thread_buffer() =
+                        a_scale_block_tensor.get_y_sliced_thread_data(
+                            merge_sequences(sequence<mIter, kIter>{}, a_scale_warp_y_index_zeros),
+                            merge_sequences(sequence<1, 1>{}, a_scale_warp_y_lengths));
 
-                AScaleWarpTensor a_scale_warp_tensor;
+                    CWarpTensor c_warp_tensor;
+                    c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
+                                        c_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths));
 
-                a_scale_warp_tensor.get_thread_buffer() =
-                    a_scale_block_tensor.get_y_sliced_thread_data(
-                        merge_sequences(sequence<mIter, kIter>{}, a_scale_warp_y_index_zeros),
-                        merge_sequences(sequence<1, 1>{}, a_scale_warp_y_lengths));
+                    // warp GEMM with OPSEL cycling for B scale
+                    constexpr index_t opsel_b =
+                        kBScaleIsPackedInt32_ ? (nIter % ScaleRepeatB) : 0;
+                    WarpGemm{}.template operator()<0, opsel_b>(
+                        c_warp_tensor,
+                        a_warp_tensor,
+                        b_warp_tensor,
+                        int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
+                        b_scale_val);
 
-                // read C warp tensor from C block tensor
-                CWarpTensor c_warp_tensor;
-
-                c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
-                    merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
-                                    c_warp_y_index_zeros),
-                    merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths));
-
-                // warp GEMM
-                WarpGemm{}.template operator()<0, 0>(
-                    c_warp_tensor,
-                    a_warp_tensor,
-                    b_warp_tensor,
-                    int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
-                    int32_t(b_scale_warp_tensor.get_thread_buffer()[0]));
-
-                // write C warp tensor into C block tensor
-                c_block_tensor.set_y_sliced_thread_data(
-                    merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
-                                    c_warp_y_index_zeros),
-                    merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths),
-                    c_warp_tensor.get_thread_buffer());
+                    c_block_tensor.set_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
+                                        c_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths),
+                        c_warp_tensor.get_thread_buffer());
+                });
             });
         });
     }
@@ -327,6 +403,29 @@ struct BlockGemmMxARegBSmemCRegV1
         return make_static_tile_distribution(b_scale_block_dstr_encode);
     }
 
+    template <index_t NPerBlock_ = NPerBlock, index_t KPerBlock_ = KPerBlock>
+    CK_TILE_DEVICE static constexpr auto MakeBScaleBlockTileDistributionPackedInt32()
+    {
+        constexpr index_t NIterPerWarp_ = NPerBlock_ / (NWarp * WarpGemm::kN);
+
+        using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
+
+        constexpr index_t ABScaleKLane = Impl::kABKLane;
+
+        constexpr auto b_scale_packed_dstr_encode = ck_tile::tile_distribution_encoding<
+            ck_tile::sequence<MWarp>,
+            ck_tile::tuple<ck_tile::sequence<NIterPerWarp_ / ScaleRepeatB,
+                                             NWarp,
+                                             Impl::kCMLane>,
+                           ck_tile::sequence<KPerBlock_ / WarpGemm::kK, ABScaleKLane>>,
+            ck_tile::tuple<ck_tile::sequence<0, 1>, ck_tile::sequence<2, 1>>,
+            ck_tile::tuple<ck_tile::sequence<0, 1>, ck_tile::sequence<1, 2>>,
+            ck_tile::sequence<1, 2>,
+            ck_tile::sequence<0, 0>>{};
+
+        return make_static_tile_distribution(b_scale_packed_dstr_encode);
+    }
+
     CK_TILE_DEVICE static constexpr auto MakeCBlockTile()
     {
         using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
@@ -348,6 +447,147 @@ struct BlockGemmMxARegBSmemCRegV1
         constexpr auto c_block_dstr = make_static_tile_distribution(c_block_dstr_encode);
         auto c_block_tensor         = make_static_distributed_tensor<CDataType>(c_block_dstr);
         return c_block_tensor;
+    }
+
+    // C += A * B with pre-packed int32 B scale (OPSEL cycling, no shift+OR)
+    // b_scale_packed_arr: array of KIterPerWarp * NumScaleGroupsB int32 values
+    template <typename CBlockTensor,
+              typename ABlockTensorTmp,
+              typename AScaleBlockTensorTmp,
+              typename BBlockWindowTmp>
+    CK_TILE_DEVICE void operator()(CBlockTensor& c_block_tensor,
+                                   const ABlockTensorTmp& a_block_tensor_tmp,
+                                   const AScaleBlockTensorTmp& a_scale_block_tensor_tmp,
+                                   const BBlockWindowTmp& b_block_window_tmp,
+                                   const int32_t* b_scale_packed_arr) const
+    {
+        static_assert(std::is_same_v<ADataType, remove_cv_t<typename ABlockTensorTmp::DataType>> &&
+                      std::is_same_v<BDataType, remove_cv_t<typename BBlockWindowTmp::DataType>> &&
+                      std::is_same_v<CDataType, remove_cv_t<typename CBlockTensor::DataType>>);
+
+        static_assert(MPerBlock == ABlockTensorTmp{}.get_lengths()[number<0>{}] &&
+                      NPerBlock == BBlockWindowTmp{}.get_window_lengths()[number<0>{}] &&
+                      KPerBlock == ABlockTensorTmp{}.get_lengths()[number<1>{}]);
+
+        const index_t iNWarp = get_warp_id() % NWarp;
+
+        auto a_block_tensor = make_static_distributed_tensor<typename ABlockTensorTmp::DataType>(
+            MakeABlockTileDistribution());
+        a_block_tensor.get_thread_buffer() = a_block_tensor_tmp.get_thread_buffer();
+
+        auto a_scale_block_tensor =
+            make_static_distributed_tensor<remove_cv_t<typename AScaleBlockTensorTmp::DataType>>(
+                MakeAScaleBlockTileDistribution());
+        a_scale_block_tensor.get_thread_buffer() = a_scale_block_tensor_tmp.get_thread_buffer();
+
+        auto b_warp_window_tmp = [&] {
+            using Impl = typename WarpGemm::WarpGemmAttribute::Impl;
+
+            constexpr index_t N3 = Impl::kCM1PerLane;
+            constexpr index_t N2 = TargetCMPerLane / N3;
+            constexpr index_t N1 = Impl::kCMLane;
+            constexpr index_t N0 = NPerBlock / (N1 * N2 * N3);
+
+            const auto b_lds_unmerged = transform_tensor_view(
+                b_block_window_tmp.get_bottom_tensor_view(),
+                make_tuple(make_unmerge_transform(
+                               make_tuple(number<N0>{}, number<N1>{}, number<N2>{}, number<N3>{})),
+                           make_pass_through_transform(number<KPerBlock>{})),
+                make_tuple(sequence<0>{}, sequence<1>{}),
+                make_tuple(sequence<0, 2, 1, 3>{}, sequence<4>{}));
+
+            const auto b_lds_merged = transform_tensor_view(
+                b_lds_unmerged,
+                make_tuple(make_merge_transform(
+                               make_tuple(number<N0>{}, number<N2>{}, number<N1>{}, number<N3>{})),
+                           make_pass_through_transform(number<KPerBlock>{})),
+                make_tuple(sequence<0, 1, 2, 3>{}, sequence<4>{}),
+                make_tuple(sequence<0>{}, sequence<1>{}));
+
+            return make_tile_window(
+                b_lds_merged,
+                make_tuple(number<WarpGemm::kN>{}, number<WarpGemm::kK>{}),
+                b_block_window_tmp.get_window_origin() +
+                    multi_index<2>{iNWarp * WarpGemm::kN, 0},
+                make_static_tile_distribution(typename WarpGemm::BWarpDstrEncoding{}));
+        }();
+
+        static_assert(
+            std::is_same_v<remove_cvref_t<decltype(MakeCBlockTile()
+                                                        .get_tile_distribution()
+                                                        .get_static_tile_distribution_encoding())>,
+                           remove_cvref_t<decltype(CBlockTensor::get_tile_distribution()
+                                                        .get_static_tile_distribution_encoding())>>);
+
+        using AWarpDstr = typename WarpGemm::AWarpDstr;
+        using CWarpDstr = typename WarpGemm::CWarpDstr;
+
+        using AWarpTensor = typename WarpGemm::AWarpTensor;
+        using CWarpTensor = typename WarpGemm::CWarpTensor;
+
+        using AScaleWarpDstr =
+            remove_cvref_t<decltype(make_static_tile_distribution(MakeAScaleWarpDstrEncoding()))>;
+        using AScaleWarpTensor =
+            static_distributed_tensor<remove_cv_t<typename AScaleBlockTensorTmp::DataType>,
+                                      AScaleWarpDstr>;
+
+        constexpr auto a_warp_y_lengths =
+            to_sequence(AWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
+        constexpr auto c_warp_y_lengths =
+            to_sequence(CWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
+
+        constexpr auto a_warp_y_index_zeros = uniform_sequence_gen_t<AWarpDstr::NDimY, 0>{};
+        constexpr auto c_warp_y_index_zeros = uniform_sequence_gen_t<CWarpDstr::NDimY, 0>{};
+
+        constexpr auto a_scale_warp_y_lengths =
+            to_sequence(AScaleWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
+        constexpr auto a_scale_warp_y_index_zeros =
+            uniform_sequence_gen_t<AScaleWarpDstr::NDimY, 0>{};
+
+        static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
+            static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                const int32_t b_scale_val =
+                    b_scale_packed_arr[kIter * NumScaleGroupsB + nIter / ScaleRepeatB];
+                auto b_warp_window = b_warp_window_tmp;
+                move_tile_window(
+                    b_warp_window,
+                    {nIter * (NPerBlock / NIterPerWarp), kIter * (KPerBlock / KIterPerWarp)});
+                const auto b_warp_tensor = load_tile(b_warp_window);
+
+                static_for<0, MIterPerWarp, 1>{}([&](auto mIter) {
+                    AWarpTensor a_warp_tensor;
+                    a_warp_tensor.get_thread_buffer() = a_block_tensor.get_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, kIter>{}, a_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1>{}, a_warp_y_lengths));
+
+                    AScaleWarpTensor a_scale_warp_tensor;
+                    a_scale_warp_tensor.get_thread_buffer() =
+                        a_scale_block_tensor.get_y_sliced_thread_data(
+                            merge_sequences(sequence<mIter, kIter>{}, a_scale_warp_y_index_zeros),
+                            merge_sequences(sequence<1, 1>{}, a_scale_warp_y_lengths));
+
+                    CWarpTensor c_warp_tensor;
+                    c_warp_tensor.get_thread_buffer() = c_block_tensor.get_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
+                                        c_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths));
+
+                    constexpr index_t opsel_b = nIter % ScaleRepeatB;
+                    WarpGemm{}.template operator()<0, opsel_b>(
+                        c_warp_tensor,
+                        a_warp_tensor,
+                        b_warp_tensor,
+                        int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
+                        b_scale_val);
+
+                    c_block_tensor.set_y_sliced_thread_data(
+                        merge_sequences(sequence<mIter, nIter / NIterPack, nIter % NIterPack>{},
+                                        c_warp_y_index_zeros),
+                        merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths),
+                        c_warp_tensor.get_thread_buffer());
+                });
+            });
+        });
     }
 
     // C = A * B
