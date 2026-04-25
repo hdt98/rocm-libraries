@@ -64,9 +64,12 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     static constexpr bool kQLoadOnce = true;
     static_assert(kQLoadOnce == Policy::QLoadOnce);
 
-    // SA3 always uses batch async K load (pre-shuffled K, aligned hdim).
+    // SA3 always uses batch async K/V load (pre-shuffled K, aligned hdim,
+    // pre-padded seqlen). No padding variants needed.
     static_assert(!Problem::kPadHeadDimQ,
-                  "SA3 pipeline does not support kPadHeadDimQ (hdim always aligned)");
+                  "SA3 pipeline does not support kPadHeadDimQ");
+    static_assert(!Problem::kPadSeqLenK,
+                  "SA3 pipeline does not support kPadSeqLenK (seqlen pre-padded)");
 
     // Batch async K: k0_loops LDS buffers so all K sub-tiles load at once.
     static constexpr index_t kAsyncKBuffers =
@@ -74,10 +77,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
     using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, kAsyncKBuffers, 1>;
 
-    // V async requires dword-aligned loads (>= 4 bytes per thread).
-    // Disabled for padded mxfp4 configs where VDataType alignment < 4.
-    static constexpr bool kUseAsyncVLoad =
-        (numeric_traits<VDataType>::PackedSize >= 4) || !Problem::kPadSeqLenK;
     static constexpr index_t k1_loops_static = BlockFmhaShape::kN0 / BlockFmhaShape::kK1;
     using AsyncVPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, 1, k1_loops_static>;
@@ -194,13 +193,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         constexpr index_t k_async_bytes =
             AsyncKPolicy::template GetSingleSmemElementSpaceSize<Problem>() *
             sizeof(KDataType) * AsyncKPolicy::NumKVLdsBuffers;
-        if constexpr(kUseAsyncVLoad)
-        {
-            constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
-            return k_async_bytes + v_smem;
-        }
-        else
-            return k_async_bytes + Policy::template GetSmemSizeKV<Problem>();
+        constexpr index_t v_smem = AsyncVPolicy::template GetSmemSizeV<Problem>();
+        return k_async_bytes + v_smem;
     }
 
     template <typename QDramBlockWindowTmp,
@@ -357,13 +351,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             AsyncVPolicy::template GetSmemSizeV<Problem>() /
             AsyncVPolicy::NumPrefetchV;
 
-        // V register-staged LDS (fallback when V async alignment is insufficient)
-        auto v_lds = make_tensor_view<address_space_enum::lds>(
-            v_lds_ptr,
-            Policy::template MakeVLdsBlockDescriptor<Problem>());
-        auto v_lds_window = make_tile_window(
-            v_lds, Policy::template MakeVLdsBlockDescriptor<Problem>().get_lengths(), {0, 0});
-
         // Block GEMMs
         auto gemm_0 = Policy::template GetQKBlockGemm<Problem>();
         auto gemm_1 = Policy::template GetKVBlockGemm<Problem>();
@@ -424,14 +411,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             make_tile_window(v_dram_block_window_tmp.get_bottom_tensor_view(),
                              v_dram_block_window_tmp.get_window_lengths(),
                              {0, seqlen_k_start},
-                             [&]() {
-                                 if constexpr(kUseAsyncVLoad)
-                                     return AsyncVPolicy::template
-                                         MakeVDramTileDistributionContiguous<Problem>();
-                                 else
-                                     return Policy::template
-                                         MakeVDramTileDistribution<Problem>();
-                             }());
+                             AsyncVPolicy::template
+                                 MakeVDramTileDistributionContiguous<Problem>());
 
         auto q_tile = tile_elementwise_in(q_element_func, q);
 
@@ -522,30 +503,24 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             if constexpr(i_k0 < k0_loops - 1)
                 move_tile_window(k_dram_window, {0, kK0});
         });
-        // V async prologue
-        if constexpr(kUseAsyncVLoad)
+        // V async prologue: zero-fill V LDS (async store leaves gaps),
+        // then load first V sub-tiles
         {
-            // Zero-fill V LDS: async store leaves gaps between warps
-            // (warp stride > 64 lanes × 16 bytes = 1024 per warp).
-            // V load descriptor reads through these gaps, so they must
-            // contain valid data (zeros).
-            {
-                constexpr index_t v_lds_total =
-                    AsyncVPolicy::template GetSmemSizeV<Problem>();
-                auto* vp = reinterpret_cast<uint32_t*>(v_lds_ptr);
-                const index_t tid = get_thread_id();
-                for(index_t i = tid; i < v_lds_total / 4; i += kBlockSize)
-                    vp[i] = 0;
-                __builtin_amdgcn_s_barrier();
-            }
-            static_for<0, k1_loops, 1>{}([&](auto i_k1) {
-                async_load_tile_raw(
-                    make_v_store_window(i_k1),
-                    v_dram_window);
-                if constexpr(i_k1 < k1_loops - 1)
-                    move_tile_window(v_dram_window, {0, kK1});
-            });
+            constexpr index_t v_lds_total =
+                AsyncVPolicy::template GetSmemSizeV<Problem>();
+            auto* vp = reinterpret_cast<uint32_t*>(v_lds_ptr);
+            const index_t tid = get_thread_id();
+            for(index_t i = tid; i < v_lds_total / 4; i += kBlockSize)
+                vp[i] = 0;
+            __builtin_amdgcn_s_barrier();
         }
+        static_for<0, k1_loops, 1>{}([&](auto i_k1) {
+            async_load_tile_raw(
+                make_v_store_window(i_k1),
+                v_dram_window);
+            if constexpr(i_k1 < k1_loops - 1)
+                move_tile_window(v_dram_window, {0, kK1});
+        });
 
         do
         {
@@ -556,9 +531,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             // STAGE 1: QK GEMM
             float delta_s_unique[kNIterPerWarp0];
             clear_tile(s_acc);
-
-            // V prefetch for register-staged fallback path
-            auto v_prefetch = decltype(load_tile(v_dram_window)){};
 
             // GEMM0 helper: produces Q slice + Q scale slice for sub-tile i_k0
             auto run_gemm_0 = [&](auto i_k0, const int32_t* k_scale_arr, auto& k_win) {
@@ -622,9 +594,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 });
                 __builtin_amdgcn_sched_group_barrier(0x020, 2, 0);
             }
-
-            if constexpr(!kUseAsyncVLoad)
-                v_prefetch = load_tile(v_dram_window);
 
             // STAGE 2: scale_s, add delta_s, bias, mask, softmax
             s_acc = tile_elementwise_in(s_acc_element_func, s_acc);
@@ -785,79 +754,40 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             const auto& p       = p_result;
             const auto& p_scale = p_scale_result;
 
-            if constexpr(kUseAsyncVLoad)
-            {
-                // V async 2-buffer in-place with interleaved V_next
-                static_for<0, k1_loops, 1>{}([&](auto i_k1) {
-                    if constexpr(i_k1 > 0)
-                        block_sync_lds();
-
-                    auto p_slice = get_slice_tile(
-                        p, sequence<0, i_k1 * kK1>{},
-                        sequence<kM0, (i_k1 + 1) * kK1>{});
-                    auto p_scale_slice = get_slice_tile(
-                        p_scale,
-                        sequence<0, i_k1 * (kK1 / kVScaleGranularity)>{},
-                        sequence<kM0, (i_k1 + 1) * (kK1 / kVScaleGranularity)>{});
-
-                    const index_t v_read_buf = static_cast<index_t>(i_k1);
-                    auto* v_read_ptr = reinterpret_cast<VDataType*>(
-                        reinterpret_cast<char*>(v_lds_ptr) +
-                        v_read_buf * v_single_buf_bytes);
-                    auto v_lds_read_view = make_tensor_view<address_space_enum::lds>(
-                        v_read_ptr,
-                        AsyncVPolicy::template MakeVLdsLoadBlockDescriptor<Problem>());
-                    auto v_win = make_tile_window(
-                        v_lds_read_view,
-                        make_tuple(number<kN1>{}, number<kK1>{}),
-                        {0, 0});
-                    gemm_1(o_acc, p_slice, p_scale_slice,
-                           v_win, v_scale_arr);
-
-                    if(i_total_loops + 1 < num_total_loop)
-                    {
-                        move_tile_window(v_dram_window, {0, kK1});
-                        async_load_tile_raw(
-                            make_v_store_window(i_k1), v_dram_window);
-                    }
-                });
-            }
-            else
-            {
-                // V register-staged fallback (for padded mxfp4 configs)
-                if constexpr(k1_loops > 1)
+            // V async 2-buffer in-place with interleaved V_next
+            static_for<0, k1_loops, 1>{}([&](auto i_k1) {
+                if constexpr(i_k1 > 0)
                     block_sync_lds();
-                store_tile(v_lds_window, tile_elementwise_in(v_element_func, v_prefetch));
-                move_tile_window(v_dram_window, {0, kK1});
 
-                auto run_gemm_1_packed = [&](auto i_k1) {
-                    auto p_slice = get_slice_tile(
-                        p, sequence<0, i_k1 * kK1>{},
-                        sequence<kM0, (i_k1 + 1) * kK1>{});
-                    auto p_scale_slice = get_slice_tile(
-                        p_scale,
-                        sequence<0, i_k1 * (kK1 / kVScaleGranularity)>{},
-                        sequence<kM0, (i_k1 + 1) * (kK1 / kVScaleGranularity)>{});
-                    gemm_1(o_acc, p_slice, p_scale_slice, v_lds_window, v_scale_arr);
-                };
+                auto p_slice = get_slice_tile(
+                    p, sequence<0, i_k1 * kK1>{},
+                    sequence<kM0, (i_k1 + 1) * kK1>{});
+                auto p_scale_slice = get_slice_tile(
+                    p_scale,
+                    sequence<0, i_k1 * (kK1 / kVScaleGranularity)>{},
+                    sequence<kM0, (i_k1 + 1) * (kK1 / kVScaleGranularity)>{});
 
-                if constexpr(k1_loops > 1)
+                const index_t v_read_buf = static_cast<index_t>(i_k1);
+                auto* v_read_ptr = reinterpret_cast<VDataType*>(
+                    reinterpret_cast<char*>(v_lds_ptr) +
+                    v_read_buf * v_single_buf_bytes);
+                auto v_lds_read_view = make_tensor_view<address_space_enum::lds>(
+                    v_read_ptr,
+                    AsyncVPolicy::template MakeVLdsLoadBlockDescriptor<Problem>());
+                auto v_win = make_tile_window(
+                    v_lds_read_view,
+                    make_tuple(number<kN1>{}, number<kK1>{}),
+                    {0, 0});
+                gemm_1(o_acc, p_slice, p_scale_slice,
+                       v_win, v_scale_arr);
+
+                if(i_total_loops + 1 < num_total_loop)
                 {
-                    static_for<0, k1_loops - 1, 1>{}([&](auto i_k1) {
-                        const auto v = load_tile(v_dram_window);
-                        block_sync_lds();
-                        run_gemm_1_packed(number<i_k1>{});
-                        block_sync_lds();
-                        store_tile(v_lds_window, tile_elementwise_in(v_element_func, v));
-                        move_tile_window(v_dram_window, {0, kK1});
-                    });
+                    move_tile_window(v_dram_window, {0, kK1});
+                    async_load_tile_raw(
+                        make_v_store_window(i_k1), v_dram_window);
                 }
-                {
-                    block_sync_lds();
-                    run_gemm_1_packed(number<k1_loops - 1>{});
-                    block_sync_lds();
-                }
-            }
+            });
 
             // Reload dwordx4 scale for next block
             if(i_total_loops + 1 < num_total_loop)
