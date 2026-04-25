@@ -1338,45 +1338,15 @@ struct FmhaFwdKernel
         }
 #endif
 
-        // XCD-interleave remap: spread adjacent blocks across XCDs for L2 locality.
-        // Tail blocks (grid_size % kNumXCDs != 0) keep identity mapping since
-        // they occupy indices above the remapped range, so no collision.
-        auto xcd_interleave_remap = [](index_t i_block, [[maybe_unused]] index_t grid_size) {
-#if !defined(__gfx950__)
-            constexpr index_t kNumXCDs         = 8;
-            constexpr index_t kMinTilesPerXCD  = 16;
-            const index_t cus_per_xdim_per_xcd = grid_size / kNumXCDs;
-            if(cus_per_xdim_per_xcd >= kMinTilesPerXCD)
-            {
-                const index_t cu_id  = i_block / kNumXCDs;
-                const index_t xcd_id = i_block % kNumXCDs;
-                if(cu_id < cus_per_xdim_per_xcd)
-                {
-                    i_block = xcd_id * cus_per_xdim_per_xcd + cu_id;
-                }
-            }
-#endif
-            return i_block;
-        };
-
         if(has_padded_seqlen_k)
         {
             // const index_t num_tile_m0 = seqlen_q / kM0;
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            index_t i_block       = blockIdx.z;
+            const index_t i_block = blockIdx.z;
             const index_t i_nhead = blockIdx.x;
             const index_t i_batch = blockIdx.y;
-
-            // XCD-interleave scheduling: remap block indices so that adjacent
-            // Q-tiles land on the same XCD (chiplet), improving L2 cache
-            // locality for KV reuse. Adapted from FA4 (Tri Dao, 2025).
-            // Only enabled on gfx942 (MI300X) where it gives up to 3.3x on
-            // GQA workloads. On gfx950 (MI350X), the V3 persistent kernel
-            // provides better scheduling; V2 XCD-interleave regresses some
-            // configs there.
-            i_block = xcd_interleave_remap(i_block, gridDim.z);
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
@@ -1390,8 +1360,9 @@ struct FmhaFwdKernel
             {
                 // LPT (Largest Processing Time) reversal: assign longer
                 // causal rows first so the last wave finishes sooner.
+                // gridDim.z = num_tile_m0 * num_tile_n1 by construction
+                // (see GridSize), so i_tile_m < num_tile_m0 is guaranteed.
                 const index_t num_tile_m0 = gridDim.z / num_tile_n1;
-                assert(i_tile_m < num_tile_m0 && "LPT reversal: i_tile_m out of range");
                 return ck_tile::make_tuple(num_tile_m0 - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
             }
             else
@@ -1405,11 +1376,9 @@ struct FmhaFwdKernel
             const index_t num_tile_n1 =
                 ck_tile::integer_divide_ceil(kargs.hdim_v, FmhaPipeline::kN1);
 
-            index_t i_block       = blockIdx.y; // blockIdx.x
-            const index_t i_nhead = blockIdx.x; // blockIdx.y
+            const index_t i_block = blockIdx.y;
+            const index_t i_nhead = blockIdx.x;
             const index_t i_batch = blockIdx.z;
-
-            i_block = xcd_interleave_remap(i_block, gridDim.y);
 
             const auto f = [](index_t dividend, index_t divisor) {
                 index_t quotient = dividend / divisor;
@@ -1423,7 +1392,6 @@ struct FmhaFwdKernel
             {
                 // LPT reversal for causal masking (see padded path above).
                 const index_t num_tile_m0 = gridDim.y / num_tile_n1;
-                assert(i_tile_m < num_tile_m0 && "LPT reversal: i_tile_m out of range");
                 return ck_tile::make_tuple(num_tile_m0 - 1 - i_tile_m, i_tile_n, i_nhead, i_batch);
             }
             else
