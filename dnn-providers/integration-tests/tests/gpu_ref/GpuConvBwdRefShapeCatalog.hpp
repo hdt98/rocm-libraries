@@ -48,7 +48,7 @@ inline std::vector<ConvBwdShapeCase> withChannelLastLayout(std::vector<ConvBwdSh
 // Small shapes — fast binary (CI gate)
 // ============================================================================
 
-// Small 1D shapes: basic NCW convolution tests
+// Small 1D shapes: basic NCL convolution tests
 inline std::vector<ConvBwdShapeCase> getSmall1dDgradCases()
 {
     return {

@@ -283,7 +283,7 @@ TEST_P(TestGpuConvBwdRefShapesBfp16, MatchesCpuRef)
 }
 
 // ============================================================================
-// Default layout (NCHW/NCDHW/NCW) instantiations — small shapes only.
+// Default layout (NCHW/NCDHW/NCL) instantiations — small shapes only.
 // Medium/large shapes are in the slow binary.
 // ============================================================================
 

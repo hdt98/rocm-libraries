@@ -27,7 +27,7 @@ TEST_P(TestGpuConvWrwRefShapesBfp16, MatchesCpuRef)
 }
 
 // ============================================================================
-// Default layout (NCW/NCHW/NCDHW) — medium/large shapes
+// Default layout (NCL/NCHW/NCDHW) — medium/large shapes
 // ============================================================================
 
 // fp32

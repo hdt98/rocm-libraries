@@ -733,7 +733,7 @@ TEST_P(TestGpuConvFwdRefShapesBfp16, MatchesCpuRef)
 }
 
 // ============================================================================
-// Default layout (NCHW/NCDHW/NCW) instantiations — packed strides, no layout set.
+// Default layout (NCHW/NCDHW/NCL) instantiations — packed strides, no layout set.
 // Only small/fast shapes here. Medium/large shapes are in the slow binary.
 // ============================================================================
 
@@ -751,7 +751,7 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                              return info.param.tag;
                          });
 
-// fp32 NCW: 1D shapes
+// fp32 NCL: 1D shapes
 INSTANTIATE_TEST_SUITE_P(Small1d,
                          TestGpuConvFwdRefShapesFp32,
                          ::testing::ValuesIn(getSmall1dConvCases()),
@@ -759,7 +759,7 @@ INSTANTIATE_TEST_SUITE_P(Small1d,
                              return info.param.tag;
                          });
 
-// fp16 NCHW/NCDHW/NCW
+// fp16 NCHW/NCDHW/NCL
 INSTANTIATE_TEST_SUITE_P(Small2d,
                          TestGpuConvFwdRefShapesFp16,
                          ::testing::ValuesIn(getSmall2dConvCases()),
@@ -779,7 +779,7 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                              return info.param.tag;
                          });
 
-// bfp16 NCHW/NCDHW/NCW
+// bfp16 NCHW/NCDHW/NCL
 INSTANTIATE_TEST_SUITE_P(Small2d,
                          TestGpuConvFwdRefShapesBfp16,
                          ::testing::ValuesIn(getSmall2dConvCases()),
@@ -800,11 +800,17 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                          });
 
 // ============================================================================
-// Channel-last (NHWC/NDHWC) instantiations — small shapes only.
+// Channel-last (NLC/NHWC/NDHWC) instantiations — small shapes only.
 // Medium/large channel-last shapes are in the slow binary.
 // ============================================================================
 
-// fp32 NHWC/NDHWC
+// fp32 NLC/NHWC/NDHWC
+INSTANTIATE_TEST_SUITE_P(Nlc1dSmall,
+                         TestGpuConvFwdRefShapesFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
+                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 INSTANTIATE_TEST_SUITE_P(Nhwc2dSmall,
                          TestGpuConvFwdRefShapesFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),
@@ -818,7 +824,13 @@ INSTANTIATE_TEST_SUITE_P(Ndhwc3dSmall,
                              return info.param.tag;
                          });
 
-// fp16 NHWC/NDHWC
+// fp16 NLC/NHWC/NDHWC
+INSTANTIATE_TEST_SUITE_P(Nlc1dSmall,
+                         TestGpuConvFwdRefShapesFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
+                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 INSTANTIATE_TEST_SUITE_P(Nhwc2dSmall,
                          TestGpuConvFwdRefShapesFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),
@@ -832,7 +844,13 @@ INSTANTIATE_TEST_SUITE_P(Ndhwc3dSmall,
                              return info.param.tag;
                          });
 
-// bfp16 NHWC/NDHWC
+// bfp16 NLC/NHWC/NDHWC
+INSTANTIATE_TEST_SUITE_P(Nlc1dSmall,
+                         TestGpuConvFwdRefShapesBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
+                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
+                             return info.param.tag;
+                         });
 INSTANTIATE_TEST_SUITE_P(Nhwc2dSmall,
                          TestGpuConvFwdRefShapesBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),

@@ -410,7 +410,7 @@ TEST_P(TestGpuConvWrwRefShapesBfp16, MatchesCpuRef)
 }
 
 // ============================================================================
-// Default layout (NCHW/NCDHW/NCW) instantiations — small shapes only.
+// Default layout (NCHW/NCDHW/NCL) instantiations — small shapes only.
 // Medium/large shapes are in the slow binary.
 // ============================================================================
 
@@ -428,7 +428,7 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                              return info.param.tag;
                          });
 
-// fp32 NCW: 1D shapes
+// fp32 NCL: 1D shapes
 INSTANTIATE_TEST_SUITE_P(Small1d,
                          TestGpuConvWrwRefShapesFp32,
                          ::testing::ValuesIn(getSmall1dWgradCases()),
@@ -436,7 +436,7 @@ INSTANTIATE_TEST_SUITE_P(Small1d,
                              return info.param.tag;
                          });
 
-// fp16 NCHW/NCDHW/NCW
+// fp16 NCHW/NCDHW/NCL
 INSTANTIATE_TEST_SUITE_P(Small2d,
                          TestGpuConvWrwRefShapesFp16,
                          ::testing::ValuesIn(getSmall2dWgradCases()),
@@ -456,7 +456,7 @@ INSTANTIATE_TEST_SUITE_P(Small3d,
                              return info.param.tag;
                          });
 
-// bfp16 NCHW/NCDHW/NCW
+// bfp16 NCHW/NCDHW/NCL
 INSTANTIATE_TEST_SUITE_P(Small2d,
                          TestGpuConvWrwRefShapesBfp16,
                          ::testing::ValuesIn(getSmall2dWgradCases()),
