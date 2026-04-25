@@ -804,7 +804,7 @@ struct HostTensor
     // Save to a text file in rows × cols matrix format (space-separated).
     // The tensor must be 2-D. Each row is one line in the output file.
     // dtype controls the output type: "float" (default), "int", or "int8_t".
-    void save_as_text(std::string file_name, std::string dtype = "float") const
+    void save_as_text(const std::string& file_name, const std::string& dtype = "float") const
     {
         if(mDesc.get_num_of_dimension() != 2)
         {
@@ -828,13 +828,16 @@ struct HostTensor
                 if(c > 0)
                     file << " ";
 
-                const auto& val = mData[r * cols + c];
+                const auto& val = (*this)(r, c);
                 if(dtype == "int")
                     file << type_convert<int>(val);
                 else if(dtype == "int8_t")
                     file << static_cast<int>(type_convert<ck_tile::int8_t>(val));
-                else
+                else if(dtype == "float")
                     file << type_convert<float>(val);
+                else
+                    throw std::runtime_error(std::string("save_as_text: unsupported dtype: ") +
+                                             dtype);
             }
             file << "\n";
         }
