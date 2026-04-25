@@ -501,53 +501,22 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 }
             };
 
-            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
-            sweep_tile_span(p_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                auto row_max         = scale_s * get_validated_m(m[i_idx]);
-                sweep_tile_span(p_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
-                    {
-                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
-                    }
-                    else
-                    {
-                        if constexpr(kHasLogitsSoftCap)
-                        {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
-                        }
-                        else
-                        {
-                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
-                        }
-                    }
-                });
-            });
-
-            auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
-                p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
-
-            block_tile_reduce_sync(
-                rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
-
-            // l{j}, Oacc{j}
             // Conditional rescaling (FA4): skip when correction is negligible.
+            // For skip rows we stabilize P with m_old so P is computed directly in
+            // the m_{j-1} frame, eliminating the post-correction sweep.
             static constexpr SMPLComputeDataType kRescaleThreshold =
                 type_convert<SMPLComputeDataType>(8.0f);
 
-            // Per-row P correction factor: 1.0 for rescale rows,
-            // exp2(m_j - m_{j-1}) for skip rows (to convert P from m_j to m_{j-1} frame)
-            auto p_row_correction =
+            auto m_stab =
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
-            set_tile(p_row_correction, type_convert<SMPLComputeDataType>(1.0f));
-            auto needs_p_correction =
+            auto rescale_factor =
+                make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
+            auto needs_rescale =
                 make_static_distributed_tensor<bool>(m.get_tile_distribution());
-            set_tile(needs_p_correction, false);
+            set_tile(needs_rescale, false);
 
-            constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
-            sweep_tile_span(o_spans[I0], [&](auto idx0) {
+            constexpr auto m_spans = decltype(m)::get_distributed_spans();
+            sweep_tile_span(m_spans[I0], [&](auto idx0) {
                 constexpr auto i_idx      = make_tuple(idx0);
                 const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
@@ -574,7 +543,55 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
 
                 if(need_rescale)
                 {
-                    const auto tmp = exp2(acc_scale_log2);
+                    rescale_factor(i_idx) = exp2(acc_scale_log2);
+                    m_stab(i_idx)         = m[i_idx];
+                    needs_rescale(i_idx)  = true;
+                }
+                else
+                {
+                    m_stab(i_idx) = m_old[i_idx];
+                    m(i_idx)      = m_old[i_idx];
+                }
+            });
+
+            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
+            sweep_tile_span(p_spans[I0], [&](auto idx0) {
+                constexpr auto i_idx = make_tuple(idx0);
+                auto row_max         = scale_s * get_validated_m(m_stab[i_idx]);
+                sweep_tile_span(p_spans[I1], [&](auto idx1) {
+                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
+                    {
+                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                    }
+                    else
+                    {
+                        if constexpr(kHasLogitsSoftCap)
+                        {
+                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                        }
+                        else
+                        {
+                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                        }
+                    }
+                });
+            });
+
+            auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
+                p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
+
+            block_tile_reduce_sync(
+                rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
+
+            // l{j}, Oacc{j}
+            constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+            sweep_tile_span(o_spans[I0], [&](auto idx0) {
+                constexpr auto i_idx = make_tuple(idx0);
+                if(needs_rescale[i_idx])
+                {
+                    const auto tmp = rescale_factor[i_idx];
                     l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[I1], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
@@ -583,26 +600,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 }
                 else
                 {
-                    // Skip branch: correct P from m_j frame to m_{j-1} frame
-                    const auto correction     = exp2(-acc_scale_log2);
-                    l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
-                    m(i_idx)                  = m_old[i_idx];
-                    p_row_correction(i_idx)   = correction;
-                    needs_p_correction(i_idx) = true;
-                }
-            });
-
-            // Apply per-row P correction for skip rows: convert P from
-            // m_j frame to m_{j-1} frame before the P*V GEMM.
-            sweep_tile_span(p_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                const auto corr      = p_row_correction[i_idx];
-                if(needs_p_correction[i_idx])
-                {
-                    sweep_tile_span(p_spans[I1], [&](auto idx1) {
-                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        p_compute(i_j_idx) *= corr;
-                    });
+                    // Skip: P already in m_{j-1} frame, no o_acc rescale needed.
+                    l(i_idx) = l[i_idx] + rowsum_p[i_idx];
                 }
             });
 
@@ -1069,53 +1068,22 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 }
             };
 
-            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
-            sweep_tile_span(p_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                auto row_max         = scale_s * get_validated_m(m[i_idx]);
-                sweep_tile_span(p_spans[I1], [&](auto idx1) {
-                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
-                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
-                    {
-                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
-                    }
-                    else
-                    {
-                        if constexpr(kHasLogitsSoftCap)
-                        {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m[i_idx]));
-                        }
-                        else
-                        {
-                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
-                        }
-                    }
-                });
-            });
-
-            auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
-                p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
-
-            block_tile_reduce_sync(
-                rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
-
-            // l{j}, Oacc{j}
             // Conditional rescaling (FA4): skip when correction is negligible.
+            // For skip rows we stabilize P with m_old so P is computed directly in
+            // the m_{j-1} frame, eliminating the post-correction sweep.
             static constexpr SMPLComputeDataType kRescaleThreshold =
                 type_convert<SMPLComputeDataType>(8.0f);
 
-            // Per-row P correction factor: 1.0 for rescale rows,
-            // exp2(m_j - m_{j-1}) for skip rows (to convert P from m_j to m_{j-1} frame)
-            auto p_row_correction =
+            auto m_stab =
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
-            set_tile(p_row_correction, type_convert<SMPLComputeDataType>(1.0f));
-            auto needs_p_correction =
+            auto rescale_factor =
+                make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
+            auto needs_rescale =
                 make_static_distributed_tensor<bool>(m.get_tile_distribution());
-            set_tile(needs_p_correction, false);
+            set_tile(needs_rescale, false);
 
-            constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
-            sweep_tile_span(o_spans[I0], [&](auto idx0) {
+            constexpr auto m_spans = decltype(m)::get_distributed_spans();
+            sweep_tile_span(m_spans[I0], [&](auto idx0) {
                 constexpr auto i_idx      = make_tuple(idx0);
                 const auto acc_scale_log2 = [&]() {
                     if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
@@ -1142,7 +1110,55 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
 
                 if(need_rescale)
                 {
-                    const auto tmp = exp2(acc_scale_log2);
+                    rescale_factor(i_idx) = exp2(acc_scale_log2);
+                    m_stab(i_idx)         = m[i_idx];
+                    needs_rescale(i_idx)  = true;
+                }
+                else
+                {
+                    m_stab(i_idx) = m_old[i_idx];
+                    m(i_idx)      = m_old[i_idx];
+                }
+            });
+
+            constexpr auto p_spans = decltype(p_compute)::get_distributed_spans();
+            sweep_tile_span(p_spans[I0], [&](auto idx0) {
+                constexpr auto i_idx = make_tuple(idx0);
+                auto row_max         = scale_s * get_validated_m(m_stab[i_idx]);
+                sweep_tile_span(p_spans[I1], [&](auto idx1) {
+                    constexpr auto i_j_idx = make_tuple(idx0, idx1);
+                    if constexpr(BiasEnum == BlockAttentionBiasEnum::ELEMENTWISE_BIAS ||
+                                 BiasEnum == BlockAttentionBiasEnum::ALIBI)
+                    {
+                        p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                    }
+                    else
+                    {
+                        if constexpr(kHasLogitsSoftCap)
+                        {
+                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                        }
+                        else
+                        {
+                            p_compute(i_j_idx) = exp2(scale_s * s_new[i_j_idx] - row_max);
+                        }
+                    }
+                });
+            });
+
+            auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
+                p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
+
+            block_tile_reduce_sync(
+                rowsum_p, f_sum, bool_constant<false>{} /*, bool_constant<false>{}*/);
+
+            // l{j}, Oacc{j}
+            constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
+            sweep_tile_span(o_spans[I0], [&](auto idx0) {
+                constexpr auto i_idx = make_tuple(idx0);
+                if(needs_rescale[i_idx])
+                {
+                    const auto tmp = rescale_factor[i_idx];
                     l(i_idx)       = tmp * l[i_idx] + rowsum_p[i_idx];
                     sweep_tile_span(o_spans[I1], [&](auto idx1) {
                         constexpr auto i_j_idx = make_tuple(idx0, idx1);
@@ -1151,26 +1167,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 }
                 else
                 {
-                    // Skip branch: correct P from m_j frame to m_{j-1} frame
-                    const auto correction     = exp2(-acc_scale_log2);
-                    l(i_idx)                  = l[i_idx] + rowsum_p[i_idx] * correction;
-                    m(i_idx)                  = m_old[i_idx];
-                    p_row_correction(i_idx)   = correction;
-                    needs_p_correction(i_idx) = true;
-                }
-            });
-
-            // Apply per-row P correction for skip rows: convert P from
-            // m_j frame to m_{j-1} frame before the P*V GEMM.
-            sweep_tile_span(p_spans[I0], [&](auto idx0) {
-                constexpr auto i_idx = make_tuple(idx0);
-                const auto corr      = p_row_correction[i_idx];
-                if(needs_p_correction[i_idx])
-                {
-                    sweep_tile_span(p_spans[I1], [&](auto idx1) {
-                        constexpr auto i_j_idx = make_tuple(idx0, idx1);
-                        p_compute(i_j_idx) *= corr;
-                    });
+                    // Skip: P already in m_{j-1} frame, no o_acc rescale needed.
+                    l(i_idx) = l[i_idx] + rowsum_p[i_idx];
                 }
             });
 
