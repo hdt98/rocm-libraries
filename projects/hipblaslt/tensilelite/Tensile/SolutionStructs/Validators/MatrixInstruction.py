@@ -62,6 +62,8 @@ def matrixInstructionToMIParameters(
     result = {}
     result["ISA"] = isa
 
+    isgfx950 = isa[:2] == (9, 5)
+
     # Enable F32 XDL math operation only when the input type is f32.
     enableF32xdl = (
       "F32XdlMathOp" in problemType
@@ -136,11 +138,14 @@ def matrixInstructionToMIParameters(
     sparseB = False if not isSparse else True if isSparse == 2 else False
     result['MIInputPerThreadA'] = result['MIInputPerThreadA'] if not sparseA else result['MIInputPerThreadA'] // 2
     if ("MXBlockA" in problemType) and  problemType["MXBlockA"]:
-      duplicateFactor = 32 // result["MatrixInstM"]
+      # work around for gfx950. Use duplicateFactor = 1
+      duplicateFactor = 32 // result["MatrixInstM"] if not isgfx950 else 1
       result['MIInputPerThreadMXSA'] = result['MIInputPerThreadA'] // problemType["MXBlockA"] * duplicateFactor
+      MIInputPerThreadMXSA = result['MIInputPerThreadMXSA']
     result['MIInputPerThreadB'] = result['MIInputPerThreadB'] if not sparseB else result['MIInputPerThreadB'] // 2
     if ("MXBlockB" in problemType) and problemType["MXBlockB"]:
-      duplicateFactor = 32 // result["MatrixInstN"]
+      # work around for gfx950. Use duplicateFactor = 1
+      duplicateFactor = 32 // result["MatrixInstN"] if not isgfx950 else 1
       result['MIInputPerThreadMXSB'] = result['MIInputPerThreadB'] // problemType["MXBlockB"] * duplicateFactor
     result['MIInputPerThreadMetadata'] = result['MIInputPerThread'] if not isSparse else result['MIInputPerThread'] // 8
 
