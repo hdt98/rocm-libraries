@@ -10,6 +10,8 @@
 // ============================================================================
 // Shape Catalog — centralized convolution shapes for wgrad tests.
 // Each function is kept separate for easy future splitting into tiers.
+//
+// Organization: Small (1D, 2D, 3D) → Medium (1D, 2D, 3D) → Large (1D, 2D, 3D)
 // ============================================================================
 
 namespace gpu_conv_wgrad_ref_test
@@ -42,32 +44,72 @@ inline std::vector<ConvWgradShapeCase> withChannelLastLayout(std::vector<ConvWgr
     return cases;
 }
 
+// ============================================================================
+// Small shapes — fast binary (CI gate)
+// ============================================================================
+
+// Small 1D shapes: basic NCW convolution tests
+inline std::vector<ConvWgradShapeCase> getSmall1dWgradCases()
+{
+    return {
+        {{1, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "Basic1d"},
+        {{1, 1, 6}, {1, 1, 3}, {1}, {1}, {1}, 1, "Padded1d"},
+        {{1, 1, 10}, {1, 1, 3}, {2}, {1}, {0}, 1, "Stride2x1d"},
+        {{1, 1, 9}, {1, 1, 3}, {1}, {2}, {0}, 1, "Dilation2x1d"},
+        {{1, 3, 8}, {2, 3, 3}, {1}, {1}, {0}, 1, "MultiChan1d"},
+        {{2, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "MultiBatch1d"},
+        {{1, 4, 8}, {4, 2, 3}, {1}, {1}, {0}, 2, "Grouped2x1d"},
+        {{1, 3, 8}, {2, 3, 1}, {1}, {1}, {0}, 1, "Pointwise1d"},
+    };
+}
+
 // Small 2D shapes: output < 1K elements, suitable for all types
 inline std::vector<ConvWgradShapeCase> getSmall2dWgradCases()
 {
     return {
-        // Basic single-channel 3x3 convolution, no padding
         {{1, 1, 8, 8}, {1, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "Basic3x3"},
-        // Multiple input/output channels with padding
         {{1, 3, 8, 8}, {6, 3, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "MultiChanPad"},
-        // 2-group convolution with multi-batch
         {{2, 4, 8, 8}, {4, 2, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 2, "Grouped2Batch2"},
-        // Stride=2 downsampling
         {{1, 1, 8, 8}, {2, 1, 3, 3}, {2, 2}, {1, 1}, {0, 0}, 1, "Stride2"},
-        // Dilation=2 (expanded receptive field)
         {{1, 1, 12, 12}, {1, 1, 3, 3}, {1, 1}, {2, 2}, {0, 0}, 1, "Dilation2"},
-        // Depthwise convolution (groups == input channels)
         {{1, 3, 8, 8}, {3, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 3, "Depthwise3Chan"},
-        // 1x1 pointwise convolution (channel mixing only)
         {{1, 8, 4, 4}, {16, 8, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Pointwise1x1"},
-        // Depthwise with odd group count
         {{1, 7, 8, 8}, {7, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "DepthwiseOdd7"},
         // 5x5 kernel with padding (larger receptive field)
         {{1, 2, 10, 10}, {4, 2, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 1, "Kernel5x5"},
         // Non-square spatial dimensions
         {{1, 2, 6, 10}, {4, 2, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "NonSquare6x10"},
-        // Minimum output: single element (3x3 input, 3x3 kernel)
         {{1, 1, 3, 3}, {1, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "SingleElement"},
+    };
+}
+
+// Small 3D shapes: basic 3D convolution tests
+inline std::vector<ConvWgradShapeCase> getSmall3dWgradCases()
+{
+    return {
+        {{1, 1, 4, 4, 4}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Basic3d"},
+        {{1, 1, 6, 6, 6}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Padded3d"},
+        {{2, 4, 4, 4, 4}, {8, 2, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 2, "Grouped2x3d"},
+        {{1, 1, 5, 5, 5}, {1, 1, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, 1, "Stride2x3d"},
+        {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
+        {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
+    };
+}
+
+// ============================================================================
+// Medium shapes — slow binary (nightly)
+// ============================================================================
+
+// Medium 1D shapes
+inline std::vector<ConvWgradShapeCase> getMedium1dWgradCases()
+{
+    return {
+        {{4, 16, 64}, {32, 16, 3}, {1}, {1}, {1}, 1, "MediumMultiChan1d"},
+        {{8, 32, 128}, {32, 8, 5}, {1}, {1}, {2}, 4, "Grouped4x1d"},
+        {{4, 8, 256}, {16, 8, 7}, {2}, {1}, {3}, 1, "Stride2Med1d"},
+        {{4, 8, 64}, {8, 1, 3}, {1}, {1}, {1}, 8, "Depthwise8x1d"},
+        {{2, 4, 32}, {8, 4, 3}, {1}, {2}, {2}, 1, "Dilation2Med1d"},
+        {{8, 64, 128}, {128, 64, 1}, {1}, {1}, {0}, 1, "Pointwise64to128x1d"},
     };
 }
 
@@ -75,32 +117,49 @@ inline std::vector<ConvWgradShapeCase> getSmall2dWgradCases()
 inline std::vector<ConvWgradShapeCase> getMedium2dWgradCases()
 {
     return {
-        // ResNeXt-like 2-group block
         {{8, 64, 28, 28}, {128, 32, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 2, "ResNeXt2Group"},
-        // ResNeXt-32x4d bottleneck (32 groups, 4 channels/group)
         {{8, 128, 14, 14}, {256, 4, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 32, "ResNeXt32x4d"},
-        // ResNet 1x1 pointwise reduction
         {{4, 64, 56, 56}, {64, 64, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "ResNet1x1Reduce"},
-        // ResNet stem layer: 7x7 kernel, stride=2
         {{8, 3, 28, 28}, {64, 3, 7, 7}, {2, 2}, {1, 1}, {3, 3}, 1, "ResNetStem7x7"},
-        // 8-group convolution
         {{8, 64, 14, 14}, {64, 8, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 8, "Grouped8"},
-        // MobileNet-style depthwise (16 channels)
         {{4, 16, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 16, "MobileNetDW16"},
-        // RGB 3-group with stride-2 downsampling
         {{8, 3, 108, 108}, {63, 1, 3, 3}, {2, 2}, {1, 1}, {1, 1}, 3, "RGB3GroupStride2"},
-        // 2-group with 5x5 kernel
         {{4, 32, 28, 28}, {32, 16, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 2, "Grouped2Kernel5x5"},
-        // 8-group mid-resolution
         {{8, 128, 28, 28}, {128, 16, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 8, "Grouped8MidRes"},
-        // Bottleneck 1x1 channel expansion
         {{2, 256, 14, 14}, {256, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Bottleneck1x1Expand"},
-        // Small depthwise (4 channels)
         {{4, 4, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 4, "Depthwise4Chan"},
-        // Odd channel count grouped (7 groups)
         {{8, 7, 14, 14}, {63, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "OddChanGrouped7"},
         // Dilation=2 at medium scale
         {{4, 32, 28, 28}, {32, 32, 3, 3}, {1, 1}, {2, 2}, {2, 2}, 1, "Dilation2MedScale"},
+    };
+}
+
+// Medium 3D shapes
+inline std::vector<ConvWgradShapeCase> getMedium3dWgradCases()
+{
+    return {
+        {{2, 16, 8, 8, 8}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Standard16Ch3d"},
+        {{1, 16, 4, 14, 14}, {16, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3d"},
+        {{2, 16, 8, 8, 8}, {32, 16, 5, 5, 5}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Kernel5x5x5"},
+    };
+}
+
+// ============================================================================
+// Large shapes — slow binary (nightly)
+// ============================================================================
+
+// Large 1D shapes: stress tests for audio/speech workloads
+inline std::vector<ConvWgradShapeCase> getLarge1dWgradCases()
+{
+    return {
+        // WaveNet-style high-channel long sequence
+        {{16, 128, 1024}, {256, 128, 3}, {1}, {1}, {1}, 1, "WaveNetLarge"},
+        // Large depthwise on long sequence
+        {{16, 64, 2048}, {64, 1, 3}, {1}, {1}, {1}, 64, "Depthwise64Long"},
+        // Stride-2 on long sequence with large kernel
+        {{8, 32, 4096}, {64, 32, 7}, {2}, {1}, {3}, 1, "Stride2LargeKernel7"},
+        // 8-group on medium-long sequence
+        {{16, 64, 512}, {64, 8, 5}, {1}, {1}, {2}, 8, "Grouped8Kernel5"},
     };
 }
 
@@ -108,17 +167,11 @@ inline std::vector<ConvWgradShapeCase> getMedium2dWgradCases()
 inline std::vector<ConvWgradShapeCase> getLarge2dWgradCases()
 {
     return {
-        // ResNeXt-32x4d high-resolution block
         {{16, 128, 56, 56}, {256, 4, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 32, "ResNeXt32x4dHiRes"},
-        // ResNeXt deep 32-group (512->1024 channels)
         {{16, 512, 14, 14}, {1024, 16, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 32, "ResNeXtDeep32Group"},
-        // ResNeXt stride-2 downsample (256->512)
         {{16, 256, 28, 28}, {512, 8, 3, 3}, {2, 2}, {1, 1}, {1, 1}, 32, "ResNeXtStride2Down"},
-        // Large stem: 3-group 7x7 on 224x224 input
         {{16, 3, 224, 224}, {63, 1, 7, 7}, {2, 2}, {1, 1}, {3, 3}, 3, "LargeStem7x7"},
-        // Mid-resolution 8-group on 56x56
         {{8, 128, 56, 56}, {128, 16, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 8, "MidRes8Group56x56"},
-        // Inception-like 5x5 kernel, 16-group
         {{16, 192, 28, 28}, {32, 12, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 16, "Inception5x5x16Group"},
         // DeepSpeech-like non-square spatial (161x700)
         {{4, 4, 161, 700}, {32, 1, 5, 20}, {2, 2}, {1, 1}, {0, 0}, 4, "DeepSpeechNonSquare"},
@@ -127,77 +180,18 @@ inline std::vector<ConvWgradShapeCase> getLarge2dWgradCases()
     };
 }
 
-// Small 1D shapes: basic NCW convolution tests
-inline std::vector<ConvWgradShapeCase> getSmall1dWgradCases()
+// Large 3D shapes: stress tests for volumetric/video workloads
+inline std::vector<ConvWgradShapeCase> getLarge3dWgradCases()
 {
     return {
-        // Basic 1D: single-channel, kernel=3
-        {{1, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "Basic1d"},
-        // 1D with padding
-        {{1, 1, 6}, {1, 1, 3}, {1}, {1}, {1}, 1, "Padded1d"},
-        // 1D with stride=2
-        {{1, 1, 10}, {1, 1, 3}, {2}, {1}, {0}, 1, "Stride2x1d"},
-        // 1D with dilation=2
-        {{1, 1, 9}, {1, 1, 3}, {1}, {2}, {0}, 1, "Dilation2x1d"},
-        // 1D multi-channel (3 in, 2 out)
-        {{1, 3, 8}, {2, 3, 3}, {1}, {1}, {0}, 1, "MultiChan1d"},
-        // 1D multi-batch
-        {{2, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "MultiBatch1d"},
-        // 1D grouped (2 groups)
-        {{1, 4, 8}, {4, 2, 3}, {1}, {1}, {0}, 2, "Grouped2x1d"},
-        // 1D pointwise (kernel=1)
-        {{1, 3, 8}, {2, 3, 1}, {1}, {1}, {0}, 1, "Pointwise1d"},
-    };
-}
-
-// Medium 1D shapes: larger 1D convolutions for additional coverage
-inline std::vector<ConvWgradShapeCase> getMedium1dWgradCases()
-{
-    return {
-        // Multi-batch multi-channel with padding
-        {{4, 16, 64}, {32, 16, 3}, {1}, {1}, {1}, 1, "MediumMultiChan1d"},
-        // Grouped 4-group with larger spatial
-        {{8, 32, 128}, {32, 8, 5}, {1}, {1}, {2}, 4, "Grouped4x1d"},
-        // Stride=2 downsampling
-        {{4, 8, 256}, {16, 8, 7}, {2}, {1}, {3}, 1, "Stride2Med1d"},
-        // Depthwise 1D (8 channels)
-        {{4, 8, 64}, {8, 1, 3}, {1}, {1}, {1}, 8, "Depthwise8x1d"},
-        // Dilation=2 with padding
-        {{2, 4, 32}, {8, 4, 3}, {1}, {2}, {2}, 1, "Dilation2Med1d"},
-        // Large kernel pointwise (1x1)
-        {{8, 64, 128}, {128, 64, 1}, {1}, {1}, {0}, 1, "Pointwise64to128x1d"},
-    };
-}
-
-// Small 3D shapes: basic 3D convolution tests
-inline std::vector<ConvWgradShapeCase> getSmall3dWgradCases()
-{
-    return {
-        // Basic 3D: single-channel 3x3x3
-        {{1, 1, 4, 4, 4}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Basic3d"},
-        // 3D with padding
-        {{1, 1, 6, 6, 6}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Padded3d"},
-        // 3D grouped (2 groups)
-        {{2, 4, 4, 4, 4}, {8, 2, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 2, "Grouped2x3d"},
-        // 3D with stride=2
-        {{1, 1, 5, 5, 5}, {1, 1, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, 1, "Stride2x3d"},
-        // 3D with dilation=2
-        {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
-        // 3D multi-channel (3 in, 2 out)
-        {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
-    };
-}
-
-// Medium 3D shapes: larger 3D convolutions
-inline std::vector<ConvWgradShapeCase> getMedium3dWgradCases()
-{
-    return {
-        // Standard 3D with 16 input channels and padding
-        {{2, 16, 8, 8, 8}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Standard16Ch3d"},
-        // Non-cube spatial dimensions (4x14x14)
-        {{1, 16, 4, 14, 14}, {16, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3d"},
-        // Large 5x5x5 kernel
-        {{2, 16, 8, 8, 8}, {32, 16, 5, 5, 5}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Kernel5x5x5"},
+        // 3D medical imaging style: 16ch, 32x32x32
+        {{4, 16, 32, 32, 32}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "MedImg32cube"},
+        // 3D with stride-2 downsampling
+        {{4, 32, 16, 16, 16}, {64, 32, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {1, 1, 1}, 1, "Stride2x3dLarge"},
+        // 3D 4-group on larger spatial
+        {{2, 32, 16, 16, 16}, {32, 8, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 4, "Grouped4x3dLarge"},
+        // 3D non-cube spatial (8x32x32)
+        {{4, 16, 8, 32, 32}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3dLarge"},
     };
 }
 

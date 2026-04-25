@@ -10,6 +10,8 @@
 // ============================================================================
 // Shape Catalog — centralized forward convolution shapes, categorized by size.
 // Each function is kept separate for easy future splitting into tiers.
+//
+// Organization: Small (1D, 2D, 3D) → Medium (1D, 2D, 3D) → Large (1D, 2D, 3D)
 // ============================================================================
 
 namespace gpu_conv_fwd_ref_test
@@ -43,6 +45,33 @@ inline std::vector<ConvFwdShapeCase> withChannelLastLayout(std::vector<ConvFwdSh
     return cases;
 }
 
+// ============================================================================
+// Small shapes — fast binary (CI gate)
+// ============================================================================
+
+// Small 1D shapes: basic NCW convolution tests
+inline std::vector<ConvFwdShapeCase> getSmall1dConvCases()
+{
+    return {
+        // Basic 1D: single-channel, kernel=3
+        {{1, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "Basic1d"},
+        // 1D with padding
+        {{1, 1, 6}, {1, 1, 3}, {1}, {1}, {1}, 1, "Padded1d"},
+        // 1D with stride=2
+        {{1, 1, 10}, {1, 1, 3}, {2}, {1}, {0}, 1, "Stride2x1d"},
+        // 1D with dilation=2
+        {{1, 1, 9}, {1, 1, 3}, {1}, {2}, {0}, 1, "Dilation2x1d"},
+        // 1D multi-channel (3 in, 2 out)
+        {{1, 3, 8}, {2, 3, 3}, {1}, {1}, {0}, 1, "MultiChan1d"},
+        // 1D multi-batch
+        {{2, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "MultiBatch1d"},
+        // 1D grouped (2 groups)
+        {{1, 4, 8}, {4, 2, 3}, {1}, {1}, {0}, 2, "Grouped2x1d"},
+        // 1D pointwise (kernel=1)
+        {{1, 3, 8}, {2, 3, 1}, {1}, {1}, {0}, 1, "Pointwise1d"},
+    };
+}
+
 // Small 2D shapes: output < 1K elements, suitable for all types
 inline std::vector<ConvFwdShapeCase> getSmall2dConvCases()
 {
@@ -69,6 +98,48 @@ inline std::vector<ConvFwdShapeCase> getSmall2dConvCases()
         {{1, 2, 6, 10}, {4, 2, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "NonSquare6x10"},
         // Minimum output: single element (3x3 input, 3x3 kernel)
         {{1, 1, 3, 3}, {1, 1, 3, 3}, {1, 1}, {1, 1}, {0, 0}, 1, "SingleElement"},
+    };
+}
+
+// Small 3D shapes: basic 3D convolution tests
+inline std::vector<ConvFwdShapeCase> getSmall3dConvCases()
+{
+    return {
+        // Basic 3D: single-channel 3x3x3
+        {{1, 1, 4, 4, 4}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Basic3d"},
+        // 3D with padding
+        {{1, 1, 6, 6, 6}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Padded3d"},
+        // 3D grouped (2 groups)
+        {{2, 4, 4, 4, 4}, {8, 2, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 2, "Grouped2x3d"},
+        // 3D with stride=2
+        {{1, 1, 5, 5, 5}, {1, 1, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, 1, "Stride2x3d"},
+        // 3D with dilation=2
+        {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
+        // 3D multi-channel (3 in, 2 out)
+        {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
+    };
+}
+
+// ============================================================================
+// Medium shapes — slow binary (nightly)
+// ============================================================================
+
+// Medium 1D shapes: larger 1D convolutions for additional coverage
+inline std::vector<ConvFwdShapeCase> getMedium1dConvCases()
+{
+    return {
+        // Multi-batch multi-channel with padding
+        {{4, 16, 64}, {32, 16, 3}, {1}, {1}, {1}, 1, "MediumMultiChan1d"},
+        // Grouped 4-group with larger spatial
+        {{8, 32, 128}, {32, 8, 5}, {1}, {1}, {2}, 4, "Grouped4x1d"},
+        // Stride=2 downsampling
+        {{4, 8, 256}, {16, 8, 7}, {2}, {1}, {3}, 1, "Stride2Med1d"},
+        // Depthwise 1D (8 channels)
+        {{4, 8, 64}, {8, 1, 3}, {1}, {1}, {1}, 8, "Depthwise8x1d"},
+        // Dilation=2 with padding
+        {{2, 4, 32}, {8, 4, 3}, {1}, {2}, {2}, 1, "Dilation2Med1d"},
+        // Large kernel pointwise (1x1)
+        {{8, 64, 128}, {128, 64, 1}, {1}, {1}, {0}, 1, "Pointwise64to128x1d"},
     };
 }
 
@@ -105,6 +176,38 @@ inline std::vector<ConvFwdShapeCase> getMedium2dConvCases()
     };
 }
 
+// Medium 3D shapes: larger 3D convolutions
+inline std::vector<ConvFwdShapeCase> getMedium3dConvCases()
+{
+    return {
+        // Standard 3D with 16 input channels and padding
+        {{2, 16, 8, 8, 8}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Standard16Ch3d"},
+        // Non-cube spatial dimensions (4x14x14)
+        {{1, 16, 4, 14, 14}, {16, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3d"},
+        // Large 5x5x5 kernel
+        {{2, 16, 8, 8, 8}, {32, 16, 5, 5, 5}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Kernel5x5x5"},
+    };
+}
+
+// ============================================================================
+// Large shapes — slow binary (nightly)
+// ============================================================================
+
+// Large 1D shapes: stress tests for audio/speech workloads
+inline std::vector<ConvFwdShapeCase> getLarge1dConvCases()
+{
+    return {
+        // WaveNet-style high-channel long sequence
+        {{16, 128, 1024}, {256, 128, 3}, {1}, {1}, {1}, 1, "WaveNetLarge"},
+        // Large depthwise on long sequence
+        {{16, 64, 2048}, {64, 1, 3}, {1}, {1}, {1}, 64, "Depthwise64Long"},
+        // Stride-2 on long sequence with large kernel
+        {{8, 32, 4096}, {64, 32, 7}, {2}, {1}, {3}, 1, "Stride2LargeKernel7"},
+        // 8-group on medium-long sequence
+        {{16, 64, 512}, {64, 8, 5}, {1}, {1}, {2}, 8, "Grouped8Kernel5"},
+    };
+}
+
 // Large 2D shapes: stress tests matching real workloads
 inline std::vector<ConvFwdShapeCase> getLarge2dConvCases()
 {
@@ -128,58 +231,18 @@ inline std::vector<ConvFwdShapeCase> getLarge2dConvCases()
     };
 }
 
-// Small 1D shapes: basic NCW convolution tests
-inline std::vector<ConvFwdShapeCase> getSmall1dConvCases()
+// Large 3D shapes: stress tests for volumetric/video workloads
+inline std::vector<ConvFwdShapeCase> getLarge3dConvCases()
 {
     return {
-        // Basic 1D: single-channel, kernel=3
-        {{1, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "Basic1d"},
-        // 1D with padding
-        {{1, 1, 6}, {1, 1, 3}, {1}, {1}, {1}, 1, "Padded1d"},
-        // 1D with stride=2
-        {{1, 1, 10}, {1, 1, 3}, {2}, {1}, {0}, 1, "Stride2x1d"},
-        // 1D with dilation=2
-        {{1, 1, 9}, {1, 1, 3}, {1}, {2}, {0}, 1, "Dilation2x1d"},
-        // 1D multi-channel (3 in, 2 out)
-        {{1, 3, 8}, {2, 3, 3}, {1}, {1}, {0}, 1, "MultiChan1d"},
-        // 1D multi-batch
-        {{2, 1, 8}, {1, 1, 3}, {1}, {1}, {0}, 1, "MultiBatch1d"},
-        // 1D grouped (2 groups)
-        {{1, 4, 8}, {4, 2, 3}, {1}, {1}, {0}, 2, "Grouped2x1d"},
-        // 1D pointwise (kernel=1)
-        {{1, 3, 8}, {2, 3, 1}, {1}, {1}, {0}, 1, "Pointwise1d"},
-    };
-}
-
-// Small 3D shapes: basic 3D convolution tests
-inline std::vector<ConvFwdShapeCase> getSmall3dConvCases()
-{
-    return {
-        // Basic 3D: single-channel 3x3x3
-        {{1, 1, 4, 4, 4}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Basic3d"},
-        // 3D with padding
-        {{1, 1, 6, 6, 6}, {1, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Padded3d"},
-        // 3D grouped (2 groups)
-        {{2, 4, 4, 4, 4}, {8, 2, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 2, "Grouped2x3d"},
-        // 3D with stride=2
-        {{1, 1, 5, 5, 5}, {1, 1, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {0, 0, 0}, 1, "Stride2x3d"},
-        // 3D with dilation=2
-        {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
-        // 3D multi-channel (3 in, 2 out)
-        {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
-    };
-}
-
-// Medium 3D shapes: larger 3D convolutions
-inline std::vector<ConvFwdShapeCase> getMedium3dConvCases()
-{
-    return {
-        // Standard 3D with 16 input channels and padding
-        {{2, 16, 8, 8, 8}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "Standard16Ch3d"},
-        // Non-cube spatial dimensions (4x14x14)
-        {{1, 16, 4, 14, 14}, {16, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3d"},
-        // Large 5x5x5 kernel
-        {{2, 16, 8, 8, 8}, {32, 16, 5, 5, 5}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Kernel5x5x5"},
+        // 3D medical imaging style: 16ch, 32x32x32
+        {{4, 16, 32, 32, 32}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "MedImg32cube"},
+        // 3D with stride-2 downsampling
+        {{4, 32, 16, 16, 16}, {64, 32, 3, 3, 3}, {2, 2, 2}, {1, 1, 1}, {1, 1, 1}, 1, "Stride2x3dLarge"},
+        // 3D 4-group on larger spatial
+        {{2, 32, 16, 16, 16}, {32, 8, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 4, "Grouped4x3dLarge"},
+        // 3D non-cube spatial (8x32x32)
+        {{4, 16, 8, 32, 32}, {32, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3dLarge"},
     };
 }
 
