@@ -485,8 +485,20 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             delta_s_raw_ptr != nullptr ? delta_s_raw_ptr
                                        : reinterpret_cast<const float*>(smem_ptr));
 
-        // Packed K/V scale: dwordx4 loading
-        const index_t k_group = get_lane_id() / 32;
+        // Packed K/V scale: per-block dwordx4 loading
+        // Each dwordx4 holds scale for 1 block × 1 k_group:
+        //   [ki0_sg0, ..., ki0_sgN, ki1_sg0, ..., ki1_sgN]
+        // where sg indexes NumScaleGroupsB within each k0_iter.
+        using BlockGemm0Type = remove_cvref_t<decltype(gemm_0)>;
+        using BlockGemm1Type = remove_cvref_t<decltype(gemm_1)>;
+        constexpr index_t kNumSGB0 = BlockGemm0Type::NumScaleGroupsB;
+        constexpr index_t kNumSGB1 = BlockGemm1Type::NumScaleGroupsB;
+        constexpr index_t kABScaleKLane0 = kK0 / kQKScaleGranularity;
+        constexpr index_t kScalePerBlock_K =
+            (kQKHeaddim / kK0) * kNumSGB0;
+        constexpr index_t kScalePerBlock_V =
+            (kN0 / kK1) * kNumSGB1;
+        const index_t k_group = get_lane_id() / (64 / kABScaleKLane0);
         const index_t lane_n  = get_lane_id() % kCNLane0;
 
         auto k_scale_res = make_wave_buffer_resource(
@@ -496,23 +508,26 @@ struct BlockFmhaPipelineQRKSVSSageAttn
             v_scale_packed_ptr != nullptr ? v_scale_packed_ptr
                                           : reinterpret_cast<const int32_t*>(smem_ptr));
 
-        index_t scale_pair_idx = (seqlen_k_start / kN0) / 2;
-
-        auto load_k_scale_dwordx4 = [&](index_t pair_idx) {
+        auto load_k_scale_dwordx4 = [&](index_t block_idx) {
             return llvm_amdgcn_raw_buffer_load_i32x4(
                 k_scale_res,
-                static_cast<index_t>((pair_idx * 8 + k_group * 4) * sizeof(int32_t)),
+                static_cast<index_t>(
+                    (block_idx * kABScaleKLane0 * kScalePerBlock_K +
+                     k_group * kScalePerBlock_K) * sizeof(int32_t)),
                 0, 0);
         };
-        auto load_v_scale_dwordx4 = [&](index_t pair_idx) {
+        auto load_v_scale_dwordx4 = [&](index_t block_idx) {
             return llvm_amdgcn_raw_buffer_load_i32x4(
                 v_scale_res,
-                static_cast<index_t>((pair_idx * 8 + k_group * 4) * sizeof(int32_t)),
+                static_cast<index_t>(
+                    (block_idx * kABScaleKLane0 * kScalePerBlock_V +
+                     k_group * kScalePerBlock_V) * sizeof(int32_t)),
                 0, 0);
         };
 
-        int32x4_t k_scale_4 = load_k_scale_dwordx4(scale_pair_idx);
-        int32x4_t v_scale_4 = load_v_scale_dwordx4(scale_pair_idx);
+        const index_t scale_block_start = seqlen_k_start / kN0;
+        int32x4_t k_scale_4 = load_k_scale_dwordx4(scale_block_start);
+        int32x4_t v_scale_4 = load_v_scale_dwordx4(scale_block_start);
 
         index_t i_total_loops      = 0;
         constexpr index_t k0_loops = kQKHeaddim / kK0;
@@ -587,13 +602,6 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
         do
         {
-            // Select K scale for this block from dwordx4
-            const index_t block_in_pair = i_total_loops % 2;
-            const int32_t k_scale_ki0 =
-                (block_in_pair == 0) ? k_scale_4[0] : k_scale_4[2];
-            const int32_t k_scale_ki1 =
-                (block_in_pair == 0) ? k_scale_4[1] : k_scale_4[3];
-
             // STAGE 1: QK GEMM
             float delta_s_unique[kNIterPerWarp0];
             clear_tile(s_acc);
@@ -606,9 +614,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 k_block_tile = load_tile(k_dram_window);
             }
 
-            // K scale: 1 int32 per k0_iter (KIterPerWarp=1 for GEMM0)
-            const int32_t k_scale_arr_k0_0[1] = {k_scale_ki0};
-            const int32_t k_scale_arr_k0_1[1] = {k_scale_ki1};
+            // K scale from dwordx4: kNumSGB0 int32 per k0_iter
+            // dwordx4 layout = [ki0_sg0..ki0_sgN, ki1_sg0..ki1_sgN]
+            // k_scale_arr_k0_X points into k_scale_4 at offset X*kNumSGB0
+            const int32_t* k_scale_arr_k0_0 =
+                reinterpret_cast<const int32_t*>(&k_scale_4) + 0 * kNumSGB0;
+            const int32_t* k_scale_arr_k0_1 =
+                reinterpret_cast<const int32_t*>(&k_scale_4) + 1 * kNumSGB0;
 
             // GEMM0 helper: produces Q slice + Q scale slice for sub-tile i_k0
             auto run_gemm_0 = [&](auto i_k0, const int32_t* k_scale_arr, auto& k_win) {
@@ -650,8 +662,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
                     // Dense GEMM0 — no intermediate stalls
                     static_for<0, k0_loops, 1>{}([&](auto i_k0) {
-                        const int32_t k_arr[1] = {
-                            (i_k0 < 2) ? k_scale_ki0 : k_scale_ki1};
+                        const int32_t* k_arr =
+                            reinterpret_cast<const int32_t*>(&k_scale_4) +
+                            i_k0 * kNumSGB0;
                         auto k_slice = get_slice_tile(
                             k_lds_load,
                             sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
@@ -706,8 +719,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                         async_load_fence();
                         __builtin_amdgcn_s_barrier();
 
-                        const int32_t k_arr[1] = {
-                            (i_k0 < 2) ? k_scale_ki0 : k_scale_ki1};
+                        const int32_t* k_arr =
+                            reinterpret_cast<const int32_t*>(&k_scale_4) +
+                            i_k0 * kNumSGB0;
                         auto k_slice = get_slice_tile(
                             k_lds_load,
                             sequence<LdsSeq.at(number<i_k0>{}) * kN0, 0>{},
@@ -727,8 +741,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 {
                     static_for<0, k0_loops - 2, 1>{}([&](auto i_k0) {
                         block_sync_lds();
-                        const int32_t k_arr[1] = {
-                            (i_k0 == 0) ? k_scale_ki0 : k_scale_ki1};
+                        const int32_t* k_arr =
+                            reinterpret_cast<const int32_t*>(&k_scale_4) +
+                            i_k0 * kNumSGB0;
                         run_gemm_0(number<i_k0>{}, k_arr, k_lds_window);
                         block_sync_lds();
                         move_tile_window(k_dram_window, {0, kK0});
@@ -903,11 +918,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 });
             }
 
-            // V scale from dwordx4: 2 int32 for this block (KIterPerWarp=2 for GEMM1)
-            const int32_t v_scale_arr[2] = {
-                (block_in_pair == 0) ? v_scale_4[0] : v_scale_4[2],
-                (block_in_pair == 0) ? v_scale_4[1] : v_scale_4[3]
-            };
+            // V scale from dwordx4: kScalePerBlock_V int32 for this block
+            const int32_t* v_scale_arr =
+                reinterpret_cast<const int32_t*>(&v_scale_4);
 
             // MXFP4 quantization
             auto p_result = make_static_distributed_tensor<PDataType>(
@@ -1010,15 +1023,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                 }
             }
 
-            // Reload dwordx4 scale after processing second block of pair
-            if(block_in_pair == 1)
+            // Reload dwordx4 scale for next block
+            if(i_total_loops + 1 < num_total_loop)
             {
-                scale_pair_idx++;
-                if(i_total_loops + 1 < num_total_loop)
-                {
-                    k_scale_4 = load_k_scale_dwordx4(scale_pair_idx);
-                    v_scale_4 = load_v_scale_dwordx4(scale_pair_idx);
-                }
+                k_scale_4 = load_k_scale_dwordx4(
+                    scale_block_start + i_total_loops + 1);
+                v_scale_4 = load_v_scale_dwordx4(
+                    scale_block_start + i_total_loops + 1);
             }
 
             // Prefetch K for next iteration (non-batch paths only;

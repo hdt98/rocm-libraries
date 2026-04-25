@@ -450,7 +450,7 @@ struct BlockGemmMxARegBSmemCRegV1
     }
 
     // C += A * B with pre-packed int32 B scale (OPSEL cycling, no shift+OR)
-    // b_scale_packed_arr: array of KIterPerWarp int32 values, one per kIter
+    // b_scale_packed_arr: array of KIterPerWarp * NumScaleGroupsB int32 values
     template <typename CBlockTensor,
               typename ABlockTensorTmp,
               typename AScaleBlockTensorTmp,
@@ -545,8 +545,9 @@ struct BlockGemmMxARegBSmemCRegV1
             uniform_sequence_gen_t<AScaleWarpDstr::NDimY, 0>{};
 
         static_for<0, KIterPerWarp, 1>{}([&](auto kIter) {
-            const int32_t b_scale_val = b_scale_packed_arr[kIter];
             static_for<0, NIterPerWarp, 1>{}([&](auto nIter) {
+                const int32_t b_scale_val =
+                    b_scale_packed_arr[kIter * NumScaleGroupsB + nIter / ScaleRepeatB];
                 auto b_warp_window = b_warp_window_tmp;
                 move_tile_window(
                     b_warp_window,

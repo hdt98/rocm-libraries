@@ -1021,31 +1021,32 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
         const ck_tile::index_t num_k_blocks =
             ck_tile::integer_divide_ceil(shape_seqlen_k, kN0_sa3);
-        const ck_tile::index_t num_k_pairs =
-            ck_tile::integer_divide_ceil(num_k_blocks, 2);
         const ck_tile::index_t k0_loops =
             ck_tile::integer_divide_ceil(hdim_q, kK0_sa3);
+        constexpr ck_tile::index_t kScaleRepeatB = 4;
+        const ck_tile::index_t kNumScaleGroups = kNIterPerWarp / kScaleRepeatB;
+        const ck_tile::index_t kScalePerBlock = k0_loops * kNumScaleGroups;
 
-        k_scale_packed_size_per_head = num_k_pairs * kABScaleKLane * 4;
+        k_scale_packed_size_per_head = num_k_blocks * kABScaleKLane * kScalePerBlock;
         k_scale_packed_host.resize(shape_batch * nhead_k * k_scale_packed_size_per_head, 0);
 
         for(ck_tile::index_t b = 0; b < shape_batch; b++)
         {
             for(ck_tile::index_t h = 0; h < nhead_k; h++)
             {
-                for(ck_tile::index_t pair = 0; pair < num_k_pairs; pair++)
+                for(ck_tile::index_t block = 0; block < num_k_blocks; block++)
                 {
                     for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
                     {
-                        for(ck_tile::index_t bip = 0; bip < 2; bip++)
+                        for(ck_tile::index_t ki = 0; ki < k0_loops; ki++)
                         {
-                            ck_tile::index_t block = pair * 2 + bip;
-                            for(ck_tile::index_t ki = 0; ki < k0_loops; ki++)
+                            ck_tile::index_t col = ki * kABScaleKLane + kg;
+                            for(ck_tile::index_t sg = 0; sg < kNumScaleGroups; sg++)
                             {
                                 int32_t packed = 0;
-                                ck_tile::index_t col = ki * kABScaleKLane + kg;
-                                for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
+                                for(ck_tile::index_t si = 0; si < kScaleRepeatB; si++)
                                 {
+                                    ck_tile::index_t ni = sg * kScaleRepeatB + si;
                                     ck_tile::index_t row =
                                         block * kN0_sa3 + ni * kCNLane_sa3;
                                     uint8_t byte_val = 0;
@@ -1055,12 +1056,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
                                             i_perm ? k_descale_host(b, h, row, col)
                                                    : k_descale_host(b, row, h, col));
                                     }
-                                    packed |= static_cast<int32_t>(byte_val) << (ni * 8);
+                                    packed |=
+                                        static_cast<int32_t>(byte_val) << (si * 8);
                                 }
                                 ck_tile::index_t dst_idx =
                                     (b * nhead_k + h) * k_scale_packed_size_per_head +
-                                    pair * (kABScaleKLane * 4) + kg * 4 +
-                                    bip * k0_loops + ki;
+                                    block * (kABScaleKLane * kScalePerBlock) +
+                                    kg * kScalePerBlock +
+                                    ki * kNumScaleGroups + sg;
                                 k_scale_packed_host[dst_idx] = packed;
                             }
                         }
@@ -1069,53 +1072,65 @@ fwd_result fmha_fwd_run(mode_enum mode,
             }
         }
 
-        // V scale repack: V is column-major, scale is [hdim_v, seqlen_v_scale]
-        // GEMM1: KIterPerWarp=2 for kK1=128, WarpGemm::kK=64
-        constexpr ck_tile::index_t kK1_gemm1         = 128;
-        constexpr ck_tile::index_t kKIterPerWarp_gemm1 = kK1_gemm1 / 64;
+        // V scale repack: V is column-major, scale is [hdim_v, seqlen_k/gran]
+        // GEMM1: B=V, N=hdim_v, K=seqlen_k_per_block
+        const ck_tile::index_t kK1_sa3 = (hdim_q <= 128) ? 64 : 128;
+        const ck_tile::index_t kNIterPerWarp_V = hdim_v / kCNLane_sa3;
+        const ck_tile::index_t kNumScaleGroups_V = kNIterPerWarp_V / kScaleRepeatB;
+        const ck_tile::index_t k1_loops =
+            ck_tile::integer_divide_ceil(kN0_sa3, kK1_sa3);
+        const ck_tile::index_t kScalePerBlock_V = k1_loops * kNumScaleGroups_V;
 
-        v_scale_packed_size_per_head = num_k_pairs * kABScaleKLane * 4;
-        v_scale_packed_host.resize(shape_batch * nhead_k * v_scale_packed_size_per_head, 0);
+        v_scale_packed_size_per_head =
+            num_k_blocks * kABScaleKLane * kScalePerBlock_V;
+        v_scale_packed_host.resize(
+            shape_batch * nhead_k * v_scale_packed_size_per_head, 0);
 
         for(ck_tile::index_t b = 0; b < shape_batch; b++)
         {
             for(ck_tile::index_t h = 0; h < nhead_k; h++)
             {
-                for(ck_tile::index_t pair = 0; pair < num_k_pairs; pair++)
+                for(ck_tile::index_t block = 0; block < num_k_blocks; block++)
                 {
                     for(ck_tile::index_t kg = 0; kg < kABScaleKLane; kg++)
                     {
-                        for(ck_tile::index_t bip = 0; bip < 2; bip++)
+                        for(ck_tile::index_t ki = 0; ki < k1_loops; ki++)
                         {
-                            ck_tile::index_t block = pair * 2 + bip;
-                            for(ck_tile::index_t ki = 0; ki < kKIterPerWarp_gemm1; ki++)
+                            ck_tile::index_t v_scale_col_base =
+                                block * (kK1_sa3 / kVScaleGranularity);
+                            ck_tile::index_t v_col =
+                                v_scale_col_base + ki * kABScaleKLane + kg;
+                            for(ck_tile::index_t sg = 0;
+                                sg < kNumScaleGroups_V; sg++)
                             {
                                 int32_t packed = 0;
-                                // V scale: [hdim_v, seqlen_k/kVScaleGranularity]
-                                // For GEMM1 iteration, the K-dim corresponds to
-                                // seqlen_k direction. Each outer-loop block advances
-                                // by kK1/kVScaleGranularity = 128/32 = 4 columns.
-                                ck_tile::index_t v_scale_col_base =
-                                    block * (kK1_gemm1 / kVScaleGranularity);
-                                ck_tile::index_t v_col =
-                                    v_scale_col_base + ki * kABScaleKLane + kg;
-                                for(ck_tile::index_t ni = 0; ni < kNIterPerWarp; ni++)
+                                for(ck_tile::index_t si = 0;
+                                    si < kScaleRepeatB; si++)
                                 {
-                                    ck_tile::index_t v_row = ni * kCNLane_sa3;
-                                    uint8_t byte_val       = 0;
+                                    ck_tile::index_t ni =
+                                        sg * kScaleRepeatB + si;
+                                    ck_tile::index_t v_row =
+                                        ni * kCNLane_sa3;
+                                    uint8_t byte_val = 0;
                                     if(v_row < hdim_v &&
                                        v_col < shape_seqlen_v_scale)
                                     {
                                         byte_val = ck_tile::bit_cast<uint8_t>(
-                                            i_perm ? v_descale_host(b, h, v_row, v_col)
-                                                   : v_descale_host(b, v_row, h, v_col));
+                                            i_perm
+                                                ? v_descale_host(b, h, v_row, v_col)
+                                                : v_descale_host(
+                                                      b, v_row, h, v_col));
                                     }
-                                    packed |= static_cast<int32_t>(byte_val) << (ni * 8);
+                                    packed |= static_cast<int32_t>(byte_val)
+                                              << (si * 8);
                                 }
                                 ck_tile::index_t dst_idx =
-                                    (b * nhead_k + h) * v_scale_packed_size_per_head +
-                                    pair * (kABScaleKLane * 4) + kg * 4 +
-                                    bip * kKIterPerWarp_gemm1 + ki;
+                                    (b * nhead_k + h) *
+                                        v_scale_packed_size_per_head +
+                                    block *
+                                        (kABScaleKLane * kScalePerBlock_V) +
+                                    kg * kScalePerBlock_V +
+                                    ki * kNumScaleGroups_V + sg;
                                 v_scale_packed_host[dst_idx] = packed;
                             }
                         }
