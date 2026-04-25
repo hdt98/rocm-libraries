@@ -207,14 +207,46 @@ class ProfileViewer(App):
         list_view.clear()
         self._line_items.clear()
         if not self.profile_data:
-            # No data yet — show a waiting message
-            from rich.text import Text as RichText
-            msg = RichText("  Waiting for profile data...", style="dim italic")
-            list_view.append(ListItem(CodeLine(msg)))
+            # No profile data yet — show source from map.json if available
+            self._render_source_only(list_view)
             return
         for i, line in enumerate(self.profile_data.lines):
             ls = style_line(line.inst_type, line.stall_per_hit, self.baselines)
             rich_text = _build_line_text(line, ls, i + 1)
+            code_widget = CodeLine(rich_text)
+            item = ListItem(code_widget)
+            self._line_items.append((item, line))
+            list_view.append(item)
+
+    def _render_source_only(self, list_view: ListView) -> None:
+        """Show source code from .map.json without profiling colors.
+
+        Used when profile.txt doesn't exist yet so the user can browse
+        the rocasm code while waiting for profiling data.
+        """
+        if not self.map_path or not self.map_path.exists():
+            from rich.text import Text as RichText
+            msg = RichText("  Waiting for profile data...", style="dim italic")
+            list_view.append(ListItem(CodeLine(msg)))
+            return
+
+        from rocprof_cli.loader import load_source_map_asm, ProfiledSourceLine
+        import json
+
+        with open(self.map_path) as f:
+            entries = json.load(f)
+
+        for i, entry in enumerate(entries):
+            python_text = entry.get("python_text", "")
+            line = ProfiledSourceLine(
+                index=i, inst_type="", avg_lat=0.0,
+                stall=0, stall_per_hit=0.0,
+                python_text=python_text,
+                asm_text=entry.get("asm_text", ""),
+            )
+            # No color — neutral style
+            no_style = LineStyle(bg_color="", intensity="neutral", inst_type="")
+            rich_text = _build_line_text(line, no_style, i + 1)
             code_widget = CodeLine(rich_text)
             item = ListItem(code_widget)
             self._line_items.append((item, line))
