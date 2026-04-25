@@ -272,9 +272,6 @@ def getLocalWriteMFMAEnd(writer, kernel, tensorParametersA, tensorParametersB):
             tmpNumMfmaForLR = writer.states.numMfmaForLR
         # ds_read[B][1:]
         calculateLatencyLeft((writer.states.numReadsPerIterB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollB), tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
-        # ds_read[MXSB][1:]
-        if kernel["ProblemType"]["MXBlockB"]:
-            calculateLatencyLeft(writer.states.numReadsPerIterMXSB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollMXSB, tensorParametersB["MX"]["localReadInstruction"].blockWidth, tensorParametersB["MX"]["localReadInstruction"].issueLatency)
 
     # to calculate number of mfma we need to wait before data arrive from lds to vgpr.
     # latency: 40 quad-cycle for 4 word, 20 quad-cycle for 2 word, 10 quad-cycle for 1 word / half word
@@ -392,9 +389,6 @@ def getLocalWriteMFMAStart(writer, kernel, tensorParametersA, tensorParametersB,
                         calculateLatencyLeft((writer.states.numReadsPerIterMXSB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollMXSB) * doReadMXSB, tensorParametersB["MX"]["localReadInstruction"].blockWidth, tensorParametersB["MX"]["localReadInstruction"].issueLatency)
                     # ds_read[B][1:]
                     calculateLatencyLeft((writer.states.numReadsPerIterB//kernel["InnerUnroll"] - writer.states.numReadsPerUnrollB) * doReadB, tensorParametersB["localReadInstruction"].blockWidth, tensorParametersB["localReadInstruction"].issueLatency)
-                    # ds_read[MXSB][1:]
-                    if kernel["ProblemType"]["MXBlockB"]:
-                        calculateLatencyLeft((writer.states.numReadsPerIterMXSB//kernel["InnerUnroll"]  - writer.states.numReadsPerUnrollMXSB) * doReadMXSB, tensorParametersB["MX"]["localReadInstruction"].blockWidth, tensorParametersB["MX"]["localReadInstruction"].issueLatency)
             lwStartMfmaIndex = numMfmaForCurrentLoopLR
         else:
             lwStartMfmaIndex = numMfmaPerIter * (kernel["LoopIters"] - 1 - writer.states.numItersPLR) + writer.states.numMfmaForLR

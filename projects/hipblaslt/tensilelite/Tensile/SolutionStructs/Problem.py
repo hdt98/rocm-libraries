@@ -745,8 +745,6 @@ class ProblemType(Mapping):
     # adjusting all data types
     if "DataType" in config:
       self["DataType"]  = DataType(config["DataType"])
-      self["MacDataTypeA"] = self["DataType"]
-      self["MacDataTypeB"] = self["DataType"]
       self["DataTypeA"] = self["DataType"]
       self["DataTypeB"] = self["DataType"]
       self["MacDataTypeA"] = self["DataType"]
@@ -754,8 +752,6 @@ class ProblemType(Mapping):
     else:
       raise Exception("NO data type specified")
       self["DataType"]  = DataType(0)
-      self["MacDataTypeA"] = DataType(0)
-      self["MacDataTypeB"] = DataType(0)
       self["DataTypeA"] = DataType(0)
       self["DataTypeB"] = DataType(0)
       self["MacDataTypeA"] = DataType(0)

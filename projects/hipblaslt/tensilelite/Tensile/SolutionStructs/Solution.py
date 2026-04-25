@@ -1459,10 +1459,6 @@ class Solution(collections.abc.Mapping):
     # set True for DTL
     state["UseGeneralizedNLCOneA"] = state["DirectToLdsA"]
     state["UseGeneralizedNLCOneB"] = state["DirectToLdsB"]
-    if state["ProblemType"]["MXBlockA"]:
-      state["UseGeneralizedNLCOneMXSA"] = False #state["DirectToLdsA"]
-    if state["ProblemType"]["MXBlockB"]:
-      state["UseGeneralizedNLCOneMXSB"] = False #state["DirectToLdsB"]
 
     state["UseGeneralizedNLCOneMXSA"] = False
     state["UseGeneralizedNLCOneMXSB"] = False
@@ -1691,8 +1687,6 @@ class Solution(collections.abc.Mapping):
         or (numBytesB == 2 and isaInfoMap[isa].asmCaps["HasGLTr16B128"]) \
       )
 	  
-    state["enableLDSTrMXSA"] = False
-    state["enableLDSTrMXSB"] = False
     if state["enableLDSTrA"] or state["enableGLTrA"]:
       state["VectorWidthA"] = 1
 
@@ -3463,12 +3457,6 @@ class Solution(collections.abc.Mapping):
     # LDS
     ########################################
 
-    if state["ProblemType"]["MXBlockA"]:
-      state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
-
-    if state["ProblemType"]["MXBlockB"]:
-      state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
-
     if state["ProblemType"]["Sparse"]:
       transposeLDSMetadata = int(state["TransposeLDSMetadata"])
       if transposeLDSMetadata == -1:
@@ -3859,18 +3847,12 @@ class Solution(collections.abc.Mapping):
     state["LdsOffsetMetadata_Blk"] = 0
 
     # todo, can the alignment be a power of 2?
+    state["LdsOffsetA"] = 0
     state["LdsNumElementsAlignedA"] = int(ldsNumBytesAlignedA)
     state["LdsNumElementsAlignedMXSA"] = int(ldsNumBytesAlignedMXSA)
     state["LdsNumElementsAlignedB"] = int(ldsNumBytesAlignedB)
     state["LdsNumElementsAlignedMXSB"] = int(ldsNumBytesAlignedMXSB)
     state["LdsNumElementsAlignedMetadata"] = int(ldsNumBytesAlignedMetadata)
-
-    state["LdsOffsetA"] = 0
-    state["LdsNumElementsAlignedA"] = ldsNumBytesAlignedA
-    state["LdsNumElementsAlignedMXSA"] = ldsNumBytesAlignedMXSA
-    state["LdsNumElementsAlignedB"] = ldsNumBytesAlignedB
-    state["LdsNumElementsAlignedMXSB"] = ldsNumBytesAlignedMXSB
-    state["LdsNumElementsAlignedMetadata"] = ldsNumBytesAlignedMetadata
     # check for auto DtlPlusLdsBuf
     if state["DtlPlusLdsBuf"] == -1:
       if state["PrefetchGlobalRead"] > 2:
