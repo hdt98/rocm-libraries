@@ -72,18 +72,13 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
     // When async K load is active, use the async copy policy variant for K descriptors.
     // Batch async K: use k0_loops LDS buffers so all K sub-tiles load at once.
-    // Disabled for large kK0 (d=256 with 16x16x128 MFMA) where extra LDS buffers
-    // push VGPR too high and cause codegen issues.
     static constexpr index_t kAsyncKBuffers =
-        (BlockFmhaShape::kK0 < 128) ? BlockFmhaShape::kQKHeaddim / BlockFmhaShape::kK0 : 1;
+        BlockFmhaShape::kQKHeaddim / BlockFmhaShape::kK0;
     using AsyncKPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, kAsyncKBuffers, 1>;
 
-    // V async disabled when masking: the K_next prefetch advances k_dram_block_window
-    // before the mask check, causing an off-by-kN0 error in edge tile detection at
-    // high occupancy. TODO: fix by saving K origin before advancing.
     static constexpr bool kUseAsyncVLoad =
-        kUseAsyncKLoad && (kAsyncKBuffers > 1) && !FmhaMask::IsMasking;
+        kUseAsyncKLoad && (kAsyncKBuffers > 1);
     static constexpr index_t k1_loops_static = BlockFmhaShape::kN0 / BlockFmhaShape::kK1;
     using AsyncVPolicy = BlockFmhaPipelineQXKSVSCustomPolicy<
         true, true, 1, k1_loops_static>;
@@ -602,6 +597,10 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
         do
         {
+            // Save current K origin before K_next prefetch may advance it.
+            // Mask check needs the *current* block's N coordinate.
+            const auto k_origin_cur = k_dram_block_window.get_window_origin();
+
             // STAGE 1: QK GEMM
             float delta_s_unique[kNIterPerWarp0];
             clear_tile(s_acc);
@@ -809,11 +808,11 @@ struct BlockFmhaPipelineQRKSVSSageAttn
 
             if constexpr(kPadSeqLenK || FmhaMask::IsMasking)
             {
-                const auto k_origin      = k_dram_block_window.get_window_origin();
-                bool need_perpixel_check = mask.IsEdgeTile(q_origin.at(number<0>{}),
-                                                           k_origin.at(number<0>{}),
-                                                           number<kM0>{},
-                                                           number<kN0>{});
+                bool need_perpixel_check = mask.IsEdgeTile(
+                    q_origin.at(number<0>{}),
+                    k_origin_cur.at(number<0>{}),
+                    number<kM0>{},
+                    number<kN0>{});
                 if(need_perpixel_check)
                 {
                     set_tile_if(
@@ -821,7 +820,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                             const auto row =
                                 q_origin.at(number<0>{}) + tile_idx.at(number<0>{});
                             const auto col =
-                                k_origin.at(number<0>{}) + tile_idx.at(number<1>{});
+                                k_origin_cur.at(number<0>{}) + tile_idx.at(number<1>{});
                             return !variant.LogitsMask(variant_params,
                                                       block_indices.batch_idx,
                                                       row,
