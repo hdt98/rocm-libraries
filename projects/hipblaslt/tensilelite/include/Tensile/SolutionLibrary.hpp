@@ -61,9 +61,7 @@ namespace TensileLite
            && solutions.problemType.cType == problem.c().dataType()
            && solutions.problemType.dType == problem.d().dataType()
            && solutions.problemType.computeType == problem.computeType()
-           && solutions.problemType.groupedGemm == problem.groupedGemm()
-           && solutions.problemType.mxBlockA == problem.mxBlockA()
-           && solutions.problemType.mxBlockB == problem.mxBlockB())
+           && solutions.problemType.groupedGemm == problem.groupedGemm())
             return true;
         return false;
     }

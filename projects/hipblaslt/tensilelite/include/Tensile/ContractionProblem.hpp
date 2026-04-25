@@ -1050,12 +1050,22 @@ namespace TensileLite
 
         void setMXScaleA(rocisa::DataType mxType, int mxBlock, std::vector<size_t> saStride = {});
 
+        size_t mxBlockA() const
+        {
+            return m_mxBlockA;
+        }
+
         rocisa::DataType mxTypeA() const
         {
             return m_mxTypeA;
         }
 
         void setMXScaleB(rocisa::DataType mxType, int mxBlock, std::vector<size_t> sbStride = {});
+
+        size_t mxBlockB() const
+        {
+            return m_mxBlockB;
+        }
 
         rocisa::DataType mxTypeB() const
         {
@@ -1080,16 +1090,6 @@ namespace TensileLite
         void setSwizzleTensorB(bool swizzle)
         {
             m_swizzleTensorB = swizzle;
-        }
-
-        size_t mxBlockA() const
-        {
-            return m_mxBlockA;
-        }
-
-        size_t mxBlockB() const
-        {
-            return m_mxBlockB;
         }
 
         /// Allocated elements excluding batch dimensions

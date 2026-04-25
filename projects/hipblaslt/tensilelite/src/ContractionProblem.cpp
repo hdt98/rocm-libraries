@@ -584,8 +584,6 @@ namespace TensileLite
             = TensorDescriptor("scaleAlphaVec");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::METADATA]   = TensorDescriptor("metadata");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::AMAXD]      = TensorDescriptor("amaxD");
-        gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSA]     = TensorDescriptor("mxScaleA");
-        gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSB]     = TensorDescriptor("mxScaleB");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::COMPRESSED] = TensorDescriptor("compressed");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSA]       = TensorDescriptor("mx-a");
         gemm.m_tensors[ContractionProblemGemm::TENSOR::MXSB]       = TensorDescriptor("mx-b");
@@ -688,7 +686,7 @@ namespace TensileLite
         normalize();
         calcArithmeticIntensity();
     }
-	
+
     void ContractionProblemGemm::setMXScaleA(rocisa::DataType mxTypeA, int mxBlockA, std::vector<size_t> saStride)
     {
         m_mxBlockA = mxBlockA;
@@ -1283,16 +1281,10 @@ namespace TensileLite
             gflop += 2 * cSize * 1e-9; // Include (+ beta * C) in gflops
             cSize *= 2; // Include read C and write D in gbytes
         }
-        // TODO: for MX data types, the size is smaller than a byte
-        // so we need to use (elementSize/packing) to derive the actual
-        // byte size of a segment.
-        auto infoA = DataTypeInfo::Get(a().dataType());
-        auto infoB = DataTypeInfo::Get(b().dataType());
-        auto infoC = DataTypeInfo::Get(c().dataType());
         double gbyte
-            = ((aSize * infoA.elementSize / infoA.packing) +
-               (bSize * infoB.elementSize / infoB.packing) +
-               (cSize * infoC.elementSize / infoC.packing))
+            = (multiplyElementSize(aSize, a().elementBytes()) +
+               multiplyElementSize(bSize, b().elementBytes()) +
+               multiplyElementSize(cSize, c().elementBytes()))
               * 1e-9;
 
         m_arithmeticIntensity = gflop / gbyte;
@@ -1504,7 +1496,7 @@ namespace TensileLite
         rocisa::DataType               typeAlpha,
         rocisa::DataType               typeBeta,
         rocisa::DataType               typeComputeInputA,
-		rocisa::DataType               typeComputeInputB,
+        rocisa::DataType               typeComputeInputB,
         rocisa::DataType               typeCompute,
         double                         alpha,
         double                         beta,
