@@ -29,7 +29,7 @@ from rocisa.instruction import MacroInstruction, SAddCU32, SAddU32, SAndB32, SBa
     SCmpGtU32, SCmpLeU32, SCmpLtU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, SLoadB32, \
     SMaxI32, SMinU32, SMovB32, SMovB64, SMulI32, SNop, SOrB32, SSleep, SStoreB32, SSubU32, \
     SWaitCnt, VAddF32, VAddF64, VAddPKF16, VAddU32, VLShiftRightB32, VMovB32, \
-    VReadfirstlaneB32, VCvtBF16toFP32, BufferStoreB32
+    VReadfirstlaneB32, VCvtBF16toFP32, BufferLoadB32, BufferStoreB32
 from rocisa.functions import scalarStaticDivideAndRemainder, sMagicDiv2, \
     vectorStaticMultiply, BranchIfNotZero, scalarUInt24DivideAndRemainder, scalarUInt32DivideAndRemainder
 
@@ -1108,14 +1108,11 @@ class StreamK(Component):
         # gfx1250: drain in-flight XNACK retries before the flag store.
         module.add(self._waitXcnt0(writer, comment="drain xnacks before volatile VMEM store"))
         if self._isGfx1250(writer):
-            module.add(MacroInstruction(
-                name=f"buffer_store_b32 {src}, {vgpr(tmpVgprOff)}, {sgpr(tmpSgprBuffer, 4)}, {soffset} offen offset:0 scope:SCOPE_DEV",
-                args=[],
-                comment=comment))
+            mubuf = MUBUFModifiers(offen=True, scope=CacheScope.SCOPE_DEV)
         else:
-            module.add(BufferStoreB32(src=src, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
-                                      mubuf=MUBUFModifiers(offen=True, glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
-                                      comment=comment))
+            mubuf = MUBUFModifiers(offen=True, glc=True, dlc=True, scope=CacheScope.SCOPE_DEV)
+        module.add(BufferStoreB32(src=src, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
+                                  mubuf=mubuf, comment=comment))
         module.add(SWaitCnt(vscnt=0, comment="wait for data store"))
         writer.vgprPool.checkIn(tmpVgprOff)
         writer.sgprPool.checkIn(tmpSgprBuffer)
@@ -1134,10 +1131,9 @@ class StreamK(Component):
         module.add(self.shiftSrd(writer, tmpSgprBuffer))
         # gfx1250: drain in-flight XNACK retries before the flag load.
         module.add(self._waitXcnt0(writer, comment="drain xnacks before volatile VMEM load"))
-        module.add(MacroInstruction(
-            name=f"buffer_load_b32 {dst}, {vgpr(tmpVgprOff)}, {sgpr(tmpSgprBuffer, 4)}, {soffset} offen offset:0 scope:SCOPE_DEV",
-            args=[],
-            comment=comment))
+        module.add(BufferLoadB32(dst=dst, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset,
+                                 mubuf=MUBUFModifiers(offen=True, scope=CacheScope.SCOPE_DEV),
+                                 comment=comment))
         writer.vgprPool.checkIn(tmpVgprOff)
         writer.sgprPool.checkIn(tmpSgprBuffer)
 

@@ -387,7 +387,7 @@ inline std::map<std::string, int>
           || tryAssembler(
               isaVersion,
               assemblerPath,
-              "buffer_load_dwordx4 v[10:13], v[0], s[0:3], null, offen offset:0, scope:SCOPE_DEV",
+              "buffer_load_dwordx4 v[10:13], v[0], s[0:3], null offen offset:0, scope:SCOPE_DEV",
               isDebug);
     rv["HasMUBUFConst"] = tryAssembler(isaVersion,
                                        assemblerPath,
