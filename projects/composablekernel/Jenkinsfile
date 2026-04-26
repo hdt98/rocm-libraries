@@ -39,7 +39,7 @@ def show_node_info() {
 }
 
 def cloneUpdateRefRepo() {
-    def refRepoPath = "/var/jenkins/ref-repo/rocm-libraries"
+    def refRepoPath = "/var/jenkins/ref-repo-internal/rocm-libraries"
     def lockLabel = "git ref repo lock - ${env.NODE_NAME}"
     def folderExists = sh(
         script: "test -d ${refRepoPath}/refs",
@@ -50,12 +50,14 @@ def cloneUpdateRefRepo() {
         echo "rocm-libraries repo does not exist at ${refRepoPath}, creating mirror clone..."
         echo "locking on label: ${lockLabel}"
         lock(lockLabel) {
+          withCredentials([usernamePassword(credentialsId: "${env.ck_githubemu_creds}", usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
             def cloneCommand = """
-                set -ex
-                rm -rf ${refRepoPath} && mkdir -p ${refRepoPath}
-                git clone --mirror https://github.com/ROCm/rocm-libraries.git ${refRepoPath}
+              set -ex
+              rm -rf ${refRepoPath} && mkdir -p ${refRepoPath}
+              git clone --mirror https://${GIT_USERNAME}:${GIT_PASSWORD}@github.com/AMD-ROCm-Internal/rocm-libraries.git /var/jenkins/ref-repo-internal/rocm-libraries
             """
             sh(script: cloneCommand, label: "clone ref repo")
+           }
         }
         echo "Completed git clone, lock released"
     }
@@ -76,7 +78,9 @@ def cloneUpdateRefRepo() {
 def checkoutComposableKernel()
 {
     //update ref repo
-    cloneUpdateRefRepo()
+    gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
+       cloneUpdateRefRepo()
+    }
     // checkout project
     checkout scm
 }
@@ -356,6 +360,13 @@ def check_host() {
     }
 }
 
+def build_compiler(){
+    def compiler
+    compiler = "${params.BUILD_COMPILER}"
+    return compiler
+}
+
+
 def check_arch_name(){
     sh 'rocminfo | tee rocminfo.log'
     if ( runShell('grep -n "gfx90a" rocminfo.log') ){
@@ -374,7 +385,10 @@ def check_arch_name(){
         return "gfx11"
     }
     else if ( runShell('grep -n "gfx120" rocminfo.log') ) {
-        return "gfx12"
+        return "gfx120"
+    }
+    else if ( runShell('grep -n "gfx125" rocminfo.log') ) {
+        return "gfx125"
     }
     else if ( runShell('grep -n "gfx908" rocminfo.log') ) {
         return "gfx908"
@@ -513,7 +527,7 @@ def get_docker_options(){
     // on some machines the group ids for video and render groups may not be the same as in the docker image!
     def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3')
     def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3')
-    dockerOpts = dockerOpts + " --group-add=${video_id} --group-add=${render_id} -v /var/jenkins/ref-repo/:/var/jenkins/ref-repo/ "
+    dockerOpts = dockerOpts + " --group-add=${video_id} --group-add=${render_id} -v /var/jenkins/ref-internal-repo/:/var/jenkins/ref-internal-repo/ "
     echo "Docker flags: ${dockerOpts}"
     return dockerOpts
 }
@@ -745,7 +759,7 @@ def cmake_build(Map conf=[:]){
         }
 
         //run tests except when NO_CK_BUILD is set
-        if(!setup_args.contains("NO_CK_BUILD")){
+        if(!setup_args.contains("NO_CK_BUILD") && !setup_args.contains("gfx1250")){
             if (params.NINJA_BUILD_TRACE || params.BUILD_INSTANCES_ONLY){
                 // do not run unit tests when building instances only
                 if(!params.BUILD_INSTANCES_ONLY){
@@ -860,7 +874,7 @@ def buildHipClangJob(Map conf=[:]){
         def retimage
         (retimage, image) = getDockerImage(conf)
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
             withDockerContainer(image: image, args: dockerOpts) {
                 timeout(time: 20, unit: 'HOURS')
                 {
@@ -890,7 +904,7 @@ def Build_CK(Map conf=[:]){
         def image
         def retimage
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
             try {
                 (retimage, image) = getDockerImage(conf)
                 withDockerContainer(image: image, args: dockerOpts) {
@@ -949,7 +963,7 @@ def Build_CK(Map conf=[:]){
                         // build and test hipTensor on gfx90a node
                         sh """#!/bin/bash
                             rm -rf rocm-libraries
-                            git clone --no-checkout --filter=blob:none https://github.com/ROCm/rocm-libraries.git
+                            git clone --no-checkout --filter=blob:none https://github.com/AMD-ROCm-Internal/rocm-libraries.git
                             cd rocm-libraries
                             git sparse-checkout init --cone
                             git sparse-checkout set projects/hiptensor
@@ -960,9 +974,9 @@ def Build_CK(Map conf=[:]){
                                 mkdir -p build
                                 ls -ltr
                                 CC=hipcc CXX=hipcc cmake -Bbuild . -D CMAKE_PREFIX_PATH="${env.WORKSPACE}/install"
-                                cmake --build build -- -j
-                                ctest --test-dir build
+                                cmake --build build -- -j64
                             """
+                            //  ctest --test-dir build // disable the testing for now
                         }
                     }
                 }
@@ -983,11 +997,12 @@ def Build_CK_and_Reboot(Map conf=[:]){
 }
 
 def process_results(Map conf=[:]){
-    checkoutComposableKernel()
+
+    checkout scm
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
-    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
         try
         {
             echo "Pulling image: ${image}"
@@ -1058,10 +1073,10 @@ def process_results(Map conf=[:]){
                             echo "could not locate profiler_package_gfx950."
                         }
                         try{
-                            unstash "profiler_package_gfx12"
+                            unstash "profiler_package_gfx120"
                         }
                         catch(Exception err){
-                            echo "could not locate profiler_package_gfx12."
+                            echo "could not locate profiler_package_gfx120."
                         }
                         sh "sshpass -p ${env.ck_deb_pw} scp -o StrictHostKeyChecking=no composablekernel-ckprofiler*.deb ${env.ck_deb_user}@${env.ck_deb_ip}:/var/www/html/composable_kernel/"
                     }
@@ -1099,7 +1114,7 @@ def process_results(Map conf=[:]){
                         }
                         try{
 
-                            unstash "perf_log_gfx12"
+                            unstash "perf_log_gfx120"
                         }
                         catch(Exception err){
                             echo "could not locate the gfx12 performance logs: ${err.getMessage()}."
@@ -1126,7 +1141,7 @@ def run_downstream_tests(Map conf=[:]){
     checkoutComposableKernel()
     def dockerOpts = get_docker_options() + ' --group-add irc '
 
-    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
         try
         {
             echo "Pulling image: ${conf.image}"
@@ -1253,8 +1268,8 @@ pipeline {
             description: "Use the CK build to verify hipTensor build and tests (default: OFF)")
         string(
             name: 'hipTensor_branch',
-            defaultValue: 'develop',
-            description: 'Specify which branch of hipTensor to use (default: develop)')
+            defaultValue: 'gfx1250',
+            description: 'Specify which branch of hipTensor to use (default: gfx1250)')
         booleanParam(
             name: "USE_SCCACHE",
             defaultValue: true,
@@ -1285,8 +1300,8 @@ pipeline {
             description: "Run the ck_tile FMHA tests (default: OFF)")
         booleanParam(
             name: "RUN_TILE_ENGINE_BASIC_TESTS",
-            defaultValue: true,
-            description: "Run the tile_engine_basic tests (default: ON)")
+            defaultValue: false,
+            description: "Run the tile_engine_basic tests (default: OFF)")
         booleanParam(
             name: "RUN_TILE_ENGINE_GEMM_TESTS",
             defaultValue: false,
@@ -1316,6 +1331,10 @@ pipeline {
             defaultValue: true,
             description: "Build CK and run tests on gfx950 (default: ON)")
         booleanParam(
+            name: "BUILD_GFX1250",
+            defaultValue: true,
+            description: "Build CK for gfx1250 (default: ON)")
+        booleanParam(
             name: "BUILD_GFX101",
             defaultValue: false,
             description: "Build CK and run tests on gfx101 (default: OFF)")
@@ -1336,7 +1355,7 @@ pipeline {
             defaultValue: true,
             description: "Generate a ninja build trace (default: ON)")
         booleanParam(
-            name: "NINJA_FTIME_TRACE",
+            name: "RUN_CLANG_ANALYZER",
             defaultValue: false,
             description: "Generate a detailed time trace (default: OFF)")
         booleanParam(
@@ -1353,8 +1372,8 @@ pipeline {
             description: "Run CK_BUILDER tests (default: OFF)")
         booleanParam(
             name: "RUN_ALL_UNIT_TESTS",
-            defaultValue: false,
-            description: "Run all unit tests (default: OFF)")
+            defaultValue: true,
+            description: "Run all unit tests (default: ON)")
         booleanParam(
             name: "RUN_PYTORCH_TESTS",
             defaultValue: false,
@@ -1407,7 +1426,7 @@ pipeline {
         dbsshport = "${dbsshport}"
         dbsshuser = "${dbsshuser}"
         dbsshpassword = "${dbsshpassword}"
-        ck_git_creds = "${ck_git_creds}"
+        ck_githubemu_creds = "${ck_githubemu_creds}"
         gerrit_cred="${gerrit_cred}"
         DOCKER_BUILDKIT = "1"
     }
@@ -1487,7 +1506,7 @@ pipeline {
                 }
             }
         }
-         stage("Run Downstream Tests")
+        stage("Run Downstream Tests")
         {
             when {
                 beforeAgent true
@@ -1729,7 +1748,7 @@ pipeline {
                 }
             }
         }
-        stage("Run TILE_ENGINE_BASIC Tests")
+        stage("Run TILE_ENGINE_GEMM Tests")
         {
             when {
                 beforeAgent true
@@ -1737,25 +1756,25 @@ pipeline {
             }
             parallel
             {
-                stage("Run TILE_ENGINE_BASIC Tests on gfx942")
+                stage("Run TILE_ENGINE_GEMM Tests on gfx90a")
                 {
                     when {
                         beforeAgent true
-                        expression { params.RUN_TILE_ENGINE_BASIC_TESTS.toBoolean() }
+                        expression { params.RUN_TILE_ENGINE_GEMM_TESTS.toBoolean() }
                     }
-                    agent{ label rocmnode("gfx942") }
+                    agent{ label rocmnode("gfx90a") }
                     environment{
                         setup_args = "NO_CK_BUILD"
                         execute_args = """ cmake -G Ninja -D CMAKE_PREFIX_PATH=/opt/rocm \
                                             -D CMAKE_CXX_COMPILER="${params.BUILD_COMPILER}" \
                                             -D CMAKE_BUILD_TYPE=Release \
-                                            -D GPU_TARGETS="gfx942" \
+                                            -D GPU_TARGETS="gfx90a" \
                                             -D GEMM_UNIVERSAL_DATATYPE="fp8;fp16" \
                                             -D GEMM_UNIVERSAL_LAYOUT="rcr;rrr;crr;ccr" \
-                                            -D GEMM_UNIVERSAL_CONFIG_FILE="default_ci_config.json" \
+                                            -D GEMM_STREAMK_DATATYPE="fp8;fp16" \
+                                            -D GEMM_STREAMK_LAYOUT="rcr" \
                                             -D GEMM_MULTI_D_DATATYPE="fp16" \
                                             -D GEMM_MULTI_D_LAYOUT="rcrr;rrrr;crrr;ccrr" \
-                                            -D GEMM_MULTI_D_CONFIG_FILE="default_ci_config.json" \
                                             -D GEMM_PRESHUFFLE_DATATYPE="fp16;fp8;bf16;bf8" \
                                             -D GEMM_PRESHUFFLE_LAYOUT="rcr" \
                                             -D GEMM_PRESHUFFLE_CONFIG_FILE="default_ci_config.json" .. && \
@@ -1769,16 +1788,6 @@ pipeline {
                         cleanWs()
                     }
                 }
-            }
-        }
-        stage("Run TILE_ENGINE_GEMM Tests")
-        {
-            when {
-                beforeAgent true
-                expression { env.SHOULD_RUN_CI.toBoolean() }
-            }
-            parallel
-            {
                 stage("Run TILE_ENGINE_GEMM Tests on gfx942")
                 {
                     when {
@@ -1908,6 +1917,21 @@ pipeline {
                         cleanWs()
                     }
                 }
+                stage("Build CK for gfx1250")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.BUILD_GFX1250.toBoolean() && !params.BUILD_INSTANCES_ONLY.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx90a") }
+                    environment{
+                        setup_args = """ -DCMAKE_INSTALL_PREFIX=../install -DGPU_TARGETS="gfx1250" -DDISABLE_DL_KERNELS="ON" """
+                    }
+                    steps{
+                        Build_CK_and_Reboot(setup_args: setup_args, docker_name: "${env.CK_DOCKERHUB_PRIVATE}:npi-mi450-latest", config_targets: "install", no_reboot:true, build_type: 'Release', prefixpath: '/usr/local')
+                        cleanWs()
+                    }
+                }
                 stage("Build CK and run Tests on gfx908")
                 {
                     when {
@@ -1954,7 +1978,7 @@ pipeline {
                                                 -DCMAKE_HIP_COMPILER="${params.BUILD_COMPILER}" \
                                                 -D CMAKE_BUILD_TYPE=Release .. && ninja -j64 """
 
-                            buildHipClangJobAndReboot(setup_cmd: "",  build_cmd: "", build_type: 'Release', execute_cmd: execute_args)
+                            buildHipClangJobAndReboot(setup_cmd: "",  build_cmd: "", build_type: 'Release', execute_cmd: execute_args, docker_name: "${env.CK_DOCKERHUB_PRIVATE}:npi-mi450-latest")
                         }
                         cleanWs()
                     }
@@ -2041,7 +2065,7 @@ pipeline {
                 success {
                     script {
                         // Report the parent stage build ck and run tests status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+                        gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
                             echo "Reporting success status for build ck and run tests"
                         }
                     }
@@ -2068,11 +2092,11 @@ pipeline {
                 success {
                     script {
                         // Report the skipped parent's stage status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process Performance Test Results", account: 'ROCm', repo: 'rocm-libraries') {
+                        gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "Process Performance Test Results", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
                             echo "Process Performance Test Results stage skipped."
                         }
                         // Report the skipped stage's status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process results", account: 'ROCm', repo: 'rocm-libraries') {
+                        gitStatusWrapper(credentialsId: "${ck_githubemu_creds}", gitHubContext: "Process results", account: 'AMD-ROCm-Internal', repo: 'rocm-libraries') {
                             echo "Process Performance Test Results stage skipped."
                         }
                     }

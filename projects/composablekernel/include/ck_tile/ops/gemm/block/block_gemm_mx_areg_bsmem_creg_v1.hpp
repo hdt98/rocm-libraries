@@ -205,6 +205,7 @@ struct BlockGemmMxARegBSmemCRegV1
                                     c_warp_y_index_zeros),
                     merge_sequences(sequence<1, 1, 1>{}, c_warp_y_lengths));
 
+<<<<<<< HEAD
                 // warp GEMM
                 WarpGemm{}.template operator()<0, 0>(
                     c_warp_tensor,
@@ -212,6 +213,15 @@ struct BlockGemmMxARegBSmemCRegV1
                     b_warp_tensor,
                     int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
                     int32_t(b_scale_warp_tensor.get_thread_buffer()[0]));
+=======
+                    // warp GEMM
+                    WarpGemm{}.template operator()<OpSelA<0>, OpSelB<0>>(
+                        c_warp_tensor,
+                        a_warp_tensor,
+                        b_warp_tensor,
+                        int32_t(a_scale_warp_tensor.get_thread_buffer()[0]),
+                        int32_t(b_scale_warp_tensor.get_thread_buffer()[0]));
+>>>>>>> gfx1250
 
                 // write C warp tensor into C block tensor
                 c_block_tensor.set_y_sliced_thread_data(

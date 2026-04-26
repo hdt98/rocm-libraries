@@ -183,7 +183,11 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
           lcm_AK1_BK1 <= 4) ||
          (is_same<ComputeTypeA, int8_t>::value && lcm_AK1_BK1 <= 8) ||
          ((is_same<ComputeTypeA, f8_t>::value || is_same<ComputeTypeA, bf8_t>::value) &&
+#if defined(__gfx125__)
+          lcm_AK1_BK1 < 128))
+#else
           lcm_AK1_BK1 < 32))
+#endif
             ? true
             : false;
     static constexpr auto is_scale_mfma = false;
@@ -447,6 +451,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     {
         if constexpr(DirectLoad)
         {
+<<<<<<< HEAD
             if constexpr(is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
             {
                 return make_naive_tensor_descriptor(
@@ -459,6 +464,12 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                     make_tuple(AK0Number, Number<MPerBlock>{}, AK1Number),
                     make_tuple(Number<MPerBlock * AK1Number>{}, I1, Number<MPerBlock>{}));
             }
+=======
+            // Force use padded layout on gfx950 to reduce bank conflicts
+            return make_naive_tensor_descriptor(
+                make_tuple(AK0Number, Number<MPerBlock>{}, AK1Number),
+                make_tuple(Number<MPerBlock * AK1Number>{}, I1, Number<MPerBlock>{}));
+>>>>>>> gfx1250
         }
         else if constexpr(is_same_v<DeviceArch, gfx950_t>)
         {
@@ -525,6 +536,7 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                      GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch()))),
                  decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
                      GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch()))),
+<<<<<<< HEAD
                  ABlockTransferSrcScalarPerVector,
                  BBlockTransferSrcScalarPerVector,
                  MPerBlock,
@@ -538,6 +550,22 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                  DirectLoad,
                  ALdsScalarLoadToVgpr,
                  BLdsScalarLoadToVgpr>())>;
+=======
+                                   ABlockTransferSrcScalarPerVector,
+                                   BBlockTransferSrcScalarPerVector,
+                                   MPerBlock,
+                                   NPerBlock,
+                                   KPerBlock,
+                                   MPerXdl,
+                                   NPerXdl,
+                                   MXdlPerWave,
+                                   NXdlPerWave,
+                                   KPack,
+                                   DirectLoad,
+                                   false, // TransposeC
+                                   false, // UseDataCachePrefetch
+                                   LdsScalarLoadToVgpr>())>;
+>>>>>>> gfx1250
 
     template <typename DeviceArch>
     __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)
