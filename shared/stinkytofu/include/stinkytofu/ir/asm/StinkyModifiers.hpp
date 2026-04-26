@@ -151,9 +151,11 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
     MUBUFModifiers(bool offen = false, int offset12 = 0, bool glc = false, bool slc = false,
                    bool nt = false, bool lds = false, bool isStore = false,
                    bool hasMUBUFConst = false, bool hasGLCModifier = false,
-                   bool hasSC0Modifier = false)
+                   bool hasSC0Modifier = false, bool hasSCOPEModifier = false,
+                   const std::string& scope = "")
         : TypedModifier<MUBUFModifiers>(),
           offset12(offset12),
+          scope(scope),
           offen(offen),
           glc(glc),
           slc(slc),
@@ -162,9 +164,11 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
           isStore(isStore),
           hasMUBUFConst(hasMUBUFConst),
           hasGLCModifier(hasGLCModifier),
-          hasSC0Modifier(hasSC0Modifier) {}
+          hasSC0Modifier(hasSC0Modifier),
+          hasSCOPEModifier(hasSCOPEModifier) {}
 
     int offset12;
+    std::string scope;
     uint32_t offen : 1;
     uint32_t glc : 1;
     uint32_t slc : 1;
@@ -174,6 +178,7 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
     uint32_t hasMUBUFConst : 1;
     uint32_t hasGLCModifier : 1;
     uint32_t hasSC0Modifier : 1;
+    uint32_t hasSCOPEModifier : 1;
 };
 
 struct SMEMModifiers : public TypedModifier<SMEMModifiers> {
