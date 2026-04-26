@@ -565,6 +565,9 @@ def noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode):
                 # TODO: For the 1-wave case, schedule B's TDM load independently for better tensor load balance.
                 deferMod.addComment1("Global Read B (TDM deferred after LDS swap)")
                 deferMod.add(tdmLoadModB)
+            if kernel["ProblemType"]["Sparse"]:
+                imod.addComment1("Global Read Metadata")
+                imod.add(writer.codes.globalReadMetadata)
         else:
             imod.addComment1("Global Read A")
             imod.add(writer.codes.dtlsM0UpdateA)
@@ -578,6 +581,9 @@ def noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode):
             imod.addComment1("Global Read B")
             imod.add(writer.codes.dtlsM0UpdateB)
             imod.add(writer.codes.globalReadB)
+            if kernel["ProblemType"]["Sparse"]:
+                imod.addComment1("Global Read Metadata")
+                imod.add(writer.codes.globalReadMetadata)
     else:
         # put everything in the header (original behavior for PGR=0/1):
         writer.codes.unrollLoopHeader.add(writer.codes.dtlsM0UpdateA)
@@ -588,6 +594,7 @@ def noSchedGlobalRead(writer, kernel, globalReadIncACode, globalReadIncBCode):
         writer.codes.unrollLoopHeader.add(writer.codes.globalReadMXSB)
         writer.codes.unrollLoopHeader.add(writer.codes.dtlsM0UpdateB)
         writer.codes.unrollLoopHeader.add(writer.codes.globalReadB)
+        writer.codes.unrollLoopHeader.add(writer.codes.globalReadMetadata) if kernel["ProblemType"]["Sparse"] else None
         writer.codes.unrollLoopHeader.add(globalReadIncACode)
         writer.codes.unrollLoopHeader.add(globalReadIncBCode)
     # Dummy
@@ -600,6 +607,7 @@ def prepareGRInstToSched(writer, kernel, isNGLL):
     writer.codes.unrollLoopHeader.add(writer.codes.globalReadMXSA.header)
     writer.codes.unrollLoopHeader.add(writer.codes.globalReadMXSB.header)
     writer.codes.unrollLoopHeader.add(writer.codes.globalReadB.header)
+    writer.codes.unrollLoopHeader.add(writer.codes.globalReadMetadata.header) if kernel["ProblemType"]["Sparse"] else None
 
     # Add all loads from middle as individual schedulable items
     # when using PGR2, put global read instruction right after corresponding localWrite instruction
@@ -611,12 +619,14 @@ def prepareGRInstToSched(writer, kernel, isNGLL):
         itemsGRToSchedLater = list(writer.codes.globalReadA.middle.items()) + \
                          list(writer.codes.globalReadMXSA.middle.items()) + \
                          list(writer.codes.globalReadMXSB.middle.items()) + \
-                         list(writer.codes.globalReadB.middle.items())
+                         list(writer.codes.globalReadB.middle.items()) + \
+                         list(writer.codes.globalReadMetadata.middle.items())
     else:
         itemsGRToSched =  list(writer.codes.globalReadA.middle.items()) + \
                         list(writer.codes.globalReadMXSA.middle.items()) + \
                         list(writer.codes.globalReadMXSB.middle.items()) + \
-                        list(writer.codes.globalReadB.middle.items())
+                        list(writer.codes.globalReadB.middle.items()) + \
+                        list(writer.codes.globalReadMetadata.middle.items())
         itemsGRToSchedLater = []
 
     itemsGRToSchedTemp = []
@@ -747,6 +757,9 @@ def schedGlobalRead(writer, itemsGRToSched, itemsGRIncToSched, numGlobalReadInsP
         writer.codes.globalReadMXSB.middle.getItem(0).add(writer.codes.dtlsM0UpdateMXSB, 0)
     if writer.codes.globalReadB.middle.items():
         writer.codes.globalReadB.middle.getItem(0).add(writer.codes.dtlsM0UpdateB, 0)
+    # TODO: if metadata supports directToLds
+    # if writer.codes.globalReadMetadata.middle.items():
+    #     writer.codes.globalReadMetadata.middle.getItem(0).add(writer.codes.dtlsM0UpdateMetadata, 0)
 
     itemsGRToSched.extend(itemsGRIncToSched)
     # append 'n' global load at a time
@@ -774,6 +787,7 @@ def schedGlobalRead(writer, itemsGRToSched, itemsGRIncToSched, numGlobalReadInsP
     writer.codes.perIterGlobalRead[endIter-1].add(writer.codes.globalReadMXSA.footer)
     writer.codes.perIterGlobalRead[endIter-1].add(writer.codes.globalReadMXSB.footer)
     writer.codes.perIterGlobalRead[endIter-1].add(writer.codes.globalReadB.footer)
+    writer.codes.perIterGlobalRead[endIter-1].add(writer.codes.globalReadMetadata.footer)
     return lastLoadIter
 
 ################################################################################
@@ -802,6 +816,9 @@ def noSchedLocalWrite(writer, kernel, tensorParametersA, tensorParametersB, loca
         imod.add(writer.codes.localWriteMXSB)
         imod.addComment1("local write B")
         imod.add(writer.codes.localWriteB)
+        # if kernel["ProblemType"]["Sparse"]:
+        #     imod.addComment1("local write Metadata")
+        #     imod.add(writer.codes.localWriteMetadata)
 
         if kernel["PrefetchGlobalRead"] == 2 and writer.codes.perIterLocalWriteCodeNGLL is not None: # TODO: check condition
             # do we need a module here? That would prevent these from being scheduled
@@ -817,6 +834,9 @@ def noSchedLocalWrite(writer, kernel, tensorParametersA, tensorParametersB, loca
             imod.add(writer.codes.localWriteMXSB)
             imod.addComment1("local write B")
             imod.add(writer.codes.localWriteB)
+            # if kernel["ProblemType"]["Sparse"]:
+            #     imod.addComment1("local write Metadata")
+            #     imod.add(writer.codes.localWriteMetadata)
 
 def prepareLWInstToSched(writer, kernel, numLocalWritesPerSched, isNGLL=False):
     #################
@@ -834,6 +854,7 @@ def prepareLWInstToSched(writer, kernel, numLocalWritesPerSched, isNGLL=False):
         lenMXSA = len(list(writer.codes.globalReadMXSA.middle.items()))
         lenMXSB = len(list(writer.codes.globalReadMXSB.middle.items()))
         lenB    = len(list(writer.codes.globalReadB.middle.items()))
+        
 
         lenAFooter    = len(list(writer.codes.globalReadA.footer.items()))
         lenMXSAFooter = len(list(writer.codes.globalReadMXSA.footer.items()))
