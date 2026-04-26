@@ -858,11 +858,9 @@ struct GridwiseGemmMX_xdl_cshuffle_v3_bpreshuffle
                                        const AScaleDataType* p_a_scale_grid_left,
                                        CDataType* p_c_grid_left) const
         {
-            auto [M_left, M_right] = [&] {
-                constexpr index_t PartitionSize = 256;
-                index_t left = ck::math::integer_least_multiple(M_ / 2, PartitionSize);
-                return std::make_tuple(left, M_ - left);
-            }();
+            constexpr index_t PartitionSize = 256;
+            const index_t M_left  = ck::math::integer_least_multiple(M_ / 2, PartitionSize);
+            const index_t M_right = M_ - M_left;
 
             GemmPartitioner conv_to_gemm_transformer_left  = *this;
             GemmPartitioner conv_to_gemm_transformer_right = *this;
