@@ -746,9 +746,6 @@ struct FmhaBatchPrefillV3Kernel
         __shared__ char
             smem_v[2]
                   [FmhaPipeline::Policy::template GetSmemSizeV<typename FmhaPipeline::Problem>()];
-        constexpr auto smem_epilogue_size = max(1, EpiloguePipeline::GetSmemSize());
-        __shared__ char smem_epilogue_buf[smem_epilogue_size];
-
         auto* smem_k0              = reinterpret_cast<KDataType*>(smem_k[0]);
         auto* smem_k1              = reinterpret_cast<KDataType*>(smem_k[1]);
         auto* smem_v0              = reinterpret_cast<VDataType*>(smem_v[0]);
