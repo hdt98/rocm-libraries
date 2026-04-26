@@ -31,6 +31,7 @@
 #include "TimingInstrumentation.hpp"
 #include "TypedId.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <iostream>
 #include <omp.h>
@@ -67,21 +68,33 @@ namespace TensileLite
             }
         }
 
-        /** One MX scale tensor element as float (E8 / E5M3 / Float8 E4M3). */
+        /** One MX scale tensor element as float (E8 / E5M3 / Float8 E4M3).
+         *
+         * Returns the magnitude of the scale (std::fabs). MX scales are interpreted
+         * as positive multipliers per the OCP MX spec; for the canonical UE8M0
+         * (E8) type this is a no-op, but for E5M3 / Float8 (E4M3) used as scale
+         * elements it preserves the prior reference behaviour that explicitly
+         * applied abs() before folding the scale into the accumulator.
+         */
         inline float mxScaleElementAsFloat(rocisa::DataType mxType, void const* base, size_t index)
         {
+            float v;
             switch(mxType)
             {
             case rocisa::DataType::E8:
-                return static_cast<float>(static_cast<E8 const*>(base)[index]);
+                v = static_cast<float>(static_cast<E8 const*>(base)[index]);
+                break;
             case rocisa::DataType::E5M3:
-                return static_cast<float>(static_cast<E5M3 const*>(base)[index]);
+                v = static_cast<float>(static_cast<E5M3 const*>(base)[index]);
+                break;
             case rocisa::DataType::Float8:
-                return static_cast<float>(static_cast<Float8 const*>(base)[index]);
+                v = static_cast<float>(static_cast<Float8 const*>(base)[index]);
+                break;
             default:
                 throw std::runtime_error(concatenate(
                     "Reference MX scale: unsupported element type ", static_cast<int>(mxType)));
             }
+            return std::fabs(v);
         }
 
         // Helper class that wraps a shadow copy of input buffers in float format.

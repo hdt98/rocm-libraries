@@ -2462,7 +2462,9 @@ class Solution(collections.abc.Mapping):
               state["LocalReadVectorWidthA"] = maxLRVWA
             else:
               state["LocalReadVectorWidthA"] = min(state["MIInputPerThread"], maxLRVWA)
-            assert state["LocalReadVectorWidthA"] <= maxLRVWA, "# bytes of lrvw > 32"
+            if state["LocalReadVectorWidthA"] > maxLRVWA:
+              raise RuntimeError("LocalReadVectorWidthA (%d) exceeds max %d (# bytes of lrvw > 32)" \
+                                 % (state["LocalReadVectorWidthA"], maxLRVWA))
           else:
             if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
               if state["LocalReadVectorWidthA"] != maxLRVWA and state["TransposeLDS"]:
@@ -2499,7 +2501,9 @@ class Solution(collections.abc.Mapping):
               state["LocalReadVectorWidthB"] = maxLRVWB
             else:
               state["LocalReadVectorWidthB"] = min(state["MIInputPerThread"], maxLRVWB)
-            assert state["LocalReadVectorWidthB"] <= maxLRVWB, "# bytes of lrvwB > 32"
+            if state["LocalReadVectorWidthB"] > maxLRVWB:
+              raise RuntimeError("LocalReadVectorWidthB (%d) exceeds max %d (# bytes of lrvw > 32)" \
+                                 % (state["LocalReadVectorWidthB"], maxLRVWB))
           else:
             if isaInfoMap[isa].asmCaps["HasWMMA_V3"]:
               if state["LocalReadVectorWidthB"] != maxLRVWB and state["TransposeLDS"]:
@@ -2660,7 +2664,8 @@ class Solution(collections.abc.Mapping):
           if state["ProblemType"]["MXBlockB"]:
             state["LocalReadVectorWidthMXSB"] = 1 # TODO: check if need to fomulization
         else:
-          assert False, "expecting MFMA for MX datatypes"
+          reject(state, printRejectionReason, "expecting MFMA for MX datatypes")
+          return
 
       # Default LocalReadVectorWidth
       if state["ISA"] == IsaVersion(9,5,0) and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
@@ -3437,7 +3442,7 @@ class Solution(collections.abc.Mapping):
       # - TailloopInNll
       # - MX + StreamK (not enough sgpr)
       if state["TailloopInNll"] or \
-         (state["StreamK"] and state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
+         (state["StreamK"] and (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"])):
         # need to disable StaggerU
         state["StaggerU"] = 0
         state["StaggerUMapping"] = 0

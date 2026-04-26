@@ -5494,7 +5494,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # - StreamK + MX (not enough sgpr. gfx950 only for now)
     self.states.staggerUCode = True
     if self.states.tailloopInNll or \
-       ((kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and kernel["ISA"][:2] == (9, 5)):
+       (kernel["StreamK"] and \
+        (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and \
+        kernel["ISA"][:2] == (9, 5)):
       self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:

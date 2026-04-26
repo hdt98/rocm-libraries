@@ -26,7 +26,17 @@
 
 #pragma once
 
+// Workaround: ROCm's amd_hip_ocp_host.hpp has a static_assert size mismatch
+// (fp6x32_packed vs __amd_fp6x32_storage_t) in its host-fallback path, which
+// is taken for all non-gfx950/gfx1250 device targets. The non-Windows full
+// implementation below uses the same fp6x32 intrinsics, so we gate it on the
+// same condition. The Windows path uses a stub typedef and is always enabled
+// so client/host code compiles regardless of HIP availability.
+#if defined(_WIN32) || defined(WIN32)
 #define TENSILE_USE_FP6
+#elif (!defined(__HIP_DEVICE_COMPILE__) || defined(__gfx950__) || defined(__gfx1250__))
+#define TENSILE_USE_FP6
+#endif
 
 #ifdef TENSILE_USE_FP6
 

@@ -141,7 +141,6 @@ def matrixInstructionToMIParameters(
       # work around for gfx950. Use duplicateFactor = 1
       duplicateFactor = 32 // result["MatrixInstM"] if not isgfx950 else 1
       result['MIInputPerThreadMXSA'] = result['MIInputPerThreadA'] // problemType["MXBlockA"] * duplicateFactor
-      MIInputPerThreadMXSA = result['MIInputPerThreadMXSA']
     result['MIInputPerThreadB'] = result['MIInputPerThreadB'] if not sparseB else result['MIInputPerThreadB'] // 2
     if ("MXBlockB" in problemType) and problemType["MXBlockB"]:
       # work around for gfx950. Use duplicateFactor = 1

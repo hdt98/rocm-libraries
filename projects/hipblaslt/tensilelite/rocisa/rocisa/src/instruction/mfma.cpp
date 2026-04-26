@@ -161,6 +161,12 @@ void mfma_inst(nb::module_ m_mfma)
         });
 
     nb::class_<rocisa::MXMFMAInstruction, rocisa::Instruction>(m_mfma, "MXMFMAInstruction")
+        // The C++ constructor parameter order was reshuffled (mxScaleA/BType moved
+        // from positions 3-4 to after mxsb). nb::kw_only() forces every Python
+        // caller to spell out argument names, which prevents a silent positional
+        // mis-binding if the C++ signature changes again. The lone in-tree caller
+        // (KernelWriterAssembly.MXMFMAInstruction(...)) already uses keyword args,
+        // so this is non-breaking.
         .def(nb::init<rocisa::InstType,
                       rocisa::InstType,
                       const std::vector<int>&,
@@ -174,6 +180,7 @@ void mfma_inst(nb::module_ m_mfma)
                       rocisa::InstType,
                       int,
                       const std::string&>(),
+             nb::kw_only(),
              nb::arg("instType"),
              nb::arg("accType"),
              nb::arg("variant"),

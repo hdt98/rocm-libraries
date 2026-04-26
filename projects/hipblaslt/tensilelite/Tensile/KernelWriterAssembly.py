@@ -5809,7 +5809,7 @@ class KernelWriterAssembly(KernelWriter):
 
     if numG2LA + numG2LB + numG2LMXSA + numG2LMXSB + numG2LMetadata > 0:
       vgprBase = self.vgprPool.checkOutAligned(numG2LA + numG2LB + numG2LMXSA + numG2LMXSB + numG2LMetadata, 2)
-      imod.addComment0("Check out VGPR (numG2LA,numG2LB,numG2LMXSA,numG2LMXSBnumG2LMetadata) = (%d,%d,%d,%d,%d)"%(numG2LA,numG2LB,numG2LMXSA,numG2LMXSB,numG2LMetadata))
+      imod.addComment0("Check out VGPR (numG2LA,numG2LB,numG2LMXSA,numG2LMXSB,numG2LMetadata) = (%d,%d,%d,%d,%d)"%(numG2LA,numG2LB,numG2LMXSA,numG2LMXSB,numG2LMetadata))
     if numG2LA > 0:
       imod.add(RegSet("v", "vgprG2LA_BASE", vgprBase))
       if kernel["DirectToLdsA"] and kernel["NonDTLTailLoopA"]:

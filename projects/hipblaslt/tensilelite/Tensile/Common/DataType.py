@@ -25,7 +25,6 @@
 from rocisa.enum import DataTypeEnum
 from functools import lru_cache
 import functools
-import platform
 
 @lru_cache
 def _is8bitFloat(value):
