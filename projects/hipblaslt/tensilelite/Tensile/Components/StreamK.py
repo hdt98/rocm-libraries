@@ -24,7 +24,7 @@ from rocisa.enum import CacheScope
 from rocisa.code import Module, Label
 from rocisa.container import vgpr, sgpr, SMEMModifiers, MUBUFModifiers, replaceHolder, EXEC,\
     VOP3PModifiers, ContinuousRegister
-from rocisa.instruction import SAddCU32, SAddU32, SAndB32, SBarrier, \
+from rocisa.instruction import MacroInstruction, SAddCU32, SAddU32, SAndB32, SBarrier, \
     SBranch, SCBranchSCC0, SCBranchSCC1, SCMovB32, SCSelectB32, SCmpEQU32, SCmpEQU64, \
     SCmpGtU32, SCmpLeU32, SCmpLtU32, SLShiftLeftB32, SLShiftLeftB64, SLShiftRightB32, SLoadB32, \
     SMaxI32, SMinU32, SMovB32, SMovB64, SMulI32, SNop, SOrB32, SSleep, SStoreB32, SSubU32, \
@@ -138,6 +138,57 @@ class StreamK(Component):
           module.add(SLShiftRightB32(sgpr(srdIdx+2), 7, sgpr(srdIdx+2)))
 
       return module
+
+    # gfx1250 StreamK flag/partial ordering helpers. No-op on other arches.
+    # Predicate matches shiftSrd above.
+    def _isGfx1250(self, writer) -> bool:
+        return writer.states.version[:2] == (12, 5)
+
+    def _waitXcnt0(self, writer, comment: str = "") -> Module:
+        module = Module("gfx1250 s_wait_xcnt 0")
+        if self._isGfx1250(writer):
+            module.add(MacroInstruction(name="s_wait_xcnt 0", args=[], comment=comment))
+        return module
+
+    def _globalWbDev(self, writer, comment: str = "") -> Module:
+        module = Module("gfx1250 global_wb")
+        if self._isGfx1250(writer):
+            module.add(MacroInstruction(name="global_wb scope:SCOPE_DEV", args=[], comment=comment))
+        return module
+
+    def _globalInvDev(self, writer, comment: str = "") -> Module:
+        module = Module("gfx1250 global_inv")
+        if self._isGfx1250(writer):
+            module.add(MacroInstruction(name="global_inv scope:SCOPE_DEV", args=[], comment=comment))
+        return module
+
+    def _waitLoadcntForRelease(self, writer) -> Module:
+        # Drain in-flight VMEM loads before the release writeback.
+        module = Module("gfx1250 s_wait_loadcnt 0 (release)")
+        if self._isGfx1250(writer):
+            module.add(SWaitCnt(vlcnt=0, comment="release: drain in-flight loads before global_wb"))
+        return module
+
+    def _waitGlobalWbForRelease(self, writer) -> Module:
+        module = Module("gfx1250 wait global_wb")
+        if self._isGfx1250(writer):
+            # gfx1250 has split VMEM counters. Drain both sides after global_wb
+            # before publishing the StreamK flag.
+            module.add(SWaitCnt(vlcnt=0, vscnt=0, comment="release: wait for global_wb"))
+        return module
+
+    def _readFlagValue(self, writer, dst, soffset) -> Module:
+        module = Module("Read StreamK flag")
+        if self._isGfx1250(writer):
+            flagVgpr = writer.vgprPool.checkOut(1, "flagAcq")
+            module.add(self.getFlagValue(writer, dst=vgpr(flagVgpr), soffset=soffset, comment="acquire: get flag (VMEM)"))
+            module.add(SWaitCnt(vlcnt=0, comment="acquire: wait VMEM flag load"))
+            module.add(VReadfirstlaneB32(dst=sgpr(dst), src=vgpr(flagVgpr), comment="move VMEM flag to SGPR for compare"))
+            writer.vgprPool.checkIn(flagVgpr)
+        else:
+            module.add(SLoadB32(dst=sgpr(dst), base=sgpr("AddressFlags", 2), soffset=soffset, smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="get flag"))
+            module.add(SWaitCnt(kmcnt=0, comment="wait for flag load"))
+        return module
 
     def _skv(self, writer, name):
         """Return the VGPR index holding a StreamK constant."""
@@ -593,11 +644,13 @@ class StreamK(Component):
             module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr), src=sgpr(sFlagIdx), shiftHex=log2(4), comment="flag offset based on wg index"))
 
             module.add(skFixupWaitForFlag) # loop to wait for flag
-            module.add(SLoadB32(dst=sgpr(tmpSgpr+1), base=sgpr("AddressFlags", 2), soffset=sgpr(tmpSgpr), smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="get flag"))
-            module.add(SWaitCnt(kmcnt=0, comment="wait for flag load"))
+            module.add(self._readFlagValue(writer, dst=tmpSgpr+1, soffset=sgpr(tmpSgpr)))
             if kernel["DebugStreamK"] & 2 == 0: # Don't wait for partials if not being written
                 module.add(SCmpEQU32(src0=sgpr(tmpSgpr+1), src1=1, comment="check if ready"))
                 module.add(SCBranchSCC0(labelName=skFixupWaitForFlag.getLabelName(), comment="if flag not set, wait and check again"))
+                if self._isGfx1250(writer):
+                    module.add(self._globalInvDev(writer, comment="acquire: invalidate partials after flag"))
+                    module.add(SWaitCnt(vlcnt=0, comment="acquire: wait for global_inv"))
 
             module.add(SBarrier(comment="wait for all workgroups before resetting flag"))
             skipFlagReset = Label(label=writer.labels.getNameInc("SK_SkipFlagReset"), comment="")
@@ -681,11 +734,13 @@ class StreamK(Component):
 
                 # Check flag
                 module.add(SLShiftLeftB32(dst=sgpr(tmpSgpr), src=sgpr(sCtaIdx), shiftHex=log2(4), comment="flag offset based on CTA index"))
-                module.add(SLoadB32(dst=sgpr(tmpSgpr+2), base=sgpr("AddressFlags", 2), soffset=sgpr(tmpSgpr), smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="get flag"))
-                module.add(SWaitCnt(kmcnt=0, comment="wait for flag load"))
+                module.add(self._readFlagValue(writer, dst=tmpSgpr+2, soffset=sgpr(tmpSgpr)))
                 if kernel["DebugStreamK"] & 2 == 0:
                     module.add(SCmpEQU32(src0=sgpr(tmpSgpr+2), src1=1, comment="check if ready"))
                     module.add(SCBranchSCC0(labelName=skFixupLabel.getLabelName(), comment="if flag not set, wait and check again"))
+                    if self._isGfx1250(writer):
+                        module.add(self._globalInvDev(writer, comment="acquire: invalidate partials after flag"))
+                        module.add(SWaitCnt(vlcnt=0, comment="acquire: wait for global_inv"))
 
                 # TODO Barrier here to sync all threads in workgroup, but maybe better to have separate flag for each wavefront (to be tested)
                 module.add(SBarrier(comment="wait for all workgroups before resetting flag"))
@@ -1009,7 +1064,10 @@ class StreamK(Component):
             #     kStr += PreLoopVmcntCaseStr
 
             # Set flag
+            module.add(self._waitLoadcntForRelease(writer))
             module.add(SWaitCnt(vscnt=0, comment="wait for data store"))
+            module.add(self._globalWbDev(writer, comment="release: writeback partials to L2-coherent point"))
+            module.add(self._waitGlobalWbForRelease(writer))
             module.add(SBarrier(comment="store all data before setting flag"))
             sIdx = writer.acquireStreamKConstSgpr(kernel, "StreamKIdx")
             if writer.isStreamKConstantsToVgprEnabled(kernel):
@@ -1047,10 +1105,39 @@ class StreamK(Component):
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+2), src="BufferOOB"))
         module.add(SMovB32(dst=sgpr(tmpSgprBuffer+3), src="Srd127_96"))
         module.add(self.shiftSrd(writer, tmpSgprBuffer))
-        module.add(BufferStoreB32(src=src, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
-                                  mubuf=MUBUFModifiers(offen=True, glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
-                                  comment=comment))
+        # gfx1250: drain in-flight XNACK retries before the flag store.
+        module.add(self._waitXcnt0(writer, comment="drain xnacks before volatile VMEM store"))
+        if self._isGfx1250(writer):
+            module.add(MacroInstruction(
+                name=f"buffer_store_b32 {src}, {vgpr(tmpVgprOff)}, {sgpr(tmpSgprBuffer, 4)}, {soffset} offen offset:0 scope:SCOPE_DEV",
+                args=[],
+                comment=comment))
+        else:
+            module.add(BufferStoreB32(src=src, vaddr=vgpr(tmpVgprOff), saddr=sgpr(tmpSgprBuffer, 4), soffset=soffset, \
+                                      mubuf=MUBUFModifiers(offen=True, glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), \
+                                      comment=comment))
         module.add(SWaitCnt(vscnt=0, comment="wait for data store"))
+        writer.vgprPool.checkIn(tmpVgprOff)
+        writer.sgprPool.checkIn(tmpSgprBuffer)
+
+        return module
+
+    def getFlagValue(self, writer, dst, soffset, comment=""):
+        """gfx1250 acquire-side VMEM load of the StreamK flag."""
+        module = Module("Buffer Load Flag Value")
+        tmpSgprBuffer = writer.sgprPool.checkOutAligned(4, 4, preventOverflow=False)
+        tmpVgprOff = writer.vgprPool.checkOut(1, "vaddr_off")
+        module.add(VMovB32(dst=vgpr(tmpVgprOff), src=0, comment="zero vaddr offset"))
+        module.add(SMovB64(dst=sgpr(tmpSgprBuffer, 2), src=sgpr("AddressFlags", 2)))
+        module.add(SMovB32(dst=sgpr(tmpSgprBuffer+2), src="BufferOOB"))
+        module.add(SMovB32(dst=sgpr(tmpSgprBuffer+3), src="Srd127_96"))
+        module.add(self.shiftSrd(writer, tmpSgprBuffer))
+        # gfx1250: drain in-flight XNACK retries before the flag load.
+        module.add(self._waitXcnt0(writer, comment="drain xnacks before volatile VMEM load"))
+        module.add(MacroInstruction(
+            name=f"buffer_load_b32 {dst}, {vgpr(tmpVgprOff)}, {sgpr(tmpSgprBuffer, 4)}, {soffset} offen offset:0 scope:SCOPE_DEV",
+            args=[],
+            comment=comment))
         writer.vgprPool.checkIn(tmpVgprOff)
         writer.sgprPool.checkIn(tmpSgprBuffer)
 
