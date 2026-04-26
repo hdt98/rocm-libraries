@@ -9,6 +9,7 @@
 #include "ck_tile/ops/fmha/block/block_attention_quant_scale_enum.hpp"
 #include "ck_tile/ops/fmha/block/variants.hpp"
 
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -538,6 +539,25 @@ struct FmhaFwdKernel
         }
         else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
         {
+            // BLOCKSCALE descale is per (block_scale_size_*) chunk; the kernel
+            // reads ONE descale per tile (kM0 for Q, kN0 for K/V), so the user-
+            // supplied block sizes must be >= and a multiple of the kernel
+            // tile sizes. Sub-tile granularity is not supported here.
+            constexpr index_t kM0 = FmhaPipeline::kM0;
+            constexpr index_t kN0 = FmhaPipeline::kN0;
+            if(block_scale_size_q < kM0 || block_scale_size_q % kM0 != 0)
+                throw std::invalid_argument(
+                    "BLOCKSCALE: block_scale_size_q (" +
+                    std::to_string(block_scale_size_q) +
+                    ") must be >= kM0 (" + std::to_string(kM0) +
+                    ") and an integer multiple of it");
+            if(block_scale_size_kv < kN0 || block_scale_size_kv % kN0 != 0)
+                throw std::invalid_argument(
+                    "BLOCKSCALE: block_scale_size_kv (" +
+                    std::to_string(block_scale_size_kv) +
+                    ") must be >= kN0 (" + std::to_string(kN0) +
+                    ") and an integer multiple of it");
+
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
@@ -1008,6 +1028,23 @@ struct FmhaFwdKernel
         }
         else if constexpr(QScaleEnum == BlockAttentionQuantScaleEnum::BLOCKSCALE)
         {
+            // See batch-mode BLOCKSCALE branch above for the contract:
+            // block_scale_size_{q,kv} must be >= and multiple of kM0/kN0.
+            constexpr index_t kM0 = FmhaPipeline::kM0;
+            constexpr index_t kN0 = FmhaPipeline::kN0;
+            if(block_scale_size_q < kM0 || block_scale_size_q % kM0 != 0)
+                throw std::invalid_argument(
+                    "BLOCKSCALE (group): block_scale_size_q (" +
+                    std::to_string(block_scale_size_q) +
+                    ") must be >= kM0 (" + std::to_string(kM0) +
+                    ") and an integer multiple of it");
+            if(block_scale_size_kv < kN0 || block_scale_size_kv % kN0 != 0)
+                throw std::invalid_argument(
+                    "BLOCKSCALE (group): block_scale_size_kv (" +
+                    std::to_string(block_scale_size_kv) +
+                    ") must be >= kN0 (" + std::to_string(kN0) +
+                    ") and an integer multiple of it");
+
             kargs.q_descale_ptr = q_descale_ptr;
             kargs.k_descale_ptr = k_descale_ptr;
             kargs.v_descale_ptr = v_descale_ptr;
