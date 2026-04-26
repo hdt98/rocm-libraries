@@ -417,15 +417,9 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-#ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
             case rocisa::DataType::BFloat6:
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
-#endif // #ifdef TENSILE_USE_FP4
             ;
             }
             return DataInitialization::getValue<Accumulator, InitMode::Zero>();
@@ -537,15 +531,9 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-#ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
             case rocisa::DataType::BFloat6:
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
-#endif // #ifdef TENSILE_USE_FP4
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
@@ -596,15 +584,9 @@ namespace TensileLite
             case rocisa::DataType::BFloat8Float8:
             case rocisa::DataType::Float8BFloat8_fnuz:
             case rocisa::DataType::BFloat8Float8_fnuz:
-#ifdef TENSILE_USE_FP6
             case rocisa::DataType::Float6:
-#endif // #ifdef TENSILE_USE_FP6
-#ifdef TENSILE_USE_BF6
             case rocisa::DataType::BFloat6:
-#endif // #ifdef TENSILE_USE_BF6
-#ifdef TENSILE_USE_FP4
             case rocisa::DataType::Float4:
-#endif // #ifdef TENSILE_USE_FP4
             case rocisa::DataType::E8:
             case rocisa::DataType::E5M3:
                 ;
@@ -933,7 +915,8 @@ namespace TensileLite
             return static_cast<Accumulator>(static_cast<MultT>(static_cast<MathOpMultT>(val)));
         }
 
-#ifndef _WIN32
+#if !defined(_WIN32) \
+    && (defined(TENSILE_USE_FP6) || defined(TENSILE_USE_BF6) || defined(TENSILE_USE_FP4))
         template <typename Accumulator,
                   typename MathOpAccum,
                   typename Type,
@@ -962,7 +945,7 @@ namespace TensileLite
 
             return static_cast<Accumulator>(ptr[packIdx].getElement(elemIdx));
         }
-#endif // !_WIN32
+#endif // !_WIN32 && (TENSILE_USE_FP6 || TENSILE_USE_BF6 || TENSILE_USE_FP4)
 
         template <typename Inputs,
                   typename Accumulator,
