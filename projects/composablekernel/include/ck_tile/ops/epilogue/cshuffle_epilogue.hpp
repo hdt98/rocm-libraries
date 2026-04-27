@@ -33,7 +33,6 @@ template <typename AsDataType_,
           index_t kNumWaveGroups_      = 1,
           bool FixedVectorSize_        = false,
           index_t VectorSizeC_         = 1,
-          bool TiledMMAPermuteN_       = false,
           index_t BlockedXDLN_PerWarp_ = 1, // The number of continuous xdl_output per warp
           bool DoubleSmemBuffer_       = false>
 struct CShuffleEpilogueProblem
@@ -59,7 +58,6 @@ struct CShuffleEpilogueProblem
     static constexpr index_t VectorSizeC         = VectorSizeC_;
     static constexpr index_t BlockedXDLN_PerWarp = BlockedXDLN_PerWarp_;
     static constexpr bool DoubleSmemBuffer       = DoubleSmemBuffer_;
-    static constexpr bool TiledMMAPermuteN       = TiledMMAPermuteN_;
     static constexpr index_t kNumWaveGroups      = kNumWaveGroups_;
     static constexpr index_t NumDTensor          = DsDataType::size();
 
@@ -89,19 +87,32 @@ struct CShuffleEpilogue
                                                remove_cvref_t<BsDataType>,
                                                remove_cvref_t<tuple<BsDataType>>>;
 
-    using ADataType = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
-    using BDataType = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
+    // ADataTypeCompute: compute type from Problem (may be tf32_t for TF32 mode)
+    using ADataTypeCompute = remove_cvref_t<std::tuple_element_t<number<0>{}, AsDataTypeTuple>>;
+    using BDataTypeCompute = remove_cvref_t<std::tuple_element_t<number<0>{}, BsDataTypeTuple>>;
 
-    using ATypeToUse = std::conditional_t<std::is_same_v<ADataType, pk_int4_t> ||
-                                              std::is_same_v<ADataType, pk_fp4_t>,
-                                          BDataType,
-                                          ADataType>;
+    // ADataTypeBuf: buffer/storage type (fp32 when tf32)
+    using ADataTypeBuf = if_select_t<ADataTypeCompute, tf32_t, float, ADataTypeCompute>;
+    using BDataTypeBuf = if_select_t<BDataTypeCompute, tf32_t, float, BDataTypeCompute>;
+
+    // For warp gemm selection: use tf32_t if compute type was tf32_t
+    // For pk_int4/pk_fp4: use the other data type
+    using ATypeToUse =
+        std::conditional_t<std::is_same_v<ADataTypeCompute, tf32_t>,
+                           tf32_t,
+                           std::conditional_t<std::is_same_v<ADataTypeBuf, pk_int4_t> ||
+                                                  std::is_same_v<ADataTypeBuf, pk_fp4_t>,
+                                              BDataTypeBuf,
+                                              ADataTypeBuf>>;
     // Used for weight-only quantization kernel, B would be dequantized to the same data type as A
-    using BTypeToUse = std::conditional_t<std::is_same_v<BDataType, pk_int4_t> ||
-                                              std::is_same_v<BDataType, pk_fp4_t> ||
-                                              sizeof(BDataType) < sizeof(ADataType),
-                                          ADataType,
-                                          BDataType>;
+    using BTypeToUse =
+        std::conditional_t<std::is_same_v<BDataTypeCompute, tf32_t>,
+                           tf32_t,
+                           std::conditional_t<std::is_same_v<BDataTypeBuf, pk_int4_t> ||
+                                                  std::is_same_v<BDataTypeBuf, pk_fp4_t> ||
+                                                  sizeof(BDataTypeBuf) < sizeof(ADataTypeBuf),
+                                              ADataTypeBuf,
+                                              BDataTypeBuf>>;
 
     using ELayout                          = remove_cvref_t<typename Problem::ELayout>;
     using CDElementwise                    = remove_cvref_t<typename Problem::CDElementwise>;
@@ -116,7 +127,13 @@ struct CShuffleEpilogue
     static constexpr index_t isCTransposed = Problem::isCTransposed;
     static constexpr bool FixedVectorSize  = Problem::FixedVectorSize;
     static constexpr bool TiledMMAPermuteN = Problem::TiledMMAPermuteN;
-    static constexpr bool EightWave        = (MWave * NWave == 8);
+
+#if defined(__gfx9__)
+    static constexpr bool EightWave = (MWave * NWave == 8);
+#else
+    static constexpr bool EightWave = false;
+#endif
+
     static constexpr index_t BlockedXDLN_PerWarp =
         EightWave ? kNPerBlock / NWave / NPerXdl : Problem::BlockedXDLN_PerWarp;
     static constexpr bool DoubleSmemBuffer = Problem::DoubleSmemBuffer;
@@ -137,7 +154,7 @@ struct CShuffleEpilogue
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
         // clang-format off
-        return concat('_', "CShuffleEpilogue", 
+        return concat('_', "CShuffleEpilogue",
                       concat('x', MWave, NWave),
                       concat('x', MPerXdl, NPerXdl, KPerXdl),
                       VectorSizeC,
@@ -298,52 +315,15 @@ struct CShuffleEpilogue
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeLdsBlockDescriptor()
     {
-        constexpr auto DataTypeSize      = sizeof(ODataType);
-        constexpr index_t BaseVectorLen  = GetVectorSizeC();
-        // Use compile-time constant for banks since get_n_lds_banks() depends on
-        // __gfx950__ which is only defined during device compilation, not host.
-#if defined(CK_GFX950_SUPPORT)
-        constexpr index_t banks          = 64;  // gfx950 has 64 LDS banks
-#else
-        constexpr index_t banks          = 32;  // gfx942 and others have 32 LDS banks
-#endif
+        constexpr auto DataTypeSize = sizeof(ODataType);
+        constexpr index_t VectorLen = GetVectorSizeC();
+        constexpr index_t banks     = get_n_lds_banks();
 
         constexpr index_t BytesPerBank = 4;
 
         // N is contiguous dimension
         if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::RowMajor>)
         {
-            // For 16x16 XDL with narrow N (e.g., FP8 2x2), reduce VectorLen to enable
-            // XOR swizzle. XOR requires NPerIterationShuffle >= 2^(log2_vec + 2).
-            // With VectorLen=16, this requires N>=64, but FP8 2x2 has N=32.
-            // Reducing to VectorLen=8 requires only N>=32, enabling 2-bit XOR swizzle.
-            //
-            // For gfx950 (64-bank LDS), 2-bit XOR is insufficient - we need 3-bit XOR
-            // which requires VectorLen=4 (col_bit_start=2, need N>=32 for 3 col bits).
-            constexpr index_t log2_base_vec = [] {
-                index_t v = BaseVectorLen, l = 0;
-                while(v > 1)
-                {
-                    v >>= 1;
-                    ++l;
-                }
-                return l;
-            }();
-#if defined(CK_GFX950_SUPPORT)
-            // gfx950: 64-bank LDS needs 3-bit XOR, which requires VectorLen=4
-            constexpr bool needs_vec_reduction_to_4 =
-                (MPerXdl == 16) &&
-                ((1 << (log2_base_vec + 3)) > NPerIterationShuffle) &&  // +3 for 3-bit XOR
-                (BaseVectorLen > 4);
-            constexpr index_t VectorLen = needs_vec_reduction_to_4 ? 4 : BaseVectorLen;
-#else
-            // gfx942: 32-bank LDS works with 2-bit XOR, VectorLen=8 is sufficient
-            constexpr bool needs_vec_reduction =
-                (MPerXdl == 16) &&
-                ((1 << (log2_base_vec + 2)) > NPerIterationShuffle) &&
-                (BaseVectorLen > 8);
-            constexpr index_t VectorLen = needs_vec_reduction ? 8 : BaseVectorLen;
-#endif
             constexpr index_t MLdsLayerRequired =
                 banks * BytesPerBank / NPerIterationShuffle / DataTypeSize;
             constexpr auto MLdsLayer = max(1, MLdsLayerRequired);
@@ -352,23 +332,14 @@ struct CShuffleEpilogue
             static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
                           "LDS row stride must be 4B-aligned for bank-word padding logic");
             // calculate how many elements to pad to avoid bank conflict
-            //
-            // For 16x16 XDL with FP16 output, the MLdsLayer=4 interleaving combined with
-            // VectorLen=8 column grouping causes 2.0 store conflicts (8 threads/bank).
-            // Adding 16 elements (32 bytes = 8 banks) of padding shifts row groups to
-            // different bank regions while preserving the load-friendly interleaved layout.
+#if defined(__gfx950__)
             constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
-            constexpr bool needs_16x16_padding = (MPerXdl == 16);
-#if defined(CK_GFX950_SUPPORT)
             constexpr auto ToWords       = [](index_t elems) constexpr {
                 return (elems * DataTypeSize) / BytesPerBank;
             };
             constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = needs_16x16_padding ? 8 : (((BaseWords % 2) == 0) ? 1 : 0);
+            constexpr index_t PadWords   = ((BaseWords % 2) == 0) ? 1 : 0;
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
-#else
-            constexpr auto PaddingAmount = needs_16x16_padding ? (8 * ElemsPer4B) : 0;
-#endif
 
             constexpr auto lds_block_desc_0 = make_naive_tensor_descriptor(
                 make_tuple(number<MPerIterationShuffle / MLdsLayer>{},
@@ -389,7 +360,7 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}, sequence<2>{}),
                 make_tuple(sequence<0>{}, sequence<1, 2>{}, sequence<3>{}));
 
-            constexpr auto lds_block_desc_2 = transform_tensor_descriptor(
+            constexpr auto lds_block_desc = transform_tensor_descriptor(
                 lds_block_desc_1,
                 make_tuple(make_merge_transform_v3_division_mod(make_tuple(
                                number<MPerIterationShuffle / MLdsLayer>{}, number<MLdsLayer>{})),
@@ -398,84 +369,25 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0, 1>{}, sequence<2, 3>{}),
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
-            // Apply XOR swizzle to avoid LDS bank conflicts
-            // LDS has 32 banks with 4-byte words. Bank = (byte_addr / 4) % 32
-            // For stores, gfx950 (64 physical banks) also behaves like 32 banks.
-            //
-            // Conflict patterns by XDL size:
-            // - 16x16 XDL: rows 0,4,8,12 conflict (stride 4) - differ in bits 2,3
-            // - 32x32 XDL: rows 0,8,16,24 conflict (stride 8) - differ in bits 3,4
-            //
-            // We use RowPeriod = MPerXdl to handle wave layouts where
-            // MPerIterationShuffle > MPerXdl (e.g., 4x1 with MPerIterationShuffle=64)
-            constexpr index_t log2_vec = [] {
-                index_t v = VectorLen, l = 0;
-                while(v > 1) { v >>= 1; ++l; }
-                return l;
-            }();
-            constexpr index_t col_bit_start = log2_vec;
+            return lds_block_desc;
 
-            // Check if we have enough column bits for the XOR transform
-            // gfx950 (64 banks) needs 3-bit XOR, others need 2-bit XOR
-#if defined(CK_GFX950_SUPPORT)
-            constexpr index_t xor_bits = 3;  // 8-way spread for 64-bank LDS
 #else
-            constexpr index_t xor_bits = 2;  // 4-way spread for 32-bank LDS
+            constexpr auto PaddingAmount = 0;
+
+            constexpr auto lds_block_desc = make_naive_tensor_descriptor(
+                make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}),
+                make_tuple(number<NPerIterationShuffle + PaddingAmount>{}, number<1>{}),
+                number<VectorLen>{},
+                number<1>{});
+
+            return lds_block_desc;
 #endif
-            constexpr bool has_enough_col_bits =
-                (1 << (col_bit_start + xor_bits)) <= NPerIterationShuffle;
-
-            if constexpr(MPerXdl == 16 && has_enough_col_bits)
-            {
-#if defined(CK_GFX950_SUPPORT)
-                // 16x16 XDL on gfx950: use 3-bit XOR for 64-bank LDS
-                // Conflicting rows 0,4,8,12,16,20,24,28 differ in bits 2,3,4
-                using RowBits = sequence<2, 3, 4>;
-                using ColBits = sequence<col_bit_start, col_bit_start + 1, col_bit_start + 2>;
-#else
-                // 16x16 XDL on gfx942: use 2-bit XOR for 32-bank LDS
-                // Row bits 2,3 give 4-way spread across 32 banks
-                using RowBits = sequence<2, 3>;
-                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
-#endif
-                constexpr auto lds_block_desc = transform_tensor_descriptor(
-                    lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
-                    make_tuple(sequence<0, 1>{}),
-                    make_tuple(sequence<0, 1>{}));
-
-                return lds_block_desc;
-            }
-            else if constexpr(MPerXdl == 32 && has_enough_col_bits)
-            {
-                // 32x32 XDL: rows 0,8,16,24 conflict - XOR row bits 3,4
-                using RowBits = sequence<3, 4>;
-                using ColBits = sequence<col_bit_start, col_bit_start + 1>;
-
-                constexpr auto lds_block_desc = transform_tensor_descriptor(
-                    lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
-                    make_tuple(sequence<0, 1>{}),
-                    make_tuple(sequence<0, 1>{}));
-
-                return lds_block_desc;
-            }
-            else
-            {
-                // Fallback: no XOR swizzle (either unsupported XDL size or narrow N)
-                return lds_block_desc_2;
-            }
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)
         {
-            // Use base vector size for ColumnMajor (no XOR swizzle reduction needed)
-            constexpr index_t VectorLen = BaseVectorLen;
-
             constexpr index_t NLdsLayerRequired =
-                banks * BytesPerBank / MPerIterationShuffle / DataTypeSize;
+                get_n_lds_banks() * BytesPerBank / MPerIterationShuffle / DataTypeSize;
             constexpr auto NLdsLayer = max(1, NLdsLayerRequired);
 
             constexpr index_t BaseStrideElems = MPerIterationShuffle * NLdsLayer;
@@ -483,7 +395,7 @@ struct CShuffleEpilogue
             static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
                           "LDS row stride must be 4B-aligned for bank-word padding logic");
 
-#if defined(CK_GFX950_SUPPORT)
+#if defined(__gfx950__)
             constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
             constexpr auto ToWords       = [](index_t elems) constexpr {
                 return (elems * DataTypeSize) / BytesPerBank;
@@ -546,7 +458,7 @@ struct CShuffleEpilogue
             }
             else
             {
-#if defined(CK_GFX950_SUPPORT)
+#if defined(__gfx950__)
                 constexpr auto is_950 = true;
 #else
                 constexpr auto is_950 = false;
@@ -554,8 +466,8 @@ struct CShuffleEpilogue
                 constexpr int RakedXDLN_PerWarp = NumNXdlPerWavePerShuffle / BlockedXDLN_PerWarp;
                 // BlockedLayout
                 // this branch is for original a16w4
-                if constexpr(is_950 || is_any_of<ADataType, pk_int4_t, pk_fp4_t>::value ||
-                             is_any_of<BDataType, pk_int4_t, pk_fp4_t>::value)
+                if constexpr(is_950 || is_any_of<ADataTypeBuf, pk_int4_t, pk_fp4_t>::value ||
+                             is_any_of<BDataTypeBuf, pk_int4_t, pk_fp4_t>::value)
                 {
                     if constexpr(EightWave)
                     {
@@ -744,152 +656,8 @@ struct CShuffleEpilogue
     template <typename ODramWindow,
               typename OAccTile,
               typename DsDramWindows,
-              typename ScaleM                         = EmptyScale,
-              typename ScaleN                         = EmptyScale,
-              int EnablePermuateN_                    = TiledMMAPermuteN,
-              std::enable_if_t<EnablePermuateN_, int> = 0>
-    CK_TILE_DEVICE auto operator()(ODramWindow& out_dram_window,
-                                   const OAccTile& o_acc_tile,
-                                   const DsDramWindows& ds_dram_windows,
-                                   void* /* p_smem */,
-                                   const ScaleM& scale_m = {},
-                                   const ScaleN& scale_n = {})
-    {
-        static constexpr int RowsPerLane = CWarpTensor::get_thread_buffer_size();
-
-        static_assert(MPerXdl % RowsPerLane == 0,
-                      "CShuffle (permuteN): MPerXdl must be divisible by per-lane row count.");
-        constexpr int kM0 = MWave;
-        constexpr int kM2 = RowsPerLane;
-        constexpr int kM1 = MPerXdl / kM2;
-
-        constexpr int kN0 = NWave;
-        constexpr int kN1 = NPerXdl;
-        constexpr int kN2 = NRepeat;
-
-        using IntrThreadShuffleEncode =
-            tile_distribution_encoding<sequence<>,
-                                       tuple<sequence<kM0, kM1, kM2>, sequence<kN0, kN1, kN2>>,
-                                       tuple<sequence<1, 2>, sequence<1, 2>>,
-                                       tuple<sequence<0, 0>, sequence<1, 1>>,
-                                       sequence<1, 2>,
-                                       sequence<2, 2>>;
-        constexpr auto dram_tile_distribution =
-            make_static_tile_distribution(IntrThreadShuffleEncode{});
-
-        auto d_dram_windows = generate_tuple(
-            [&](auto idx) {
-                return make_tile_window(ds_dram_windows[idx], dram_tile_distribution);
-            },
-            number<NumDTensor>{});
-
-        constexpr auto c_warp_y_lengths =
-            to_sequence(CWarpDstr{}.get_ys_to_d_descriptor().get_lengths());
-        constexpr auto c_warp_y_index_zeros = uniform_sequence_gen_t<CWarpDstr::NDimY, 0>{};
-
-        auto shuffle_acc  = make_static_distributed_tensor<AccDataType>(dram_tile_distribution);
-        auto c_out_tensor = make_static_distributed_tensor<ODataType>(dram_tile_distribution);
-
-        // Optional scales (must share the same distribution to match per-thread indexing)
-        constexpr bool has_scales =
-            !std::is_same<ScaleM, EmptyScale>::value && !std::is_same<ScaleN, EmptyScale>::value;
-        constexpr bool has_scalar_scales =
-            std::is_same_v<ScaleM, AccDataType> && std::is_same_v<ScaleN, AccDataType>;
-
-        // Tiles to hold row/col scales when present
-        using SMType = typename ScaleDataType<ScaleM>::DataType;
-        using SNType = typename ScaleDataType<ScaleN>::DataType;
-
-        auto sm_tile = make_static_distributed_tensor<SMType>(dram_tile_distribution);
-        auto sn_tile = make_static_distributed_tensor<SNType>(dram_tile_distribution);
-
-        // Build windows only if non-scalar scales are provided
-        auto scale_m_window = [&]() {
-            if constexpr(has_scales && !has_scalar_scales)
-            {
-                return make_tile_window(scale_m, dram_tile_distribution);
-            }
-            else
-            {
-                return EmptyScale{};
-            }
-        }();
-        auto scale_n_window = [&]() {
-            if constexpr(has_scales && !has_scalar_scales)
-            {
-                return make_tile_window(scale_n, dram_tile_distribution);
-            }
-            else
-            {
-                return EmptyScale{};
-            }
-        }();
-
-        static_for<0, MRepeat, 1>{}([&](auto mIter) {
-            // Slice accumulators for this M repeat into the permuted layout
-            shuffle_acc.get_thread_buffer() = o_acc_tile.get_y_sliced_thread_data(
-                merge_sequences(sequence<mIter, 0>{}, c_warp_y_index_zeros),
-                merge_sequences(sequence<1, NRepeat>{}, c_warp_y_lengths));
-
-            // If non-scalar scales provided, load them with identical distribution
-            if constexpr(has_scales && !has_scalar_scales)
-            {
-                sm_tile = load_tile(scale_m_window); // row scales in permuted layout
-                sn_tile = load_tile(scale_n_window); // col scales in permuted layout
-            }
-
-            // Pack 4 “rows per lane” as you already do
-            static_for<0, NRepeat, 1>{}([&](auto n_idx) {
-                // source indices in shuffle_acc: (n_idx * product(Y) + row)
-                const index_t plane = c_warp_y_lengths.product();
-
-                // local lambda to fuse scale (if present) and convert
-                static_for<0, kM2, 1>{}([&](auto m_lane) {
-                    const int src = n_idx * plane + m_lane;   // source row in this N-plane
-                    const int dst = n_idx + m_lane * NRepeat; // permuted N layout in output
-                    AccDataType v = shuffle_acc.get_thread_buffer()[src];
-
-                    if constexpr(has_scalar_scales)
-                    {
-                        v = static_cast<AccDataType>(v * scale_m * scale_n);
-                    }
-                    else if constexpr(has_scales && !has_scalar_scales)
-                    {
-                        const auto sm = static_cast<float>(sm_tile.get_thread_buffer()[dst]);
-                        const auto sn = static_cast<float>(sn_tile.get_thread_buffer()[dst]);
-                        v             = static_cast<AccDataType>(v * sm * sn);
-                    }
-
-                    c_out_tensor.get_thread_buffer()[dst] = type_convert<ODataType>(v);
-                });
-            });
-
-            // store/update
-            if constexpr(decltype(out_dram_window.get_bottom_tensor_view())::DstInMemOp ==
-                         memory_operation_enum::set)
-            {
-                store_tile(out_dram_window, c_out_tensor);
-            }
-            else
-            {
-                update_tile(out_dram_window, c_out_tensor);
-            }
-
-            // advance output (and any D-tensors) by one MPerXdl*MWave chunk
-            move_tile_window(out_dram_window, {number<MPerXdl * MWave>{}, number<0>{}});
-            static_for<0, NumDTensor, 1>{}([&](auto idx) {
-                move_tile_window(d_dram_windows[idx], {number<MPerXdl * MWave>{}, number<0>{}});
-            });
-        });
-    }
-
-    template <typename ODramWindow,
-              typename OAccTile,
-              typename DsDramWindows,
-              typename ScaleM                          = EmptyScale,
-              typename ScaleN                          = EmptyScale,
-              int EnablePermuateN_                     = TiledMMAPermuteN,
-              std::enable_if_t<!EnablePermuateN_, int> = 0>
+              typename ScaleM = EmptyScale,
+              typename ScaleN = EmptyScale>
     CK_TILE_DEVICE auto operator()(ODramWindow& out_dram_window,
                                    const OAccTile& o_acc_tile,
                                    const DsDramWindows& ds_dram_windows,
