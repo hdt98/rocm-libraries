@@ -24,15 +24,14 @@
  *
  *******************************************************************************/
 
-// ALMIOPEN-718: GemmKBlock threshold experiment for WrwV4R4Xdlops determinism.
+// ALMIOPEN-718: Bit-exact determinism tests for implicit GEMM convolution solvers.
+// Runs each solver 10 times with identical input and verifies bit-exact output match.
 //
-// Goal: Prove that the determinism threshold is GemmKBlock > 2 (not > 1).
-// ~33 configs x 3 data types (FP32, FP16, BF16) = ~99 tests.
-// Focus on GKB=1 and GKB=2 boundary with extra configs around anomaly.
-// Each test: 10 seeds x 10 iterations = 100 kernel runs.
-// Non-fatal assertions (EXPECT) so all tests run for full analysis.
+// Each solver gets its own set of configs that are known to be applicable.
+// Configs chosen to satisfy each solver's GEMM dimension divisibility requirements.
 
 #include <cstring>
+#include <cstdlib>
 #include <gtest/gtest.h>
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/solvers.hpp>
@@ -75,148 +74,257 @@ struct DeterministicTestConfig
     }
 };
 
-/// Compute GemmKBlock using the same algorithm as the solver.
-/// Returns GemmKBlock value, or 0 if computation fails.
-static int ComputeGemmKBlock(const DeterministicTestConfig& cfg,
-                             size_t Ho,
-                             size_t Wo,
-                             int GemmMPerBlock,
-                             int GemmNPerBlock,
-                             int GemmKPerBlock,
-                             int GemmKPack,
-                             int maxComputeUnits)
-{
-    const int N      = static_cast<int>(cfg.N);
-    const int K      = static_cast<int>(cfg.K);
-    const int C      = static_cast<int>(cfg.C);
-    const int y      = static_cast<int>(cfg.y);
-    const int x      = static_cast<int>(cfg.x);
-    const int gemm_m = K;
-    const int gemm_n = C * y * x;
-
-    if(GemmMPerBlock == 0 || GemmNPerBlock == 0 || GemmKPack == 0)
-        return 0;
-
-    const int n_ho_wo = N * static_cast<int>(Ho) * static_cast<int>(Wo);
-
-    if(n_ho_wo % (GemmKPack) != 0)
-        return 0;
-    if(gemm_m % GemmMPerBlock != 0 || gemm_n % GemmNPerBlock != 0)
-        return 0;
-
-    const int grid_size_without_split = (gemm_m / GemmMPerBlock) * (gemm_n / GemmNPerBlock);
-    if(grid_size_without_split == 0)
-        return 0;
-
-    const int max_grid_size = 20 * maxComputeUnits;
-    int gemm_k_block        = std::max(max_grid_size / grid_size_without_split, 1);
-    gemm_k_block            = std::min(gemm_k_block, N);
-
-    for(; gemm_k_block > 1; gemm_k_block--)
-    {
-        if(N % gemm_k_block != 0)
-            continue;
-        if(n_ho_wo % (gemm_k_block * GemmKPack) != 0)
-            continue;
-        const int gemm_k = n_ho_wo / (gemm_k_block * GemmKPack);
-        if(gemm_k % GemmKPerBlock != 0)
-            continue;
-        break;
-    }
-    return std::max(1, gemm_k_block);
-}
-
-// 33 WrwV4R4Xdlops configs focused on GKB=1/2 boundary.
+// ~100 test configs total. Each solver gets 8-20 configs to systematically test
+// determinism across different parameters (kernel size, stride, dilation, batch, channels).
+// BwdV1R1 gets extra configs to map the AtomicAdd determinism boundary.
+//
 // Config format: {N, C, K, H, W, y, x, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w}
-std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
+
+// FwdV4R5Xdlops: xdlops forward (~20 configs)
+std::vector<DeterministicTestConfig> GetConfigFwdV4R5Xdlops()
 {
     return {
-        // === GKB=1 (deterministic, no AtomicAdd) ===
-        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}, // [0]
-        {1, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [1]
-        {1, 64, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},  // [2]
-        {1, 128, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [3]
-        {1, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1}, // [4]
-        {4, 128, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [5]
-        {2, 256, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [6]
-        {2, 128, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1}, // [7]
-
-        // === GKB=2 (deterministic, FP commutativity) ===
-        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // [8]  verified
-        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [9]  verified
-        {2, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [10] verified
-        {16, 64, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // [11] verified
-        {8, 32, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [12] verified
-        {4, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},  // [13]
-        {2, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // [14]
-        {2, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // [15]
-
-        // === Anomaly region: N=32 C=32 K=64 and variants ===
-        // Test 40 FP16 anomaly was here: GKB computed as 2 but FAIL
-        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [16] anomaly
-        {32, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [17] anomaly variant
-        {32, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [18] anomaly variant
-        {32, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [19] anomaly variant
-        {16, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [20] anomaly variant
-        {16, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [21] anomaly variant
-        {32, 32, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [22] anomaly variant
-        {16, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // [23] anomaly variant
-
-        // === GKB=3 boundary (should FAIL) ===
-        {3, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [24]
-        {3, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [25]
-        {6, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [26]
-        {3, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [27]
-
-        // === GKB=4+ (should FAIL) ===
-        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},  // [28]
-        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [29]
-        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},  // [30]
-        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // [31]
-        {32, 32, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // [32]
+        // Original + varied batch/channel sizes
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1}, // Jira original
+        {64, 16, 64, 32, 32, 3, 3, 1, 1, 1, 1, 1, 1},  // smaller batch
+        {32, 32, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1}, // larger C/K
+        {16, 64, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},  // small spatial
+        {8, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},   // small batch
+        // Stride and dilation variations
+        {32, 16, 64, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},  // stride 2
+        {16, 32, 64, 28, 28, 3, 3, 0, 0, 1, 1, 2, 2},  // dilation 2
+        {64, 16, 128, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1}, // no padding
+        // 5x5 kernel
+        {16, 16, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1}, // 5x5 kernel
+        {32, 16, 64, 28, 28, 5, 5, 2, 2, 1, 1, 1, 1}, // 5x5 larger
+        // Additional configs
+        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 32, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 64, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
+        {8, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {2, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 16, 128, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 64, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 16, 64, 32, 32, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 32, 128, 14, 14, 3, 3, 1, 1, 2, 2, 1, 1},
     };
 }
 
-template <typename T, typename SolverType>
-class GPU_WrwXdlDeterminism : public ::testing::TestWithParam<DeterministicTestConfig>
+// FwdV4R4Xdlops: xdlops forward (~15 configs)
+std::vector<DeterministicTestConfig> GetConfigFwdV4R4Xdlops()
+{
+    return {
+        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1},
+        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1},
+        {64, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {32, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 64, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 128, 28, 28, 1, 1, 0, 0, 2, 2, 1, 1},
+        {32, 16, 64, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
+        // Additional
+        {8, 128, 128, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 32, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 64, 192, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {32, 32, 128, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
+        {64, 16, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
+    };
+}
+
+// FwdV4R1: non-xdlops forward (~15 configs)
+std::vector<DeterministicTestConfig> GetConfigFwdV4R1()
+{
+    return {
+        {256, 32, 128, 27, 27, 1, 1, 0, 0, 1, 1, 1, 1},
+        {128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1},
+        {64, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {32, 32, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {128, 16, 64, 54, 54, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 128, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
+        {128, 64, 64, 28, 28, 1, 1, 0, 0, 2, 2, 1, 1},
+        {32, 16, 64, 28, 28, 5, 5, 2, 2, 1, 1, 1, 1},
+        // Additional
+        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 32, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 16, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 64, 64, 28, 28, 3, 3, 0, 0, 1, 1, 1, 1},
+    };
+}
+
+// BwdV1R1: CRITICAL — tests the AtomicAdd boundary (~30 configs)
+// Rule: deterministic when stride >= dilation*(kernel_size-1)+1
+std::vector<DeterministicTestConfig> GetConfigBwdV1R1()
+{
+    return {
+        // === 1x1 kernel: always deterministic ===
+        {32, 128, 12, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},
+        {64, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 64, 32, 32, 32, 1, 1, 0, 0, 1, 1, 1, 1},
+        {32, 32, 64, 16, 16, 1, 1, 0, 0, 2, 2, 1, 1},
+        {4, 256, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {4, 128, 128, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {128, 32, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 64, 32, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},
+        // === 3x3 stride=1: NON-DET (1<3) ===
+        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},
+        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {1, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 32, 8, 8, 3, 3, 0, 0, 1, 1, 1, 1},
+        {2, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        // === 3x3 stride=2: NON-DET (2<3) ===
+        {16, 64, 32, 16, 16, 3, 3, 1, 1, 2, 2, 1, 1},
+        {8, 32, 64, 16, 16, 3, 3, 1, 1, 2, 2, 1, 1},
+        // === 3x3 stride=3: DET (3>=3) ===
+        {16, 64, 32, 16, 16, 3, 3, 0, 0, 3, 3, 1, 1},
+        // === 5x5 stride=1: NON-DET (1<5) ===
+        {16, 32, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1},
+        {8, 64, 32, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},
+        // === 5x5 stride=5: DET (5>=5) ===
+        {8, 32, 64, 16, 16, 5, 5, 0, 0, 5, 5, 1, 1},
+        // === dilation=2 ===
+        {16, 64, 32, 16, 16, 3, 3, 0, 0, 1, 1, 2, 2},
+        {8, 64, 32, 28, 28, 3, 3, 0, 0, 5, 5, 2, 2},
+        // === 7x7 kernel ===
+        {4, 32, 64, 16, 16, 7, 7, 3, 3, 1, 1, 1, 1},
+    };
+}
+
+// BwdV4R1: disabled by default, enabled via env var (~15 configs)
+std::vector<DeterministicTestConfig> GetConfigBwdV4R1()
+{
+    return {
+        {16, 64, 64, 16, 16, 3, 3, 0, 0, 1, 1, 1, 1},
+        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 128, 64, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {16, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
+        {32, 32, 64, 16, 16, 1, 1, 0, 0, 2, 2, 1, 1},
+        {8, 32, 64, 16, 16, 5, 5, 2, 2, 1, 1, 1, 1},
+        {16, 64, 32, 14, 14, 3, 3, 0, 0, 1, 1, 2, 2},
+        // Additional
+        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {128, 32, 32, 8, 8, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 64, 64, 14, 14, 3, 3, 0, 0, 1, 1, 1, 1},
+        {16, 32, 128, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {4, 128, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+    };
+}
+
+// WrwV4R4: non-xdlops weight gradient (~15 configs)
+std::vector<DeterministicTestConfig> GetConfigWrwV4R4()
+{
+    return {
+        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 64, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {4, 128, 128, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 32, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 128, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {4, 256, 64, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},
+        {4, 64, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},
+        // Additional
+        {2, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {64, 32, 32, 8, 8, 3, 3, 1, 1, 1, 1, 1, 1},
+        {1, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},
+        {8, 32, 32, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},
+    };
+}
+
+// WrwV4R4Xdlops: xdlops weight gradient (~30 configs)
+// FOCUS: probe GemmKBlock > 1 boundary (gemm_k = N*Ho*Wo)
+std::vector<DeterministicTestConfig> GetConfigWrwV4R4Xdlops()
+{
+    return {
+        // === Original configs ===
+        {1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1},  // Jira original PASS
+        {4, 128, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // PASS
+        {8, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1},   // FAIL (GemmKBlock>1)
+        {8, 128, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},  // PASS
+        {4, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},   // FAIL
+        {16, 32, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // FAIL
+        {2, 256, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // PASS
+        {1, 64, 64, 28, 28, 3, 3, 1, 1, 1, 1, 1, 1},   // PASS
+        {4, 64, 32, 28, 28, 3, 3, 1, 1, 2, 2, 1, 1},   // PASS
+        {2, 128, 64, 14, 14, 5, 5, 2, 2, 1, 1, 1, 1},  // PASS
+        // === Probing GemmKBlock boundary: vary N and spatial size ===
+        // Small N*Ho*Wo → likely GemmKBlock=1 → deterministic
+        {1, 128, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // N*Ho*Wo=196
+        {1, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // 196
+        {2, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // 392
+        {1, 128, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // 256
+        // Medium N*Ho*Wo → GemmKBlock boundary
+        {4, 64, 32, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // 784
+        {2, 64, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // 512
+        {4, 32, 64, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // 1024
+        {8, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // 1568
+        // Large N*Ho*Wo → likely GemmKBlock>1 → non-deterministic
+        {16, 64, 32, 16, 16, 1, 1, 0, 0, 1, 1, 1, 1}, // 4096
+        {32, 32, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1}, // 6272
+        {8, 64, 64, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},  // 1568
+        // === 3x3 with varied N ===
+        {1, 128, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1}, // small N
+        {2, 64, 32, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 32, 64, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {16, 64, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {32, 32, 32, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        // === Different K values ===
+        {4, 128, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {4, 64, 128, 14, 14, 3, 3, 1, 1, 1, 1, 1, 1},
+        {8, 32, 128, 14, 14, 1, 1, 0, 0, 1, 1, 1, 1},
+        {1, 64, 128, 16, 16, 3, 3, 1, 1, 1, 1, 1, 1},
+    };
+}
+
+template <typename T, Direction CONV_DIR, typename SolverType>
+class GPU_ConvDeterministicImplicitGemm : public ::testing::TestWithParam<DeterministicTestConfig>
 {
 protected:
-    static constexpr int NUM_ITERATIONS  = 10;
-    static constexpr int NUM_INPUT_SEEDS = 10;
+    static constexpr int NUM_ITERATIONS = 10;
 
     void SetUp() override { prng::reset_seed(); }
 
     void RunTest()
     {
         const auto& config = GetParam();
-        std::cout << "PRNG seed: " << 12345678 << std::endl;
         std::cout << "Testing configuration: " << config << std::endl;
-        std::cout << "Data type: "
-                  << (sizeof(T) == 4 ? "FP32"
-                      : sizeof(T) == 2
-                          ? (std::is_same<T, half_float::half>::value ? "FP16" : "BF16")
-                          : "???")
-                  << std::endl;
 
         auto& handle = get_handle();
 
+        // Create tensors (NCHW layout, non-grouped)
         std::vector<size_t> input_dims  = {config.N, config.C, config.H, config.W};
         std::vector<size_t> weight_dims = {config.K, config.C, config.y, config.x};
 
         tensor<T> input{miopenTensorNCHW, input_dims};
         tensor<T> weights{miopenTensorNCHW, weight_dims};
 
+        // Create convolution descriptor with deterministic mode enabled
         auto conv_desc = miopen::ConvolutionDescriptor{
-            2,
+            2, // num spatial dims
             miopenConvolution,
             miopenPaddingDefault,
             {static_cast<int>(config.pad_h), static_cast<int>(config.pad_w)},
             {static_cast<int>(config.stride_h), static_cast<int>(config.stride_w)},
             {static_cast<int>(config.dilation_h), static_cast<int>(config.dilation_w)},
-            {0, 0},
-            1,
-            1.0};
+            {0, 0}, // adj
+            1,      // group_count
+            1.0};   // lowp_quant
 
+        // Enable deterministic mode
         conv_desc.attribute.Set(MIOPEN_CONVOLUTION_ATTRIB_DETERMINISTIC, 1);
         ASSERT_TRUE(conv_desc.attribute.deterministic.Get() == 1);
 
@@ -224,26 +332,54 @@ protected:
             conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<T>{});
         tensor<T> output{miopenTensorNCHW, output_desc.GetLengths()};
 
-        const auto Ho = output_desc.GetLengths()[2];
-        const auto Wo = output_desc.GetLengths()[3];
-        std::cout << "Output dims: Ho=" << Ho << " Wo=" << Wo << " N*Ho*Wo=" << config.N * Ho * Wo
-                  << std::endl;
-
-        input.generate(
-            [](auto...) { return prng::gen_A_to_B(static_cast<T>(-0.1), static_cast<T>(0.1)); });
-        output.generate(
-            [](auto...) { return prng::gen_A_to_B(static_cast<T>(-0.01), static_cast<T>(0.1)); });
-        std::fill(weights.begin(), weights.end(), T{0});
+        // Initialize tensors
+        if constexpr(CONV_DIR == Direction::Forward)
+        {
+            input.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-3.0), static_cast<T>(3.0));
+            });
+            weights.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-3.0), static_cast<T>(3.0));
+            });
+            std::fill(output.begin(), output.end(), T(0));
+        }
+        else if constexpr(CONV_DIR == Direction::BackwardData)
+        {
+            output.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-3.0), static_cast<T>(3.0));
+            });
+            weights.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-3.0), static_cast<T>(3.0));
+            });
+            std::fill(input.begin(), input.end(), T(0));
+        }
+        else // BackwardWeights
+        {
+            input.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-0.1), static_cast<T>(0.1));
+            });
+            output.generate([](auto...) {
+                return prng::gen_A_to_B(static_cast<T>(-0.01), static_cast<T>(0.1));
+            });
+            std::fill(weights.begin(), weights.end(), T{0});
+        }
 
         auto in_dev  = handle.Write(input.data);
         auto wei_dev = handle.Write(weights.data);
         auto out_dev = handle.Write(output.data);
 
+        // Create solver and problem
         SolverType solv{};
         auto ctx = miopen::ExecutionContext{&handle};
 
-        auto problem = miopen::conv::ProblemDescription{
-            output.desc, weights.desc, input.desc, conv_desc, Direction::BackwardWeights};
+        miopen::conv::ProblemDescription problem = [&]() {
+            if constexpr(CONV_DIR == Direction::Forward)
+                return miopen::conv::ProblemDescription{
+                    input.desc, weights.desc, output.desc, conv_desc, CONV_DIR};
+            else
+                return miopen::conv::ProblemDescription{
+                    output.desc, weights.desc, input.desc, conv_desc, CONV_DIR};
+        }();
 
         problem.SetupFloats(ctx);
 
@@ -267,67 +403,62 @@ protected:
 
         std::cout << "Performance config: " << perf_config << std::endl;
 
-        // Parse perf config to compute GemmKBlock
-        {
-            std::stringstream ss;
-            ss << perf_config;
-            std::string pc_str = ss.str();
-            std::vector<int> pc_vals;
-            std::stringstream ss2(pc_str);
-            std::string token;
-            while(std::getline(ss2, token, ','))
-            {
-                try
-                {
-                    pc_vals.push_back(std::stoi(token));
-                }
-                catch(...)
-                {
-                    pc_vals.push_back(0);
-                }
-            }
-            if(pc_vals.size() >= 6)
-            {
-                int gkb = ComputeGemmKBlock(config,
-                                            Ho,
-                                            Wo,
-                                            pc_vals[0],
-                                            pc_vals[1],
-                                            pc_vals[2],
-                                            pc_vals[5],
-                                            static_cast<int>(handle.GetMaxComputeUnits()));
-                std::cout << "GemmKBlock=" << gkb << std::endl;
-            }
-        }
-
         const auto invoker = handle.PrepareInvoker(*sol.invoker_factory, sol.construction_params);
 
-        int seeds_passed = 0;
-        int seeds_failed = 0;
+        // Store results from each iteration
+        std::vector<std::vector<T>> results;
+        results.reserve(NUM_ITERATIONS);
 
-        for(int seed = 0; seed < NUM_INPUT_SEEDS; ++seed)
+        for(int i = 0; i < NUM_ITERATIONS; ++i)
         {
-            prng::reset_seed(seed * 17 + 42);
-
-            input.generate([](auto...) {
-                return prng::gen_A_to_B(static_cast<T>(-0.1), static_cast<T>(0.1));
-            });
-            output.generate([](auto...) {
-                return prng::gen_A_to_B(static_cast<T>(-0.01), static_cast<T>(0.1));
-            });
-
-            in_dev  = handle.Write(input.data);
-            wei_dev = handle.Write(weights.data);
-            out_dev = handle.Write(output.data);
-
-            std::vector<std::vector<T>> results;
-            results.reserve(NUM_ITERATIONS);
-
-            for(int i = 0; i < NUM_ITERATIONS; ++i)
+            // Reset result buffer before each run
+            if constexpr(CONV_DIR == Direction::Forward)
+            {
+                std::fill(output.begin(), output.end(), T(0));
+                out_dev = handle.Write(output.data);
+            }
+            else if constexpr(CONV_DIR == Direction::BackwardData)
+            {
+                std::fill(input.begin(), input.end(), T(0));
+                in_dev = handle.Write(input.data);
+            }
+            else
             {
                 std::fill(weights.begin(), weights.end(), T(0));
                 wei_dev = handle.Write(weights.data);
+            }
 
+            // Execute kernel
+            if constexpr(CONV_DIR == Direction::Forward)
+            {
+                auto invoke_params =
+                    miopen::conv::DataInvokeParams{miopen::ConvFwdTensors{input.desc,
+                                                                          in_dev.get(),
+                                                                          weights.desc,
+                                                                          wei_dev.get(),
+                                                                          output.desc,
+                                                                          out_dev.get()},
+                                                   wspace.ptr(),
+                                                   wspace.size(),
+                                                   false};
+                (invoker)(handle, invoke_params);
+            }
+            else if constexpr(CONV_DIR == Direction::BackwardData)
+            {
+                auto invoke_params =
+                    miopen::conv::DataInvokeParams{miopen::ConvDataTensors{output.desc,
+                                                                           out_dev.get(),
+                                                                           weights.desc,
+                                                                           wei_dev.get(),
+                                                                           input.desc,
+                                                                           in_dev.get()},
+                                                   wspace.ptr(),
+                                                   wspace.size(),
+                                                   false};
+                (invoker)(handle, invoke_params);
+            }
+            else // BackwardWeights
+            {
                 auto invoke_params =
                     miopen::conv::WrWInvokeParams{miopen::ConvWrwTensors{output.desc,
                                                                          out_dev.get(),
@@ -339,84 +470,157 @@ protected:
                                                   wspace.size(),
                                                   false};
                 (invoker)(handle, invoke_params);
-                handle.Finish();
-
-                handle.ReadToVec(wei_dev, weights.data);
-                results.push_back(weights.data);
             }
 
-            const auto& reference = results[0];
-            bool match            = true;
-            size_t mismatch_count = 0;
-            for(int i = 1; i < NUM_ITERATIONS; ++i)
-            {
-                const auto& current = results[i];
-                if(reference.size() != current.size())
-                {
-                    match = false;
-                    break;
-                }
-                for(size_t j = 0; j < reference.size(); ++j)
-                {
-                    if(std::memcmp(&reference[j], &current[j], sizeof(T)) != 0)
-                    {
-                        if(match)
-                        {
-                            std::cout << "  seed " << seed << ": MISMATCH at iteration " << i
-                                      << ", element " << j << "/" << reference.size()
-                                      << ": ref=" << reference[j] << " cur=" << current[j]
-                                      << std::endl;
-                        }
-                        match = false;
-                        mismatch_count++;
-                    }
-                }
-            }
+            handle.Finish();
 
-            if(match)
+            // Read result
+            if constexpr(CONV_DIR == Direction::Forward)
             {
-                std::cout << "  seed " << seed << ": PASS (all " << NUM_ITERATIONS
-                          << " iterations bit-exact)" << std::endl;
-                seeds_passed++;
+                handle.ReadToVec(out_dev, output.data);
+                results.push_back(output.data);
+            }
+            else if constexpr(CONV_DIR == Direction::BackwardData)
+            {
+                handle.ReadToVec(in_dev, input.data);
+                results.push_back(input.data);
             }
             else
             {
-                std::cout << "  seed " << seed << ": FAIL (" << mismatch_count
-                          << " mismatches across iterations)" << std::endl;
-                seeds_failed++;
+                handle.ReadToVec(wei_dev, weights.data);
+                results.push_back(weights.data);
             }
         }
 
-        std::cout << "Summary: " << seeds_passed << " seeds PASS, " << seeds_failed
-                  << " seeds FAIL out of " << NUM_INPUT_SEEDS << std::endl;
+        // Verify bit-exact determinism: compare all iterations against first run
+        const auto& reference = results[0];
+        for(int i = 1; i < NUM_ITERATIONS; ++i)
+        {
+            const auto& current = results[i];
+            ASSERT_EQ(reference.size(), current.size());
 
-        EXPECT_EQ(seeds_failed, 0) << seeds_failed << " out of " << NUM_INPUT_SEEDS
-                                   << " seeds had non-deterministic results";
+            bool match            = true;
+            size_t first_mismatch = 0;
+            for(size_t j = 0; j < reference.size(); ++j)
+            {
+                if(std::memcmp(&reference[j], &current[j], sizeof(T)) != 0)
+                {
+                    match          = false;
+                    first_mismatch = j;
+                    break;
+                }
+            }
+
+            ASSERT_TRUE(match) << "Bit-exact mismatch at iteration " << i << ", element "
+                               << first_mismatch << ": reference = " << reference[first_mismatch]
+                               << ", current = " << current[first_mismatch];
+        }
+
+        std::cout << "✓ All " << NUM_ITERATIONS << " iterations produced bit-exact results"
+                  << std::endl;
     }
+};
+
+// BwdV4R1 needs special setup: it's disabled by default via WORKAROUND_SWDEV_229277_227616_229195
+template <typename T, typename SolverType>
+class GPU_ConvDeterministicBwdV4R1
+    : public GPU_ConvDeterministicImplicitGemm<T, Direction::BackwardData, SolverType>
+{
+protected:
+    void SetUp() override
+    {
+        prng::reset_seed();
+        // Enable the solver which is disabled by default due to a workaround
+        setenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1", "1", 1);
+    }
+    void TearDown() override { unsetenv("MIOPEN_DEBUG_CONV_IMPLICIT_GEMM_HIP_BWD_V4R1"); }
 };
 
 } // namespace
 
-// FP32
-using GPU_WrwXdl_FP32 =
-    GPU_WrwXdlDeterminism<float, miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
-TEST_P(GPU_WrwXdl_FP32, DeterministicTest) { this->RunTest(); };
-INSTANTIATE_TEST_SUITE_P(GKBThreshold,
-                         GPU_WrwXdl_FP32,
-                         testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
+// ============================================================================
+// Forward solvers
+// ============================================================================
 
-// FP16
-using GPU_WrwXdl_FP16 =
-    GPU_WrwXdlDeterminism<half_float::half, miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
-TEST_P(GPU_WrwXdl_FP16, DeterministicTest) { this->RunTest(); };
-INSTANTIATE_TEST_SUITE_P(GKBThreshold,
-                         GPU_WrwXdl_FP16,
-                         testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
+using GPU_Deterministic_FwdV4R5Xdlops_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::Forward,
+                                      miopen::solver::conv::ConvHipImplicitGemmForwardV4R5Xdlops>;
+using GPU_Deterministic_FwdV4R5Xdlops_BFP16 =
+    GPU_ConvDeterministicImplicitGemm<bfloat16,
+                                      Direction::Forward,
+                                      miopen::solver::conv::ConvHipImplicitGemmForwardV4R5Xdlops>;
+using GPU_Deterministic_FwdV4R4Xdlops_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::Forward,
+                                      miopen::solver::conv::ConvHipImplicitGemmForwardV4R4Xdlops>;
+using GPU_Deterministic_FwdV4R1_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::Forward,
+                                      miopen::solver::conv::ConvHipImplicitGemmV4R1Fwd>;
 
-// BF16
-using GPU_WrwXdl_BF16 =
-    GPU_WrwXdlDeterminism<bfloat16, miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
-TEST_P(GPU_WrwXdl_BF16, DeterministicTest) { this->RunTest(); };
-INSTANTIATE_TEST_SUITE_P(GKBThreshold,
-                         GPU_WrwXdl_BF16,
+// ============================================================================
+// Backward Data solvers
+// ============================================================================
+
+using GPU_Deterministic_BwdV1R1_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::BackwardData,
+                                      miopen::solver::conv::ConvHipImplicitGemmBwdDataV1R1>;
+using GPU_Deterministic_BwdV4R1_FP32 =
+    GPU_ConvDeterministicBwdV4R1<float, miopen::solver::conv::ConvHipImplicitGemmBwdDataV4R1>;
+
+// ============================================================================
+// Weight gradient (WrW) solvers
+// ============================================================================
+
+using GPU_Deterministic_WrwV4R4_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::BackwardWeights,
+                                      miopen::solver::conv::ConvHipImplicitGemmV4R4WrW>;
+using GPU_Deterministic_WrwV4R4Xdlops_FP32 =
+    GPU_ConvDeterministicImplicitGemm<float,
+                                      Direction::BackwardWeights,
+                                      miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
+
+// ============================================================================
+// Test definitions
+// ============================================================================
+
+TEST_P(GPU_Deterministic_FwdV4R5Xdlops_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_FwdV4R5Xdlops_BFP16, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_FwdV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_FwdV4R1_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_BwdV1R1_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_BwdV4R1_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_WrwV4R4_FP32, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_WrwV4R4Xdlops_FP32, DeterministicTest) { this->RunTest(); };
+
+// ============================================================================
+// Test instantiations — each solver gets its own applicable configs
+// ============================================================================
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_FwdV4R5Xdlops_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_FwdV4R5Xdlops_BFP16,
+                         testing::ValuesIn(GetConfigFwdV4R5Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_FwdV4R4Xdlops_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R4Xdlops()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_FwdV4R1_FP32,
+                         testing::ValuesIn(GetConfigFwdV4R1()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_BwdV1R1_FP32,
+                         testing::ValuesIn(GetConfigBwdV1R1()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_BwdV4R1_FP32,
+                         testing::ValuesIn(GetConfigBwdV4R1()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_WrwV4R4_FP32,
+                         testing::ValuesIn(GetConfigWrwV4R4()));
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_Deterministic_WrwV4R4Xdlops_FP32,
                          testing::ValuesIn(GetConfigWrwV4R4Xdlops()));
