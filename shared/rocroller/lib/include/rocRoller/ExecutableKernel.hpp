@@ -26,7 +26,7 @@ namespace rocRoller
     class ExecutableKernel
     {
     public:
-        explicit ExecutableKernel(ContextPtr context);
+        explicit ExecutableKernel(GPUArchitectureTarget target);
         ~ExecutableKernel() = default;
 
         /**
@@ -114,7 +114,7 @@ namespace rocRoller
         bool                     m_kernelLoaded;
         std::shared_ptr<HIPData> m_hipData;
 
-        ContextPtr m_context;
+        GPUArchitectureTarget m_target;
 
         /**
          * @brief Execute a kernel on a GPU with optional timer and stream

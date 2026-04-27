@@ -43,10 +43,10 @@ namespace rocRoller
         }
     };
 
-    ExecutableKernel::ExecutableKernel(ContextPtr context)
+    ExecutableKernel::ExecutableKernel(GPUArchitectureTarget target)
         : m_kernelLoaded(false)
         , m_hipData(std::make_shared<HIPData>())
-        , m_context(context)
+        , m_target(target)
     {
     }
 
@@ -157,12 +157,11 @@ namespace rocRoller
                                    &argsSize,
                                    HIP_LAUNCH_PARAM_END};
 
-        const auto& arch = m_context->targetArchitecture();
-        int         idx = -1, currDeviceAsicRevisionId = -1;
+        int idx = -1, currDeviceAsicRevisionId = -1;
         HIP_CHECK(hipGetDevice(&idx));
         HIP_CHECK(
             hipDeviceGetAttribute(&currDeviceAsicRevisionId, hipDeviceAttributeAsicRevision, idx));
-        if(arch.target().gfx == GPUArchitectureGFX::GFX1250)
+        if(m_target.gfx == GPUArchitectureGFX::GFX1250)
         {
             if(currDeviceAsicRevisionId == 2)
             {
@@ -172,9 +171,9 @@ namespace rocRoller
                           newRevId);
                 currDeviceAsicRevisionId = newRevId;
             }
-            AssertFatal(arch.target().asicRevisionId == currDeviceAsicRevisionId,
+            AssertFatal(m_target.asicRevisionId == currDeviceAsicRevisionId,
                         "The kernel and current device must have the same target revision id.",
-                        ShowValue(arch.target().asicRevisionId),
+                        ShowValue(m_target.asicRevisionId),
                         ShowValue(currDeviceAsicRevisionId));
         }
 
