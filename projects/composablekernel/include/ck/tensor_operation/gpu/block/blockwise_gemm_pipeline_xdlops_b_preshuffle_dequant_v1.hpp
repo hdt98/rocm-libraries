@@ -329,10 +329,10 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v1<BlockGemmPipelineSch
                                                               decltype(a_thread_buf),
                                                               decltype(a_thread_desc_),
                                                               ComputeDataType,
-                                                              decltype(m0),
+                                                              Number<m0>,
                                                               Number<0>,
                                                               Number<0>,
-                                                              decltype(k0),
+                                                              Number<k0>,
                                                               Number<0>,
                                                               index_expression::Ik>{a_thread_vec,
                                                                                     a_thread_buf};
@@ -341,9 +341,9 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v1<BlockGemmPipelineSch
                                                      decltype(b_thread_dequant_bufs[mfma_reg_buf]),
                                                      decltype(b_thread_desc_),
                                                      ComputeDataType,
-                                                     decltype(n0),
+                                                     Number<n0>,
                                                      Number<0>,
-                                                     decltype(k0),
+                                                     Number<k0>,
                                                      index_expression::Ik>{
                                 b_thread_vec, b_thread_dequant_bufs[mfma_reg_buf]};
 
@@ -413,19 +413,19 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v1<BlockGemmPipelineSch
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_dequant_bufs[I0]),
                                                       decltype(b_thread_desc_),
                                                       ComputeDataType,
-                                                      decltype(n0),
+                                                      Number<n0>,
                                                       Number<0>,
-                                                      decltype(k0),
+                                                      Number<k0>,
                                                       index_expression::Ik>{
                     b_thread_vec, b_thread_dequant_bufs[I0]};
 
@@ -475,19 +475,19 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v1<BlockGemmPipelineSch
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_dequant_bufs[I1]),
                                                       decltype(b_thread_desc_),
                                                       ComputeDataType,
-                                                      decltype(n0),
+                                                      Number<n0>,
                                                       Number<0>,
-                                                      decltype(k0),
+                                                      Number<k0>,
                                                       index_expression::Ik>{
                     b_thread_vec, b_thread_dequant_bufs[I1]};
 
@@ -520,19 +520,19 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_bdequant_v1<BlockGemmPipelineSch
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_dequant_bufs[I0]),
                                                       decltype(b_thread_desc_),
                                                       ComputeDataType,
-                                                      decltype(n0),
+                                                      Number<n0>,
                                                       Number<0>,
-                                                      decltype(k0),
+                                                      Number<k0>,
                                                       index_expression::Ik>{
                     b_thread_vec, b_thread_dequant_bufs[I0]};
 

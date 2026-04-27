@@ -328,10 +328,10 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                                               decltype(a_thread_buf),
                                                               decltype(a_thread_desc_),
                                                               ComputeDataType,
-                                                              decltype(m0),
+                                                              Number<m0>,
                                                               Number<0>,
                                                               Number<0>,
-                                                              decltype(k0),
+                                                              Number<k0>,
                                                               Number<0>,
                                                               index_expression::Ik>{a_thread_vec,
                                                                                     a_thread_buf};
@@ -339,9 +339,9 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                                               decltype(b_thread_bufs[mfma_reg_buf]),
                                                               decltype(b_thread_desc_),
                                                               ComputeDataType,
-                                                              decltype(n0),
+                                                              Number<n0>,
                                                               Number<0>,
-                                                              decltype(k0),
+                                                              Number<k0>,
                                                               index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[mfma_reg_buf]};
 
@@ -407,10 +407,10 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB =
@@ -418,9 +418,9 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(b_thread_bufs[I0]),
                                              decltype(b_thread_desc_),
                                              ComputeDataType,
-                                             decltype(n0),
+                                             Number<n0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              index_expression::Ik>{b_thread_vec, b_thread_bufs[I0]};
 
                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -464,10 +464,10 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB =
@@ -475,9 +475,9 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(b_thread_bufs[I1]),
                                              decltype(b_thread_desc_),
                                              ComputeDataType,
-                                             decltype(n0),
+                                             Number<n0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              index_expression::Ik>{b_thread_vec, b_thread_bufs[I1]};
 
                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));
@@ -509,10 +509,10 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(a_thread_buf),
                                              decltype(a_thread_desc_),
                                              ComputeDataType,
-                                             decltype(m0),
+                                             Number<m0>,
                                              Number<0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              Number<0>,
                                              index_expression::Ik>{a_thread_vec, a_thread_buf};
                 auto loadB =
@@ -520,9 +520,9 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v1<BlockGemmPipelineScheduler::I
                                              decltype(b_thread_bufs[I0]),
                                              decltype(b_thread_desc_),
                                              ComputeDataType,
-                                             decltype(n0),
+                                             Number<n0>,
                                              Number<0>,
-                                             decltype(k0),
+                                             Number<k0>,
                                              index_expression::Ik>{b_thread_vec, b_thread_bufs[I0]};
 
                 static_for<0, KPack, 1>{}(MakeFunctorInvoker(loadA, loadB));

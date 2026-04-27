@@ -668,8 +668,8 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                                                       ComputeTypeA,
                                                                       Number<0>,
                                                                       Number<0>,
-                                                                      decltype(im_minor),
-                                                                      decltype(k0),
+                                                                      Number<im_minor>,
+                                                                      Number<k0>,
                                                                       index_expression::Ik>{
                                     a_thread_vec, a_thread_buf};
                                 auto loadB = thread_buf_to_vec_loader<
@@ -677,10 +677,10 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                     decltype(b_thread_bufs[scale_comp_buf]),
                                     decltype(b_thread_desc_),
                                     ComputeTypeB,
-                                    decltype(in_major),
+                                    Number<in_major>,
                                     Number<0>,
-                                    decltype(in_minor),
-                                    decltype(k0),
+                                    Number<in_minor>,
+                                    Number<k0>,
                                     index_expression::Ik>{b_thread_vec,
                                                           b_thread_bufs[scale_comp_buf]};
 
@@ -851,18 +851,18 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                                               ComputeTypeA,
                                                               Number<0>,
                                                               Number<0>,
-                                                              decltype(im_minor),
-                                                              decltype(k0),
+                                                              Number<im_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{a_thread_vec,
                                                                                     a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I0]),
                                                               decltype(b_thread_desc_),
                                                               ComputeTypeB,
-                                                              decltype(in_major),
+                                                              Number<in_major>,
                                                               Number<0>,
-                                                              decltype(in_minor),
-                                                              decltype(k0),
+                                                              Number<in_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I0]};
 
@@ -969,18 +969,18 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                                               ComputeTypeA,
                                                               Number<0>,
                                                               Number<0>,
-                                                              decltype(im_minor),
-                                                              decltype(k0),
+                                                              Number<im_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{a_thread_vec,
                                                                                     a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I1]),
                                                               decltype(b_thread_desc_),
                                                               ComputeTypeB,
-                                                              decltype(in_major),
+                                                              Number<in_major>,
                                                               Number<0>,
-                                                              decltype(in_minor),
-                                                              decltype(k0),
+                                                              Number<in_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I1]};
 
@@ -1087,18 +1087,18 @@ struct BlockwiseGemmXdlops_pipeline_v3_mx_bprehuffle<BlockGemmPipelineScheduler:
                                                               ComputeTypeA,
                                                               Number<0>,
                                                               Number<0>,
-                                                              decltype(im_minor),
-                                                              decltype(k0),
+                                                              Number<im_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{a_thread_vec,
                                                                                     a_thread_buf};
                         auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                               decltype(b_thread_bufs[I0]),
                                                               decltype(b_thread_desc_),
                                                               ComputeTypeB,
-                                                              decltype(in_major),
+                                                              Number<in_major>,
                                                               Number<0>,
-                                                              decltype(in_minor),
-                                                              decltype(k0),
+                                                              Number<in_minor>,
+                                                              Number<k0>,
                                                               index_expression::Ik>{
                             b_thread_vec, b_thread_bufs[I0]};
 
