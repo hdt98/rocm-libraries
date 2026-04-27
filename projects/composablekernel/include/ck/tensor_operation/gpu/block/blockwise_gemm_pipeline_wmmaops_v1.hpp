@@ -1677,7 +1677,7 @@ struct BlockwiseGemmWmmaops_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                                      Number<0>,
                                                      decltype(n0),
                                                      Number<0>,
-                                                     decltype(k0),
+                                                     Number<k_index>,
                                                      index_expression::Mod<KK, Number<B_K1>>>(
                                 b_thread_vec, b_thread_bufs[reg_buf]);
 
