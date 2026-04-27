@@ -108,10 +108,10 @@ endforeach()
 #   ----------------------------------------------------------
 #   <N>/<TOTAL> Test: <test-name> ........ Passed/Failed <time>
 
-# SHARD_DIR is .../build/test/gtest; two DIRECTORY hops up = .../build
-get_filename_component(project_binary_dir "${SHARD_DIR}" DIRECTORY)
-get_filename_component(project_binary_dir "${project_binary_dir}" DIRECTORY)
-set(last_test_log "${project_binary_dir}/Testing/Temporary/LastTest.log")
+# SHARD_DIR is .../build/test/gtest; one DIRECTORY hop up = .../build/test,
+# which is the directory from which ctest runs (where LastTest.log is written).
+get_filename_component(ctest_binary_dir "${SHARD_DIR}" DIRECTORY)
+set(last_test_log "${ctest_binary_dir}/Testing/Temporary/LastTest.log")
 
 set(ctest_failures "")   # list of test names
 set(ctest_log "")        # log content for ctest section
@@ -125,6 +125,7 @@ if(EXISTS "${last_test_log}")
 
     foreach(line ${lines})
         # Detect "Testing: <name>" lines that start a new test block.
+        # CTest format:  "<N>/<TOTAL> Testing: <test-name>"
         if(line MATCHES "^[0-9]+/[0-9]+ Testing: (.+)$")
             set(current_test "${CMAKE_MATCH_1}")
             string(STRIP "${current_test}" current_test)
@@ -141,10 +142,13 @@ if(EXISTS "${last_test_log}")
         # Collect output lines while in capturing mode.
         if(capturing)
             # The result line ends the block.
-            if(line MATCHES "^[0-9]+/[0-9]+ Test: .+ (Passed|Failed|FAILED|Not Run)")
+            # CTest formats:
+            #   "<N>/<TOTAL> Test: <name> ........ Passed  0.12 sec"
+            #   "<N>/<TOTAL> Test: <name> ....*** Failed  0.12 sec"
+            if(line MATCHES "^[0-9]+/[0-9]+ Test: ")
                 set(capturing FALSE)
-                # Record non-shard failures.
-                if(line MATCHES "(Failed|FAILED)"
+                # Match any form of failure: "Failed", "***Failed", "FAILED"
+                if(line MATCHES "[Ff]ailed|FAILED"
                    AND NOT current_test MATCHES "^${TEST_NAME}_shard[0-9]+"
                    AND NOT current_test MATCHES "_failure_summary$")
                     list(APPEND ctest_failures "${current_test}")
