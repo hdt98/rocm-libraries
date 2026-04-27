@@ -18,15 +18,11 @@ using BF8Types = ::testing::Types<
     std::tuple<BF8, BF8, FP16, FlatmmConfig32_950<BF8>, Gemm2>>;
 // clang-format on
 
-// DISABLED_: the non-MX MoeFlatmmPipelineAGmemBGmemCRegV1 fails on production-
-// shaped inputs (~30-95% wrong values across all scenarios). See
-// docs/issues/moe-flatmm-non-mx-pipeline/findings.md. Re-enable once the kernel
-// is fixed; the input generator and scenario matrix are already in place.
 template <typename Tuple>
-class DISABLED_TestMoeFlatmmBF8 : public TestMoeFlatmmBase<Tuple>
+class TestMoeFlatmmBF8 : public TestMoeFlatmmBase<Tuple>
 {
 };
 
-TYPED_TEST_SUITE(DISABLED_TestMoeFlatmmBF8, BF8Types);
+TYPED_TEST_SUITE(TestMoeFlatmmBF8, BF8Types);
 
-MOE_FLATMM_DECLARE_SCENARIOS(DISABLED_TestMoeFlatmmBF8)
+MOE_FLATMM_DECLARE_SCENARIOS(TestMoeFlatmmBF8)

@@ -483,7 +483,8 @@ struct MoeFlatmmPipelineAGmemBGmemCRegV1
             make_tuple(number<kMPerBlock>{}, number<kKPerBlock>{}),
             a_dram_block_window_tmp.get_window_origin(),
             PipelinePolicy::template MakeADramTileDistribution<Problem>(),
-            a_dram_block_window_tmp.page_idx_); // K DRAM tile window for
+            a_dram_block_window_tmp.page_idx_,
+            a_dram_block_window_tmp.valids_); // K DRAM tile window for
 
         auto a_copy_lds_window_ping =
             make_tile_window(a_lds_block_ping,

@@ -25,6 +25,9 @@
 //                          and (M_a-1) sentinels per tile. This is the regime
 //                          the original hand-rolled fixture inadvertently
 //                          tested; kept here as a control.
+//   MultiTokenPerTile    - one expert gets several real tokens in a padded
+//                          tile, exposing row-gather bugs masked by sparse
+//                          one-token tiles.
 //   FullTileNoSentinels  - exactly M_a tokens routed to one expert via a
 //                          forced topk-id of all zero; produces a single
 //                          tile with no sentinels.
@@ -60,7 +63,25 @@ inline void run_all_experts_populated(Fixture& f)
 template <typename Fixture>
 inline void run_one_token_per_tile(Fixture& f)
 {
-    f.run_test(/*num_tokens=*/8, /*topk=*/1, /*experts=*/8, /*N=*/512, /*K=*/256);
+    std::vector<ck_tile::index_t> forced{0, 1, 2, 3, 4, 5, 6, 7};
+    f.run_test(/*num_tokens=*/8,
+               /*topk=*/1,
+               /*experts=*/8,
+               /*N=*/512,
+               /*K=*/256,
+               std::move(forced));
+}
+
+template <typename Fixture>
+inline void run_multi_token_per_tile(Fixture& f)
+{
+    std::vector<ck_tile::index_t> forced(8, 0);
+    f.run_test(/*num_tokens=*/8,
+               /*topk=*/1,
+               /*experts=*/1,
+               /*N=*/512,
+               /*K=*/256,
+               std::move(forced));
 }
 
 template <typename Fixture>
@@ -96,6 +117,10 @@ inline void run_large_k(Fixture& f)
         test_moe_flatmm::run_all_experts_populated(*this);                                        \
     }                                                                                             \
     TYPED_TEST(SuiteName, OneTokenPerTile) { test_moe_flatmm::run_one_token_per_tile(*this); }    \
+    TYPED_TEST(SuiteName, MultiTokenPerTile)                                                      \
+    {                                                                                             \
+        test_moe_flatmm::run_multi_token_per_tile(*this);                                         \
+    }                                                                                             \
     TYPED_TEST(SuiteName, FullTileNoSentinels)                                                    \
     {                                                                                             \
         test_moe_flatmm::run_full_tile_no_sentinels(*this);                                       \

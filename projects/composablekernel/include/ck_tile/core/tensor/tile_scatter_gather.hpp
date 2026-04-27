@@ -1271,6 +1271,36 @@ template <typename TensorView_,
           typename StaticTileDistribution_,
           typename StaticPageIndexArray_,
           typename StaticValidArray_,
+          index_t HsGatherDim,
+          index_t NumCoord,
+          index_t... YsGatherDims>
+CK_TILE_DEVICE constexpr auto
+make_tile_scatter_gather(const TensorView_& tensor_view,
+                         const WindowLengths_& window_lengths,
+                         const multi_index<TensorView_::get_num_of_dimension()>& origin,
+                         const StaticTileDistribution_& tile_distribution,
+                         const StaticPageIndexArray_& page_idx,
+                         const StaticValidArray_& valids,
+                         number<HsGatherDim>,
+                         number<NumCoord>,
+                         sequence<YsGatherDims...>)
+{
+    return tile_scatter_gather<remove_cvref_t<TensorView_>,
+                               remove_cvref_t<WindowLengths_>,
+                               remove_cvref_t<StaticTileDistribution_>,
+                               remove_cvref_t<StaticPageIndexArray_>,
+                               remove_cvref_t<StaticValidArray_>,
+                               HsGatherDim,
+                               NumCoord,
+                               sequence<YsGatherDims...>>{
+        tensor_view, window_lengths, origin, tile_distribution, page_idx, valids};
+}
+
+template <typename TensorView_,
+          typename WindowLengths_,
+          typename StaticTileDistribution_,
+          typename StaticPageIndexArray_,
+          typename StaticValidArray_,
           index_t HsGatherDim = 0,
           index_t NumCoord    = 1>
 CK_TILE_DEVICE constexpr auto

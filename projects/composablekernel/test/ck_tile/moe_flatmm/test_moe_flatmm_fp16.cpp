@@ -18,15 +18,11 @@ using FP16Types = ::testing::Types<
     std::tuple<FP16, FP16, FP16, FlatmmConfig32_950<FP16>, Gemm2>>;
 // clang-format on
 
-// DISABLED_: the non-MX MoeFlatmmPipelineAGmemBGmemCRegV1 fails on production-
-// shaped inputs (~30-95% wrong values across all scenarios). See
-// docs/issues/moe-flatmm-non-mx-pipeline/findings.md. Re-enable once the kernel
-// is fixed; the input generator and scenario matrix are already in place.
 template <typename Tuple>
-class DISABLED_TestMoeFlatmmFP16 : public TestMoeFlatmmBase<Tuple>
+class TestMoeFlatmmFP16 : public TestMoeFlatmmBase<Tuple>
 {
 };
 
-TYPED_TEST_SUITE(DISABLED_TestMoeFlatmmFP16, FP16Types);
+TYPED_TEST_SUITE(TestMoeFlatmmFP16, FP16Types);
 
-MOE_FLATMM_DECLARE_SCENARIOS(DISABLED_TestMoeFlatmmFP16)
+MOE_FLATMM_DECLARE_SCENARIOS(TestMoeFlatmmFP16)

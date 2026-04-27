@@ -934,9 +934,20 @@ struct MoeFlatmmKernel
         constexpr ck_tile::index_t DramMRepeat =
             decltype(a_dram_dist)::DstrEncode::hs_lengthss_[number<0>{}][number<0>{}];
         statically_indexed_array<ck_tile::index_t, DramMRepeat> a_offsets;
+        statically_indexed_array<bool, DramMRepeat> a_valids;
 
         constexpr index_t token_id_offset = 24;
         constexpr index_t token_id_mask   = (1 << token_id_offset) - 1;
+
+        auto row_to_raw_token_idx = [&](auto row_idx) {
+            const index_t fused_token =
+                kargs.p_sorted_token_ids[row_idx]; // topk-idx[31:24] + token_idx[23:0]
+            return fused_token & token_id_mask;
+        };
+
+        auto row_is_valid_token = [&](auto row_idx) {
+            return row_to_raw_token_idx(row_idx) < kargs.NumTokens;
+        };
 
         auto row_to_token_idx = [&](auto row_idx) {
             const index_t fused_token =
@@ -952,10 +963,12 @@ struct MoeFlatmmKernel
         static_for<0, DramMRepeat, 1>{}([&](auto m0) {
             const auto row_idx =
                 coord_m + m0 * (TilePartitioner::MPerBlock / DramMRepeat) + a_coord[I0];
-            index_t gather_token_id = row_to_token_idx(row_idx);
+            const bool is_valid_token = row_is_valid_token(row_idx);
+            index_t gather_token_id   = is_valid_token ? row_to_token_idx(row_idx) : 0;
             a_offsets[m0]           = std::is_same_v<ALayout, tensor_layout::gemm::RowMajor>
                                           ? gather_token_id * kargs.stride_A
                                           : gather_token_id;
+            a_valids[m0] = is_valid_token;
         });
 
         const SplitKBatchOffset splitk_batch_offset(kargs);
@@ -991,7 +1004,8 @@ struct MoeFlatmmKernel
                                               a_block_window.get_window_lengths(),
                                               a_block_window.get_window_origin(),
                                               a_dram_dist,
-                                              a_offsets); // K DRAM tile window for
+                                              a_offsets,
+                                              a_valids); // K DRAM tile window for
 
         auto c_block_tile = [&] {
             if constexpr(BMXFP4_Pipeline)
@@ -1096,16 +1110,29 @@ struct MoeFlatmmKernel
 
             constexpr index_t ScaleMRepeat = MRepeat * kM0 * kM2;
             statically_indexed_array<index_t, ScaleMRepeat> scale_m_offsets;
+            statically_indexed_array<bool, ScaleMRepeat> scale_m_valids;
 
             if constexpr(!BMXFP4_Pipeline)
                 static_ford<sequence<MRepeat, kM0, kM2>>{}([&](auto mmm) {
                     constexpr auto mIter = number<mmm[number<0>{}]>{};
                     constexpr auto m0    = number<mmm[number<1>{}]>{};
                     constexpr auto m2    = number<mmm[number<2>{}]>{};
+                    constexpr auto scale_m_idx =
+                        m2 + m0 * number<kM2>{} + mIter * number<kM0 * kM2>{};
                     const auto row_idx =
                         coord_m + mIter * MPerXdl + m0 * kM1 * kM2 + m2 + scale_m_coord[I0];
-                    scale_m_offsets[mIter * number<kM0 * kM2>{} + m0 * number<kM2>{} + m2] =
-                        row_to_token_idx(row_idx);
+                    if constexpr(ScaleGranularityM == 0)
+                    {
+                        scale_m_offsets[scale_m_idx] = 0;
+                        scale_m_valids[scale_m_idx]  = true;
+                    }
+                    else
+                    {
+                        const bool is_valid_token     = row_is_valid_token(row_idx);
+                        scale_m_offsets[scale_m_idx] = is_valid_token ? row_to_token_idx(row_idx)
+                                                                       : 0;
+                        scale_m_valids[scale_m_idx]  = is_valid_token;
+                    }
                 });
 
             constexpr int DynamicTileOffsetFlag = 0;
@@ -1155,7 +1182,11 @@ struct MoeFlatmmKernel
                                                     number<TilePartitioner::NPerBlock>{}),
                                          {0, 0}, // offset m is included in gather offsets
                                          output_acc_tile_distr,
-                                         scale_m_offsets);
+                                         scale_m_offsets,
+                                         scale_m_valids,
+                                         number<0>{},
+                                         number<1>{},
+                                         sequence<3, 2, 0>{});
 
             auto scale_n_window = make_tile_window(
                 make_naive_tensor_view<address_space_enum::global>(
