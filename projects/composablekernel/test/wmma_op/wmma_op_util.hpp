@@ -305,11 +305,6 @@ __device__ void builtin_wmma_naive_selector(
             {
                 CK_WMMA_CALL_INTRIN_1(f32, f32, 4);
             }
-            else if constexpr(std::is_same_v<srcAType, double> &&
-                              std::is_same_v<srcBType, double> && std::is_same_v<dstType, double>)
-            {
-                CK_WMMA_CALL_INTRIN_1(f64, f64, 4);
-            }
             else
             {
                 static_assert(false);
