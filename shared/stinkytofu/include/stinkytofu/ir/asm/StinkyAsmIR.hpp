@@ -288,8 +288,13 @@ class AsmIRBuilder : public IRBuilder {
     /// def = PHI(pred0_def, pred1_def, ..., predN_def)
 
     /// Creates a scheduling fence pseudo-instruction (emits no assembly).
-    /// Used to enforce ordering between instruction groups via MemTokenData.
-    StinkyInstruction* createFence();
+    /// Acts as a hard region boundary in the DAG scheduler — nothing can be
+    /// reordered across it.
+    StinkyInstruction* createFence() {
+        static const HwInstDesc fenceMCID{
+            GFX::FENCE, GFX::FENCE, 0, 0, "FENCE", makeFlagSet({InstFlag::IF_HasSideEffect})};
+        return create(&fenceMCID);
+    }
 
     /// Creates and inserts a PHI instruction at the beginning of the block.
     /// The PHI defines one DWORD register and has one placeholder srcReg per
