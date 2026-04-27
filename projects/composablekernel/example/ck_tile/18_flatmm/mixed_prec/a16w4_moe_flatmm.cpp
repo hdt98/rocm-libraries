@@ -221,17 +221,6 @@ float a16w4_moe_gemm(const MoeFlatmmHostArgs& args, const ck_tile::stream_config
         if(s.flush_cache_)
         {
             std::cout << "Flushing cache..." << std::endl;
-            static constexpr ck_tile::index_t APackedSize =
-                std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
-                        std::is_same_v<BDataType, ck_tile::pk_fp4_t>
-                    ? 2
-                    : 1;
-            static constexpr ck_tile::index_t BPackedSize =
-                std::is_same_v<BDataType, ck_tile::pk_int4_t> ||
-                        std::is_same_v<BDataType, ck_tile::pk_fp4_t>
-                    ? 2
-                    : 1;
-
             ck_tile::HostTensor<ADataType> a_m(ck_tile::host_tensor_descriptor(
                 moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm2 ? args.NumTokens * args.TopK
                                                                : args.NumTokens,
@@ -244,8 +233,8 @@ float a16w4_moe_gemm(const MoeFlatmmHostArgs& args, const ck_tile::stream_config
             const int outputN =
                 moe_kind == ck_tile::MoeFlatmmKind::kFFN_gemm1_gate_up ? args.N / 2 : args.N;
 
-            auto size_a_buffer = a_m.get_element_space_size_in_bytes() / APackedSize;
-            auto size_b_buffer = b_n.get_element_space_size_in_bytes() / BPackedSize;
+            auto size_a_buffer = a_m.get_element_space_size_in_bytes();
+            auto size_b_buffer = b_n.get_element_space_size_in_bytes();
 
             ck_tile::RotatingMemWrapper<ADataType, BDataType> rotating_mem(
                 kargs.a_ptr, kargs.b_ptr, s.rotating_count_, size_a_buffer, size_b_buffer);

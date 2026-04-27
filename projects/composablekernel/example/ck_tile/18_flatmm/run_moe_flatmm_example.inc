@@ -436,8 +436,7 @@ int run_mx_moe_gemm_example_with_layouts(int argc,
 
     // B-side MX block scales
     ck_tile::HostTensor<ScaleType> scale_b(ck_tile::HostTensorDescriptor(
-        {K * experts / ScaleGranularityK, N / ScaleGranularityMN},
-        {N / ScaleGranularityMN, 1}));
+        {K * experts / ScaleGranularityK, N / ScaleGranularityMN}, {N / ScaleGranularityMN, 1}));
     ck_tile::FillUniformDistribution<ScaleType>{0.f, 1.f}(scale_b);
 
     // A-side MX block scales: fill with 0x7F (e8m0 exponent 127 = scale 1.0)
@@ -459,9 +458,8 @@ int run_mx_moe_gemm_example_with_layouts(int argc,
               << "\n  num_tokens: " << num_tokens << "\n  topk: " << topk
               << "\n  sorted_tile_num: " << sorted_tile_num << "\n  problem_n: " << N
               << "\n  problem_k: " << K << "\n  a_m_k: " << a_m_k_tensor.mDesc
-              << "\n  b_k_n: " << b_k_n_tensor.mDesc
-              << "\n  b_shuffle: " << b_shuffle_host.mDesc << "\n  c_m_n: " << c_m_n_tensor.mDesc
-              << std::endl;
+              << "\n  b_k_n: " << b_k_n_tensor.mDesc << "\n  b_shuffle: " << b_shuffle_host.mDesc
+              << "\n  c_m_n: " << c_m_n_tensor.mDesc << std::endl;
 
     ck_tile::HostTensor<ck_tile::index_t> expert_ids(
         ck_tile::HostTensorDescriptor({sorted_tile_num}, {1}));
@@ -563,16 +561,16 @@ int run_mx_moe_gemm_example_with_layouts(int argc,
                             scale_b_dev_ptr};
 
     invoke_mx_moe_gemm<FlatmmConfig,
-                        ADataType,
-                        BDataType,
-                        ck_tile::tuple<>,
-                        AccDataType,
-                        CDataType,
-                        ALayout,
-                        BLayout,
-                        ck_tile::tuple<>,
-                        CLayout,
-                        kind>(warmup, repeat, gemm_desc);
+                       ADataType,
+                       BDataType,
+                       ck_tile::tuple<>,
+                       AccDataType,
+                       CDataType,
+                       ALayout,
+                       BLayout,
+                       ck_tile::tuple<>,
+                       CLayout,
+                       kind>(warmup, repeat, gemm_desc);
 
     c_m_n_dev_buf.FromDevice(c_m_n_tensor.data());
 
@@ -594,9 +592,9 @@ int run_mx_moe_gemm_example_with_layouts(int argc,
         scale_a_float_dev_buf.ToDevice(scale_a_float.data());
 
         // Convert scale_b from e8m0 to float for reference
-        ck_tile::HostTensor<AccDataType> scale_b_float(ck_tile::HostTensorDescriptor(
-            {K * experts / ScaleGranularityK, N / ScaleGranularityMN},
-            {N / ScaleGranularityMN, 1}));
+        ck_tile::HostTensor<AccDataType> scale_b_float(
+            ck_tile::HostTensorDescriptor({K * experts / ScaleGranularityK, N / ScaleGranularityMN},
+                                          {N / ScaleGranularityMN, 1}));
         std::copy(scale_b.begin(), scale_b.end(), scale_b_float.begin());
         ck_tile::DeviceMem scale_b_float_dev_buf(scale_b_float.get_element_space_size_in_bytes());
         scale_b_float_dev_buf.ToDevice(scale_b_float.data());
