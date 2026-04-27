@@ -58,6 +58,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Emit a CTest-level JUnit XML so non-shard test failures are captured in
+# failures.log alongside the per-shard GTest XML results.
+# CMAKE_CTEST_ARGUMENTS must be set before include(CTest).
+list(APPEND CMAKE_CTEST_ARGUMENTS
+    "--output-junit" "${CMAKE_BINARY_DIR}/ctest_junit_results.xml")
 include(CTest)
 
 find_package(Threads REQUIRED)
