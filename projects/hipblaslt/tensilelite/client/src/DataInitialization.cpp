@@ -395,25 +395,39 @@ namespace TensileLite
             PackK = 16 / MiKv / rocisa::GetElementSize(datatype);
         }
 
-        /// RDNA4 WMMA FP16/BF16 TN swizzle-A slab.
-        void calculateKforSwizzlingRdna4Fp16Slab(rocisa::DataType datatype,
-                                                 size_t&          MiK,
-                                                 size_t&          MiKv,
-                                                 size_t&          PackK)
+        /**
+         * RDNA4 WMMA TN swizzle-A slab (all supported datatypes).
+         * PackK=1, MiK=16, MiKv=8 for FP16/BF16/FP8/BF8.
+         *   - FP16/BF16: GRVW=8 half  = 16B → buffer_load_b128
+         *   - FP8/BF8:   GRVW=8 FP8   =  8B → buffer_load_b64
+         *
+         * TODO: FP8/BF8 follow-up optimization — PackK=2 for buffer_load_b128.
+         * When PackK=2 + MIWT>1, the kernel splits vgpr[0:3] across M-tiles
+         * (vgpr[0:1] → M-tile 0, vgpr[2:3] → M-tile 1).  A correct host scatter
+         * must interleave M-tile data within each 16-byte chunk accordingly.
+         * See git history for the single-wave prototype (shuffleFp8SlabRdna4).
+         *
+         */
+        void calculateKforSwizzlingRdna4Slab(rocisa::DataType datatype,
+                                             size_t&          MiK,
+                                             size_t&          MiKv,
+                                             size_t&          PackK)
         {
             switch(datatype)
             {
             case rocisa::DataType::Half:
             case rocisa::DataType::BFloat16:
+            case rocisa::DataType::Float8:
+            case rocisa::DataType::BFloat8:
                 MiK   = 16;
                 MiKv  = 8;
                 PackK = 1;
                 break;
             default:
-                throw std::runtime_error("unsupported datatype for swizzling");
+                throw std::runtime_error(
+                    "calculateKforSwizzlingRdna4Slab: unsupported datatype");
             }
         }
-
 
         static AMDGPU::Processor gpuProcessorForDataInit(
             std::shared_ptr<TensileLite::Hardware const> const& hardware)
@@ -433,6 +447,16 @@ namespace TensileLite
             return AMDGPU::toProcessor(prop.gcnArchName);
         }
 
+        static bool isRdna4SupportedSwizzleTensor(
+            ContractionProblemGemm const& problem, size_t tensorIndex, rocisa::DataType dt)
+        {
+            if(tensorIndex != ContractionProblemGemm::TENSOR::A
+               || !problem.swizzleTensorA() || !problem.transA())
+                return false;
+            return dt == rocisa::DataType::Half || dt == rocisa::DataType::BFloat16
+                   || dt == rocisa::DataType::Float8 || dt == rocisa::DataType::BFloat8;
+        }
+
         void calculateKforSwizzlingTensor(SwizzleSlabLayoutType         slabLayout,
                                           ContractionProblemGemm const& problem,
                                           size_t                        tensorIndex,
@@ -441,22 +465,14 @@ namespace TensileLite
                                           size_t&                       MiKv,
                                           size_t&                       PackK)
         {
-            static auto isRdna4SupportedSwizzleTensor = 
-                [](ContractionProblemGemm const& problem, size_t tensorIndex, rocisa::DataType dt) -> bool {
-                    return tensorIndex == ContractionProblemGemm::TENSOR::A &&
-                           problem.swizzleTensorA() &&
-                           problem.transA() &&
-                           (dt == rocisa::DataType::Half || dt == rocisa::DataType::BFloat16);
-            };
-
             switch(slabLayout)
             {
             case SwizzleSlabLayoutType::SWZ_SLAB_RDNA4:
                 if(!isRdna4SupportedSwizzleTensor(problem, tensorIndex, dt))
                     throw std::runtime_error(
                         "[DataInitialization] RDNA4 (gfx1200/gfx1201): host swizzle slab requires "
-                        "FP16/BF16 TN with SwizzleTensorA on tensor A.");
-                calculateKforSwizzlingRdna4Fp16Slab(dt, MiK, MiKv, PackK);
+                        "FP16/BF16/FP8/BF8 TN with SwizzleTensorA on tensor A.");
+                calculateKforSwizzlingRdna4Slab(dt, MiK, MiKv, PackK);
                 break;
             case SwizzleSlabLayoutType::SWZ_SLAB_CDNA3:
                 calculateKforSwizzlingCdna3Slab(dt, MiK, MiKv, PackK);
@@ -2235,10 +2251,10 @@ namespace TensileLite
 
                         memcpy(
                             tmpTensor.as<void>(), p.cpuInput.valid.get(), tmpTensor.getNumBytes());
-                        //Temporary hack
                         uint64_t padVal{};
                         auto     paddedTensor = ::Tensor::Manipulation::pad(
                             tmpTensor, paddedShape, &padVal, tmpTensor.getElementSize());
+
                         paddedTensor.reshape({paddedShape[0] / MiM_N,
                                               MiM_N,
                                               paddedShape[1] / (MiK * PackK),

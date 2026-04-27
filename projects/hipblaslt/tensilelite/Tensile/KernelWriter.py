@@ -5916,8 +5916,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # Gives pointer shift some room to move left, even into the previous macro-tile
     # This slightly reduces the range of the GRO since they have to include the offset
     # Pointer shift still cannot be used with very small matrices < GRVW
-    self.states.srdShiftLeft["A"] = kernel["GlobalReadVectorWidthA"]
-    self.states.srdShiftLeft["B"] = kernel["GlobalReadVectorWidthB"]
+    self.states.srdShiftLeft["A"] = int(kernel["GlobalReadVectorWidthA"])
+    self.states.srdShiftLeft["B"] = int(kernel["GlobalReadVectorWidthB"])
     if kernel["ProblemType"]["MXBlockA"]:
       self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthA"]
     if kernel["ProblemType"]["MXBlockB"]:
@@ -8194,9 +8194,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
           cal_swizzle_pack_k_tensor,
           cal_swizzle_lane_size_elements,
       )
-      tP["swizzlePackK"] = cal_swizzle_pack_k_tensor(kernel, cM, kernel["ISA"])
-      tP["swizzleK"] = kernel["MatrixInstK"] * tP["swizzlePackK"]
-      tP["swizzleLaneSize"] = cal_swizzle_lane_size_elements(kernel, cM, kernel["ISA"])
+      tP["swizzlePackK"] = int(cal_swizzle_pack_k_tensor(kernel, cM, kernel["ISA"]))
+      tP["swizzleK"] = int(kernel["MatrixInstK"]) * tP["swizzlePackK"]
+      tP["swizzleLaneSize"] = int(cal_swizzle_lane_size_elements(kernel, cM, kernel["ISA"]))
 
   ##############################################################################
   # Global Read Addresses: Tile Assignment A/B

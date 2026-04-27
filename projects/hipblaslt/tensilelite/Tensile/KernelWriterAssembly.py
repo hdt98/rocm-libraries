@@ -16232,6 +16232,12 @@ class KernelWriterAssembly(KernelWriter):
       if isNLL:
         # NLL case, no (non DTV) global load A, B in no load loop. Reset numGlobalReadNonDTV
         numGlobalReadNonDTV = 0
+        if numRegsIn1set == 0:
+          # When fewer DTV loads than LoopIters (e.g. single buffer_load_b128 for FP8 swizzle
+          # with LoopIters=2), the formula yields needToWait = numGlobalReadDTV regardless of u.
+          # In NLL there are no subsequent s_wait_loadcnt to force the old DTV load to complete,
+          # so we must wait for all outstanding DTV loads here.
+          needToWait = 0
       if kernel["PrefetchGlobalRead"] >= 2:
         # PGR=2 case, add numGlobalReadNonDTV for second set of prefetch
         needToWait += numGlobalReadNonDTV
