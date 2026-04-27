@@ -350,7 +350,8 @@ def run_suite(
     """
     reporter = Reporter()
     graph_results: List[GraphResult] = [
-        _run_one_graph(graph_path, config, handle, reporter) for graph_path in graph_paths
+        _run_one_graph(graph_path, config, handle, reporter)
+        for graph_path in graph_paths
     ]
     metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
     return SuiteResult(metadata=metadata, graphs=graph_results)
@@ -460,7 +461,6 @@ def _orchestrate_suite_cli(
         suite_result.save_json(str(output_path))
 
     return _suite_exit_code(suite_result)
-
 
 
 def main() -> int:

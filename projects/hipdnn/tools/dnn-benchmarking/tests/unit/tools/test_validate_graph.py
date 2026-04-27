@@ -125,7 +125,9 @@ class TestValidateGraphMain:
             result = main()
         assert result == 1
 
-    def test_valid_graph_prints_ok(self, tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    def test_valid_graph_prints_ok(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture
+    ) -> None:
         graph_file = tmp_path / "graph.json"
         _write_json(graph_file, _valid_graph())
 
@@ -140,7 +142,14 @@ class TestValidateGraphMain:
             _write_json(tmp_path / name, _valid_graph())
 
         with patch.object(
-            sys, "argv", ["dnn-validate-graph", str(tmp_path / "a.json"), str(tmp_path / "b.json"), str(tmp_path / "c.json")]
+            sys,
+            "argv",
+            [
+                "dnn-validate-graph",
+                str(tmp_path / "a.json"),
+                str(tmp_path / "b.json"),
+                str(tmp_path / "c.json"),
+            ],
         ):
             result = main()
 
@@ -152,7 +161,20 @@ class TestValidateGraphMain:
         good = tmp_path / "good.json"
         bad = tmp_path / "bad.json"
         _write_json(good, _valid_graph())
-        _write_json(bad, {"tensors": [], "nodes": [{"type": "MatmulAttributes", "name": "m", "inputs": {}, "outputs": {}}]})
+        _write_json(
+            bad,
+            {
+                "tensors": [],
+                "nodes": [
+                    {
+                        "type": "MatmulAttributes",
+                        "name": "m",
+                        "inputs": {},
+                        "outputs": {},
+                    }
+                ],
+            },
+        )
 
         with patch.object(sys, "argv", ["dnn-validate-graph", str(good), str(bad)]):
             result = main()
@@ -177,8 +199,13 @@ class TestValidateGraphMain:
                 raise GraphLoadError("simulated tarball error")
             return real_resolve(arg)
 
-        with patch("dnn_benchmarking.tools.validate_graph.resolve_graph_files", side_effect=_resolve_side_effect):
-            with patch.object(sys, "argv", ["dnn-validate-graph", "bad.tar.gz", str(good)]):
+        with patch(
+            "dnn_benchmarking.tools.validate_graph.resolve_graph_files",
+            side_effect=_resolve_side_effect,
+        ):
+            with patch.object(
+                sys, "argv", ["dnn-validate-graph", "bad.tar.gz", str(good)]
+            ):
                 result = main()
 
         assert result == 1  # failed flag set by first arg
@@ -190,12 +217,16 @@ class TestValidateGraphMain:
             "dnn_benchmarking.tools.validate_graph.resolve_graph_files",
             side_effect=GraphLoadError("boom"),
         ):
-            with patch.object(sys, "argv", ["dnn-validate-graph", "a.tar.gz", "b.tar.gz"]):
+            with patch.object(
+                sys, "argv", ["dnn-validate-graph", "a.tar.gz", "b.tar.gz"]
+            ):
                 result = main()
 
         assert result == 1
 
-    def test_tarball_with_no_json_emits_warning(self, capsys: pytest.CaptureFixture) -> None:
+    def test_tarball_with_no_json_emits_warning(
+        self, capsys: pytest.CaptureFixture
+    ) -> None:
         """resolve_graph_files returning tmpdirs but no paths triggers the warning."""
         td = _fake_tmpdir()
 
@@ -259,14 +290,19 @@ class TestValidateGraphMain:
                 td.cleanup = _tracked_cleanup
             return tmpdirs, files, source
 
-        with patch("dnn_benchmarking.tools.validate_graph.resolve_graph_files", side_effect=_spying_resolve):
+        with patch(
+            "dnn_benchmarking.tools.validate_graph.resolve_graph_files",
+            side_effect=_spying_resolve,
+        ):
             with patch.object(sys, "argv", ["dnn-validate-graph", str(tb)]):
                 result = main()
 
         assert result == 0
         assert len(cleaned) == 1
 
-    def test_glob_with_no_matches_emits_warning(self, capsys: pytest.CaptureFixture) -> None:
+    def test_glob_with_no_matches_emits_warning(
+        self, capsys: pytest.CaptureFixture
+    ) -> None:
         """resolve_graph_files returning no tmpdirs and no paths triggers the no-files warning."""
         with patch(
             "dnn_benchmarking.tools.validate_graph.resolve_graph_files",

@@ -348,7 +348,7 @@ def _conv_filename(prefix: str, p: _ConvParams) -> str:
             f"_k{p.K}Df{p.D_f}R{p.R}S{p.S}"
             f"_pd{p.pad_d}p{p.pad_h}q{p.pad_w}"
             f"_sd{p.stride_d}u{p.stride_h}v{p.stride_w}"
-            f"_g{p.groups}"
+            f"_g{p.groups}",
         )
     else:
         name = _join_prefix(
