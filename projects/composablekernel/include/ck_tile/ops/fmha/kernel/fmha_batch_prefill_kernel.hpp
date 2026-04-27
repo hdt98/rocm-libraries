@@ -1326,6 +1326,7 @@ struct FmhaBatchPrefillWithPagedKVCacheKernel
                                       kargs.batch_stride_v,
                                       dropout,
                                       sink_value,
+                                      nullptr, // block_mask_row_ptr
                                       k_descale_ptr,
                                       v_descale_ptr,
                                       kargs.nblock_stride_kv_block_descale,
