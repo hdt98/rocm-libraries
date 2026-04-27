@@ -47,6 +47,7 @@ struct BenchResult
     float k_preprocess_ms = 0.0f;
     float v_preprocess_ms = 0.0f;
     float delta_s_ms      = 0.0f;
+    float scale_pack_ms   = 0.0f;
     float total_ms        = 0.0f;
 };
 
@@ -74,30 +75,32 @@ static ck_tile::SageAttnV3PreprocessArgs<InputT> make_hargs(const RunShape& s,
     const int sq = s.seqlen_q, sk = s.seqlen_k, hd = s.hdim;
 
     ck_tile::SageAttnV3PreprocessArgs<InputT> a{};
-    a.q_ptr          = static_cast<const InputT*>(q_ptr);
-    a.seqlen_q       = sq;
-    a.hdim           = hd;
-    a.stride_q       = hd;
-    a.nhead_stride_q = sq * hd;
-    a.batch_stride_q = hq * sq * hd;
-    a.q_hat_ptr      = static_cast<uint8_t*>(q_hat_ptr);
-    a.q_scale_ptr    = static_cast<uint8_t*>(q_scale_ptr);
-    a.q_mean_ptr     = static_cast<InputT*>(q_mean_ptr);
-    a.k_ptr          = static_cast<const InputT*>(k_ptr);
-    a.seqlen_k       = sk;
-    a.stride_k       = hd;
-    a.nhead_stride_k = sk * hd;
-    a.batch_stride_k = hkv * sk * hd;
-    a.k_hat_ptr      = static_cast<uint8_t*>(k_hat_ptr);
-    a.k_scale_ptr    = static_cast<uint8_t*>(k_scale_ptr);
-    a.v_ptr          = static_cast<const InputT*>(v_ptr);
-    a.nhead_stride_v = sk * hd;
-    a.batch_stride_v = hkv * sk * hd;
-    a.v_hat_ptr      = static_cast<uint8_t*>(v_hat_ptr);
-    a.v_scale_ptr    = static_cast<uint8_t*>(v_scale_ptr);
-    a.batch          = b;
-    a.nhead_q        = hq;
-    a.nhead_kv       = hkv;
+    a.q_ptr              = static_cast<const InputT*>(q_ptr);
+    a.seqlen_q           = sq;
+    a.hdim               = hd;
+    a.stride_q           = hd;
+    a.nhead_stride_q     = sq * hd;
+    a.batch_stride_q     = hq * sq * hd;
+    a.q_hat_ptr          = static_cast<uint8_t*>(q_hat_ptr);
+    a.q_scale_ptr        = static_cast<uint8_t*>(q_scale_ptr);
+    a.q_mean_ptr         = static_cast<InputT*>(q_mean_ptr);
+    a.k_ptr              = static_cast<const InputT*>(k_ptr);
+    a.seqlen_k           = sk;
+    a.stride_k           = hd;
+    a.nhead_stride_k     = sk * hd;
+    a.batch_stride_k     = hkv * sk * hd;
+    a.k_hat_ptr          = static_cast<uint8_t*>(k_hat_ptr);
+    a.k_scale_ptr        = static_cast<uint8_t*>(k_scale_ptr);
+    a.v_ptr              = static_cast<const InputT*>(v_ptr);
+    a.nhead_stride_v     = sk * hd;
+    a.batch_stride_v     = hkv * sk * hd;
+    a.v_hat_ptr          = static_cast<uint8_t*>(v_hat_ptr);
+    a.v_scale_ptr        = static_cast<uint8_t*>(v_scale_ptr);
+    a.k_scale_packed_ptr = nullptr;
+    a.v_scale_packed_ptr = nullptr;
+    a.batch              = b;
+    a.nhead_q            = hq;
+    a.nhead_kv           = hkv;
     return a;
 }
 
@@ -124,12 +127,14 @@ BenchResult run_benchmark(const RunShape& s)
     ck_tile::DeviceMem delta_s_dev(bsz.delta_s_bytes);
     ck_tile::DeviceMem k_mean_buf(bsz.k_mean_bytes);
     ck_tile::DeviceMem k_prime_buf(bsz.k_prime_bytes);
+    ck_tile::DeviceMem k_scale_packed_dev(bsz.k_scale_packed_bytes);
+    ck_tile::DeviceMem v_scale_packed_dev(bsz.v_scale_packed_bytes);
 
     q_dev.SetZero();
     k_dev.SetZero();
     v_dev.SetZero();
 
-    auto hargs = make_hargs<InputT>(s,
+    auto hargs               = make_hargs<InputT>(s,
                                     q_dev.GetDeviceBuffer(),
                                     k_dev.GetDeviceBuffer(),
                                     v_dev.GetDeviceBuffer(),
@@ -140,6 +145,8 @@ BenchResult run_benchmark(const RunShape& s)
                                     k_scale_dev.GetDeviceBuffer(),
                                     v_hat_dev.GetDeviceBuffer(),
                                     v_scale_dev.GetDeviceBuffer());
+    hargs.k_scale_packed_ptr = static_cast<int32_t*>(k_scale_packed_dev.GetDeviceBuffer());
+    hargs.v_scale_packed_ptr = static_cast<int32_t*>(v_scale_packed_dev.GetDeviceBuffer());
 
     auto* k_mean_ptr  = static_cast<float*>(k_mean_buf.GetDeviceBuffer());
     auto* k_prime_ptr = static_cast<InputT*>(k_prime_buf.GetDeviceBuffer());
@@ -177,6 +184,7 @@ BenchResult run_benchmark(const RunShape& s)
     res.k_preprocess_ms = time_ms(ck_tile::kSA3StageKPreprocess);
     res.v_preprocess_ms = time_ms(ck_tile::kSA3StageVPreprocess);
     res.delta_s_ms      = time_ms(ck_tile::kSA3StageDeltaS);
+    res.scale_pack_ms   = time_ms(ck_tile::kSA3StageScalePack);
 
     HIP_CHECK_ERROR(hipEventDestroy(ev_start));
     HIP_CHECK_ERROR(hipEventDestroy(ev_stop));
@@ -309,8 +317,10 @@ bool run_verify(const RunShape& s)
     ck_tile::DeviceMem delta_s_dev(bsz.delta_s_bytes);
     ck_tile::DeviceMem k_mean_buf(bsz.k_mean_bytes);
     ck_tile::DeviceMem k_prime_buf(bsz.k_prime_bytes);
+    ck_tile::DeviceMem k_scale_packed_dev(bsz.k_scale_packed_bytes);
+    ck_tile::DeviceMem v_scale_packed_dev(bsz.v_scale_packed_bytes);
 
-    auto hargs = make_hargs<InputT>(s,
+    auto hargs               = make_hargs<InputT>(s,
                                     q_dev.GetDeviceBuffer(),
                                     k_dev.GetDeviceBuffer(),
                                     v_dev.GetDeviceBuffer(),
@@ -321,6 +331,8 @@ bool run_verify(const RunShape& s)
                                     k_scale_dev.GetDeviceBuffer(),
                                     v_hat_dev.GetDeviceBuffer(),
                                     v_scale_dev.GetDeviceBuffer());
+    hargs.k_scale_packed_ptr = static_cast<int32_t*>(k_scale_packed_dev.GetDeviceBuffer());
+    hargs.v_scale_packed_ptr = static_cast<int32_t*>(v_scale_packed_dev.GetDeviceBuffer());
 
     SA3::run(hargs,
              static_cast<float*>(delta_s_dev.GetDeviceBuffer()),
@@ -376,16 +388,14 @@ bool run_verify(const RunShape& s)
         return out;
     };
 
-    auto compact_f32 = [](const float* src,
-                          std::size_t n_outer,
-                          std::size_t gpu_stride,
-                          std::size_t n_valid) {
-        std::vector<float> out(n_outer * n_valid);
-        for(std::size_t i = 0; i < n_outer; i++)
-            std::copy(src + i * gpu_stride, src + i * gpu_stride + n_valid,
-                      out.data() + i * n_valid);
-        return out;
-    };
+    auto compact_f32 =
+        [](const float* src, std::size_t n_outer, std::size_t gpu_stride, std::size_t n_valid) {
+            std::vector<float> out(n_outer * n_valid);
+            for(std::size_t i = 0; i < n_outer; i++)
+                std::copy(
+                    src + i * gpu_stride, src + i * gpu_stride + n_valid, out.data() + i * n_valid);
+            return out;
+        };
 
     bool all_pass = true;
     auto chk      = [&](bool ok, const char* name) {
@@ -516,8 +526,12 @@ print_result(const RunShape& s, const std::string& dtype, const BenchResult& res
         write_q_mean + write_k_prime +
         std::size_t(b) * hq * num_q_tiles * sk * sizeof(float); // write delta_s
 
-    const std::size_t bytes_total =
-        bytes_kmean + bytes_q_preprocess + bytes_k_preprocess + bytes_v + bytes_delta_s;
+    const std::size_t bytes_scale_pack =
+        std::size_t(b) * hkv * sk * (hd / kG) * 2    // K: read + write
+        + std::size_t(b) * hkv * hd * (sk / kG) * 2; // V: read + write
+
+    const std::size_t bytes_total = bytes_kmean + bytes_q_preprocess + bytes_k_preprocess +
+                                    bytes_v + bytes_delta_s + bytes_scale_pack;
 
     auto gbs = [](std::size_t bytes, float ms) -> double {
         return static_cast<double>(bytes) / 1.0e6 / static_cast<double>(ms);
@@ -535,6 +549,7 @@ print_result(const RunShape& s, const std::string& dtype, const BenchResult& res
         row("k_preprocess", res.k_preprocess_ms, bytes_k_preprocess);
         row("v_preprocess", res.v_preprocess_ms, bytes_v);
         row("delta_s_gemm", res.delta_s_ms, bytes_delta_s);
+        row("scale_pack", res.scale_pack_ms, bytes_scale_pack);
         row("total", res.total_ms, bytes_total);
     }
     else
@@ -543,15 +558,16 @@ print_result(const RunShape& s, const std::string& dtype, const BenchResult& res
                   << " Sq=" << sq << " Sk=" << sk << " D=" << hd << "\n";
         auto line = [&](const char* name, float ms, std::size_t bytes) {
             std::cout << "  " << std::left << std::setw(22) << name << std::right << std::fixed
-                      << std::setprecision(3) << std::setw(8) << ms << " ms"
-                      << "  " << std::setprecision(1) << std::setw(8) << gbs(bytes, ms) << " GB/s"
-                      << "  (" << std::setprecision(0) << bytes / 1.0e6 << " MB)\n";
+                      << std::setprecision(3) << std::setw(8) << ms << " ms" << "  "
+                      << std::setprecision(1) << std::setw(8) << gbs(bytes, ms) << " GB/s" << "  ("
+                      << std::setprecision(0) << bytes / 1.0e6 << " MB)\n";
         };
         line("[0] KMean", res.kmean_ms, bytes_kmean);
         line("[1] Prep Q", res.q_preprocess_ms, bytes_q_preprocess);
         line("[2] Prep K", res.k_preprocess_ms, bytes_k_preprocess);
         line("[3] Prep V", res.v_preprocess_ms, bytes_v);
         line("[4] delta_s GEMM", res.delta_s_ms, bytes_delta_s);
+        line("[5] Scale pack", res.scale_pack_ms, bytes_scale_pack);
         std::cout << "  " << std::string(56, '-') << "\n";
         line("Total", res.total_ms, bytes_total);
     }

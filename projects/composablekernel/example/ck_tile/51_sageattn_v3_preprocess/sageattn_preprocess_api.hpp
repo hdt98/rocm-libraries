@@ -59,6 +59,10 @@ struct SageAttnV3PreprocessArgs
     uint8_t* v_hat_ptr;   // [batch, nhead_kv, hdim, seqlen_k_padded/2] uint8
     uint8_t* v_scale_ptr; // [batch, nhead_kv, hdim, seqlen_k_padded/32] uint8
 
+    // Packed scale outputs for MFMA OPSEL (optional, nullptr to skip)
+    int32_t* k_scale_packed_ptr; // [batch, nhead_kv, packed_size_per_head_k] int32
+    int32_t* v_scale_packed_ptr; // [batch, nhead_kv, packed_size_per_head_v] int32
+
     // --- Common dimensions ---
     index_t batch;
     index_t nhead_q;  // number of Q heads
@@ -66,13 +70,14 @@ struct SageAttnV3PreprocessArgs
 };
 
 // Stage bitmask for sageattn_v3_preprocess_run.
-// Each bit enables one kernel launch; default (kSA3StageAll) runs all five.
+// Each bit enables one kernel launch; default (kSA3StageAll) runs all.
 static constexpr uint32_t kSA3StageKMean       = 1u << 0; // Launch 0: KMean
 static constexpr uint32_t kSA3StageQPreprocess = 1u << 1; // Launch 1: Q preprocess
 static constexpr uint32_t kSA3StageKPreprocess = 1u << 2; // Launch 2: K preprocess
 static constexpr uint32_t kSA3StageVPreprocess = 1u << 3; // Launch 3: V preprocess
 static constexpr uint32_t kSA3StageDeltaS      = 1u << 4; // Launch 4: delta_s GEMM
-static constexpr uint32_t kSA3StageAll         = 0x1Fu;   // All stages (bits 0-4)
+static constexpr uint32_t kSA3StageScalePack   = 1u << 5; // Launch 5: fused K+V scale pack
+static constexpr uint32_t kSA3StageAll         = 0x3Fu;   // All stages (bits 0-5)
 
 // ============================================================================
 // sageattn_v3_preprocess_run
@@ -117,15 +122,17 @@ static constexpr uint32_t kSA3StageAll         = 0x1Fu;   // All stages (bits 0-
 struct SageAttnV3PreprocessBufferSizes
 {
     // ---- outputs produced by sageattn_v3_preprocess_run ----
-    size_t delta_s_bytes; // float  [B, H, num_q_tiles, seqlen_k_padded]
-    size_t k_prime_bytes; // InputT [B, H, seqlen_k_padded, hdim]
-    size_t q_hat_bytes;   // uint8  [B, H, seqlen_q_padded, hdim/2]
-    size_t q_scale_bytes; // uint8  [B, H, seqlen_q_padded, hdim/32]
-    size_t q_mean_bytes;  // InputT [B, H, num_q_tiles, hdim]
-    size_t k_hat_bytes;   // uint8  [B, H, seqlen_k_padded, hdim/2]
-    size_t k_scale_bytes; // uint8  [B, H, seqlen_k_padded, hdim/32]
-    size_t v_hat_bytes;   // uint8  [B, H, hdim, seqlen_k_padded/2]
-    size_t v_scale_bytes; // uint8  [B, H, hdim, seqlen_k_padded/32]
+    size_t delta_s_bytes;        // float  [B, H, num_q_tiles, seqlen_k_padded]
+    size_t k_prime_bytes;        // InputT [B, H, seqlen_k_padded, hdim]
+    size_t q_hat_bytes;          // uint8  [B, H, seqlen_q_padded, hdim/2]
+    size_t q_scale_bytes;        // uint8  [B, H, seqlen_q_padded, hdim/32]
+    size_t q_mean_bytes;         // InputT [B, H, num_q_tiles, hdim]
+    size_t k_hat_bytes;          // uint8  [B, H, seqlen_k_padded, hdim/2]
+    size_t k_scale_bytes;        // uint8  [B, H, seqlen_k_padded, hdim/32]
+    size_t v_hat_bytes;          // uint8  [B, H, hdim, seqlen_k_padded/2]
+    size_t v_scale_bytes;        // uint8  [B, H, hdim, seqlen_k_padded/32]
+    size_t k_scale_packed_bytes; // int32  [B, H_kv, packed_k_per_head]
+    size_t v_scale_packed_bytes; // int32  [B, H_kv, packed_v_per_head]
     // ---- caller-allocated scratch (unchanged by padding) ----
     size_t k_mean_bytes; // InputT [B, H, hdim]
     // ---- padded dims ----
@@ -189,13 +196,24 @@ struct SageAttnV3Preprocess
         s.k_scale_bytes = static_cast<size_t>(batch * nhead_kv * sk_pad * (hdim / kG));
         s.v_hat_bytes   = static_cast<size_t>(batch * nhead_kv * hdim * (sk_pad / 2));
         s.v_scale_bytes = static_cast<size_t>(batch * nhead_kv * hdim * (sk_pad / kG));
+        // Packed scale sizes (depends on MFMA tile shape → kK0)
+        {
+            constexpr index_t kK0_          = (kCols <= 128) ? 64 : 128;
+            using PackKernel                = SageAttnV3ScalePackKernel<kK0_>;
+            const index_t k_packed_per_head = PackKernel::KPackedPerHead(sk_pad, hdim);
+            const index_t v_packed_per_head = PackKernel::VPackedPerHead(sk_pad, hdim);
+            s.k_scale_packed_bytes =
+                static_cast<size_t>(batch * nhead_kv * k_packed_per_head) * sizeof(int32_t);
+            s.v_scale_packed_bytes =
+                static_cast<size_t>(batch * nhead_kv * v_packed_per_head) * sizeof(int32_t);
+        }
         // k_mean_buf: float scratch for KMean atomic accumulation, [batch, nhead_kv, hdim] float.
-        s.k_mean_bytes  = static_cast<size_t>(batch * nhead_kv * hdim) * sizeof(float);
+        s.k_mean_bytes = static_cast<size_t>(batch * nhead_kv * hdim) * sizeof(float);
         return s;
     }
 
-    static void run(
-        const SageAttnV3PreprocessArgs<InputT>& args,
+    static void
+    run(const SageAttnV3PreprocessArgs<InputT>& args,
         float* delta_s_ptr,  // [batch, nhead_q,  num_q_tiles, seqlen_k_padded] float
         float* k_mean_buf,   // [batch, nhead_kv, hdim]                         float scratch
         InputT* k_prime_buf, // [batch, nhead_kv, seqlen_k_padded, hdim]        InputT
@@ -210,9 +228,9 @@ struct SageAttnV3Preprocess
         const index_t seqlen_k = args.seqlen_k;
         constexpr index_t kG   = 32; // MXFP4 scale granularity
 
-        const auto bsz            = get_buffer_sizes(batch, nhead_q, nhead_kv, seqlen_q, seqlen_k, hdim);
-        const index_t sq_pad      = bsz.seqlen_q_padded;
-        const index_t sk_pad      = bsz.seqlen_k_padded;
+        const auto bsz       = get_buffer_sizes(batch, nhead_q, nhead_kv, seqlen_q, seqlen_k, hdim);
+        const index_t sq_pad = bsz.seqlen_q_padded;
+        const index_t sk_pad = bsz.seqlen_k_padded;
         const index_t num_q_tiles = bsz.num_q_tiles;
         const index_t num_k_tiles = bsz.num_k_tiles;
 
@@ -495,6 +513,45 @@ struct SageAttnV3Preprocess
                     launch_and_check(sc, make_kernel(GemmKernel{}, grids, blks, 0, kargs));
                 }
             }
+        }
+
+        // ------------------------------------------------------------------ //
+        // Launch 5: fused K+V scale packing — e8m0 uint8 → packed int32
+        // ------------------------------------------------------------------ //
+        if((stages & kSA3StageScalePack) && args.k_scale_packed_ptr != nullptr &&
+           args.v_scale_packed_ptr != nullptr)
+        {
+            constexpr index_t kK0_ = (kCols <= 128) ? 64 : 128;
+            using PackKernel       = SageAttnV3ScalePackKernel<kK0_>;
+            using PackKargs        = typename PackKernel::Kargs;
+
+            const index_t k_packed_per_head = PackKernel::KPackedPerHead(sk_pad, hdim);
+            const index_t v_packed_per_head = PackKernel::VPackedPerHead(sk_pad, hdim);
+
+            PackKargs kargs{};
+            kargs.k_scale_ptr                 = args.k_scale_ptr;
+            kargs.k_scale_packed_ptr          = args.k_scale_packed_ptr;
+            kargs.stride_k_scale              = hdim / kG;
+            kargs.nhead_stride_k_scale        = sk_pad * (hdim / kG);
+            kargs.batch_stride_k_scale        = nhead_kv * sk_pad * (hdim / kG);
+            kargs.nhead_stride_k_scale_packed = k_packed_per_head;
+            kargs.batch_stride_k_scale_packed = nhead_kv * k_packed_per_head;
+            kargs.v_scale_ptr                 = args.v_scale_ptr;
+            kargs.v_scale_packed_ptr          = args.v_scale_packed_ptr;
+            kargs.stride_v_scale              = sk_pad / kG;
+            kargs.nhead_stride_v_scale        = hdim * (sk_pad / kG);
+            kargs.batch_stride_v_scale        = nhead_kv * hdim * (sk_pad / kG);
+            kargs.nhead_stride_v_scale_packed = v_packed_per_head;
+            kargs.batch_stride_v_scale_packed = nhead_kv * v_packed_per_head;
+            kargs.hdim                        = hdim;
+            kargs.seqlen_k_padded             = sk_pad;
+            kargs.nhead                       = nhead_kv;
+            kargs.batch                       = batch;
+
+            const dim3 grids  = PackKernel::GridSize(kargs);
+            const dim3 blocks = PackKernel::BlockSize();
+            stream_config sc{stream};
+            launch_and_check(sc, make_kernel(PackKernel{}, grids, blocks, 0, kargs));
         }
     }
 };
