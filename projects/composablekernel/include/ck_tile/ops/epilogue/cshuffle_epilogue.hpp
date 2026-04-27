@@ -381,18 +381,6 @@ struct CShuffleEpilogue
                 make_tuple(sequence<0>{}, sequence<1>{}));
 
             return lds_block_desc;
-
-#else
-            constexpr auto PaddingAmount = 0;
-
-            constexpr auto lds_block_desc = make_naive_tensor_descriptor(
-                make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}),
-                make_tuple(number<NPerIterationShuffle + PaddingAmount>{}, number<1>{}),
-                number<VectorLen>{},
-                number<1>{});
-
-            return lds_block_desc;
-#endif
         }
         // M is contiguous dimension
         else if constexpr(std::is_same_v<ELayout, tensor_layout::gemm::ColumnMajor>)

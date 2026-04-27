@@ -1739,4 +1739,3 @@ struct GridwiseGemm_xdl_cshuffle_v3
 } // namespace ck
 
 #pragma clang diagnostic pop
-
