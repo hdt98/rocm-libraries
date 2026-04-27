@@ -69,7 +69,8 @@ public:
     // Static instance management using Meyer's singleton pattern to avoid ODR issues
     static std::unique_ptr<TestHeuristicPluginBase>& getInstanceStorage()
     {
-        static std::unique_ptr<TestHeuristicPluginBase> sInstance = nullptr; // NOLINT(readability-identifier-naming)
+        static std::unique_ptr<TestHeuristicPluginBase> sInstance
+            = nullptr; // NOLINT(readability-identifier-naming)
         return sInstance;
     }
 
@@ -201,7 +202,7 @@ public:
 
     static hipdnnPluginStatus_t
         handleSetDeviceProperties(hipdnnHeuristicHandle_t handle,
-                                   const hipdnnPluginConstData_t* devicePropsSerialized)
+                                  const hipdnnPluginConstData_t* devicePropsSerialized)
     {
         if(handle == nullptr)
         {
@@ -259,8 +260,8 @@ public:
     }
 
     static hipdnnPluginStatus_t policySetEngineIds(hipdnnHeuristicPolicyDescriptor_t descriptor,
-                                                    const int64_t* engineIds,
-                                                    size_t engineIdCount)
+                                                   const int64_t* engineIds,
+                                                   size_t engineIdCount)
     {
         if(descriptor == nullptr)
         {
@@ -304,7 +305,7 @@ public:
     }
 
     static hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t descriptor,
-                                                int32_t* applied)
+                                               int32_t* applied)
     {
         if(descriptor == nullptr)
         {
@@ -361,7 +362,6 @@ public:
         *count = numToCopy;
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
-
 };
 
 // Macro to register all heuristic plugin API functions
@@ -415,14 +415,14 @@ public:
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \
         hipdnnHeuristicHandleSetDeviceProperties(hipdnnHeuristicHandle_t handle,                  \
-                                                  const hipdnnPluginConstData_t* deviceProps)     \
+                                                 const hipdnnPluginConstData_t* deviceProps)      \
     {                                                                                             \
         return TestHeuristicPluginBase::handleSetDeviceProperties(handle, deviceProps);           \
     }                                                                                             \
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \
         hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t handle,                     \
-                                               hipdnnHeuristicPolicyDescriptor_t* outDescriptor)  \
+                                              hipdnnHeuristicPolicyDescriptor_t* outDescriptor)   \
     {                                                                                             \
         return TestHeuristicPluginBase::policyDescriptorCreate(handle, outDescriptor);            \
     }                                                                                             \
@@ -435,29 +435,27 @@ public:
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \
         hipdnnHeuristicPolicySetEngineIds(hipdnnHeuristicPolicyDescriptor_t descriptor,           \
-                                           const int64_t* engineIds,                              \
-                                           size_t engineIdCount)                                  \
+                                          const int64_t* engineIds,                               \
+                                          size_t engineIdCount)                                   \
     {                                                                                             \
         return TestHeuristicPluginBase::policySetEngineIds(descriptor, engineIds, engineIdCount); \
     }                                                                                             \
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \
         hipdnnHeuristicPolicySetSerializedGraph(hipdnnHeuristicPolicyDescriptor_t descriptor,     \
-                                                 const hipdnnPluginConstData_t* serializedGraph)  \
+                                                const hipdnnPluginConstData_t* serializedGraph)   \
     {                                                                                             \
         return TestHeuristicPluginBase::policySetSerializedGraph(descriptor, serializedGraph);    \
     }                                                                                             \
                                                                                                   \
     hipdnnPluginStatus_t hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc,    \
-                                                        int32_t* applied)                         \
+                                                       int32_t* applied)                          \
     {                                                                                             \
         return TestHeuristicPluginBase::policyFinalize(desc, applied);                            \
     }                                                                                             \
                                                                                                   \
-    hipdnnPluginStatus_t                                                                          \
-        hipdnnHeuristicPolicyGetSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t descriptor,     \
-                                                 int64_t* engineIds,                              \
-                                                 size_t* count)                                   \
+    hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(                                 \
+        hipdnnHeuristicPolicyDescriptor_t descriptor, int64_t* engineIds, size_t* count)          \
     {                                                                                             \
         return TestHeuristicPluginBase::policyGetSortedEngineIds(descriptor, engineIds, count);   \
     }                                                                                             \
