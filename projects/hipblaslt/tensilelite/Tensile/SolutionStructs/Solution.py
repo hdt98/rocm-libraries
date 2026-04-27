@@ -2586,8 +2586,16 @@ class Solution(collections.abc.Mapping):
         return optGRVW
 
       def calSwizzlePackK(state, tc):
-        from Tensile.SwizzleSlabArch import cal_swizzle_pack_k_tensor
-        return cal_swizzle_pack_k_tensor(state, tc, isa)
+        pt = state["ProblemType"]
+        mi_pt = state[f"MIInputPerThread{tc}"]
+        dt = pt[f"DataType{tc}"]
+        bpe = dt.numBytes()
+        isaVersion = tuple(isa)
+        # RDNA4 SwizzleTensorA: PackK=1 for all supported dtypes
+        if (isaVersion == (12, 0, 0) or isaVersion == (12, 0, 1)) and \
+           tc == "A" and pt.get("SwizzleTensorA", False):
+            return 1
+        return 16 // mi_pt // bpe
 
       genGRVWA = False
       genGRVWB = False
