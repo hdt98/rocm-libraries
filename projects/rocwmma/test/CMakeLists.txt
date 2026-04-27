@@ -96,9 +96,24 @@ set(ROCWMMA_COMMON_TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/hip_device.cpp
 
 # Build the rocwmma ptrace wrapper for gdb attachment without sudo
 if(UNIX AND NOT APPLE)
+  # Paths in build directory (not source directory)
+  set(SCRIPTS_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}/scripts")
   set(PTRACE_WRAPPER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rocwmma_ptrace_wrapper.c")
-  set(PTRACE_WRAPPER_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/scripts/rocwmma_ptrace_wrapper")
+  set(PTRACE_WRAPPER_OUTPUT "${SCRIPTS_BUILD_DIR}/rocwmma_ptrace_wrapper")
+  set(WATCHDOG_WRAPPER_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/scripts/watchdog_wrapper.sh")
+  set(WATCHDOG_WRAPPER_OUTPUT "${SCRIPTS_BUILD_DIR}/watchdog_wrapper.sh")
 
+  # Create scripts directory in build
+  file(MAKE_DIRECTORY ${SCRIPTS_BUILD_DIR})
+
+  # Copy watchdog wrapper script to build directory
+  configure_file(
+    ${WATCHDOG_WRAPPER_SOURCE}
+    ${WATCHDOG_WRAPPER_OUTPUT}
+    COPYONLY
+  )
+
+  # Build ptrace wrapper in build directory
   add_custom_command(
     OUTPUT ${PTRACE_WRAPPER_OUTPUT}
     COMMAND ${CMAKE_C_COMPILER} -o ${PTRACE_WRAPPER_OUTPUT} ${PTRACE_WRAPPER_SOURCE}
@@ -107,6 +122,19 @@ if(UNIX AND NOT APPLE)
   )
 
   add_custom_target(rocwmma_ptrace_wrapper ALL DEPENDS ${PTRACE_WRAPPER_OUTPUT})
+
+  # Install the scripts for packaged tests
+  install(
+    PROGRAMS ${WATCHDOG_WRAPPER_OUTPUT} ${PTRACE_WRAPPER_OUTPUT}
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}/scripts"
+    COMPONENT tests
+  )
+
+  # Set the watchdog wrapper path for use in tests
+  set(ROCWMMA_WATCHDOG_WRAPPER "${WATCHDOG_WRAPPER_OUTPUT}")
+else()
+  # On non-Unix or Apple, no watchdog wrapper
+  set(ROCWMMA_WATCHDOG_WRAPPER "")
 endif()
 
 set(INSTALL_TEST_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
@@ -189,12 +217,15 @@ function(add_rocwmma_test TEST_TARGET TEST_SOURCE)
     endforeach()
   endif()
 
-  # Set up watchdog wrapper script
-  set(WATCHDOG_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/scripts/watchdog_wrapper.sh")
-
-  # Add test with watchdog wrapper
-  add_test(NAME ${TEST_TARGET}
-           COMMAND ${WATCHDOG_WRAPPER} ${TEST_TIMEOUT} $<TARGET_FILE:${TEST_TARGET}>)
+  # Add test with watchdog wrapper (if available)
+  if(ROCWMMA_WATCHDOG_WRAPPER)
+    add_test(NAME ${TEST_TARGET}
+             COMMAND ${ROCWMMA_WATCHDOG_WRAPPER} ${TEST_TIMEOUT} $<TARGET_FILE:${TEST_TARGET}>)
+  else()
+    # No watchdog wrapper on this platform
+    add_test(NAME ${TEST_TARGET}
+             COMMAND $<TARGET_FILE:${TEST_TARGET}>)
+  endif()
   set_property(TEST ${TEST_TARGET} PROPERTY SKIP_REGULAR_EXPRESSION "no ROCm-capable device" "unsupported host device")
   set_property(TEST ${TEST_TARGET} PROPERTY TIMEOUT ${TEST_TIMEOUT})
 
