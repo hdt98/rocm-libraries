@@ -333,7 +333,16 @@ bool ConvWinoRageRxSCommon<Winodata, Winofilter>::IsApplicable(const ExecutionCo
     if(!args.SetConvParams(problem))
         return false;
 
-    args.n_groups     = getMaxNGroups(ctx);
+    if(StartsWith(devName, "gfx942"))
+    {
+        constexpr uint64_t maxNGroups = WinoShaderArgsV2::PowOf2<16>() - 1;
+        args.n_groups                 = std::min(
+            static_cast<uint64_t>(ctx.GetStream().GetMaxHardwareComputeUnits()), maxNGroups);
+    }
+    else
+    {
+        args.n_groups = getMaxNGroups(ctx);
+    }
     auto shader_model = ShaderModelFactory::Create(
         devName, args, ctx.GetStream().GetMaxHardwareComputeUnits(), problem);
 
@@ -395,6 +404,12 @@ ConvWinoRageRxSCommon<Winodata, Winofilter>::GetSolution(const ExecutionContext&
         devName, args, ctx.GetStream().GetMaxHardwareComputeUnits(), problem, kernelVersion);
     auto perfmodel_result = shader_model->ComputeWti(problem.IsFp32());
     auto nGroups          = perfmodel_result.n_groups;
+    if(StartsWith(devName, "gfx942"))
+    {
+        constexpr uint64_t maxNGroups = WinoShaderArgsV2::PowOf2<16>() - 1;
+        nGroups = std::min(static_cast<uint64_t>(ctx.GetStream().GetMaxHardwareComputeUnits()),
+                           maxNGroups);
+    }
     args.SetShaderParams(nGroups, flags, 0, 0);
 
     // Kernel name and file
