@@ -448,18 +448,6 @@ class Reporter:
             f"[{index}/{total}] {graph_name}...", end="", flush=True, file=self._output
         )
 
-    def print_suite_graph_result(
-        self, passed: int, failed: int, skipped: int, errored: int
-    ) -> None:
-        """Print per-graph result summary on the same line as the start.
-
-        Format: [1/3] graph_name... -> 1 passed, 0 failed, 0 skipped, 0 errored
-        """
-        self._print(
-            f" -> {passed} passed, {failed} failed, "
-            f"{skipped} skipped, {errored} errored"
-        )
-
     def print_suite_per_engine_results(
         self, results: List[ProviderEngineResult]
     ) -> None:
