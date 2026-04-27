@@ -63,7 +63,7 @@ bool run_test()
     return pass ? 1 : 0;
 }
 
-// gfx1250, gfx1251
+// gfx125
 template <typename SrcAType,
           typename SrcBType,
           typename DstType,
@@ -262,11 +262,3 @@ TEST(WMMATest, F32_16x16x4_F32)
     auto pass = run_test<float, float, float, float, float, 4>();
     EXPECT_TRUE(pass);
 }
-
-#if defined(__gfx1251__)
-TEST(WMMATest, F64_16x16x4_F64)
-{
-    auto pass = run_test<double, double, double, double, double, 4>();
-    EXPECT_TRUE(pass);
-}
-#endif

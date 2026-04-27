@@ -28,13 +28,13 @@
 #define __gfx115__
 #endif
 #if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__) || \
-    defined(__gfx1250__) || defined(__gfx1251__)
+    defined(__gfx1250__)
 #define __gfx12__
 #endif
 #if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__)
 #define __gfx120__
 #endif
-#if defined(__gfx1250__) || defined(__gfx1251__)
+#if defined(__gfx1250__)
 #define __gfx125__
 #endif
 #if defined(__gfx120__) || defined(__gfx125__)
@@ -386,7 +386,6 @@ namespace ck_tile::core {
  * @var CK_TILE_ARCH_GFX1201 Indicates if the compiler target architecture is GFX1201.
  * @var CK_TILE_ARCH_GFX12_GENERIC Indicates if the compiler target architecture is GFX12 generic.
  * @var CK_TILE_ARCH_GFX1250 Indicates if the compiler target architecture is GFX1250.
- * @var CK_TILE_ARCH_GFX1251 Indicates if the compiler target architecture is GFX1251.
  */
 struct amdgcn_compiler_target_state
 {
@@ -579,12 +578,6 @@ struct amdgcn_compiler_target_state
 #else
     static constexpr bool CK_TILE_ARCH_GFX1250 = false;
 #endif // __gfx1250__
-
-#if defined(__gfx1251__)
-    static constexpr bool CK_TILE_ARCH_GFX1251 = true;
-#else
-    static constexpr bool CK_TILE_ARCH_GFX1251 = false;
-#endif // __gfx1251__
 };
 
 /**
@@ -637,8 +630,7 @@ CK_TILE_HOST_DEVICE static constexpr uint32_t count_values_of(T search, Ts... se
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1200,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1201,         \
         amdgcn_compiler_target_state::CK_TILE_ARCH_GFX12_GENERIC,   \
-        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1250,         \
-        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1251
+        amdgcn_compiler_target_state::CK_TILE_ARCH_GFX1250
 
 // Sanity check: make sure only one target architecture is defined during device compile
 static_assert(!amdgcn_compiler_target_state::CK_TILE_DEVICE_COMPILE ||

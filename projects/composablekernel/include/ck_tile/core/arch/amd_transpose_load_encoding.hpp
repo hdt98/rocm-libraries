@@ -38,7 +38,7 @@ struct LaneGroupTransposeTraits<T, LaneGroupSize, std::enable_if_t<sizeof(T) == 
         tuple<sequence<0, 0, 2, 2, 3>>,
         sequence<2, 1, 2>,
         sequence<1, 1, 4>>;
-#else // now this branch just for gfx1250 and gfx1251
+#else // now this branch just for gfx125
     static_assert(LaneGroupSize == 16, "LaneGroupSize must be 16");
 
     static constexpr index_t ksecondDim = 8;
@@ -83,7 +83,7 @@ struct LaneGroupTransposeTraits<T, LaneGroupSize, std::enable_if_t<sizeof(T) == 
         tuple<sequence<0, 0, 2, 2, 3>>,
         sequence<2, 1, 2>,
         sequence<1, 1, 4>>;
-#else // now this branch just for gfx1250 and gfx1251
+#else // now this branch just for gfx125
     template <index_t kOuterDistDim0,
               index_t kOuterDistDim1,
               index_t kInnerDistDim0,

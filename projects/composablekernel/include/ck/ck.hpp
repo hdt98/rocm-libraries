@@ -73,13 +73,13 @@
 #define __gfx11__
 #endif
 #if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__) || \
-    defined(__gfx1250__) || defined(__gfx1251__)
+    defined(__gfx1250__)
 #define __gfx12__
 #endif
 #if defined(__gfx1200__) || defined(__gfx1201__) || defined(__gfx12_generic__)
 #define __gfx120__
 #endif
-#if defined(__gfx1250__) || defined(__gfx1251__)
+#if defined(__gfx1250__)
 #define __gfx125__
 #endif
 // buffer resource
