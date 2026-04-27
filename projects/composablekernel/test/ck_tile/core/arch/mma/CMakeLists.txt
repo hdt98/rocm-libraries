@@ -45,7 +45,7 @@ if(GPU_TARGETS MATCHES "gfx11")
     target_compile_options(test_amdgcn_mma_layout_gfx11 PRIVATE ${EXAMPLE_GEMM_COMPILE_OPTIONS})
 endif()
 
-if(GPU_TARGETS MATCHES "gfx12")
+if(GPU_TARGETS MATCHES "gfx120")
     add_gtest_executable(test_amdgcn_mma_layout_gfx12 test_amdgcn_mma_layout_gfx12.cpp)
     target_compile_options(test_amdgcn_mma_layout_gfx12 PRIVATE ${EXAMPLE_GEMM_COMPILE_OPTIONS})
 endif()
