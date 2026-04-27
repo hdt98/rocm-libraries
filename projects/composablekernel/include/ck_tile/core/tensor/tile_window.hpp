@@ -1098,29 +1098,31 @@ struct tile_window_with_static_distribution
             // Create reverse iteration order: dimension 0 moves fastest
             constexpr auto reverse_order =
                 typename arithmetic_sequence_gen<box_dim.size() - 1, -1, -1>::type{};
-            static_ford<decltype(box_dim), decltype(reverse_order)>{}([&](auto box_dim_idx) {
-                const index_t x =
-                    x_lane_offset + box_dim_idx[I0] * lanes_per_row * col_prefetch_stride;
-                index_t prefetch_offset = base_offset + x * Traits::PackedSize;
-                bool is_valid           = x < tensor_dims[0];
+            static_ford<decltype(box_dim), remove_cvref_t<decltype(reverse_order)>>{}(
+                [&](auto box_dim_idx) {
+                    const index_t x =
+                        x_lane_offset + box_dim_idx[I0] * lanes_per_row * col_prefetch_stride;
+                    index_t prefetch_offset = base_offset + x * Traits::PackedSize;
+                    bool is_valid           = x < tensor_dims[0];
 
-                if constexpr(box_dim.size() > 1)
-                {
-                    const index_t y = y_lane_offset + box_dim_idx[I1] * num_rows_parallel;
-                    prefetch_offset += y * global_strides[0];
-                    is_valid = is_valid && y < tensor_dims[1];
-                }
+                    if constexpr(box_dim.size() > 1)
+                    {
+                        const index_t y = y_lane_offset + box_dim_idx[I1] * num_rows_parallel;
+                        prefetch_offset += y * global_strides[0];
+                        is_valid = is_valid && y < tensor_dims[1];
+                    }
 
-                static_for<2, box_dim.size(), 1>{}([&](auto i) {
-                    prefetch_offset += box_dim_idx[i] * global_strides[i - 1];
-                    is_valid = is_valid && box_dim_idx[i] < tensor_dims[i];
+                    static_for<2, box_dim.size(), 1>{}([&](auto i) {
+                        prefetch_offset += box_dim_idx[i] * global_strides[i - 1];
+                        is_valid = is_valid && box_dim_idx[i] < tensor_dims[i];
+                    });
+
+                    using DataType = typename Base::DataType;
+                    this->get_bottom_tensor_view()
+                        .get_buffer_view()
+                        .template prefetch<DataType, preferred_coherence>(
+                            0, prefetch_offset, is_valid);
                 });
-
-                using DataType = typename Base::DataType;
-                this->get_bottom_tensor_view()
-                    .get_buffer_view()
-                    .template prefetch<DataType, preferred_coherence>(0, prefetch_offset, is_valid);
-            });
         });
 #endif
     }
@@ -1240,23 +1242,25 @@ struct tile_window_with_static_distribution
         constexpr auto reverse_order =
             typename arithmetic_sequence_gen<box_dim.size() - 1, -1, -1>::type{};
 
-        static_ford<decltype(box_dim), decltype(reverse_order)>{}([&](auto box_dim_idx) {
-            const index_t x = x_lane_offset + box_dim_idx[I0] * lanes_per_row * col_prefetch_stride;
-            const index_t y = y_wave_base + y_lane_offset + box_dim_idx[I1] * num_rows_parallel;
+        static_ford<decltype(box_dim), remove_cvref_t<decltype(reverse_order)>>{}(
+            [&](auto box_dim_idx) {
+                const index_t x =
+                    x_lane_offset + box_dim_idx[I0] * lanes_per_row * col_prefetch_stride;
+                const index_t y = y_wave_base + y_lane_offset + box_dim_idx[I1] * num_rows_parallel;
 
-            index_t prefetch_offset = base_offset + x + y * global_strides[0];
-            bool is_valid           = x < tensor_dims[0] && y < tensor_dims[1];
+                index_t prefetch_offset = base_offset + x + y * global_strides[0];
+                bool is_valid           = x < tensor_dims[0] && y < tensor_dims[1];
 
-            static_for<2, box_dim.size(), 1>{}([&](auto i) {
-                prefetch_offset += box_dim_idx[i] * global_strides[i - 1];
-                is_valid = is_valid && box_dim_idx[i] < tensor_dims[i];
+                static_for<2, box_dim.size(), 1>{}([&](auto i) {
+                    prefetch_offset += box_dim_idx[i] * global_strides[i - 1];
+                    is_valid = is_valid && box_dim_idx[i] < tensor_dims[i];
+                });
+
+                using DataType = typename Base::DataType;
+                this->get_bottom_tensor_view()
+                    .get_buffer_view()
+                    .template prefetch<DataType, preferred_coherence>(0, prefetch_offset, is_valid);
             });
-
-            using DataType = typename Base::DataType;
-            this->get_bottom_tensor_view()
-                .get_buffer_view()
-                .template prefetch<DataType, preferred_coherence>(0, prefetch_offset, is_valid);
-        });
 #endif
     }
 
