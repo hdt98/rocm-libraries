@@ -505,12 +505,13 @@ inline std::map<std::string, int> initArchCaps(const IsaVersion& isaVersion)
     // store-release sequence must emit `s_wait_loadcnt 0; s_wait_storecnt 0;
     // global_wb scope:SCOPE_DEV` before the flag store, and a load-acquire
     // sequence must emit `global_inv scope:SCOPE_DEV; s_wait_loadcnt 0` after
-    // the flag load.
+    // the flag load. Mirrors LLVM's hasINVWBL2WaitCntRequirement().
     rv["HasInvWbDevFences"]            = checkInList(isaVersion, {{12, 5, 0}});
 
     // XNACK-replay drain. When set, in-flight VMEM ops can be replayed and
     // therefore reorder w.r.t. a subsequent volatile/atomic VMEM. An
-    // `s_wait_xcnt 0` must precede the volatile/atomic VMEM op.
+    // `s_wait_xcnt 0` must precede the volatile/atomic VMEM op. Mirrors
+    // LLVM's requiresWaitXCntForSingleAccessInstructions().
     rv["RequiresXCntForVolatileVMEM"]  = checkInList(isaVersion, {{12, 5, 0}});
 
     // Vector L1 Data cache line size (bytes) used for alignment-sensitive optimizations in codegen.
