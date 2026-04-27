@@ -84,6 +84,9 @@ if(NOT TARGET hipdnn_plugin_sdk)
     find_package(hipdnn_plugin_sdk CONFIG REQUIRED)
 endif()
 
+# Sanitizer support (Address Sanitizer, etc.)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/Sanitizers.cmake)
+
 # Setup testing dependencies, tests & clang format
 include(Dependencies)
 if (NOT HIPDNN_SKIP_TESTS)

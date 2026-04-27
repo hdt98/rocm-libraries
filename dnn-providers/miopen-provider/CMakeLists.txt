@@ -118,7 +118,7 @@ list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH}/llvm ${ROCM_PATH} ${ROCM_PATH}/hip)
 include(CheckToolVersion)
 include(ClangCheck)
 include(ClangTidy)
-include(Sanitizers)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/Sanitizers.cmake)
 
 include(Dependencies)
 include(Tests)

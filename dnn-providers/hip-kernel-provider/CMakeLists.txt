@@ -101,6 +101,7 @@ endif()
 include(CheckToolVersion)
 include(ClangCheck)
 include(ClangTidy)
+include(${CMAKE_CURRENT_LIST_DIR}/../cmake/Sanitizers.cmake)
 
 # Setup testing dependencies
 include(Dependencies)
