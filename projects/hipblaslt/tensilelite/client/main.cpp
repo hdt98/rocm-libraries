@@ -975,7 +975,7 @@ int main(int argc, const char* argv[])
     std::shared_ptr<DataInitialization> dataInit;
     {
         ScopedTimer timer("data_init_setup");
-        dataInit = std::make_shared<DataInitialization>(args, problemFactory);
+        dataInit = std::make_shared<DataInitialization>(args, problemFactory, hardware);
     }
 
     std::shared_ptr<SolutionIterator> solutionIterator;

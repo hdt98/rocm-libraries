@@ -3139,7 +3139,7 @@ class KernelWriterAssembly(KernelWriter):
           swzBlockSize = swzMorN * swzStride
           vw = kernel[f"VectorWidth{tc}"]
           kPack = tP["swizzlePackK"]
-          laneSize = int(kernel["MatrixInstK"] / 4) * kPack  # the size of one swizzle's lane
+          laneSize = tP["swizzleLaneSize"]
 
           with self.allocTmpSgpr(2) as tmpSgprInfo:
             swzBlkVWSizeSgpr = tmpSgprInfo.idx
@@ -3276,7 +3276,7 @@ class KernelWriterAssembly(KernelWriter):
       swzStride = tP["swizzleK"]
       vw = kernel[f"VectorWidth{tc}"]
       kPack = tP["swizzlePackK"]
-      laneSize = int(kernel["MatrixInstK"] / 4) * kPack  # the size of one swizzle's lane
+      laneSize = tP["swizzleLaneSize"]  # the size of one swizzle's lane (elements)
       numElmInSwzBlk = swzMorN * swzStride
 
       # Calculate local index in a swizzled block
@@ -5984,6 +5984,12 @@ class KernelWriterAssembly(KernelWriter):
     numDwordA = 1 if numDwordA == 0 else numDwordA
     numDwordB = 1 if numDwordB == 0 else numDwordB
     numTmpVgpr = maxNumOOBElementsA * numDwordA + maxNumOOBElementsB * numDwordB # 2 fo 16b
+    # CDNA (CMPXWritesSGPR): v_cmp may write compare mask to SGPR pair. GFX10+: dest is vcc (s_mov to SGPR).
+    tail_reload_vcmp_uses_vcc = not bool(self.states.archCaps["CMPXWritesSGPR"])
+    # gfx12: v_cmp src1 must be VGPR (LLVM AMDGPUAsmGFX12); tail reload compares vs sValidBytes (broadcast to VGPR).
+    tail_reload_vcmp_src1_needs_vgpr = (kernel["ISA"][0] == 12)
+    if tail_reload_vcmp_src1_needs_vgpr and (doA or doB):
+      numTmpVgpr += 1
 
     numSingleSgpr = 10
     numPairSgpr = 2
@@ -6280,12 +6286,35 @@ class KernelWriterAssembly(KernelWriter):
         loadRangePerThread = int(tP["glvw"] * tP["bpeGR"] - 1)
         imod.add(VAddU32(dst=vgpr(tmpVgpr+1), src0=vgpr(tmpVgpr), src1=loadRangePerThread, \
                          comment="Calculate load range per thread"))
-        imod.add(VCmpLtI32(dst=sgpr(sCmpLoadStartAddrStatusx2, 2), src0=vgpr(tmpVgpr), \
-                           src1=sgpr(sValidBytes), \
-                           comment="If loading start address < total valid bytes?"))
-        imod.add(VCmpGEI32(dst=sgpr(sCmpLoadEndAddrStatusx2, 2), src0=vgpr(tmpVgpr+1), \
-                           src1=sgpr(sValidBytes), \
-                           comment="If loading end address >= total valid bytes?"))
+        if tailReloadCmpSrc1Vgpr is not None:
+          imod.add(VMovB32(dst=vgpr(tailReloadCmpSrc1Vgpr), src=sgpr(sValidBytes), \
+                           comment="gfx12: v_cmp src1 must be VGPR"))
+          cmpSrc1 = vgpr(tailReloadCmpSrc1Vgpr)
+        else:
+          cmpSrc1 = sgpr(sValidBytes)
+        if tail_reload_vcmp_uses_vcc:
+          def storeVccCompareMaskToSgprPair(dstBase):
+            if kernel["WavefrontSize"] == 64:
+              imod.add(SMovB64(dst=sgpr(dstBase, 2), src=VCC(), \
+                               comment="GFX10+: compare mask vcc -> SGPR"))
+            else:
+              imod.add(SMovB32(dst=sgpr(dstBase), src=VCC(), \
+                               comment="GFX10+: compare mask vcc_lo -> SGPR"))
+              imod.add(SMovB32(dst=sgpr(dstBase + 1), src=0, \
+                               comment="wave32: unused hi SGPR of mask pair"))
+          imod.add(VCmpLtI32(dst=VCC(), src0=vgpr(tmpVgpr), src1=cmpSrc1, \
+                             comment="If loading start address < total valid bytes?"))
+          storeVccCompareMaskToSgprPair(sCmpLoadStartAddrStatusx2)
+          imod.add(VCmpGEI32(dst=VCC(), src0=vgpr(tmpVgpr+1), src1=cmpSrc1, \
+                             comment="If loading end address >= total valid bytes?"))
+          storeVccCompareMaskToSgprPair(sCmpLoadEndAddrStatusx2)
+        else:
+          imod.add(VCmpLtI32(dst=sgpr(sCmpLoadStartAddrStatusx2, 2), src0=vgpr(tmpVgpr), \
+                             src1=cmpSrc1, \
+                             comment="If loading start address < total valid bytes?"))
+          imod.add(VCmpGEI32(dst=sgpr(sCmpLoadEndAddrStatusx2, 2), src0=vgpr(tmpVgpr+1), \
+                             src1=cmpSrc1, \
+                             comment="If loading end address >= total valid bytes?"))
         imod.add(SAndB32(dst=sgpr(sCmpLoadStartAddrStatusx2), \
                          src0=sgpr(sCmpLoadStartAddrStatusx2), \
                          src1=sgpr(sCmpLoadEndAddrStatusx2), \
@@ -6329,6 +6358,7 @@ class KernelWriterAssembly(KernelWriter):
 
     if doA or doB:
       tmpVgpr = self.vgprPool.checkOut(numTmpVgpr)
+      tailReloadCmpSrc1Vgpr = (tmpVgpr + numTmpVgpr - 1) if tail_reload_vcmp_src1_needs_vgpr else None
       imod.add(SMovB32(dst=sgpr(sLoadCnt), src=0, comment="Set loop count = 0"))
       if doA and doB:
         imod.add(SMovB32(dst=sgpr(sBackupSkipLoadB), src=sgpr(sReloadFlagB), \
@@ -7941,14 +7971,13 @@ class KernelWriterAssembly(KernelWriter):
                 shiftK.add(SMinI32(dst=sgpr(loopCntSgpr), src0=sgpr(loopCounterName), src1=sgpr("LSUTailLoopOffset"), comment="check lsu bound"))
               shiftK.add(VCmpGEI32(dst=sgpr(tmpSgprX2, self.states.laneSGPRCount), src0=vgpr(kReg), src1=sgpr(loopCntSgpr), comment="check K index >= Size L"))
 
-            if not tPA["isSwizzled"]:
-              for se in range(0, vgprPerSet0Group):
-                for a in range(0, kernel["MIWaveTileA"]):
-                  for ti in range(0, numTileInInstA):
-                    for iui in range(0, innerUnroll):
-                      bk = se + group * vgprPerSet0Group + ti * vgprPerInUnrollA
-                      aStr = vgpr(self.generateSrcStrForMFMAshiftK(kernel, tPA, innerUnroll, vregSetIdx, vgprPerInputA, m, u, iui, a, bk=bk), 1)
-                      shiftK.add(VCndMaskB32(dst=aStr, src0=aStr, src1=0, src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment="set 0 if K_idx >= sizeL"))
+            for se in range(0, vgprPerSet0Group):
+              for a in range(0, kernel["MIWaveTileA"]):
+                for ti in range(0, numTileInInstA):
+                  for iui in range(0, innerUnroll):
+                    bk = se + group * vgprPerSet0Group + ti * vgprPerInUnrollA
+                    aStr = vgpr(self.generateSrcStrForMFMAshiftK(kernel, tPA, innerUnroll, vregSetIdx, vgprPerInputA, m, u, iui, a, bk=bk), 1)
+                    shiftK.add(VCndMaskB32(dst=aStr, src0=aStr, src1=0, src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment="set 0 if K_idx >= sizeL"))
 
           if kernel["ProblemType"]["Sparse"] == 2 and numMIInUnroll//8 >= 1:
             shiftK.add(vectorStaticRemainder(dummy, kReg_first, "Serial", kernel["WavefrontSize"], tmpVgpr, tmpSgprInfo))
@@ -9638,7 +9667,8 @@ class KernelWriterAssembly(KernelWriter):
                   # if hi8=1 or hi16=1 (component 1,2,3 for int8) or (component 1 for half), use the temp destVgprHi
                   # but only when hi16=1 we use the _d16_hi version instruction, see the below visualized int8 comment
                   if doTailOpt == 1:
-                    loadVgpr = destVgprHi
+                    # doTailOpt==1 normally loads into destVgprHi (tmp) for ECC packing; GLTr + !HasEccHalf never sets destVgprHi (use destVgpr instead)
+                    loadVgpr = destVgprHi if destVgprHi is not None else destVgpr
                   else:
                     loadVgpr = destVgprHi if ((hi16 or hi8) and destVgprHi != None) else destVgpr
                   self.vgprs.globalReadRegisters[tc][-1] = destVgprHi if ((hi16 or hi8) and destVgprHi != None) else self.vgprs.globalReadRegisters[tc][-1]
@@ -9664,7 +9694,8 @@ class KernelWriterAssembly(KernelWriter):
                                   glc=isGlc, slc=isSlc, nt=isNT, lds=isLds, \
                                   tr=isTr, hi16=hi16, \
                                   comment=comment))
-                        tmpVgprIdx += 1
+                        if destVgprHi is not None:
+                          tmpVgprIdx += 1
 
                         if (numElementsPerLoad == 2 and r == (numLoadVectorComp - 1)) or \
                            (numElementsPerLoad != 2 and (r + 1) == (numLoadVectorComp - 1)):

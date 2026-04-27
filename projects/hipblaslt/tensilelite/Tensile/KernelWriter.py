@@ -8190,9 +8190,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tP["isSwizzled"] = (kernel["ProblemType"]["SwizzleTensorB"] and tP["isB"]) or (kernel["ProblemType"]["SwizzleTensorA"] and tP["isA"])
 
     if tP["isSwizzled"]:
-      # 16 means bytes of buffer_load_dwordx4
-      tP["swizzlePackK"] = 16 // kernel["MIInputPerThread%s"%cM] // int(kernel["ProblemType"]["DataType%s"%cM].numBytes())
+      from Tensile.SwizzleSlabArch import (
+          cal_swizzle_pack_k_tensor,
+          cal_swizzle_lane_size_elements,
+      )
+      tP["swizzlePackK"] = cal_swizzle_pack_k_tensor(kernel, cM, kernel["ISA"])
       tP["swizzleK"] = kernel["MatrixInstK"] * tP["swizzlePackK"]
+      tP["swizzleLaneSize"] = cal_swizzle_lane_size_elements(kernel, cM, kernel["ISA"])
 
   ##############################################################################
   # Global Read Addresses: Tile Assignment A/B
