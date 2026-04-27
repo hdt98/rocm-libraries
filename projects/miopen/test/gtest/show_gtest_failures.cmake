@@ -1,16 +1,17 @@
 # show_gtest_failures.cmake
 #
-# Parses two sources of test result XML and writes failures.log:
+# Parses two sources of test result data and writes failures.log:
 #
 #   1. Per-shard GTest JUnit XML (miopen_gtest_shard*.xml)
-#      Written by --gtest_output=xml.  The <failure message="..."> attribute
+#      Written by --gtest_output=xml.  The <failure message=".."> attribute
 #      holds the full assertion text (file:line + values), encoded with XML
 #      character entities.  This gives individual GTest-case granularity.
 #
-#   2. CTest-level JUnit XML (ctest_junit_results.xml)
-#      Written by ctest --output-junit.  The <system-out> element holds the
-#      captured stdout of each CTest test.  Shard entries are skipped here
-#      because they are already covered by source 1 above.
+#   2. CTest LastTest.log (Testing/Temporary/LastTest.log)
+#      Written progressively by CTest as each test completes — available
+#      during FIXTURES_CLEANUP unlike ctest --output-junit which is written
+#      only when ctest exits.  Shard entries are skipped here because they
+#      are already covered by source 1 above.
 #
 # Called automatically by CTest via FIXTURES_CLEANUP after all shards finish,
 # regardless of whether any shard passed or failed.
@@ -20,8 +21,8 @@
 #   TEST_NAME            - base name of the gtest binary (e.g. miopen_gtest)
 #   GTEST_PARALLEL_LEVEL - number of shards
 #
-# The CTest JUnit XML is expected one level above SHARD_DIR (i.e. the project
-# binary directory), which is where CMAKE_CTEST_ARGUMENTS points it.
+# The CTest LastTest.log is expected at:
+#   <SHARD_DIR>/../../Testing/Temporary/LastTest.log
 
 # ── Helper: decode XML attribute entities from GTest's EscapeXml() ───────────
 macro(decode_xml_entities var)
@@ -90,71 +91,71 @@ foreach(xml ${shard_xml_files})
 endforeach()
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Part 2 — CTest-level JUnit XML (non-shard CTest tests)
+# Part 2 — CTest LastTest.log (non-shard CTest tests)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# ctest --output-junit writes its XML only when ctest exits, so it is never
+# available when FIXTURES_CLEANUP runs.  Testing/Temporary/LastTest.log is
+# written progressively by CTest as each test completes, so it IS available.
+#
+# Format of LastTest.log (CTest appends one block per test):
+#   ----------------------------------------------------------
+#   <N>/<TOTAL> Testing: <test-name>
+#   ...
+#   Output:
+#   ----------------------------------------------------------
+#   <captured output>
+#   ----------------------------------------------------------
+#   <N>/<TOTAL> Test: <test-name> ........ Passed/Failed <time>
 
-# The CTest JUnit XML is written to the project binary dir (one level up from
-# the gtest build dir where SHARD_DIR points).
+# SHARD_DIR is .../build/test/gtest; two DIRECTORY hops up = .../build
 get_filename_component(project_binary_dir "${SHARD_DIR}" DIRECTORY)
 get_filename_component(project_binary_dir "${project_binary_dir}" DIRECTORY)
-set(ctest_junit "${project_binary_dir}/ctest_junit_results.xml")
+set(last_test_log "${project_binary_dir}/Testing/Temporary/LastTest.log")
 
 set(ctest_failures "")   # list of test names
 set(ctest_log "")        # log content for ctest section
 
-if(EXISTS "${ctest_junit}")
-    file(STRINGS "${ctest_junit}" lines)
+if(EXISTS "${last_test_log}")
+    file(STRINGS "${last_test_log}" lines)
 
     set(current_test "")
-    set(is_failed FALSE)
-    set(in_sysout FALSE)
-    set(sysout_content "")
+    set(capturing FALSE)
+    set(output_lines "")
 
     foreach(line ${lines})
-        # New testcase element — reset state.
-        if(line MATCHES "<testcase ")
-            string(REGEX MATCH " name=\"([^\"]*)\"" _ "${line}")
+        # Detect "Testing: <name>" lines that start a new test block.
+        if(line MATCHES "^[0-9]+/[0-9]+ Testing: (.+)$")
             set(current_test "${CMAKE_MATCH_1}")
-            set(is_failed FALSE)
-            set(in_sysout FALSE)
-            set(sysout_content "")
+            string(STRIP "${current_test}" current_test)
+            set(capturing FALSE)
+            set(output_lines "")
         endif()
 
-        # A <failure> element marks the test as failed.
-        # (The message attribute only says "Failed" for CTest tests; the real
-        # output is in <system-out> below.)
-        if(line MATCHES "<failure")
-            set(is_failed TRUE)
+        # Start collecting after the "Output:" marker.
+        if(line MATCHES "^Output:$")
+            set(capturing TRUE)
+            continue()
         endif()
 
-        # Collect lines inside <system-out>...</system-out>.
-        if(line MATCHES "<system-out>")
-            set(in_sysout TRUE)
-            # Grab any content on the same line after the tag.
-            string(REGEX REPLACE ".*<system-out>" "" rest "${line}")
-            if(NOT rest MATCHES "^[[:space:]]*$")
-                string(APPEND sysout_content "${rest}\n")
-            endif()
-        elseif(in_sysout)
-            if(line MATCHES "</system-out>")
-                set(in_sysout FALSE)
+        # Collect output lines while in capturing mode.
+        if(capturing)
+            # The result line ends the block.
+            if(line MATCHES "^[0-9]+/[0-9]+ Test: .+ (Passed|Failed|FAILED|Not Run)")
+                set(capturing FALSE)
+                # Record non-shard failures.
+                if(line MATCHES "(Failed|FAILED)"
+                   AND NOT current_test MATCHES "^${TEST_NAME}_shard[0-9]+"
+                   AND NOT current_test MATCHES "_failure_summary$")
+                    list(APPEND ctest_failures "${current_test}")
+                    string(APPEND ctest_log
+                        "==== [ctest] FAILED: ${current_test} ====\n"
+                        "${output_lines}\n")
+                endif()
+                set(output_lines "")
             else()
-                string(APPEND sysout_content "${line}\n")
+                string(APPEND output_lines "${line}\n")
             endif()
-        endif()
-
-        # End of testcase — record if it failed and is not a shard
-        # (shards are already covered by Part 1).
-        if(line MATCHES "</testcase>" AND is_failed)
-            if(NOT current_test MATCHES "^${TEST_NAME}_shard[0-9]+$"
-               AND NOT current_test MATCHES "_failure_summary$")
-                list(APPEND ctest_failures "${current_test}")
-                string(APPEND ctest_log
-                    "==== [ctest] FAILED: ${current_test} ====\n"
-                    "${sysout_content}\n")
-            endif()
-            set(is_failed FALSE)
-            set(sysout_content "")
         endif()
     endforeach()
 endif()

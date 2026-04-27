@@ -884,3 +884,14 @@ add_subdirectory(gtest EXCLUDE_FROM_ALL)
 else()
 add_subdirectory(gtest)
 endif()
+
+# Ensure every non-gtest test waits for (and is accounted by) the gtest
+# shard fixture.  This prevents the miopen_gtest_failure_summary cleanup
+# from running before these tests have finished.
+if(NOT MIOPEN_TEST_DISCRETE)
+    get_property(_all_ctests DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY TESTS)
+    if(_all_ctests)
+        set_tests_properties(${_all_ctests} PROPERTIES
+            FIXTURES_REQUIRED "miopen_gtest_shards")
+    endif()
+endif()
