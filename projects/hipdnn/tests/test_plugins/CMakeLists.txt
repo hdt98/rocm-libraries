@@ -22,6 +22,10 @@ set(TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME "test_incompatible_version_plugin")
 set(TEST_GOOD_HEURISTIC_PLUGIN_NAME "test_good_heuristic_plugin")
 set(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME "test_incomplete_heuristic_api_plugin")
 set(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME "test_no_optional_heuristic_plugin")
+set(TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME "test_bad_api_version_heuristic_plugin")
+set(TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME "test_empty_name_heuristic_plugin")
+set(TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME "test_duplicate_policy_id_a_plugin")
+set(TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME "test_duplicate_policy_id_b_plugin")
 
 # Function to create a test plugin with common configuration
 function(add_test_plugin target_name)
@@ -106,6 +110,16 @@ add_test_plugin(${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME} TestIncompleteHeuri
 # test_no_optional_heuristic_plugin omits optional symbols (GetPolicyName, SetLogLevel)
 add_test_plugin(${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME} TestNoOptionalHeuristicPlugin.cpp)
 
+# test_bad_api_version_heuristic_plugin returns incompatible API version
+add_test_plugin(${TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME} TestBadApiVersionHeuristicPlugin.cpp)
+
+# test_empty_name_heuristic_plugin returns empty policy name
+add_test_plugin(${TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME} TestEmptyNameHeuristicPlugin.cpp)
+
+# test_duplicate_policy_id_a/b_plugin return same policy name (same ID)
+add_test_plugin(${TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME} TestDuplicatePolicyIdAPlugin.cpp)
+add_test_plugin(${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME} TestDuplicatePolicyIdBPlugin.cpp)
+
 # Export plugin names to parent scope for use in test compilation
 set(TEST_GOOD_PLUGIN_NAME "${TEST_GOOD_PLUGIN_NAME}" PARENT_SCOPE)
 set(TEST_EXECUTE_FAILS_PLUGIN_NAME "${TEST_EXECUTE_FAILS_PLUGIN_NAME}" PARENT_SCOPE)
@@ -125,3 +139,7 @@ set(TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME "${TEST_INCOMPATIBLE_VERSION_PLUGIN_NA
 set(TEST_GOOD_HEURISTIC_PLUGIN_NAME "${TEST_GOOD_HEURISTIC_PLUGIN_NAME}" PARENT_SCOPE)
 set(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME "${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME}" PARENT_SCOPE)
 set(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME "${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME}" PARENT_SCOPE)
+set(TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME "${TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME}" PARENT_SCOPE)
+set(TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME "${TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME}" PARENT_SCOPE)
+set(TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME "${TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME}" PARENT_SCOPE)
+set(TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME "${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME}" PARENT_SCOPE)

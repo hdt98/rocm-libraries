@@ -98,110 +98,10 @@ TEST_F(IntegrationHeuristicPlugin, CompleteHandleLifecycleWithGoodPlugin)
     EXPECT_FALSE(plugin->version().empty());
 }
 
-TEST_F(IntegrationHeuristicPlugin, CompletePolicyDescriptorLifecycle)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(handle, nullptr);
-
-    // Create policy descriptor
-    auto desc = plugin->createPolicyDescriptor(handle);
-    EXPECT_NE(desc, nullptr);
-
-    // Destroy policy descriptor (should not throw)
-    EXPECT_NO_THROW(plugin->destroyPolicyDescriptor(desc));
-}
-
-TEST_F(IntegrationHeuristicPlugin, SetEngineIdsOnPolicyDescriptor)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(handle, nullptr);
-
-    auto desc = plugin->createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
-
-    // Set engine IDs
-    const std::vector<int64_t> engineIds = {1, 2, 3};
-    EXPECT_NO_THROW(plugin->setEngineIds(desc, engineIds.data(), engineIds.size()));
-
-    plugin->destroyPolicyDescriptor(desc);
-}
-
-TEST_F(IntegrationHeuristicPlugin, SetSerializedGraphOnPolicyDescriptor)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(handle, nullptr);
-
-    auto desc = plugin->createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
-
-    // Create a simple serialized graph (just some bytes)
-    const std::vector<uint8_t> graphBytes = {1, 2, 3, 4, 5};
-    hipdnnPluginConstData_t serializedGraph;
-    serializedGraph.ptr = graphBytes.data();
-    serializedGraph.size = graphBytes.size();
-
-    EXPECT_NO_THROW(plugin->setSerializedGraph(desc, &serializedGraph));
-
-    plugin->destroyPolicyDescriptor(desc);
-}
-
-TEST_F(IntegrationHeuristicPlugin, FinalizeAndGetSortedEngineIds)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(handle, nullptr);
-
-    auto desc = plugin->createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
-
-    // Set engine IDs
-    const std::vector<int64_t> engineIds = {100, 200, 300};
-    plugin->setEngineIds(desc, engineIds.data(), engineIds.size());
-
-    // Finalize the policy
-    plugin->finalize(desc);
-
-    // Get sorted IDs
-    const auto sortedIds = plugin->getSortedEngineIds(desc);
-    EXPECT_TRUE(sortedIds.empty() || !sortedIds.empty()); // May or may not apply
-
-    plugin->destroyPolicyDescriptor(desc);
-}
+// ========== Basic Operation Tests ==========
+// Note: Basic individual operations (createHandle, createPolicyDescriptor, setEngineIds,
+// setSerializedGraph, finalize, getSortedEngineIds) are tested in TestHeuristicPluginLoadedGood
+// fixture with focused assertions. Tests here focus on resource manager integration.
 
 TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnHandle)
 {
@@ -308,58 +208,8 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
 }
 
 // ========== Plugin Metadata Coverage ==========
-
-TEST_F(IntegrationHeuristicPlugin, GetPolicyNameFromLoadedPlugin)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    for(const auto& info : policyInfos)
-    {
-        const HeuristicPlugin* plugin = rm->getPluginForPolicyId(info.policyId);
-        if(plugin != nullptr)
-        {
-            // Should return policy name (may be empty for no-optional plugin)
-            const auto policyName = plugin->name();
-            // Just verify it doesn't crash
-            EXPECT_TRUE(policyName.empty() || !policyName.empty());
-        }
-    }
-}
-
-TEST_F(IntegrationHeuristicPlugin, GetPluginVersionFromLoadedPlugin)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    const auto pluginVersion = plugin->version();
-    EXPECT_FALSE(pluginVersion.empty());
-}
-
-TEST_F(IntegrationHeuristicPlugin, GetApiVersionFromLoadedPlugin)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(policyInfos[0].policyId);
-    ASSERT_NE(plugin, nullptr);
-
-    const auto apiVersion = plugin->apiVersion();
-    EXPECT_FALSE(apiVersion.empty());
-    EXPECT_NE(apiVersion.find("0."), std::string_view::npos); // Should be version 0.x
-}
+// Note: Plugin metadata queries (name, version, API version, policy ID) are tested
+// in TestHeuristicPluginLoadedGood fixture with more specific assertions
 
 TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
 {
