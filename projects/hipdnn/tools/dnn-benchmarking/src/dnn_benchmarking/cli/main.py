@@ -332,28 +332,33 @@ def run_suite(
     graph_paths: List[Path],
     config: SuiteConfig,
     handle: Any,
+    reporter: Optional[Reporter] = None,
 ) -> SuiteResult:
     """Run benchmark suite and return aggregated results.
 
-    Pure runner: does not print, write files, or check the validation
-    startup gate (the caller is responsible for that). Per-graph errors
-    are captured in the returned SuiteResult; the function does not raise
-    for per-graph load or execution failures.
+    Pure runner: does not write files or check the validation startup gate
+    (the caller is responsible for that). Per-graph errors are captured in
+    the returned SuiteResult; the function does not raise for per-graph load
+    or execution failures.
 
     Args:
         graph_paths: List of resolved graph file paths.
         config: Suite configuration.
         handle: hipdnn.Handle instance, ready to use.
+        reporter: Optional Reporter for per-engine and per-graph progress lines.
 
     Returns:
         Aggregated SuiteResult covering every graph in ``graph_paths``.
     """
-    reporter = Reporter()
-    graph_results: List[GraphResult] = [
-        _run_one_graph(graph_path, config, handle, reporter)
-        for graph_path in graph_paths
-    ]
-    metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
+    total = len(graph_paths)
+    graph_results: List[GraphResult] = []
+    for i, graph_path in enumerate(graph_paths, start=1):
+        if reporter is not None:
+            reporter.print_suite_graph_start(i, total, graph_path.stem)
+            print(flush=True)  # end the "graph_name..." line before per-engine lines
+        gr = _run_one_graph(graph_path, config, handle, reporter)
+        graph_results.append(gr)
+    metadata = _build_suite_metadata(graph_results, total_graphs=total)
     return SuiteResult(metadata=metadata, graphs=graph_results)
 
 
@@ -430,15 +435,10 @@ def _orchestrate_suite_cli(
     reporter.print_hipdnn_init_done()
     reporter.print_running_benchmark(total)
 
-    graph_results: List[GraphResult] = []
-    for i, graph_path in enumerate(graph_paths, start=1):
-        reporter.print_suite_graph_start(i, total, graph_path.stem)
-        print(flush=True)  # end the "graph_name..." line before per-engine lines
-        gr = _run_one_graph(graph_path, config, handle, reporter)
-        graph_results.append(gr)
-        # Pre-execution graph errors come back as a single "unknown" provider
-        # entry with an error message and no timing data; surface those via
-        # the dedicated graph-error printer so they read like load failures.
+    suite_result = run_suite(graph_paths, config, handle, reporter=reporter)
+
+    # Handle results: surface per-graph errors and verbose blocks.
+    for gr in suite_result.graphs:
         is_setup_error = (
             len(gr.results) == 1
             and gr.results[0].status == "error"
@@ -450,9 +450,6 @@ def _orchestrate_suite_cli(
             )
         elif config.verbose:
             reporter.print_verbose_graph_result(gr, config)
-
-    metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
-    suite_result = SuiteResult(metadata=metadata, graphs=graph_results)
 
     reporter.print_suite_summary(suite_result.metadata)
     reporter.print_suite_footer()
