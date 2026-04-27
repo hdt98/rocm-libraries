@@ -198,15 +198,34 @@ function(add_gtest TEST_NAME TEST_CPP)
     message(STATUS "MIOPEN_GTEST_FILTER ${MIOPEN_GTEST_FILTER}")
 
     foreach(i RANGE 1 ${GTEST_PARALLEL_LEVEL})
+      set(SHARD_XML "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}_shard${i}.xml")
       add_test(NAME ${TEST_NAME}_shard${i}
-        COMMAND ${TEST_NAME} --gtest_filter=${MIOPEN_GTEST_FILTER}
+        COMMAND ${TEST_NAME}
+          --gtest_filter=${MIOPEN_GTEST_FILTER}
+          --gtest_output=xml:${SHARD_XML}
         WORKING_DIRECTORY "${PROJECT_BINARY_DIR}/${DATABASE_INSTALL_DIR}"
       )
       math(EXPR SHARD_INDEX "${i} - 1")
       set_tests_properties(${TEST_NAME}_shard${i} PROPERTIES
         ENVIRONMENT "MIOPEN_USER_DB_PATH=${CMAKE_CURRENT_BINARY_DIR};MIOPEN_INVOKED_FROM_CTEST=1;GTEST_TOTAL_SHARDS=${GTEST_PARALLEL_LEVEL};GTEST_SHARD_INDEX=${SHARD_INDEX}"
+        FIXTURES_REQUIRED "${TEST_NAME}_shards"
       )
     endforeach()
+
+    # Run after all shards complete (pass or fail) and print a consolidated
+    # failure summary across every shard.  Uses only CMake — no Python needed.
+    add_test(NAME ${TEST_NAME}_failure_summary
+      COMMAND ${CMAKE_COMMAND}
+        -DSHARD_DIR=${CMAKE_CURRENT_BINARY_DIR}
+        -DTEST_NAME=${TEST_NAME}
+        -DGTEST_PARALLEL_LEVEL=${GTEST_PARALLEL_LEVEL}
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/show_gtest_failures.cmake"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    )
+    set_tests_properties(${TEST_NAME}_failure_summary PROPERTIES
+      FIXTURES_CLEANUP "${TEST_NAME}_shards"
+      RUN_SERIAL TRUE
+    )
 
   endif()
   target_link_libraries(${TEST_NAME} BZip2::BZip2)
