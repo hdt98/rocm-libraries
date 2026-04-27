@@ -545,11 +545,11 @@ struct F8xMXF4FlatmmPipelineAgBgCrPolicy : UniversalFlatmmPipelineAgBgCrPolicy
         constexpr int K_Lane = 64 / M_Lane; // 4
 
         constexpr int K_Thread = TileShape::WarpTile::at(I2) / K_Lane; // 32
-        
-        using ADataType = remove_cvref_t<typename Problem::ADataType>;
+
+        using ADataType                = remove_cvref_t<typename Problem::ADataType>;
         constexpr index_t num_access_v = std::is_same_v<ADataType, pk_fp4_t> ? 1 : 2;
-        
-        constexpr int K1               = K_Thread / num_access_v; // 16
+
+        constexpr int K1 = K_Thread / num_access_v; // 16
 
         return make_static_tile_distribution(
             std::conditional_t<

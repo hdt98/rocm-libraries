@@ -6,7 +6,7 @@
 #include "test_moe_flatmm_base.hpp"
 #include "test_moe_flatmm_scenarios.hpp"
 
-// FP16 MoE FlatMM on gfx950 warp configs (16x16x32 and 32x32x16).
+// FP16 MoE FlatMM on CDNA gfx942/gfx950 warp configs (16x16x32 and 32x32x16).
 // Covers all three MoE kinds per config.
 // clang-format off
 using FP16Types = ::testing::Types<

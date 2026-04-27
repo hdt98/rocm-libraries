@@ -6,7 +6,7 @@
 #include "test_moe_flatmm_base.hpp"
 #include "test_moe_flatmm_scenarios.hpp"
 
-// BF8 MoE FlatMM on gfx950 warp configs.
+// BF8 MoE FlatMM on CDNA gfx942/gfx950 warp configs.
 // Output is fp16 (matches GemmBasicTypeConfig<bf8_t>::CDataType).
 // clang-format off
 using BF8Types = ::testing::Types<

@@ -6,7 +6,7 @@
 #include "test_moe_flatmm_base.hpp"
 #include "test_moe_flatmm_scenarios.hpp"
 
-// BF16 MoE FlatMM on gfx950 warp configs.
+// BF16 MoE FlatMM on CDNA gfx942/gfx950 warp configs.
 // clang-format off
 using BF16Types = ::testing::Types<
     std::tuple<BF16, BF16, BF16, FlatmmConfig16_950<BF16>, GateOnly>,

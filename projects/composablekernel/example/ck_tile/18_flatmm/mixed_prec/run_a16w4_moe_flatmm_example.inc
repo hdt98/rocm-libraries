@@ -175,8 +175,10 @@ int run_a16w4_moe_gemm_example_with_layouts(int argc,
         ck_tile::FillUniformDistribution<AccDataType>{0.0f, 0.0f}(expert_bias);
     }
 
-    max_token_id.mData = {valid_tile_num * MPerBlock, 0, 1, 2, 3, 4, 6, 7, 8, 8};
-    // int eids[]         = {0, 1, 2, 3, 4, 4, 5, 6, 3, 3, 3, 3}; // {2, 1, 1, 2, 2, 2, 1, 2}
+    max_token_id.mData.assign(max_token_id.mData.size(), 0);
+    max_token_id.mData[0] = valid_tile_num * MPerBlock;
+    for(ck_tile::index_t i = 0; i < sorted_tile_num; ++i)
+        max_token_id.mData[1 + i] = i;
 
     for(int i = 0; i < sorted_tile_num; i++)
     {
@@ -184,9 +186,7 @@ int run_a16w4_moe_gemm_example_with_layouts(int argc,
     }
 
     int token_per_tile = (num_tokens * topk + valid_tile_num - 1) / valid_tile_num;
-    // int token_per_tile = num_tokens * topk / valid_tile_num;
-    int tokenid = 0;
-    // sorted_token_ids.mData[0] = 0;
+    int tokenid        = 0;
     for(int i = 0; i < sorted_tile_num * MPerBlock; i++)
     {
         int tile_off = i % MPerBlock;

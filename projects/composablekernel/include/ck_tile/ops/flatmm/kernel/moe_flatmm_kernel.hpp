@@ -965,10 +965,10 @@ struct MoeFlatmmKernel
                 coord_m + m0 * (TilePartitioner::MPerBlock / DramMRepeat) + a_coord[I0];
             const bool is_valid_token = row_is_valid_token(row_idx);
             index_t gather_token_id   = is_valid_token ? row_to_token_idx(row_idx) : 0;
-            a_offsets[m0]           = std::is_same_v<ALayout, tensor_layout::gemm::RowMajor>
-                                          ? gather_token_id * kargs.stride_A
-                                          : gather_token_id;
-            a_valids[m0] = is_valid_token;
+            a_offsets[m0]             = std::is_same_v<ALayout, tensor_layout::gemm::RowMajor>
+                                            ? gather_token_id * kargs.stride_A
+                                            : gather_token_id;
+            a_valids[m0]              = is_valid_token;
         });
 
         const SplitKBatchOffset splitk_batch_offset(kargs);
@@ -1128,10 +1128,10 @@ struct MoeFlatmmKernel
                     }
                     else
                     {
-                        const bool is_valid_token     = row_is_valid_token(row_idx);
-                        scale_m_offsets[scale_m_idx] = is_valid_token ? row_to_token_idx(row_idx)
-                                                                       : 0;
-                        scale_m_valids[scale_m_idx]  = is_valid_token;
+                        const bool is_valid_token = row_is_valid_token(row_idx);
+                        scale_m_offsets[scale_m_idx] =
+                            is_valid_token ? row_to_token_idx(row_idx) : 0;
+                        scale_m_valids[scale_m_idx] = is_valid_token;
                     }
                 });
 
@@ -1186,6 +1186,8 @@ struct MoeFlatmmKernel
                                          scale_m_valids,
                                          number<0>{},
                                          number<1>{},
+                                         // Gather over MRepeat, intra-XDL M value, and vector M
+                                         // value for the current embedded C-warp distribution.
                                          sequence<3, 2, 0>{});
 
             auto scale_n_window = make_tile_window(
