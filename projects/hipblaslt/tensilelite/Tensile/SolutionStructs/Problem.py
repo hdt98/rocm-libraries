@@ -825,17 +825,17 @@ class ProblemType(Mapping):
         self["F32XdlMathOp"] = DataType(DataTypeEnum.Float)
 
     # Modifying ComputeDataType for HHH+HPA: if (HHH+HPA), convert it to HHS_BH by setting ComputeDataType to S.
-    if self["ComputeDataType"].isHalf() and self["MacDataTypeA"].isHalf() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isHalf() and self["DataType"].isHalf() and self["HighPrecisionAccumulate"]:
       printWarning("Inconsistent DataTypes: DataType == f16, DestType == f16, ComputeDataType == f16, but HPA == True (HHH+HPA, no such a type); Converting HHH+HPA to HHS_BH by setting compute data type to f32.")
       self["ComputeDataType"] = DataType('s')
 
     # Modifying ComputeDataType for BBB+HPA: if (BBB+HPA), convert it to BBS_BH by setting ComputeDataType to S.
-    if self["ComputeDataType"].isBFloat16() and self["MacDataTypeA"].isBFloat16() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isBFloat16() and self["DataType"].isBFloat16() and self["HighPrecisionAccumulate"]:
       printWarning("Inconsistent DataTypes: DataType == bf16, DestType == bf16, ComputeDataType == bf16, but HPA == True (BBB+HPA, no such a type); Converting BBB+HPA to BBS_BH by setting compute data type to f32.")
       self["ComputeDataType"] = DataType('s')
 
     # Modifying ComputeDataType for I8I8I_BH: if (I8I8I8+HPA), convert it to I8I8I_BH by setting ComputeDataType to i.
-    if self["ComputeDataType"].isInt8() and DataType(config["MacDataTypeA"]).isInt8() and self["HighPrecisionAccumulate"]:
+    if self["ComputeDataType"].isInt8() and DataType(config["DataType"]).isInt8() and self["HighPrecisionAccumulate"]:
       print2("DataType == i8 and HPA == True; setting compute data type to int32")
       self["ComputeDataType"] = DataType('i')
 
@@ -895,7 +895,7 @@ class ProblemType(Mapping):
                                                                                                 self["DestDataType"]))
         self["ActivationComputeDataType"] = self["ComputeDataType"]
       if (self["ActivationComputeDataType"].numRegisters() != self["ComputeDataType"].numRegisters()) and \
-        (self["MacDataTypeA"].numRegisters() < self["DestDataType"].numRegisters()):
+        (self["DataType"].numRegisters() < self["DestDataType"].numRegisters()):
         printWarning("TensileLite only supports ActivationComputeDataType = ComputeDataType if DestDataType > DataType. \
                       ActivationComputeDataType will be set to ComputeDataType automatically.")
         self["ActivationComputeDataType"] = self["ComputeDataType"]
