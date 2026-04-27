@@ -1311,6 +1311,7 @@ inline void sort_keys_large_sizes()
         SCOPED_TRACE(testing::Message() << "with size = " << size);
 
 std::cout << "testing with size: " << size << std::endl;
+
 test_utils::MemCheck memcheck;
 
         // QA is also testing on APU platforms with only 32GB of system memory
@@ -1325,7 +1326,7 @@ test_utils::MemCheck memcheck;
 //            break;
 //        }
 
-memcheck.alloc_device<key_type>(size);
+if (!memcheck.alloc_device<key_type>(size)) GTEST_SKIP() << "skip 1";
         common::device_ptr<key_type> d_keys;
         if(!d_keys.resize_with_memory_check(size))
         {
@@ -1335,7 +1336,7 @@ memcheck.alloc_device<key_type>(size);
 
         // Generate data
         {
-memcheck.alloc_host<key_type>(size);
+if (!memcheck.alloc_host<key_type>(size)) GTEST_SKIP() << "skip 2";
             std::vector<key_type> keys_input(size);
             std::iota(keys_input.begin(), keys_input.end(), 0);
             d_keys.store(keys_input);
@@ -1352,7 +1353,7 @@ memcheck.free_host<key_type>(size);
                                            end_bit,
                                            stream));
 
-memcheck.alloc_device_bytes(temporary_storage_bytes);
+if (!memcheck.alloc_device_bytes(temporary_storage_bytes)) GTEST_SKIP() << "skip 3";
         ASSERT_GT(temporary_storage_bytes, 0U);
         common::device_ptr<void> d_temporary_storage;
         if(!d_temporary_storage.resize_with_memory_check(temporary_storage_bytes))
@@ -1370,7 +1371,7 @@ memcheck.alloc_device_bytes(temporary_storage_bytes);
                                            end_bit,
                                            stream));
 
-memcheck.alloc_host_bytes(d_keys.msize());
+if (!memcheck.alloc_host_bytes(d_keys.msize())) GTEST_SKIP() << "skip 4";
         const auto keys_output = d_keys.load();
 
         // Check if output values are as expected

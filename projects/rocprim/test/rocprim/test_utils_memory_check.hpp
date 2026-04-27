@@ -153,19 +153,19 @@ public:
 
 	// Call this before host allocs. Must be inline to allow mem_check to issue continue/GTEST_SKIP() statements
     template<typename T>
-    inline void alloc_host(const size_t size)
+    inline bool alloc_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
         std::cout << "\nAlloc host usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-        this->mem_check();
+        return this->mem_check();
     }
 
-    inline void alloc_host_bytes(const size_t bytes)
+    inline bool alloc_host_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc host usage: " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-        this->mem_check();
+        return this->mem_check();
     }
 
     template<typename T>
@@ -184,19 +184,19 @@ public:
 
 	// Call this before dev allocs
     template<typename T>
-    inline void alloc_device(const size_t size)
+    inline bool alloc_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
         std::cout << "\nAlloc dev usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-        this->mem_check();
+        return this->mem_check();
     }
 
-    inline void alloc_device_bytes(const size_t bytes)
+    inline bool alloc_device_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc dev usage: " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-        this->mem_check();
+        return this->mem_check();
     }
 
     template<typename T>
@@ -215,7 +215,7 @@ public:
 
 private:
 
-	inline void mem_check()
+	bool mem_check()
         {
             std::cout << "--- mem_check ---" << std::endl;
             bool success = false;
@@ -247,17 +247,7 @@ private:
             }
             std::cout.flush();
 
-            if (!success)
-            {
-#if continue_on_fail
-                std::cout << "Issuing continue." << std::endl;
-                std::cout << "Skipping size - not enough memory.";
-                continue;
-#else
-                std::cout << "Calling GTEST_SKIP" << std::endl;
-                GTEST_SKIP() << "Skipping test - not enough memory.";
-#endif
-            }
+            return success;
     }
 
 	// Returns total system memory minus the amount that's been carved out for the GPU.
@@ -293,24 +283,29 @@ private:
 			// hipMemGetInfo fetches total free GPU memory, but currently
 			// on APUs this does not get updated when host allocations are made.
             HIP_CHECK(hipMemGetInfo(&free_dev_mem, &total_dev_mem));
+            std::cout << "total device memory: " << (total_dev_mem >> 20) << std::endl;
 
             size_t total_host_mem = MemCheck::get_host_memory();
-            size_t max_dev_shared_mem = total_dev_mem / 2;
+            std::cout << "total host memory: " << (total_host_mem >> 20) << std::endl;
 
-            size_t dedicated_dev_mem = total_dev_mem - max_dev_shared_mem;
-            size_t total_sys_mem = dedicated_dev_mem + total_host_mem;
+            //size_t max_dev_shared_mem = total_dev_mem / 2;
 
-            MemCheck::sys_info.unified_mem_limit = total_sys_mem;
-            std::cout << "free_dev_mem: " << free_dev_mem << std::endl;
-            std::cout << "total_dev_mem: " << total_dev_mem << std::endl;
-            std::cout << "total_host_mem: " << total_host_mem << std::endl;
+            //size_t dedicated_dev_mem = total_dev_mem - max_dev_shared_mem;
+            //size_t total_sys_mem = dedicated_dev_mem + total_host_mem;
+
+            //MemCheck::sys_info.unified_mem_limit = total_sys_mem;
+            //std::cout << "free_dev_mem: " << free_dev_mem << std::endl;
+            //std::cout << "total_dev_mem: " << total_dev_mem << std::endl;
+            //std::cout << "total_host_mem: " << total_host_mem << std::endl;
+
+            MemCheck::sys_info.unified_mem_limit = total_dev_mem; // for now
             std::cout << "unified_mem_limit: " << MemCheck::sys_info.unified_mem_limit << std::endl;
         }
         else
         {
 			// Here all GPU memory is dedicated and there's no shared memory.
             MemCheck::sys_info.host_mem_limit = props.totalGlobalMem;
-            MemCheck::sys_info.dev_mem_limit = MemCheck::get_host_memory();
+            MemCheck::sys_info.dev_mem_limit = MemCheck::get_host_memory(); // ?????
             std::cout << "host_mem_limit: " << MemCheck::sys_info.host_mem_limit << std::endl;
             std::cout << "dev_mem_limit: " << MemCheck::sys_info.dev_mem_limit << std::endl;
         }
