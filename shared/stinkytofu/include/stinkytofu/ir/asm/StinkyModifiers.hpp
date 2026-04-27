@@ -26,6 +26,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace stinkytofu {
@@ -33,6 +34,37 @@ namespace stinkytofu {
 enum class HighBitSel : int { NONE = -1, LOW = 0, HIGH = 1 };
 
 enum class MatrixFmt : uint8_t { FP4 = 0, FP6 = 1, FP8 = 2 };
+
+enum class MUBUFScope : uint8_t {
+    SCOPE_NONE = 0,
+    SCOPE_CU = 1,
+    SCOPE_SE = 2,
+    SCOPE_DEV = 3,
+    SCOPE_SYS = 4
+};
+
+inline std::string_view toString(MUBUFScope scope) {
+    switch (scope) {
+        case MUBUFScope::SCOPE_CU:
+            return "SCOPE_CU";
+        case MUBUFScope::SCOPE_SE:
+            return "SCOPE_SE";
+        case MUBUFScope::SCOPE_DEV:
+            return "SCOPE_DEV";
+        case MUBUFScope::SCOPE_SYS:
+            return "SCOPE_SYS";
+        default:
+            return "";
+    }
+}
+
+inline MUBUFScope parseMUBUFScope(std::string_view scope) {
+    if (scope == "SCOPE_CU") return MUBUFScope::SCOPE_CU;
+    if (scope == "SCOPE_SE") return MUBUFScope::SCOPE_SE;
+    if (scope == "SCOPE_DEV") return MUBUFScope::SCOPE_DEV;
+    if (scope == "SCOPE_SYS") return MUBUFScope::SCOPE_SYS;
+    return MUBUFScope::SCOPE_NONE;
+}
 
 struct Modifier {
     enum class Type : uint8_t {
@@ -152,7 +184,7 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
                    bool nt = false, bool lds = false, bool isStore = false,
                    bool hasMUBUFConst = false, bool hasGLCModifier = false,
                    bool hasSC0Modifier = false, bool hasSCOPEModifier = false,
-                   const std::string& scope = "")
+                   MUBUFScope scope = MUBUFScope::SCOPE_NONE)
         : TypedModifier<MUBUFModifiers>(),
           offset12(offset12),
           scope(scope),
@@ -168,7 +200,7 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
           hasSCOPEModifier(hasSCOPEModifier) {}
 
     int offset12;
-    std::string scope;
+    MUBUFScope scope;
     uint32_t offen : 1;
     uint32_t glc : 1;
     uint32_t slc : 1;

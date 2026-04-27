@@ -717,7 +717,7 @@ TEST_F(AsmEmitterTest, MUBUFScopeModifier) {
                             /*nt=*/false, /*lds=*/false, /*isStore=*/true,
                             /*hasMUBUFConst=*/false, /*hasGLCModifier=*/false,
                             /*hasSC0Modifier=*/false, /*hasSCOPEModifier=*/true,
-                            /*scope=*/"SCOPE_DEV");
+                            /*scope=*/MUBUFScope::SCOPE_DEV);
     inst->addModifier(mubufMod);
 
     AsmEmitterOptions options;

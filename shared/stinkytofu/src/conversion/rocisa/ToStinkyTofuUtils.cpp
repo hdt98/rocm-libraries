@@ -80,14 +80,28 @@ stinkytofu::FLATModifiers convertFLATModifiers(const rocisa::FLATModifiers& rocM
                                      rocMod.isStore, hasGLCModifier, hasSC0Modifier);
 }
 
+stinkytofu::MUBUFScope convertMUBUFScope(rocisa::CacheScope scope) {
+    switch (scope) {
+        case rocisa::CacheScope::SCOPE_CU:
+            return stinkytofu::MUBUFScope::SCOPE_CU;
+        case rocisa::CacheScope::SCOPE_SE:
+            return stinkytofu::MUBUFScope::SCOPE_SE;
+        case rocisa::CacheScope::SCOPE_DEV:
+            return stinkytofu::MUBUFScope::SCOPE_DEV;
+        case rocisa::CacheScope::SCOPE_SYS:
+            return stinkytofu::MUBUFScope::SCOPE_SYS;
+        default:
+            return stinkytofu::MUBUFScope::SCOPE_NONE;
+    }
+}
+
 stinkytofu::MUBUFModifiers convertMUBUFModifiers(const rocisa::MUBUFModifiers& rocMod,
                                                  const std::map<std::string, int>& asmCaps) {
     bool hasMUBUFConst = asmCaps.count("HasMUBUFConst") && asmCaps.at("HasMUBUFConst");
     bool hasGLCModifier = asmCaps.count("HasGLCModifier") && asmCaps.at("HasGLCModifier");
     bool hasSC0Modifier = asmCaps.count("HasSC0Modifier") && asmCaps.at("HasSC0Modifier");
     bool hasSCOPEModifier = asmCaps.count("HasSCOPEModifier") && asmCaps.at("HasSCOPEModifier");
-    std::string scope =
-        rocMod.scope == rocisa::CacheScope::SCOPE_NONE ? "" : rocisa::toString(rocMod.scope);
+    stinkytofu::MUBUFScope scope = convertMUBUFScope(rocMod.scope);
     return stinkytofu::MUBUFModifiers(rocMod.offen, rocMod.offset12, rocMod.glc, rocMod.slc,
                                       rocMod.nt, rocMod.lds, rocMod.isStore, hasMUBUFConst,
                                       hasGLCModifier, hasSC0Modifier, hasSCOPEModifier, scope);

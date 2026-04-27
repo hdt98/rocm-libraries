@@ -203,8 +203,8 @@ inline std::ostream& operator<<(std::ostream& os, const MUBUFModifiers& mubufMod
         else if (mubufMod.hasSC0Modifier)
             os << " sc1";
     }
-    if (mubufMod.hasSCOPEModifier && !mubufMod.scope.empty()) {
-        os << " scope:" << mubufMod.scope;
+    if (mubufMod.hasSCOPEModifier && mubufMod.scope != MUBUFScope::SCOPE_NONE) {
+        os << " scope:" << toString(mubufMod.scope);
     }
     if (mubufMod.nt) {
         os << " nt";
