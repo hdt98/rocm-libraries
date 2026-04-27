@@ -622,6 +622,13 @@ namespace rocRoller
                        or solutionParams.workgroupClusterSizeY > 0
                        or solutionParams.workgroupClusterSizeZ > 0)
                     {
+#ifndef ROCROLLER_HAS_HIP_WORKGROUP_CLUSTERS
+                        Throw<FatalError>(
+                            "Workgroup cluster feature requested but the installed ROCm/HIP "
+                            "version does not support hipLaunchAttributeClusterDimension. "
+                            "Please upgrade to a ROCm version that includes workgroup cluster "
+                            "support.");
+#endif
                         AssertFatal(arch.HasCapability(GPUCapability::HasWorkgroupClusters),
                                     "Workgroup clusters are not available on: ",
                                     arch.target().toString());

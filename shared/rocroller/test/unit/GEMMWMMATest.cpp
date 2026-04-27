@@ -463,6 +463,10 @@ namespace GEMMTests
 
     TEST_P(GEMMWMMAClustersTestSuite, GPU_GEMM_CLUSTERS)
     {
+#ifndef ROCROLLER_HAS_HIP_WORKGROUP_CLUSTERS
+        GTEST_SKIP() << "Workgroup cluster feature is disabled: the installed ROCm/HIP version "
+                        "does not support hipLaunchAttributeClusterDimension.";
+#endif
         REQUIRE_ARCH_CAP(GPUCapability::HasWorkgroupClusters);
         REQUIRE_ARCH_CAP(GPUCapability::HasWMMA_f32_16x16x32_f16);
 

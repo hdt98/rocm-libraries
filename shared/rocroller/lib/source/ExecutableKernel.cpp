@@ -182,6 +182,7 @@ namespace rocRoller
 
         if(invocation.workgroupClusterSize)
         {
+#ifdef ROCROLLER_HAS_HIP_WORKGROUP_CLUSTERS
             auto const workgroupClusterSize = *invocation.workgroupClusterSize;
             auto const numWorkgroupsX = invocation.workitemCount[0] / invocation.workgroupSize[0];
             auto const numWorkgroupsY = invocation.workitemCount[1] / invocation.workgroupSize[1];
@@ -237,6 +238,12 @@ namespace rocRoller
             const HIP_LAUNCH_CONFIG* pConfig = &config;
             HIP_CHECK(hipDrvLaunchKernelEx(
                 pConfig, m_hipData->function, nullptr, (void**)&hipLaunchParams));
+#else
+            Throw<FatalError>(
+                "Workgroup cluster launch requested but the installed ROCm/HIP version does not "
+                "support hipLaunchAttributeClusterDimension. "
+                "Please upgrade to a ROCm version that includes workgroup cluster support.");
+#endif /* ROCROLLER_HAS_HIP_WORKGROUP_CLUSTERS */
         }
         else
         {

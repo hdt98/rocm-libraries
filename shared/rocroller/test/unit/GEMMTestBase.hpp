@@ -678,6 +678,10 @@ namespace GEMMTests
             if(gemm.workgroupClusterSizeX > 0 || gemm.workgroupClusterSizeY > 0
                || gemm.workgroupClusterSizeZ > 0)
             {
+#ifndef ROCROLLER_HAS_HIP_WORKGROUP_CLUSTERS
+                GTEST_SKIP() << "Workgroup cluster feature is disabled: the installed ROCm/HIP "
+                                "version does not support hipLaunchAttributeClusterDimension.";
+#endif
                 REQUIRE_ARCH_CAP(GPUCapability::HasWorkgroupClusters);
 
                 auto const workgroupClusterSizeX
