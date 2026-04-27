@@ -4,6 +4,8 @@
 #pragma once
 
 #include "ck_tile/core.hpp"
+#include "ck_tile/host/kernel_launch.hpp"
+#include "ck_tile/ops/common/tensor_layout.hpp"
 #include "ck_tile/ops/gemm/kernel/streamk_gemm/streamk_gemm_coherency.hpp"
 
 namespace ck_tile {
@@ -27,7 +29,7 @@ template <typename AsLayout,
           index_t KPerBlock,
           index_t NumATensor,
           index_t NumBTensor>
-CK_TILE_DEVICE static tuple<std::array<index_t, NumATensor>, std::array<index_t, NumBTensor>>
+CK_TILE_DEVICE tuple<std::array<index_t, NumATensor>, std::array<index_t, NumBTensor>>
 GetKOffsets(index_t iter_offset,
             const std::array<index_t, NumATensor>& stride_as,
             const std::array<index_t, NumBTensor>& stride_bs)
@@ -70,7 +72,7 @@ GetKOffsets(index_t iter_offset,
     return ck_tile::make_tuple(a_k_offsets, b_k_offsets);
 }
 
-CK_TILE_HOST static int NumCU()
+CK_TILE_HOST int NumCU()
 {
     hipDeviceProp_t dev_prop;
     hipDevice_t dev;
@@ -89,13 +91,13 @@ CK_TILE_HOST static int NumCU()
  * `hipOccupancyMaxActiveBlocksPerMultiprocessor`.
  */
 template <typename Kernel, typename KernelArgs, index_t kBlockSize>
-CK_TILE_HOST static int Occupancy()
+CK_TILE_HOST int Occupancy()
 {
     int occupancy;
 
     // Since occupancy of 1 is valid for stream k, we set min_num_block_per_cu to 1
     constexpr int min_block_per_cu = 1;
-    const auto kernel              = kentry<min_block_per_cu, Kernel, KernelArgs>;
+    const auto kernel              = ck_tile::kentry<min_block_per_cu, Kernel, KernelArgs>;
 
     ck_tile::hip_check_error(
         hipOccupancyMaxActiveBlocksPerMultiprocessor(&occupancy, kernel, kBlockSize, 0));

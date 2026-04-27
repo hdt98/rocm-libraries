@@ -117,42 +117,10 @@ struct StreamKKernel
     static_assert(!is_tuple_v<CLayout> && !is_tuple_v<CDataType>,
                   "CLayout and CDataType must be scalars.");
 
-    struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<>
-    {
-        StreamKKernelArgs(const StreamKHostArgs& host_args, index_t max_active_wgs)
-            : UniversalGemmKernelArgs{host_args.as_ptr,
-                                      host_args.bs_ptr,
-                                      host_args.ds_ptr,
-                                      host_args.e_ptr,
-                                      host_args.M,
-                                      host_args.N,
-                                      host_args.K,
-                                      host_args.stride_As,
-                                      host_args.stride_Bs,
-                                      host_args.stride_Ds,
-                                      host_args.stride_E,
-                                      host_args.k_batch},
-              // The workspace pointer is set to nullptr because we must first
-              // instantiate the TilePartitioner to get the necessary size
-              workspace_ptr{nullptr},
-              tile_partitioner{
-                  TilePartitioner{host_args.M, host_args.N, host_args.K, max_active_wgs}}
+    // Use the global StreamKKernelArgs from ck_tile namespace
+    using StreamKKernelArgs = ck_tile::
+        StreamKKernelArgs<TilePartitioner, /*NumATensor=*/1, /*NumBTensor=*/1, /*NumDTensor=*/0>;
 
-        {
-        }
-        /**
-         * @brief  A pointer to a buffer in device memory for accumulating partial via reduction
-         * strategy.
-         */
-        void* workspace_ptr;
-        /**
-         * @brief  An instance of the TilePartioner class for assisting with mapping workgroups to
-         * the C tensor.
-         */
-        TilePartitioner tile_partitioner;
-    };
-
-    using KernelArgs = StreamKKernelArgs;
     using Kernel     = StreamKKernel<TilePartitioner, GemmPipeline, EpiloguePipeline>;
     using StreamKOps = StreamKReductionOps<TilePartitioner, GemmPipeline, StreamKKernelArgs>;
 
@@ -207,11 +175,25 @@ struct StreamKKernel
     CK_TILE_HOST static StreamKKernelArgs
     MakeKernelArgs(const StreamKHostArgs& host_args,
                    int num_cu    = NumCU(),
-                   int occupancy = Occupancy<Kernel, KernelArgs, kBlockSize>())
+                   int occupancy = Occupancy<Kernel, StreamKKernelArgs, kBlockSize>())
     {
         const index_t max_active_wgs = num_cu * occupancy;
 
-        return StreamKKernelArgs{host_args, max_active_wgs};
+        // Convert StreamKHostArgs to UniversalGemmHostArgs
+        const ck_tile::UniversalGemmHostArgs<1, 1, 0> universal_host_args(host_args.as_ptr,
+                                                                          host_args.bs_ptr,
+                                                                          host_args.ds_ptr,
+                                                                          host_args.e_ptr,
+                                                                          host_args.k_batch,
+                                                                          host_args.M,
+                                                                          host_args.N,
+                                                                          host_args.K,
+                                                                          host_args.stride_As,
+                                                                          host_args.stride_Bs,
+                                                                          host_args.stride_Ds,
+                                                                          host_args.stride_E);
+
+        return StreamKKernelArgs{universal_host_args, max_active_wgs};
     }
 
     template <bool UseDefaultScheduler = true>
@@ -358,7 +340,7 @@ struct StreamKKernel
             index_t k_size = num_loop_sk * TilePartitioner::KPerBlock;
 
             // Get the K offsets for the A and B tensors
-            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout, TilePartitioner::KPerBlock>(
+            auto [i_k_a, i_k_b] = GetKOffsets<ALayout, BLayout>(
                 local_iter_start, kargs.stride_As[0], kargs.stride_Bs[0]);
 
             if constexpr(TilePartitioner::ReductionStrategy == StreamKReductionStrategy::Atomic)
@@ -538,6 +520,44 @@ struct StreamKKernel
                 BaseGemm(kargs, tile_idx, dp_num_loop, 0, 0, kargs.K, smem_ptr_0);
             },
             [&](index_t sk_cta_idx) { StreamKGemm(kargs, sk_cta_idx, smem_ptr_0); });
+    }
+
+    private:
+    /**
+     * @brief Computes the K offsets in the A and B tensors given iter_offset, where iter_offset
+     * is the starting macro tile index in the K dimension for the workgroup.
+     * @return A tuple containing the offsets into the A and B tensors accounting for the
+     * layouts of A and B.
+     * @note The default case is that A is assumed to be row major and B is assumed to be column
+     * major.
+     */
+    template <typename ALayout, typename BLayout>
+    CK_TILE_DEVICE static tuple<index_t, index_t>
+    GetKOffsets(index_t iter_offset, index_t stride_a, index_t stride_b)
+    {
+        index_t stride_offset_a;
+        index_t stride_offset_b;
+        if constexpr(std::is_same_v<ALayout, ck_tile::tensor_layout::gemm::ColumnMajor>)
+        {
+            stride_offset_a = stride_a;
+        }
+        else
+        {
+            stride_offset_a = 1;
+        }
+
+        if constexpr(std::is_same_v<BLayout, ck_tile::tensor_layout::gemm::RowMajor>)
+        {
+            stride_offset_b = stride_b;
+        }
+        else
+        {
+            stride_offset_b = 1;
+        }
+
+        index_t base_offset = iter_offset * TilePartitioner::KPerBlock;
+
+        return make_tuple(base_offset * stride_offset_a, base_offset * stride_offset_b);
     }
 };
 } // namespace ck_tile
