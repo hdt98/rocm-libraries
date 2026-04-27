@@ -201,7 +201,10 @@ endif()
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 message("\n========================================================")
-message("CONSOLIDATED TEST FAILURES:")
+message("CONSOLIDATED TEST FAILURES (all shards + ctest tests):")
+message("NOTE: This summary runs before CTest prints its own exit")
+message("      summary — that is normal. This is the authoritative")
+message("      view of failures across all tests.")
 message("========================================================")
 
 if(gtest_failures)
@@ -223,7 +226,7 @@ endif()
 
 if(has_any_failure)
     message("")
-    message("Full output written to: ${log_path}")
+    message("Full details written to artifact: build/test/gtest/failures.log")
 else()
     message("  (none — all tests passed)")
 endif()

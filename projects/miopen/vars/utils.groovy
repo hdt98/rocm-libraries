@@ -173,6 +173,10 @@ def cmake_build(Map conf=[:]){
     echo cmd
     sh cmd
 
+    // Archive the consolidated gtest/ctest failure log on every run so that
+    // failures are easy to find regardless of branch or build type.
+    archiveArtifacts artifacts: "build/test/gtest/failures.log", allowEmptyArchive: true, fingerprint: true
+
     // Only archive from master or develop
     if (package_build == true && (env.BRANCH_NAME == "develop" || env.BRANCH_NAME == "master" ||
         params.PERF_TEST_ARCHIVE == true)) {
