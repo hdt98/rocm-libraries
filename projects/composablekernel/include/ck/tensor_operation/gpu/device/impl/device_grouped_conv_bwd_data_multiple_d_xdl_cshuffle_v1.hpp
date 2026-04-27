@@ -1470,8 +1470,13 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 // Dispatch: use flat-descriptor path (non-grouped GEMM) for G=1,
                 // NDim=2. The non-grouped kernel uses packed (flat) descriptors
                 // with fewer transform layers, avoiding the grouped GEMM overhead.
+                // The NoShuffle epilogue used by this path supports only unary
+                // element-wise ops (e.g. PassThrough). When D tensors are present
+                // the cde_element_op is multi-input (e.g. AddRelu(y, x0, x1)),
+                // which is incompatible with the unary VGPR->global writer; fall
+                // back to the regular CShuffle path in that case.
                 bool used_flat_desc = false;
-                if constexpr(NDimSpatial == 2 && !CTranspose)
+                if constexpr(NDimSpatial == 2 && !CTranspose && NumDTensor == 0)
                 {
                     if(arg.num_group_ == 1 && !arg.flat_a_container_.empty())
                     {
