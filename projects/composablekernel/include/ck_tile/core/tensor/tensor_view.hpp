@@ -279,6 +279,8 @@ struct tensor_view
     }
 
     template <typename X,
+              index_t TrKVector      = 0,
+              index_t TrKPadElements = 0,
               typename std::enable_if<
                   std::is_same_v<typename vector_traits<remove_cvref_t<X>>::scalar_type,
                                  typename vector_traits<DataType_>::scalar_type>,
@@ -286,7 +288,7 @@ struct tensor_view
     CK_TILE_HOST_DEVICE constexpr remove_cvref_t<X>
     get_transpose_vectorized_elements(const TensorCoord& coord, index_t linear_offset) const
     {
-        return buf_.template transpose_get<X>(
+        return buf_.template transpose_get<X, TrKVector, TrKPadElements>(
             coord.get_offset() / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord));

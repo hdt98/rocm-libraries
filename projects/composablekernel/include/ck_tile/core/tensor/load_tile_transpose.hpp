@@ -394,6 +394,8 @@ CK_TILE_HOST_DEVICE constexpr auto InputTileDistributionEncoding()
  * - The transpose operation is performed according to the specified Policy.
  */
 template <
+    index_t TrKVector      = 0,
+    index_t TrKPadElements = 0,
     typename DistributedTensor_,
     typename BottomTensorView_,
     typename WindowLengths_,
@@ -412,7 +414,8 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
                                                NumCoord>& __restrict__ tile_window,
     index_t offset)
 {
-    auto trans_tensor           = tile_window.template load_transpose_with_offset<Policy>(offset);
+    auto trans_tensor = tile_window.template load_transpose_with_offset<Policy, TrKVector,
+                                                                        TrKPadElements>(offset);
     constexpr auto input_distr  = TileDistribution_{};
     constexpr auto output_distr = typename DistributedTensor_::StaticTileDistribution{};
 
@@ -482,6 +485,8 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
  * - The transpose operation is performed according to the specified Policy.
  */
 template <
+    index_t TrKVector      = 0,
+    index_t TrKPadElements = 0,
     typename DistributedTensor_,
     typename BottomTensorView_,
     typename WindowLengths_,
@@ -499,10 +504,12 @@ load_tile_transpose(DistributedTensor_& out_tensor,
                                                                TileDistribution_,
                                                                NumCoord>& __restrict__ tile_window)
 {
-    load_tile_transpose_with_offset(out_tensor, tile_window, 0);
+    load_tile_transpose_with_offset<TrKVector, TrKPadElements>(out_tensor, tile_window, 0);
 }
 
 template <
+    index_t TrKVector      = 0,
+    index_t TrKPadElements = 0,
     typename BottomTensorView_,
     typename WindowLengths_,
     typename TileDistribution_,
@@ -524,7 +531,7 @@ load_tile_transpose(const tile_window_with_static_distribution<BottomTensorView_
     auto out_tensor = make_static_distributed_tensor<typename BottomTensorView_::DataType>(
         make_static_tile_distribution(OutTileDstrEncode{}));
 
-    load_tile_transpose_with_offset(out_tensor, tile_window, 0);
+    load_tile_transpose_with_offset<TrKVector, TrKPadElements>(out_tensor, tile_window, 0);
 
     return out_tensor;
 }

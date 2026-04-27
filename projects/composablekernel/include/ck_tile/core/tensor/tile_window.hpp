@@ -679,29 +679,40 @@ struct tile_window_with_static_distribution
         });
     }
 
-    template <typename Policy, index_t i_access_unsupport_ = -1, bool oob_conditional_check = true>
+    template <typename Policy,
+              index_t TrKVector      = 0,
+              index_t TrKPadElements = 0,
+              index_t i_access_unsupport_ = -1,
+              bool oob_conditional_check  = true>
     CK_TILE_DEVICE auto load_transpose(number<i_access_unsupport_>          = {},
                                        bool_constant<oob_conditional_check> = {}) const
     {
-        return this->template load_transpose_with_offset<Policy>(
+        return this->template load_transpose_with_offset<Policy, TrKVector, TrKPadElements>(
             0, number<i_access_unsupport_>{}, bool_constant<oob_conditional_check>{});
     }
 
-    template <typename Policy, index_t i_access_unsupport_ = -1, bool oob_conditional_check = true>
+    template <typename Policy,
+              index_t TrKVector      = 0,
+              index_t TrKPadElements = 0,
+              index_t i_access_unsupport_ = -1,
+              bool oob_conditional_check  = true>
     CK_TILE_DEVICE auto load_transpose_with_offset(index_t offset,
                                                    number<i_access_unsupport_>          = {},
                                                    bool_constant<oob_conditional_check> = {}) const
     {
         constexpr auto tile_dstr = typename Base::TileDstr{};
         auto dst_tensor = make_static_distributed_tensor<typename Base::DataType>(tile_dstr);
-        this->template load_transpose_with_offset<Policy>(offset,
-                                                          dst_tensor,
-                                                          number<i_access_unsupport_>{},
-                                                          bool_constant<oob_conditional_check>{});
+        this->template load_transpose_with_offset<Policy, TrKVector, TrKPadElements>(
+            offset,
+            dst_tensor,
+            number<i_access_unsupport_>{},
+            bool_constant<oob_conditional_check>{});
         return dst_tensor;
     }
 
     template <typename Policy,
+              index_t TrKVector      = 0,
+              index_t TrKPadElements = 0,
               typename DistributedTensor,
               index_t i_access_unsupport_ = -1,
               bool oob_conditional_check  = true>
@@ -733,7 +744,8 @@ struct tile_window_with_static_distribution
                 // read from bottom tensor
                 const vector_t vec_value =
                     this->get_bottom_tensor_view()
-                        .template get_transpose_vectorized_elements<vector_t>(
+                        .template get_transpose_vectorized_elements<vector_t, TrKVector,
+                                                                    TrKPadElements>(
                             bottom_tensor_thread_coord, offset);
                 // write into distributed tensor
                 static_for<0, Traits::ScalarPerVector, Traits::PackedSize>{}([&](auto j) {

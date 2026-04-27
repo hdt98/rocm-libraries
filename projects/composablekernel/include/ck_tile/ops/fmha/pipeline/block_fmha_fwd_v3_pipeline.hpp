@@ -624,7 +624,12 @@ struct BlockFmhaFwdV3Pipeline
         };
 
         auto V_lds_load = [&](auto v_lds_read_idx) {
-            load_tile_transpose(kv_tile.v_tile, v_lds_window_load(v_lds_read_idx));
+            // V LDS layout params for strided read optimization on non-gfx950
+            constexpr index_t kVKVector = Policy::template GetAlignmentV<Problem>();
+            constexpr index_t kVPadElements =
+                Policy::kVLdsPadInBytes / sizeof(remove_cvref_t<typename Problem::VDataType>);
+            load_tile_transpose<kVKVector, kVPadElements>(
+                kv_tile.v_tile, v_lds_window_load(v_lds_read_idx));
         };
 
         decltype(m) m_old;

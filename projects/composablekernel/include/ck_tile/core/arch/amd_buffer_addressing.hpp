@@ -3052,7 +3052,12 @@ CK_TILE_DEVICE void amd_buffer_atomic_max(const thread_buffer<T, N>& src_thread_
 #endif
 }
 
-template <typename T, index_t N>
+// KVector: number of elements per lane in the LDS store layout (= GetAlignmentV).
+//   KVector=0 (default): use ds_bpermute fallback (safe for any LDS layout).
+//   KVector>0: use strided LDS reads (optimized), stride computed from KVector and kPadElements.
+// kPadElements: padding elements between warp groups in LDS (= kVLdsPadInBytes / sizeof(T)).
+// Both parameters are ignored on gfx950 (native ds_read_tr instruction).
+template <typename T, index_t N, index_t KVector = 0, index_t kPadElements = 0>
 __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
 {
 #if defined(__gfx950__)
@@ -3095,71 +3100,95 @@ __device__ auto amd_transpose_load_to_vgpr(const T* __restrict__ in_ptr)
     if constexpr(std::is_same_v<remove_cvref_t<T>, ck_tile::half_t> ||
                  std::is_same_v<remove_cvref_t<T>, ck_tile::bf16_t>)
     {
-        // SW emulation of ds_read_tr16_b64 for fp16/bf16 using strided LDS reads.
-        // Replaces 2 ds_read + 8 ds_bpermute (10 LDS ops) with 4 ds_read_b32 + 2 v_perm.
-        //
-        // HW ds_read_tr16_b64 semantics (fp16, 64-lane wave):
-        //   - The wave is divided into blocks of 16 consecutive lanes
-        //   - Each lane occupies 2 DWORDs (8 bytes) in LDS: dw0={col0,col1}, dw1={col2,col3}
-        //   - Intra-quad stride: 8 bytes (2 DWORDs) between consecutive lanes
-        //   - Inter-quad stride: 320 bytes (80 DWORDs) = one LDS row (WS*KVec+kPad elements)
-        //   - The 4 source rows for quad q within a 16-lane block are at stride 4:
-        //     lanes {q, q+4, q+8, q+12} (one per quad, same position within each quad)
-        //   - Lane j within quad receives column j of the transposed 4×4 matrix
-        //
-        // Key insight: each lane only needs ONE DWORD from each source row:
-        //   j=0,1: dw0 from source lanes {q, q+4, q+8, q+12}
-        //   j=2,3: dw0 from source lanes {q+1, q+5, q+9, q+13}
-        //   (because for j>=2, the data comes from the adjacent lane within each quad)
+        // SW emulation of ds_read_tr16_b64 for fp16/bf16
         static_assert(N == 4, "SW transpose load: N must be 4 for 16-bit types");
 
-        const uint32_t lane_id      = static_cast<uint32_t>(__lane_id());
-        const uint32_t quad_id      = (lane_id / 4) % 4;   // which quad within block (0..3)
-        const uint32_t lane_in_quad = lane_id % 4;          // position within quad (= column)
-
-        // Compute DWORD offset from current lane to source lanes.
-        //
-        // LDS layout (measured):
-        //   intra-quad stride = 2 DWORDs (8 bytes) per lane
-        //   inter-quad stride = 80 DWORDs (320 bytes) per quad
-        //   each lane occupies 2 DWORDs: dw0 at offset 0, dw1 at offset 1
-        //
-        // Source lanes are always {q, q+4, q+8, q+12} (position q in each quad).
-        // j=0,1 need dw0 from sources, j=2,3 need dw1 from sources.
-        //
-        // Offset from current lane (quad q, position j) to source in quad 0 at position q:
-        //   = (0 * 80 + q * 2) - (q * 80 + j * 2) = -78*q - 2*j
-        const int32_t base_dword_off =
-            -80 * static_cast<int32_t>(quad_id) +
-            2 * (static_cast<int32_t>(quad_id) - static_cast<int32_t>(lane_in_quad));
-        // j=0,1: read dw0 (DWORD offset +0), j=2,3: read dw1 (DWORD offset +1)
-        const int32_t dw_select = (lane_in_quad >= 2) ? 1 : 0;
-
-        // Step 1: Read 1 DWORD from each of 4 source rows (one per quad).
-        // Inter-quad stride = 80 DWORDs.
-        const uint32_t* base_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
-        uint32_t s0 = base_u32[base_dword_off + 0 * 80 + dw_select]; // source row 0 (quad 0)
-        uint32_t s1 = base_u32[base_dword_off + 1 * 80 + dw_select]; // source row 1 (quad 1)
-        uint32_t s2 = base_u32[base_dword_off + 2 * 80 + dw_select]; // source row 2 (quad 2)
-        uint32_t s3 = base_u32[base_dword_off + 3 * 80 + dw_select]; // source row 3 (quad 3)
-
-        // Step 2: Extract the correct half-word from each source DWORD and pack.
-        // Each DWORD = {elem_lo, elem_hi} (2 fp16 packed)
-        // even columns (j=0,2): extract low half  (bytes 0,1)
-        // odd  columns (j=1,3): extract high half (bytes 2,3)
-        // __builtin_amdgcn_perm(src0, src1, sel): src1=bytes[0:3], src0=bytes[4:7]
-        uint32_t perm_sel = (lane_in_quad & 1u) ? 0x07060302u : 0x05040100u;
-
-        uint32_t out_dw0 =
-            __builtin_amdgcn_perm(bit_cast<int>(s1), bit_cast<int>(s0), perm_sel);
-        uint32_t out_dw1 =
-            __builtin_amdgcn_perm(bit_cast<int>(s3), bit_cast<int>(s2), perm_sel);
-
-        // Pack 2 DWORDs into thread_buffer<T, 4>
-        struct dw2_t
+        if constexpr(KVector > 0)
         {
-            uint32_t v[2];
-        };
+            // Optimized path: strided LDS reads (4 ds_read_b32 + 2 v_perm).
+            constexpr int32_t INTRA_Q_DW = N * sizeof(T) / sizeof(uint32_t);
+            constexpr int32_t INTER_Q_DW =
+                (64 * KVector + kPadElements) * sizeof(T) / sizeof(uint32_t);
+
+            const uint32_t lane_id      = static_cast<uint32_t>(__lane_id());
+            const uint32_t quad_id      = (lane_id / 4) % 4;
+            const uint32_t lane_in_quad = lane_id % 4;
+
+            const int32_t base_dword_off =
+                -INTER_Q_DW * static_cast<int32_t>(quad_id) +
+                INTRA_Q_DW *
+                    (static_cast<int32_t>(quad_id) - static_cast<int32_t>(lane_in_quad));
+            const int32_t dw_select = (lane_in_quad >= 2) ? 1 : 0;
+
+            const uint32_t* base_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
+            uint32_t s0 = base_u32[base_dword_off + 0 * INTER_Q_DW + dw_select];
+            uint32_t s1 = base_u32[base_dword_off + 1 * INTER_Q_DW + dw_select];
+            uint32_t s2 = base_u32[base_dword_off + 2 * INTER_Q_DW + dw_select];
+            uint32_t s3 = base_u32[base_dword_off + 3 * INTER_Q_DW + dw_select];
+
+            uint32_t perm_sel = (lane_in_quad & 1u) ? 0x07060302u : 0x05040100u;
+            uint32_t out_dw0 =
+                __builtin_amdgcn_perm(bit_cast<int>(s1), bit_cast<int>(s0), perm_sel);
+            uint32_t out_dw1 =
+                __builtin_amdgcn_perm(bit_cast<int>(s3), bit_cast<int>(s2), perm_sel);
+
+            struct dw2_t
+            {
+                uint32_t v[2];
+            };
+            dw2_t raw{out_dw0, out_dw1};
+            return bit_cast<thread_buffer<T, N>>(raw);
+        }
+        else
+        {
+            // Fallback path: ds_bpermute (2 ds_read + 8 ds_bpermute + 4 v_cndmask + 2 v_perm).
+            const uint32_t* lds_u32 = reinterpret_cast<const uint32_t*>(in_ptr);
+            uint32_t dw0 = lds_u32[0];
+            uint32_t dw1 = lds_u32[1];
+
+            const uint32_t lane_id      = static_cast<uint32_t>(__lane_id());
+            const uint32_t block_offset = (lane_id / 16) * 16;
+            const uint32_t quad_id      = (lane_id / 4) % 4;
+            const uint32_t lane_in_quad = lane_id % 4;
+
+            const uint32_t src0 = block_offset + quad_id + 0 * 4;
+            const uint32_t src1 = block_offset + quad_id + 1 * 4;
+            const uint32_t src2 = block_offset + quad_id + 2 * 4;
+            const uint32_t src3 = block_offset + quad_id + 3 * 4;
+
+            uint32_t g0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                        bit_cast<int32_t>(dw0));
+            uint32_t g1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                        bit_cast<int32_t>(dw0));
+            uint32_t g2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                        bit_cast<int32_t>(dw0));
+            uint32_t g3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                        bit_cast<int32_t>(dw0));
+
+            uint32_t h0 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src0 << 2),
+                                                        bit_cast<int32_t>(dw1));
+            uint32_t h1 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src1 << 2),
+                                                        bit_cast<int32_t>(dw1));
+            uint32_t h2 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src2 << 2),
+                                                        bit_cast<int32_t>(dw1));
+            uint32_t h3 = __builtin_amdgcn_ds_bpermute(static_cast<int>(src3 << 2),
+                                                        bit_cast<int32_t>(dw1));
+
+            uint32_t s0 = (lane_in_quad < 2) ? g0 : h0;
+            uint32_t s1 = (lane_in_quad < 2) ? g1 : h1;
+            uint32_t s2 = (lane_in_quad < 2) ? g2 : h2;
+            uint32_t s3 = (lane_in_quad < 2) ? g3 : h3;
+
+            uint32_t perm_sel = (lane_in_quad & 1u) ? 0x07060302u : 0x05040100u;
+            uint32_t out_dw0 =
+                __builtin_amdgcn_perm(bit_cast<int>(s1), bit_cast<int>(s0), perm_sel);
+            uint32_t out_dw1 =
+                __builtin_amdgcn_perm(bit_cast<int>(s3), bit_cast<int>(s2), perm_sel);
+
+            struct dw2_t
+            {
+                uint32_t v[2];
+            };
         dw2_t raw{out_dw0, out_dw1};
         return bit_cast<thread_buffer<T, N>>(raw);
     }

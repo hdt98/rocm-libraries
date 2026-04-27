@@ -876,6 +876,8 @@ struct buffer_view<address_space_enum::lds,
     }
 
     template <typename X,
+              index_t TrKVector     = 0,
+              index_t TrKPadElements = 0,
               typename std::enable_if<
                   std::is_same<typename vector_traits<remove_cvref_t<X>>::scalar_type,
                                typename vector_traits<remove_cvref_t<T>>::scalar_type>::value,
@@ -895,8 +897,8 @@ struct buffer_view<address_space_enum::lds,
         if(is_valid_element)
         {
             constexpr index_t t_per_x = scalar_per_x_vector / scalar_per_t_vector;
-            return amd_transpose_load_to_vgpr<remove_cvref_t<T>, t_per_x>(p_data_ + i +
-                                                                          linear_offset);
+            return amd_transpose_load_to_vgpr<remove_cvref_t<T>, t_per_x, TrKVector, TrKPadElements>(
+                p_data_ + i + linear_offset);
         }
         else
         {
