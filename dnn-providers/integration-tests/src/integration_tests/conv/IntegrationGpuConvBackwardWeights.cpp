@@ -110,20 +110,19 @@ template <typename DataType>
 class ConvBackwardWeightsLargeValues : public ConvBackwardWeights<DataType>
 {
 protected:
-    void initializeBundle(const hipdnn_frontend::graph::Graph& /*graph*/,
-                          hipdnn_test_sdk::utilities::GraphTensorBundle& bundle,
-                          unsigned int seed) override
+    void SetUp() override
     {
-        for(auto& tensorPair : bundle.tensors)
-        {
-            bundle.randomizeTensor(tensorPair.first, -10.0f, 10.0f, seed);
-        }
+        ConvBackwardWeights<DataType>::SetUp();
+        this->_fillMin = -10.0f;
+        this->_fillMax = 10.0f;
     }
 };
 // Large input value range [-10, 10] stress-tests numerical precision in wgrad
 // accumulation. Limited to fp32 because half/bfloat16 would overflow during
 // reduction over batch and spatial dimensions.
 using IntegrationGpuConvWrwLargeValues2dFp32 = ConvBackwardWeightsLargeValues<float>;
+using IntegrationGpuConvWrwLargeValues2dFp16 = ConvBackwardWeightsLargeValues<half>;
+using IntegrationGpuConvWrwLargeValues2dBfp16 = ConvBackwardWeightsLargeValues<bfloat16>;
 
 } // namespace
 
@@ -165,9 +164,21 @@ TEST_P(IntegrationGpuConvWrw3dFp16, Correctness)
     runGraphTest();
 }
 
-// Large values test
+// Large values tests
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(IntegrationGpuConvWrwLargeValues2dFp32);
 TEST_P(IntegrationGpuConvWrwLargeValues2dFp32, Correctness)
+{
+    runGraphTest();
+}
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(IntegrationGpuConvWrwLargeValues2dFp16);
+TEST_P(IntegrationGpuConvWrwLargeValues2dFp16, Correctness)
+{
+    runGraphTest();
+}
+
+GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(IntegrationGpuConvWrwLargeValues2dBfp16);
+TEST_P(IntegrationGpuConvWrwLargeValues2dBfp16, Correctness)
 {
     runGraphTest();
 }
@@ -210,9 +221,21 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::Values(TensorLayout::NCDHW, TensorLayout::NDHWC),
                      testing::ValuesIn(test_conv_common::getConvTestCases5D())));
 
-// Large values instantiation — only first 4D case, NCHW layout
+// Large values instantiations — only first 4D case, NCHW layout
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     IntegrationGpuConvWrwLargeValues2dFp32,
+    testing::Combine(testing::Values(TensorLayout::NCHW),
+                     testing::Values(test_conv_common::getConvTestCases4D()[0])));
+
+INSTANTIATE_TEST_SUITE_P(
+    Smoke,
+    IntegrationGpuConvWrwLargeValues2dFp16,
+    testing::Combine(testing::Values(TensorLayout::NCHW),
+                     testing::Values(test_conv_common::getConvTestCases4D()[0])));
+
+INSTANTIATE_TEST_SUITE_P(
+    Smoke,
+    IntegrationGpuConvWrwLargeValues2dBfp16,
     testing::Combine(testing::Values(TensorLayout::NCHW),
                      testing::Values(test_conv_common::getConvTestCases4D()[0])));

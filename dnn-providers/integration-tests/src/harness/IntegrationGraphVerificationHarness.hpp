@@ -56,6 +56,11 @@ protected:
 
     virtual void runGraphTest() = 0;
 
+    // Fill range used by initializeBundle and dynamic tolerance calculation.
+    // Subclasses can set these in SetUp() to test with different value ranges.
+    float _fillMin = -1.0f;
+    float _fillMax = 1.0f;
+
     // Determine tolerance for an output tensor based on the graph and
     // configured tolerance mode for the engine.
     float getTolerance(const hipdnn_frontend::graph::Graph& graph,
@@ -86,7 +91,11 @@ protected:
                 return 0.0f;
             }
 
-            return toleranceForNode(*rootOp, output->get_data_type());
+            return toleranceForNode(
+                *rootOp,
+                output->get_data_type(),
+                static_cast<double>(_fillMin),
+                static_cast<double>(_fillMax));
         }
 
         ADD_FAILURE() << "getTolerance: unhandled tolerance mode";
@@ -297,21 +306,23 @@ protected:
         {
             auto tensorSeed
                 = seed ^ static_cast<unsigned int>(std::hash<int64_t>{}(tensorPair.first));
-            bundle.randomizeTensor(tensorPair.first, -1.0f, 1.0f, tensorSeed);
+            bundle.randomizeTensor(tensorPair.first, _fillMin, _fillMax, tensorSeed);
         }
     }
 
     static float toleranceForNode(const hipdnn_frontend::graph::INode& node,
-                                  hipdnn_frontend::DataType dataType)
+                                  hipdnn_frontend::DataType dataType,
+                                  double fillMin,
+                                  double fillMax)
     {
         switch(dataType)
         {
         case hipdnn_frontend::DataType::FLOAT:
-            return toleranceForNodeTyped<float>(node);
+            return toleranceForNodeTyped<float>(node, fillMin, fillMax);
         case hipdnn_frontend::DataType::HALF:
-            return toleranceForNodeTyped<half>(node);
+            return toleranceForNodeTyped<half>(node, fillMin, fillMax);
         case hipdnn_frontend::DataType::BFLOAT16:
-            return toleranceForNodeTyped<bfloat16>(node);
+            return toleranceForNodeTyped<bfloat16>(node, fillMin, fillMax);
         default:
             ADD_FAILURE() << "toleranceForNode: unsupported data type";
             return 0.0f;
@@ -319,15 +330,12 @@ protected:
     }
 
     template <typename T>
-    static float toleranceForNodeTyped(const hipdnn_frontend::graph::INode& node)
+    static float toleranceForNodeTyped(const hipdnn_frontend::graph::INode& node,
+                                       double fillMin,
+                                       double fillMax)
     {
         namespace fe = hipdnn_frontend::graph;
         using namespace hipdnn_test_sdk::utilities;
-
-        // Convolution tolerances: use dynamic calculation based on MAC count.
-        // Fill range matches initializeBundle default of [-1.0, 1.0].
-        constexpr double fillMin = -1.0;
-        constexpr double fillMax = 1.0;
 
         if(const auto* fpropNode = dynamic_cast<const fe::ConvolutionFpropNode*>(&node))
         {
