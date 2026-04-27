@@ -39,12 +39,13 @@ The recommended reading order is **1 → 3 → 2 → 4** (simple to complex):
 | `tile_distribution.cpp` | 1 | 32×8 | 128 (2 warps) | NDimP=1, basic P/Y split | MakeADramTileDistribution (simplified) |
 | `tile_distribution_3.cpp` | 3 | 128×8 | 128 (2 warps) | NDimP=2, lane→M only (small K) | MakeADramTileDistribution (RowMajor) |
 | `tile_distribution_2.cpp` | 2 | 64×32 | 128 (2 warps) | NDimP=2, lane→M+K (coalesced) | MakeADramTileDistribution (RowMajor) |
-| `tile_distribution_4.cpp` | 4 | 128×8 | 256 (4 warps) | NDimP=2 + R (inter-warp replicate) | MakeScaleADramTileDistribution |
+| `tile_distribution_4.cpp` | 4 | 128×8 | 256 (4 warps) | NDimP=2 + R (inter-warp replicate) | Tutorial replicate-pattern example |
 
 Scenarios 1-3 are from
 `include/ck_tile/ops/gemm/pipeline/gemm_pipeline_agmem_bgmem_creg_v1_default_policy.hpp`.
-Scenario 4 demonstrates the R (replicate) dimension pattern used in MX-GEMM scale-factor
-distributions.
+Scenario 4 demonstrates the R (replicate) dimension pattern used for scale-factor style
+distributions, but this tutorial does not currently point to a matching production helper in
+this repository.
 
 ## Building
 
