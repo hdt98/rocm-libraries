@@ -110,6 +110,7 @@ add_executable(
     TestHeuristicPluginResourceManager.cpp
     TestUserLoggingApis.cpp
     TestPlatformUtils.cpp
+    heuristics/TestDeviceProperties.cpp
     TestPlugin.cpp
     TestSharedLibrary.cpp
     TestStaticOrderingPolicy.cpp
