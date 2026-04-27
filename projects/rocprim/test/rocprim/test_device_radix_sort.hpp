@@ -1310,19 +1310,20 @@ inline void sort_keys_large_sizes()
     {
         SCOPED_TRACE(testing::Message() << "with size = " << size);
 
+std::cout << "testing with size: " << size << std::endl;
 test_utils::MemCheck memcheck;
 
         // QA is also testing on APU platforms with only 32GB of system memory
         // shared amongst the host and device.  Trim maximum size under these
         // conditions.  This is a temporary coding workaround until we come up
         // with a properly-engineered memory management system for the unit tests.
-        bool is_apu = test_utils::is_apu(arch);
-        if (is_apu && test_utils::get_total_system_memory(true) <= test_utils::minimum_memory_required_bytes
-            && size >= (size_t{1} << 33))
-        {
-            std::cout << "Insufficient APU system memory. Skipping test for size = " << size << std::endl;
-            break;
-        }
+//        bool is_apu = test_utils::is_apu(arch);
+//        if (is_apu && test_utils::get_total_system_memory(true) <= test_utils::minimum_memory_required_bytes
+//            && size >= (size_t{1} << 33))
+//        {
+//            std::cout << "Insufficient APU system memory. Skipping test for size = " << size << std::endl;
+//            break;
+//        }
 
 memcheck.alloc_device<key_type>(size);
         common::device_ptr<key_type> d_keys;

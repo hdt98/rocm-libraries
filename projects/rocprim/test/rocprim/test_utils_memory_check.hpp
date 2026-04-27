@@ -156,16 +156,16 @@ public:
     inline void alloc_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nAlloc host usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc host usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-       // this->mem_check();
+        this->mem_check();
     }
 
     inline void alloc_host_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc host usage: " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-       // this->mem_check();
+        this->mem_check();
     }
 
     template<typename T>
@@ -187,16 +187,16 @@ public:
     inline void alloc_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nAlloc dev usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc dev usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-      //  this->mem_check();
+        this->mem_check();
     }
 
     inline void alloc_device_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc dev usage: " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-      //  this->mem_check();
+        this->mem_check();
     }
 
     template<typename T>
@@ -214,7 +214,7 @@ public:
     }
 
 private:
-/*
+
 	inline void mem_check()
         {
             std::cout << "--- mem_check ---" << std::endl;
@@ -225,8 +225,10 @@ private:
                 const size_t total_usage = this->host_usage + this->dev_usage;
                 const size_t limit = static_cast<size_t>(MemCheck::sys_info.unified_mem_limit * (1 - this->padding_factor));
 
-                std::cout << "total_usage: " << total_usage << std::endl;
-                std::cout << "limit: " << limit << std::endl;
+                std::cout << "    host_usage: " << (host_usage >> 20) << std::endl;
+                std::cout << "    device_usage: " << (dev_usage >> 20) << std::endl;
+                std::cout << "    total_usage: " << (total_usage >> 20) << std::endl;
+                std::cout << "    limit: " << (limit >> 20) << std::endl;
 
                 success = total_usage <= limit;
             }
@@ -235,10 +237,10 @@ private:
                 const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - this->padding_factor));
                 const size_t dev_limit = static_cast<size_t>(MemCheck::sys_info.dev_mem_limit * (1 - this->padding_factor));
 
-                std::cout << "host usage: " << this->host_usage << std::endl;
-                std::cout << "host limit: " << host_limit << std::endl;
-                std::cout << "dev usage: " << this->dev_usage << std::endl;
-                std::cout << "dev limit: " << dev_limit << std::endl;
+                std::cout << "    host usage: " << this->host_usage << std::endl;
+                std::cout << "    host limit: " << host_limit << std::endl;
+                std::cout << "    dev usage: " << this->dev_usage << std::endl;
+                std::cout << "    dev limit: " << dev_limit << std::endl;
                 
                 success = (this->host_usage <= host_limit &&
                            this->dev_usage <= dev_limit);
@@ -257,7 +259,7 @@ private:
 #endif
             }
     }
-*/
+
 	// Returns total system memory minus the amount that's been carved out for the GPU.
 	static size_t get_host_memory()
     {
