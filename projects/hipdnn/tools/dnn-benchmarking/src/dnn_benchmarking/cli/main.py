@@ -368,7 +368,7 @@ def _suite_exit_code(suite_result: SuiteResult) -> int:
     return 0
 
 
-def run_benchmark_suite(
+def _run_benchmark_suite(
     graph_paths: List[Path],
     config: SuiteConfig,
     plugin_path: Optional[Path],
@@ -459,33 +459,6 @@ def run_benchmark_suite(
 
     return suite_result
 
-
-def _orchestrate_suite_cli(
-    graph_paths: List[Path],
-    config: SuiteConfig,
-    output_path: Optional[Path],
-    plugin_path: Optional[Path],
-    tarball_source: Optional[str] = None,
-) -> int:
-    """Run the benchmark suite CLI workflow and return an exit code.
-
-    Delegates to run_benchmark_suite for all side effects (validation gate,
-    GPU check, console output). Writes JSON output if output_path is given.
-
-    Returns:
-        0 on success, 1 on setup/execution error, 2 on correctness failure.
-    """
-    suite_result = run_benchmark_suite(
-        graph_paths=graph_paths,
-        config=config,
-        plugin_path=plugin_path,
-        tarball_source=tarball_source,
-    )
-    if suite_result is None:
-        return 1
-    if output_path is not None:
-        suite_result.save_json(str(output_path))
-    return _suite_exit_code(suite_result)
 
 
 def main() -> int:
@@ -651,13 +624,17 @@ def main() -> int:
             print(f"Suite configuration error: {e}", file=sys.stderr)
             return 1
 
-        return _orchestrate_suite_cli(
+        suite_result = _run_benchmark_suite(
             graph_paths=[Path(p) for p in resolved_files],
             config=suite_config,
-            output_path=args.output,
             plugin_path=args.plugin_path,
             tarball_source=tarball_source,
         )
+        if suite_result is None:
+            return 1
+        if args.output is not None:
+            suite_result.save_json(str(args.output))
+        return _suite_exit_code(suite_result)
     finally:
         for td in _tmpdirs:
             td.cleanup()
