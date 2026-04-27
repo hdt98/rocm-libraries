@@ -14,15 +14,10 @@ The CShuffleEpilogue uses LDS to redistribute GEMM output tiles from MFMA regist
 
 Benchmarks are generated for all combinations of:
 
-- **FP32 MFMA tiles**: 32x32x4, 32x32x8, 16x16x4, 16x16x8, 16x16x16
-- **FP16 MFMA tiles**: 32x32x8, 32x32x16, 16x16x16, 4x64x16, 64x4x16
-- **FP8 MFMA tiles**: 32x32x16, 16x16x32 (output FP16 or FP8)
+- **MFMA tiles**: 32x32x8, 32x32x16, 16x16x16, 16x16x32 (FP16)
+- **MFMA tiles**: 32x32x16, 16x16x32, 16x16x64, 16x16x128 (FP8)
 - **Wave layouts**: 4x1, 2x2, 1x4 (block size = MFMA tile × wave layout)
-
-**gfx950-only configurations:**
-- **FP16**: 16x16x32
-- **BF16**: 16x16x64 (uses gfx950-only 16x16x32 base instruction)
-- **FP8**: 32x32x32, 32x32x64, 16x16x64, 16x16x128 (output FP16 or FP8)
+- **Output types**: FP16, FP8
 
 Each configuration produces two measurements: Store and Load.
 

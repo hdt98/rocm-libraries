@@ -50,6 +50,67 @@ using BenchmarkEpilogue = CShuffleEpilogue<CShuffleEpilogueProblem<ADataType,
                                                                    false>>;
 
 /**
+ * @brief Debug helper to print XOR swizzle parameters at runtime.
+ */
+template <typename Epilogue>
+struct XorDebugInfo
+{
+    CK_TILE_DEVICE static void print()
+    {
+        if(threadIdx.x == 0 && blockIdx.x == 0)
+        {
+            // Get values from Epilogue
+            constexpr int MPerXdl = Epilogue::Problem::MPerXdl;
+            constexpr int NPerIter = Epilogue::NPerIterationShuffle;
+            constexpr int DataTypeSize = sizeof(typename Epilogue::ODataType);
+            constexpr int BaseVectorLen = Epilogue::GetVectorSizeC();
+
+            // Compute log2 at runtime
+            int log2_base = 0;
+            for(int v = BaseVectorLen; v > 1; v >>= 1) ++log2_base;
+
+#if defined(CK_GFX950_SUPPORT)
+            // gfx950: 64-bank LDS needs 3-bit XOR, which requires VectorLen=4
+            bool needs_reduction = (MPerXdl == 16) &&
+                                   ((1 << (log2_base + 3)) > NPerIter) &&  // +3 for 3-bit XOR
+                                   (BaseVectorLen > 4);
+            int vec_len = needs_reduction ? 4 : BaseVectorLen;
+#else
+            // gfx942: 32-bank LDS works with 2-bit XOR, VectorLen=8 sufficient
+            bool needs_reduction = (MPerXdl == 16) &&
+                                   ((1 << (log2_base + 2)) > NPerIter) &&
+                                   (BaseVectorLen > 8);
+            int vec_len = needs_reduction ? 8 : BaseVectorLen;
+#endif
+
+            int log2_vec = 0;
+            for(int v = vec_len; v > 1; v >>= 1) ++log2_vec;
+            int col_bit_start = log2_vec;
+
+#if defined(CK_GFX950_SUPPORT)
+            int xor_bits = 3;
+            int is_gfx950 = 1;
+#else
+            int xor_bits = 2;
+            int is_gfx950 = 0;
+#endif
+            bool has_enough = (1 << (col_bit_start + xor_bits)) <= NPerIter;
+            bool xor_applied = (MPerXdl == 16) && has_enough;
+
+            printf("XOR Debug: ODataSize=%d, MPerXdl=%d, NPerIter=%d\n",
+                   DataTypeSize, MPerXdl, NPerIter);
+            printf("  BaseVectorLen=%d, VectorLen=%d (reduced=%d)\n",
+                   BaseVectorLen, vec_len, (int)needs_reduction);
+            printf("  col_bit_start=%d, xor_bits=%d, gfx950=%d\n",
+                   col_bit_start, xor_bits, is_gfx950);
+            printf("  has_enough_col_bits=%d (need N>=%d, have N=%d)\n",
+                   (int)has_enough, (1 << (col_bit_start + xor_bits)), NPerIter);
+            printf("  XOR_APPLIED=%d\n", (int)xor_applied);
+        }
+    }
+};
+
+/**
  * @brief Setup for LDS store benchmark - adapts CShuffleEpilogue for tile benchmark.
  */
 template <typename Epilogue>
@@ -66,6 +127,9 @@ struct LdsStoreSetup
 
     CK_TILE_DEVICE static auto create()
     {
+        // Print XOR debug info once per kernel
+        XorDebugInfo<Epilogue>::print();
+
         alignas(16) __shared__ char smem[Epilogue::GetSmemSize()];
 
         auto lds_view =
