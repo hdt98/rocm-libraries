@@ -154,7 +154,8 @@ class OrigamiMatmulSelector:
         # Run Origami solution selection
         self._result = origami.select_config(self._problem,
                                              self._hardware,
-                                             self._configs)
+                                             self._configs,
+                                             origami.model_t.gemm)
 
         if streamk:
             self._grid = origami.select_grid_size(self._problem,
@@ -533,10 +534,11 @@ class OrigamiAttentionSelector:
         # Create list of Origami config_t objects based on generator
         self._configs = self._generate_configs(config_gen)
 
-        # Run Origami solution selection (uses attention namespace)
+        # Run Origami solution selection using attention model
         self._result = origami.select_config(self._problem,
                                              self._hardware,
-                                             self._configs)
+                                             self._configs,
+                                             origami.model_t.attention)
 
         # For attention, typically use k_split_aware grid selection
         self._grid = origami.select_grid_size(self._problem,

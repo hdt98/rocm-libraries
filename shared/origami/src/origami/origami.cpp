@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "origami/attention.hpp"
 #include "origami/gemm.hpp"
 #include "origami/math.hpp"
 #include "origami/origami.hpp"
@@ -18,9 +19,10 @@ namespace origami {
 std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
                                                      const hardware_t& hardware,
                                                      const std::vector<config_t>& configs,
-                                                     std::size_t topk) {
+                                                     std::size_t topk,
+                                                     model_t model) {
   // Use rank_configs to get configurations with latencies ranked by performance
-  auto ranked_configs = rank_configs(problem, hardware, configs);
+  auto ranked_configs = rank_configs(problem, hardware, configs, model);
 
   // Return only the top K configurations
   std::vector<prediction_result_t> topk_configs;
@@ -529,7 +531,8 @@ staggerU_t select_staggerU(const problem_t& problem,
 
 std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                                               const hardware_t& hardware,
-                                              const std::vector<config_t>& configs) {
+                                              const std::vector<config_t>& configs,
+                                              model_t model) {
   if (configs.empty()) { throw std::runtime_error("No configurations provided."); }
 
   struct prediction_result_wrapper_t {
@@ -540,10 +543,26 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
   std::vector<prediction_result_wrapper_t> latencies_configs;
   latencies_configs.reserve(configs.size());
 
+  std::cerr << "[rank_configs] Model type: " << (model == model_t::attention ? "attention" : "gemm") << std::endl;
+
   for (auto& config : configs) {
-    if (!gemm::check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype))
-      continue;
-    double latency = gemm::compute_total_latency(problem, hardware, config, hardware.N_CU);
+    // Use appropriate capacity check and latency computation based on model type
+    bool fits_in_lds;
+    double latency;
+
+    if (model == model_t::attention) {
+      fits_in_lds = attention::check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype);
+      if (!fits_in_lds)
+        continue;
+      latency = attention::compute_total_latency(problem, hardware, config, hardware.N_CU);
+    } else {
+      // Default to GEMM model
+      fits_in_lds = gemm::check_lds_capacity(hardware, config.mt, problem.a_dtype, problem.b_dtype);
+      if (!fits_in_lds)
+        continue;
+      latency = gemm::compute_total_latency(problem, hardware, config, hardware.N_CU);
+    }
+
     if (latency != std::numeric_limits<double>::max())
       latencies_configs.push_back({latency, std::cref(config)});
   }
@@ -706,8 +725,9 @@ prediction_result_t select_config_mnk(size_t M,
 
 prediction_result_t select_config(const problem_t& problem,
                                   const hardware_t& hardware,
-                                  const std::vector<config_t>& configs) {
-  auto ranked_configs = rank_configs(problem, hardware, configs);
+                                  const std::vector<config_t>& configs,
+                                  model_t model) {
+  auto ranked_configs = rank_configs(problem, hardware, configs, model);
 
   // Return the top configuration
   return ranked_configs[0];

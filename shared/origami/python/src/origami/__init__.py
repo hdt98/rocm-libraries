@@ -17,6 +17,7 @@ try:
         grid_selection_t,
         reduction_t,
         prediction_modes_t,
+        model_t,
         # Data structures
         dim3_t,
         tensile_params_t,
@@ -97,6 +98,7 @@ __all__ = [
     "grid_selection_t",
     "reduction_t",
     "prediction_modes_t",
+    "model_t",
     # Data structures
     "dim3_t",
     "tensile_params_t",

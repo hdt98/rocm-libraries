@@ -89,6 +89,11 @@ NB_MODULE(origami, m) {
       .value("simulation", origami::prediction_modes_t::simulation)
       .export_values();
 
+  nanobind::enum_<origami::model_t>(m, "model_t")
+      .value("gemm", origami::model_t::gemm)
+      .value("attention", origami::model_t::attention)
+      .export_values();
+
   // Add new struct bindings
   nanobind::class_<origami::dim3_t>(m, "dim3_t")
       .def(nanobind::init<std::size_t, std::size_t, std::size_t>())

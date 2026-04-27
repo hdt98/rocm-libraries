@@ -46,7 +46,8 @@ namespace origami {
  */
 prediction_result_t select_config(const problem_t& problem,
                                   const hardware_t& hardware,
-                                  const std::vector<config_t>& configs);
+                                  const std::vector<config_t>& configs,
+                                  model_t model = model_t::gemm);
 
 /**
  * @brief Select best workgroup-mapping for the given tile size.
@@ -84,12 +85,14 @@ staggerU_t select_staggerU(const problem_t& problem,
  * @param problem Problem description (M, N, K, etc.)
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param configs List of candidate configurations to rank
+ * @param model Model type to use for ranking (gemm or attention)
  * @return std::vector<prediction_result_t> Configurations with latencies ranked by performance
  * (best first)
  */
 std::vector<prediction_result_t> rank_configs(const problem_t& problem,
                                               const hardware_t& hardware,
-                                              const std::vector<config_t>& configs);
+                                              const std::vector<config_t>& configs,
+                                              model_t model = model_t::gemm);
 
 /**
  * @brief Select best configuration based only on M, N, K dimensions with default settings.
@@ -119,7 +122,8 @@ prediction_result_t select_config_mnk(std::size_t M,
 std::vector<prediction_result_t> select_topk_configs(const problem_t& problem,
                                                      const hardware_t& hardware,
                                                      const std::vector<config_t>& configs,
-                                                     std::size_t topk);
+                                                     std::size_t topk,
+                                                     model_t model = model_t::gemm);
 
 /**
  * @brief Given a latency, compute the achieved throughput in gflops.

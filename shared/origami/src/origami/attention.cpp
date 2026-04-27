@@ -80,6 +80,11 @@ std::tuple<size_t, size_t, size_t, size_t> compute_cu_occupancy(const problem_t&
                                                                 grid_selection_t grid_selection,
                                                                 size_t max_cus,
                                                                 size_t split = 0) {
+  OLOG_DEBUG("compute_cu_occupancy: problem size (M=" << problem.size.m
+             << ", N=" << problem.size.n << ", K=" << problem.size.k
+             << "), config MT (M=" << config.mt.m << ", N=" << config.mt.n
+             << ", K=" << config.mt.k << ")");
+
   // For flash attention: total work = batch * q_heads * grid_M * grid_N tiles
   size_t grid_m = math::safe_ceil_div(problem.size.m, config.mt.m);
   size_t grid_n = math::safe_ceil_div(problem.size.n, config.mt.n);
@@ -569,11 +574,20 @@ double compute_total_latency(const problem_t& problem,
   assert(config.is_valid());
   bool debug = runtime_options::get().debug_enabled;
 
+  OLOG_DEBUG("=== Attention compute_total_latency START ===");
+  OLOG_DEBUG("Problem: M=" << problem.size.m << " N=" << problem.size.n
+             << " K=" << problem.size.k << " batch=" << problem.batch
+             << " q_heads=" << problem.q_heads);
+  OLOG_DEBUG("Config MT: M=" << config.mt.m << " N=" << config.mt.n
+             << " K=" << config.mt.k);
+  OLOG_DEBUG("Hardware: N_CU=" << hardware.N_CU << " max_cus=" << max_cus);
+
   // Problem dimensions: M=Q_SEQ, N=K_SEQ, K=H_DIM
   const size_t M = problem.size.m;
   const size_t N = problem.size.n;
   const size_t K = problem.size.k;
   const size_t batch = problem.batch;
+  const size_t q_heads = problem.q_heads;
 
   const size_t MT_M = config.mt.m;
   const size_t MT_N = config.mt.n;
@@ -583,6 +597,8 @@ double compute_total_latency(const problem_t& problem,
   const size_t grid_m = math::safe_ceil_div(M, MT_M);
   const size_t grid_n = math::safe_ceil_div(N, MT_N);
   const size_t grid_k = math::safe_ceil_div(K, MT_K);
+
+  const size_t wgs_per_cu = 2;
 
   // CU occupancy (simplified for flash attention)
   size_t num_active_cus = std::min(max_cus, hardware.N_CU);
@@ -602,11 +618,14 @@ double compute_total_latency(const problem_t& problem,
 
   // --- Number of pipeline iterations ---
   // Total work = batch * grid_M * grid_N * grid_K tiles distributed across N_CU CUs
-  double total_tiles = static_cast<double>(batch) *
+  const size_t adjustment_factor = 8;
+  double total_tiles = static_cast<double>(adjustment_factor) *
+                       static_cast<double>(batch) *
+                       static_cast<double>(q_heads) *
                        static_cast<double>(grid_m) *
                        static_cast<double>(grid_n) *
                        static_cast<double>(grid_k);
-  double num_iters = std::ceil(total_tiles / static_cast<double>(num_active_cus));
+  double num_iters = std::ceil(total_tiles / (static_cast<double>(wgs_per_cu) * static_cast<double>(num_active_cus)));
   num_iters = std::max(num_iters, 1.0);
 
   // --- Total latency ---
