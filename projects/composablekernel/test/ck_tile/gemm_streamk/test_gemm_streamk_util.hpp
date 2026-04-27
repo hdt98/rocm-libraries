@@ -96,7 +96,7 @@ class TestCkTileStreamK : public ::testing::Test
               bool PadK       = true,
               bool Preshuffle = false,
               bool TransposeC = false>
-    ck_tile::index_t invoke_streamk(const ck_tile::StreamKHostArgs& args,
+    ck_tile::index_t invoke_streamk(const ck_tile::UniversalGemmHostArgs<>& args,
                                     const ck_tile::stream_config& s)
     {
         constexpr ck_tile::index_t M_Warp = 2;
@@ -167,7 +167,7 @@ class TestCkTileStreamK : public ::testing::Test
                                              K_Warp_Tile,
                                              UniversalGemmProblem::TransposeC>>;
 
-        using Kernel = ck_tile::StreamKKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
+        using Kernel = ck_tile::UniversalGemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 
         auto kargs                = Kernel::MakeKernelArgs(args);
         const auto workspace_size = Kernel::GetWorkSpaceSize(kargs);
@@ -258,15 +258,18 @@ class TestCkTileStreamK : public ::testing::Test
         c_m_n_dev_buf.SetZero();
         c_m_n_dev_result.SetZero();
 
-        ck_tile::StreamKHostArgs args{a_m_k_dev_buf.GetDeviceBuffer(),
-                                      b_k_n_dev_buf.GetDeviceBuffer(),
-                                      c_m_n_dev_buf.GetDeviceBuffer(),
-                                      M,
-                                      N,
-                                      K,
-                                      stride_A,
-                                      stride_B,
-                                      stride_C};
+        ck_tile::UniversalGemmHostArgs<> args = {{a_m_k_dev_buf.GetDeviceBuffer()},
+                                                 {b_k_n_dev_buf.GetDeviceBuffer()},
+                                                 /*ds_ptr*/ {},
+                                                 c_m_n_dev_buf.GetDeviceBuffer(),
+                                                 /*kbatch*/ 1,
+                                                 M,
+                                                 N,
+                                                 K,
+                                                 {stride_A},
+                                                 {stride_B},
+                                                 /*stride_Ds*/ {},
+                                                 stride_C};
 
         ck_tile::index_t num_accumulations_per_tile =
             invoke_streamk<>(args, ck_tile::stream_config{nullptr, false, 0, 0, 1});
