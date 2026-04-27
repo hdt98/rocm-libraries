@@ -593,9 +593,10 @@ class LocalReadMFMA(LocalRead):
 
                 offset_val = eIdx * stridePerRead
                 offset_val = offset_val + vIdx * MIWaveGroupShape[tile01] * mxUnit
+                offset_val = offset_val + tP["localReadOffset"]
                 if (kernel["LdsBlockSizePerPad%s"%tc] != 0) and (kernel["LdsPad%s"%tc] != 0):
                     offset_val = int(offset_val + (offset_val // kernel["LdsBlockSizePerPad%s"%tc]) * kernel["LdsPad%s"%tc] * tP["bpeDS"])
-                offset_val = offset_val + tP["localReadOffset"] + tP["localReadSwapByteOffset"]
+                offset_val = offset_val + tP["localReadSwapByteOffset"]
 
                 paramList.append(int(offset_val))
 

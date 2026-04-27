@@ -38,7 +38,7 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     roundUp, INDEX_CHARS, IsaVersion, SemanticVersion, \
                     roundUpToNearestMultiple
 from Tensile.Common.DataType import DataType
-from Tensile.SolutionStructs.LdsPadding import get_fp4_mt_config, get_fp8_mt_config, \
+from Tensile.SolutionStructs.LdsPadding import get_fp4_mt_config, get_fp8_mt_config, get_mxs_mt_config, \
                                                get_fp16_mt_config, get_fp32_mt_config
 from Tensile.Common.GlobalParameters import defaultSolution, \
                                             defaultInternalSupportParams
@@ -2564,8 +2564,24 @@ class Solution(collections.abc.Mapping):
         if state["DirectToVgprB"]:
           ldsPadB = 0
 
-        ldsPadMXSA = 4 * 2 if (state["LdsPadMXSA"] == -1) else state["LdsPadMXSA"]
-        ldsPadMXSB = 4 * 2 if (state["LdsPadMXSB"] == -1) else state["LdsPadMXSB"]
+        if isa[:2] == (12, 5):
+          if state["LdsPadMXSA"] == -1:
+            ldsPadMXSA = get_mxs_mt_config(state["MatrixInstK"],
+                                          state["ProblemType"]["MXBlockA"],
+                                          state["VectorWidthA"], "pad") \
+                        if state["ProblemType"]["MXBlockA"] else 0
+          else:
+            ldsPadMXSA = state["LdsPadMXSA"]
+          if state["LdsPadMXSB"] == -1:
+            ldsPadMXSB = get_mxs_mt_config(state["MatrixInstK"],
+                                          state["ProblemType"]["MXBlockB"],
+                                          state["VectorWidthB"], "pad") \
+                        if state["ProblemType"]["MXBlockB"] else 0
+          else:
+            ldsPadMXSB = state["LdsPadMXSB"]
+        else:
+          ldsPadMXSA = 4 * 2 if (state["LdsPadMXSA"] == -1) else state["LdsPadMXSA"]
+          ldsPadMXSB = 4 * 2 if (state["LdsPadMXSB"] == -1) else state["LdsPadMXSB"]
 
         if state["TDMInst"]:
           pads = {"A": ldsPadA * state["ProblemType"]["MacDataTypeA"].numBytes(), "B": ldsPadB * state["ProblemType"]["MacDataTypeB"].numBytes(), "MXSA": ldsPadMXSA, "MXSB": ldsPadMXSB}
@@ -2593,15 +2609,22 @@ class Solution(collections.abc.Mapping):
 
       def calcMXSLdsBlockSizePerPad(tc: str, lrvw: int) -> int:
         LdsBlockSizePerPad = state["LdsBlockSizePerPad%s"%tc]
-        bpe = 1 # MX scale size
-        multiple = 256 if isa[:2] == (12, 5) else 128
-        if LdsBlockSizePerPad == -1:
-          vw = state["VectorWidthA"] if "A" in tc else state["VectorWidthB"]
-          if state["ISA"] == (12, 5, 0):
-            LdsBlockSizePerPad = 0
-          else:
+        if isa[:2] == (12, 5):
+          if LdsBlockSizePerPad != -1:
+            return LdsBlockSizePerPad
+          subTc = tc[3]
+          mxBlock = state["ProblemType"]["MXBlock%s"%subTc]
+          if not mxBlock:
+            return 0
+          return get_mxs_mt_config(state["MatrixInstK"], mxBlock,
+                                   state["VectorWidth%s"%subTc], "perBlock")
+        else:
+          bpe = 1 # MX scale size
+          multiple = 128
+          if LdsBlockSizePerPad == -1:
+            vw = state["VectorWidthA"] if "A" in tc else state["VectorWidthB"]
             LdsBlockSizePerPad = roundUpToNearestMultiple(int(state["_DepthU%s"%tc] * bpe * vw), multiple)
-        return LdsBlockSizePerPad
+          return LdsBlockSizePerPad
 
       def getLdsBpe(tc: str) -> float:
         return state["ProblemType"]["DataType%s"%tc].numBytes() if state["ConvertAfterDS"] else state["ProblemType"]["MacDataType%s"%tc].numBytes()

@@ -38,6 +38,7 @@ Public API:
   get_fp8_mt_config(mt, key, miWaveTile, miWaveGroup)   -> int
   get_fp16_mt_config(mt, key, miWaveGroup)              -> int
   get_fp32_mt_config(mt, key, vw, lrvw, miWaveGroup)    -> int
+  get_mxs_mt_config(matrixInstK, mxBlock, vw, key)      -> int
 
   key is one of "perBlock", "pad", "shift" (FP4/FP8 only for "shift").
 """
@@ -398,3 +399,14 @@ def get_fp32_mt_config(mt: int, key: str, vw: int, lrvw: int,
                               miWaveTile=miWaveTile,
                               xf32EmuPack=xf32EmuPack)[key]
 
+@lru_cache(maxsize=None)
+def _compute_mxs_config(matrixInstK: int, mxBlock: int, vw: int) -> Dict[str, int]:
+  if mxBlock <= 0 or vw <= 0:
+    return {"perBlock": 0, "pad": 0}
+  d = (matrixInstK // mxBlock) * vw
+  if vw < 4 or d == 0 or d % 16 != 0 or (d // 16) & 1:
+    return {"perBlock": 0, "pad": 0}
+  return {"perBlock": 256, "pad": 16}
+
+def get_mxs_mt_config(matrixInstK: int, mxBlock: int, vw: int, key: str) -> int:
+  return _compute_mxs_config(matrixInstK, mxBlock, vw)[key]
