@@ -451,7 +451,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
     {
         if constexpr(DirectLoad)
         {
-<<<<<<< HEAD
             if constexpr(is_same<tensor_layout::gemm::RowMajor, ALayout>::value)
             {
                 return make_naive_tensor_descriptor(
@@ -464,12 +463,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                     make_tuple(AK0Number, Number<MPerBlock>{}, AK1Number),
                     make_tuple(Number<MPerBlock * AK1Number>{}, I1, Number<MPerBlock>{}));
             }
-=======
-            // Force use padded layout on gfx950 to reduce bank conflicts
-            return make_naive_tensor_descriptor(
-                make_tuple(AK0Number, Number<MPerBlock>{}, AK1Number),
-                make_tuple(Number<MPerBlock * AK1Number>{}, I1, Number<MPerBlock>{}));
->>>>>>> gfx1250
         }
         else if constexpr(is_same_v<DeviceArch, gfx950_t>)
         {
@@ -536,7 +529,6 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                      GetABlockDescriptor_AK0PerBlock_MPerBlock_AK1(get_device_arch()))),
                  decltype(MakeBMmaTileDescriptor_N0_N1_N2_K(
                      GetBBlockDescriptor_BK0PerBlock_NPerBlock_BK1(get_device_arch()))),
-<<<<<<< HEAD
                  ABlockTransferSrcScalarPerVector,
                  BBlockTransferSrcScalarPerVector,
                  MPerBlock,
@@ -548,24 +540,10 @@ struct GridwiseGemm_xdl_cshuffle_conv_v3
                  NXdlPerWave,
                  KPack,
                  DirectLoad,
+                 false, // TransposeC
+                 false, // UseDataCachePrefetch
                  ALdsScalarLoadToVgpr,
                  BLdsScalarLoadToVgpr>())>;
-=======
-                                   ABlockTransferSrcScalarPerVector,
-                                   BBlockTransferSrcScalarPerVector,
-                                   MPerBlock,
-                                   NPerBlock,
-                                   KPerBlock,
-                                   MPerXdl,
-                                   NPerXdl,
-                                   MXdlPerWave,
-                                   NXdlPerWave,
-                                   KPack,
-                                   DirectLoad,
-                                   false, // TransposeC
-                                   false, // UseDataCachePrefetch
-                                   LdsScalarLoadToVgpr>())>;
->>>>>>> gfx1250
 
     template <typename DeviceArch>
     __device__ static constexpr index_t GetSharedMemoryNumberOfByte(DeviceArch)

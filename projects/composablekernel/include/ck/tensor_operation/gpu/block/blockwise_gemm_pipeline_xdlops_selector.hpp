@@ -33,14 +33,10 @@ template <BlockGemmPipelineVersion BlkGemmPipelineVer,
           index_t NRepeat,
           index_t KPack,
           bool DirectLoad           = false,
-<<<<<<< HEAD
-          bool ALdsScalarLoadToVgpr = false,
-          bool BLdsScalarLoadToVgpr = false>
-=======
           bool TransposeC           = false,
           bool UseDataCachePrefetch = false,
-          bool LdsScalarLoadToVgpr  = false>
->>>>>>> gfx1250
+          bool ALdsScalarLoadToVgpr = false,
+          bool BLdsScalarLoadToVgpr = false>
 constexpr auto BlockGemmPipeline_Selector()
 {
     // Supported for Direct Load and V1
@@ -72,13 +68,9 @@ constexpr auto BlockGemmPipeline_Selector()
                                                              MRepeat,
                                                              NRepeat,
                                                              KPack,
-<<<<<<< HEAD
+                                                             TransposeC,
                                                              ALdsScalarLoadToVgpr,
                                                              BLdsScalarLoadToVgpr>{};
-=======
-                                                             TransposeC,
-                                                             LdsScalarLoadToVgpr>{};
->>>>>>> gfx1250
         }
         else if constexpr(BlkGemmPipelineVer == BlockGemmPipelineVersion::v4)
         {

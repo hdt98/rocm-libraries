@@ -1299,12 +1299,11 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                    ck_tile::WPABQuantBPipelineAgBgCrV2<PipelineProblem>,
                                    ck_tile::ABQuantGemmPipelineAgBgCrCompV3<PipelineProblem>>>;
 
-<<<<<<< HEAD
             using GemmEpilogue = std::conditional_t<
                 TiledMMAPermuteN,
                 ck_tile::PermuteNEpilogue<
-                    ck_tile::PermuteNEpilogueProblem<typename PipelineProblem::ComputeDataType,
-                                                     typename PipelineProblem::ComputeDataType,
+                    ck_tile::PermuteNEpilogueProblem<typename PipelineProblem::AComputeDataType,
+                                                     typename PipelineProblem::BComputeDataType,
                                                      ck_tile::tuple<>,
                                                      AccDataType,
                                                      CDataType,
@@ -1322,8 +1321,8 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                                      false,
                                                      1>>,
                 ck_tile::CShuffleEpilogue<
-                    ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::ComputeDataType,
-                                                     typename PipelineProblem::ComputeDataType,
+                    ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::AComputeDataType,
+                                                     typename PipelineProblem::BComputeDataType,
                                                      ck_tile::tuple<>,
                                                      AccDataType,
                                                      CDataType,
@@ -1338,29 +1337,6 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                                      Base::N_Warp_Tile,
                                                      Base::K_Warp_Tile,
                                                      transpose_c>>>;
-=======
-            using GemmEpilogue = ck_tile::CShuffleEpilogue<
-                ck_tile::CShuffleEpilogueProblem<typename PipelineProblem::AComputeDataType,
-                                                 typename PipelineProblem::BComputeDataType,
-                                                 ck_tile::tuple<>,
-                                                 AccDataType,
-                                                 CDataType,
-                                                 ck_tile::tuple<>,
-                                                 CLayout,
-                                                 ck_tile::element_wise::PassThrough,
-                                                 TilePartitioner::MPerBlock,
-                                                 TilePartitioner::NPerBlock,
-                                                 Base::M_Warp,
-                                                 Base::N_Warp,
-                                                 Base::M_Warp_Tile,
-                                                 Base::N_Warp_Tile,
-                                                 Base::K_Warp_Tile,
-                                                 transpose_c,
-                                                 1,
-                                                 false,
-                                                 1,
-                                                 TiledMMAPermuteN>>;
->>>>>>> gfx1250
 
             using Kernel = ck_tile::QuantGemmKernel<TilePartitioner,
                                                     GemmPipeline,

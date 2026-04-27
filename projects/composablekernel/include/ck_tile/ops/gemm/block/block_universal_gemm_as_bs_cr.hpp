@@ -347,22 +347,17 @@ struct BlockUniversalGemmAsBsCr
                         merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                         merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
-<<<<<<< HEAD
                     // warp GEMM
-                    WarpGemm{}(c_warp_tensor, a_warp_tensor, b_warp_tensor);
-=======
-                        // warp GEMM
-                        if constexpr(nIter != 0)
-                        {
-                            WarpGemm{}.template operator()<ReuseA<true>, ReuseB<false>>(
-                                c_warp_tensor, a_warp_tensor, b_warp_tensor);
-                        }
-                        else
-                        {
-                            WarpGemm{}.template operator()<ReuseA<false>, ReuseB<false>>(
-                                c_warp_tensor, a_warp_tensor, b_warp_tensor);
-                        }
->>>>>>> gfx1250
+                    if constexpr(nIter != 0)
+                    {
+                        WarpGemm{}.template operator()<ReuseA<true>, ReuseB<false>>(
+                            c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                    }
+                    else
+                    {
+                        WarpGemm{}.template operator()<ReuseA<false>, ReuseB<false>>(
+                            c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                    }
 
                     // write C warp tensor into C block tensor
                     c_block_tensor.set_y_sliced_thread_data(
@@ -512,7 +507,6 @@ struct BlockUniversalGemmAsBsCr
                             merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths));
 
-<<<<<<< HEAD
                         // The block_sync_lds() here performs double duty:
                         // A) safeguard against data hazard because barrier from
                         // blockwise_gemm is moved here B) reduce VMEM FIFO congestion
@@ -529,46 +523,21 @@ struct BlockUniversalGemmAsBsCr
                             __builtin_amdgcn_sched_barrier(0);
                         }
                         // warp GEMM
-                        WarpGemm{}(c_warp_tensor, a_warp_tensor, b_warp_tensor);
-
+                        if constexpr(nIter != 0)
+                        {
+                            WarpGemm{}.template operator()<ReuseA<true>, ReuseB<false>>(
+                                c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                        }
+                        else
+                        {
+                            WarpGemm{}.template operator()<ReuseA<false>, ReuseB<false>>(
+                                c_warp_tensor, a_warp_tensor, b_warp_tensor);
+                        }
                         // write C warp tensor into C block tensor
                         c_block_tensor.set_y_sliced_thread_data(
                             merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                             merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                             c_warp_tensor.get_thread_buffer());
-=======
-                            // The block_sync_lds() here performs double duty:
-                            // A) safeguard against data hazard because barrier from
-                            // blockwise_gemm is moved here B) reduce VMEM FIFO congestion
-                            // by applying small delays to different wavefronts It is
-                            // performed near the end of MAC cluster to minimize lgkmcnt
-                            // penalty
-                            if constexpr(kIter.value == KRepeat - 1 &&
-                                         kInnerIter.value == KInnerLoopIter - 1 &&
-                                         mIter.value == MIterPerWarp - 1 &&
-                                         nIter.value == NIterPerWarp - 1)
-                            {
-                                __builtin_amdgcn_sched_barrier(0);
-                                block_sync_lds();
-                                __builtin_amdgcn_sched_barrier(0);
-                            }
-                            // warp GEMM
-                            if constexpr(nIter != 0)
-                            {
-                                WarpGemm{}.template operator()<ReuseA<true>, ReuseB<false>>(
-                                    c_warp_tensor, a_warp_tensor, b_warp_tensor);
-                            }
-                            else
-                            {
-                                WarpGemm{}.template operator()<ReuseA<false>, ReuseB<false>>(
-                                    c_warp_tensor, a_warp_tensor, b_warp_tensor);
-                            }
-                            // write C warp tensor into C block tensor
-                            c_block_tensor.set_y_sliced_thread_data(
-                                merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
-                                merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
-                                c_warp_tensor.get_thread_buffer());
->>>>>>> gfx1250
 
                         if constexpr(kInnerIter.value == 0 && mIter.value == 0 && nIter.value == 0)
                         {

@@ -122,69 +122,45 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
 
     using CodegenFlatmmPipeline = ck_tile::FlatmmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem>;
 
-<<<<<<< HEAD
-        using GemmEpilogue = std::conditional_t<
-            FlatmmConfig::TiledMMAPermuteN,
-            ck_tile::PermuteNEpilogue<
-                ck_tile::PermuteNEpilogueProblem<ADataType,
-                                                 BDataType,
-                                                 DsDatatype,
-                                                 AccDataType,
-                                                 CDataType,
-                                                 DsLayout,
-                                                 ELayout,
-                                                 CDEElementWise,
-                                                 TilePartitioner::MPerBlock,
-                                                 TilePartitioner::NPerBlock,
-                                                 FlatmmConfig::M_Warp,
-                                                 FlatmmConfig::N_Warp,
-                                                 FlatmmConfig::M_Warp_Tile,
-                                                 FlatmmConfig::N_Warp_Tile,
-                                                 FlatmmConfig::K_Warp_Tile,
-                                                 CodegenPipelineProblem::TransposeC,
-                                                 false,
-                                                 1>>,
-            ck_tile::CShuffleEpilogue<
-                ck_tile::CShuffleEpilogueProblem<ADataType,
-                                                 BDataType,
-                                                 DsDatatype,
-                                                 AccDataType,
-                                                 CDataType,
-                                                 DsLayout,
-                                                 ELayout,
-                                                 CDEElementWise,
-                                                 TilePartitioner::MPerBlock,
-                                                 TilePartitioner::NPerBlock,
-                                                 FlatmmConfig::M_Warp,
-                                                 FlatmmConfig::N_Warp,
-                                                 FlatmmConfig::M_Warp_Tile,
-                                                 FlatmmConfig::N_Warp_Tile,
-                                                 FlatmmConfig::K_Warp_Tile,
-                                                 CodegenPipelineProblem::TransposeC,
-                                                 FlatmmConfig::NumWaveGroups>>>;
-=======
-    using GemmEpilogue = ck_tile::CShuffleEpilogue<
-        ck_tile::CShuffleEpilogueProblem<ADataType,
-                                         BDataType,
-                                         DsDatatype,
-                                         AccDataType,
-                                         CDataType,
-                                         DsLayout,
-                                         ELayout,
-                                         CDEElementWise,
-                                         TilePartitioner::MPerBlock,
-                                         TilePartitioner::NPerBlock,
-                                         FlatmmConfig::M_Warp,
-                                         FlatmmConfig::N_Warp,
-                                         FlatmmConfig::M_Warp_Tile,
-                                         FlatmmConfig::N_Warp_Tile,
-                                         FlatmmConfig::K_Warp_Tile,
-                                         CodegenPipelineProblem::TransposeC,
-                                         FlatmmConfig::NumWaveGroups,
-                                         false,
-                                         1,
-                                         FlatmmConfig::TiledMMAPermuteN>>;
->>>>>>> gfx1250
+    using GemmEpilogue =
+        std::conditional_t<FlatmmConfig::TiledMMAPermuteN,
+                           ck_tile::PermuteNEpilogue<
+                               ck_tile::PermuteNEpilogueProblem<ADataType,
+                                                                BDataType,
+                                                                DsDatatype,
+                                                                AccDataType,
+                                                                CDataType,
+                                                                DsLayout,
+                                                                ELayout,
+                                                                CDEElementWise,
+                                                                TilePartitioner::MPerBlock,
+                                                                TilePartitioner::NPerBlock,
+                                                                FlatmmConfig::M_Warp,
+                                                                FlatmmConfig::N_Warp,
+                                                                FlatmmConfig::M_Warp_Tile,
+                                                                FlatmmConfig::N_Warp_Tile,
+                                                                FlatmmConfig::K_Warp_Tile,
+                                                                CodegenPipelineProblem::TransposeC,
+                                                                false,
+                                                                1>>,
+                           ck_tile::CShuffleEpilogue<
+                               ck_tile::CShuffleEpilogueProblem<ADataType,
+                                                                BDataType,
+                                                                DsDatatype,
+                                                                AccDataType,
+                                                                CDataType,
+                                                                DsLayout,
+                                                                ELayout,
+                                                                CDEElementWise,
+                                                                TilePartitioner::MPerBlock,
+                                                                TilePartitioner::NPerBlock,
+                                                                FlatmmConfig::M_Warp,
+                                                                FlatmmConfig::N_Warp,
+                                                                FlatmmConfig::M_Warp_Tile,
+                                                                FlatmmConfig::N_Warp_Tile,
+                                                                FlatmmConfig::K_Warp_Tile,
+                                                                CodegenPipelineProblem::TransposeC,
+                                                                FlatmmConfig::NumWaveGroups>>>;
 
     // ToDo: Will add the codegen part to test different pipeline policies in GEMM.
     // Now we only use the BlockGemmASmemBSmemCRegV1DefaultPolicy.
@@ -200,19 +176,6 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
         throw std::runtime_error("Wrong! Arguments not supported! Skipping gemm!\n");
     }
 
-<<<<<<< HEAD
-        if(s.log_level_ > 0)
-        {
-            std::cout << "Launching kernel with args:" << CodegenFlatmmShape::GetName() << "\n"
-                      << "Shape: " << CodegenFlatmmShape::GetName() << "\n"
-                      << "problem: " << CodegenPipelineProblem::GetName() << "\n"
-                      << "pipeline: " << CodegenFlatmmPipeline::GetName() << "\n"
-                      << "epilogue: " << GemmEpilogue::GetName() << "\n"
-                      << "grid: {" << grids.x << ", " << grids.y << ", " << grids.z << "}"
-                      << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
-                      << std::endl;
-        }
-=======
     if(s.log_level_ > 0)
     {
         std::cout << "Launching kernel with args:" << CodegenFlatmmShape::GetName() << "\n"
@@ -223,7 +186,6 @@ float flatmm_calc(const ck_tile::ScaleFlatmmHostArgs<ScaleM, ScaleN>& args,
                   << ", blocks: {" << blocks.x << ", " << blocks.y << ", " << blocks.z << "}"
                   << std::endl;
     }
->>>>>>> gfx1250
 
     if(s.flush_cache_)
     {

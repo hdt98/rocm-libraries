@@ -125,20 +125,12 @@ struct UniversalInvoker
                                              GemmConfig::K_Warp_Tile,
                                              UniversalGemmProblem::TransposeC,
                                              GemmConfig::NumWaveGroups,
-<<<<<<< HEAD
-                                             false, /*FixedVectorSize_*/
-                                             1,     /*VectorSizeC_*/
-                                             1,     /*BlockedXDLN_PerWarp_*/
-                                             GemmConfig::DoubleSmemBuffer /*DoubleSmemBuffer*/>>;
-=======
                                              false,                        /*FixedVectorSize_*/
                                              1,                            /*VectorSizeC_*/
-                                             false,                        /*TiledMMAPermuteN_*/
                                              1,                            /*BlockedXDLN_PerWarp_*/
                                              GemmConfig::DoubleSmemBuffer, /*DoubleSmemBuffer*/
                                              AComputeDataType,
                                              BComputeDataType>>::Epilogue;
->>>>>>> gfx1250
 
         using Kernel = ck_tile::GemmKernel<TilePartitioner, GemmPipeline, GemmEpilogue>;
 

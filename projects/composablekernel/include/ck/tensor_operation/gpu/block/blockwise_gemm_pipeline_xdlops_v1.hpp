@@ -752,13 +752,9 @@ template <BlockGemmPipelineScheduler BlkGemmPipelineVer,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPacks,
-<<<<<<< HEAD
+          bool TransposeC           = false,
           bool ALdsScalarLoadToVgpr = false,
           bool BLdsScalarLoadToVgpr = false>
-=======
-          bool TransposeC          = false,
-          bool LdsScalarLoadToVgpr = false>
->>>>>>> gfx1250
 struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1
 {
 };
@@ -782,14 +778,9 @@ template <index_t BlockSize,
           index_t MRepeat,
           index_t NRepeat,
           index_t KPack,
-<<<<<<< HEAD
-          // ,bool TransposeC //disable transposec right now...
+          bool TransposeC,
           bool ALdsScalarLoadToVgpr,
           bool BLdsScalarLoadToVgpr>
-=======
-          bool TransposeC,
-          bool LdsScalarLoadToVgpr>
->>>>>>> gfx1250
 struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Intrawave,
                                                  BlockSize,
                                                  ADataType,
@@ -810,13 +801,9 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                                  MRepeat,
                                                  NRepeat,
                                                  KPack,
-<<<<<<< HEAD
+                                                 TransposeC,
                                                  ALdsScalarLoadToVgpr,
                                                  BLdsScalarLoadToVgpr>
-=======
-                                                 TransposeC,
-                                                 LdsScalarLoadToVgpr>
->>>>>>> gfx1250
     : BlockwiseGemmXdlops_pipeline_base<BlockSize,
                                         ADataType,
                                         BDataType,
@@ -836,14 +823,9 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                         MRepeat,
                                         NRepeat,
                                         KPack,
-<<<<<<< HEAD
-                                        false /*TransposeC*/,
+                                        TransposeC,
                                         ALdsScalarLoadToVgpr,
                                         BLdsScalarLoadToVgpr>
-=======
-                                        TransposeC,
-                                        LdsScalarLoadToVgpr>
->>>>>>> gfx1250
 
 {
     using Base = BlockwiseGemmXdlops_pipeline_base<BlockSize,
@@ -865,14 +847,9 @@ struct BlockwiseGemmXdlopsDirectLoad_pipeline_v1<BlockGemmPipelineScheduler::Int
                                                    MRepeat,
                                                    NRepeat,
                                                    KPack,
-<<<<<<< HEAD
-                                                   false /*TransposeC*/,
+                                                   TransposeC,
                                                    ALdsScalarLoadToVgpr,
                                                    BLdsScalarLoadToVgpr>;
-=======
-                                                   TransposeC,
-                                                   LdsScalarLoadToVgpr>;
->>>>>>> gfx1250
     using Base::I0;
     using Base::KRepeat;
     using Base::xdlops_gemm;

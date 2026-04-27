@@ -284,17 +284,8 @@ struct DeviceGroupedGemm_Xdl_Multi_ABD_Fixed_NK
         CDEBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock,
         CDEBlockTransferScalarPerVector_NPerBlock,
         LoopSched>;
-<<<<<<< HEAD
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
-=======
     using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
     using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
-    template <typename UnderlyingBlockToCTileMap>
-    struct OffsettedBlockToCTileMapMLoops
-    {
-        using underlying_type = UnderlyingBlockToCTileMap;
->>>>>>> gfx1250
 
     using Block2ETileMap =
         DeviceGroupedGemm_Fixed_NK_Common::BlockToCTileMap_KBatch_M00_N0_M01Adapt_MLoops<MPerBlock,

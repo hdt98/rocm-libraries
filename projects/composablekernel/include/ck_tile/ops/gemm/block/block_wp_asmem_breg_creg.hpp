@@ -206,38 +206,27 @@ struct BlockWeightPreshuffleASmemBRegCReg
                 WarpGemm{}(
                     c_warp_tensor, preloaded_a_warp_tensor(number<AwarpIter>{}), b_warp_tensor);
 
-<<<<<<< HEAD
                 // write C warp tensor into C block tensor
                 c_block_tensor.set_y_sliced_thread_data(
                     merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
                     merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
                     c_warp_tensor.get_thread_buffer());
-
-                __builtin_amdgcn_sched_barrier(0x7F6);
-=======
-                    // write C warp tensor into C block tensor
-                    c_block_tensor.set_y_sliced_thread_data(
-                        merge_sequences(sequence<mIter, nIter>{}, c_warp_y_index_zeros),
-                        merge_sequences(sequence<1, 1>{}, c_warp_y_lengths),
-                        c_warp_tensor.get_thread_buffer());
-                });
-                // preload next A from lds
-                if constexpr((kIter * MIterPerWarp + mIter) <
-                             (KIterPerWarp * MIterPerWarp - m_preload))
-                {
-                    constexpr auto AmIter = (mIter + m_preload) % MIterPerWarp;
-                    constexpr auto AkIter = (kIter + (mIter + m_preload) / MIterPerWarp);
-
-                    load_tile(preloaded_a_warp_tensor(number<AwarpIter>{}),
-                              a_load_windows[number<AkIter>{}][number<AmIter>{}]);
-                }
-
-                // barrier
-                if constexpr((kIter == KIterPerWarp - 1) && (mIter == MIter_2nd_last))
-                {
-                    block_sync_lds();
-                }
             });
+            // preload next A from lds
+            if constexpr((kIter * MIterPerWarp + mIter) < (KIterPerWarp * MIterPerWarp - m_preload))
+            {
+                constexpr auto AmIter = (mIter + m_preload) % MIterPerWarp;
+                constexpr auto AkIter = (kIter + (mIter + m_preload) / MIterPerWarp);
+
+                load_tile(preloaded_a_warp_tensor(number<AwarpIter>{}),
+                          a_load_windows[number<AkIter>{}][number<AmIter>{}]);
+            }
+
+            // barrier
+            if constexpr((kIter == KIterPerWarp - 1) && (mIter == MIter_2nd_last))
+            {
+                block_sync_lds();
+            }
         });
     }
 
@@ -327,7 +316,6 @@ struct BlockWeightPreshuffleASmemBRegCReg
                 {
                     block_sync_lds();
                 }
->>>>>>> gfx1250
             });
             // preload next A from lds
             if constexpr((kIter * MIterPerWarp + mIter) < (KIterPerWarp * MIterPerWarp - m_preload))

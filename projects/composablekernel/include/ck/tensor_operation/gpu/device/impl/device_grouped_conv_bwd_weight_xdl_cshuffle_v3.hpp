@@ -424,7 +424,6 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
             ? 4 / sizeof(BDataType)
             : BBlockTransferSrcScalarPerVector;
 
-<<<<<<< HEAD
     static constexpr bool ALdsScalarLoadToVgpr =
         (DirectLoad && BlkGemmPipelineVer == BlockGemmPipelineVersion::v1 ? true : false);
     static constexpr bool BLdsScalarLoadToVgpr =
@@ -432,10 +431,7 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
 
     // Note: Direct load use layout to create proper block and mmtile descriptor
     // TODO: Fix and verify RC layout for not direct load (currently it returns wrong results)
-    template <index_t NXdlPerWave_>
-=======
     template <typename WarpTileConfig>
->>>>>>> gfx1250
     using GridwiseGemmBase = GridwiseGemm_xdl_cshuffle_conv_v3<
         std::conditional_t<DirectLoad,
                            tensor_layout::gemm::ColumnMajor,
@@ -487,17 +483,11 @@ struct DeviceGroupedConvBwdWeight_Xdl_CShuffleV3
         BlkGemmPipelineVer,
         ComputeTypeA,
         ComputeTypeB,
-<<<<<<< HEAD
         DirectLoad,
         ALdsScalarLoadToVgpr,
         BLdsScalarLoadToVgpr>;
-    using GridwiseGemm64 = GridwiseGemmBase<math::max(NXdlPerWave64, 1)>;
-    using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
-=======
-        DirectLoad>;
     using GridwiseGemm64 = GridwiseGemmBase<decltype(WarpTileConfig64)>;
     using GridwiseGemm32 = GridwiseGemmBase<decltype(WarpTileConfig32)>;
->>>>>>> gfx1250
 
     // Argument
     using CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock =
