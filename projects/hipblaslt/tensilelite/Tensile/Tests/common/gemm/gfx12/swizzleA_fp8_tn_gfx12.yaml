@@ -1,0 +1,108 @@
+# SwizzleTensorA + FP8 TN (F8F8S → Half) on RDNA4 WMMA (gfx1200 / gfx1201).
+# Host pre-shuffle uses SWZ_SLAB_RDNA4 FP8 scatter (shuffleFp8SlabRdna4);
+# kernel uses DirectToVgprA + swizzled GRO with buffer_load_b128 (GRVW=16).
+# Skips non-gfx12 GPUs.
+
+TestParameters:
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102]
+
+GlobalParameters:
+  MinimumRequiredVersion: 5.0.0
+  SleepPercent: 50
+  NumElementsToValidate: -1
+  DataInitTypeA: 21
+  DataInitTypeB: 21
+  DataInitTypeAlpha: 1
+  DataInitTypeBeta: 1
+  NewClient: 2
+  CSVExportWinner: 1
+  CSVMergeSameProblemID: 1
+  PrintSolutionRejectionReason: True
+  BoundsCheck: 2
+  Device: 0
+
+BenchmarkProblems:
+  ########################################
+  # F8F8S_HS TN — SwizzleTensorA, small tiles
+  ########################################
+  -
+    - # ProblemType — TN, SwizzleTensorA (tensor A pre-shuffled on client)
+      OperationType: GEMM
+      DataType: F8
+      DestDataType: h
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: 1
+      TransposeB: 0
+      SwizzleTensorA: True
+      UseBeta: True
+      Batched: True
+    - # Small fork: WMMA swizzle-A tiles for gfx1200/gfx1201
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 16, 1, 1, 1, 1, 1, 1] # MT16x16
+          - [16, 16, 16, 1, 1, 1, 1, 2, 2] # MT32x32
+          - [16, 16, 16, 1, 1, 2, 2, 2, 2] # MT64x64
+          - [16, 16, 16, 1, 1, 2, 8, 4, 1] # MT128x128
+        - WorkGroup:
+          - [16, 16, 1]
+        - WavefrontSize: [32]
+        - DepthU: [32, 64, 128, 256]
+        - GlobalReadVectorWidthA: [-1]
+        - GlobalReadVectorWidthB: [-1]
+        - VectorWidthA: [1]
+        - VectorWidthB: [-1]
+        - LocalReadVectorWidth: [8]
+        - PrefetchGlobalRead: [1]
+        - PrefetchLocalRead: [1]
+        - ClusterLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - ExpandPointerSwap: [False]
+        - TransposeLDS: [-1]
+        - LdsBlockSizePerPadA: [-1]
+        - LdsBlockSizePerPadB: [-1]
+        - LdsPadA: [-1]
+        - LdsPadB: [-1]
+        - 1LDSBuffer: [-1]
+        - GlobalSplitU: [1]
+        - GlobalSplitUAlgorithm: ["MultipleBuffer"]
+        - StaggerU: [32]
+        - StaggerUStride: [256]
+        - StaggerUMapping: [0]
+        - DirectToVgprA: [1]
+        - DirectToVgprB: [0]
+        - UseSgprForGRO: [0]
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          # --- aligned, square ---
+          - Exact: [16, 16, 1, 32]
+          - Exact: [32, 32, 1, 64]
+          - Exact: [64, 64, 1, 64]
+          - Exact: [256, 256, 1, 256]
+          - Exact: [1024, 1024, 1, 1024]
+          - Exact: [4096, 4096, 1, 4096]
+          # --- non-aligned M/N (tile-tail padding) ---
+          - Exact: [17, 17, 1, 64]
+          - Exact: [33, 33, 1, 64]
+          - Exact: [127, 129, 1, 128]
+          # --- non-aligned K (tail-loop) ---
+          - Exact: [64, 64, 1, 48]
+          - Exact: [64, 64, 1, 96]
+          - Exact: [128, 128, 1, 100]
+          - Exact: [256, 256, 1, 200]
+          # --- K < DepthU (tail-only, no main loop) ---
+          - Exact: [64, 64, 1, 16]
+          - Exact: [128, 128, 1, 24]
+          # --- skinny-M (small M, large N/K) ---
+          - Exact: [16, 4096, 1, 4096]
+          - Exact: [64, 4096, 1, 4096]
+          # --- skinny-N (large M, small N) ---
+          - Exact: [4096, 16, 1, 4096]
+          - Exact: [4096, 64, 1, 4096]
+          # --- asymmetric M != N ---
+          - Exact: [128, 64, 1, 128]
+          - Exact: [64, 256, 1, 64]
