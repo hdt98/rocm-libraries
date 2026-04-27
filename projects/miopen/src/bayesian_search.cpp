@@ -40,9 +40,183 @@ namespace solver {
 namespace bayesian {
 
 // ===================================================================
+// PCA feature reduction (v25)
+// Reduce high-dimensional feature spaces to top-k principal components
+// explaining >= 95% variance. Uses Jacobi eigendecomposition (no
+// external dependency). d×d covariance matrix is at most ~20×20.
+// ===================================================================
+
+PCAState PCAFit(const std::vector<double>& X, std::size_t n, std::size_t d, double variance_ratio)
+{
+    PCAState pca;
+    pca.d_orig = d;
+
+    if(n < 2 || d < 2)
+    {
+        pca.k = d;
+        return pca;
+    }
+
+    // Center: compute column means
+    pca.mean.assign(d, 0.0);
+    for(std::size_t i = 0; i < n; ++i)
+        for(std::size_t j = 0; j < d; ++j)
+            pca.mean[j] += X[i * d + j];
+    for(std::size_t j = 0; j < d; ++j)
+        pca.mean[j] /= static_cast<double>(n);
+
+    // Centered data
+    std::vector<double> Xc(n * d);
+    for(std::size_t i = 0; i < n; ++i)
+        for(std::size_t j = 0; j < d; ++j)
+            Xc[i * d + j] = X[i * d + j] - pca.mean[j];
+
+    // Covariance matrix C = X^T X / (n-1), stored row-major d×d
+    std::vector<double> C(d * d, 0.0);
+    const double norm = 1.0 / static_cast<double>(n - 1);
+    for(std::size_t i = 0; i < n; ++i)
+        for(std::size_t p = 0; p < d; ++p)
+            for(std::size_t q = p; q < d; ++q)
+                C[p * d + q] += Xc[i * d + p] * Xc[i * d + q];
+    for(std::size_t p = 0; p < d; ++p)
+        for(std::size_t q = p; q < d; ++q)
+        {
+            C[p * d + q] *= norm;
+            C[q * d + p] = C[p * d + q];
+        }
+
+    // Jacobi eigendecomposition of symmetric C
+    std::vector<double> V(d * d, 0.0);
+    for(std::size_t i = 0; i < d; ++i)
+        V[i * d + i] = 1.0;
+
+    constexpr int MAX_SWEEPS = 100;
+    for(int sweep = 0; sweep < MAX_SWEEPS; ++sweep)
+    {
+        double off_diag = 0.0;
+        for(std::size_t p = 0; p < d; ++p)
+            for(std::size_t q = p + 1; q < d; ++q)
+                off_diag += C[p * d + q] * C[p * d + q];
+        if(off_diag < 1e-20)
+            break;
+
+        for(std::size_t p = 0; p < d; ++p)
+        {
+            for(std::size_t q = p + 1; q < d; ++q)
+            {
+                double apq = C[p * d + q];
+                if(std::abs(apq) < 1e-15)
+                    continue;
+
+                double tau = (C[q * d + q] - C[p * d + p]) / (2.0 * apq);
+                double t   = (tau >= 0 ? 1.0 : -1.0) / (std::abs(tau) + std::sqrt(1.0 + tau * tau));
+                double c   = 1.0 / std::sqrt(1.0 + t * t);
+                double s   = t * c;
+
+                // Rotate C
+                double app   = C[p * d + p] - t * apq;
+                double aqq   = C[q * d + q] + t * apq;
+                C[p * d + p] = app;
+                C[q * d + q] = aqq;
+                C[p * d + q] = 0.0;
+                C[q * d + p] = 0.0;
+                for(std::size_t r = 0; r < d; ++r)
+                {
+                    if(r == p || r == q)
+                        continue;
+                    double crp = C[r * d + p], crq = C[r * d + q];
+                    C[r * d + p] = c * crp - s * crq;
+                    C[p * d + r] = C[r * d + p];
+                    C[r * d + q] = s * crp + c * crq;
+                    C[q * d + r] = C[r * d + q];
+                }
+                // Rotate V
+                for(std::size_t r = 0; r < d; ++r)
+                {
+                    double vrp = V[r * d + p], vrq = V[r * d + q];
+                    V[r * d + p] = c * vrp - s * vrq;
+                    V[r * d + q] = s * vrp + c * vrq;
+                }
+            }
+        }
+    }
+
+    // Extract eigenvalues and sort descending
+    std::vector<double> eigenvalues(d);
+    std::vector<std::size_t> order(d);
+    for(std::size_t i = 0; i < d; ++i)
+        eigenvalues[i] = std::max(C[i * d + i], 0.0);
+    std::iota(order.begin(), order.end(), 0);
+    std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+        return eigenvalues[a] > eigenvalues[b];
+    });
+
+    double total_var = 0.0;
+    for(auto ev : eigenvalues)
+        total_var += ev;
+    if(total_var < 1e-15)
+    {
+        pca.k = d;
+        return pca;
+    }
+
+    // Determine k: smallest number of components capturing >= variance_ratio
+    double cum = 0.0;
+    pca.k      = d;
+    for(std::size_t i = 0; i < d; ++i)
+    {
+        cum += eigenvalues[order[i]];
+        if(cum / total_var >= variance_ratio)
+        {
+            pca.k = i + 1;
+            break;
+        }
+    }
+    pca.k = std::max(pca.k, std::size_t(2)); // at least 2 components
+
+    // Store top-k eigenvectors as rows of components (k × d)
+    pca.components.resize(pca.k * d);
+    for(std::size_t i = 0; i < pca.k; ++i)
+    {
+        std::size_t col = order[i];
+        for(std::size_t j = 0; j < d; ++j)
+            pca.components[i * d + j] = V[j * d + col];
+    }
+
+    return pca;
+}
+
+void PCATransform(const PCAState& pca,
+                  const std::vector<double>& X_in,
+                  std::size_t n,
+                  std::vector<double>& X_out)
+{
+    if(pca.k == 0 || pca.k == pca.d_orig || pca.components.empty())
+    {
+        X_out = X_in;
+        return;
+    }
+    const std::size_t d = pca.d_orig;
+    const std::size_t k = pca.k;
+    X_out.resize(n * k);
+    for(std::size_t i = 0; i < n; ++i)
+    {
+        for(std::size_t c = 0; c < k; ++c)
+        {
+            double val = 0.0;
+            for(std::size_t j = 0; j < d; ++j)
+                val += (X_in[i * d + j] - pca.mean[j]) * pca.components[c * d + j];
+            X_out[i * k + c] = val;
+        }
+    }
+}
+
+// ===================================================================
 // GaussianProcess implementation
 // ===================================================================
 
+// Matern 5/2 kernel (isotropic).
+// r^2 = sum_i ((x1[i] - x2[i]) / ls)^2
 double GaussianProcess::Matern52(const double* x1, const double* x2, std::size_t d) const
 {
     double r2 = 0.0;
@@ -51,9 +225,8 @@ double GaussianProcess::Matern52(const double* x1, const double* x2, std::size_t
         double diff = (x1[i] - x2[i]) / length_scale_;
         r2 += diff * diff;
     }
-    double r = std::sqrt(r2);
+    double r  = std::sqrt(r2);
     double s5 = std::sqrt(5.0);
-    // k(r) = (1 + sqrt(5)*r + 5/3*r^2) * exp(-sqrt(5)*r)
     return (1.0 + s5 * r + (5.0 / 3.0) * r2) * std::exp(-s5 * r);
 }
 
@@ -83,6 +256,59 @@ void GaussianProcess::CholeskySolve(const std::vector<double>& L,
     }
 }
 
+// Adaptive GP noise from measurement-to-signal variance ratio.
+//
+// After y-normalization to unit variance, the noise parameter represents the
+// fraction of total variance attributable to measurement error:
+//
+//   noise = (measurement_std / signal_std)^2
+//         = (MEASUREMENT_CV / data_cv)^2
+//
+// MEASUREMENT_CV is the coefficient of variation of repeated GPU timing
+// measurements for the *same* configuration (~0.5% for modern GPUs).
+//
+// At data_cv ≈ 0.50 (typical for diverse solver configs), this gives
+// noise = 1e-4 — identical to the previously hardcoded value.
+// As data_cv decreases (tightly clustered timings where measurement jitter
+// dominates), noise increases automatically.
+//
+// Examples:
+//   data_cv = 0.50 → noise = 1.0e-4  (same as old default)
+//   data_cv = 0.10 → noise = 2.5e-3
+//   data_cv = 0.05 → noise = 1.0e-2
+//   data_cv = 0.01 → noise = 5.0e-2  (capped)
+double GaussianProcess::EstimateNoise(const std::vector<double>& y_obs, std::size_t n_obs)
+{
+    constexpr double MEASUREMENT_CV = 0.005;
+    constexpr double NOISE_FLOOR    = 1e-4;
+    constexpr double NOISE_CAP      = 0.05;
+
+    if(n_obs < 4)
+        return NOISE_FLOOR;
+
+    double ymean = 0.0;
+    for(std::size_t i = 0; i < n_obs; ++i)
+        ymean += y_obs[i];
+    ymean /= static_cast<double>(n_obs);
+
+    if(ymean < 1e-10)
+        return NOISE_FLOOR;
+
+    double sum_sq = 0.0;
+    for(std::size_t i = 0; i < n_obs; ++i)
+        sum_sq += (y_obs[i] - ymean) * (y_obs[i] - ymean);
+    double ystd = std::sqrt(sum_sq / static_cast<double>(n_obs));
+
+    double cv = ystd / ymean;
+    if(cv < 1e-10)
+        return NOISE_CAP;
+
+    double ratio     = MEASUREMENT_CV / cv;
+    double noise_est = ratio * ratio;
+
+    return std::max(NOISE_FLOOR, std::min(NOISE_CAP, noise_est));
+}
+
 void GaussianProcess::Fit(const std::vector<double>& X_obs,
                           const std::vector<double>& y_obs,
                           std::size_t n_obs,
@@ -91,6 +317,9 @@ void GaussianProcess::Fit(const std::vector<double>& X_obs,
     n_obs_      = n_obs;
     n_features_ = n_features;
     X_obs_      = X_obs;
+
+    // Estimate noise from data before normalization
+    noise_ = EstimateNoise(y_obs, n_obs);
 
     // Normalize y to zero mean, unit variance
     y_mean_ = 0.0;
@@ -109,13 +338,19 @@ void GaussianProcess::Fit(const std::vector<double>& X_obs,
     for(std::size_t i = 0; i < n_obs; ++i)
         y_norm_[i] = (y_obs[i] - y_mean_) / y_std_;
 
-    // Auto-tune length_scale: use median pairwise distance / sqrt(n_features)
-    if(n_obs > 1)
+    // Isotropic length-scale: ls = median(pairwise euclidean distance) / sqrt(d).
+    // Clamped to [1e-3, 10.0] for numerical stability.
+    constexpr double LS_FLOOR = 1e-3;
+    constexpr double LS_CAP   = 10.0;
+
+    length_scale_ = 1.0;
+
+    if(n_obs > 1 && n_features > 0)
     {
-        std::vector<double> dists;
-        dists.reserve(n_obs * (n_obs - 1) / 2);
+        const double sqrt_d = std::sqrt(static_cast<double>(n_features));
+        std::vector<double> pair_dists;
+        pair_dists.reserve(n_obs * (n_obs - 1) / 2);
         for(std::size_t i = 0; i < n_obs; ++i)
-        {
             for(std::size_t j = i + 1; j < n_obs; ++j)
             {
                 double d2 = 0.0;
@@ -124,13 +359,12 @@ void GaussianProcess::Fit(const std::vector<double>& X_obs,
                     double diff = X_obs[i * n_features + k] - X_obs[j * n_features + k];
                     d2 += diff * diff;
                 }
-                dists.push_back(std::sqrt(d2));
+                pair_dists.push_back(std::sqrt(d2));
             }
-        }
-        std::sort(dists.begin(), dists.end());
-        length_scale_ = dists[dists.size() / 2];
-        if(length_scale_ < 1e-10)
-            length_scale_ = 1.0;
+        std::sort(pair_dists.begin(), pair_dists.end());
+        double med    = pair_dists[pair_dists.size() / 2];
+        double ls     = med / sqrt_d;
+        length_scale_ = std::max(LS_FLOOR, std::min(LS_CAP, ls));
     }
 
     // Build kernel matrix K + noise * I
@@ -139,7 +373,7 @@ void GaussianProcess::Fit(const std::vector<double>& X_obs,
     {
         for(std::size_t j = 0; j <= i; ++j)
         {
-            double val = Matern52(&X_obs[i * n_features], &X_obs[j * n_features], n_features);
+            double val       = Matern52(&X_obs[i * n_features], &X_obs[j * n_features], n_features);
             K[i * n_obs + j] = val;
             K[j * n_obs + i] = val;
         }
@@ -186,9 +420,7 @@ void GaussianProcess::Predict(const std::vector<double>& X_cand,
         // k_star[j] = kernel(X_cand[i], X_obs[j])
         std::vector<double> k_star(n_obs_);
         for(std::size_t j = 0; j < n_obs_; ++j)
-            k_star[j] = Matern52(&X_cand[i * n_features_],
-                                 &X_obs_[j * n_features_],
-                                 n_features_);
+            k_star[j] = Matern52(&X_cand[i * n_features_], &X_obs_[j * n_features_], n_features_);
 
         // mu_norm = k_star^T * alpha
         double mu_norm = 0.0;
@@ -206,7 +438,7 @@ void GaussianProcess::Predict(const std::vector<double>& X_cand,
         }
 
         // var_norm = k(x*, x*) - v^T * v
-        double k_self = 1.0; // Matern52(x, x) = 1.0
+        double k_self   = 1.0; // Matern52(x, x) = 1.0
         double var_norm = k_self;
         for(std::size_t j = 0; j < n_obs_; ++j)
             var_norm -= v[j] * v[j];
@@ -223,15 +455,9 @@ void GaussianProcess::Predict(const std::vector<double>& X_cand,
 // Expected Improvement
 // ===================================================================
 
-static double NormalCDF(double x)
-{
-    return 0.5 * std::erfc(-x * M_SQRT1_2);
-}
+static double NormalCDF(double x) { return 0.5 * std::erfc(-x * M_SQRT1_2); }
 
-static double NormalPDF(double x)
-{
-    return std::exp(-0.5 * x * x) / std::sqrt(2.0 * M_PI);
-}
+static double NormalPDF(double x) { return std::exp(-0.5 * x * x) / std::sqrt(2.0 * M_PI); }
 
 std::size_t SelectNextByEI(const std::vector<double>& mu,
                            const std::vector<double>& sigma,
@@ -239,10 +465,7 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
                            std::size_t n_cand,
                            double* out_max_ei)
 {
-    // EI(x) = (best - mu(x)) * Phi(z) + sigma(x) * phi(z)
-    // where z = (best - mu(x)) / sigma(x)
-    // We MINIMIZE time, so "improvement" = best_observed - mu(x)
-    double best_ei    = -1.0;
+    double best_ei       = -1.0;
     std::size_t best_idx = 0;
 
     for(std::size_t i = 0; i < n_cand; ++i)
@@ -255,7 +478,7 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
         else
         {
             double z = (best_observed - mu[i]) / sigma[i];
-            ei = (best_observed - mu[i]) * NormalCDF(z) + sigma[i] * NormalPDF(z);
+            ei       = (best_observed - mu[i]) * NormalCDF(z) + sigma[i] * NormalPDF(z);
         }
         if(ei > best_ei)
         {
@@ -266,6 +489,32 @@ std::size_t SelectNextByEI(const std::vector<double>& mu,
 
     if(out_max_ei != nullptr)
         *out_max_ei = best_ei;
+
+    return best_idx;
+}
+
+// ===================================================================
+// Thompson Sampling
+// ===================================================================
+
+std::size_t SelectNextByTS(const std::vector<double>& mu,
+                           const std::vector<double>& sigma,
+                           std::size_t n_cand,
+                           std::mt19937& rng)
+{
+    std::normal_distribution<double> normal(0.0, 1.0);
+    double best_sample   = std::numeric_limits<double>::max();
+    std::size_t best_idx = 0;
+
+    for(std::size_t i = 0; i < n_cand; ++i)
+    {
+        double s = (sigma[i] < 1e-10) ? mu[i] : mu[i] + sigma[i] * normal(rng);
+        if(s < best_sample)
+        {
+            best_sample = s;
+            best_idx    = i;
+        }
+    }
 
     return best_idx;
 }
@@ -354,7 +603,7 @@ static bool ParseCKConfigString(const std::string& config_str,
     if(angle_close + 1 < config_str.size() && config_str[angle_close + 1] == '+')
     {
         std::string sk_str = config_str.substr(angle_close + 2);
-        sk_str = TrimWhitespace(sk_str);
+        sk_str             = TrimWhitespace(sk_str);
         if(!sk_str.empty())
             out_split_k = std::stod(sk_str);
     }
@@ -387,7 +636,7 @@ static void ParseCSVConfigString(const std::string& config_str,
         if(bracket_close != std::string::npos && bracket_close > bracket_open)
         {
             std::string gks_str = str.substr(bracket_open + 1, bracket_close - bracket_open - 1);
-            gks_str = TrimWhitespace(gks_str);
+            gks_str             = TrimWhitespace(gks_str);
             if(!gks_str.empty())
                 out_gks = std::stod(gks_str);
             str = str.substr(0, bracket_open);
@@ -424,9 +673,9 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
 
     std::vector<ParsedConfig> parsed(n);
     std::map<std::string, int> variant_map;
-    std::size_t max_params   = 0;
-    bool has_any_ck          = false;
-    bool has_any_suffix      = false;
+    std::size_t max_params = 0;
+    bool has_any_ck        = false;
+    bool has_any_suffix    = false;
 
     for(std::size_t i = 0; i < n; ++i)
     {
@@ -436,7 +685,7 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
 
         if(ParseCKConfigString(config_strings[i], variant, params, suffix))
         {
-            parsed[i] = {true, variant, std::move(params), suffix};
+            parsed[i]  = {true, variant, std::move(params), suffix};
             has_any_ck = true;
         }
         else
@@ -506,7 +755,7 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
         // Variant: one-hot (CK only)
         if(variant_width > 0 && parsed[i].is_ck)
         {
-            int vid = variant_map[parsed[i].variant];
+            int vid                                        = variant_map[parsed[i].variant];
             out_features[i][static_cast<std::size_t>(vid)] = 1.0;
         }
 
@@ -527,16 +776,17 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
             }
         }
 
-        // Suffix column (split_k or gks)
+        // Suffix column (split_k or gks) — log₂ encoding for uniform spacing
         if(has_suffix_col)
         {
-            std::size_t suffix_col = variant_width + param_total;
-            out_features[i][suffix_col] =
-                (parsed[i].suffix_value >= 0.0) ? parsed[i].suffix_value : 0.0;
+            std::size_t suffix_col      = variant_width + param_total;
+            double sv                   = parsed[i].suffix_value;
+            out_features[i][suffix_col] = (sv > 0.0) ? std::log2(sv) + 1.0 : 0.0;
         }
     }
 
-    // --- Pass 3: per-feature min-max normalization to [0, 1] ---
+    // --- Pass 3: per-feature min-max normalization to [0, 1], then drop constants ---
+    std::vector<bool> col_active(n_features, false);
     for(std::size_t j = 0; j < n_features; ++j)
     {
         double fmin = out_features[0][j];
@@ -549,6 +799,7 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
         double range = fmax - fmin;
         if(range > 1e-12)
         {
+            col_active[j] = true;
             for(std::size_t i = 0; i < n; ++i)
                 out_features[i][j] = (out_features[i][j] - fmin) / range;
         }
@@ -559,7 +810,27 @@ std::size_t BuildFeatureMatrix(const std::vector<std::string>& config_strings,
         }
     }
 
-    return n_features;
+    // Remove constant columns to reduce GP noise
+    std::size_t n_active = 0;
+    for(std::size_t j = 0; j < n_features; ++j)
+        if(col_active[j])
+            ++n_active;
+
+    if(n_active > 0 && n_active < n_features)
+    {
+        for(std::size_t i = 0; i < n; ++i)
+        {
+            std::vector<double> compact(n_active);
+            std::size_t k = 0;
+            for(std::size_t j = 0; j < n_features; ++j)
+                if(col_active[j])
+                    compact[k++] = out_features[i][j];
+            out_features[i] = std::move(compact);
+        }
+        return n_active;
+    }
+
+    return (n_active > 0) ? n_features : 0;
 }
 
 BayesOptTracker& GetBayesOptTracker()

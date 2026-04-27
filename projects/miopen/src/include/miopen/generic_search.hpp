@@ -428,10 +428,11 @@ auto GenericSearch(const Solver s,
                    const Context& context_,
                    const Problem& problem,
                    const AnyInvokeParams& invoke_ctx_,
-                   std::vector<SolutionPerf>* perf_solsp = nullptr)
+                   std::vector<SolutionPerf>* perf_solsp = nullptr,
+                   bool force_brute_force                = false)
     -> decltype(s.GetDefaultPerformanceConfig(context_, problem))
 {
-    if(env::value(MIOPEN_TUNING_SEARCH_METHOD) == 1)
+    if(!force_brute_force && env::value(MIOPEN_TUNING_SEARCH_METHOD) == 1)
     {
         MIOPEN_LOG_I("GenericSearch: routing to BayesianSearch");
         return BayesianSearch(s, context_, problem, invoke_ctx_);
