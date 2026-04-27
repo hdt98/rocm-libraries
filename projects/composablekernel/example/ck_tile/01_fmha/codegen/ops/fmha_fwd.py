@@ -913,7 +913,7 @@ class CompatibilityRuleFactoryGfx950(CompatibilityRuleFactoryGfx9):
                     and kernel_ctx.tile.F_bn0 == 128
                 )
                 or (
-                    (problem_ctx.hdim, problem_ctx.hdim_v) not in [(64, 64), (128, 128)]
+                    (problem_ctx.hdim, problem_ctx.hdim_v) not in [(64, 64), (128, 128), (256, 256)]
                 )
             ):
                 return False
@@ -985,7 +985,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
               # (160, 160) : [FmhaFwdTileSize(128, 128 , 32, 160,  32, 160,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
                 (192, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 (192, 192) : [FmhaFwdTileSize(128, 128,  32, 192,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
-                (256, 256) : [FmhaFwdTileSize(128, 128,  32, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
+                (256, 256) : [FmhaFwdTileSize(128,  64,  16, 256,  32, 256,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
             }  # fmt: skip
         elif dtype in cls._DT_FP8 or dtype in cls._DT_FP8BF16:
             return {
@@ -1036,10 +1036,10 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ["t", "f"],
             ):
                 if hdim == 256 and hdim_v == 256:
-                    pipelines.append(FmhaFwdPipeline("qr", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                    pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "f", "f", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     # the below two is used for hdim vectorize load
-                    pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
-                    pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                    pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "t", "t", "f", "f", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
+                    pipelines.append(FmhaFwdPipeline("qr_async_trload", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                 else:
                     if bias == "bias":
                         # TODO: rocm 6.2 compiler problem if using qr_async for bias case
@@ -1088,11 +1088,13 @@ class KernelComponentFactoryGfx950(
     def get_hdim_tile_size_dict(cls, dtype: str) -> Optional[dict]:
         result = KernelComponentFactoryGfx9.get_hdim_tile_size_dict(dtype)
         if dtype in cls._DT_FP16_BF16:
+            # Override hdim=256 to use K0=32 for gfx950 (supports larger vector loads)
+            if (256, 256) in result.keys():
+                result[(256, 256)] = [FmhaFwdTileSize(128, 64, 32, 256, 32, 256, 4, 1, 1, 4, 1, 1, 32, 32, 16, 32, 32, 16, -1)]  # fmt: skip
             # # add tile for qr_async_trload_v3 (bf16/fp16 V3 not ready)
             # if (128, 128) in result.keys():
             #     result[(128, 128)].append(
             #         FmhaFwdTileSize(256, 32, 128, 128, 32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1))  # fmt: skip
-            pass
         elif dtype in cls._DT_MXFP8:
             return {
                 #                             bm0, bn0, bk0, bn1, bk1,
@@ -1220,7 +1222,7 @@ class KernelComponentFactoryGfx11(CompatibilityRuleFactory):
                 (128, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("a.max_seqlen_q < 2048")),
                               FmhaFwdTileSize(128,  64,  32, 128,  32,  128,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)],
                 (192, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
-                (256, 256) : [FmhaFwdTileSize(128,  64,  32, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)]
+                (256, 256) : [FmhaFwdTileSize(128,  64,  16, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)]
             }  # fmt: skip
         else:
             raise ValueError(f"unsupported dtype={dtype}")
@@ -1258,7 +1260,7 @@ class KernelComponentFactoryGfx115(KernelComponentFactoryGfx11):
         result = super().get_hdim_tile_size_dict(dtype)
         if dtype in cls._DT_FP16_BF16:
             result[(64, 64)] = [FmhaFwdTileSize( 64,  64,  32,  64,  32,   64,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)]  # fmt: skip
-            result[(256, 256)] = [FmhaFwdTileSize(128,  64,  32, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,  -1)]  # fmt: skip
+            result[(256, 256)] = [FmhaFwdTileSize(128,  64,  16, 256,  32,  256,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,  -1)]  # fmt: skip
         return result
 
 
@@ -1284,7 +1286,7 @@ class KernelComponentFactoryGfx12(CompatibilityRuleFactory):
                 (128, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  128,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1, CppConstraint("a.max_seqlen_q <= 4096")),
                               FmhaFwdTileSize(128,  64,  32, 128,  32,  128,  8, 1, 1,  8, 1, 1,  16, 16, 16,  16, 16, 16,   6)],
                 (192, 128) : [FmhaFwdTileSize( 64,  64,  32, 128,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
-                (256, 256) : [FmhaFwdTileSize( 64,  64,  32, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
+                (256, 256) : [FmhaFwdTileSize( 64,  64,  16, 256,  32,  256,  4, 1, 1,  4, 1, 1,  16, 16, 16,  16, 16, 16,  -1)],
             }  # fmt: skip
         elif dtype in cls._DT_FP8_FP8BF16:
             return {
