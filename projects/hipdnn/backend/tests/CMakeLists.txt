@@ -33,6 +33,7 @@ add_executable(
     descriptors/TestEngineConfigDescriptor.cpp
     descriptors/TestEngineDescriptor.cpp
     descriptors/TestEngineHeuristicDescriptor.cpp
+    descriptors/TestEngineHeuristicDescriptorAdditional.cpp
     descriptors/TestExecutionPlanDescriptor.cpp
     descriptors/TestGraphDescriptor.cpp
     descriptors/TestTensorDescriptor.cpp
@@ -104,6 +105,8 @@ add_executable(
     TestGraphLogger.cpp
     TestHeuristicPlugin.cpp
     TestHeuristicPluginManager.cpp
+    TestHeuristicPluginManagerValidationPaths.cpp
+    TestSelectionHeuristic.cpp
     TestHeuristicPluginResourceManager.cpp
     TestUserLoggingApis.cpp
     TestPlatformUtils.cpp
@@ -133,6 +136,10 @@ target_compile_definitions(
             TEST_GOOD_HEURISTIC_PLUGIN_NAME="${TEST_GOOD_HEURISTIC_PLUGIN_NAME}"
             TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME="${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME}"
             TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME="${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME}"
+            TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME="${TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME}"
+            TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME="${TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME}"
+            TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME="${TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME}"
+            TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME="${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME}"
 )
 target_compile_options(hipdnn_backend_tests PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS} ${HIPDNN_NO_RTTI_OPTIONS})
 clang_tidy_check(hipdnn_backend_tests)
@@ -211,6 +218,10 @@ add_dependencies(hipdnn_backend_tests
     ${TEST_GOOD_HEURISTIC_PLUGIN_NAME}
     ${TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME}
     ${TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME}
+    ${TEST_BAD_API_VERSION_HEURISTIC_PLUGIN_NAME}
+    ${TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME}
+    ${TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME}
+    ${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME}
 )
 
 # Add dependencies on default heuristic plugins (RFC 0007)

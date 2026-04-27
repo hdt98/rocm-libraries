@@ -231,3 +231,7 @@ TEST_F(TestHeuristicPlugin, MockPluginLongPolicyNameIsValid)
 
 // Base class interface tests (name, version, type) are covered by loading tests
 // since they delegate to virtual methods that can't be effectively tested with mocks
+
+// Note: Template function coverage (invokeHeuristicFunction, tryAssignSymbol) is achieved
+// through integration tests that load actual plugins (TestHeuristicPluginIntegration.cpp)
+// and error path tests that exercise symbol resolution failures
