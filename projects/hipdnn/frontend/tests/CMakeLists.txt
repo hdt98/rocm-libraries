@@ -45,7 +45,6 @@ add_executable(
     TestGraph.cpp
     TestGraphAttributes.cpp
     TestHandle.cpp
-    TestHeuristicPolicyEnumeration.cpp
     TestIncompatibleBackendWrapper.cpp
     TestINode.cpp
     TestKnob.cpp

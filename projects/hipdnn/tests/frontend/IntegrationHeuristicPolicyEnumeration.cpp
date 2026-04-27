@@ -15,7 +15,7 @@
 
 using namespace hipdnn_frontend;
 
-class HeuristicPolicyEnumerationTest : public ::testing::Test
+class IntegrationHeuristicPolicyEnumeration : public ::testing::Test
 {
 protected:
     void SetUp() override
@@ -30,7 +30,7 @@ protected:
 
 // ========== Basic Enumeration Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, GetLoadedPoliciesReturnsNonEmpty)
+TEST_F(IntegrationHeuristicPolicyEnumeration, GetLoadedPoliciesReturnsNonEmpty)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
@@ -38,7 +38,7 @@ TEST_F(HeuristicPolicyEnumerationTest, GetLoadedPoliciesReturnsNonEmpty)
     EXPECT_GE(policies.size(), 2u) << "Expected at least Config and StaticOrdering policies";
 }
 
-TEST_F(HeuristicPolicyEnumerationTest, PolicyInfoHasValidMetadata)
+TEST_F(IntegrationHeuristicPolicyEnumeration, PolicyInfoHasValidMetadata)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
@@ -54,7 +54,7 @@ TEST_F(HeuristicPolicyEnumerationTest, PolicyInfoHasValidMetadata)
     }
 }
 
-TEST_F(HeuristicPolicyEnumerationTest, DefaultPoliciesAreLoaded)
+TEST_F(IntegrationHeuristicPolicyEnumeration, DefaultPoliciesAreLoaded)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
@@ -82,7 +82,7 @@ TEST_F(HeuristicPolicyEnumerationTest, DefaultPoliciesAreLoaded)
 
 // ========== Error Handling Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, NullHandleReturnsError)
+TEST_F(IntegrationHeuristicPolicyEnumeration, NullHandleReturnsError)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(nullptr);
 
@@ -94,7 +94,7 @@ TEST_F(HeuristicPolicyEnumerationTest, NullHandleReturnsError)
 
 // ========== snake_case Alias Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, SnakeCaseAliasWorks)
+TEST_F(IntegrationHeuristicPolicyEnumeration, SnakeCaseAliasWorks)
 {
     auto [policies, err] = get_loaded_heuristic_policy_infos(*_handle);
 
@@ -104,7 +104,7 @@ TEST_F(HeuristicPolicyEnumerationTest, SnakeCaseAliasWorks)
 
 // ========== Multiple Query Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, MultipleQueriesReturnSameResults)
+TEST_F(IntegrationHeuristicPolicyEnumeration, MultipleQueriesReturnSameResults)
 {
     auto [policies1, err1] = getLoadedHeuristicPolicyInfos(*_handle);
     auto [policies2, err2] = getLoadedHeuristicPolicyInfos(*_handle);
@@ -124,7 +124,7 @@ TEST_F(HeuristicPolicyEnumerationTest, MultipleQueriesReturnSameResults)
 
 // ========== Handle Independence Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, DifferentHandlesHaveSamePolicies)
+TEST_F(IntegrationHeuristicPolicyEnumeration, DifferentHandlesHaveSamePolicies)
 {
     auto [handle2, err] = createHipdnnHandle();
     ASSERT_FALSE(err.is_bad());
@@ -141,7 +141,7 @@ TEST_F(HeuristicPolicyEnumerationTest, DifferentHandlesHaveSamePolicies)
 
 // ========== Content Validation Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, PolicyNamesAreUTF8)
+TEST_F(IntegrationHeuristicPolicyEnumeration, PolicyNamesAreUTF8)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
@@ -155,7 +155,7 @@ TEST_F(HeuristicPolicyEnumerationTest, PolicyNamesAreUTF8)
     }
 }
 
-TEST_F(HeuristicPolicyEnumerationTest, VersionStringsAreValid)
+TEST_F(IntegrationHeuristicPolicyEnumeration, VersionStringsAreValid)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
@@ -174,7 +174,7 @@ TEST_F(HeuristicPolicyEnumerationTest, VersionStringsAreValid)
 
 // ========== Performance Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, EnumerationIsReasonablyFast)
+TEST_F(IntegrationHeuristicPolicyEnumeration, EnumerationIsReasonablyFast)
 {
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -191,7 +191,7 @@ TEST_F(HeuristicPolicyEnumerationTest, EnumerationIsReasonablyFast)
 
 // ========== Integration with Graph Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, CanQueryPoliciesBeforeGraphCreation)
+TEST_F(IntegrationHeuristicPolicyEnumeration, CanQueryPoliciesBeforeGraphCreation)
 {
     // Should be able to query policies before creating any graphs
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
@@ -202,7 +202,7 @@ TEST_F(HeuristicPolicyEnumerationTest, CanQueryPoliciesBeforeGraphCreation)
 
 // ========== Logging Tests ==========
 
-TEST_F(HeuristicPolicyEnumerationTest, EnumerationCanBeLogged)
+TEST_F(IntegrationHeuristicPolicyEnumeration, EnumerationCanBeLogged)
 {
     auto [policies, err] = getLoadedHeuristicPolicyInfos(*_handle);
 
