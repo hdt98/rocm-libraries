@@ -91,11 +91,10 @@ protected:
                 return 0.0f;
             }
 
-            return toleranceForNode(
-                *rootOp,
-                output->get_data_type(),
-                static_cast<double>(_fillMin),
-                static_cast<double>(_fillMax));
+            return toleranceForNode(*rootOp,
+                                    output->get_data_type(),
+                                    static_cast<double>(_fillMin),
+                                    static_cast<double>(_fillMax));
         }
 
         ADD_FAILURE() << "getTolerance: unhandled tolerance mode";
