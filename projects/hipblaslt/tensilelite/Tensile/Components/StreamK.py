@@ -274,14 +274,6 @@ class StreamK(Component):
     def computeLoadSrdCommon(self, writer, kernel, tP, sTmp):
         module = Module("StreamK Common computeLoadSrd")
 
-        tc = tP["tensorChar"]
-        _DepthU = kernel["_DepthU%s" % tc]
-        # swizzle
-        if (tP["isSwizzled"] and tc == 'A'):
-            _DepthU = (_DepthU * 16)
-        elif (tP["isSwizzled"] and tc == 'B'):
-            _DepthU = (_DepthU * 16)
-
         tileStart = sTmp + 2
         tc = tP["tensorChar"]
         depthU = self._depthUForTc(kernel, tc)
