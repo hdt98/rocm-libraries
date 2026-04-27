@@ -1310,6 +1310,8 @@ inline void sort_keys_large_sizes()
     {
         SCOPED_TRACE(testing::Message() << "with size = " << size);
 
+test_utils::MemCheck memcheck;
+
         // QA is also testing on APU platforms with only 32GB of system memory
         // shared amongst the host and device.  Trim maximum size under these
         // conditions.  This is a temporary coding workaround until we come up
@@ -1322,7 +1324,7 @@ inline void sort_keys_large_sizes()
             break;
         }
 
-        // memcheck::alloc_device<key_type>(size);
+memcheck.alloc_device<key_type>(size);
         common::device_ptr<key_type> d_keys;
         if(!d_keys.resize_with_memory_check(size))
         {
@@ -1332,11 +1334,11 @@ inline void sort_keys_large_sizes()
 
         // Generate data
         {
-            // memcheck::alloc_host<key_type>(size);
+memcheck.alloc_host<key_type>(size);
             std::vector<key_type> keys_input(size);
             std::iota(keys_input.begin(), keys_input.end(), 0);
             d_keys.store(keys_input);
-            // memcheck::free_host<key_type>(size);
+memcheck.free_host<key_type>(size);
         }
 
         size_t temporary_storage_bytes = 0;
@@ -1349,7 +1351,7 @@ inline void sort_keys_large_sizes()
                                            end_bit,
                                            stream));
 
-        // memcheck::alloc_device_bytes(temporary_storage_bytes);
+memcheck.alloc_device_bytes(temporary_storage_bytes);
         ASSERT_GT(temporary_storage_bytes, 0U);
         common::device_ptr<void> d_temporary_storage;
         if(!d_temporary_storage.resize_with_memory_check(temporary_storage_bytes))
@@ -1367,7 +1369,7 @@ inline void sort_keys_large_sizes()
                                            end_bit,
                                            stream));
 
-        // memcheck::alloc_host_bytes(d_keys.size());
+memcheck.alloc_host_bytes(d_keys.msize());
         const auto keys_output = d_keys.load();
 
         // Check if output values are as expected
