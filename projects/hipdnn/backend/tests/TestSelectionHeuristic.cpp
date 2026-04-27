@@ -65,7 +65,7 @@ TEST_F(TestSelectionHeuristic, ConstructorThrowsOnNullHandle)
     // Null handle should throw
     EXPECT_THROW(
         {
-            SelectionHeuristic heuristic(mockPlugin.get(), nullptr);
+            const SelectionHeuristic heuristic(mockPlugin.get(), nullptr);
         }, // NOLINT(misc-const-correctness)
         hipdnn_backend::HipdnnException);
 }
@@ -264,8 +264,8 @@ TEST_F(TestSelectionHeuristic, DestructorHandlesExceptionInCleanup)
 
     // Should not throw from destructor
     {
-        SelectionHeuristic heuristic(mockPlugin.get(), _mockHandle);
-    } // NOLINT(misc-const-correctness)
+        const SelectionHeuristic heuristic(mockPlugin.get(), _mockHandle);
+    }
 }
 
 TEST_F(TestSelectionHeuristic, MoveAssignmentHandlesExceptionInCleanup)

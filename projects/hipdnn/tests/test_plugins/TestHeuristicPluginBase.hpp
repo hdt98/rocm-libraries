@@ -69,8 +69,8 @@ public:
     // Static instance management using Meyer's singleton pattern to avoid ODR issues
     static std::unique_ptr<TestHeuristicPluginBase>& getInstanceStorage()
     {
-        static std::unique_ptr<TestHeuristicPluginBase> sInstance
-            = nullptr; // NOLINT(readability-identifier-naming)
+        // NOLINTNEXTLINE(readability-identifier-naming)
+        static std::unique_ptr<TestHeuristicPluginBase> sInstance = nullptr;
         return sInstance;
     }
 

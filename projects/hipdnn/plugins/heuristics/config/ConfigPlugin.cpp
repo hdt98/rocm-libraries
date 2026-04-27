@@ -13,7 +13,7 @@
  * not by hard-coded backend logic.
  */
 
-#include <hipdnn_data_sdk/data_objects/graph_generated.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
@@ -419,13 +419,13 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         // Parse the serialized graph using FlatBuffers
         flatbuffers::Verifier verifier(d->serializedGraphBuffer.data(),
                                        d->serializedGraphBuffer.size());
-        if(!verifier.VerifyBuffer<hipdnn_data_sdk::data_objects::Graph>())
+        if(!verifier.VerifyBuffer<hipdnn_flatbuffers_sdk::data_objects::Graph>())
         {
             CONFIG_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: invalid graph buffer");
             return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
 
-        auto graph = hipdnn_data_sdk::data_objects::GetGraph(d->serializedGraphBuffer.data());
+        auto graph = hipdnn_flatbuffers_sdk::data_objects::GetGraph(d->serializedGraphBuffer.data());
         if(graph == nullptr)
         {
             CONFIG_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: failed to get graph root");

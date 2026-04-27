@@ -18,7 +18,7 @@
 #include "mocks/MockHeuristicPluginResourceManager.hpp"
 
 #include <gtest/gtest.h>
-#include <hipdnn_data_sdk/data_objects/engine_details_generated.h>
+#include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 
 #include <memory>
@@ -186,7 +186,7 @@ protected:
     hipdnnPluginConstData_t serializeEngineDetails(int64_t gidx)
     {
         flatbuffers::FlatBufferBuilder builder;
-        hipdnn_data_sdk::data_objects::EngineDetailsBuilder engineDetailsBuilder(builder);
+        hipdnn_flatbuffers_sdk::data_objects::EngineDetailsBuilder engineDetailsBuilder(builder);
         engineDetailsBuilder.add_engine_id(gidx);
         builder.Finish(engineDetailsBuilder.Finish());
         auto engineDetailsBuffer = builder.Release();
