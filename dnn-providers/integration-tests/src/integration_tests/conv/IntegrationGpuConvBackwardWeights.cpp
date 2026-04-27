@@ -221,21 +221,21 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Combine(testing::Values(TensorLayout::NCDHW, TensorLayout::NDHWC),
                      testing::ValuesIn(test_conv_common::getConvTestCases5D())));
 
-// Large values instantiations — only first 4D case, NCHW layout
+// Large values instantiations — all 4D cases, NCHW layout
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     IntegrationGpuConvWrwLargeValues2dFp32,
     testing::Combine(testing::Values(TensorLayout::NCHW),
-                     testing::Values(test_conv_common::getConvTestCases4D()[0])));
+                     testing::ValuesIn(test_conv_common::getConvTestCases4D())));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     IntegrationGpuConvWrwLargeValues2dFp16,
     testing::Combine(testing::Values(TensorLayout::NCHW),
-                     testing::Values(test_conv_common::getConvTestCases4D()[0])));
+                     testing::ValuesIn(test_conv_common::getConvTestCases4D())));
 
 INSTANTIATE_TEST_SUITE_P(
     Smoke,
     IntegrationGpuConvWrwLargeValues2dBfp16,
     testing::Combine(testing::Values(TensorLayout::NCHW),
-                     testing::Values(test_conv_common::getConvTestCases4D()[0])));
+                     testing::ValuesIn(test_conv_common::getConvTestCases4D())));
