@@ -82,14 +82,17 @@ public:
                       << "AMDGPU Driver: " << amdgpuVer << std::endl;
         }
 #else
-        miopMajor;
-        miopMinor;
-        miopPatch;
         const bool json_mode = miopen::IsPerformanceLoggingEnabled();
         if(json_mode)
         {
             std::cout << "{\"build_info\":{" << "\"miopen_version\":\"" << miopMajor << "."
                       << miopMinor << "." << miopPatch << "\"}}" << std::endl;
+        }
+        else
+        {
+            (void)miopMajor;
+            (void)miopMinor;
+            (void)miopPatch;
         }
 #endif
     }

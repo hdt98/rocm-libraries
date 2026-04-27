@@ -23,20 +23,20 @@ inline std::random_device::result_type get_default_seed()
     static std::random_device::result_type seed{[] {
         auto external_seed = env::value(MIOPEN_DEBUG_DRIVER_PRNG_SEED);
 
-        auto seed = external_seed == 0
-                        ? std::random_device{}()
-                        : static_cast<std::random_device::result_type>(external_seed);
+        auto seed_ = external_seed == 0
+                         ? std::random_device{}()
+                         : static_cast<std::random_device::result_type>(external_seed);
 
         // Check if JSON mode is enabled in MIOPEN_PERFORMANCE_LOGS
         if(miopen::IsPerformanceLoggingEnabled())
         {
-            std::cout << "{\"prng_seed\":" << seed << "}" << std::endl;
+            std::cout << "{\"prng_seed\":" << seed_ << "}" << std::endl;
         }
         else
         {
-            std::cout << "PRNG seed: " << seed << "\n";
+            std::cout << "PRNG seed: " << seed_ << "\n";
         }
-        return seed;
+        return seed_;
     }()};
     return seed;
 }
