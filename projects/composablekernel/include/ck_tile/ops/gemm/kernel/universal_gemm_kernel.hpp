@@ -340,6 +340,47 @@ struct UniversalGemmKernel
     }
 
     /**
+     * @brief Compute the grid size for the Stream K kernel using the tile_partitioner.
+     * @return The grid size.
+     */
+    template <bool V = IsStreamK>
+    CK_TILE_HOST static auto GridSize(const TilePartitioner& tile_partitioner)
+    {
+        if constexpr(IsStreamK)
+        {
+            return tile_partitioner.grid_size();
+        }
+        else
+        {
+            static_assert(!V,
+                          "GridSize(tile_partitioner) only supported for Stream-K tile "
+                          "partitioners.");
+        }
+    }
+
+    /**
+     * @brief Computes the buffer size needed to store accumulation results for Stream K.
+     * @return The buffer size needed.
+     */
+    template <bool V = IsStreamK>
+    CK_TILE_HOST static std::enable_if_t<V, uint32_t> GetWorkSpaceSize(const KernelArgs& kargs)
+    {
+        return kargs.tile_partitioner.get_workspace_size(
+            sizeof(typename EpiloguePipeline::AccDataType));
+    }
+
+    /**
+     * @brief Fallback workspace size for non-Stream-K kernels.
+     * @return zero
+     */
+    template <bool V = IsStreamK>
+    CK_TILE_HOST static std::enable_if_t<!V, uint32_t>
+    GetWorkSpaceSize([[maybe_unused]] const KernelArgs& kargs)
+    {
+        return 0;
+    }
+
+    /**
      * @brief Calculate grid size that maximizes hardware utilization for persistent kernels.
      * @return Grid size that fills all compute units at maximum occupancy.
      * @note Persistent kernels loop over tiles, so grid size should match hardware capacity
@@ -1356,7 +1397,8 @@ struct UniversalGemmKernel
 
             // Get the K offsets for the A and B tensors
             auto [i_k_as, i_k_bs] =
-                GetKOffsets<AsLayout, BsLayout>(local_iter_start, kargs.stride_As, kargs.stride_Bs);
+                GetKOffsets<AsLayout, BsLayout, TilePartitioner::KPerBlock, NumATensor, NumBTensor>(
+                    local_iter_start, kargs.stride_As, kargs.stride_Bs);
 
             const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
             const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
