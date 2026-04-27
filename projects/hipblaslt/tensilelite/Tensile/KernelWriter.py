@@ -1809,7 +1809,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
         ####
         # scheduled wait localReads
         ####
-        if self.states.numItersPLR == 0 and kernel["EnableMatrixInstruction"] and self.do["OptimizeNumItersPLR0"] and not scheduleTF32Emu:
+        subIterMxNeedsDependentLrWait = (
+          kernel["ForceUnrollSubIter"] and self.states.version == (12,5,0)
+          and (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"])
+        )
+        if ((self.states.numItersPLR == 0 and self.do["OptimizeNumItersPLR0"]) or subIterMxNeedsDependentLrWait) \
+            and kernel["EnableMatrixInstruction"] and not scheduleTF32Emu:
           dscnt = -1
           mfmas = getMFMAs(macIterCode)
           ## To support do["MAC"] is False
