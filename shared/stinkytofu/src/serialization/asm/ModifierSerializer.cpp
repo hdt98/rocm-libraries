@@ -380,12 +380,11 @@ void deserializeVisit(StinkyInstruction* inst, const std::string& attrKey,
     } else if (attrKey == "mod.global") {
         inst->addModifier(GLOBALModifiers(getInt(fields, "offset", 0)));
     } else if (attrKey == "mod.mubuf") {
-        inst->addModifier(
-            MUBUFModifiers(getBool(fields, "offen", false), getInt(fields, "offset12", 0),
-                           getBool(fields, "glc", false), getBool(fields, "slc", false),
-                           getBool(fields, "nt", false), getBool(fields, "lds", false),
-                           false, false, false, false, getStr(fields, "scope", "") != "",
-                           getStr(fields, "scope", "")));
+        inst->addModifier(MUBUFModifiers(
+            getBool(fields, "offen", false), getInt(fields, "offset12", 0),
+            getBool(fields, "glc", false), getBool(fields, "slc", false),
+            getBool(fields, "nt", false), getBool(fields, "lds", false), false, false, false, false,
+            getStr(fields, "scope", "") != "", getStr(fields, "scope", "")));
     } else if (attrKey == "mod.smem") {
         inst->addModifier(SMEMModifiers(getBool(fields, "glc", false), getBool(fields, "nv", false),
                                         getInt(fields, "offset", 0)));
