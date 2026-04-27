@@ -867,8 +867,7 @@ struct BlockFmhaPipelineQRKSVS
             // needs_rescale[i] is true.
             auto rescale_factor =
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
-            auto needs_rescale =
-                make_static_distributed_tensor<bool>(m.get_tile_distribution());
+            auto needs_rescale = make_static_distributed_tensor<bool>(m.get_tile_distribution());
             set_tile(needs_rescale, false);
 
             constexpr auto m_spans = decltype(m)::get_distributed_spans();

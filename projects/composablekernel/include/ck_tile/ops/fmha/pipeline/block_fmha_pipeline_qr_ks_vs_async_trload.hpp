@@ -511,8 +511,7 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
             auto rescale_factor =
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
-            auto needs_rescale =
-                make_static_distributed_tensor<bool>(m.get_tile_distribution());
+            auto needs_rescale = make_static_distributed_tensor<bool>(m.get_tile_distribution());
             set_tile(needs_rescale, false);
 
             constexpr auto m_spans = decltype(m)::get_distributed_spans();
@@ -569,7 +568,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                            p_compute(i_j_idx) =
+                                exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
                         }
                         else
                         {
@@ -1078,8 +1078,7 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
             auto rescale_factor =
                 make_static_distributed_tensor<SMPLComputeDataType>(m.get_tile_distribution());
-            auto needs_rescale =
-                make_static_distributed_tensor<bool>(m.get_tile_distribution());
+            auto needs_rescale = make_static_distributed_tensor<bool>(m.get_tile_distribution());
             set_tile(needs_rescale, false);
 
             constexpr auto m_spans = decltype(m)::get_distributed_spans();
@@ -1136,7 +1135,8 @@ struct BlockFmhaPipelineQRKSVSAsyncTrload
                     {
                         if constexpr(kHasLogitsSoftCap)
                         {
-                            p_compute(i_j_idx) = exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
+                            p_compute(i_j_idx) =
+                                exp2(s_new[i_j_idx] - get_validated_m(m_stab[i_idx]));
                         }
                         else
                         {
