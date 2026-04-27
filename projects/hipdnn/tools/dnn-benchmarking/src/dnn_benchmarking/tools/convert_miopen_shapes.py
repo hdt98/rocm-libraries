@@ -332,12 +332,18 @@ def _build_conv_json(p: _ConvParams) -> Dict[str, Any]:
     }
 
 
+def _join_prefix(prefix: str, rest: str) -> str:
+    """Join prefix and rest with '_', omitting the separator when prefix is empty."""
+    return f"{prefix}_{rest}" if prefix else rest
+
+
 def _conv_filename(prefix: str, p: _ConvParams) -> str:
     direction = _conv_direction_label(p.F)
 
     if p.spatial_dim == 3 and p.D is not None and p.D_f is not None:
-        name = (
-            f"{prefix}_conv_{direction}"
+        name = _join_prefix(
+            prefix,
+            f"conv_{direction}"
             f"_n{p.N}c{p.C}D{p.D}H{p.H}W{p.W}"
             f"_k{p.K}Df{p.D_f}R{p.R}S{p.S}"
             f"_pd{p.pad_d}p{p.pad_h}q{p.pad_w}"
@@ -345,14 +351,15 @@ def _conv_filename(prefix: str, p: _ConvParams) -> str:
             f"_g{p.groups}"
         )
     else:
-        name = (
-            f"{prefix}_conv_{direction}"
+        name = _join_prefix(
+            prefix,
+            f"conv_{direction}"
             f"_n{p.N}c{p.C}H{p.H}W{p.W}"
             f"_k{p.K}R{p.R}S{p.S}"
             f"_p{p.pad_h}q{p.pad_w}"
             f"_u{p.stride_h}v{p.stride_w}"
             f"_l{p.dil_h}j{p.dil_w}"
-            f"_g{p.groups}"
+            f"_g{p.groups}",
         )
     return name
 
@@ -496,8 +503,8 @@ def _bnorm_filename(prefix: str, args: Dict[str, str]) -> str:
     is_3d = "-D" in args
     if is_3d:
         D = _int(args, "-D", 1)
-        return f"{prefix}_bnorm_{direction}_n{N}c{C}D{D}H{H}W{W}"
-    return f"{prefix}_bnorm_{direction}_n{N}c{C}H{H}W{W}"
+        return _join_prefix(prefix, f"bnorm_{direction}_n{N}c{C}D{D}H{H}W{W}")
+    return _join_prefix(prefix, f"bnorm_{direction}_n{N}c{C}H{H}W{W}")
 
 
 # ---------------------------------------------------------------------------
@@ -602,9 +609,6 @@ def _process_inline_args(args_str: str, output: Optional[str]) -> int:
 
     try:
         name_stem, graph = _convert_line(operation, parsed_args, "")
-        # Strip leading underscore that results from empty prefix
-        name_stem = name_stem.lstrip("_")
-        graph["name"] = name_stem
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

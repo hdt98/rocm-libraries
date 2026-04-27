@@ -4,6 +4,7 @@
 """Main entry point for dnn-benchmark CLI."""
 
 import socket
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,8 +44,6 @@ def _gpu_is_available() -> bool:
         pass
     # Fallback: check for ROCm devices via the hip runtime
     try:
-        import subprocess
-
         result = subprocess.run(
             ["rocm-smi", "--showid"],
             capture_output=True,
@@ -349,8 +348,9 @@ def run_suite(
     Returns:
         Aggregated SuiteResult covering every graph in ``graph_paths``.
     """
+    reporter = Reporter()
     graph_results: List[GraphResult] = [
-        _run_one_graph(graph_path, config, handle) for graph_path in graph_paths
+        _run_one_graph(graph_path, config, handle, reporter) for graph_path in graph_paths
     ]
     metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
     return SuiteResult(metadata=metadata, graphs=graph_results)
@@ -370,18 +370,18 @@ def _suite_exit_code(suite_result: SuiteResult) -> int:
     return 0
 
 
-def _run_benchmark_suite(
+def _orchestrate_suite_cli(
     graph_paths: List[Path],
     config: SuiteConfig,
+    output_path: Optional[Path],
     plugin_path: Optional[Path],
     tarball_source: Optional[str] = None,
-) -> Optional[SuiteResult]:
-    """Run the benchmark suite and return the aggregated result.
+) -> int:
+    """Run the benchmark suite, handle all side effects, and return an exit code.
 
-    Owns all side effects: validation startup gate, hipdnn import, and console
-    output via Reporter. Returns None if a fatal setup error occurred (error
-    already printed). JSON export and exit code derivation are the caller's
-    responsibility.
+    Owns: validation startup gate, hipdnn import, console output via Reporter,
+    and JSON export. Returns 1 on fatal setup errors, otherwise delegates to
+    ``_suite_exit_code``.
     """
     reporter = Reporter()
     total = len(graph_paths)
@@ -396,19 +396,19 @@ def _run_benchmark_suite(
             reporter.print_error(
                 f"Reference provider '{config.reference_provider}' is not registered."
             )
-            return None
+            return 1
         if not ref.is_available():
             reporter.print_error(
                 f"Reference provider '{config.reference_provider}' is not available "
                 "(check that its dependencies are installed)."
             )
-            return None
+            return 1
 
     if not _gpu_is_available():
         reporter.print_error(
             "No GPU detected. hipDNN requires an AMD GPU with ROCm support."
         )
-        return None
+        return 1
 
     reporter.print_suite_header(total, tarball_source=tarball_source)
 
@@ -424,7 +424,7 @@ def _run_benchmark_suite(
         reporter.print_error(
             "hipdnn_frontend not available. Install hipDNN Python bindings first."
         )
-        return None
+        return 1
 
     reporter.print_hipdnn_init_done()
     reporter.print_running_benchmark(total)
@@ -456,7 +456,10 @@ def _run_benchmark_suite(
     reporter.print_suite_summary(suite_result.metadata)
     reporter.print_suite_footer()
 
-    return suite_result
+    if output_path is not None:
+        suite_result.save_json(str(output_path))
+
+    return _suite_exit_code(suite_result)
 
 
 
@@ -623,17 +626,13 @@ def main() -> int:
             print(f"Suite configuration error: {e}", file=sys.stderr)
             return 1
 
-        suite_result = _run_benchmark_suite(
+        return _orchestrate_suite_cli(
             graph_paths=[Path(p) for p in resolved_files],
             config=suite_config,
+            output_path=args.output,
             plugin_path=args.plugin_path,
             tarball_source=tarball_source,
         )
-        if suite_result is None:
-            return 1
-        if args.output is not None:
-            suite_result.save_json(str(args.output))
-        return _suite_exit_code(suite_result)
     finally:
         for td in _tmpdirs:
             td.cleanup()

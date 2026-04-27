@@ -4,6 +4,7 @@
 """Graph file resolution utilities: tarball extraction and glob expansion."""
 
 import glob as _glob
+import sys
 import tarfile
 import tempfile
 from pathlib import Path
@@ -58,12 +59,10 @@ def extract_tarball(tarball_path: str) -> Tuple[tempfile.TemporaryDirectory, Lis
             json_members = [m for m in all_json if _is_safe_member(m)]
             skipped = len(all_json) - len(json_members)
             if skipped > 0:
-                import warnings
-
-                warnings.warn(
-                    f"{tarball_path}: skipped {skipped} JSON member(s) with unsafe paths "
-                    "(absolute paths or '..' components)",
-                    stacklevel=2,
+                print(
+                    f"Warning: {tarball_path}: skipped {skipped} JSON member(s) with "
+                    "unsafe paths (absolute paths or '..' components)",
+                    file=sys.stderr,
                 )
             if not json_members:
                 raise GraphLoadError(f"No .json files found in tarball: {tarball_path}")

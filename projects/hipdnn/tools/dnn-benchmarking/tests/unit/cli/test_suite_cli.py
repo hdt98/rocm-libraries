@@ -894,26 +894,25 @@ class TestValidationStartupGate:
 
 
 class TestNoGpuDetected:
-    """_orchestrate_suite_cli and run_ab_test return 1 when no GPU is detected."""
+    """_run_benchmark_suite and run_ab_test return None/1 when no GPU is detected."""
 
     @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=False)
     @patch("dnn_benchmarking.cli.main.run_graph_all_providers")
-    def test_orchestrate_returns_one_when_no_gpu(
+    def test_suite_returns_none_when_no_gpu(
         self, mock_run: MagicMock, mock_gpu: MagicMock
     ) -> None:
-        from dnn_benchmarking.cli.main import _orchestrate_suite_cli
+        from dnn_benchmarking.cli.main import _run_benchmark_suite
 
         with tempfile.TemporaryDirectory() as tmpdir:
             graph = Path(tmpdir) / "g.json"
             graph.write_text(json.dumps({"name": "g", "nodes": [], "tensors": []}))
-            result = _orchestrate_suite_cli(
+            result = _run_benchmark_suite(
                 graph_paths=[graph],
                 config=SuiteConfig(),
-                output_path=None,
                 plugin_path=None,
             )
 
-        assert result == 1
+        assert result is None
         mock_run.assert_not_called()
 
     @patch("dnn_benchmarking.cli.main._gpu_is_available", return_value=False)
