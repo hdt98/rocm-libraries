@@ -19,6 +19,7 @@ from ..common.exceptions import ExecutionError
 from ..config.benchmark_config import BenchmarkConfig, SuiteConfig
 from ..execution.buffer_manager import BufferManager
 from ..execution.executor import Executor
+from ..reporting.reporter import Reporter
 from ..reporting.statistics import BenchmarkStats
 from ..reporting.suite_results import (
     CorrectnessResult,
@@ -226,6 +227,7 @@ def run_graph_all_providers(
     tensor_infos: list,
     config: SuiteConfig,
     handle: Any,
+    reporter: Optional[Reporter] = None,
 ) -> GraphResult:
     """Run a single graph against every engine the backend ranks for it.
 
@@ -314,6 +316,8 @@ def run_graph_all_providers(
     pe_results: List[ProviderEngineResult] = []
     for engine_id in engine_ids:
         engine_name = _resolve_engine_name(engine_id)
+        if reporter is not None:
+            reporter.print_engine_start(engine_name)
         pe_result = _run_single_provider_engine(
             graph_path=graph_path,
             graph_json_str=graph_json_str,
@@ -327,6 +331,8 @@ def run_graph_all_providers(
             validation_requested=validation_requested,
             graph_json=graph_json,
         )
+        if reporter is not None:
+            reporter.print_engine_result(pe_result)
         pe_results.append(pe_result)
 
     return GraphResult(

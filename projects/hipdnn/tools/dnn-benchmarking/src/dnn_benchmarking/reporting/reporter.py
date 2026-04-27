@@ -448,21 +448,19 @@ class Reporter:
             f"[{index}/{total}] {graph_name}...", end="", flush=True, file=self._output
         )
 
-    def print_suite_per_engine_results(
-        self, results: List[ProviderEngineResult]
-    ) -> None:
-        """Print one indented result line per engine with name and outcome.
+    def print_engine_start(self, name: str) -> None:
+        """Print the engine name with trailing ellipsis, no newline.
 
-        Format:
-          miopen_winograd       passed
-          miopen_implicit_gemm  failed
+        Format:   miopen_winograd...
         """
-        if not results:
-            return
-        max_name_len = max(len(pe.provider) for pe in results)
-        for pe in results:
-            outcome = self._pe_outcome(pe)
-            self._print(f"  {pe.provider:<{max_name_len}}  {outcome}")
+        print(f"  {name}...", end="", flush=True, file=self._output)
+
+    def print_engine_result(self, pe: ProviderEngineResult) -> None:
+        """Append the outcome to the engine start line, then newline.
+
+        Format:   miopen_winograd...passed
+        """
+        print(self._pe_outcome(pe), file=self._output)
 
     def print_suite_graph_error(self, graph_name: str, error: str) -> None:
         """Print inline error on the same line as the graph start, then newline.

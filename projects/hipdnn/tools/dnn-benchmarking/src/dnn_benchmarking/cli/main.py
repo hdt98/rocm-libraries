@@ -275,7 +275,9 @@ def _error_graph_result(graph_path: Path, error_message: str) -> GraphResult:
     )
 
 
-def _run_one_graph(graph_path: Path, config: SuiteConfig, handle: Any) -> GraphResult:
+def _run_one_graph(
+    graph_path: Path, config: SuiteConfig, handle: Any, reporter: Reporter
+) -> GraphResult:
     """Load and run a single graph. Returns a GraphResult (errors included).
 
     Per-graph load/validate/execution failures are captured as error entries
@@ -287,7 +289,7 @@ def _run_one_graph(graph_path: Path, config: SuiteConfig, handle: Any) -> GraphR
         loader.validate(graph_json)
         tensor_infos = loader.extract_tensor_info(graph_json)
         result = run_graph_all_providers(
-            graph_path, graph_json, tensor_infos, config, handle
+            graph_path, graph_json, tensor_infos, config, handle, reporter=reporter
         )
         if len(result.results) == 0:
             return _error_graph_result(
@@ -430,7 +432,8 @@ def _run_benchmark_suite(
     graph_results: List[GraphResult] = []
     for i, graph_path in enumerate(graph_paths, start=1):
         reporter.print_suite_graph_start(i, total, graph_path.stem)
-        gr = _run_one_graph(graph_path, config, handle)
+        print(flush=True)  # end the "graph_name..." line before per-engine lines
+        gr = _run_one_graph(graph_path, config, handle, reporter)
         graph_results.append(gr)
         # Pre-execution graph errors come back as a single "unknown" provider
         # entry with an error message and no timing data; surface those via
@@ -445,11 +448,7 @@ def _run_benchmark_suite(
                 gr.graph_name, gr.results[0].error_message or "unknown error"
             )
         elif config.verbose:
-            print(flush=True)  # end the "graph_name..." line before verbose block
             reporter.print_verbose_graph_result(gr, config)
-        else:
-            print(flush=True)  # end the "graph_name..." line
-            reporter.print_suite_per_engine_results(gr.results)
 
     metadata = _build_suite_metadata(graph_results, total_graphs=len(graph_paths))
     suite_result = SuiteResult(metadata=metadata, graphs=graph_results)
