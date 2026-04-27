@@ -132,12 +132,11 @@ public:
 		// Is this an APU or discrete GPU?
 		bool is_apu = false;
 
-        // Valid when is_apu is true.
-		size_t unified_mem_limit = 0;
-		
-		// Valid when is_apu is false.
 		size_t host_mem_limit = 0;
 		size_t dev_mem_limit = 0;
+
+        // Valid when is_apu is true.
+		size_t unified_mem_limit = 0;
 	};
 
 	// padding_factor is a value in [0, 1] that indicates how much of a buffer we should leave below
@@ -271,43 +270,26 @@ private:
 	static void init_info()
     {
         std::cout << "*** init_info() ***" << std::endl;
-		
+
+        size_t free_dev_mem;
+        size_t total_dev_mem;
+        HIP_CHECK(hipMemGetInfo(&free_dev_mem, &total_dev_mem));
+        std::cout << "total device memory: " << (total_dev_mem >> 20) << std::endl;
+        MemCheck::sys_info.dev_mem_limit = total_dev_mem;
+
+        size_t total_host_mem = MemCheck::get_host_memory();
+        std::cout << "total host memory: " << (total_host_mem >> 20) << std::endl;
+        MemCheck::sys_info.host_mem_limit = total_host_mem;
+
         hipDeviceProp_t props;
         HIP_CHECK(hipGetDeviceProperties(&props, 0));
         MemCheck::sys_info.is_apu = static_cast<bool>(props.integrated);
+        std::cout << "is_apu: " << MemCheck::sys_info.is_apu << std::endl;
 
         if (MemCheck::sys_info.is_apu)
         {
-            size_t free_dev_mem;
-            size_t total_dev_mem;
-			// hipMemGetInfo fetches total free GPU memory, but currently
-			// on APUs this does not get updated when host allocations are made.
-            HIP_CHECK(hipMemGetInfo(&free_dev_mem, &total_dev_mem));
-            std::cout << "total device memory: " << (total_dev_mem >> 20) << std::endl;
-
-            size_t total_host_mem = MemCheck::get_host_memory();
-            std::cout << "total host memory: " << (total_host_mem >> 20) << std::endl;
-
-            //size_t max_dev_shared_mem = total_dev_mem / 2;
-
-            //size_t dedicated_dev_mem = total_dev_mem - max_dev_shared_mem;
-            //size_t total_sys_mem = dedicated_dev_mem + total_host_mem;
-
-            //MemCheck::sys_info.unified_mem_limit = total_sys_mem;
-            //std::cout << "free_dev_mem: " << free_dev_mem << std::endl;
-            //std::cout << "total_dev_mem: " << total_dev_mem << std::endl;
-            //std::cout << "total_host_mem: " << total_host_mem << std::endl;
-
             MemCheck::sys_info.unified_mem_limit = total_dev_mem; // for now
-            std::cout << "unified_mem_limit: " << MemCheck::sys_info.unified_mem_limit << std::endl;
-        }
-        else
-        {
-			// Here all GPU memory is dedicated and there's no shared memory.
-            MemCheck::sys_info.host_mem_limit = props.totalGlobalMem;
-            MemCheck::sys_info.dev_mem_limit = MemCheck::get_host_memory(); // ?????
-            std::cout << "host_mem_limit: " << MemCheck::sys_info.host_mem_limit << std::endl;
-            std::cout << "dev_mem_limit: " << MemCheck::sys_info.dev_mem_limit << std::endl;
+            std::cout << "unified_mem_limit: " << (MemCheck::sys_info.unified_mem_limit >> 20) << std::endl;
         }
             
         MemCheck::sys_info.is_initialized = true;
