@@ -15,7 +15,10 @@ from dnn_benchmarking.graph.resolver import resolve_graph_files
 def main() -> int:
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <graph.json|tarball|glob> [...]", file=sys.stderr)
-        print("  Accepts .json files, tarballs (.tar.gz etc.), and glob patterns.", file=sys.stderr)
+        print(
+            "  Accepts .json files, tarballs (.tar.gz etc.), and glob patterns.",
+            file=sys.stderr,
+        )
         return 1
 
     all_tmpdirs = []

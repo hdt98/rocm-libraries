@@ -320,7 +320,10 @@ class TestRunSuiteWorkflow:
                             {
                                 "type": "ConvolutionFwdAttributes",
                                 "name": "conv",
-                                "inputs": {"x_tensor_uid": x_uid, "w_tensor_uid": w_uid},
+                                "inputs": {
+                                    "x_tensor_uid": x_uid,
+                                    "w_tensor_uid": w_uid,
+                                },
                                 "outputs": {"y_tensor_uid": y_uid},
                                 "parameters": {
                                     "conv_mode": "CROSS_CORRELATION",
@@ -919,7 +922,10 @@ class TestNoGpuDetected:
         import tempfile
 
         from dnn_benchmarking.cli.main import run_ab_test
-        from dnn_benchmarking.config.benchmark_config import ABTestConfig, BenchmarkConfig
+        from dnn_benchmarking.config.benchmark_config import (
+            ABTestConfig,
+            BenchmarkConfig,
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             graph = Path(tmpdir) / "g.json"

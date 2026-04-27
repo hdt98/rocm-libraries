@@ -25,12 +25,30 @@ def _valid_graph() -> Dict[str, Any]:
         "io_data_type": "float",
         "intermediate_data_type": "float",
         "tensors": [
-            {"uid": 1, "name": "a", "dims": [4, 4], "strides": [4, 1],
-             "data_type": "float", "virtual": False},
-            {"uid": 2, "name": "b", "dims": [4, 4], "strides": [4, 1],
-             "data_type": "float", "virtual": False},
-            {"uid": 3, "name": "c", "dims": [4, 4], "strides": [4, 1],
-             "data_type": "float", "virtual": False},
+            {
+                "uid": 1,
+                "name": "a",
+                "dims": [4, 4],
+                "strides": [4, 1],
+                "data_type": "float",
+                "virtual": False,
+            },
+            {
+                "uid": 2,
+                "name": "b",
+                "dims": [4, 4],
+                "strides": [4, 1],
+                "data_type": "float",
+                "virtual": False,
+            },
+            {
+                "uid": 3,
+                "name": "c",
+                "dims": [4, 4],
+                "strides": [4, 1],
+                "data_type": "float",
+                "virtual": False,
+            },
         ],
         "nodes": [
             {

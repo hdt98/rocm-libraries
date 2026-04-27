@@ -444,7 +444,9 @@ class Reporter:
 
         Format: [1/3] graph_name...
         """
-        print(f"[{index}/{total}] {graph_name}...", end="", flush=True, file=self._output)
+        print(
+            f"[{index}/{total}] {graph_name}...", end="", flush=True, file=self._output
+        )
 
     def print_suite_graph_result(
         self, passed: int, failed: int, skipped: int, errored: int

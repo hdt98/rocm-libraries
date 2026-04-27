@@ -59,15 +59,14 @@ def extract_tarball(tarball_path: str) -> Tuple[tempfile.TemporaryDirectory, Lis
             skipped = len(all_json) - len(json_members)
             if skipped > 0:
                 import warnings
+
                 warnings.warn(
                     f"{tarball_path}: skipped {skipped} JSON member(s) with unsafe paths "
                     "(absolute paths or '..' components)",
                     stacklevel=2,
                 )
             if not json_members:
-                raise GraphLoadError(
-                    f"No .json files found in tarball: {tarball_path}"
-                )
+                raise GraphLoadError(f"No .json files found in tarball: {tarball_path}")
             tf.extractall(path=tmpdir.name, members=json_members)
     except GraphLoadError:
         tmpdir.cleanup()

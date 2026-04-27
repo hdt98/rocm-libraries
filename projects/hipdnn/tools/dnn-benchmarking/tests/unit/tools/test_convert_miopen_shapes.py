@@ -123,10 +123,24 @@ class TestBuildConvJson:
 
     def _make_params(self, **overrides) -> _ConvParams:
         defaults = dict(
-            N=2, C=32, H=8, W=8, K=64, R=3, S=3,
-            pad_h=1, pad_w=1, stride_h=1, stride_w=1,
-            dil_h=1, dil_w=1, groups=1, F=1, spatial_dim=2,
-            in_layout="NCHW", out_layout="NCHW",
+            N=2,
+            C=32,
+            H=8,
+            W=8,
+            K=64,
+            R=3,
+            S=3,
+            pad_h=1,
+            pad_w=1,
+            stride_h=1,
+            stride_w=1,
+            dil_h=1,
+            dil_w=1,
+            groups=1,
+            F=1,
+            spatial_dim=2,
+            in_layout="NCHW",
+            out_layout="NCHW",
         )
         defaults.update(overrides)
         return _ConvParams(**defaults)
@@ -179,11 +193,29 @@ class TestBuildConvJson:
 
     def test_3d_conv_produces_5d_dims(self) -> None:
         p = _ConvParams(
-            N=1, C=4, H=4, W=4, K=8, R=3, S=3,
-            pad_h=1, pad_w=1, stride_h=1, stride_w=1,
-            dil_h=1, dil_w=1, groups=1, F=1, spatial_dim=3,
-            in_layout="NCDHW", out_layout="NCDHW",
-            D=4, D_f=3, pad_d=1, stride_d=1, dil_d=1,
+            N=1,
+            C=4,
+            H=4,
+            W=4,
+            K=8,
+            R=3,
+            S=3,
+            pad_h=1,
+            pad_w=1,
+            stride_h=1,
+            stride_w=1,
+            dil_h=1,
+            dil_w=1,
+            groups=1,
+            F=1,
+            spatial_dim=3,
+            in_layout="NCDHW",
+            out_layout="NCDHW",
+            D=4,
+            D_f=3,
+            pad_d=1,
+            stride_d=1,
+            dil_d=1,
         )
         graph = _build_conv_json(p)
         x_tensor = next(t for t in graph["tensors"] if t["uid"] == 1)
@@ -252,7 +284,9 @@ class TestParseLine:
         assert args["-F"] == "1"
 
     def test_repeat_count_prefix_stripped(self) -> None:
-        line = "     5  ./bin/MIOpenDriver convbfp16 -n 1 -c 32 -H 4 -W 4 -k 32 -y 1 -x 1"
+        line = (
+            "     5  ./bin/MIOpenDriver convbfp16 -n 1 -c 32 -H 4 -W 4 -k 32 -y 1 -x 1"
+        )
         result = _parse_line(line)
         assert result is not None
         operation, _ = result
@@ -270,8 +304,16 @@ class TestConvertLine:
             _convert_line("matmul", {}, "prefix")
 
     def test_conv_operation_succeeds(self) -> None:
-        args = {"-n": "1", "-c": "8", "-H": "4", "-W": "4",
-                "-k": "16", "-y": "1", "-x": "1", "-F": "1"}
+        args = {
+            "-n": "1",
+            "-c": "8",
+            "-H": "4",
+            "-W": "4",
+            "-k": "16",
+            "-y": "1",
+            "-x": "1",
+            "-F": "1",
+        }
         name_stem, graph = _convert_line("convbfp16", args, "test")
         assert "conv" in name_stem
         assert graph["nodes"][0]["type"] == "ConvolutionFwdAttributes"

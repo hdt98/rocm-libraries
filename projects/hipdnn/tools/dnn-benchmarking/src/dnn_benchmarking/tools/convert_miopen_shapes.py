@@ -17,10 +17,10 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Stride helpers
 # ---------------------------------------------------------------------------
+
 
 def _nchw_strides(N: int, C: int, H: int, W: int) -> List[int]:
     return [C * H * W, H * W, W, 1]
@@ -40,8 +40,9 @@ def _ndhwc_strides(N: int, C: int, D: int, H: int, W: int) -> List[int]:
     return [D * H * W * C, 1, H * W * C, W * C, C]
 
 
-def _input_strides(layout: str, N: int, C: int, H: int, W: int,
-                   D: Optional[int] = None) -> List[int]:
+def _input_strides(
+    layout: str, N: int, C: int, H: int, W: int, D: Optional[int] = None
+) -> List[int]:
     """Return strides for an input tensor given its memory layout."""
     if D is not None:
         if layout == "NDHWC":
@@ -52,8 +53,9 @@ def _input_strides(layout: str, N: int, C: int, H: int, W: int,
     return _nchw_strides(N, C, H, W)
 
 
-def _weight_strides(K: int, Cg: int, R: int, S: int,
-                    D: Optional[int] = None) -> List[int]:
+def _weight_strides(
+    K: int, Cg: int, R: int, S: int, D: Optional[int] = None
+) -> List[int]:
     """Weight strides are always row-major KCRS (or KCDRS for 3D)."""
     if D is not None:
         return [Cg * D * R * S, D * R * S, R * S, S, 1]
@@ -64,14 +66,17 @@ def _weight_strides(K: int, Cg: int, R: int, S: int,
 # Output dimension formula
 # ---------------------------------------------------------------------------
 
-def _conv_out_dim(dim_in: int, pad: int, dilation: int, kernel: int,
-                  stride: int) -> int:
+
+def _conv_out_dim(
+    dim_in: int, pad: int, dilation: int, kernel: int, stride: int
+) -> int:
     return math.floor((dim_in + 2 * pad - dilation * (kernel - 1) - 1) / stride + 1)
 
 
 # ---------------------------------------------------------------------------
 # MIOpen argument parsers
 # ---------------------------------------------------------------------------
+
 
 def _is_flag(token: str) -> bool:
     """Return True if token looks like a CLI flag (e.g. -n, --layout).
@@ -113,8 +118,15 @@ def _int(args: Dict[str, str], key: str, default: int = 0) -> int:
 # Build tensor objects
 # ---------------------------------------------------------------------------
 
-def _make_tensor(uid: int, name: str, dims: List[int], strides: List[int],
-                 data_type: str = "bfloat16", virtual: bool = False) -> Dict[str, Any]:
+
+def _make_tensor(
+    uid: int,
+    name: str,
+    dims: List[int],
+    strides: List[int],
+    data_type: str = "bfloat16",
+    virtual: bool = False,
+) -> Dict[str, Any]:
     return {
         "uid": uid,
         "name": name,
@@ -129,9 +141,11 @@ def _make_tensor(uid: int, name: str, dims: List[int], strides: List[int],
 # Convolution parameter container
 # ---------------------------------------------------------------------------
 
+
 @dataclasses.dataclass
 class _ConvParams:
     """Parsed convolution parameters extracted from MIOpen driver args."""
+
     N: int
     C: int
     H: int
@@ -213,6 +227,7 @@ class _ConvParams:
 # ---------------------------------------------------------------------------
 # Convolution conversion
 # ---------------------------------------------------------------------------
+
 
 def _conv_direction_label(F: int) -> str:
     return {1: "fwd", 2: "dgrad", 4: "wgrad"}.get(F, f"F{F}")
@@ -346,6 +361,7 @@ def _conv_filename(prefix: str, p: _ConvParams) -> str:
 # Batchnorm conversion
 # ---------------------------------------------------------------------------
 
+
 def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
     """Build a hipDNN JSON graph dict from parsed bnormbfp16 args."""
     N = _int(args, "-n", 1)
@@ -375,7 +391,9 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
         tensors = [
             _make_tensor(1, "input_x", x_dims, x_strides),
             _make_tensor(2, "mean", scale_dims, scale_strides, data_type="float"),
-            _make_tensor(3, "inv_variance", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(
+                3, "inv_variance", scale_dims, scale_strides, data_type="float"
+            ),
             _make_tensor(4, "scale", scale_dims, scale_strides, data_type="float"),
             _make_tensor(5, "bias", scale_dims, scale_strides, data_type="float"),
             _make_tensor(6, "output_y", x_dims, x_strides),
@@ -426,11 +444,17 @@ def _build_bnorm_json(args: Dict[str, str]) -> Dict[str, Any]:
             _make_tensor(1, "input_x", x_dims, x_strides),
             _make_tensor(2, "input_dy", x_dims, x_strides),
             _make_tensor(3, "mean", scale_dims, scale_strides, data_type="float"),
-            _make_tensor(4, "inv_variance", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(
+                4, "inv_variance", scale_dims, scale_strides, data_type="float"
+            ),
             _make_tensor(5, "scale", scale_dims, scale_strides, data_type="float"),
             _make_tensor(6, "output_dx", x_dims, x_strides),
-            _make_tensor(7, "output_dscale", scale_dims, scale_strides, data_type="float"),
-            _make_tensor(8, "output_dbias", scale_dims, scale_strides, data_type="float"),
+            _make_tensor(
+                7, "output_dscale", scale_dims, scale_strides, data_type="float"
+            ),
+            _make_tensor(
+                8, "output_dbias", scale_dims, scale_strides, data_type="float"
+            ),
         ]
         nodes = [
             {
@@ -480,6 +504,7 @@ def _bnorm_filename(prefix: str, args: Dict[str, str]) -> str:
 # Line parser dispatcher
 # ---------------------------------------------------------------------------
 
+
 def _parse_line(line: str) -> Optional[Tuple[str, Dict[str, str]]]:
     """Parse one shape file line. Returns (operation, args_dict) or None."""
     line = line.strip()
@@ -489,7 +514,7 @@ def _parse_line(line: str) -> Optional[Tuple[str, Dict[str, str]]]:
     # Strip leading repeat count (e.g. "     5  ./bin/MIOpenDriver ...")
     m = re.match(r"^\s*\d+\s+", line)
     if m:
-        line = line[m.end():]
+        line = line[m.end() :]
 
     parts = line.split()
     # parts[0] is the executable path, parts[1] is the operation
@@ -502,8 +527,9 @@ def _parse_line(line: str) -> Optional[Tuple[str, Dict[str, str]]]:
     return operation, args
 
 
-def _convert_line(operation: str, args: Dict[str, str],
-                  prefix: str) -> Tuple[str, Dict[str, Any]]:
+def _convert_line(
+    operation: str, args: Dict[str, str], prefix: str
+) -> Tuple[str, Dict[str, Any]]:
     """Convert parsed MIOpen args to (filename_stem, json_dict)."""
     if operation in ("convbfp16", "conv"):
         p = _ConvParams.from_args(args)
@@ -523,6 +549,7 @@ def _convert_line(operation: str, args: Dict[str, str],
 # Main
 # ---------------------------------------------------------------------------
 
+
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Convert MIOpen driver shape files or inline args to hipDNN JSON graph files."
@@ -534,7 +561,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help="One or more MIOpen shape .txt files to convert.",
     )
     parser.add_argument(
-        "-A", "--args",
+        "-A",
+        "--args",
         metavar="MIOPEN_ARGS",
         default=None,
         help=(
@@ -637,7 +665,10 @@ def main() -> int:
 
     if ns.args:
         if ns.inputs:
-            print("ERROR: cannot combine --args with positional SHAPES_FILE arguments.", file=sys.stderr)
+            print(
+                "ERROR: cannot combine --args with positional SHAPES_FILE arguments.",
+                file=sys.stderr,
+            )
             return 1
         return _process_inline_args(ns.args, ns.output)
 

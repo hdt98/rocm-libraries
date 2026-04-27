@@ -60,7 +60,9 @@ class TestGraphValidator:
         with pytest.raises(GraphLoadError, match="required top-level keys"):
             validator.validate(graph_json)
 
-    def test_accepts_mixed_operations(self, sample_conv_fwd_json: Dict[str, Any]) -> None:
+    def test_accepts_mixed_operations(
+        self, sample_conv_fwd_json: Dict[str, Any]
+    ) -> None:
         """Test that graph with mixed operations is accepted."""
         validator = GraphValidator()
         # PointwiseAttributes has no entry in _REQUIRED_NODE_FIELDS, so field
@@ -127,7 +129,7 @@ class TestGraphValidator:
                         "dbias_tensor_uid": 8,
                     },
                 }
-            ]
+            ],
         }
 
         with pytest.raises(GraphLoadError, match="dx_tensor_uid"):

@@ -501,6 +501,7 @@ def main() -> int:
 
     # Resolve --graph: tarball, glob, or single file.
     from ..graph.resolver import is_tarball as _is_tarball
+
     _looks_like_tarball = _is_tarball(args.graph)
     if _looks_like_tarball:
         print(f"Extracting {args.graph}...", file=sys.stderr, flush=True)
@@ -510,7 +511,10 @@ def main() -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
     if _tmpdirs:
-        print(f"Extracted {len(resolved_files)} graph(s) from {args.graph}", file=sys.stderr)
+        print(
+            f"Extracted {len(resolved_files)} graph(s) from {args.graph}",
+            file=sys.stderr,
+        )
 
     if not resolved_files:
         for td in _tmpdirs:
