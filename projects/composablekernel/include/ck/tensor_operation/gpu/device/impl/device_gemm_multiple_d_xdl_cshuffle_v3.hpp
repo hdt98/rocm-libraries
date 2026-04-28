@@ -663,7 +663,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 auto sub_arguments = GridwiseGemm::partition_gemm_problem(arg);
                 return std::accumulate(sub_arguments.begin(),
                                        sub_arguments.end(),
-                                       0,
+                                       0.0f,
                                        [&](float sum, const auto& sub_arg) {
                                            return sum + RunImpSinglePartition<GridwiseGemm>(
                                                             sub_arg, stream_config);

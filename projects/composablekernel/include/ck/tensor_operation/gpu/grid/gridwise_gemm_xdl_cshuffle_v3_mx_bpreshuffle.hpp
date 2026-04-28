@@ -3,6 +3,10 @@
 
 #pragma once
 
+#include <array>
+#include <queue>
+#include <vector>
+
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -847,9 +851,11 @@ struct GridwiseGemmMX_xdl_cshuffle_v3_bpreshuffle
             constexpr long_index_t TwoGB = long_index_t{1} << 31;
 
             const bool is_A_descriptor_smaller_than_2GB =
-                (M_ * StrideA_ * sizeof(ADataType)) <= TwoGB;
+                (static_cast<long_index_t>(M_) * static_cast<long_index_t>(StrideA_) *
+                 sizeof(ADataType)) <= TwoGB;
             const bool is_C_descriptor_smaller_than_2GB =
-                (M_ * StrideC_ * sizeof(CDataType)) <= TwoGB;
+                (static_cast<long_index_t>(M_) * static_cast<long_index_t>(StrideC_) *
+                 sizeof(CDataType)) <= TwoGB;
 
             return is_A_descriptor_smaller_than_2GB && is_C_descriptor_smaller_than_2GB;
         }
@@ -859,6 +865,10 @@ struct GridwiseGemmMX_xdl_cshuffle_v3_bpreshuffle
                                        CDataType* p_c_grid_left) const
         {
             constexpr index_t PartitionSize = 256;
+            if(M_ <= PartitionSize)
+            {
+                throw std::runtime_error("Unable to split problem.");
+            }
             const index_t M_left  = ck::math::integer_least_multiple(M_ / 2, PartitionSize);
             const index_t M_right = M_ - M_left;
 
