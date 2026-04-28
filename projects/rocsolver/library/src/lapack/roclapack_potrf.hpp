@@ -53,8 +53,7 @@ template <typename T, typename I>
 inline static bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
 {
     bool const is_use_recursion = ((sizeof(T) == 16) && (n >= 1024))
-        || ((sizeof(T) == 4) && (n >= 1024))
-        || ((sizeof(T) == 8) && (n > 1024) && (uplo == rocblas_fill_upper));
+        || ((sizeof(T) == 4) && (n >= 1024)) || ((sizeof(T) == 8) && (n > 1024));
 
     return is_use_recursion;
 };
