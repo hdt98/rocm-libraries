@@ -34,8 +34,8 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${ROCM_PATH}/lib/cmake/hip
-     ${HIP_DIR}/cmake
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake
+     ${CMAKE_CURRENT_SOURCE_DIR}/../cmake ${ROCM_PATH}/lib/cmake/hip ${HIP_DIR}/cmake
 )
 
 option(HIPDNN_SKIP_TESTS "Skip building tests" OFF)
@@ -85,7 +85,7 @@ if(NOT TARGET hipdnn_plugin_sdk)
 endif()
 
 # Sanitizer support (Address Sanitizer, etc.)
-include(${CMAKE_CURRENT_LIST_DIR}/../cmake/Sanitizers.cmake)
+include(Sanitizers)
 
 # Setup testing dependencies, tests & clang format
 include(Dependencies)
