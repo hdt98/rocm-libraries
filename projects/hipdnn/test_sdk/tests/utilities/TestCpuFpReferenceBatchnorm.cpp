@@ -13,17 +13,19 @@
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
+#include <hipdnn_test_sdk/utilities/detail/CpuFpReferenceUtilities.hpp>
 
-#ifndef HIPDNN_DATA_SDK_SKIP_JSON_LIB
+#ifndef HIPDNN_FLATBUFFERS_SDK_SKIP_JSON_LIB
 #include "GoldenReferenceCpu.hpp"
 #endif
 
 using namespace hipdnn_test_sdk::utilities;
-using namespace hipdnn_data_sdk::data_objects;
+using namespace hipdnn_flatbuffers_sdk::data_objects;
 using namespace hipdnn_data_sdk::utilities;
 using namespace hipdnn_data_sdk::types;
+using hipdnn_test_sdk::detail::safeTestTypeCast;
 
-#ifndef HIPDNN_DATA_SDK_SKIP_JSON_LIB
+#ifndef HIPDNN_FLATBUFFERS_SDK_SKIP_JSON_LIB
 
 template <class T>
 class TestCpuBatchnormFwdInferenceGoldenReference : public TestGoldenReferenceCpu
@@ -96,7 +98,7 @@ INSTANTIATE_TEST_SUITE_P(,
                          TestCpuBatchnormFwdInferenceGoldenReferenceNcdhwFp32,
                          getGoldenReferenceParams("BatchnormFwdInference/ncdhw/fp32"));
 
-#endif // HIPDNN_DATA_SDK_SKIP_JSON_LIB
+#endif // HIPDNN_FLATBUFFERS_SDK_SKIP_JSON_LIB
 
 //--------------------------
 
@@ -983,11 +985,11 @@ TYPED_TEST(CpuFpReferenceBatchnromFwdTrainingNchw, BatchnormFwdTrainingNchw)
     Tensor<typename TypeParam::Third> savedMean({1, 3});
     Tensor<typename TypeParam::Third> savedInvVariance({1, 3});
 
-    inputTensor.fillWithValue(static_cast<typename TypeParam::First>(1.0));
+    inputTensor.fillWithValue(safeTestTypeCast<typename TypeParam::First>(1.0));
     for(int i = 0; i < 3; i++)
     {
-        scaleTensor.setHostValue(static_cast<typename TypeParam::Second>(1.0), 0, i);
-        biasTensor.setHostValue(static_cast<typename TypeParam::Second>(0.0), 0, i);
+        scaleTensor.setHostValue(safeTestTypeCast<typename TypeParam::Second>(1.0), 0, i);
+        biasTensor.setHostValue(safeTestTypeCast<typename TypeParam::Second>(0.0), 0, i);
     }
 
     CpuFpReferenceBatchnorm::fwdTraining(inputTensor,
