@@ -55,3 +55,10 @@ TYPED_TEST(TestMxGemmFp4_32, BasicSizes)
     this->Run(128, 128, 256);
     this->Run(128, 128, 512);
 }
+
+TYPED_TEST(TestMxGemmFp4_32, MultiBlockMN)
+{
+    this->Run(256, 128, 256);
+    this->Run(128, 256, 256);
+    this->Run(256, 256, 256);
+}

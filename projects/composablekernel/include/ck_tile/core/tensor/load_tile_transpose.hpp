@@ -451,6 +451,8 @@ struct DefaultTranspose
     };
 };
 
+namespace detail {
+
 // Normalize a distribution encoding so that the last K sub-dimension equals SubtileMinorDim.
 // ds_read_tr loads SubtileMinorDim (= 64 / bits_per_element) elements per instruction.
 // When the last K sub-dim is a multiple of SubtileMinorDim, this struct splits it into
@@ -483,10 +485,10 @@ struct NormalizeEncodingForTranspose
     static constexpr index_t split_factor = needs_split ? (last_k / SubtileMinorDim) : 1;
 
     static constexpr bool ps_maps_terminal_k =
-        detail::rhs_mapping_contains<typename DstrEncode::Ps2RHssMajor,
-                                     typename DstrEncode::Ps2RHssMinor,
-                                     2,
-                                     k_dim.size() - 1>::value;
+        rhs_mapping_contains<typename DstrEncode::Ps2RHssMajor,
+                             typename DstrEncode::Ps2RHssMinor,
+                             2,
+                             k_dim.size() - 1>::value;
     static_assert(!needs_split || !ps_maps_terminal_k,
                   "cannot split terminal K while a P mapping points at it");
 
@@ -537,6 +539,8 @@ struct NormalizeEncodingForTranspose
                                             remove_cvref_t<decltype(new_ys_minor)>>;
 };
 
+} // namespace detail
+
 template <typename TileDistribution_, typename DataType_, typename Policy>
 struct TransposeTileDistrChecker
 {
@@ -560,10 +564,10 @@ struct TransposeTileDistributionTraits
     // The original block encoding's last K sub-dim may exceed SubtileMinorDim and need splitting.
     // For ReverseDirection=false (OutputTileDistributionTraits), the encoding is already
     // transposed and has the correct structure.
-    using InDstrEncode =
-        std::conditional_t<ReverseDirection,
-                           typename NormalizeEncodingForTranspose<RawDstrEncode, DataType_>::type,
-                           RawDstrEncode>;
+    using InDstrEncode = std::conditional_t<
+        ReverseDirection,
+        typename detail::NormalizeEncodingForTranspose<RawDstrEncode, DataType_>::type,
+        RawDstrEncode>;
     static constexpr auto input_hs_lengthss = InDstrEncode::hs_lengthss_;
     static constexpr index_t LaneGroupSize =
         Policy::template ValidationTraits<InDstrEncode, ReverseDirection>::LaneGroupSize;

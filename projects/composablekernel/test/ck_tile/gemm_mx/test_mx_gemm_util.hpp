@@ -105,8 +105,10 @@ class TestMxGemmUtil : public ::testing::Test
             ck_tile::get_default_stride(M, N, 0, is_row_major(CLayout{}));
         // Scales use fixed layouts independent of A/B layout:
         // scale A is row-major [M, K/32], and scale B is column-major [K/32, N].
-        const ck_tile::index_t stride_scale_a = scale_k_size;
-        const ck_tile::index_t stride_scale_b = scale_k_size;
+        const ck_tile::index_t stride_scale_a =
+            ck_tile::get_default_stride(M, scale_k_size, 0, ck_tile::bool_constant<true>{});
+        const ck_tile::index_t stride_scale_b =
+            ck_tile::get_default_stride(scale_k_size, N, 0, ck_tile::bool_constant<false>{});
 
         ck_tile::HostTensor<ADataType> a_host(
             ck_tile::host_tensor_descriptor(M, K, stride_A, is_row_major(ALayout{})));

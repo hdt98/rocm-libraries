@@ -78,9 +78,6 @@ struct WarpGemmAttributeMfma
     static_assert(Impl::kAMBlock == 1 && Impl::kBNBlock == 1,
                   "Multi-block WarpGemmAttributeMfmaImpl is not supported");
 
-    // No transpose split here — NormalizeEncodingForTranspose inside
-    // TransposeTileDistributionTraits handles splitting the K-dim suffix
-    // to match SubtileMinorDim when transpose loads are used.
     template <index_t kMNLane, index_t AttrNumAccessV_>
     static constexpr auto get_warp_dstr_encoding()
     {

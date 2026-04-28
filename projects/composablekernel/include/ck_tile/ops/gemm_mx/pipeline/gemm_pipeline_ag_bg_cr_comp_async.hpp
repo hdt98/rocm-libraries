@@ -431,13 +431,13 @@ struct MXGemmPipelineAgBgCrCompAsync : public BaseMXGemmPipelineAgBgCrCompAsync<
                 b_copy_lds_window1, b_tile_windows[number<0>{}], b_dram_tile_window_step);
 
             // tile distribution for the register tiles
-            constexpr auto ALdsTileDistr =
-                make_static_tile_distribution(BlockGemm::MakeABlockDistributionEncode());
-            constexpr auto BLdsTileDistr =
-                make_static_tile_distribution(BlockGemm::MakeBBlockDistributionEncode());
+            using ALdsTileDistr =
+                decltype(make_static_tile_distribution(BlockGemm::MakeABlockDistributionEncode()));
+            using BLdsTileDistr =
+                decltype(make_static_tile_distribution(BlockGemm::MakeBBlockDistributionEncode()));
 
-            using ALdsTile = decltype(make_static_distributed_tensor<ADataType>(ALdsTileDistr));
-            using BLdsTile = decltype(make_static_distributed_tensor<BDataType>(BLdsTileDistr));
+            using ALdsTile = decltype(make_static_distributed_tensor<ADataType>(ALdsTileDistr{}));
+            using BLdsTile = decltype(make_static_distributed_tensor<BDataType>(BLdsTileDistr{}));
 
             // register tiles; double buffering -> a register tile corresponds to a LDS tile window
             ALdsTile a_block_tile0, a_block_tile1;
@@ -484,23 +484,23 @@ struct MXGemmPipelineAgBgCrCompAsync : public BaseMXGemmPipelineAgBgCrCompAsync<
                 move_tile_window(scale_b_dram_window, scale_b_dram_tile_window_step);
             };
 
-            constexpr auto a_lds_input_tile_distr = [ALdsTileDistr]() {
+            constexpr auto a_lds_input_tile_distr = []() {
                 if constexpr(is_a_load_tr_v)
                     return make_static_tile_distribution(
                         typename InputTileDistributionTraits<
-                            typename decltype(ALdsTileDistr)::DstrEncode,
+                            typename ALdsTileDistr::DstrEncode,
                             typename Problem::ADataType>::TransposedDstrEncode{});
                 else
-                    return ALdsTileDistr;
+                    return ALdsTileDistr{};
             }();
-            constexpr auto b_lds_input_tile_distr = [BLdsTileDistr]() {
+            constexpr auto b_lds_input_tile_distr = []() {
                 if constexpr(is_b_load_tr_v)
                     return make_static_tile_distribution(
                         typename InputTileDistributionTraits<
-                            typename decltype(BLdsTileDistr)::DstrEncode,
+                            typename BLdsTileDistr::DstrEncode,
                             typename Problem::BDataType>::TransposedDstrEncode{});
                 else
-                    return BLdsTileDistr;
+                    return BLdsTileDistr{};
             }();
 
             // LDS tile windows for reading;

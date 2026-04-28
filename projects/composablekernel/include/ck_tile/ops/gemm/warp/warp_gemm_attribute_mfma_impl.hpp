@@ -1736,8 +1736,8 @@ struct WarpGemmAttributeMfmaImpl_f32_16x16x128_f8f6f4
 
     static constexpr index_t kScaleGranularity = 32;
 
-    // To get unity scale: 2^(kDefaultScale - 127) = 1.0
-    static constexpr index_t kDefaultScale = 0x7F7F7F7F;
+    // Four packed e8m0 unity scales: 2^(bias - bias) = 1.0.
+    static constexpr index_t kDefaultScale = numeric_traits<e8m0_t>::bias * 0x01010101;
 
     // c_vec += a_vec * b_vec
     template <index_t opselA, index_t opselB, bool post_nop_ = false>
@@ -1849,7 +1849,8 @@ struct WarpGemmAttributeMfmaImpl_f32_32x32x64_f8f6f4
     static constexpr index_t kCM1PerLane = 4;
 
     static constexpr index_t kScaleGranularity = 32;
-    static constexpr index_t kDefaultScale     = 0x7F7F7F7F;
+    // Four packed e8m0 unity scales: 2^(bias - bias) = 1.0.
+    static constexpr index_t kDefaultScale = numeric_traits<e8m0_t>::bias * 0x01010101;
 
     // c_vec += a_vec * b_vec (scaled)
     template <index_t opselA, index_t opselB, bool post_nop_ = false>

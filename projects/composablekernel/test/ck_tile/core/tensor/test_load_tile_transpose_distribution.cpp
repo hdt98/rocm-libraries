@@ -82,7 +82,7 @@ using OddVectorSplitEncoding = tile_distribution_encoding<sequence<>,
                                                           sequence<1, 0, 1>>;
 
 using NormalizedPackedEncoding =
-    typename NormalizeEncodingForTranspose<MergedEncoding, pk_fp4_t>::type;
+    typename detail::NormalizeEncodingForTranspose<MergedEncoding, pk_fp4_t>::type;
 
 static_assert(std::is_same_v<NormalizedPackedEncoding, SplitEncoding>);
 

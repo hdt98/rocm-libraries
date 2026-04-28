@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include <gtest/gtest.h>
+#include <type_traits>
+
 #include "ck_tile/host.hpp"
 #include "ck_tile/host/kernel_launch.hpp"
 #include "ck_tile/ops/gemm/warp/warp_gemm_dispatcher.hpp"
@@ -35,6 +37,51 @@ struct WGDispCase
 using WGDispatcherTypesList =
     ::testing::Types<WGDispCase<ck_tile::pk_fp4_t, ck_tile::pk_fp4_t, float, 16, 16, 128, false>>;
 
+template <typename A,
+          typename B,
+          index_t M,
+          index_t N,
+          index_t K,
+          WGAttrNumAccessEnum NA,
+          typename = void>
+struct IsWarpGemmDispatchable : std::false_type
+{
+};
+
+template <typename A, typename B, index_t M, index_t N, index_t K, WGAttrNumAccessEnum NA>
+struct IsWarpGemmDispatchable<
+    A,
+    B,
+    M,
+    N,
+    K,
+    NA,
+    std::void_t<ck_tile::WarpGemmDispatcher<A, B, float, M, N, K, false, false, false, NA>>>
+    : std::true_type
+{
+};
+
+static_assert(IsWarpGemmDispatchable<ck_tile::pk_fp4_t,
+                                     ck_tile::pk_fp4_t,
+                                     32,
+                                     32,
+                                     64,
+                                     WGAttrNumAccessEnum::Single>::value);
+
+static_assert(IsWarpGemmDispatchable<ck_tile::pk_fp6x16_t,
+                                     ck_tile::pk_fp4_t,
+                                     32,
+                                     32,
+                                     64,
+                                     WGAttrNumAccessEnum::Single>::value);
+
+static_assert(!IsWarpGemmDispatchable<ck_tile::half_t,
+                                      ck_tile::half_t,
+                                      32,
+                                      32,
+                                      64,
+                                      WGAttrNumAccessEnum::Single>::value);
+
 template <typename AType,
           typename BType,
           typename CType,
@@ -44,7 +91,8 @@ template <typename AType,
           bool TransposeC,
           bool SwizzleA,
           bool UseStructuredSparsity,
-          WGAttrNumAccessEnum NumAccess>
+          WGAttrNumAccessEnum NumAccess,
+          bool UseDefaultScale>
 struct WarpGemmKernel
 {
     static constexpr int kBlockSize = 64;
@@ -102,16 +150,24 @@ struct WarpGemmKernel
         ck_tile::load_tile(a_tile, a_win);
         ck_tile::load_tile(b_tile, b_win);
 
-        auto scale_a = static_cast<int32_t>(static_cast<ck_tile::e8m0_t*>(ScaleA)[0].get());
-        auto scale_b = static_cast<int32_t>(static_cast<ck_tile::e8m0_t*>(ScaleB)[0].get());
-
-        auto c_tile = WarpGemm{}.template operator()<0, 0>(a_tile, b_tile, scale_a, scale_b);
+        const auto c_tile = [&]() {
+            if constexpr(UseDefaultScale)
+            {
+                return WarpGemm{}(a_tile, b_tile);
+            }
+            else
+            {
+                auto scale_a = static_cast<int32_t>(static_cast<ck_tile::e8m0_t*>(ScaleA)[0].get());
+                auto scale_b = static_cast<int32_t>(static_cast<ck_tile::e8m0_t*>(ScaleB)[0].get());
+                return WarpGemm{}.template operator()<0, 0>(a_tile, b_tile, scale_a, scale_b);
+            }
+        }();
 
         ck_tile::store_tile(c_win, c_tile);
     }
 };
 
-template <typename Case>
+template <typename Case, bool UseDefaultScale = false>
 static void RunWarpGemmCase(const ck_tile::HostTensor<typename Case::AType>& A,
                             const ck_tile::HostTensor<typename Case::BType>& B,
                             const ck_tile::HostTensor<e8m0_t>& ScaleA,
@@ -130,7 +186,8 @@ static void RunWarpGemmCase(const ck_tile::HostTensor<typename Case::AType>& A,
                                   Case::kTransposeC,
                                   Case::kSwizzleA,
                                   Case::kUSS,
-                                  Case::kNA>;
+                                  Case::kNA,
+                                  UseDefaultScale>;
 
     (void)ck_tile::launch_kernel(ck_tile::stream_config{nullptr, true, 0, 0, 1},
                                  ck_tile::make_kernel(Kernel{},
@@ -153,10 +210,10 @@ class WGRuntimeTest : public ::testing::Test
 
 TYPED_TEST_SUITE(WGRuntimeTest, WGDispatcherTypesList);
 
-TYPED_TEST(WGRuntimeTest, Compare_Dispatcher_MakeWG)
+template <typename Case, bool UseDefaultScale>
+static void
+RunAndCompareWarpGemm(ck_tile::e8m0_t scale_a, ck_tile::e8m0_t scale_b, const char* error_msg)
 {
-    using Case = TypeParam;
-
     using AType = typename Case::AType;
     using BType = typename Case::BType;
     using CType = typename Case::AccType;
@@ -165,9 +222,6 @@ TYPED_TEST(WGRuntimeTest, Compare_Dispatcher_MakeWG)
     constexpr index_t M = Case::MPerWave;
     constexpr index_t N = Case::NPerWave;
     constexpr index_t K = Case::KPerWave;
-
-    auto ScaleA = e8m0_t{2.f};
-    auto ScaleB = e8m0_t{4.f};
 
     ck_tile::HostTensor<AType> A({M, K});
     ck_tile::HostTensor<BType> B({N, K});
@@ -178,15 +232,27 @@ TYPED_TEST(WGRuntimeTest, Compare_Dispatcher_MakeWG)
     ck_tile::FillUniformDistribution<AType>{-5.f, 5.f}(A);
     ck_tile::FillUniformDistribution<BType>{-5.f, 5.f}(B);
     C.SetZero();
-    ck_tile::FillConstant<e8m0_t>{ScaleA}(sA);
-    ck_tile::FillConstant<e8m0_t>{ScaleB}(sB);
+    ck_tile::FillConstant<e8m0_t>{scale_a}(sA);
+    ck_tile::FillConstant<e8m0_t>{scale_b}(sB);
 
-    RunWarpGemmCase<Case>(A, B, sA, sB, C);
+    RunWarpGemmCase<Case, UseDefaultScale>(A, B, sA, sB, C);
 
     ck_tile::HostTensor<CType> C_ref({M, N});
     C_ref.SetZero();
     ck_tile::reference_mx_gemm<AType, BType, e8m0_t, CType, CType>(
         A, B.transpose(), C_ref, sA, sB.transpose());
 
-    EXPECT_TRUE(ck_tile::check_err(C, C_ref, "Warp gemm result error."));
+    EXPECT_TRUE(ck_tile::check_err(C, C_ref, error_msg));
+}
+
+TYPED_TEST(WGRuntimeTest, Compare_Dispatcher_MakeWG)
+{
+    RunAndCompareWarpGemm<TypeParam, false>(
+        ck_tile::e8m0_t{2.f}, ck_tile::e8m0_t{4.f}, "Warp gemm scaled result error.");
+}
+
+TYPED_TEST(WGRuntimeTest, DefaultScaleMatchesUnityScales)
+{
+    RunAndCompareWarpGemm<TypeParam, true>(
+        ck_tile::e8m0_t{1.f}, ck_tile::e8m0_t{1.f}, "Warp gemm default-scale result error.");
 }
