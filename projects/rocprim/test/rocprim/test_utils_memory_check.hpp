@@ -117,9 +117,7 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 #include <unistd.h>
 #endif
 
-// When continue_on_fail == true, issue a continue statement (skip to next
-// iteration of enclosing loop, which runs the next input size) when mem check fails.
-// Otherwise, issue a GTEST_SKIP() call to skip the test completely.
+// todo: remove templating
 template<bool continue_on_fail=true>
 class MemCheck
 {
@@ -157,14 +155,14 @@ public:
         size_t bytes = sizeof(T) * size;
         std::cout << "\nAlloc host usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-        return this->mem_check();
+        return this->mem_check_host();
     }
 
     inline bool alloc_host_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc host usage: " << (bytes >> 20) << std::endl;
         this->host_usage += bytes;
-        return this->mem_check();
+        return this->mem_check_host();
     }
 
     template<typename T>
@@ -188,14 +186,14 @@ public:
         size_t bytes = sizeof(T) * size;
         std::cout << "\nAlloc dev usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-        return this->mem_check();
+        return this->mem_check_device();
     }
 
     inline bool alloc_device_bytes(const size_t bytes)
     {
         std::cout << "\nAlloc dev usage: " << (bytes >> 20) << std::endl;
         this->dev_usage += bytes;
-        return this->mem_check();
+        return this->mem_check_device();
     }
 
     template<typename T>
@@ -214,42 +212,61 @@ public:
 
 private:
 
-	bool mem_check()
+    bool mem_check_host()
+    {
+        const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - padding_factor));
+
+        std::cout << "mem_check_host()" << std::endl;
+        std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
+        std::cout << "    host limit: " << (host_limit >> 20) << std::endl;
+
+        bool success = false;
+        if (MemCheck::sys_info.is_apu)
         {
-            std::cout << "--- mem_check ---" << std::endl;
-            bool success = false;
-            
-            if (MemCheck::sys_info.is_apu)
-            {
-                const size_t total_usage = this->host_usage + this->dev_usage;
-                const size_t limit = static_cast<size_t>(MemCheck::sys_info.unified_mem_limit * (1 - this->padding_factor));
-
-                std::cout << "    host_usage: " << (host_usage >> 20) << std::endl;
-                std::cout << "    device_usage: " << (dev_usage >> 20) << std::endl;
-                std::cout << "    total_usage: " << (total_usage >> 20) << std::endl;
-                std::cout << "    limit: " << (limit >> 20) << std::endl;
-
-                success = total_usage <= limit;
-            }
-            else
-            {
-                const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - this->padding_factor));
-                const size_t dev_limit = static_cast<size_t>(MemCheck::sys_info.dev_mem_limit * (1 - this->padding_factor));
-
-                std::cout << "    host usage: " << this->host_usage << std::endl;
-                std::cout << "    host limit: " << host_limit << std::endl;
-                std::cout << "    dev usage: " << this->dev_usage << std::endl;
-                std::cout << "    dev limit: " << dev_limit << std::endl;
-                
-                success = (this->host_usage <= host_limit &&
-                           this->dev_usage <= dev_limit);
-            }
-            std::cout.flush();
-
-            return success;
+            // assume all device usage is shared and subtracts from host memory
+            std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
+            success = host_usage <= (host_limit - dev_usage);
+        }
+        else
+        {
+            success = host_usage <= host_limit;
+        }
+        std::cout.flush();
+        return success;
     }
 
-	// Returns total system memory minus the amount that's been carved out for the GPU.
+    bool mem_check_device()
+    {
+        const size_t dev_limit = static_cast<size_t>(MemCheck::sys_info.dev_mem_limit * (1 - padding_factor));
+
+        std::cout << "mem_check_device()" << std::endl;
+        std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
+        std::cout << "    device limit: " << (dev_limit >> 20) << std::endl;
+
+        bool success = false;
+        if (MemCheck::sys_info.is_apu)
+        {
+            // Any memory used in excess of host_limit - dev_limit will spill
+            // into the device's shared memory, reducing the device limit
+            const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - padding_factor));
+            size_t host_unshared_limit = host_limit - dev_limit;
+            size_t spill = host_usage > host_unshared_limit ? 
+                           host_usage - host_unshared_limit : 0UL;
+
+            std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
+            std::cout << "    spill into device: " << (spill >> 20) << std::endl;
+
+            success = dev_usage <= dev_limit - spill;
+        }
+        else
+        {
+            success = dev_usage <= dev_limit;
+        }
+        std::cout.flush();
+        return success;
+    }
+
+	// Returns total system memory.
 	static size_t get_host_memory()
     {
             size_t size = 0;
@@ -265,7 +282,7 @@ private:
             return static_cast<size_t>(size);
     }
 
-	// Do some runtime queries to see if we're on an APU, and try to calculate the
+	// Do some runtime queries to see if we're on an APU, and retrieve the
 	// amount of available GPU and host memory.
 	static void init_info()
     {
