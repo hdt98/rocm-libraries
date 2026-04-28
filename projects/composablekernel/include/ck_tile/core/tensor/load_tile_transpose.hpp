@@ -72,10 +72,9 @@ struct is_terminal_split_sequence<sequence<Longs...>, sequence<Shorts...>>
             return true;
         else
         {
-            using PrefixIndices =
-                typename arithmetic_sequence_gen<0, ShortSize - 1, 1>::type;
-            using LongPrefix  = decltype(LongSequence::extract(PrefixIndices{}));
-            using ShortPrefix = decltype(ShortSequence::extract(PrefixIndices{}));
+            using PrefixIndices = typename arithmetic_sequence_gen<0, ShortSize - 1, 1>::type;
+            using LongPrefix    = decltype(LongSequence::extract(PrefixIndices{}));
+            using ShortPrefix   = decltype(ShortSequence::extract(PrefixIndices{}));
             return std::is_same_v<LongPrefix, ShortPrefix>;
         }
     }();
@@ -101,19 +100,102 @@ struct is_same_or_terminal_split_sequence
                                   is_terminal_split_sequence<Rhs, Lhs>::value;
 };
 
-template <typename MajorSequence,
-          typename MinorSequence,
-          index_t TargetMajor,
-          index_t TargetMinor>
+template <typename LongMajorSequence,
+          typename LongMinorSequence,
+          typename ShortMajorSequence,
+          typename ShortMinorSequence>
+struct is_terminal_split_mapping : std::false_type
+{
+};
+
+/// Checks if the longer Y->RHS mapping is identical to the shorter mapping except that the
+/// shorter terminal dimension is represented by two adjacent terminal dimensions in the longer
+/// mapping. This matches NormalizeEncodingForTranspose, which splits the terminal H dimension
+/// from minor m into minors m and m+1.
+template <index_t... LongMajors,
+          index_t... LongMinors,
+          index_t... ShortMajors,
+          index_t... ShortMinors>
+struct is_terminal_split_mapping<sequence<LongMajors...>,
+                                 sequence<LongMinors...>,
+                                 sequence<ShortMajors...>,
+                                 sequence<ShortMinors...>>
+{
+    using LongMajorSequence  = sequence<LongMajors...>;
+    using LongMinorSequence  = sequence<LongMinors...>;
+    using ShortMajorSequence = sequence<ShortMajors...>;
+    using ShortMinorSequence = sequence<ShortMinors...>;
+
+    static constexpr index_t LongSize  = LongMajorSequence::size();
+    static constexpr index_t ShortSize = ShortMajorSequence::size();
+    static_assert(LongSize == LongMinorSequence::size(), "Y->RHS mapping ranks must match");
+    static_assert(ShortSize == ShortMinorSequence::size(), "Y->RHS mapping ranks must match");
+
+    static constexpr bool size_valid = (ShortSize > 0) && (LongSize == ShortSize + 1);
+
+    static constexpr bool prefix_matches = []() {
+        if constexpr(!size_valid)
+            return false;
+        else if constexpr(ShortSize == 1)
+            return true;
+        else
+        {
+            // Extract all majors and minors before the last major and minor of the shorter mapping
+            using PrefixIndices    = typename arithmetic_sequence_gen<0, ShortSize - 1, 1>::type;
+            using LongMajorPrefix  = decltype(LongMajorSequence::extract(PrefixIndices{}));
+            using LongMinorPrefix  = decltype(LongMinorSequence::extract(PrefixIndices{}));
+            using ShortMajorPrefix = decltype(ShortMajorSequence::extract(PrefixIndices{}));
+            using ShortMinorPrefix = decltype(ShortMinorSequence::extract(PrefixIndices{}));
+            // Every major and minor prefix must match exactly
+            return std::is_same_v<LongMajorPrefix, ShortMajorPrefix> &&
+                   std::is_same_v<LongMinorPrefix, ShortMinorPrefix>;
+        }
+    }();
+
+    static constexpr bool terminal_matches = []() {
+        if constexpr(!size_valid)
+            return false;
+        else
+        {
+            // Get the last major and minor of the shorter mapping
+            constexpr index_t short_major = ShortMajorSequence::at(ShortSize - 1);
+            constexpr index_t short_minor = ShortMinorSequence::at(ShortSize - 1);
+            // Require same major, and sequential minors
+            return LongMajorSequence::at(LongSize - 2) == short_major &&
+                   LongMajorSequence::at(LongSize - 1) == short_major &&
+                   LongMinorSequence::at(LongSize - 2) == short_minor &&
+                   LongMinorSequence::at(LongSize - 1) == short_minor + 1;
+        }
+    }();
+
+    static constexpr bool value = prefix_matches && terminal_matches;
+};
+
+template <typename LhsMajorSequence,
+          typename LhsMinorSequence,
+          typename RhsMajorSequence,
+          typename RhsMinorSequence>
+struct is_same_or_terminal_split_mapping
+{
+    static constexpr bool value = (std::is_same_v<LhsMajorSequence, RhsMajorSequence> &&
+                                   std::is_same_v<LhsMinorSequence, RhsMinorSequence>) ||
+                                  is_terminal_split_mapping<LhsMajorSequence,
+                                                            LhsMinorSequence,
+                                                            RhsMajorSequence,
+                                                            RhsMinorSequence>::value ||
+                                  is_terminal_split_mapping<RhsMajorSequence,
+                                                            RhsMinorSequence,
+                                                            LhsMajorSequence,
+                                                            LhsMinorSequence>::value;
+};
+
+template <typename MajorSequence, typename MinorSequence, index_t TargetMajor, index_t TargetMinor>
 struct rhs_sequence_contains : std::false_type
 {
 };
 
 template <index_t... Majors, index_t... Minors, index_t TargetMajor, index_t TargetMinor>
-struct rhs_sequence_contains<sequence<Majors...>,
-                             sequence<Minors...>,
-                             TargetMajor,
-                             TargetMinor>
+struct rhs_sequence_contains<sequence<Majors...>, sequence<Minors...>, TargetMajor, TargetMinor>
 {
     static_assert(sizeof...(Majors) == sizeof...(Minors), "RHS mapping ranks must match");
 
@@ -133,12 +215,12 @@ struct rhs_mapping_contains
                 [](auto i) {
                     using MajorSequence = remove_cvref_t<decltype(MajorTuple{}[i])>;
                     using MinorSequence = remove_cvref_t<decltype(MinorTuple{}[i])>;
-                    return number<rhs_sequence_contains<MajorSequence,
-                                                        MinorSequence,
-                                                        TargetMajor,
-                                                        TargetMinor>::value
-                                      ? 1
-                                      : 0>{};
+                    return number<(rhs_sequence_contains<MajorSequence,
+                                                         MinorSequence,
+                                                         TargetMajor,
+                                                         TargetMinor>::value
+                                       ? 1
+                                       : 0)>{};
                 },
                 number<MajorTuple::size()>{}));
 
@@ -162,9 +244,8 @@ struct have_compatible_hs_lengthss
                 [](auto i) {
                     using ExpectedHs = remove_cvref_t<decltype(expected_hs[i])>;
                     using ActualHs   = remove_cvref_t<decltype(actual_hs[i])>;
-                    return number<is_same_or_terminal_split_sequence<ExpectedHs, ActualHs>::value
-                                      ? 1
-                                      : 0>{};
+                    return number<(
+                        is_same_or_terminal_split_sequence<ExpectedHs, ActualHs>::value ? 1 : 0)>{};
                 },
                 number<ExpectedEncoding::NDimX>{}));
 
@@ -187,8 +268,7 @@ struct is_transpose_output_compatible
     using ExpectedYLengths = remove_cvref_t<decltype(to_sequence(expected_y_desc.get_lengths()))>;
     using ActualYLengths   = remove_cvref_t<decltype(to_sequence(actual_y_desc.get_lengths()))>;
 
-    static constexpr index_t PackedSize =
-        numeric_traits<remove_cvref_t<DataType>>::PackedSize;
+    static constexpr index_t PackedSize = numeric_traits<remove_cvref_t<DataType>>::PackedSize;
 
     static constexpr bool exact_match = std::is_same_v<ExpectedDstr, ActualDstr>;
     static constexpr bool same_logical_x_lengths =
@@ -197,24 +277,29 @@ struct is_transpose_output_compatible
         expected_y_desc.get_element_space_size() == actual_y_desc.get_element_space_size();
     static constexpr bool same_flattened_y_order =
         is_same_or_terminal_split_sequence<ExpectedYLengths, ActualYLengths>::value;
+    static constexpr bool same_y_to_rhs_mapping =
+        is_same_or_terminal_split_mapping<typename ExpectedEnc::Ys2RHsMajor,
+                                          typename ExpectedEnc::Ys2RHsMinor,
+                                          typename ActualEnc::Ys2RHsMajor,
+                                          typename ActualEnc::Ys2RHsMinor>::value;
 
     static constexpr bool compatible_vector_grouping = []() {
         if constexpr(ExpectedYLengths::size() == 0 || ActualYLengths::size() == 0)
             return false;
         else
         {
-            constexpr index_t expected_vector =
-                ExpectedYLengths::at(ExpectedYLengths::size() - 1);
-            constexpr index_t actual_vector = ActualYLengths::at(ActualYLengths::size() - 1);
+            constexpr index_t expected_vector = ExpectedYLengths::at(ExpectedYLengths::size() - 1);
+            constexpr index_t actual_vector   = ActualYLengths::at(ActualYLengths::size() - 1);
 
             return expected_vector % PackedSize == 0 && actual_vector % PackedSize == 0 &&
                    (expected_vector % actual_vector == 0 || actual_vector % expected_vector == 0);
         }
     }();
 
-    static constexpr bool value = exact_match ||
-                                  (same_logical_x_lengths && same_thread_element_space &&
-                                   same_flattened_y_order && compatible_vector_grouping);
+    static constexpr bool value =
+        exact_match ||
+        (same_logical_x_lengths && same_thread_element_space && same_flattened_y_order &&
+         same_y_to_rhs_mapping && compatible_vector_grouping);
 };
 
 template <typename ExpectedDistribution, typename ActualDistribution, typename DataType>
@@ -386,7 +471,7 @@ struct NormalizeEncodingForTranspose
     static constexpr auto I0 = number<0>{};
     static constexpr auto I1 = number<1>{};
 
-    static constexpr auto k_dim     = DstrEncode::hs_lengthss_[I1];
+    static constexpr auto k_dim = DstrEncode::hs_lengthss_[I1];
     static_assert(k_dim.size() > 0, "NormalizeEncodingForTranspose requires a non-empty K dim");
     static constexpr index_t last_k = k_dim[number<k_dim.size() - 1>{}];
 
@@ -397,11 +482,11 @@ struct NormalizeEncodingForTranspose
         (last_k > SubtileMinorDim) && (last_k % SubtileMinorDim == 0);
     static constexpr index_t split_factor = needs_split ? (last_k / SubtileMinorDim) : 1;
 
-    static constexpr bool ps_maps_terminal_k = detail::rhs_mapping_contains<
-        typename DstrEncode::Ps2RHssMajor,
-        typename DstrEncode::Ps2RHssMinor,
-        2,
-        k_dim.size() - 1>::value;
+    static constexpr bool ps_maps_terminal_k =
+        detail::rhs_mapping_contains<typename DstrEncode::Ps2RHssMajor,
+                                     typename DstrEncode::Ps2RHssMinor,
+                                     2,
+                                     k_dim.size() - 1>::value;
     static_assert(!needs_split || !ps_maps_terminal_k,
                   "cannot split terminal K while a P mapping points at it");
 
@@ -697,10 +782,9 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
         typename BottomTensorView_::DataType>::TransposedDstrEncode;
     using ExpectedDstr = decltype(make_static_tile_distribution(OutTileDstrEncode{}));
     using ActualDstr   = remove_cvref_t<decltype(output_distr)>;
-    static_assert(detail::is_transpose_output_compatible_v<
-                      ExpectedDstr,
-                      ActualDstr,
-                      typename BottomTensorView_::DataType>,
+    static_assert(detail::is_transpose_output_compatible_v<ExpectedDstr,
+                                                           ActualDstr,
+                                                           typename BottomTensorView_::DataType>,
                   "out_tensor distribution is not compatible with transpose load output");
 
     // Check that the datatype of out_tensor matches that of the bottom tensor view.
