@@ -52,12 +52,12 @@ class SumUnrollMfma(SumUnroll):
 
         # Init sum unroll, create pack for dot if needed
         # Unregister is in storeSumLDS
-        if kernel["ProblemType"]["MacDataTypeA"].numRegisters() < 1:
-            if kernel["ProblemType"]["MacDataTypeA"].isHalf():
+        if kernel["ProblemType"]["DataType"].numRegisters() < 1:
+            if kernel["ProblemType"]["DataType"].isHalf():
                 writer.defineSgpr("SumUnrollConstOne", 1)
                 imod.add(RegSet("s", "sgprSumUnrollConstOne", writer.sgprs["SumUnrollConstOne"]))
                 imod.add(SMovB32(dst=sgpr("SumUnrollConstOne"), src=hex(0x3c003c00), comment="packed 1.0"))
-            elif kernel["ProblemType"]["MacDataTypeA"].isBFloat16() and writer.states.asmCaps['v_dot2_f32_bf16']:
+            elif kernel["ProblemType"]["DataType"].isBFloat16() and writer.states.asmCaps['v_dot2_f32_bf16']:
                 writer.defineSgpr("SumUnrollConstOne", 1)
                 imod.add(RegSet("s", "sgprSumUnrollConstOne", writer.sgprs["SumUnrollConstOne"]))
                 imod.add(SMovB32(dst=sgpr("SumUnrollConstOne"), src=hex(0x3F803F80), comment="packed 1.0"))
@@ -200,8 +200,8 @@ class SumUnrollMfma(SumUnroll):
     def storeSumLDS(self, writer, kernel, tP):
         imod = Module("StoreSumLDS")
         # Unregister defined sgpr
-        if kernel["ProblemType"]["MacDataTypeA"].numRegisters() < 1:
-            if kernel["ProblemType"]["MacDataTypeA"].isHalf():
+        if kernel["ProblemType"]["DataType"].numRegisters() < 1:
+            if kernel["ProblemType"]["DataType"].isHalf():
                 writer.undefineSgpr("SumUnrollConstOne")
 
         # bias data type

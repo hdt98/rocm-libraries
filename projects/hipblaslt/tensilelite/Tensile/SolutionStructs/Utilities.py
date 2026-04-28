@@ -45,7 +45,7 @@ def getMiInputType(kernel: dict):
     if kernel["UseF32XEmulation"]:
       return DataType(DataTypeEnum.BFloat16)
     return kernel["ProblemType"]["F32XdlMathOp"]
-  return kernel["ProblemType"]["MacDataTypeA"]
+  return kernel["ProblemType"]["DataType"]
 
 def reject(state: dict, printSolutionRejectionReason: bool = True, *args) -> bool:
   """
