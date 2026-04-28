@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include <array>
-#include <queue>
-#include <vector>
-
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
@@ -680,7 +676,6 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
 
     struct Problem
     {
-        __host__ Problem() = default;
         __host__ Problem(index_t M_,
                          index_t N_,
                          index_t K_,
@@ -743,7 +738,6 @@ struct GridwiseGemmMX_xdl_cshuffle_v3
     // Argument
     struct Argument : public tensor_operation::device::BaseArgument, public Problem
     {
-        __host__ Argument() = default;
         __host__ Argument(const ADataType* p_a_grid_,
                           const AScaleDataType* p_a_scale_grid_,
                           const BDataType* p_b_grid_,

@@ -5,6 +5,10 @@
 
 #include <iostream>
 #include <sstream>
+#include <array>
+#include <queue>
+#include <vector>
+#include <algorithm>
 
 #include "ck/utility/common_header.hpp"
 

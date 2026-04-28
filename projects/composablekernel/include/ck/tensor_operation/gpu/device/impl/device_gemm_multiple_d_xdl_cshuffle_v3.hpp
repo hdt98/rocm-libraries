@@ -6,6 +6,10 @@
 #include <iostream>
 #include <sstream>
 #include <numeric>
+#include <array>
+#include <queue>
+#include <vector>
+#include <algorithm>
 
 #include "ck/utility/common_header.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"

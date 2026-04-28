@@ -3,10 +3,6 @@
 
 #pragma once
 
-#include <array>
-#include <queue>
-#include <vector>
-
 #include "ck/tensor_description/multi_index_transform_helper.hpp"
 #include "ck/tensor_description/tensor_descriptor.hpp"
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
