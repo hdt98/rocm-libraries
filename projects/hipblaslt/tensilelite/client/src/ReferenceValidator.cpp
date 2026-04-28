@@ -493,11 +493,13 @@ namespace TensileLite
                     refPtr = reference.scaleAlphaVec;
                     resPtr = result.scaleAlphaVec;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::Synchronizer:
                 {
                     refPtr = reference.Synchronizer;
                     resPtr = result.Synchronizer;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::AMAXD:
                 {
                     refPtr = reference.amaxD;
