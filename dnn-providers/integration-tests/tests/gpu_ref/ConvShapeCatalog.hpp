@@ -311,6 +311,31 @@ inline std::vector<ConvShapeCase> getLarge3dConvCases()
          {0, 1, 1},
          1,
          "Degenerate3dD1"},
+        // 3D ResNet / C3D block — matches CK's standard 3D test shape
+        // (CK: N=64,C=64,K=128,28³; scaled for reference impl)
+        {{8, 64, 14, 14, 14},
+         {128, 64, 3, 3, 3},
+         {1, 1, 1},
+         {1, 1, 1},
+         {1, 1, 1},
+         1,
+         "ResNet3d"},
+        // Large-spatial 5x5x5 kernel — from MIOpen conv3d_test (N=2,C=16,50³,K=32)
+        {{2, 16, 50, 50, 50},
+         {32, 16, 5, 5, 5},
+         {1, 1, 1},
+         {1, 1, 1},
+         {2, 2, 2},
+         1,
+         "MedImg50cube5x5x5"},
+        // Video-style temporal: small D, large HW — from MIOpen grouped conv3d
+        {{8, 32, 4, 56, 56},
+         {64, 32, 3, 3, 3},
+         {1, 2, 2},
+         {1, 1, 1},
+         {1, 1, 1},
+         1,
+         "VideoTemporal"},
     };
 }
 
