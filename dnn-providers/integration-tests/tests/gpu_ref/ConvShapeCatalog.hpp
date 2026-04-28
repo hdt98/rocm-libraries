@@ -52,7 +52,7 @@ inline std::vector<ConvShapeCase> withChannelLastLayout(std::vector<ConvShapeCas
 // Small shapes — fast binary (CI gate)
 // ============================================================================
 
-// Small 1D shapes: basic NCL convolution tests
+// Small 1D shapes: basic NCL convolution tests [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getSmall1dConvCases()
 {
     return {
@@ -75,7 +75,7 @@ inline std::vector<ConvShapeCase> getSmall1dConvCases()
     };
 }
 
-// Small 2D shapes: output < 1K elements, suitable for all types
+// Small 2D shapes: output < 1K elements, suitable for all types [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getSmall2dConvCases()
 {
     return {
@@ -104,7 +104,7 @@ inline std::vector<ConvShapeCase> getSmall2dConvCases()
     };
 }
 
-// Small 3D shapes: basic 3D convolution tests
+// Small 3D shapes: basic 3D convolution tests [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getSmall3dConvCases()
 {
     return {
@@ -127,7 +127,7 @@ inline std::vector<ConvShapeCase> getSmall3dConvCases()
 // Medium shapes — slow binary (nightly)
 // ============================================================================
 
-// Medium 1D shapes: used by fwd and wgrad
+// Medium 1D shapes [fwd, wgrad] — dgrad uses getMedium1dDgradCases() instead
 inline std::vector<ConvShapeCase> getMedium1dConvCases()
 {
     return {
@@ -146,7 +146,7 @@ inline std::vector<ConvShapeCase> getMedium1dConvCases()
     };
 }
 
-// Medium 1D shapes for dgrad — intentionally different from fwd/wgrad
+// Medium 1D shapes [dgrad] — intentionally different from fwd/wgrad
 inline std::vector<ConvShapeCase> getMedium1dDgradCases()
 {
     return {
@@ -159,7 +159,7 @@ inline std::vector<ConvShapeCase> getMedium1dDgradCases()
     };
 }
 
-// Medium 2D shapes: ResNet/ResNeXt/Inception-like, suitable for fp32 + fp16
+// Medium 2D shapes: ResNet/ResNeXt/Inception-like, suitable for fp32 + fp16 [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getMedium2dConvCases()
 {
     return {
@@ -192,7 +192,7 @@ inline std::vector<ConvShapeCase> getMedium2dConvCases()
     };
 }
 
-// Medium 3D shapes: larger 3D convolutions
+// Medium 3D shapes: larger 3D convolutions [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getMedium3dConvCases()
 {
     return {
@@ -209,7 +209,7 @@ inline std::vector<ConvShapeCase> getMedium3dConvCases()
 // Large shapes — slow binary (nightly)
 // ============================================================================
 
-// Large 1D shapes: stress tests for audio/speech workloads
+// Large 1D shapes: stress tests for audio/speech workloads [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getLarge1dConvCases()
 {
     return {
@@ -232,7 +232,7 @@ inline std::vector<ConvShapeCase> getLarge1dConvCases()
     };
 }
 
-// Large 2D shapes: stress tests matching real workloads
+// Large 2D shapes: stress tests matching real workloads [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getLarge2dConvCases()
 {
     return {
@@ -267,7 +267,7 @@ inline std::vector<ConvShapeCase> getLarge2dConvCases()
     };
 }
 
-// Large 3D shapes: stress tests for volumetric/video workloads
+// Large 3D shapes: stress tests for volumetric/video workloads [fwd, dgrad, wgrad]
 inline std::vector<ConvShapeCase> getLarge3dConvCases()
 {
     return {
