@@ -295,7 +295,6 @@ struct TransformConvBwdDataToGemm_v1
         XDot_ = math::integer_divide_ceil(X_, XTilde_);
     }
 
-#if 0 // At now not supported to split tensor
     __host__ bool AreDescriptorsSmallerThan2GB() const
     {
         constexpr long_index_t TwoGB = (long_index_t{1} << 31);
@@ -312,193 +311,112 @@ struct TransformConvBwdDataToGemm_v1
 
         return is_a_descriptor_smaller_than_2GB && is_c_descriptor_smaller_than_2GB;
     }
-
     __host__ auto SplitConvProblem(const ADataType* a_grid_ptr_base,
                                    CDataType* c_grid_ptr_base) const
     {
-        // Create copies
         auto conv_to_gemm_transformer_left  = *this;
         auto conv_to_gemm_transformer_right = *this;
-        IndexType a_right_offset            = 0;
-        IndexType c_right_offset            = 0;
-        // Calculate real filter size
-        const IndexType z_eff = (Z_ - 1) * ConvDilationD_ + 1;
-        const IndexType y_eff = (Y_ - 1) * ConvDilationH_ + 1;
-        const IndexType x_eff = (X_ - 1) * ConvDilationW_ + 1;
-        // Calculate start position in input for right tensor
-        const IndexType di_right_transformer_start_idx = (Do_ / 2) * ConvStrideD_;
-        const IndexType hi_right_transformer_start_idx = (Ho_ / 2) * ConvStrideH_;
-        const IndexType wi_right_transformer_start_idx = (Wo_ / 2) * ConvStrideW_;
-        // Calculate last position in input for left tensor
-        const IndexType di_left_transformer_end_idx = (Do_ / 2 - 1) * ConvStrideD_ + z_eff;
-        const IndexType hi_left_transformer_end_idx = (Ho_ / 2 - 1) * ConvStrideH_ + y_eff;
-        const IndexType wi_left_transformer_end_idx = (Wo_ / 2 - 1) * ConvStrideW_ + x_eff;
-        // Allow to split if whole left padding will be in left tensor and right padding in right
-        // tensor
-        const bool is_possible_to_split_d = Do_ != 1 &&
-                                            di_right_transformer_start_idx > InLeftPadD_ &&
-                                            di_left_transformer_end_idx <= (InLeftPadD_ + Di_);
-        const bool is_possible_to_split_h = Ho_ != 1 &&
-                                            hi_right_transformer_start_idx > InLeftPadH_ &&
-                                            hi_left_transformer_end_idx <= (InLeftPadH_ + Hi_);
-        const bool is_possible_to_split_w = Wo_ != 1 &&
-                                            wi_right_transformer_start_idx > InLeftPadW_ &&
-                                            wi_left_transformer_end_idx <= (InLeftPadW_ + Wi_);
+        long_index_t a_right_offset         = 0;
+        long_index_t c_right_offset         = 0;
 
-        if(is_possible_to_split_d)
+        // For bwd data: A = grad_output (Do/Ho/Wo), C = grad_input (Di/Hi/Wi).
+        // We split along the grad_input (C) spatial dimension and derive the
+        // corresponding grad_output (A) window for each half.
+
+        // First output pixel whose receptive field starts at or after Di_/2
+        const IndexType do_right_start = math::integer_divide_ceil(
+            (Di_ / 2) + InLeftPadD_ - (Z_ - 1) * ConvDilationD_, ConvStrideD_);
+        const IndexType ho_right_start = math::integer_divide_ceil(
+            (Hi_ / 2) + InLeftPadH_ - (Y_ - 1) * ConvDilationH_, ConvStrideH_);
+        const IndexType wo_right_start = math::integer_divide_ceil(
+            (Wi_ / 2) + InLeftPadW_ - (X_ - 1) * ConvDilationW_, ConvStrideW_);
+
+        // Count of grad_output pixels that have any receptive field contribution
+        // to grad_input pixels in [0, Di_/2), [0, Hi_/2), [0, Wi_/2) respectively.
+        // Derived from: ho * ConvStride - InLeftPad < Hi_/2  =>  ho < (Hi_/2 + InLeftPad) / S.
+        const IndexType do_left_end =
+            math::integer_divide_ceil(Di_ / 2 + InLeftPadD_, ConvStrideD_);
+        const IndexType ho_left_end =
+            math::integer_divide_ceil(Hi_ / 2 + InLeftPadH_, ConvStrideH_);
+        const IndexType wo_left_end =
+            math::integer_divide_ceil(Wi_ / 2 + InLeftPadW_, ConvStrideW_);
+
+        if(Di_ != 1)
         {
-            // Apply new sizes
-            // Split output on half
-            conv_to_gemm_transformer_left.Do_  = Do_ / 2;
-            conv_to_gemm_transformer_right.Do_ = Do_ - Do_ / 2;
-            // Assign left padding to left convolution
-            conv_to_gemm_transformer_left.InLeftPadD_  = InLeftPadD_;
-            conv_to_gemm_transformer_right.InLeftPadD_ = 0;
-            // Assign right padding to right convolution
-            conv_to_gemm_transformer_left.InRightPadD_  = 0;
-            conv_to_gemm_transformer_right.InRightPadD_ = InRightPadD_;
-            // Calculate new input size
-            conv_to_gemm_transformer_left.Di_ = di_left_transformer_end_idx - InLeftPadD_;
-            conv_to_gemm_transformer_right.Di_ =
-                math::min(Di_ - (di_right_transformer_start_idx - InLeftPadD_),
-                          (conv_to_gemm_transformer_right.Do_ - 1) * ConvStrideD_ + z_eff);
-            ;
-            // Calcualte offsets
-            a_right_offset = (Do_ / 2) * DoStride_;
-            c_right_offset = ((Do_ / 2) * ConvStrideD_ - InLeftPadD_) * DiStride_;
-        }
-        else if(is_possible_to_split_h)
-        {
-            conv_to_gemm_transformer_left.Ho_  = Ho_ / 2;
-            conv_to_gemm_transformer_right.Ho_ = Ho_ - Ho_ / 2;
-
-            conv_to_gemm_transformer_left.InLeftPadH_  = InLeftPadH_;
-            conv_to_gemm_transformer_right.InLeftPadH_ = 0;
-
-            conv_to_gemm_transformer_left.InRightPadH_  = 0;
-            conv_to_gemm_transformer_right.InRightPadH_ = InRightPadH_;
-
-            conv_to_gemm_transformer_left.Hi_ = hi_left_transformer_end_idx - InLeftPadH_;
-            conv_to_gemm_transformer_right.Hi_ =
-                math::min(Hi_ - (hi_right_transformer_start_idx - InLeftPadH_),
-                          (conv_to_gemm_transformer_right.Ho_ - 1) * ConvStrideH_ + y_eff);
-            a_right_offset = (Ho_ / 2) * HoStride_;
-            c_right_offset = ((Ho_ / 2) * ConvStrideH_ - InLeftPadH_) * HiStride_;
-        }
-        else if(is_possible_to_split_w)
-        {
-            conv_to_gemm_transformer_left.Wo_  = Wo_ / 2;
-            conv_to_gemm_transformer_right.Wo_ = Wo_ - Wo_ / 2;
-
-            conv_to_gemm_transformer_left.InLeftPadW_  = InLeftPadW_;
-            conv_to_gemm_transformer_right.InLeftPadW_ = 0;
-
-            conv_to_gemm_transformer_left.InRightPadW_  = 0;
-            conv_to_gemm_transformer_right.InRightPadW_ = InRightPadW_;
-
-            conv_to_gemm_transformer_left.Wi_ = wi_left_transformer_end_idx - InLeftPadW_;
-            conv_to_gemm_transformer_right.Wi_ =
-                math::min(Wi_ - (wi_right_transformer_start_idx - InLeftPadW_),
-                          (conv_to_gemm_transformer_right.Wo_ - 1) * ConvStrideW_ + x_eff);
-
-            a_right_offset = (Wo_ / 2) * WoStride_;
-            c_right_offset = ((Wo_ / 2) * ConvStrideW_ - InLeftPadW_) * WiStride_;
-        }
-        // Return left transform, right transformer, right offset to Input and right offset to
-        // Output
-        return ck::make_tuple(conv_to_gemm_transformer_left,
-                              conv_to_gemm_transformer_right,
-                              a_grid_ptr_base + a_right_offset,
-                              c_grid_ptr_base + c_right_offset);
-    }
-
-    __host__ auto SplitConvProblem(const ADataType* a_grid_ptr_base,
-                                   CDataType* c_grid_ptr_base) const
-    {
-        // Create copies
-        auto conv_to_gemm_transformer_left  = *this;
-        auto conv_to_gemm_transformer_right = *this;
-        IndexType a_right_offset            = 0;
-        IndexType c_right_offset            = 0;
-
-        // Calculate start position in input for right tensor
-        const IndexType do_right_transformer_start_idx = math::integer_divide_ceil((Di_ / 2) + InLeftPadD_ - ((Z_ - 1) * ConvDilationD_), ConvStrideD_);
-        const IndexType ho_right_transformer_start_idx = math::integer_divide_ceil((Hi_ / 2) + InLeftPadH_ - ((Y_ - 1) * ConvDilationH_), ConvStrideH_);
-        const IndexType wo_right_transformer_start_idx = math::integer_divide_ceil((Wi_ / 2) + InLeftPadW_ - ((X_ - 1) * ConvDilationW_), ConvStrideW_);
-        // Calculate last position in input for left tensor
-        const IndexType do_left_transformer_end_idx = math::integer_divide_ceil((Di_ / 2 - 1) + InLeftPadD_, ConvStrideD_);
-        const IndexType ho_left_transformer_end_idx = math::integer_divide_ceil((Hi_ / 2 - 1) + InLeftPadH_, ConvStrideH_);
-        const IndexType wo_left_transformer_end_idx = math::integer_divide_ceil((Wi_ / 2 - 1) + InLeftPadW_, ConvStrideW_);
-
-
-        if(Di_!=1)
-        {
-            // Apply new sizes
-            // Split output on half
+            // Split grad_input depth in half
             conv_to_gemm_transformer_left.Di_  = Di_ / 2;
             conv_to_gemm_transformer_right.Di_ = Di_ - Di_ / 2;
-            // Assign left padding to left convolution
-            conv_to_gemm_transformer_left.InLeftPadD_  = InLeftPadD_;
-            conv_to_gemm_transformer_right.InLeftPadD_ = 0;
-            // // Assign right padding to right convolution
+            // Left padding stays on the left; right gets residual: local di'=0 corresponds to
+            // global di=Di_/2, and local do'=0 corresponds to global do=do_right_start, so
+            // InLeftPad_right = InLeftPad_orig + Di_/2 - do_right_start * ConvStrideD_.
+            conv_to_gemm_transformer_left.InLeftPadD_ = InLeftPadD_;
+            conv_to_gemm_transformer_right.InLeftPadD_ =
+                InLeftPadD_ + (Di_ / 2) - do_right_start * ConvStrideD_;
+            // Right padding stays on the right; left gets none
             conv_to_gemm_transformer_left.InRightPadD_  = 0;
             conv_to_gemm_transformer_right.InRightPadD_ = InRightPadD_;
-            // Calculate new input size
-            conv_to_gemm_transformer_left.Do_ = do_left_transformer_end_idx;
-            conv_to_gemm_transformer_right.Do_ = Do_ - do_right_transformer_start_idx;
-            ;
-            // Calcualte offsets
-            a_right_offset = do_right_transformer_start_idx * DoStride_;
+            // Trim grad_output (A) windows
+            conv_to_gemm_transformer_left.Do_  = do_left_end;
+            conv_to_gemm_transformer_right.Do_ = Do_ - do_right_start;
+            // Pointer offsets using actual tensor strides
+            a_right_offset = do_right_start * DoStride_;
             c_right_offset = (Di_ / 2) * DiStride_;
+            // DTilde_ depends on Do_ which changed; recompute for both halves.
+            conv_to_gemm_transformer_left.DTilde_ =
+                conv_to_gemm_transformer_left.Do_ +
+                math::integer_divide_ceil(ConvDilationD_ * (Z_ - I1), ConvStrideD_);
+            conv_to_gemm_transformer_right.DTilde_ =
+                conv_to_gemm_transformer_right.Do_ +
+                math::integer_divide_ceil(ConvDilationD_ * (Z_ - I1), ConvStrideD_);
         }
-        else if(Hi_!=1)
+        else if(Hi_ != 1)
         {
-            // Apply new sizes
-            // Split output on half
-            conv_to_gemm_transformer_left.Hi_  = Hi_ / 2;
-            conv_to_gemm_transformer_right.Hi_ = Hi_ - Hi_ / 2;
-            // Assign left padding to left convolution
-            conv_to_gemm_transformer_left.InLeftPadH_  = InLeftPadH_;
-            conv_to_gemm_transformer_right.InLeftPadH_ = 0;
-            // // Assign right padding to right convolution
+            conv_to_gemm_transformer_left.Hi_         = Hi_ / 2;
+            conv_to_gemm_transformer_right.Hi_        = Hi_ - Hi_ / 2;
+            conv_to_gemm_transformer_left.InLeftPadH_ = InLeftPadH_;
+            conv_to_gemm_transformer_right.InLeftPadH_ =
+                InLeftPadH_ + (Hi_ / 2) - ho_right_start * ConvStrideH_;
             conv_to_gemm_transformer_left.InRightPadH_  = 0;
             conv_to_gemm_transformer_right.InRightPadH_ = InRightPadH_;
-            // Calculate new input size
-            conv_to_gemm_transformer_left.Ho_ = ho_left_transformer_end_idx ;
-            conv_to_gemm_transformer_right.Ho_ = Ho_ - ho_right_transformer_start_idx ;
-            ;
-            // Calcualte offsets
-            a_right_offset = ho_right_transformer_start_idx * HoStride_;
-            c_right_offset = (Hi_ / 2) * HiStride_;
+            conv_to_gemm_transformer_left.Ho_           = ho_left_end;
+            conv_to_gemm_transformer_right.Ho_          = Ho_ - ho_right_start;
+            a_right_offset                              = ho_right_start * HoStride_;
+            c_right_offset                              = (Hi_ / 2) * HiStride_;
+            // HTilde_ depends on Ho_ which changed; recompute for both halves.
+            conv_to_gemm_transformer_left.HTilde_ =
+                conv_to_gemm_transformer_left.Ho_ +
+                math::integer_divide_ceil(ConvDilationH_ * (Y_ - I1), ConvStrideH_);
+            conv_to_gemm_transformer_right.HTilde_ =
+                conv_to_gemm_transformer_right.Ho_ +
+                math::integer_divide_ceil(ConvDilationH_ * (Y_ - I1), ConvStrideH_);
         }
-        else if(Wi_!=1)
+        else if(Wi_ != 1)
         {
-            // Apply new sizes
-            // Split output on half
-            conv_to_gemm_transformer_left.Wi_  = Wi_ / 2;
-            conv_to_gemm_transformer_right.Wi_ = Wi_ - Wi_ / 2;
-            // Assign left padding to left convolution
-            conv_to_gemm_transformer_left.InLeftPadW_  = InLeftPadW_;
-            conv_to_gemm_transformer_right.InLeftPadW_ = 0;
-            // Assign right padding to right convolution
+            conv_to_gemm_transformer_left.Wi_         = Wi_ / 2;
+            conv_to_gemm_transformer_right.Wi_        = Wi_ - Wi_ / 2;
+            conv_to_gemm_transformer_left.InLeftPadW_ = InLeftPadW_;
+            conv_to_gemm_transformer_right.InLeftPadW_ =
+                InLeftPadW_ + (Wi_ / 2) - wo_right_start * ConvStrideW_;
             conv_to_gemm_transformer_left.InRightPadW_  = 0;
             conv_to_gemm_transformer_right.InRightPadW_ = InRightPadW_;
-            // Calculate new input size
-            conv_to_gemm_transformer_left.Wo_ = wo_left_transformer_end_idx;
-            conv_to_gemm_transformer_right.Wo_ = Wo_ - wo_right_transformer_start_idx;
-            ;
-            // Calcualte offsets
-            a_right_offset = wo_right_transformer_start_idx * WoStride_;
-            c_right_offset = (Wi_ / 2) * WiStride_;
+            conv_to_gemm_transformer_left.Wo_           = wo_left_end;
+            conv_to_gemm_transformer_right.Wo_          = Wo_ - wo_right_start;
+            a_right_offset                              = wo_right_start * WoStride_;
+            c_right_offset                              = (Wi_ / 2) * WiStride_;
+            // WTilde_ depends on Wo_ which changed; recompute for both halves.
+            conv_to_gemm_transformer_left.WTilde_ =
+                conv_to_gemm_transformer_left.Wo_ +
+                math::integer_divide_ceil(ConvDilationW_ * (X_ - I1), ConvStrideW_);
+            conv_to_gemm_transformer_right.WTilde_ =
+                conv_to_gemm_transformer_right.Wo_ +
+                math::integer_divide_ceil(ConvDilationW_ * (X_ - I1), ConvStrideW_);
         }
-        // Return left transform, right transformer, right offset to Input and right offset to
-        // Output
+
         return ck::make_tuple(conv_to_gemm_transformer_left,
                               conv_to_gemm_transformer_right,
                               a_grid_ptr_base + a_right_offset,
                               c_grid_ptr_base + c_right_offset);
     }
-#endif
 
     __host__ __device__ auto MakeOutGridDesc() const
     {
