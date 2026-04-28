@@ -61,11 +61,10 @@ target_compile_options(hipdnn_gpu_ref_tests
 
 clang_tidy_check(hipdnn_gpu_ref_tests)
 
-# We don't use add_unit_test_target() here because it registers one ctest entry
-# for the full binary (no "slow" label), which breaks ctest -LE slow filtering.
-# Instead we replicate its infra setup and register two filtered ctest entries.
-
 # -- Infra setup (RPATH, install, test-name validation) --
+# We don't use add_unit_test_target() here because it registers an unfiltered
+# ctest entry that would overlap with the YAML-generated category suites,
+# causing every test to run twice under ninja check / ninja unit-check.
 set(CHECK_DEPENDS_GLOBAL ${CHECK_DEPENDS_GLOBAL} hipdnn_gpu_ref_tests
     CACHE INTERNAL "Accumulated global dependencies for test name validation" FORCE)
 set(_gpu_ref_exe hipdnn_gpu_ref_tests${CMAKE_EXECUTABLE_SUFFIX})
@@ -81,18 +80,12 @@ set_target_properties(hipdnn_gpu_ref_tests PROPERTIES
 set_property(GLOBAL APPEND PROPERTY INTEGRATION_TESTS_TEST_TARGETS hipdnn_gpu_ref_tests)
 install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# -- Filtered ctest entries (one binary, two invocations) --
-# Category is encoded in the INSTANTIATE_TEST_SUITE_P prefix: Small*, Medium*, Large*.
-# Standalone (non-parameterized) tests all start with "Test*".
-#   ctest              → all tests (fast + slow)
-#   ctest -LE slow     → fast only (excludes anything labeled "slow")
-#   ctest -L slow      → slow only (Medium* + Large*)
-add_test(NAME hipdnn_gpu_ref_fast
-    COMMAND hipdnn_gpu_ref_tests "--gtest_filter=Small*:Test*"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-set_tests_properties(hipdnn_gpu_ref_fast PROPERTIES LABELS "unit_test")
-
-add_test(NAME hipdnn_gpu_ref_slow
-    COMMAND hipdnn_gpu_ref_tests "--gtest_filter=Medium*:Large*"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-set_tests_properties(hipdnn_gpu_ref_slow PROPERTIES LABELS "unit_test;slow")
+# -- YAML-based test categories (generates ctest entries with gtest filters) --
+# quick and nightly are disjoint and together cover all tests. Both carry the
+# unit_test label so ninja unit-check (ctest -L unit_test) runs everything once.
+# See shared/ctest/README.md for the full architecture.
+include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
+apply_test_category_labels(
+    hipdnn_gpu_ref_tests
+    "${CMAKE_CURRENT_SOURCE_DIR}/gpu_ref/test_categories.yaml"
+    "${CMAKE_CURRENT_BINARY_DIR}")

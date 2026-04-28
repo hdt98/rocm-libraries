@@ -10,28 +10,27 @@ Integration tests for hipDNN provider implementations.
 |---------|-----------|----------|
 | `ninja check` | All tests | Full validation |
 | `ninja unit-check` | All unit tests | CI gate on every PR |
-| `ctest` | fast + slow (all tests) | Alternative to ninja check |
-| `ctest -LE slow` | fast only | Excludes tests labeled slow |
-| `ctest -L slow` | slow only | Medium + Large shapes |
+| `ctest -L quick` | Quick tests only | Small shapes + standalone tests |
+| `ctest -L nightly` | Nightly tests only | Medium + Large shapes |
 
 ### Filtering GPU reference tests by category
 
 All GPU reference shape tests live in a single binary (`hipdnn_gpu_ref_tests`).
-Test instantiation prefixes encode the category (`{Size}{Layout}{Dim}`):
+Test instantiation prefixes encode the shape size (`{Size}{Layout}{Dim}`):
 
-| Prefix | Category | Typical run |
-|--------|----------|-------------|
-| `Small*` | Fast / small shapes | Every PR |
+| Prefix | Size | Typical run |
+|--------|------|-------------|
+| `Small*` | Small shapes | Every PR (quick) |
 | `Medium*` | Medium shapes | Nightly |
-| `Large*` | Large shapes | Weekly |
+| `Large*` | Large shapes | Nightly |
 
-Use `--gtest_filter` to select categories:
+Use `--gtest_filter` to select manually:
 
 ```bash
-# Fast only: small shapes + standalone tests
+# Quick only: small shapes + standalone tests
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Small*:Test*"
 
-# Slow only: medium + large shapes
+# Nightly only: medium + large shapes
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Medium*:Large*"
 
 # Run everything
