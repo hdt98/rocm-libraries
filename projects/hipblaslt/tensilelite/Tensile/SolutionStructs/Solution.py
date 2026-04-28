@@ -1316,7 +1316,7 @@ class Solution(collections.abc.Mapping):
       if key not in ("SS", "XX", "DD", "BB", "HH", "CC", "ZZ", "I8I8", \
                      "F8F8", "F8B8", "B8B8", "B8F8", \
                      "F8NF8N", "F8NB8N", "B8NB8N", "B8NF8N", \
-                     "F8F6", "F6F8", "F8F4", "F4F8","B8F6", "F6B8", "B8F4", "F4B8", \
+                     "F8F6", "F6F8", "F8F4", "F4F8","B8F6", "F6B8", "B8F4", "F4B8", "F8B6", "B6F8","B8B6", "B6B8",\
                      "F6F6", "B6B6", "F6B6", "B6F6","B6F4", "F4B6", "F6F4", "F4F6", "F4F4"):
         reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % key)
         return
