@@ -1357,23 +1357,27 @@ fwd_result fmha_fwd_run(mode_enum mode,
             args.sink_size         = mask.sink;
             args.mask_type         = static_cast<ck_tile::index_t>(mask.type);
 
-            // Block mask setup
-            if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+            // Block mask setup (only fmha_fwd_args has block_mask fields)
+            if constexpr(std::is_same_v<fmha_fwd_args, std::decay_t<decltype(args)>>)
             {
-                ck_tile::index_t num_kv_blocks =
-                    (max_seqlen_k + block_mask_config.block_size_kv - 1) /
-                    block_mask_config.block_size_kv;
-                args.block_mask_ptr = static_cast<const int32_t*>(block_mask_buf.GetDeviceBuffer());
-                args.stride_block_mask       = num_kv_blocks;
-                args.nhead_stride_block_mask = 0;
-                args.batch_stride_block_mask = 0;
-            }
-            else
-            {
-                args.block_mask_ptr          = nullptr;
-                args.stride_block_mask       = 0;
-                args.nhead_stride_block_mask = 0;
-                args.batch_stride_block_mask = 0;
+                if(block_mask_config.pattern != ck_tile::BlockMaskPattern::None)
+                {
+                    ck_tile::index_t num_kv_blocks =
+                        (max_seqlen_k + block_mask_config.block_size_kv - 1) /
+                        block_mask_config.block_size_kv;
+                    args.block_mask_ptr =
+                        static_cast<const int32_t*>(block_mask_buf.GetDeviceBuffer());
+                    args.stride_block_mask       = num_kv_blocks;
+                    args.nhead_stride_block_mask = 0;
+                    args.batch_stride_block_mask = 0;
+                }
+                else
+                {
+                    args.block_mask_ptr          = nullptr;
+                    args.stride_block_mask       = 0;
+                    args.nhead_stride_block_mask = 0;
+                    args.batch_stride_block_mask = 0;
+                }
             }
 
             if constexpr(std::is_same_v<fmha_fwd_args, std::decay_t<decltype(args)>>)
