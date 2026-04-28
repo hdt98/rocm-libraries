@@ -46,6 +46,183 @@ constexpr bool is_sequence_suffix_v = is_sequence_suffix<Suffix, Sequence>::valu
 
 } // namespace util
 
+namespace detail {
+
+template <typename LongSequence, typename ShortSequence>
+struct is_terminal_split_sequence : std::false_type
+{
+};
+
+/// Checks if first sequence has the same prefix as the second sequence and
+/// the last two elements match the last element of the second sequence.
+template <index_t... Longs, index_t... Shorts>
+struct is_terminal_split_sequence<sequence<Longs...>, sequence<Shorts...>>
+{
+    using LongSequence  = sequence<Longs...>;
+    using ShortSequence = sequence<Shorts...>;
+
+    static constexpr index_t LongSize  = LongSequence::size();
+    static constexpr index_t ShortSize = ShortSequence::size();
+    static constexpr bool size_valid   = (ShortSize > 0) && (LongSize == ShortSize + 1);
+
+    static constexpr bool prefix_matches = []() {
+        if constexpr(!size_valid)
+            return false;
+        else if constexpr(ShortSize == 1)
+            return true;
+        else
+        {
+            using PrefixIndices =
+                typename arithmetic_sequence_gen<0, ShortSize - 1, 1>::type;
+            using LongPrefix  = decltype(LongSequence::extract(PrefixIndices{}));
+            using ShortPrefix = decltype(ShortSequence::extract(PrefixIndices{}));
+            return std::is_same_v<LongPrefix, ShortPrefix>;
+        }
+    }();
+
+    static constexpr bool terminal_matches = []() {
+        if constexpr(!size_valid)
+            return false;
+        else
+        {
+            return LongSequence::at(LongSize - 2) * LongSequence::at(LongSize - 1) ==
+                   ShortSequence::at(ShortSize - 1);
+        }
+    }();
+
+    static constexpr bool value = prefix_matches && terminal_matches;
+};
+
+template <typename Lhs, typename Rhs>
+struct is_same_or_terminal_split_sequence
+{
+    static constexpr bool value = std::is_same_v<Lhs, Rhs> ||
+                                  is_terminal_split_sequence<Lhs, Rhs>::value ||
+                                  is_terminal_split_sequence<Rhs, Lhs>::value;
+};
+
+template <typename MajorSequence,
+          typename MinorSequence,
+          index_t TargetMajor,
+          index_t TargetMinor>
+struct rhs_sequence_contains : std::false_type
+{
+};
+
+template <index_t... Majors, index_t... Minors, index_t TargetMajor, index_t TargetMinor>
+struct rhs_sequence_contains<sequence<Majors...>,
+                             sequence<Minors...>,
+                             TargetMajor,
+                             TargetMinor>
+{
+    static_assert(sizeof...(Majors) == sizeof...(Minors), "RHS mapping ranks must match");
+
+    static constexpr bool value =
+        (false || ... || ((Majors == TargetMajor) && (Minors == TargetMinor)));
+};
+
+template <typename MajorTuple, typename MinorTuple, index_t TargetMajor, index_t TargetMinor>
+struct rhs_mapping_contains
+{
+    static constexpr bool value = []() {
+        if constexpr(MajorTuple::size() != MinorTuple::size())
+            return false;
+        else
+        {
+            using MatchFlags = decltype(generate_sequence_v2(
+                [](auto i) {
+                    using MajorSequence = remove_cvref_t<decltype(MajorTuple{}[i])>;
+                    using MinorSequence = remove_cvref_t<decltype(MinorTuple{}[i])>;
+                    return number<rhs_sequence_contains<MajorSequence,
+                                                        MinorSequence,
+                                                        TargetMajor,
+                                                        TargetMinor>::value
+                                      ? 1
+                                      : 0>{};
+                },
+                number<MajorTuple::size()>{}));
+
+            return MatchFlags::sum() != 0;
+        }
+    }();
+};
+
+template <typename ExpectedEncoding, typename ActualEncoding>
+struct have_compatible_hs_lengthss
+{
+    static constexpr bool value = []() {
+        if constexpr(ExpectedEncoding::NDimX != ActualEncoding::NDimX)
+            return false;
+        else
+        {
+            constexpr auto expected_hs = ExpectedEncoding::hs_lengthss_;
+            constexpr auto actual_hs   = ActualEncoding::hs_lengthss_;
+
+            using CompatibleFlags = decltype(generate_sequence_v2(
+                [](auto i) {
+                    using ExpectedHs = remove_cvref_t<decltype(expected_hs[i])>;
+                    using ActualHs   = remove_cvref_t<decltype(actual_hs[i])>;
+                    return number<is_same_or_terminal_split_sequence<ExpectedHs, ActualHs>::value
+                                      ? 1
+                                      : 0>{};
+                },
+                number<ExpectedEncoding::NDimX>{}));
+
+            return CompatibleFlags::sum() == ExpectedEncoding::NDimX;
+        }
+    }();
+};
+
+template <typename ExpectedDistribution, typename ActualDistribution, typename DataType>
+struct is_transpose_output_compatible
+{
+    using ExpectedDstr = remove_cvref_t<ExpectedDistribution>;
+    using ActualDstr   = remove_cvref_t<ActualDistribution>;
+    using ExpectedEnc  = typename ExpectedDstr::DstrEncode;
+    using ActualEnc    = typename ActualDstr::DstrEncode;
+
+    static constexpr auto expected_y_desc = ExpectedDstr{}.get_ys_to_d_descriptor();
+    static constexpr auto actual_y_desc   = ActualDstr{}.get_ys_to_d_descriptor();
+
+    using ExpectedYLengths = remove_cvref_t<decltype(to_sequence(expected_y_desc.get_lengths()))>;
+    using ActualYLengths   = remove_cvref_t<decltype(to_sequence(actual_y_desc.get_lengths()))>;
+
+    static constexpr index_t PackedSize =
+        numeric_traits<remove_cvref_t<DataType>>::PackedSize;
+
+    static constexpr bool exact_match = std::is_same_v<ExpectedDstr, ActualDstr>;
+    static constexpr bool same_logical_x_lengths =
+        have_compatible_hs_lengthss<ExpectedEnc, ActualEnc>::value;
+    static constexpr bool same_thread_element_space =
+        expected_y_desc.get_element_space_size() == actual_y_desc.get_element_space_size();
+    static constexpr bool same_flattened_y_order =
+        is_same_or_terminal_split_sequence<ExpectedYLengths, ActualYLengths>::value;
+
+    static constexpr bool compatible_vector_grouping = []() {
+        if constexpr(ExpectedYLengths::size() == 0 || ActualYLengths::size() == 0)
+            return false;
+        else
+        {
+            constexpr index_t expected_vector =
+                ExpectedYLengths::at(ExpectedYLengths::size() - 1);
+            constexpr index_t actual_vector = ActualYLengths::at(ActualYLengths::size() - 1);
+
+            return expected_vector % PackedSize == 0 && actual_vector % PackedSize == 0 &&
+                   (expected_vector % actual_vector == 0 || actual_vector % expected_vector == 0);
+        }
+    }();
+
+    static constexpr bool value = exact_match ||
+                                  (same_logical_x_lengths && same_thread_element_space &&
+                                   same_flattened_y_order && compatible_vector_grouping);
+};
+
+template <typename ExpectedDistribution, typename ActualDistribution, typename DataType>
+inline constexpr bool is_transpose_output_compatible_v =
+    is_transpose_output_compatible<ExpectedDistribution, ActualDistribution, DataType>::value;
+
+} // namespace detail
+
 // Default policy: Retains original 2D transpose behavior
 template <typename DataType>
 struct DefaultTranspose
@@ -197,6 +374,11 @@ struct DefaultTranspose
 template <typename DstrEncode, typename DataType>
 struct NormalizeEncodingForTranspose
 {
+    static_assert(DstrEncode::NDimX == 2,
+                  "NormalizeEncodingForTranspose only supports 2D distributions");
+    static_assert(DstrEncode::NDimY > 0,
+                  "NormalizeEncodingForTranspose requires at least one Y dimension");
+
     static constexpr index_t NumBits =
         sizeof(DataType) * 8 / numeric_traits<remove_cvref_t<DataType>>::PackedSize;
     static constexpr index_t SubtileMinorDim = 64 / NumBits;
@@ -205,11 +387,29 @@ struct NormalizeEncodingForTranspose
     static constexpr auto I1 = number<1>{};
 
     static constexpr auto k_dim     = DstrEncode::hs_lengthss_[I1];
+    static_assert(k_dim.size() > 0, "NormalizeEncodingForTranspose requires a non-empty K dim");
     static constexpr index_t last_k = k_dim[number<k_dim.size() - 1>{}];
+
+    static_assert(last_k <= SubtileMinorDim || last_k % SubtileMinorDim == 0,
+                  "terminal K dim must be divisible by the transpose subtile size");
 
     static constexpr bool needs_split =
         (last_k > SubtileMinorDim) && (last_k % SubtileMinorDim == 0);
     static constexpr index_t split_factor = needs_split ? (last_k / SubtileMinorDim) : 1;
+
+    static constexpr bool ps_maps_terminal_k = detail::rhs_mapping_contains<
+        typename DstrEncode::Ps2RHssMajor,
+        typename DstrEncode::Ps2RHssMinor,
+        2,
+        k_dim.size() - 1>::value;
+    static_assert(!needs_split || !ps_maps_terminal_k,
+                  "cannot split terminal K while a P mapping points at it");
+
+    static constexpr bool ys_last_maps_terminal_k =
+        DstrEncode::ys_to_rhs_major_.back() == 2 &&
+        DstrEncode::ys_to_rhs_minor_.back() == k_dim.size() - 1;
+    static_assert(!needs_split || ys_last_maps_terminal_k,
+                  "terminal K split requires the last Y mapping to point at terminal K");
 
     static constexpr auto new_k_dim = []() {
         if constexpr(needs_split)
@@ -488,6 +688,21 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     constexpr auto input_distr  = TileDistribution_{};
     constexpr auto output_distr = typename DistributedTensor_::StaticTileDistribution{};
 
+    // Check that out_tensor's distribution matches the expected transposed-load distribution.
+    // Exact equality is accepted, as is the narrow case where the terminal Y dimension is
+    // represented as either one dimension or two adjacent split dimensions with identical flat
+    // per-thread access order.
+    using OutTileDstrEncode = typename OutputTileDistributionTraits<
+        typename TileDistribution_::DstrEncode,
+        typename BottomTensorView_::DataType>::TransposedDstrEncode;
+    using ExpectedDstr = decltype(make_static_tile_distribution(OutTileDstrEncode{}));
+    using ActualDstr   = remove_cvref_t<decltype(output_distr)>;
+    static_assert(detail::is_transpose_output_compatible_v<
+                      ExpectedDstr,
+                      ActualDstr,
+                      typename BottomTensorView_::DataType>,
+                  "out_tensor distribution is not compatible with transpose load output");
+
     // Check that the datatype of out_tensor matches that of the bottom tensor view.
     static_assert(std::is_same_v<typename DistributedTensor_::DataType,
                                  typename BottomTensorView_::DataType>);
@@ -495,22 +710,14 @@ CK_TILE_DEVICE void load_tile_transpose_with_offset(
     constexpr auto y_in_desc  = input_distr.get_ys_to_d_descriptor();
     constexpr auto y_out_desc = output_distr.get_ys_to_d_descriptor();
 
-    constexpr index_t NDimYIn  = input_distr.get_num_of_dimension_y();
-    constexpr index_t NDimYOut = output_distr.get_num_of_dimension_y();
+    constexpr index_t NDimYIn = input_distr.get_num_of_dimension_y();
 
-    constexpr auto y_in_lengths  = to_sequence(y_in_desc.get_lengths());
-    constexpr auto y_out_lengths = to_sequence(y_out_desc.get_lengths());
+    constexpr auto y_in_lengths = to_sequence(y_in_desc.get_lengths());
 
     constexpr auto y_in_element_space_size  = y_in_desc.get_element_space_size();
     constexpr auto y_out_element_space_size = y_out_desc.get_element_space_size();
     static_assert(y_in_element_space_size == y_out_element_space_size,
                   "the element space size is not the same!");
-    // The input (transposed) and output distributions may have different last-Y sizes when
-    // NormalizeEncodingForTranspose splits the K-dim for transpose validation. The split is
-    // a virtual subdivision so the flat buffer layout is identical; only require divisibility.
-    static_assert(y_out_lengths[NDimYOut - 1] % y_in_lengths[NDimYIn - 1] == 0 ||
-                      y_in_lengths[NDimYIn - 1] % y_out_lengths[NDimYOut - 1] == 0,
-                  "vector lengths must be related by a split factor");
     constexpr index_t vecLoadSize = y_in_lengths[NDimYIn - 1];
     constexpr index_t num_of_access =
         reduce_on_sequence(y_in_lengths, multiplies<>{}, number<1>{}) / vecLoadSize;
