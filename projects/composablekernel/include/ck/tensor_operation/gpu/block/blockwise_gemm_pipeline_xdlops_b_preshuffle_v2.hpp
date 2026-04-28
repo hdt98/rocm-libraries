@@ -426,18 +426,17 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v2<BlockGemmPipelineScheduler::I
                 vector_type<ComputeDataType, KPack> a_thread_vec;
                 vector_type<ComputeDataType, KPack> b_thread_vec;
 
-                auto loadA =
-                    thread_buf_to_vec_loader<decltype(a_thread_vec),
-                                             decltype(a_thread_bufs[mfma_reg]),
-                                             decltype(a_thread_desc_),
-                                             ComputeDataType,
-                                             decltype(m0),
-                                             Number<0>,
-                                             Number<0>,
-                                             decltype(k0),
-                                             Number<0>,
-                                             index_expression::Ik>{a_thread_vec,
-                                                                   a_thread_bufs[mfma_reg]};
+                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                      decltype(a_thread_bufs[mfma_reg]),
+                                                      decltype(a_thread_desc_),
+                                                      ComputeDataType,
+                                                      decltype(m0),
+                                                      Number<0>,
+                                                      Number<0>,
+                                                      decltype(k0),
+                                                      Number<0>,
+                                                      index_expression::Ik>{
+                    a_thread_vec, a_thread_bufs[mfma_reg]};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_bufs[mfma_reg]),
                                                       decltype(b_thread_desc_),
@@ -492,18 +491,17 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v2<BlockGemmPipelineScheduler::I
                 vector_type<ComputeDataType, KPack> a_thread_vec;
                 vector_type<ComputeDataType, KPack> b_thread_vec;
 
-                auto loadA =
-                    thread_buf_to_vec_loader<decltype(a_thread_vec),
-                                             decltype(a_thread_bufs[mfma_reg]),
-                                             decltype(a_thread_desc_),
-                                             ComputeDataType,
-                                             decltype(m0),
-                                             Number<0>,
-                                             Number<0>,
-                                             decltype(k0),
-                                             Number<0>,
-                                             index_expression::Ik>{a_thread_vec,
-                                                                   a_thread_bufs[mfma_reg]};
+                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                      decltype(a_thread_bufs[mfma_reg]),
+                                                      decltype(a_thread_desc_),
+                                                      ComputeDataType,
+                                                      decltype(m0),
+                                                      Number<0>,
+                                                      Number<0>,
+                                                      decltype(k0),
+                                                      Number<0>,
+                                                      index_expression::Ik>{
+                    a_thread_vec, a_thread_bufs[mfma_reg]};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_bufs[mfma_reg]),
                                                       decltype(b_thread_desc_),
@@ -538,18 +536,17 @@ struct BlockwiseGemmXdlops_pipeline_bpreshuffle_v2<BlockGemmPipelineScheduler::I
                 vector_type<ComputeDataType, KPack> a_thread_vec;
                 vector_type<ComputeDataType, KPack> b_thread_vec;
 
-                auto loadA =
-                    thread_buf_to_vec_loader<decltype(a_thread_vec),
-                                             decltype(a_thread_bufs[mfma_reg]),
-                                             decltype(a_thread_desc_),
-                                             ComputeDataType,
-                                             decltype(m0),
-                                             Number<0>,
-                                             Number<0>,
-                                             decltype(k0),
-                                             Number<0>,
-                                             index_expression::Ik>{a_thread_vec,
-                                                                   a_thread_bufs[mfma_reg]};
+                auto loadA = thread_buf_to_vec_loader<decltype(a_thread_vec),
+                                                      decltype(a_thread_bufs[mfma_reg]),
+                                                      decltype(a_thread_desc_),
+                                                      ComputeDataType,
+                                                      decltype(m0),
+                                                      Number<0>,
+                                                      Number<0>,
+                                                      decltype(k0),
+                                                      Number<0>,
+                                                      index_expression::Ik>{
+                    a_thread_vec, a_thread_bufs[mfma_reg]};
                 auto loadB = thread_buf_to_vec_loader<decltype(b_thread_vec),
                                                       decltype(b_thread_bufs[mfma_reg]),
                                                       decltype(b_thread_desc_),
