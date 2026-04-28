@@ -510,8 +510,8 @@ class Solution(collections.abc.Mapping):
     # dot2: currently only support fp16 with HPA on gfx942 or fp16 &bf16 on gfx950
     state["UseDotInstruction"] = (not state["EnableMatrixInstruction"]) \
       and state["ProblemType"]["HighPrecisionAccumulate"] \
-      and ((state["ISA"] == IsaVersion(9,4,2) and state["ProblemType"]["MacDataTypeA"].isHalf()) \
-      or (state["ISA"] == IsaVersion(9,5,0) and (state["ProblemType"]["MacDataTypeA"].isBFloat16() or state["ProblemType"]["MacDataTypeA"].isHalf())))
+      and ((state["ISA"] == IsaVersion(9,4,2) and state["ProblemType"]["DataType"].isHalf()) \
+      or (state["ISA"] == IsaVersion(9,5,0) and (state["ProblemType"]["DataType"].isBFloat16() or state["ProblemType"]["DataType"].isHalf())))
     if state["UseDotInstruction"]:
       # need modification for dot4 or dot8
       state["NumDotElements"] = 2
@@ -811,7 +811,7 @@ class Solution(collections.abc.Mapping):
     if state["PrefetchLocalRead"] < 1 and not (state["DirectToVgprA"] and state["DirectToVgprB"]):
       doable = False
     # only for 1 or 2 byte input (numRegister < 1)
-    if state["ProblemType"]["MacDataTypeA"].numRegisters() >= 1:
+    if state["ProblemType"]["DataType"].numRegisters() >= 1:
       doable = False
     return doable
 
@@ -819,9 +819,9 @@ class Solution(collections.abc.Mapping):
   # determine if current datatype can support DirectToVgpr
   @staticmethod
   def isDirectToVgprSupportDataType(state):
-    return (state["ProblemType"]["MacDataTypeA"].isSingle() or state["ProblemType"]["MacDataTypeA"].isDouble() or state["ProblemType"]["MacDataTypeA"].isComplex() or \
-            state["ProblemType"]["MacDataTypeA"].isHalf() or state["ProblemType"]["MacDataTypeA"].isBFloat16() or state["ProblemType"]["MacDataTypeA"].isInt8()) or \
-            state["ProblemType"]["MacDataTypeA"].is8bitFloat()
+    return (state["ProblemType"]["DataType"].isSingle() or state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isComplex() or \
+            state["ProblemType"]["DataType"].isHalf() or state["ProblemType"]["DataType"].isBFloat16() or state["ProblemType"]["DataType"].isInt8()) or \
+            state["ProblemType"]["DataType"].is8bitFloat()
 
   ########################################
   # determine can we use DirectToVgpr
@@ -1161,7 +1161,7 @@ class Solution(collections.abc.Mapping):
     #enable F32 xDL MathOp only when the input type is f32.
     if "F32XdlMathOp" in state["ProblemType"] \
        and (not state["ProblemType"]["F32XdlMathOp"].isSingle()) \
-       and (state["ProblemType"]["MacDataTypeA"].isSingle()):
+       and (state["ProblemType"]["DataType"].isSingle()):
       state["EnableF32XdlMathOp"] = True
       if isaInfoMap[isa].archCaps["HasF32XEmulation"]:
         state["UseF32XEmulation"] = True
@@ -1262,7 +1262,7 @@ class Solution(collections.abc.Mapping):
       if state["ScheduleIterAlg"] != 2 and state["ScheduleIterAlg"] != 3:
         reject(state, printRejectionReason, "ScheduleIterAlg not supported with Stream-K")
       if state["StreamKAtomic"] == 1:
-        if not state["ProblemType"]["MacDataTypeA"].isSingle():
+        if not state["ProblemType"]["DataType"].isSingle():
           reject(state, printRejectionReason, "Atomic Stream-K currently only tested for SGEMM")
         if not state["BufferStore"]:
           reject(state, printRejectionReason, "Atomic Stream-K requires BufferStore")
@@ -1316,9 +1316,9 @@ class Solution(collections.abc.Mapping):
       if key not in ("SS", "XX", "DD", "BB", "HH", "CC", "ZZ", "I8I8", \
                      "F8F8", "F8B8", "B8B8", "B8F8", \
                      "F8NF8N", "F8NB8N", "B8NB8N", "B8NF8N", \
-                     "F8F6", "F6F8", "F8F4", "F4F8", \
+                     "F8F6", "F6F8", "F8F4", "F4F8","B8F6", "F6B8", "B8F4", "F4B8", "F8B6", "B6F8","B8B6", "B6B8",\
                      "F6F6", "B6B6", "F6B6", "B6F6","B6F4", "F4B6", "F6F4", "F4F6", "F4F4"):
-        reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % str(state["ProblemType"]["MacDataTypeA"]))
+        reject(state, printRejectionReason, "didn't support Matrix Instruction with type %s" % key)
         return
       if (not isaInfoMap[isa].asmCaps["HasMFMA"] and isaInfoMap[isa].asmCaps["HasWMMA"] and (state["WavefrontSize"] == 64)):
          print2("!! Warning: WMMA only well tune on WGP mode, wave size = 32")
@@ -1335,7 +1335,7 @@ class Solution(collections.abc.Mapping):
         return
       if isaInfoMap[isa].asmCaps["HasMFMA"]:
         if not state["ProblemType"]["HighPrecisionAccumulate"] \
-           and state["ProblemType"]["MacDataTypeA"].numRegisters() < 1 \
+           and state["ProblemType"]["DataType"].numRegisters() < 1 \
            and state["ProblemType"]["DataTypeA"].numRegisters() <= state["ProblemType"]["MacDataTypeA"].numRegisters() \
            and state["ProblemType"]["DataTypeB"].numRegisters() <= state["ProblemType"]["MacDataTypeB"].numRegisters():
           reject(state, printRejectionReason, "Matrix instructions for half, bf16 (or i8) types are natively accumulated" + \
@@ -1353,7 +1353,7 @@ class Solution(collections.abc.Mapping):
       if state["InterleaveAlpha"]:
         reject(state, printRejectionReason, "Matrix instruction doesn't support InterleaveAlpha")
         return
-      if state["ProblemType"]["MacDataTypeA"].isInt8():
+      if state["ProblemType"]["DataType"].isInt8():
         if isa[:2] == (9, 4):
           if tuple(state["MatrixInstruction"])[:3] in ((32, 32, 8), (16, 16, 16)):
             reject(state, printRejectionReason, "v_mfma_i32_32x32x8 and v_mfma_i32_16x16x16 have been deprecated in gfx94x")
@@ -1376,7 +1376,7 @@ class Solution(collections.abc.Mapping):
 
     else:
       if not state["ProblemType"]["HighPrecisionAccumulate"] \
-         and state["ProblemType"]["ComputeDataType"].numRegisters() > state["ProblemType"]["MacDataTypeA"].numRegisters() :
+         and state["ProblemType"]["ComputeDataType"].numRegisters() > state["ProblemType"]["DataType"].numRegisters() :
         reject(state, printRejectionReason, "For non-MI Kernel, if sizeof(ComputeDataType) > sizeof(DataType), " + \
          "Please add the following config:" + \
          "\n - HighPrecisionAccumulate: True")
@@ -1703,7 +1703,7 @@ class Solution(collections.abc.Mapping):
       #if not (bufferLoad and state["PrefetchGlobalRead"] == 1):
       if not (bufferLoad and ( state["PrefetchGlobalRead"] == 1 \
               or (state["PrefetchGlobalRead"] > 1 and \
-                  (state["ProblemType"]["MacDataTypeA"].isDouble() or state["ProblemType"]["MacDataTypeA"].isDoubleComplex()))
+                  (state["ProblemType"]["DataType"].isDouble() or state["ProblemType"]["DataType"].isDoubleComplex()))
               or (state["ProblemType"]["Sparse"] and state["PrefetchGlobalRead"] > 0))):
         state["ExpandPointerSwap"] = False
 
@@ -1860,7 +1860,7 @@ class Solution(collections.abc.Mapping):
 
     # Some restrictions for half:
     if state["KernelLanguage"] == "Assembly" \
-      and state["ProblemType"]["MacDataTypeA"].isHalf():
+      and state["ProblemType"]["DataType"].isHalf():
 
       if isaInfoMap[state["ISA"]].archCaps["HasEccHalf"]:
         if not state["ProblemType"]["HighPrecisionAccumulate"] and state["AssertFree0ElementMultiple"] % 2 != 0:
@@ -1869,20 +1869,20 @@ class Solution(collections.abc.Mapping):
           return
 
     if state["ConvertAfterDS"]:
-      if (state["ProblemType"]["MacDataTypeA"].isHalf() == False) and (state["ProblemType"]["MacDataTypeA"].isBFloat16() == False):
+      if (state["ProblemType"]["DataType"].isHalf() == False) and (state["ProblemType"]["DataType"].isBFloat16() == False):
           reject(state, printRejectionReason, "ConvertAfterDS only support DataType half")
           return
       if (state["ProblemType"]["DataTypeA"].isAnyFloat8() == False) and (state["ProblemType"]["DataTypeB"].isAnyFloat8() == False) \
           and not (state["ProblemType"]["DataTypeA"].isSingle() and state["ProblemType"]["DataTypeB"].isSingle()):
           reject(state, printRejectionReason, "one of DataTypeA or DataTypeB need to be float8/float8_fnuz or both are fp32")
           return
-      if state["ProblemType"]["MacDataTypeA"].isBFloat16() \
+      if state["ProblemType"]["DataType"].isBFloat16() \
           and (state["ProblemType"]["DataTypeA"].isSingle() and state["ProblemType"]["DataTypeB"].isSingle()):
           reject(state, printRejectionReason, "ConvertAfterDS doesn't support SS_BSS type")
           return
 
     # Complex datatype restrictions.
-    if state["ProblemType"]["MacDataTypeA"].isComplex():
+    if state["ProblemType"]["DataType"].isComplex():
       if state["MIArchVgpr"] and state["StreamK"] != 0:
         reject(state, printRejectionReason, "Complex datatype kernel does not support StreamK with MIArchVgpr yet.")
         return
@@ -2026,7 +2026,7 @@ class Solution(collections.abc.Mapping):
       # Check if the current parameters is supported by the ExpertSchedulingMode
       if not isaInfoMap[isa].archCaps["HasSchedMode"]: return 0
       if state["ProblemType"]["Sparse"]: return 0
-      if state["ProblemType"]["MacDataTypeA"].isSingle(): return 0
+      if state["ProblemType"]["DataType"].isSingle(): return 0
 
       # parameters not tested yet:
       supportedParameters = {
@@ -3211,18 +3211,18 @@ class Solution(collections.abc.Mapping):
     if state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1:
       # added GSU support for DGEMM
       supported = \
-        (state["ProblemType"]["MacDataTypeA"].isSingle()) or \
-        (state["ProblemType"]["MacDataTypeA"].isDouble() and state["BufferStore"]) or \
+        (state["ProblemType"]["DataType"].isSingle()) or \
+        (state["ProblemType"]["DataType"].isDouble() and state["BufferStore"]) or \
         (state["ProblemType"]["DestDataType"].isInt32()) or \
         (state["KernelLanguage"] == "Assembly" and
-            (state["ProblemType"]["MacDataTypeA"].isHalf() and not state["ProblemType"]["HighPrecisionAccumulate"]) or
+            (state["ProblemType"]["DataType"].isHalf() and not state["ProblemType"]["HighPrecisionAccumulate"]) or
             (state["_GlobalAccumulation"])
         )
       if not supported:
         reject(state, printRejectionReason, "GlobalSplitU only compatible with single or asm and (half or mixed) precision")
         return
 
-    if state["ProblemType"]["MacDataTypeA"].isHalf() and state["KernelLanguage"] == "Assembly":
+    if state["ProblemType"]["DataType"].isHalf() and state["KernelLanguage"] == "Assembly":
       if (state["GlobalSplitU"] > 1 or state["GlobalSplitU"] == -1) and (not state["_GlobalAccumulation"]):
         if state["AssertFree0ElementMultiple"] < 2:
           reject(state, printRejectionReason, "Assembly GSU half requires AF0EM>=2 (for atomics on edge tiles)")
@@ -3236,8 +3236,8 @@ class Solution(collections.abc.Mapping):
         reject(state, "dot inst is for mac kernel!")
       if not bufferLoad:
         reject(state, "dot2 kernel only support bufferLoad!")
-      if not ((isaInfoMap[isa].asmCaps['v_dot2_f32_f16'] and state["ProblemType"]["MacDataTypeA"].isHalf()) \
-      or (isaInfoMap[isa].asmCaps['v_dot2_f32_bf16'] and state["ProblemType"]["MacDataTypeA"].isBFloat16())) \
+      if not ((isaInfoMap[isa].asmCaps['v_dot2_f32_f16'] and state["ProblemType"]["DataType"].isHalf()) \
+      or (isaInfoMap[isa].asmCaps['v_dot2_f32_bf16'] and state["ProblemType"]["DataType"].isBFloat16())) \
       and state["ProblemType"]["HighPrecisionAccumulate"]:
         reject(state, "dot2 kernel only support DataType fp16 or bf16 with HPA")
       if state["InnerUnroll"] not in [1,2,4]:
@@ -4009,7 +4009,7 @@ class Solution(collections.abc.Mapping):
         state["StoreSyncOpt"] = 0
         state["GroupLoadStore"] = False
       else:
-        state["NumElementsPerBatchStore"] = 16 if not state["ProblemType"]["MacDataTypeA"].numBytes() == 8 else 1
+        state["NumElementsPerBatchStore"] = 16 if not state["ProblemType"]["DataType"].numBytes() == 8 else 1
 
     # Mbsk prefetch optimization
     if state["_GlobalAccumulation"] != 'MultipleBufferSingleKernel' and state["AdaptiveGemmGSUA"] == 0:
@@ -4090,7 +4090,7 @@ class Solution(collections.abc.Mapping):
     state["LdsInitCVgprs"] = False
     if isaInfoMap[isa].archCaps["HasAccCD"] and \
          state["EnableMatrixInstruction"] and state["StorePriorityOpt"] and \
-         state["ProblemType"]["MacDataTypeA"].isDouble():
+         state["ProblemType"]["DataType"].isDouble():
       state["LdsInitCVgprs"] = True
 
     # force MIArchVgpr when using WMMA
@@ -4164,12 +4164,12 @@ class Solution(collections.abc.Mapping):
 
       computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
       multiplierGSU = computeBytes
-      if state["ProblemType"]["DestDataType"].numBytes() > state["ProblemType"]["MacDataTypeA"].numBytes():
+      if state["ProblemType"]["DestDataType"].numBytes() > state["ProblemType"]["DataType"].numBytes():
         # Determine ratio of output to input element size.
         # SRVW remaps output so we need to scale up resources.
         multiplier = state["ProblemType"]["DestDataType"].numBytes()
       else:
-        multiplier = state["ProblemType"]["MacDataTypeA"].numBytes()
+        multiplier = state["ProblemType"]["DataType"].numBytes()
 
       ldsNumBytesRemapCNonGSU = int(ldsNumBytesRemapC * multiplier)
       ldsNumBytesRemapCGSU    = int(ldsNumBytesRemapC * multiplierGSU)
@@ -4183,7 +4183,7 @@ class Solution(collections.abc.Mapping):
       if state["1LDSBuffer"] and (state["ScheduleIterAlg"] == 3) and (ldsNumBytes < ldsNumBytesRemapC):
         # TODO- Remove this DataType test condition,
         # Currently we do this test is just because we don't want to affect existing logic in rocBLAS
-        if state["ProblemType"]["MacDataTypeA"].isInt8():
+        if state["ProblemType"]["DataType"].isInt8():
           reject(state, printRejectionReason, "LDS usage is bound be StoreRemap, thus 1LDSBuffer wouldn't have any help. Skip.")
           return
 
@@ -4433,7 +4433,7 @@ class Solution(collections.abc.Mapping):
 
     state["ULSGRODoubleG2L"] = 0
     if state["UnrollLoopSwapGlobalReadOrder"] == 1:
-      bpeA       = state["ProblemType"]["MacDataTypeA"].numBytes()
+      bpeA       = state["ProblemType"]["DataType"].numBytes()
       bpr         = 4
       numVgprG2LA = roundUp((state["NumLoadsCoalescedA"] * state["NumLoadsPerpendicularA"] * \
         state["GlobalReadVectorWidthA"] * bpeA) / (float)(bpr))
@@ -4626,8 +4626,8 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "MultipleBufferSingleKernel not support UseE yet")
       if state["ProblemType"]["BiasSrc"] != "D":
         reject(state, printRejectionReason, "MultipleBufferSingleKernel not support BiasSrc not D yet")
-      if state["ProblemType"]["MacDataTypeA"].isDouble():
-        reject(state, printRejectionReason, "MultipleBufferSingleKernel not support " + str(state["ProblemType"]["MacDataTypeA"])  + " yet")
+      if state["ProblemType"]["DataType"].isDouble():
+        reject(state, printRejectionReason, "MultipleBufferSingleKernel not support " + str(state["ProblemType"]["DataType"])  + " yet")
 
     #Need to force disabling PreloadKernArgs if compiler does not support
     #Can not just reject the solution since the user library may find any solutions

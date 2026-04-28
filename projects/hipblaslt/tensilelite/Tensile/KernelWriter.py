@@ -5458,6 +5458,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.language   = "ASM"
     # ISA version, such as 803
     version = tuple(kernel["ISA"])
+    isgfx950 = kernel["ISA"][:2] == (9, 5)
     ti = rocIsa.getInstance()
     ti.setKernel(version, kernel["WavefrontSize"])
 
@@ -5493,7 +5494,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.states.tailloopInNll or \
        (kernel["StreamK"] and \
         (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and \
-        kernel["ISA"][:2] == (9, 5)):
+        isgfx950):
       self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
@@ -5703,7 +5704,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.lrvwUnrollMXSA = 1
 
     if kernel["UnrollMajorLDSB"]:
-      divider = 2 if (kernel["ProblemType"]["Sparse"] == 2) and (kernel["MIInputPerThread"] * kernel["ProblemType"]["DataType"].numBytes() <= 16) else 1
+      divider = 2 if (kernel["ProblemType"]["Sparse"] == 2) and (kernel["MIInputPerThread"] * kernel["ProblemType"]["MacDataTypeB"].numBytes() <= 16) else 1
       self.states.lrvwUnrollB = kernel["LocalReadVectorWidthB"] // divider
     else:
       self.states.lrvwUnrollB = 1
@@ -5753,7 +5754,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     if kernel["ScheduleIterAlg"] == 3 or kernel["ScheduleIterAlg"] == 2:
       self.states.numMfmaPerIter = kernel["MIWaveTile"][0] * kernel["MIWaveTile"][1] * kernel["InnerUnroll"]
-      if kernel["ProblemType"]["MacDataTypeA"].isComplex(): self.states.numMfmaPerIter *= 4
+      if kernel["ProblemType"]["DataType"].isComplex(): self.states.numMfmaPerIter *= 4
       elif kernel["UseF32XEmulation"]: self.states.numMfmaPerIter *= 3
 
     if kernel["ForceUnrollSubIter"]:
@@ -5915,7 +5916,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.use64bShadowLimit = kernel["Use64bShadowLimit"] and kernel["BufferLoad"]
     # Keep gfx950's dedicated MX shadow-limit switch, but match legacy gfx1250
     # behavior where MX tensors share the same shadow-limit mode as A/B.
-    if kernel["ISA"][:2] == (9, 5):
+    if isgfx950:
       self.states.use64bShadowLimitMX = kernel["Use64bShadowLimitMX"] and kernel["BufferLoad"]
     else:
       self.states.use64bShadowLimitMX = self.states.use64bShadowLimit
@@ -5937,9 +5938,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.srdShiftLeft["A"] = kernel["GlobalReadVectorWidthA"]
     self.states.srdShiftLeft["B"] = kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["MXBlockA"]:
-      self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthMXSA"]
+      # use MXS version for gfx950 only
+      self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthMXSA"] if isgfx950 else kernel["GlobalReadVectorWidthA"]
     if kernel["ProblemType"]["MXBlockB"]:
-      self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthMXSB"]
+      # use MXS version for gfx950 only
+      self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthMXSB"] if isgfx950 else kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       self.states.srdShiftLeft["Metadata"] = kernel["GlobalReadVectorWidthMetadata"]
 
@@ -5952,7 +5955,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.states.doubleVgpr = True
 
     if kernel["EnableMatrixInstruction"]:
-      if (kernel["ProblemType"]["MacDataTypeA"].MIOutputTypeNameAbbrev() == 'f64') and not (self.states.asmCaps["HasMFMA_f64"] or self.states.asmCaps["HasWMMA_V3_f64"]):
+      if (kernel["ProblemType"]["DataType"].MIOutputTypeNameAbbrev() == 'f64') and not (self.states.asmCaps["HasMFMA_f64"] or self.states.asmCaps["HasWMMA_V3_f64"]):
         raise RuntimeError("FP64 MatrixInstruction not supported for {0}".format(self.states.version))
       elif not ( self.states.asmCaps["HasMFMA"] or self.states.asmCaps["HasWMMA"]):
         raise RuntimeError("MatrixInstruction not supported for {0}".format(self.states.version))
@@ -6016,10 +6019,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # HPA not allowed in dgemm, cgemm, zgemm, sgemm
     if kernel["ProblemType"]["HighPrecisionAccumulate"] and \
-       not (kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["ProblemType"]["MacDataTypeA"].isBFloat16() or \
-          kernel["ProblemType"]["MacDataTypeA"].isInt8x4() or kernel["ProblemType"]["MacDataTypeA"].isInt8() or \
-          kernel["ProblemType"]["MacDataTypeA"].is8bitFloat() or kernel["ProblemType"]["MacDataTypeA"].is6bitFloat() or \
-          kernel["ProblemType"]["MacDataTypeA"].isFloat4()):
+       not (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16() or \
+          kernel["ProblemType"]["DataType"].isInt8x4() or kernel["ProblemType"]["DataType"].isInt8() or \
+          kernel["ProblemType"]["DataType"].is8bitFloat() or kernel["ProblemType"]["DataType"].is6bitFloat() or \
+          kernel["ProblemType"]["DataType"].isFloat4()):
         print("HighPrecisionAccumulate only valid when DataType is half, bf16, Int8x4, Int8, fp8, bf8, fp6, bf6, fp4. Forcing HPA to False")
         kernel["ProblemType"]["HighPrecisionAccumulate"] = False
 
@@ -6224,7 +6227,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"] * kernel["MIInputPerThreadMXSA"] // self.states.bpr
         # workaround for gfx950
         # need to allocate same amount of MIWaveTile
-        if kernel["ISA"][:2] == (9, 5):
+        if isgfx950:
           self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"]
         if kernel["DirectToVgprMXSA"] and not (self.states.packDTVA or self.states.convDTVA):
           self.states.mxsa.numVgprValuPerBlock = 0
@@ -6240,7 +6243,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"] * kernel["MIInputPerThreadMXSB"] // self.states.bpr
         # workaround for gfx950
         # need to allocate same amount of MIWaveTile
-        if kernel["ISA"][:2] == (9, 5):
+        if isgfx950:
           self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"]
         if kernel["DirectToVgprMXSB"] and not (self.states.packDTVB or self.states.convDTVB):
           self.states.mxsb.numVgprValuPerBlock = 0
@@ -7119,7 +7122,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if ((tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]) or                                 \
         (tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]) or                                 \
         (kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"] and (kernel["MIInputPerThreadMetadata"] == 4))) \
-        and (kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat()) or \
+        and (kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()) or \
         (self.states.asmCaps["HasSWMMAC_gfx1250"] and kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"]):
       self.states.a.startVgprValuPackTemp = vgprIdx
       self.states.b.startVgprValuPackTemp = vgprIdx
@@ -7234,7 +7237,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # need proper alignment
       vgprIdx = ((vgprIdx+2 - 1)//2)*2
       self.states.startVgprAlphaTmp = vgprIdx
-      vgprIdx += kernel["ProblemType"]["MacDataTypeA"].numRegisters()
+      vgprIdx += kernel["ProblemType"]["DataType"].numRegisters()
 
     # for swapping vgpr offsets of different lds buffers
     if self.states.a.numVgprLocalReadSwapAddr > 0:
@@ -8043,10 +8046,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     # shift vectors determined later
 
-    canCheckValueC = (kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["ProblemType"]["MacDataTypeA"].isBFloat16()) and \
+    canCheckValueC = (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()) and \
                       kernel["ProblemType"]["HighPrecisionAccumulate"]
-    canCheckValueC = canCheckValueC or kernel["ProblemType"]["MacDataTypeA"].isSingle()
-    canCheckValueC = canCheckValueC or (kernel["ProblemType"]["MacDataTypeA"].isInt8() and kernel["ProblemType"]["HighPrecisionAccumulate"])
+    canCheckValueC = canCheckValueC or kernel["ProblemType"]["DataType"].isSingle()
+    canCheckValueC = canCheckValueC or (kernel["ProblemType"]["DataType"].isInt8() and kernel["ProblemType"]["HighPrecisionAccumulate"])
     assert not self.db["CheckValueC"] or canCheckValueC
 
     # Epilogue related

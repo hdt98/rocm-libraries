@@ -916,7 +916,7 @@ class GSUOn(GSU):
                 numElementsPerBatch = ss.cfg.numElementsPerBatchLimitedBySgprs
 
             # TODO: Which of DataType or DestDataType is in a better sense? 0114: Check Using DestDataType + HSS
-            if (kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["ProblemType"]["MacDataTypeA"].isBFloat16()):
+            if (kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16()):
                 # only do an even number of halves - since these share hi/lo pieces of some registers?
                 if numElementsPerBatch > 1:
                     numElementsPerBatch = int(numElementsPerBatch/2)*2
@@ -1539,7 +1539,7 @@ class GSUOn(GSU):
                 for i in range(0, GSUP1):
                     vlcnt = vlcnt - 1 if vlcnt > 0 else 0
                     module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                    if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                    if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                         for j in range(0, int(gwvw)):
                             module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(tmpVAdd+0+gwvw*i+j), \
                                     comment="buffer add"))
@@ -1587,7 +1587,7 @@ class GSUOn(GSU):
                     for i in range(0, k):
                         vlcnt = vlcnt - 1 if vlcnt > 0 else 0
                         module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                        if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                        if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                             for j in range(0, int(gwvw)):
                                 module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(tmpVAdd+0+gwvw*i+j), \
                                         comment="buffer add"))
@@ -1713,7 +1713,7 @@ class GSUOn(GSU):
                 vlcnt       = vlcnt - 2 if vlcnt > 0 else 0
 
                 module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                     for j in range(0, int(gwvw)):
                         module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(data+j), \
                                 comment="buffer add"))
@@ -1755,7 +1755,7 @@ class GSUOn(GSU):
                     vlcnt       = vlcnt - 1 if vlcnt > 0 else 0
 
                     module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                    if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                    if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                         for j in range(0, int(gwvw)):
                             module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(data+j), \
                                     comment="buffer add"))
@@ -1800,7 +1800,7 @@ class GSUOn(GSU):
                     data  = tmpVAdd[-1][elementIdx]
 
                     module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                    if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                    if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                         for j in range(0, int(gwvw)):
                             module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(data+j), \
                                     comment="buffer add"))
@@ -1821,7 +1821,7 @@ class GSUOn(GSU):
                         data  = tmpVAdd[i-1][elementIdx]
 
                         module.add(SWaitCnt(vlcnt=vlcnt, comment="(wait for buffer ready)"))
-                        if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                        if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                             for j in range(0, int(gwvw)):
                                 module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(data+j), \
                                         comment="buffer add"))
@@ -1880,7 +1880,7 @@ class GSUOn(GSU):
 
                 GSUP1 = 1 # do 1 element at a time
                 for i in range(0, GSUP1):
-                    if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                    if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                         for j in range(0, int(gwvw)):
                             module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(tmpVAdd+0+gwvw*i+j), \
                                     comment="buffer add"))
@@ -1916,7 +1916,7 @@ class GSUOn(GSU):
 
                     GSUP1 = 1 # do 1 element at a time
                     for i in range(0, GSUP1):
-                        if kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].isInt32():
+                        if kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].isInt32():
                             for j in range(0, int(gwvw)):
                                 module.add(VAddI32(dst=vgpr(vgprstart+j), src0=vgpr(vgprstart+j), src1=vgpr(tmpVAdd+0+gwvw*i+j), \
                                         comment="buffer add"))

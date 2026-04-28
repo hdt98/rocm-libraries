@@ -715,14 +715,14 @@ class KernelWriterAssembly(KernelWriter):
     needPackK8Lw = False
     needPackK8Hi = False
 
-    if kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
+    if kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16():
       if self.states.lrvwTileA > 1 or self.states.lrvwTileB > 1:
         needPackK16 = True
       if self.states.lrvwTileMetadata > 1:
         needPackK8Lw = True
       if self.states.lrvwTileMetadata > 2:
         needPackK8Hi = True
-    elif kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat():
+    elif kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat():
       if self.states.lrvwTileA > 1 or self.states.lrvwTileB > 1 or self.states.lrvwTileMetadata > 1:
         needPackK8Lw = True
       if self.states.lrvwTileA > 2 or self.states.lrvwTileB > 2 or self.states.lrvwTileMetadata > 2:
@@ -1246,7 +1246,7 @@ class KernelWriterAssembly(KernelWriter):
     if ((tPA["bpe"] < 4 and not kernel["UnrollMajorLDSA"]) or                                              \
         (tPB["bpe"] < 4 and not kernel["UnrollMajorLDSB"]) or                                              \
         (kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"] and (kernel["MIInputPerThreadMetadata"] == 4))) \
-        and (kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat()) or \
+        and (kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()) or \
         (self.states.asmCaps["HasSWMMAC_gfx1250"] and kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"]):
       moduleVgprMacro.add(RegSet("v", "vgprPackTemp", "vgprBase", self.states.a.startVgprValuPackTemp - self.states.startVgpr))
 
@@ -1343,7 +1343,7 @@ class KernelWriterAssembly(KernelWriter):
       module.add(RegSet("v", "vgprAmaxOut", self.startVgprAmaxOut))
       module.add(RegSet("v", "vgprAmaxOutB", self.startVgprAmaxOutB))
 
-    if kernel["ProblemType"]["MacDataTypeA"].isDoubleComplex() and kernel["MIArchVgpr"]:
+    if kernel["ProblemType"]["DataType"].isDoubleComplex() and kernel["MIArchVgpr"]:
       module.add(RegSet("v", "vgprAlphaTmp", \
           self.states.startVgprAlphaTmp))
 
@@ -1743,7 +1743,7 @@ class KernelWriterAssembly(KernelWriter):
         macro = Macro("MAC_%ux%u_X%u" % (kernel["ThreadTile0"], kernel["ThreadTile1"], m), [])
         component = Component.MAC.find(self)
         if not component:
-          printExit("Assembly doesn't support datatype %s" % kernel["ProblemType"]["MacDataTypeA"])
+          printExit("Assembly doesn't support datatype %s" % kernel["ProblemType"]["DataType"])
         innerModule = component(self, tPA, tPB, m, kernel["InnerUnroll"])
         for item in innerModule.items():
             macro.add(item)
@@ -1754,7 +1754,7 @@ class KernelWriterAssembly(KernelWriter):
         macro = Macro("MAC_%ux%u_X%u_OneIUI" % (kernel["ThreadTile0"],kernel["ThreadTile1"], 0), [""])
         component = Component.MAC.find(self)
         if not component:
-          printExit("Assembly doesn't support datatype %s" % kernel["ProblemType"]["MacDataTypeA"])
+          printExit("Assembly doesn't support datatype %s" % kernel["ProblemType"]["DataType"])
         innerModule = component(self, tPA, tPB, 0, 1)
         for item in innerModule.items():
             macro.add(item)
@@ -2602,14 +2602,14 @@ class KernelWriterAssembly(KernelWriter):
     needPackK8Lw = False
     needPackK8Hi = False
 
-    if kernel["ProblemType"]["MacDataTypeA"].isHalf() or kernel["ProblemType"]["MacDataTypeA"].isBFloat16():
+    if kernel["ProblemType"]["DataType"].isHalf() or kernel["ProblemType"]["DataType"].isBFloat16():
       if self.states.lrvwTileA > 1 or self.states.lrvwTileB > 1:
         needPackK16 = True
       if self.states.lrvwTileMetadata > 1:
         needPackK8Lw = True
       if self.states.lrvwTileMetadata > 2:
         needPackK8Hi = True
-    elif kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat():
+    elif kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat():
       if self.states.lrvwTileA > 1 or self.states.lrvwTileB > 1 or self.states.lrvwTileMetadata > 1:
         needPackK8Lw = True
       if self.states.lrvwTileA > 2 or self.states.lrvwTileB > 2 or self.states.lrvwTileMetadata > 2:
@@ -5754,7 +5754,7 @@ class KernelWriterAssembly(KernelWriter):
     if ((tensorParametersA["bpe"] < 4 and not kernel["UnrollMajorLDSA"])                                   \
         or (tensorParametersB["bpe"] < 4 and not kernel["UnrollMajorLDSB"])                                \
         or (kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"] and (kernel["MIInputPerThreadMetadata"] == 4))) \
-        and (kernel["ProblemType"]["MacDataTypeA"].isInt8() or kernel["ProblemType"]["MacDataTypeA"].is8bitFloat()) or \
+        and (kernel["ProblemType"]["DataType"].isInt8() or kernel["ProblemType"]["DataType"].is8bitFloat()) or \
         (self.states.asmCaps["HasSWMMAC_gfx1250"] and kernel["ProblemType"]["Sparse"] and not kernel["UnrollMajorLDSMetadata"]):
       numVgprPackTemp = 1
     numVgprCvtTemp = 0
@@ -5962,7 +5962,7 @@ class KernelWriterAssembly(KernelWriter):
   def tailLoopGlobalRead(self, kernel, tPA, tPB, doA, doB):
     imod = Module("tailLoopGlobalRead")
 
-    glvwWorkaround = 8 * kernel["ProblemType"]["MacDataTypeA"].numRegisters()
+    glvwWorkaround = 8 * kernel["ProblemType"]["DataType"].numRegisters()
     dataTypeA = kernel["ProblemType"]["MacDataTypeA"] if tPA["glvw"] < glvwWorkaround else \
                 kernel["ProblemType"]["DataTypeA"]
     dataTypeB = kernel["ProblemType"]["MacDataTypeB"] if tPB["glvw"] < glvwWorkaround else \
@@ -7443,7 +7443,7 @@ class KernelWriterAssembly(KernelWriter):
 
   def mfmaIter_waitCount(self, kernel):
     if self.states.version in [(9,4,2), (9,5,0)]:
-      dataType = kernel["ProblemType"]["MacDataTypeA"]
+      dataType = kernel["ProblemType"]["DataType"]
       miM = kernel["MatrixInstM"]
       miN = kernel["MatrixInstN"]
       if dataType.isSingle() or dataType.isHalf() or dataType.isBFloat16():
@@ -7546,7 +7546,7 @@ class KernelWriterAssembly(KernelWriter):
 
     # dot2: add shiftK module to prevent read out of K bound
     shiftK           = Module("shiftK")
-    inputType        = kernel["ProblemType"]["MacDataTypeA"]
+    inputType        = kernel["ProblemType"]["DataType"]
     numRegistersIn   = inputType.numRegisters()
     loopCounterName  = self.loopCounterName(kernel, self.states.unrollIdx)
     numInput         = kernel["NumDotElements"] if kernel["UseDotInstruction"] else 1
@@ -8104,7 +8104,7 @@ class KernelWriterAssembly(KernelWriter):
                     bStr = vgpr(self.generateSrcStrForMFMAshiftK(kernel, tPB, innerUnroll, vregSetIdx, vgprPerInputB, m, u, iui, b, bk=bk), 1)
                     shiftK.add(VCndMaskB32(dst=bStr, src0=bStr, src1=0, src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment="set 0 if K_idx >= sizeL"))
             # separate code for gfx950 mx
-            if group == 0 and kernel["ProblemType"]["MXBlockB"]:
+            if group == 0 and kernel["ProblemType"]["MXBlockB"] and isgfx950:
               for mxsb in range(0, kernel["MIWaveTileMXSB"]):
                 for iui in range(0, innerUnroll):
                   for bk in range(0, vgprPerInputMXSB):
@@ -8449,7 +8449,7 @@ class KernelWriterAssembly(KernelWriter):
       loopSwap = False
       # complex case, swap inner loop and outer loop so that idxA comes outer
       # this is to re-use same tmp vgpr to nagate ai or ar
-      if kernel["ProblemType"]["MacDataTypeA"].isComplex() and tPB["tile01Idx"]:
+      if kernel["ProblemType"]["DataType"].isComplex() and tPB["tile01Idx"]:
         outer = 0
         loopSwap = True
       inner = 1 - outer # inner is the opposite of outer
@@ -8529,7 +8529,7 @@ class KernelWriterAssembly(KernelWriter):
             mStr     = "ValuMetadata_X%u_I%u+%u+%u+%u" % (vgprBufferM_new, iuiM_new, m_new, vgprBufferM_new_offset, iuiM_new_offset)
             mStr     = vgpr(mStr, vgprPerInputM)
 
-          if kernel["ProblemType"]["MacDataTypeA"].isComplex():
+          if kernel["ProblemType"]["DataType"].isComplex():
             # override because complex mul is emulated by 4 mfma insts
             # TODO: adopt component system
             miInInstType = miOutInstType #"f32" for SingleComplex, "f64" for DoubleComplex
@@ -12921,7 +12921,7 @@ class KernelWriterAssembly(KernelWriter):
         return 1000  # no limit
 
   def getVectorAtomicWidth(self, kernel):
-    if kernel["ProblemType"]["MacDataTypeA"].isHalf() and (not kernel["_GlobalAccumulation"]):
+    if kernel["ProblemType"]["DataType"].isHalf() and (not kernel["_GlobalAccumulation"]):
       return 2
     return 1
 
