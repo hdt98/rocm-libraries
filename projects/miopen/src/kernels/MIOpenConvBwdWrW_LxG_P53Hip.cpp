@@ -33,6 +33,7 @@
 #include "hip_math_ops.hpp"
 
 #define UNUSED __attribute__((__unused__))
+using uint = unsigned int;
 
 #if MLO_IN_TILE0 == 0
 #error "Error: (MLO_IN_TILE0 == 0)"
@@ -108,53 +109,53 @@
 
         no guard against number of inputs
 */
-inline __device__ void readInput(unsigned int lcl_id,
-                                 unsigned int gbl_in_scan_off,
+inline __device__ void readInput(uint lcl_id,
+                                 uint gbl_in_scan_off,
 #if !MLO_READ_PARTIAL_N_LCL_IN_MAPS
                                  UNUSED
 #endif
-                                 unsigned int n_in_map_reads,
-                                 unsigned int n_v_reads,
+                                     uint n_in_map_reads,
+                                 uint n_v_reads,
                                  const FLOAT* __restrict__ bot,
                                  FLOAT* __restrict__ lcl_bot,
-                                 unsigned int chunk_id)
+                                 uint chunk_id)
 {
 
 #if MLO_IN_WIDTH_N_LOOPS > 1 && MLO_FILTER_PAD0 > 0
-    unsigned int pad_shift = 0;
+    uint pad_shift = 0;
     if(chunk_id == 0)
     {
         pad_shift = MLO_FILTER_PAD0;
     }
 #else
-    unsigned int pad_shift = MLO_FILTER_PAD0;
+    uint pad_shift = MLO_FILTER_PAD0;
 #endif
 
-    for(unsigned int p4 = lcl_id; p4 < MLO_N_LCL_IN_MAPS * MLO_N_IN_HORIZ_READS * n_v_reads;
+    for(uint p4 = lcl_id; p4 < MLO_N_LCL_IN_MAPS * MLO_N_IN_HORIZ_READS * n_v_reads;
         p4 += MLO_GRP_SZ)
     {
-        unsigned int c    = 0;
-        unsigned int t_p4 = p4;
+        uint c    = 0;
+        uint t_p4 = p4;
 #if MLO_N_LCL_IN_MAPS > 1
         c    = p4 / (MLO_N_IN_HORIZ_READS * n_v_reads);
         t_p4 = iMod(p4, c, (MLO_N_IN_HORIZ_READS * n_v_reads));
 #endif
 
-        unsigned int c_scan = t_p4 / (MLO_N_IN_HORIZ_READS);
+        uint c_scan = t_p4 / (MLO_N_IN_HORIZ_READS);
 
 #if MLO_N_IN_HORIZ_READS & (MLO_N_IN_HORIZ_READS - 1)
-        unsigned int c_pix4 = iMod(t_p4, c_scan, (MLO_N_IN_HORIZ_READS));
+        uint c_pix4 = iMod(t_p4, c_scan, (MLO_N_IN_HORIZ_READS));
 #else
-        unsigned int c_pix4 = t_p4 & (MLO_N_IN_HORIZ_READS - 1);
+        uint c_pix4 = t_p4 & (MLO_N_IN_HORIZ_READS - 1);
 #endif
 
-        unsigned int bot_off = gbl_in_scan_off + c * MLO_IN_CHANNEL_STRIDE +
-                               c_scan * MLO_IN_STRIDE + c_pix4 * MLO_READ_UNIT;
+        uint bot_off = gbl_in_scan_off + c * MLO_IN_CHANNEL_STRIDE + c_scan * MLO_IN_STRIDE +
+                       c_pix4 * MLO_READ_UNIT;
         const FLOAT* bot_p = &bot[bot_off];
 
         FLOAT in_rd_data[MLO_READ_UNIT];
 
-        for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
         {
             in_rd_data[i] = 0;
         }
@@ -169,16 +170,14 @@ inline __device__ void readInput(unsigned int lcl_id,
             {
                 if(c_pix4 == MLO_IN_WIDTH_LAST_CHUNK_VALID_READ_UNITS - 1)
                 {
-                    for(unsigned int i = 0;
-                        i < MLO_IN_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_READ_UNIT;
-                        ++i)
+                    for(uint i = 0; i < MLO_IN_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_READ_UNIT; ++i)
                     {
                         in_rd_data[i] = bot_p[i];
                     }
                 }
                 else
                 {
-                    for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+                    for(uint i = 0; i < MLO_READ_UNIT; ++i)
                     {
                         in_rd_data[i] = bot_p[i];
                     }
@@ -190,7 +189,7 @@ inline __device__ void readInput(unsigned int lcl_id,
 #if MLO_IN_N_PIXS_OFF > 0
                 if(c_pix4 == MLO_N_IN_HORIZ_READS - 1)
                 {
-                    for(unsigned int i = 0; i < MLO_IN_N_PIXS_OFF; ++i)
+                    for(uint i = 0; i < MLO_IN_N_PIXS_OFF; ++i)
                     {
                         in_rd_data[i] = bot_p[i];
                     }
@@ -198,7 +197,7 @@ inline __device__ void readInput(unsigned int lcl_id,
                 else
 #endif
                 {
-                    for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+                    for(uint i = 0; i < MLO_READ_UNIT; ++i)
                     {
                         in_rd_data[i] = bot_p[i];
                     }
@@ -209,7 +208,7 @@ inline __device__ void readInput(unsigned int lcl_id,
 #if MLO_IN_WIDTH_N_LOOPS > 1 && MLO_FILTER_PAD0 > 0
         if(chunk_id == 0 || chunk_id == MLO_IN_WIDTH_N_LOOPS - 1)
         {
-            for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+            for(uint i = 0; i < MLO_READ_UNIT; ++i)
             {
                 int lcl_in_off = c * MLO_IN_LCL_PADDED_SZ + c_scan * MLO_IN_LCL_PADDED_WIDTH +
                                  pad_shift + c_pix4 * MLO_READ_UNIT + i;
@@ -218,7 +217,7 @@ inline __device__ void readInput(unsigned int lcl_id,
         }
         else
         {
-            for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+            for(uint i = 0; i < MLO_READ_UNIT; ++i)
             {
                 int lcl_in_off = c * MLO_IN_LCL_UNPADDED_SZ + c_scan * MLO_IN_LCL_UNPADDED_WIDTH +
                                  pad_shift + c_pix4 * MLO_READ_UNIT + i;
@@ -227,7 +226,7 @@ inline __device__ void readInput(unsigned int lcl_id,
         }
 #else
         (void)chunk_id;
-        for(unsigned int i = 0; i < MLO_READ_UNIT; ++i)
+        for(uint i = 0; i < MLO_READ_UNIT; ++i)
         {
             int lcl_in_off = c * MLO_IN_LCL_SZ + c_scan * MLO_IN_LCL_WIDTH + pad_shift +
                              c_pix4 * MLO_READ_UNIT + i;
@@ -247,26 +246,26 @@ inline __device__ void readInput(unsigned int lcl_id,
         loop over filter vertical size
 */
 inline __device__ void
-Processing(UNUSED unsigned int sc,
-           unsigned int sc_lcl_off,
-           unsigned int top_lim,
+Processing(UNUSED uint sc,
+           uint sc_lcl_off,
+           uint top_lim,
            int bot_lim, // bot_lim could be negative at lower boundary padding
            FLOAT_ACCUM* __restrict__ pvt_accum,
            FLOAT* __restrict__ lcl_bot,
            FLOAT* __restrict__ top_dat,
-           unsigned int chunk_id)
+           uint chunk_id)
 {
     for(int l = top_lim; l >= bot_lim; --l)
     {
-        for(unsigned int m = 0; m < MLO_IN_TILE0; ++m)
+        for(uint m = 0; m < MLO_IN_TILE0; ++m)
         {
-            for(unsigned int n = 0; n < MLO_FILTER_SIZE0; ++n)
+            for(uint n = 0; n < MLO_FILTER_SIZE0; ++n)
             {
-                for(unsigned int c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+                for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
                 {
 
 #if MLO_IN_WIDTH_N_LOOPS > 1 && MLO_FILTER_PAD0 > 0
-                    unsigned int bot_off = sc_lcl_off + n + m;
+                    uint bot_off = sc_lcl_off + n + m;
                     if(chunk_id == 0 || chunk_id == MLO_IN_WIDTH_N_LOOPS - 1)
                     {
                         bot_off = bot_off + c * MLO_IN_LCL_PADDED_SZ;
@@ -277,16 +276,16 @@ Processing(UNUSED unsigned int sc,
                     }
 #else
                     (void)chunk_id;
-                    unsigned int bot_off = sc_lcl_off + c * MLO_IN_LCL_SZ + n + m;
+                    uint bot_off = sc_lcl_off + c * MLO_IN_LCL_SZ + n + m;
 #endif
 
                     FLOAT bot_val = lcl_bot[bot_off];
 
-                    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+                    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
                     {
-                        unsigned int pvt_top_off =
+                        uint pvt_top_off =
                             k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + (top_lim - l) * MLO_IN_TILE0 + m;
-                        unsigned int pvt_accum_off =
+                        uint pvt_accum_off =
                             (k * MLO_N_LCL_IN_MAPS + c) * MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0 +
                             l * MLO_FILTER_SIZE0 + n;
 
@@ -304,26 +303,25 @@ Processing(UNUSED unsigned int sc,
 inline __device__ void moveOutputUp(FLOAT* __restrict__ top_dat)
 {
     // move up output to reduce overfetch
-    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
     {
-        for(unsigned int j = 0; j < MLO_FILTER_SIZE1 - 1; ++j)
+        for(uint j = 0; j < MLO_FILTER_SIZE1 - 1; ++j)
         {
-            for(unsigned int i = 0; i < MLO_IN_TILE0; ++i)
+            for(uint i = 0; i < MLO_IN_TILE0; ++i)
             {
-                unsigned int pvt_off_n = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + j * MLO_IN_TILE0 + i;
-                unsigned int pvt_off_o =
-                    k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + (j + 1) * MLO_IN_TILE0 + i;
+                uint pvt_off_n = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + j * MLO_IN_TILE0 + i;
+                uint pvt_off_o = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + (j + 1) * MLO_IN_TILE0 + i;
                 top_dat[pvt_off_n] = top_dat[pvt_off_o];
             }
         }
     }
 }
 
-inline __device__ void zeroInitLDS(unsigned int lcl_id, FLOAT* __restrict__ lcl_bot)
+inline __device__ void zeroInitLDS(uint lcl_id, FLOAT* __restrict__ lcl_bot)
 {
     __syncthreads();
 
-    for(unsigned int i = lcl_id; i < (MLO_LCL_SZ); i += MLO_GRP_SZ)
+    for(uint i = lcl_id; i < (MLO_LCL_SZ); i += MLO_GRP_SZ)
     {
         lcl_bot[i] = 0;
     }
@@ -338,7 +336,7 @@ inline __device__ void spanReadingOutput(int spn,
                                          FLOAT mask,
                                          FLOAT* __restrict__ top_dat,
                                          const FLOAT* __restrict__ top_df,
-                                         unsigned int chunk_id)
+                                         uint chunk_id)
 {
     int pvt_off           = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + j * MLO_IN_TILE0;
     const FLOAT* top_df_p = &top_df[top_df_off];
@@ -347,7 +345,7 @@ inline __device__ void spanReadingOutput(int spn,
     {
         if(spn == MLO_OUT_WIDTH_LAST_CHUNK_VALID_SPANS - 1)
         {
-            unsigned int i = 0;
+            uint i = 0;
             for(; i < MLO_OUT_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_SPAN; ++i)
             {
                 top_dat[pvt_off + i] = top_df_p[i] * mask;
@@ -359,7 +357,7 @@ inline __device__ void spanReadingOutput(int spn,
         }
         else
         {
-            for(unsigned int i = 0; i < MLO_IN_TILE0; ++i)
+            for(uint i = 0; i < MLO_IN_TILE0; ++i)
             {
                 top_dat[pvt_off + i] = top_df_p[i] * mask;
             }
@@ -371,7 +369,7 @@ inline __device__ void spanReadingOutput(int spn,
 #if MLO_OUT_N_PIXS_OFF > 0
         if(spn == MLO_N_SPANS_PER_SCAN - 1)
         {
-            unsigned int i = 0;
+            uint i = 0;
             for(; i < MLO_OUT_N_PIXS_OFF; ++i)
             {
                 top_dat[pvt_off + i] = top_df_p[i] * mask;
@@ -387,7 +385,7 @@ inline __device__ void spanReadingOutput(int spn,
 #endif
         {
             (void)chunk_id;
-            for(unsigned int i = 0; i < MLO_IN_TILE0; ++i)
+            for(uint i = 0; i < MLO_IN_TILE0; ++i)
             {
                 top_dat[pvt_off + i] = top_df_p[i] * mask;
             }
@@ -436,42 +434,42 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
     __shared__ FLOAT lcl[(MLO_LCL_SZ) + 1];
     FLOAT* lcl_bot = lcl;
 
-    unsigned int lcl_id = threadIdx.x;
+    uint lcl_id = threadIdx.x;
 
-    unsigned int c_idx_base = blockIdx.x; // input map index base
+    uint c_idx_base = blockIdx.x; // input map index base
 
-    unsigned int o_idx_base = blockIdx.y; // output map index base
+    uint o_idx_base = blockIdx.y; // output map index base
 
-    unsigned int ib_base = blockIdx.z;
+    uint ib_base = blockIdx.z;
 
-    unsigned int ib = ib_base * (MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS);
+    uint ib = ib_base * (MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS);
 
-    unsigned int c_idx = c_idx_base * MLO_N_LCL_IN_MAPS; // input map index
+    uint c_idx = c_idx_base * MLO_N_LCL_IN_MAPS; // input map index
 
-    unsigned int o_idx = o_idx_base * (MLO_N_LCL_OUT_MAPS * MLO_OUT_STACKS); // output map index
+    uint o_idx = o_idx_base * (MLO_N_LCL_OUT_MAPS * MLO_OUT_STACKS); // output map index
 
 #if MLO_READ_PARTIAL_N_LCL_IN_MAPS
-    unsigned int n_in_map_reads = MLO_N_INPUTS >= c_idx + MLO_N_LCL_IN_MAPS
-                                      ? MLO_N_LCL_IN_MAPS
-                                      : (MLO_N_INPUTS >= c_idx ? MLO_N_INPUTS - c_idx : 0);
+    uint n_in_map_reads = MLO_N_INPUTS >= c_idx + MLO_N_LCL_IN_MAPS
+                              ? MLO_N_LCL_IN_MAPS
+                              : (MLO_N_INPUTS >= c_idx ? MLO_N_INPUTS - c_idx : 0);
 #else
-    unsigned int n_in_map_reads = MLO_N_LCL_IN_MAPS;
+    uint n_in_map_reads = MLO_N_LCL_IN_MAPS;
 #endif
 
-    unsigned int gbl_in_off  = c_idx * MLO_IN_CHANNEL_STRIDE + ib * MLO_IN_BATCH_STRIDE;
-    unsigned int gbl_out_off = o_idx * MLO_OUT_CHANNEL_STRIDE + ib * MLO_OUT_BATCH_STRIDE;
+    uint gbl_in_off  = c_idx * MLO_IN_CHANNEL_STRIDE + ib * MLO_IN_BATCH_STRIDE;
+    uint gbl_out_off = o_idx * MLO_OUT_CHANNEL_STRIDE + ib * MLO_OUT_BATCH_STRIDE;
     // 1 span per wk_item, total scanline with MLO_N_SPANS_PER_SCAN spans
     // TODO: more than 1 input
-    unsigned int o = lcl_id / MLO_N_SPANS_PER_SCAN;
+    uint o = lcl_id / MLO_N_SPANS_PER_SCAN;
 #if MLO_N_SPANS_PER_SCAN & (MLO_N_SPANS_PER_SCAN - 1)
-    unsigned int spn = iMod(lcl_id, o, MLO_N_SPANS_PER_SCAN);
+    uint spn = iMod(lcl_id, o, MLO_N_SPANS_PER_SCAN);
 #else
-    unsigned int spn = lcl_id & (MLO_N_SPANS_PER_SCAN - 1);
+    uint spn = lcl_id & (MLO_N_SPANS_PER_SCAN - 1);
 #endif
     //	bool scan_lead = (o*MLO_N_SPANS_PER_SCAN == lcl_id);
 
-    unsigned int lcl_bot_off     = spn * MLO_IN_TILE0;
-    unsigned int out_wk_item_off = o * MLO_OUT_CHANNEL_STRIDE + lcl_bot_off;
+    uint lcl_bot_off     = spn * MLO_IN_TILE0;
+    uint out_wk_item_off = o * MLO_OUT_CHANNEL_STRIDE + lcl_bot_off;
     gbl_out_off += out_wk_item_off;
     // no output out of range
     gbl_out_off = (o_idx + o < MLO_N_OUTPUTS && o < MLO_OUT_STACKS) ? gbl_out_off : 0;
@@ -480,7 +478,7 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 
     FLOAT top_dat[MLO_TOP_DAT_SZ];
 
-    for(unsigned int i = 0; i < MLO_TOP_DAT_SZ; ++i)
+    for(uint i = 0; i < MLO_TOP_DAT_SZ; ++i)
     {
         top_dat[i] = 0;
     }
@@ -489,33 +487,33 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 
     FLOAT_ACCUM pvt_accum[MLO_ACCUM_SZ];
 
-    for(unsigned int i = 0; i < MLO_ACCUM_SZ; ++i)
+    for(uint i = 0; i < MLO_ACCUM_SZ; ++i)
     {
         pvt_accum[i] = static_cast<FLOAT_ACCUM>(0);
     }
 
     // zero out LDS
-    for(unsigned int i = lcl_id; i < (MLO_LCL_SZ); i += MLO_GRP_SZ)
+    for(uint i = lcl_id; i < (MLO_LCL_SZ); i += MLO_GRP_SZ)
     {
         lcl[i] = 0;
     }
 
     // over all batches
-    unsigned int bend = ib + MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS;
-    bend              = bend > MLO_BATCH_SZ ? MLO_BATCH_SZ : bend;
+    uint bend = ib + MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS;
+    bend      = bend > MLO_BATCH_SZ ? MLO_BATCH_SZ : bend;
 
-    for(unsigned int b = ib; b < bend; ++b,
-                     gbl_in_off += MLO_N_LCL_BATCHS * MLO_IN_BATCH_STRIDE,
-                     gbl_out_off += MLO_N_LCL_BATCHS * MLO_OUT_BATCH_STRIDE)
+    for(uint b = ib; b < bend; ++b,
+             gbl_in_off += MLO_N_LCL_BATCHS * MLO_IN_BATCH_STRIDE,
+             gbl_out_off += MLO_N_LCL_BATCHS * MLO_OUT_BATCH_STRIDE)
     {
         __syncthreads();
 
-        unsigned int ichunk = 0;
+        uint ichunk = 0;
 #if MLO_IN_WIDTH_N_LOOPS > 1
         for(; ichunk < MLO_IN_WIDTH_N_LOOPS; ++ichunk)
 #endif
         {
-            unsigned int filter_shift = 0;
+            uint filter_shift = 0;
 #if MLO_IN_WIDTH_N_LOOPS > 1
             if(ichunk != 0)
             {
@@ -523,16 +521,15 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
             }
 #endif
 #if MLO_IN_WIDTH_N_LOOPS > 1 && MLO_FILTER_PAD0 > 0
-            unsigned int lcl_width = (ichunk == 0 || ichunk == MLO_IN_WIDTH_N_LOOPS - 1)
-                                         ? MLO_IN_LCL_PADDED_WIDTH
-                                         : MLO_IN_LCL_UNPADDED_WIDTH;
+            uint lcl_width = (ichunk == 0 || ichunk == MLO_IN_WIDTH_N_LOOPS - 1)
+                                 ? MLO_IN_LCL_PADDED_WIDTH
+                                 : MLO_IN_LCL_UNPADDED_WIDTH;
 #else
-            unsigned int lcl_width = MLO_IN_LCL_WIDTH;
+            uint lcl_width = MLO_IN_LCL_WIDTH;
 #endif
             // top border input block
-            unsigned int gbl_in_scan_off =
-                gbl_in_off + ichunk * MLO_IN_WIDTH_CHUNK - ichunk * filter_shift;
-            unsigned int gbl_out_scan_off = gbl_out_off + ichunk * MLO_OUT_WIDTH_CHUNK;
+            uint gbl_in_scan_off = gbl_in_off + ichunk * MLO_IN_WIDTH_CHUNK - ichunk * filter_shift;
+            uint gbl_out_scan_off = gbl_out_off + ichunk * MLO_OUT_WIDTH_CHUNK;
 
             // read input map
             readInput(
@@ -541,21 +538,21 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
             // move input pointer
             gbl_in_scan_off += MLO_IN_STRIDE * MLO_IN_EXTENT1;
 
-            for(unsigned int i = 0; i < MLO_TOP_DAT_SZ; ++i)
+            for(uint i = 0; i < MLO_TOP_DAT_SZ; ++i)
             {
                 top_dat[i] = 0;
             }
 
             // prefetch output
-            unsigned int gbl_out_scan_off1 = gbl_out_scan_off;
-            for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS;
+            uint gbl_out_scan_off1 = gbl_out_scan_off;
+            for(uint k = 0; k < MLO_N_LCL_OUT_MAPS;
                 ++k, gbl_out_scan_off1 += MLO_OUT_STACKS * MLO_OUT_CHANNEL_STRIDE)
             {
-                for(unsigned int j = 0; j < MLO_FILTER_SIZE1 - 1; ++j)
+                for(uint j = 0; j < MLO_FILTER_SIZE1 - 1; ++j)
                 {
                     // loop around all output maps
-                    unsigned int top_df_off = gbl_out_scan_off1 + j * MLO_OUT_STRIDE;
-                    FLOAT mask              = 1;
+                    uint top_df_off = gbl_out_scan_off1 + j * MLO_OUT_STRIDE;
+                    FLOAT mask      = 1;
 #if MLO_IN_HEIGHT != MLO_OUT_HEIGHT || MLO_FILTER_SIZE1 - 1 > MLO_OUT_HEIGHT
                     top_df_off = (j < MLO_OUT_HEIGHT) ? top_df_off : 0;
                     mask       = (j < MLO_OUT_HEIGHT) ? 1 : 0;
@@ -567,8 +564,8 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 
             gbl_out_scan_off += (MLO_FILTER_SIZE1 - 1) * MLO_OUT_STRIDE;
 
-            unsigned int sc         = 0;
-            unsigned int sc_lcl_off = lcl_bot_off;
+            uint sc         = 0;
+            uint sc_lcl_off = lcl_bot_off;
 
             // prolog
             // handling padding
@@ -592,9 +589,9 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
                 ++sc, gbl_out_scan_off += MLO_OUT_STRIDE, sc_lcl_off += lcl_width)
             {
 
-                for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+                for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
                 {
-                    unsigned int top_df_off =
+                    uint top_df_off =
                         gbl_out_scan_off + k * MLO_OUT_STACKS * MLO_OUT_CHANNEL_STRIDE;
                     FLOAT mask = 1;
 
@@ -616,7 +613,7 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
             }
 
             // non-border input blocks
-            for(unsigned int i_loop = 0; i_loop < MLO_N_GENERIC_LOOPS;
+            for(uint i_loop = 0; i_loop < MLO_N_GENERIC_LOOPS;
                 ++i_loop, gbl_in_scan_off += MLO_IN_STRIDE * MLO_IN_EXTENT1)
             {
                 __syncthreads();
@@ -637,9 +634,9 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
                     ++sc, gbl_out_scan_off += MLO_OUT_STRIDE, sc_lcl_off += lcl_width)
                 {
 
-                    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+                    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
                     {
-                        unsigned int top_df_off =
+                        uint top_df_off =
                             gbl_out_scan_off + k * MLO_OUT_STACKS * MLO_OUT_CHANNEL_STRIDE;
                         FLOAT mask = 1;
 
@@ -703,9 +700,9 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
                     ++sc, gbl_out_scan_off += MLO_OUT_STRIDE, sc_lcl_off += lcl_width)
                 {
 
-                    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+                    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
                     {
-                        unsigned int top_df_off =
+                        uint top_df_off =
                             gbl_out_scan_off + k * MLO_OUT_STACKS * MLO_OUT_CHANNEL_STRIDE;
                         FLOAT mask = 1;
 
@@ -762,18 +759,18 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 
     // final summation over all output maps and each filter row
     // this coudl be done with log but it negligeble anyway
-    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
     {
-        for(unsigned int c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+        for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
         {
 
-            for(unsigned int l = 0; l < MLO_FILTER_SIZE1; ++l)
+            for(uint l = 0; l < MLO_FILTER_SIZE1; ++l)
             {
                 __syncthreads();
 
-                for(unsigned int n = 0; n < MLO_FILTER_SIZE0; ++n)
+                for(uint n = 0; n < MLO_FILTER_SIZE0; ++n)
                 {
-                    unsigned int pvt_off =
+                    uint pvt_off =
                         (k * MLO_N_LCL_IN_MAPS + c) * MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0 +
                         l * MLO_FILTER_SIZE0 + n;
 
@@ -784,12 +781,12 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 
                 if(spn == 0)
                 {
-                    for(unsigned int s = 0; s < MLO_N_SPANS_PER_SCAN - 1; ++s)
+                    for(uint s = 0; s < MLO_N_SPANS_PER_SCAN - 1; ++s)
                     {
 
-                        for(unsigned int n = 0; n < MLO_FILTER_SIZE0; ++n)
+                        for(uint n = 0; n < MLO_FILTER_SIZE0; ++n)
                         {
-                            unsigned int pvt_off =
+                            uint pvt_off =
                                 (k * MLO_N_LCL_IN_MAPS + c) * MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0 +
                                 l * MLO_FILTER_SIZE0 + n;
                             pvt_accum[pvt_off] +=
@@ -805,19 +802,19 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
     // inputs are outputs
     // TODO : for more than 1 input
 
-    unsigned int wei_df_off = (((ib / MLO_N_BATCH_LOOPS) * MLO_N_OUTPUTS + o_idx + o) *
-                               static_cast<unsigned int>(MLO_WEI_BATCH_STRIDE))
-                              // this input channel
-                              + (c_idx * static_cast<unsigned int>(MLO_WEI_CHANNEL_STRIDE));
+    uint wei_df_off = (((ib / MLO_N_BATCH_LOOPS) * MLO_N_OUTPUTS + o_idx + o) *
+                       static_cast<uint>(MLO_WEI_BATCH_STRIDE))
+                      // this input channel
+                      + (c_idx * static_cast<uint>(MLO_WEI_CHANNEL_STRIDE));
 
-    for(unsigned int k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
+    for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
     {
-        for(unsigned int c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
+        for(uint c = 0; c < MLO_N_LCL_IN_MAPS; ++c)
         {
             if(spn == 0 && c < n_in_map_reads && o_idx + o + k * MLO_OUT_STACKS < MLO_N_OUTPUTS &&
                o < MLO_OUT_STACKS)
             {
-                for(unsigned int i = 0; i < (MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0); ++i)
+                for(uint i = 0; i < (MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0); ++i)
                 {
                     weights_df[wei_df_off + k * MLO_OUT_STACKS * MLO_WEI_BATCH_STRIDE +
                                c * MLO_WEI_CHANNEL_STRIDE + i] =
@@ -835,15 +832,15 @@ extern "C" __global__ void __launch_bounds__(MLO_GRP_SZ)
 extern "C" __global__ void __launch_bounds__(MLO_UT_GRP_SZ0)
     MIOpenCvBwdWrW_rdc(const FLOAT* __restrict__ weight_df_tmp, FLOAT* __restrict__ weights_df)
 {
-    unsigned int gbl_id   = blockIdx.x * blockDim.x + threadIdx.x;
-    unsigned int wei_idx0 = gbl_id * MLO_UT_READ_UNIT;
+    uint gbl_id   = blockIdx.x * blockDim.x + threadIdx.x;
+    uint wei_idx0 = gbl_id * MLO_UT_READ_UNIT;
 
 #if MLO_WEI_CHANNEL_STRIDE & (MLO_WEI_CHANNEL_STRIDE - 1)
-    unsigned int wei_blk_idx = wei_idx0 / MLO_WEI_CHANNEL_STRIDE;
-    unsigned int wei_idx     = iMod(wei_idx0, wei_blk_idx, MLO_WEI_CHANNEL_STRIDE);
+    uint wei_blk_idx = wei_idx0 / MLO_WEI_CHANNEL_STRIDE;
+    uint wei_idx     = iMod(wei_idx0, wei_blk_idx, MLO_WEI_CHANNEL_STRIDE);
 #else
-    unsigned int wei_blk_idx = wei_idx0 / MLO_WEI_CHANNEL_STRIDE;
-    unsigned int wei_idx     = wei_idx0 & (MLO_WEI_CHANNEL_STRIDE - 1);
+    uint wei_blk_idx = wei_idx0 / MLO_WEI_CHANNEL_STRIDE;
+    uint wei_idx     = wei_idx0 & (MLO_WEI_CHANNEL_STRIDE - 1);
 #endif
 
     FLOAT_ACCUM pvt_accum_wei[MLO_UT_READ_UNIT] = {0};
@@ -855,9 +852,9 @@ extern "C" __global__ void __launch_bounds__(MLO_UT_GRP_SZ0)
     int batch_loop = (MLO_BATCH_SZ + (MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS) - 1) /
                      (MLO_N_BATCH_LOOPS * MLO_N_LCL_BATCHS);
 
-    for(unsigned int i = 0; i < batch_loop; ++i)
+    for(uint i = 0; i < batch_loop; ++i)
     {
-        for(unsigned int j = 0; j < MLO_UT_READ_UNIT; ++j)
+        for(uint j = 0; j < MLO_UT_READ_UNIT; ++j)
         {
             pvt_accum_wei[j] +=
                 CVT_FLOAT2ACCUM(weight_df_tmp[(wei_blk_idx * MLO_WEI_CHANNEL_STRIDE +
@@ -866,7 +863,7 @@ extern "C" __global__ void __launch_bounds__(MLO_UT_GRP_SZ0)
         }
     }
 
-    for(unsigned int j = 0; j < MLO_UT_READ_UNIT; ++j)
+    for(uint j = 0; j < MLO_UT_READ_UNIT; ++j)
     {
         weights_df[wei_idx0 + j] = CVT_ACCUM2FLOAT(pvt_accum_wei[j]);
     }
