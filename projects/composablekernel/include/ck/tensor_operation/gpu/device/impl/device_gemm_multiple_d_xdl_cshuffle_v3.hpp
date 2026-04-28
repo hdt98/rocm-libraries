@@ -144,6 +144,186 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
     using GridwiseGemm32 = GridwiseGemmBase<NXdlPerWave32>;
 
     using Argument = typename GridwiseGemm64::Argument;
+
+    struct Partitioner
+    {
+        using DsGridPointer = GridwiseGemm64::DsGridPointer;
+
+        index_t M;
+        index_t N;
+        index_t StrideA;
+        index_t StrideB;
+        std::array<index_t, NumDTensor> StrideDs;
+        index_t StrideC;
+
+        static constexpr long_index_t TwoGB = (long_index_t{1} << 31);
+
+        Partitioner() = default;
+        Partitioner(index_t M_,
+                    index_t N_,
+                    index_t StrideA_,
+                    index_t StrideB_,
+                    std::array<index_t, NumDTensor> StrideDs_,
+                    index_t StrideC_)
+            : M{M_},
+              N{N_},
+              StrideA{StrideA_},
+              StrideB{StrideB_},
+              StrideDs{StrideDs_},
+              StrideC{StrideC_}
+        {
+        }
+
+        __host__ bool isPartitionable() const
+        {
+            bool row_major = is_same<CLayout, tensor_layout::gemm::RowMajor>::value &&
+                             is_same<ALayout, tensor_layout::gemm::RowMajor>::value;
+            static_for<0, NumDTensor, 1>{}([&](auto i) {
+                using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
+                row_major &= is_same<DLayout, tensor_layout::gemm::RowMajor>::value;
+            });
+
+            bool is_B_descriptor_smaller_than_2GB =
+                (static_cast<long_index_t>(N) * static_cast<long_index_t>(StrideB) *
+                 sizeof(BDataType)) <= TwoGB;
+
+            return (row_major && is_B_descriptor_smaller_than_2GB) ||
+                   areDescriptorsSmallerThan2GB();
+        }
+
+        __host__ bool areDescriptorsSmallerThan2GB(index_t m) const
+        {
+
+            const bool is_A_descriptor_smaller_than_2GB =
+                (static_cast<long_index_t>(m) * static_cast<long_index_t>(StrideA) *
+                 sizeof(ADataType)) <= TwoGB;
+            const bool is_C_descriptor_smaller_than_2GB =
+                (static_cast<long_index_t>(m) * static_cast<long_index_t>(StrideC) *
+                 sizeof(CDataType)) <= TwoGB;
+            bool are_Ds_descriptors_smaller_than_2GB = true;
+            static_for<0, NumDTensor, 1>{}([&](auto i) {
+                using DDataType = remove_cvref_t<tuple_element_t<i.value, DsDataType>>;
+                are_Ds_descriptors_smaller_than_2GB &=
+                    (static_cast<long_index_t>(m) * static_cast<long_index_t>(StrideDs[i]) *
+                     sizeof(DDataType)) <= TwoGB;
+            });
+
+            return is_A_descriptor_smaller_than_2GB && is_C_descriptor_smaller_than_2GB &&
+                   are_Ds_descriptors_smaller_than_2GB;
+        }
+
+        __host__ bool areDescriptorsSmallerThan2GB() const
+        {
+            return areDescriptorsSmallerThan2GB(M);
+        }
+
+        __host__ auto splitProblem(index_t m,
+                                   const ADataType* p_a_grid_left,
+                                   DsGridPointer& p_ds_grid_left,
+                                   CDataType* p_c_grid_left) const
+        {
+            constexpr index_t PartitionSize = 256;
+            if(m <= PartitionSize)
+            {
+                throw std::runtime_error("Unable to split problem.");
+            }
+            const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
+            const index_t m_right = m - m_left;
+
+            const index_t a_right_offset = m_left * StrideA;
+            const index_t c_right_offset = m_left * StrideC;
+
+            const auto ds_grid_right_ptr = generate_tuple(
+                [&](auto i) {
+                    const index_t ds_right_offset = m_left * StrideDs[i];
+                    return p_ds_grid_left(i) + ds_right_offset;
+                },
+                Number<NumDTensor>{});
+
+            return ck::make_tuple(m_left,
+                                  m_right,
+                                  p_a_grid_left + a_right_offset,
+                                  ds_grid_right_ptr,
+                                  p_c_grid_left + c_right_offset);
+        }
+
+        template <typename ArgumentIn, typename ArgumentOut = ArgumentIn>
+        std::vector<ArgumentOut> partitionGemmProblem(ArgumentIn const& arg) const
+        {
+            static constexpr index_t InitialSubArgsSize = 32;
+
+            std::vector<ArgumentOut> sub_arguments;
+            sub_arguments.reserve(InitialSubArgsSize);
+
+            std::queue<index_t> split_m({arg.M});
+            std::queue<const ADataType*> a_grid_ptrs_queue({arg.p_a_grid});
+            std::queue<DsGridPointer> ds_grid_ptrs_queue({arg.p_ds_grid});
+            std::queue<CDataType*> c_grid_ptrs_queue({arg.p_c_grid});
+
+            // Algorithm:
+            // While queue is not empty:
+            //  1. Get transformer from queue.
+            //  2. If descs are smaller than 2GB push to result array.
+            //  3. If descs are bigger than 2GB split into left and right transformer.
+            //  and push the both into the queue.
+            while(!split_m.empty())
+            {
+                index_t m                   = split_m.front();
+                const ADataType* a_grid_ptr = a_grid_ptrs_queue.front();
+                DsGridPointer ds_grid_ptr   = ds_grid_ptrs_queue.front();
+                CDataType* c_grid_ptr       = c_grid_ptrs_queue.front();
+
+                if(areDescriptorsSmallerThan2GB(m))
+                {
+                    ArgumentOut newArg{a_grid_ptr,
+                                       arg.p_b_grid,
+                                       ds_grid_ptr,
+                                       c_grid_ptr,
+                                       m,
+                                       arg.N,
+                                       arg.K,
+                                       arg.StrideA,
+                                       arg.StrideB,
+                                       arg.StrideDs,
+                                       arg.StrideC,
+                                       arg.KBatch,
+                                       arg.a_element_op,
+                                       arg.b_element_op,
+                                       arg.c_element_op};
+                    sub_arguments.emplace_back(std::move(newArg));
+                }
+                else
+                {
+                    index_t left_m, right_m;
+                    const ADataType* a_grid_right_ptr;
+                    DsGridPointer ds_grid_right_ptr;
+                    CDataType* c_grid_right_ptr;
+
+                    ck::tie(
+                        left_m, right_m, a_grid_right_ptr, ds_grid_right_ptr, c_grid_right_ptr) =
+                        splitProblem(m, a_grid_ptr, ds_grid_ptr, c_grid_ptr);
+
+                    split_m.push(left_m);
+                    split_m.push(right_m);
+
+                    a_grid_ptrs_queue.push(a_grid_ptr);
+                    a_grid_ptrs_queue.push(a_grid_right_ptr);
+                    ds_grid_ptrs_queue.push(ds_grid_ptr);
+                    ds_grid_ptrs_queue.push(ds_grid_right_ptr);
+                    c_grid_ptrs_queue.push(c_grid_ptr);
+                    c_grid_ptrs_queue.push(c_grid_right_ptr);
+                }
+
+                split_m.pop();
+                a_grid_ptrs_queue.pop();
+                ds_grid_ptrs_queue.pop();
+                c_grid_ptrs_queue.pop();
+            }
+
+            return sub_arguments;
+        }
+    };
+
     // Invoker
     struct Invoker : public BaseInvoker
     {
@@ -641,34 +821,16 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 arg.Print();
             }
 
-            if(typename GridwiseGemm::GemmPartitioner(arg).AreDescriptorsSmallerThan2GB())
-            {
-                return RunImpSinglePartition<GridwiseGemm>(arg, stream_config);
-            }
-            else
-            {
-                bool layoutViolation = is_same<CLayout, tensor_layout::gemm::ColumnMajor>::value ||
-                                       is_same<ALayout, tensor_layout::gemm::ColumnMajor>::value;
-                static_for<0, NumDTensor, 1>{}([&](auto i) {
-                    using DLayout = remove_cvref_t<tuple_element_t<i.value, DsLayout>>;
-                    layoutViolation |= is_same<DLayout, tensor_layout::gemm::ColumnMajor>::value;
-                });
-
-                if(layoutViolation)
-                {
-                    throw std::runtime_error(
-                        "Large tensors that exceed 2GB are only supported for RowMajor layout.");
-                }
-
-                auto sub_arguments = GridwiseGemm::partition_gemm_problem(arg);
-                return std::accumulate(sub_arguments.begin(),
-                                       sub_arguments.end(),
-                                       0.0f,
-                                       [&](float sum, const auto& sub_arg) {
-                                           return sum + RunImpSinglePartition<GridwiseGemm>(
-                                                            sub_arg, stream_config);
-                                       });
-            }
+            Partitioner partitioner(
+                arg.M, arg.N, arg.StrideA, arg.StrideB, arg.StrideDs, arg.StrideC);
+            auto sub_arguments = partitioner.partitionGemmProblem(arg);
+            return std::accumulate(sub_arguments.begin(),
+                                   sub_arguments.end(),
+                                   0.0f,
+                                   [&](float sum, const auto& sub_arg) {
+                                       return sum + RunImpSinglePartition<GridwiseGemm>(
+                                                        sub_arg, stream_config);
+                                   });
         }
 
         INVOKER_RUN3_IMPL
@@ -710,11 +872,25 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
             return false;
         }
 
+        Partitioner partitioner(arg.M, arg.N, arg.StrideA, arg.StrideB, arg.StrideDs, arg.StrideC);
+        // True if problem is partitionable or valid without partitioning.
+        if(!partitioner.isPartitionable())
+        {
+            std::cout
+                << "Problem is not partitionable into smaller problems that fit into 2GB limit."
+                << std::endl;
+            return false;
+        }
+
         if(get_warp_size() == 64)
         {
             if constexpr(NXdlPerWave64 > 0)
             {
-                return GridwiseGemm64::CheckValidity(arg);
+                auto sub_arguments = partitioner.partitionGemmProblem(arg);
+                return std::all_of(
+                    sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
+                        return GridwiseGemm64::CheckValidity(sub_arg);
+                    });
             }
         }
         if(CDEShuffleBlockTransferScalarPerVectors{}[Number<0>{}] <= 1 && (arg.KBatch > 1))
@@ -725,10 +901,17 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
         {
             if constexpr(NXdlPerWave32 > 0)
             {
-                return GridwiseGemm32::CheckValidity(
-                    reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
+                auto sub_arguments =
+                    partitioner.template partitionGemmProblem<typename GridwiseGemm64::Argument,
+                                                              typename GridwiseGemm32::Argument>(
+                        arg);
+                return std::all_of(
+                    sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
+                        return GridwiseGemm32::CheckValidity(sub_arg);
+                    });
             }
         }
+
         return false;
     }
 
