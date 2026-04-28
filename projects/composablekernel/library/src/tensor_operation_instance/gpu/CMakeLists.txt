@@ -153,6 +153,10 @@ function(add_instance_library INSTANCE_NAME)
                 list(REMOVE_ITEM INST_TARGETS gfx900 gfx906 gfx906:xnack- gfx908:xnack- gfx908:xnack+ gfx90a:xnack+ gfx90a:xnack- gfx908 gfx90a gfx942 gfx1030 gfx1100 gfx1101 gfx1102 gfx1103 gfx1150 gfx1151 gfx1152 gfx1153 gfx1200 gfx1201 gfx10-3-generic gfx11-generic gfx12-generic)
             endif()
 
+            if(CK_WIN32_MIOPEN_HAS_GFX110X AND source_name MATCHES "conv")
+                list(REMOVE_ITEM INST_TARGETS gfx1100 gfx1101 gfx1102 gfx1103)
+            endif()
+
             #only build the fp8 gemm instances for gfx90a if the build argument is set, otherwise only build for gfx942/gfx950 and gfx1200/gfx1201
             if(NOT CK_USE_FP8_ON_UNSUPPORTED_ARCH)
                 if(source_name MATCHES "gemm_xdl_universal|gemm_multiply_multiply|gemm_universal_preshuffle|gemm_blockscale" AND source_name MATCHES "_f8_")
@@ -214,6 +218,23 @@ function(add_instance_library INSTANCE_NAME)
     set(result ${result} PARENT_SCOPE)
 endfunction(add_instance_library INSTANCE_NAME)
 
+# On Windows MIOpen builds targeting gfx110X, skip conv operations to reduce build time
+set(CK_WIN32_MIOPEN_GFX110X_ONLY FALSE)
+set(CK_WIN32_MIOPEN_HAS_GFX110X FALSE)
+if(WIN32 AND MIOPEN_REQ_LIBS_ONLY)
+    if(SUPPORTED_GPU_TARGETS MATCHES "gfx110[0-3]")
+        set(CK_WIN32_MIOPEN_HAS_GFX110X TRUE)
+        set(_non_gfx110x_targets ${SUPPORTED_GPU_TARGETS})
+        list(REMOVE_ITEM _non_gfx110x_targets gfx1100 gfx1101 gfx1102 gfx1103)
+        list(LENGTH _non_gfx110x_targets _remaining)
+        if(_remaining EQUAL 0)
+            set(CK_WIN32_MIOPEN_GFX110X_ONLY TRUE)
+            message(STATUS "MIOpen Windows gfx110X-only build: conv operations will be skipped")
+        else()
+            message(STATUS "MIOpen Windows mixed-target build: conv operations will skip gfx110X offload targets")
+        endif()
+    endif()
+endif()
 
 file(GLOB dir_list LIST_DIRECTORIES true *)
 set(CK_DEVICE_OTHER_INSTANCES)
@@ -351,6 +372,11 @@ FOREACH(subdir_path ${dir_list})
         endif()
         # Apply the pattern if one was set
         if(required_pattern AND NOT "${cmake_instance}" MATCHES "${required_pattern}")
+            set(add_inst 0)
+        endif()
+
+        if(CK_WIN32_MIOPEN_GFX110X_ONLY AND "${cmake_instance}" MATCHES "conv")
+            message(STATUS "Skipping conv directory on MIOpen Windows gfx110X-only build: ${subdir_path}")
             set(add_inst 0)
         endif()
 
