@@ -352,6 +352,10 @@ namespace rocisa
             {
                 kStr += mubuf->toString();
             }
+            if(!mubuf || !mubuf->offen)
+            {
+                kStr += " offen offset:0";
+            }
             kStr = formatWithComment(kStr);
             setMsb(kStr, {vaddr}, dst);
             return kStr;
@@ -713,6 +717,10 @@ namespace rocisa
             if(mubuf)
             {
                 kStr += mubuf->toString();
+            }
+            if(!mubuf || !mubuf->offen)
+            {
+                kStr += " offen offset:0";
             }
             kStr = formatWithComment(kStr);
             setMsb(kStr, {vaddr}, srcData);
