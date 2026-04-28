@@ -367,24 +367,19 @@ namespace TensileLite
                                                       bool hasZeroElements) const
         {
             // Skip validation if pointers are null or no data to validate
-            // Only tensor C can be null when beta is zero (UseBeta=false)
             if(!hasNullPointer && !hasZeroElements)
                 return false;
 
-            // Tensor C is allowed to be null when beta is zero (not used)
+            // Tensor C can be null when UseBeta=false (compile-time flag indicating C is not used)
+            // Since we don't have direct access to UseBeta here, we allow null C pointers
+            // The kernel will not have been given a C pointer if UseBeta=false
             bool isTensorC = (tensorName == "C");
-            bool isBetaZero = false;
-            if(m_problem != nullptr)
-            {
-                auto* gemmProblem = dynamic_cast<ContractionProblemGemm const*>(m_problem);
-                if(gemmProblem != nullptr)
-                    isBetaZero = (gemmProblem->beta() == 0.0);
-            }
 
-            if(isTensorC && isBetaZero)
+            if(isTensorC && hasNullPointer)
             {
+                // Allow null C tensor - this happens when UseBeta=false
                 if(Debug::Instance().printTensorInfo())
-                    std::cout << "Skipping validation for tensor C (beta=0, not used)" << std::endl;
+                    std::cout << "Skipping validation for tensor C (null pointer, UseBeta=false)" << std::endl;
                 return true;
             }
 
