@@ -171,8 +171,31 @@ endif()
 include(getopt)
 
 # CK version file to record release version as well as git commit hash
-find_package(Git REQUIRED)
-execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD OUTPUT_VARIABLE COMMIT_ID OUTPUT_STRIP_TRAILING_WHITESPACE)
+# identifying the CK source tree.
+#
+# NOTE: execute_process() runs in the build directory by default, so we must
+# pin WORKING_DIRECTORY to the source tree -- otherwise out-of-source builds
+# (where the build dir is not inside a git checkout) would silently produce
+# an empty CK_COMMIT_ID. We use `git log -1 -- .` (the last commit touching
+# CK's sources) rather than `git rev-parse HEAD` so unrelated changes
+# elsewhere in a containing monorepo (e.g. rocm-libraries) do not bump the
+# CK identity. RESULT_VARIABLE/ERROR_QUIET also let us degrade gracefully
+# when building from a release tarball without a .git directory.
+find_package(Git)
+set(COMMIT_ID "unknown")
+if(GIT_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" log -1 --format=%H -- .
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_COMMIT_ID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE GIT_LOG_RESULT
+        ERROR_QUIET
+    )
+    if(GIT_LOG_RESULT EQUAL 0 AND GIT_COMMIT_ID)
+        set(COMMIT_ID "${GIT_COMMIT_ID}")
+    endif()
+endif()
 configure_file(include/ck/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ck/version.h)
 
 set(ROCM_SYMLINK_LIBS OFF)
