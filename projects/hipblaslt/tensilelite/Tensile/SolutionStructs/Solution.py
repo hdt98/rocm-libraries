@@ -937,10 +937,13 @@ class Solution(collections.abc.Mapping):
       return False
 
     # TLU=False or enableGLTr case, need GlobalReadVectorWidth == LocalReadVectorWidth
-    # Exception: SwizzleTensor bypasses LDS via DirectToVgpr, so GRVW != LRVW is OK
+    # NOTE: This constraint also applies to SwizzleTensor+DTV. Although the swizzled
+    # tensor bypasses LDS, numReadsIterCoalesced (derived from LRVW) must be consistent
+    # between A and B sides for correct MFMA operand pairing. Allowing GRVW != LRVW
+    # for the swizzled tensor while the other tensor keeps a smaller LRVW creates a
+    # numReadsIterCoalesced mismatch that corrupts K-iteration buffer indexing.
     if ((not state["ProblemType"]["TLU%c"%tc]) or state["enableGLTr%c"%tc]) and \
-       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth%s"%tc] and \
-       not isSwizzle:
+       state["GlobalReadVectorWidth%c"%tc] != state["LocalReadVectorWidth%s"%tc]:
       reject(state, printRejectionReason, "DirectToVgpr%c does not supports TLU=False GlobalReadVectorWidth%c(%u) != LocalReadVectorWidth(%u)"%(tc, tc, state["GlobalReadVectorWidth%c"%tc], state["LocalReadVectorWidth%s"%tc]))
       return False
 
