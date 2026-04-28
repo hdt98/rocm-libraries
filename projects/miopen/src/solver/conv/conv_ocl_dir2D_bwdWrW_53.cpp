@@ -297,7 +297,7 @@ ConvSolution ConvOclBwdWrW53::GetSolution(const ExecutionContext& ctx,
     // add_kernels() from the basename) do not collide with any other kernels.
 
     const auto hw_wave_sz = 64;
-    // inpout are outputs
+    // inputs are outputs
     int wei_cstride = problem.GetWeightsWidth() * problem.GetWeightsHeight();
 
     // At convolutionocl level, the assertion is present to ensure output channels are
@@ -531,6 +531,12 @@ ConvSolution ConvOclBwdWrW53::GetSolution(const ExecutionContext& ctx,
 
         //		+ std::string(" -limit-vector-registers=64 ")
         + ctx.general_compile_options;
+
+    // SWDEV-200074: `#pragma unroll 3` on a hot inner loop in these kernels
+    // miscompiles on gfx908. Disable the pragma in the kernel sources by
+    // defining the suppression macro for that target only.
+    if(StartsWith(ctx.GetStream().GetDeviceName(), "gfx908"))
+        comp_options += " -DMLO_DISABLE_PRAGMA_UNROLL_COMPILER_SWDEV_200074_WORKAROUND=1";
 
     // wrt to W
     {

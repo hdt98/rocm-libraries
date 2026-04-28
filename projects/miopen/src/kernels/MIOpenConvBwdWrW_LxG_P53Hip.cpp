@@ -2,7 +2,7 @@
  *
  * MIT License
  *
- * Copyright (c) 2026 Advanced Micro Devices, Inc.
+ * Copyright (c) 2025 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,6 +30,7 @@
 #endif
 
 #include "float_types.h"
+#include "hip_math_ops.hpp"
 
 #define UNUSED __attribute__((__unused__))
 
@@ -99,14 +100,6 @@
 
 // if to read all of the number of MLO_N_LCL_IN_MAPS input channel or not
 #define MLO_READ_PARTIAL_N_LCL_IN_MAPS (MLO_N_INPUTS % MLO_N_LCL_IN_MAPS != 0)
-
-// HIP equivalents of the helpers in math_ops.h. The OpenCL header relies on
-// `uint` and `mul24`, both unavailable as built-ins in HIP, so we redefine the
-// only helper this kernel uses (iMod) inline against `unsigned int`/`__mul24`.
-inline __device__ unsigned int iMod(unsigned int v, unsigned int u, unsigned int d)
-{
-    return v - __mul24(u, d);
-}
 
 /*
         group cooperative read
