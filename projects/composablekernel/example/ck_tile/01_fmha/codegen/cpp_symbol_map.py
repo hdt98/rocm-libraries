@@ -11,6 +11,8 @@ FWD_DTYPE_MAP = {
     "fp8fp32": "FmhaFwdFp8Fp32",
     "mxfp8": "FmhaFwdMxFp8",
     "mxfp4": "FmhaFwdMxFp4",
+    "sageattnv3": "FmhaFwdSageAttnV3",
+    "sageattnv3fp16": "FmhaFwdSageAttnV3Fp16",
 }
 
 BWD_DTYPE_MAP = {"fp32": "FmhaBwdFp32", "fp16": "FmhaBwdFp16", "bf16": "FmhaBwdBf16"}
@@ -82,6 +84,7 @@ QSCALE_MAP = {
     "blockscale": "ck_tile::BlockAttentionQuantScaleEnum::BLOCKSCALE",
     "kv_blockscale": "ck_tile::BlockAttentionQuantScaleEnum::KV_BLOCKSCALE",
     "mx": "ck_tile::BlockAttentionQuantScaleEnum::MX",
+    "sageattnv3": "ck_tile::BlockAttentionQuantScaleEnum::SAGEATTN_V3",
 }
 
 QSCALE_CHECK_MAP = {
@@ -90,6 +93,7 @@ QSCALE_CHECK_MAP = {
     "blockscale": "quant_scale_enum::blockscale",
     "kv_blockscale": "quant_scale_enum::kv_blockscale",
     "mx": "quant_scale_enum::mx",
+    "sageattnv3": "quant_scale_enum::sageattnv3",
 }
 
 BIAS_MAP = {
@@ -139,22 +143,22 @@ LAYOUT_MAP = {"row": "true", "col": "false"}
 
 PIPELINE_MAP = {
     "qr": "ck_tile::BlockFmhaPipelineQRKSVS",
-    "qr_hpad": "ck_tile::BlockFmhaPipelineQRKSVSHpad",
     "qr_async": "ck_tile::BlockFmhaPipelineQRKSVSAsync",
     "qs": "ck_tile::BlockFmhaPipelineQSKSVS",
     "qr_async_trload": "ck_tile::BlockFmhaPipelineQRKSVSAsyncTrload",
     "qr_async_trload_v3": "ck_tile::BlockFmhaFwdV3Pipeline",
+    "qr_sageattn": "ck_tile::BlockFmhaPipelineQRKSVSSageAttn",
 }
 
 PIPELINE_ENUM_MAP = {
     "qr": "ck_tile::BlockFmhaPipelineEnum::QRKSVS",
-    "qr_hpad": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_HPAD",
     "qr_async": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_ASYNC",
     "qr_nwarp_sshuffle": "ck_tile::BlockFmhaPipelineEnum::QRKSVS",
     "qs": "ck_tile::BlockFmhaPipelineEnum::QSKSVS",
     "qr_pagedkv": "ck_tile::BlockFmhaPipelineEnum::QRKSVS",
     "qr_async_trload": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD",
     "qr_async_trload_v3": "ck_tile::BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD_V3",
+    "qr_sageattn": "ck_tile::BlockFmhaPipelineEnum::QRKSVS",
 }
 
 BOOL_MAP = {

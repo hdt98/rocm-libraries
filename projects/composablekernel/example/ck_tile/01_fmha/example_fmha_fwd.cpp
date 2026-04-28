@@ -65,7 +65,9 @@ auto create_args(int argc, char* argv[])
                 "n or 0, no bias\n"
                 "e(lementwise) or 1, elementwise bias with 1*1*s*s. e:1, 1*h*s*s. e:2, b*h*s*s\n"
                 "a(libi) or 2, alibi with 1*h. a:1, b*h")
-        .insert("prec", "fp16", "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8/mxfp4")
+        .insert("prec",
+                "fp16",
+                "data type: fp32/fp16/bf16/fp8/fp8bf16/fp8fp32/mxfp8/mxfp4/sageattnv3/sageattnv3fp16")
         .insert("mask",
                 "0",
                 "0: no mask, 1: top-left(same as 't'), 2:bottom-right(same as 'b')\n"
@@ -119,7 +121,10 @@ auto create_args(int argc, char* argv[])
                 "",
                 "Batch-mode only: per-batch effective seqlen for KV (exclude PAD).\n"
                 "Comma-separated list of length 'b'. If empty, no override.")
-        .insert("init_sink", "0", "value to init the output tensor sink value for validation");
+        .insert("init_sink", "0", "value to init the output tensor sink value for validation")
+        .insert("p_scale_factor",
+                "6.0",
+                "SageAttention V3 only: Level-1 P pre-scale factor (default 6.0 = FP4 E2M1 max)");
 
     bool result = arg_parser.parse(argc, argv);
     return std::make_tuple(result, arg_parser);
@@ -163,6 +168,7 @@ auto run(const ck_tile::ArgParser& arg_parser)
     std::string init_method          = arg_parser.get_str("init");
     uint32_t seed                    = arg_parser.get_uint32("seed");
     int init_sink_value              = arg_parser.get_int("init_sink");
+    float p_scale_factor             = arg_parser.get_float("p_scale_factor");
 
     ck_tile::stream_config stream_config{nullptr,
                                          true,
@@ -210,6 +216,7 @@ auto run(const ck_tile::ArgParser& arg_parser)
                                         seed,
                                         do_validation,
                                         init_sink_value,
+                                        p_scale_factor,
                                         stream_config,
                                         json);
 }
@@ -254,6 +261,14 @@ int main(int argc, char* argv[])
         else if(data_type == "mxfp4")
         {
             return run<FmhaFwdMxFp4>(arg_parser) == fwd_result::success ? 0 : -2;
+        }
+        else if(data_type == "sageattnv3")
+        {
+            return run<FmhaFwdSageAttnV3>(arg_parser) == fwd_result::success ? 0 : -2;
+        }
+        else if(data_type == "sageattnv3fp16")
+        {
+            return run<FmhaFwdSageAttnV3Fp16>(arg_parser) == fwd_result::success ? 0 : -2;
         }
         std::cerr << "Unsupported precision: " << data_type << std::endl;
         return -1;
