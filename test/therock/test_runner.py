@@ -103,8 +103,10 @@ logging.basicConfig(level=logging.INFO)
 
 # Multi-GPU setup (if --multigpu flag is set)
 if args.multigpu:
-    # Add parent directory to path for github_actions_api imports
-    sys.path.insert(0, str(SCRIPT_DIR.parent))
+    # Add TheRock's github_actions directory to path for imports
+    # When run from workflow, TheRock is checked out in the working directory
+    therock_ga_path = Path.cwd() / "build_tools" / "github_actions"
+    sys.path.insert(0, str(therock_ga_path))
     from github_actions_api import get_visible_gpu_count
 
     gpu_count = get_visible_gpu_count(env=environ_vars, therock_bin_dir=THEROCK_BIN_DIR)
