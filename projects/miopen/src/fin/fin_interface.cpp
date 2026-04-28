@@ -531,8 +531,8 @@ const std::vector<Solver>& GetAllSolvers()
 {
     static const auto solvers = [] {
         const auto& ids = GetSolversByPrimitive(SolverToPrimitive<Solver>::GetPrimitive());
-        std::vector<Solver> solvers;
-        solvers.reserve(ids.size());
+        std::vector<Solver> result;
+        result.reserve(ids.size());
 
         for(const auto& id : ids)
         {
@@ -540,12 +540,12 @@ const std::vector<Solver>& GetAllSolvers()
                 MIOPEN_THROW(miopenStatusInternalError);
 
             if constexpr(std::is_same_v<Solver, ConvSolver>)
-                solvers.emplace_back(Solver{id.GetSolverBase(), id.Value(), id.GetAlgo()});
+                result.emplace_back(Solver{id.GetSolverBase(), id.Value(), id.GetAlgo()});
             else
-                solvers.emplace_back(Solver{id.GetSolverBase(), id.Value()});
+                result.emplace_back(Solver{id.GetSolverBase(), id.Value()});
         }
 
-        return solvers;
+        return std::move(result);
     }();
     return solvers;
 }

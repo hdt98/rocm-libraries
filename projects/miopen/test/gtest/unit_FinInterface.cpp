@@ -398,7 +398,7 @@ const auto& GetSolverNames()
         names_.reserve(sinfo.size());
         for(const auto& s : sinfo)
             names_.push_back(s.first);
-        return names_;
+        return std::move(names_);
     }();
     return names;
 }
@@ -408,8 +408,7 @@ template <class Problem>
 auto GetContext(miopen::Handle* handle, const Problem& problem);
 
 template <>
-miopen::ExecutionContext GetContext(miopen::Handle* handle,
-                                    const miopen::conv::ProblemDescription& problem)
+auto GetContext(miopen::Handle* handle, const miopen::conv::ProblemDescription& problem)
 {
     miopen::ExecutionContext tmp{handle};
     problem.SetupFloats(tmp);
