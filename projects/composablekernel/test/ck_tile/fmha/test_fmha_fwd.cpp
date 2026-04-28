@@ -1220,3 +1220,77 @@ TEST_P(PaddingCases, DataTypeConfig)
                                                COMMON_ARGS);
     CHECK_RESULT(result);
 }
+
+// ---------------------------------------------------------------
+// Block sparsity tests
+// ---------------------------------------------------------------
+
+class BlockSparsity
+    : public TestWithParam<std::tuple<std::tuple<int, int>,
+                                      bool,
+                                      bool,
+                                      mode_enum,
+                                      std::string,
+                                      std::tuple<int, int, int, int, int, int, std::string>>>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(TestCkTileFmhaFwd,
+                         BlockSparsity,
+                         Combine(HDimValues,
+                                 Bool(),
+                                 IsVRowmajorValues,
+                                 ModeValues,
+                                 Values("causal", "checkerboard", "random:0.3"),
+                                 Values(std::tuple{1, 4, 2, 256, 256, -1, "0"},
+                                        std::tuple{2, 2, -1, 300, 400, -1, "1"},
+                                        std::tuple{1, 2, 1, 512, 256, -1, "2"})));
+
+TEST_P(BlockSparsity, DataTypeConfig)
+{
+    auto [hdims, perm, is_v_rowmajor, mode, block_mask_str, dims_mask]      = GetParam();
+    auto [hdim_q, hdim_v]                                                   = hdims;
+    auto [batch, nhead, nhead_k, seqlen_q, seqlen_k, seqlen_kpad, mask_str] = dims_mask;
+
+    hdim_v = hdim_v == -1 ? hdim_q : hdim_v;
+
+    auto result = fmha_fwd_run<DataTypeConfig>(
+        mode,
+        batch,
+        nhead,
+        nhead_k,
+        {adjust_seqlen(seqlen_q)},
+        {adjust_seqlen(seqlen_k)},
+        hdim_q,
+        hdim_v,
+        0,             // seqlen_knew
+        {-1},          // seqlen_qpads
+        {seqlen_kpad}, // seqlen_kpads
+        {},            // q_eff_lens_per_batch
+        {},            // kv_eff_lens_per_batch
+        0,             // rotary_dim
+        perm,          // i_perm
+        perm,          // o_perm
+        0,             // scale_s
+        0,             // logits_soft_cap
+        is_v_rowmajor, // is_v_rowmajor
+        def_lse,       // lse
+        0,             // page_block_size
+        false,         // use_cache_batch_idx
+        "n",           // bias_str
+        0.0f,          // p_drop
+        0,             // drop_seed
+        0,             // drop_offset
+        false,         // drop_prefs
+        mask_str,      // mask_str
+        qscale_str,
+        true, // is_rotary_interleaved
+        1,    // num_splits
+        init_method,
+        static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
+        1,              // do_validation
+        0,              // init_sink
+        block_mask_str, // block_mask_str
+        stream_config);
+    CHECK_RESULT(result);
+}
