@@ -5458,6 +5458,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.language   = "ASM"
     # ISA version, such as 803
     version = tuple(kernel["ISA"])
+    isgfx950 = kernel["ISA"][:2] == (9, 5)
     ti = rocIsa.getInstance()
     ti.setKernel(version, kernel["WavefrontSize"])
 
@@ -5493,7 +5494,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     if self.states.tailloopInNll or \
        (kernel["StreamK"] and \
         (kernel["ProblemType"]["MXBlockA"] or kernel["ProblemType"]["MXBlockB"]) and \
-        kernel["ISA"][:2] == (9, 5)):
+        isgfx950):
       self.states.staggerUCode = False
     self.states.tailloopInNllmaxUnit = 1
     if self.states.tailloopInNll:
@@ -5915,7 +5916,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.use64bShadowLimit = kernel["Use64bShadowLimit"] and kernel["BufferLoad"]
     # Keep gfx950's dedicated MX shadow-limit switch, but match legacy gfx1250
     # behavior where MX tensors share the same shadow-limit mode as A/B.
-    if kernel["ISA"][:2] == (9, 5):
+    if isgfx950:
       self.states.use64bShadowLimitMX = kernel["Use64bShadowLimitMX"] and kernel["BufferLoad"]
     else:
       self.states.use64bShadowLimitMX = self.states.use64bShadowLimit
@@ -5937,9 +5938,11 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.states.srdShiftLeft["A"] = kernel["GlobalReadVectorWidthA"]
     self.states.srdShiftLeft["B"] = kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["MXBlockA"]:
-      self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthMXSA"]
+      # use MXS version for gfx950 only
+      self.states.srdShiftLeft["MXSA"] = kernel["GlobalReadVectorWidthMXSA"] if isgfx950 else kernel["GlobalReadVectorWidthA"]
     if kernel["ProblemType"]["MXBlockB"]:
-      self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthMXSB"]
+      # use MXS version for gfx950 only
+      self.states.srdShiftLeft["MXSB"] = kernel["GlobalReadVectorWidthMXSB"] if isgfx950 else kernel["GlobalReadVectorWidthB"]
     if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
       self.states.srdShiftLeft["Metadata"] = kernel["GlobalReadVectorWidthMetadata"]
 
@@ -6224,7 +6227,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"] * kernel["MIInputPerThreadMXSA"] // self.states.bpr
         # workaround for gfx950
         # need to allocate same amount of MIWaveTile
-        if kernel["ISA"][:2] == (9, 5):
+        if isgfx950:
           self.states.mxsa.numVgprValuPerBlock = kernel["MIWaveTileMXSA"]
         if kernel["DirectToVgprMXSA"] and not (self.states.packDTVA or self.states.convDTVA):
           self.states.mxsa.numVgprValuPerBlock = 0
@@ -6240,7 +6243,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
         self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"] * kernel["MIInputPerThreadMXSB"] // self.states.bpr
         # workaround for gfx950
         # need to allocate same amount of MIWaveTile
-        if kernel["ISA"][:2] == (9, 5):
+        if isgfx950:
           self.states.mxsb.numVgprValuPerBlock = kernel["MIWaveTileMXSB"]
         if kernel["DirectToVgprMXSB"] and not (self.states.packDTVB or self.states.convDTVB):
           self.states.mxsb.numVgprValuPerBlock = 0

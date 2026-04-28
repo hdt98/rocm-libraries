@@ -8104,7 +8104,7 @@ class KernelWriterAssembly(KernelWriter):
                     bStr = vgpr(self.generateSrcStrForMFMAshiftK(kernel, tPB, innerUnroll, vregSetIdx, vgprPerInputB, m, u, iui, b, bk=bk), 1)
                     shiftK.add(VCndMaskB32(dst=bStr, src0=bStr, src1=0, src2=sgpr(tmpSgprX2, self.states.laneSGPRCount), comment="set 0 if K_idx >= sizeL"))
             # separate code for gfx950 mx
-            if group == 0 and kernel["ProblemType"]["MXBlockB"]:
+            if group == 0 and kernel["ProblemType"]["MXBlockB"] and isgfx950:
               for mxsb in range(0, kernel["MIWaveTileMXSB"]):
                 for iui in range(0, innerUnroll):
                   for bk in range(0, vgprPerInputMXSB):
