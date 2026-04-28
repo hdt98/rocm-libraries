@@ -106,12 +106,12 @@ if(UNIX AND NOT APPLE)
   # Create scripts directory in build
   file(MAKE_DIRECTORY ${SCRIPTS_BUILD_DIR})
 
-  # Copy watchdog wrapper script to build directory
-  configure_file(
-    ${WATCHDOG_WRAPPER_SOURCE}
-    ${WATCHDOG_WRAPPER_OUTPUT}
-    COPYONLY
-  )
+  # Copy watchdog wrapper script to build directory with execute permissions
+  file(COPY ${WATCHDOG_WRAPPER_SOURCE}
+       DESTINATION ${SCRIPTS_BUILD_DIR}
+       FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                        GROUP_READ GROUP_EXECUTE
+                        WORLD_READ WORLD_EXECUTE)
 
   # Build ptrace wrapper in build directory
   add_custom_command(
