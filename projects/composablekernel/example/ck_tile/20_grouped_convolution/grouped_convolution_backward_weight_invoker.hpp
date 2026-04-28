@@ -64,6 +64,8 @@ struct GroupedConvolutionBackwardWeightInvoker
         using TilePartitioner =
             typename PartitionerPolicy::template type<GemmShape, GroupedConvTraitsType>;
 
+        constexpr bool LargeTensors = false;
+
         using GemmUniversalTraits = ck_tile::TileGemmUniversalTraits<
             GroupedConvTraitsType::FixedGemmParams::kPadM,
             GroupedConvTraitsType::FixedGemmParams::kPadN,
@@ -75,7 +77,10 @@ struct GroupedConvolutionBackwardWeightInvoker
             GroupedConvTraitsType::FixedGemmParams::TransposeC,
             GroupedConvTraitsType::FixedGemmParams::UseStructuredSparsity,
             GroupedConvTraitsType::FixedGemmParams::Persistent,
-            ConvConfig::NumWaveGroups>;
+            ConvConfig::NumWaveGroups,
+            GroupedConvTraitsType::FixedGemmParams::Preshuffle,
+            GroupedConvTraitsType::FixedGemmParams::LDSVectorSize,
+            LargeTensors>;
         constexpr auto scheduler = ConvConfig::Scheduler;
 
         using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
