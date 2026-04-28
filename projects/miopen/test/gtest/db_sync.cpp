@@ -1048,4 +1048,9 @@ INSTANTIATE_TEST_SUITE_P(Smoke,
                                          std::make_pair("gfx90a", 104),
                                          std::make_pair("gfx90a", 110),
                                          std::make_pair("gfx942", 304),
-                                         std::make_pair("gfx1030", 36)));
+                                         std::make_pair("gfx1030", 36),
+                                         std::make_pair("gfx1100", 48),
+                                         std::make_pair("gfx1101", 27),
+                                         std::make_pair("gfx1102", 27),
+                                         std::make_pair("gfx1151", 20),
+                                         std::make_pair("gfx1201", 32)));
