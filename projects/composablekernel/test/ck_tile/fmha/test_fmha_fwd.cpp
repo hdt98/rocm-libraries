@@ -163,7 +163,7 @@ const ck_tile::stream_config stream_config{
 
 #define COMMON_ARGS                                                                              \
     init_method, static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))), 1, 0, \
-        stream_config
+        "none", stream_config
 
 auto EnableTestIf(bool condition)
 {
@@ -296,7 +296,8 @@ TEST(TestCkTileFmhaFwd, AppendKvWithBatchEffLensShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,      // init_sink
+        "none", // block_mask_str
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -341,7 +342,8 @@ TEST(TestCkTileFmhaFwd, SplitKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,      // init_sink
+        "none", // block_mask_str
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
@@ -385,7 +387,8 @@ TEST(TestCkTileFmhaFwd, PagedKvWithGroupPaddingShouldFail)
         init_method,
         static_cast<uint32_t>(ck_tile::EnvValue(CK_TILE_ENV(CK_TILE_TEST_SEED))),
         0,
-        1, // init_sink
+        1,      // init_sink
+        "none", // block_mask_str
         stream_config);
     ASSERT_EQ(result, fwd_result::invalid_args);
 }
