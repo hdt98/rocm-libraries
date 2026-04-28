@@ -132,9 +132,6 @@ public:
 
 		size_t host_mem_limit = 0;
 		size_t dev_mem_limit = 0;
-
-        // Valid when is_apu is true.
-		size_t unified_mem_limit = 0;
 	};
 
 	// padding_factor is a value in [0, 1] that indicates how much of a buffer we should leave below
@@ -302,13 +299,7 @@ private:
         HIP_CHECK(hipGetDeviceProperties(&props, 0));
         MemCheck::sys_info.is_apu = static_cast<bool>(props.integrated);
         std::cout << "is_apu: " << MemCheck::sys_info.is_apu << std::endl;
-
-        if (MemCheck::sys_info.is_apu)
-        {
-            MemCheck::sys_info.unified_mem_limit = total_dev_mem; // for now
-            std::cout << "unified_mem_limit: " << (MemCheck::sys_info.unified_mem_limit >> 20) << std::endl;
-        }
-            
+ 
         MemCheck::sys_info.is_initialized = true;
     }
 
