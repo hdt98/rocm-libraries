@@ -25,6 +25,7 @@
  *******************************************************************************/
 #pragma once
 
+#include <functional>
 #include <set>
 #include <unordered_map>
 
@@ -246,6 +247,55 @@ using UnitTestConvSolverDevApplicabilityBwd =
     UnitTestConvSolverDevApplicability<miopen::conv::Direction::BackwardData>;
 using UnitTestConvSolverDevApplicabilityWrw =
     UnitTestConvSolverDevApplicability<miopen::conv::Direction::BackwardWeights>;
+
+//************************************************************************************
+// Cross-backend Wrw comparison
+//
+// Runs the same Wrw problem twice through the given solver, with `select_backend_a`
+// and `select_backend_b` invoked between runs (typically to flip backend-selection
+// env vars), then directly compares the two GPU outputs against each other using the
+// tolerance in `params`. Inputs are generated once and shared between the two runs.
+//************************************************************************************
+template <typename T>
+void RunSolverWrwCompareBackends(const miopen::solver::conv::ConvSolverInterface& solv,
+                                 const UnitTestConvSolverParams& params,
+                                 const ConvTestCase& conv_config,
+                                 miopenConvAlgorithm_t algo,
+                                 const std::function<void()>& select_backend_a,
+                                 const std::function<void()>& select_backend_b);
+
+} // namespace unit_tests
+} // namespace miopen
+
+class bfloat16;
+namespace half_float {
+class half;
+} // namespace half_float
+
+namespace miopen {
+namespace unit_tests {
+
+extern template void
+RunSolverWrwCompareBackends<half_float::half>(const miopen::solver::conv::ConvSolverInterface&,
+                                              const UnitTestConvSolverParams&,
+                                              const ConvTestCase&,
+                                              miopenConvAlgorithm_t,
+                                              const std::function<void()>&,
+                                              const std::function<void()>&);
+extern template void
+RunSolverWrwCompareBackends<bfloat16>(const miopen::solver::conv::ConvSolverInterface&,
+                                      const UnitTestConvSolverParams&,
+                                      const ConvTestCase&,
+                                      miopenConvAlgorithm_t,
+                                      const std::function<void()>&,
+                                      const std::function<void()>&);
+extern template void
+RunSolverWrwCompareBackends<float>(const miopen::solver::conv::ConvSolverInterface&,
+                                   const UnitTestConvSolverParams&,
+                                   const ConvTestCase&,
+                                   miopenConvAlgorithm_t,
+                                   const std::function<void()>&,
+                                   const std::function<void()>&);
 
 } // namespace unit_tests
 } // namespace miopen

@@ -288,6 +288,11 @@ For more information, see :doc:`Logging and debugging <../how-to/debug-log>`.
       - | 0: Disable
         | 1: Enable
 
+    * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53``
+        | Controls ConvOclBwdWrW53 direct solution.
+      - | 0: Disable
+        | 1: Enable
+
     * - | ``MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW1X1``
         | Controls ConvOclBwdWrW1x1 direct solution.
       - | 0: Disable

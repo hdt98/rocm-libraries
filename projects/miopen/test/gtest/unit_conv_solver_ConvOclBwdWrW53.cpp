@@ -24,7 +24,20 @@
  *
  *******************************************************************************/
 
+#include <optional>
+
 #include "unit_conv_solver.hpp"
+#include "../lib_env_var.hpp"
+
+#include <miopen/bfloat16.hpp>
+#include <half/half.hpp>
+
+// The ConvOclBwdWrW53 solver supports two kernel backends selected at runtime
+// via these environment variables (read by ExecutionContext::DetectRocm()).
+// We toggle both flags so each test fixture deterministically exercises one
+// backend regardless of the host's defaults.
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_OPENCL_CONVOLUTIONS)
+MIOPEN_LIB_ENV_VAR(MIOPEN_DEBUG_HIP_KERNELS)
 
 namespace {
 
@@ -39,6 +52,20 @@ auto GetConvTestCases(miopenDataType_t datatype)
     };
 }
 
+// Grouped variant exercising the MIOpenGroupConvBwdWrW_LxG_P53{,Hip} kernel path.
+// Channel and filter counts are chosen to be divisible by the group count so the
+// solver applies cleanly: c = w_per_group * groups, k = filters * groups.
+auto GetGroupedConvTestCases(miopenDataType_t datatype)
+{
+    using TestCase = miopen::unit_tests::ConvTestCase;
+
+    return std::vector{
+        // clang-format off
+        TestCase{{16, 2, 7, 7}, {2, 1, 3, 3}, {0, 0}, {1, 1}, {1, 1}, /*groups=*/2, datatype},
+        // clang-format on
+    };
+}
+
 const auto& GetTestParams()
 {
     static const auto params = [] {
@@ -49,56 +76,340 @@ const auto& GetTestParams()
     return params;
 }
 
+// Helper that snapshots the current backend-selection env vars, forces a
+// specific backend for the duration of a single test, and restores the
+// original values on teardown. Designed to be mixed into a gtest fixture via
+// SetUp/TearDown delegation.
+class BackendEnvOverride
+{
+public:
+    enum class Backend
+    {
+        Ocl,
+        Hip,
+    };
+
+    // Capture the current env-var state so it can be restored later. Call
+    // exactly once per fixture lifetime, before any Force() flips.
+    void Snapshot()
+    {
+        prev_ocl_ = SnapshotBool(MIOPEN_DEBUG_OPENCL_CONVOLUTIONS);
+        prev_hip_ = SnapshotBool(MIOPEN_DEBUG_HIP_KERNELS);
+    }
+
+    // Flip env vars to select the requested backend. Safe to call multiple
+    // times within a single Snapshot()/Restore() pair.
+    void Force(Backend backend)
+    {
+        // Force exactly one backend on. The solver prefers HIP when both flags
+        // are true, so we additionally disable the unused side to keep the
+        // selection unambiguous and to give a clean failure mode if the
+        // intended kernel is unavailable.
+        switch(backend)
+        {
+        case Backend::Ocl:
+            lib_env::update(MIOPEN_DEBUG_OPENCL_CONVOLUTIONS, true);
+            lib_env::update(MIOPEN_DEBUG_HIP_KERNELS, false);
+            break;
+        case Backend::Hip:
+            lib_env::update(MIOPEN_DEBUG_OPENCL_CONVOLUTIONS, false);
+            lib_env::update(MIOPEN_DEBUG_HIP_KERNELS, true);
+            break;
+        }
+    }
+
+    // Convenience wrapper preserving the original Snapshot+Force semantics
+    // used by WithBackend<>.
+    void Apply(Backend backend)
+    {
+        Snapshot();
+        Force(backend);
+    }
+
+    void Restore()
+    {
+        RestoreBool(MIOPEN_DEBUG_OPENCL_CONVOLUTIONS, prev_ocl_);
+        RestoreBool(MIOPEN_DEBUG_HIP_KERNELS, prev_hip_);
+    }
+
+private:
+    static std::optional<bool> SnapshotBool(const lib_env::LibEnvVar& var)
+    {
+        if(static_cast<bool>(var))
+        {
+            return lib_env::value<bool>(var);
+        }
+        return std::nullopt;
+    }
+
+    static void RestoreBool(const lib_env::LibEnvVar& var, std::optional<bool> prev)
+    {
+        if(prev.has_value())
+        {
+            lib_env::update(var, *prev);
+        }
+        else
+        {
+            lib_env::clear(var);
+        }
+    }
+
+    std::optional<bool> prev_ocl_;
+    std::optional<bool> prev_hip_;
+};
+
+template <class Base, BackendEnvOverride::Backend kBackend>
+class WithBackend : public Base
+{
+protected:
+    void SetUp() override
+    {
+        env_override_.Apply(kBackend);
+        Base::SetUp();
+    }
+
+    void TearDown() override
+    {
+        Base::TearDown();
+        env_override_.Restore();
+    }
+
+private:
+    BackendEnvOverride env_override_;
+};
+
+// Fixture mix-in for the cross-backend comparison tests. Snapshots env vars
+// once at SetUp so a single test can flip backends multiple times via
+// env_.Force() and still have the original state restored at TearDown.
+template <class Base>
+class CompareBackendsFixture : public Base
+{
+protected:
+    void SetUp() override
+    {
+        env_.Snapshot();
+        Base::SetUp();
+    }
+
+    void TearDown() override
+    {
+        Base::TearDown();
+        env_.Restore();
+    }
+
+    template <typename T>
+    void RunCompare(const miopen::solver::conv::ConvSolverInterface& solv,
+                    miopenDataType_t datatype)
+    {
+        miopen::unit_tests::UnitTestConvSolverParams params;
+        miopenConvAlgorithm_t algo;
+        miopen::unit_tests::ConvTestCase conv_config;
+        std::tie(params, algo, conv_config) = this->GetParam();
+
+        // Tighten tolerance for the direct GPU-vs-GPU comparison. The OCL and
+        // HIP kernel paths execute the same arithmetic sequence, so for FP32
+        // we target bit-exact agreement; for FP16/BFP16 we allow a quarter of
+        // the CPU-reference default tolerance to absorb any minor codegen
+        // differences without losing the regression-detection signal.
+        // VerifyData uses a strict `<` against the threshold, so a literal 0.0
+        // would reject a true bit-exact match. Use a tiny positive value to
+        // allow error == 0 to pass while still rejecting any real divergence.
+        if(datatype == miopenFloat)
+        {
+            params.SetTolerance(Gpu::All, datatype, 1e-30f);
+        }
+        else
+        {
+            params.SetTolerance(Gpu::All, datatype, 0.25f);
+        }
+
+        miopen::unit_tests::RunSolverWrwCompareBackends<T>(
+            solv,
+            params,
+            conv_config,
+            algo,
+            [&] { env_.Force(BackendEnvOverride::Backend::Ocl); },
+            [&] { env_.Force(BackendEnvOverride::Backend::Hip); });
+    }
+
+private:
+    BackendEnvOverride env_;
+};
+
 } // namespace
 
-using GPU_UnitTestConvSolverOclBwdWrW53_FP16  = GPU_UnitTestConvSolverWrw_FP16;
-using GPU_UnitTestConvSolverOclBwdWrW53_BFP16 = GPU_UnitTestConvSolverWrw_BFP16;
-using GPU_UnitTestConvSolverOclBwdWrW53_FP32  = GPU_UnitTestConvSolverWrw_FP32;
+// OpenCL backend (legacy kernel path)
+using GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP16 =
+    WithBackend<GPU_UnitTestConvSolverWrw_FP16, BackendEnvOverride::Backend::Ocl>;
+using GPU_UnitTestConvSolverOclBwdWrW53_OCL_BFP16 =
+    WithBackend<GPU_UnitTestConvSolverWrw_BFP16, BackendEnvOverride::Backend::Ocl>;
+using GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP32 =
+    WithBackend<GPU_UnitTestConvSolverWrw_FP32, BackendEnvOverride::Backend::Ocl>;
 
-using CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_NONE =
-    CPU_UnitTestConvSolverDevApplicabilityWrw_NONE;
+// HIP backend (new kernel path)
+using GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP16 =
+    WithBackend<GPU_UnitTestConvSolverWrw_FP16, BackendEnvOverride::Backend::Hip>;
+using GPU_UnitTestConvSolverOclBwdWrW53_HIP_BFP16 =
+    WithBackend<GPU_UnitTestConvSolverWrw_BFP16, BackendEnvOverride::Backend::Hip>;
+using GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP32 =
+    WithBackend<GPU_UnitTestConvSolverWrw_FP32, BackendEnvOverride::Backend::Hip>;
 
-TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_FP16, ConvOclBwdWrW53)
+using CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_OCL_NONE =
+    WithBackend<CPU_UnitTestConvSolverDevApplicabilityWrw_NONE, BackendEnvOverride::Backend::Ocl>;
+using CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_HIP_NONE =
+    WithBackend<CPU_UnitTestConvSolverDevApplicabilityWrw_NONE, BackendEnvOverride::Backend::Hip>;
+
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP16, ConvOclBwdWrW53)
 {
     this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
 };
 
-TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_BFP16, ConvOclBwdWrW53)
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_OCL_BFP16, ConvOclBwdWrW53)
 {
     this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
 };
 
-TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_FP32, ConvOclBwdWrW53)
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP32, ConvOclBwdWrW53)
 {
     this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
 };
 
-TEST_P(CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_NONE, ConvOclBwdWrW53)
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP16, ConvOclBwdWrW53)
 {
     this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
 };
 
-// Smoke tests
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HIP_BFP16, ConvOclBwdWrW53)
+{
+    this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
+};
+
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP32, ConvOclBwdWrW53)
+{
+    this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
+};
+
+TEST_P(CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_OCL_NONE, ConvOclBwdWrW53)
+{
+    this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
+};
+
+TEST_P(CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_HIP_NONE, ConvOclBwdWrW53)
+{
+    this->RunTest(miopen::solver::conv::ConvOclBwdWrW53{});
+};
+
+// Smoke tests - OpenCL backend
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_UnitTestConvSolverOclBwdWrW53_FP16,
+                         GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP16,
                          testing::Combine(testing::Values(GetTestParams()),
                                           testing::Values(miopenConvolutionAlgoDirect),
                                           testing::ValuesIn(GetConvTestCases(miopenHalf))));
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_UnitTestConvSolverOclBwdWrW53_BFP16,
+                         GPU_UnitTestConvSolverOclBwdWrW53_OCL_BFP16,
                          testing::Combine(testing::Values(GetTestParams()),
                                           testing::Values(miopenConvolutionAlgoDirect),
                                           testing::ValuesIn(GetConvTestCases(miopenBFloat16))));
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_UnitTestConvSolverOclBwdWrW53_FP32,
+                         GPU_UnitTestConvSolverOclBwdWrW53_OCL_FP32,
                          testing::Combine(testing::Values(GetTestParams()),
                                           testing::Values(miopenConvolutionAlgoDirect),
                                           testing::ValuesIn(GetConvTestCases(miopenFloat))));
 
-// Device applicability test
+// Smoke tests - HIP backend
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_NONE,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenHalf))));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HIP_BFP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenBFloat16))));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HIP_FP32,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenFloat))));
+
+// Device applicability tests - both backends
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_OCL_NONE,
                          testing::Combine(testing::Values(GetTestParams()),
                                           testing::Values(GetConvTestCases(miopenFloat)[0])));
+
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         CPU_UnitTestConvSolverOclBwdWrW53DevApplicability_HIP_NONE,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(GetConvTestCases(miopenFloat)[0])));
+
+// Cross-backend (OCL vs HIP) numeric comparison fixtures. Each test runs the
+// same problem through both backends and diffs the GPU outputs directly,
+// giving a tighter bound than the per-backend CPU-reference comparisons.
+using GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP16 =
+    CompareBackendsFixture<GPU_UnitTestConvSolverWrw_FP16>;
+using GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_BFP16 =
+    CompareBackendsFixture<GPU_UnitTestConvSolverWrw_BFP16>;
+using GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32 =
+    CompareBackendsFixture<GPU_UnitTestConvSolverWrw_FP32>;
+
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP16, ConvOclBwdWrW53)
+{
+    this->template RunCompare<half_float::half>(miopen::solver::conv::ConvOclBwdWrW53{},
+                                                miopenHalf);
+};
+
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_BFP16, ConvOclBwdWrW53)
+{
+    this->template RunCompare<bfloat16>(miopen::solver::conv::ConvOclBwdWrW53{}, miopenBFloat16);
+};
+
+TEST_P(GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32, ConvOclBwdWrW53)
+{
+    this->template RunCompare<float>(miopen::solver::conv::ConvOclBwdWrW53{}, miopenFloat);
+};
+
+// Ungrouped (group=1) instantiations.
+INSTANTIATE_TEST_SUITE_P(Smoke_G1,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenHalf))));
+
+INSTANTIATE_TEST_SUITE_P(Smoke_G1,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_BFP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenBFloat16))));
+
+INSTANTIATE_TEST_SUITE_P(Smoke_G1,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetConvTestCases(miopenFloat))));
+
+// Grouped (group=2) instantiations exercising the
+// MIOpenGroupConvBwdWrW_LxG_P53{,Hip} kernel path.
+INSTANTIATE_TEST_SUITE_P(Smoke_G2,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP16,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetGroupedConvTestCases(miopenHalf))));
+
+INSTANTIATE_TEST_SUITE_P(
+    Smoke_G2,
+    GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_BFP16,
+    testing::Combine(testing::Values(GetTestParams()),
+                     testing::Values(miopenConvolutionAlgoDirect),
+                     testing::ValuesIn(GetGroupedConvTestCases(miopenBFloat16))));
+
+INSTANTIATE_TEST_SUITE_P(Smoke_G2,
+                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32,
+                         testing::Combine(testing::Values(GetTestParams()),
+                                          testing::Values(miopenConvolutionAlgoDirect),
+                                          testing::ValuesIn(GetGroupedConvTestCases(miopenFloat))));
