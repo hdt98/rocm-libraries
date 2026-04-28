@@ -73,7 +73,7 @@ if not test_component_job_name:
     sys.exit(1)
 
 TEST_COMPONENT = COMPONENT_DIR_MAPPING.get(
-    test_component_job_name
+    test_component_job_name, test_component_job_name
 )
 
 # GTest sharding
@@ -150,11 +150,7 @@ def get_available_gpu_suite_tests():
     Parses labels of the form ex_gpu_{gpu_arch} (e.g. ex_gpu_gfx110X, ex_gpu_gfx950).
     Returns a set of gpu_arch strings (e.g., 'gfx110X', 'gfx115X', 'gfx950').
     """
-    if args.multigpu:
-        TEST_COMPONENT = TEST_COMPONENT.split("-")[0]
-        test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
-    else:
-        test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
+    test_dir = Path(THEROCK_BIN_DIR) / TEST_COMPONENT
 
     if not test_dir.exists() or not test_dir.is_dir():
         print(f"Error: Test directory does not exist: {test_dir}", file=sys.stderr)
