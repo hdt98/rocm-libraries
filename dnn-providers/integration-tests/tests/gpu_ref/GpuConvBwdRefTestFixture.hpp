@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "ConvShapeCase.hpp"
 #include <gtest/gtest.h>
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/types.hpp>
+
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
@@ -31,6 +33,9 @@ using namespace hipdnn_data_sdk::utilities;
 using namespace hipdnn_data_sdk::types;
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_gpu_ref;
+
+using gpu_conv_ref_test::ConvShapeCase;
+using ConvBwdShapeCase = ConvShapeCase;
 
 // Validates that two tensors are element-wise close using the standard allClose validator.
 template <typename T>
@@ -97,43 +102,6 @@ void runGpuVsCpuConvBwd(const std::vector<int64_t>& xDims,
                                                                           tolerance,
                                                                           fillRange);
 }
-
-// ============================================================================
-// ConvBwdShapeCase — shape parameters for parameterized dgrad tests
-// ============================================================================
-
-struct ConvBwdShapeCase
-{
-    std::vector<int64_t> xDims;
-    std::vector<int64_t> wDims;
-    std::vector<int64_t> strides;
-    std::vector<int64_t> dilations;
-    std::vector<int64_t> padding;
-    int64_t groups = 1;
-    std::string tag;
-
-    const TensorLayout* layout = nullptr;
-
-    std::vector<int64_t> computeOutputDims() const
-    {
-        auto numSpatialDims = xDims.size() - 2;
-        std::vector<int64_t> yDims = {xDims[0], wDims[0]};
-        for(size_t i = 0; i < numSpatialDims; ++i)
-        {
-            auto outputSize
-                = (xDims[2 + i] + 2 * padding[i] - dilations[i] * (wDims[2 + i] - 1) - 1)
-                      / strides[i]
-                  + 1;
-            yDims.push_back(outputSize);
-        }
-        return yDims;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const ConvBwdShapeCase& tc)
-    {
-        return os << tc.tag;
-    }
-};
 
 // ============================================================================
 // ConvBwdShapeSuite — parameterized fixture for shape-based GPU-vs-CPU tests

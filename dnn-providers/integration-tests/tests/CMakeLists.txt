@@ -61,28 +61,38 @@ target_compile_options(hipdnn_gpu_ref_tests
 
 clang_tidy_check(hipdnn_gpu_ref_tests)
 
-add_unit_test_target(hipdnn_gpu_ref_tests ${CMAKE_CURRENT_BINARY_DIR})
+# We don't use add_unit_test_target() here because it registers one ctest entry
+# for the full binary (no "slow" label), which breaks ctest -LE slow filtering.
+# Instead we replicate its infra setup and register two filtered ctest entries.
 
-add_executable(hipdnn_gpu_ref_slow_tests
-    gpu_ref/main.cpp
-    gpu_ref/TestGpuFpReferenceConvolutionSlow.cpp
-    gpu_ref/TestGpuFpReferenceDgradSlow.cpp
-    gpu_ref/TestGpuFpReferenceWgradSlow.cpp
-)
+# -- Infra setup (RPATH, install, test-name validation) --
+set(CHECK_DEPENDS_GLOBAL ${CHECK_DEPENDS_GLOBAL} hipdnn_gpu_ref_tests
+    CACHE INTERNAL "Accumulated global dependencies for test name validation" FORCE)
+set(_gpu_ref_exe hipdnn_gpu_ref_tests${CMAKE_EXECUTABLE_SUFFIX})
+set(CHECK_EXECUTABLE_PATHS_GLOBAL ${CHECK_EXECUTABLE_PATHS_GLOBAL}
+    "${CMAKE_INSTALL_BINDIR}/${_gpu_ref_exe}"
+    CACHE INTERNAL "Accumulated global check executable paths" FORCE)
+set_target_properties(hipdnn_gpu_ref_tests PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}"
+    INSTALL_RPATH
+        "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR};\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/engines"
+    INSTALL_RPATH_USE_LINK_PATH TRUE
+    BUILD_RPATH_USE_ORIGIN TRUE)
+set_property(GLOBAL APPEND PROPERTY INTEGRATION_TESTS_TEST_TARGETS hipdnn_gpu_ref_tests)
+install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-target_link_libraries(hipdnn_gpu_ref_slow_tests
-    PRIVATE
-        hipdnn_gpu_ref
-        hipdnn_test_sdk
-        hipdnn_plugin_sdk
-        GTest::gtest
-        Threads::Threads
-        hip::host
-)
+# -- Filtered ctest entries (one binary, two invocations) --
+# Category is encoded in the INSTANTIATE_TEST_SUITE_P prefix: Small*, Medium*, Large*.
+# Standalone (non-parameterized) tests all start with "Test*".
+#   ctest              → all tests (fast + slow)
+#   ctest -LE slow     → fast only (excludes anything labeled "slow")
+#   ctest -L slow      → slow only (Medium* + Large*)
+add_test(NAME hipdnn_gpu_ref_fast
+    COMMAND hipdnn_gpu_ref_tests "--gtest_filter=Small*:Test*"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(hipdnn_gpu_ref_fast PROPERTIES LABELS "unit_test")
 
-target_compile_options(hipdnn_gpu_ref_slow_tests
-    PRIVATE ${INTEGRATION_TESTS_WARNING_COMPILE_OPTIONS})
-
-clang_tidy_check(hipdnn_gpu_ref_slow_tests)
-
-add_integration_test_target(hipdnn_gpu_ref_slow_tests ${CMAKE_CURRENT_BINARY_DIR} LABELS slow)
+add_test(NAME hipdnn_gpu_ref_slow
+    COMMAND hipdnn_gpu_ref_tests "--gtest_filter=Medium*:Large*"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(hipdnn_gpu_ref_slow PROPERTIES LABELS "unit_test;slow")

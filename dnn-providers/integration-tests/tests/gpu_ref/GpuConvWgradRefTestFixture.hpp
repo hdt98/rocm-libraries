@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include "ConvShapeCase.hpp"
 #include <gtest/gtest.h>
 #include <hip/hip_runtime.h>
 #include <hipdnn_data_sdk/types.hpp>
+
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
@@ -31,6 +33,9 @@ using namespace hipdnn_data_sdk::utilities;
 using namespace hipdnn_data_sdk::types;
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_gpu_ref;
+
+using gpu_conv_ref_test::ConvShapeCase;
+using ConvWgradShapeCase = ConvShapeCase;
 
 // Validates that two tensors are element-wise close using the standard allClose validator.
 // Handles NaN/Inf detection, stride-aware indexing, and parallel comparison.
@@ -102,46 +107,6 @@ void runGpuVsCpuConvWrw(const std::vector<int64_t>& xDims,
                                                                           tolerance,
                                                                           fillRange);
 }
-
-// ============================================================================
-// ConvWgradShapeCase — shape parameters for parameterized wgrad tests
-// ============================================================================
-
-struct ConvWgradShapeCase
-{
-    std::vector<int64_t> xDims;
-    std::vector<int64_t> wDims;
-    std::vector<int64_t> strides;
-    std::vector<int64_t> dilations;
-    std::vector<int64_t> padding;
-    int64_t groups = 1;
-    std::string tag;
-
-    // When non-null, x and dy tensors use this channel-last layout (NHWC/NDHWC/NLC).
-    // dw (weight gradient) always uses default packed (KCRS) strides regardless.
-    const TensorLayout* layout = nullptr;
-
-    // Computes the forward output dims (= dy dims for wgrad).
-    std::vector<int64_t> computeOutputDims() const
-    {
-        auto numSpatialDims = xDims.size() - 2;
-        std::vector<int64_t> dyDims = {xDims[0], wDims[0]};
-        for(size_t i = 0; i < numSpatialDims; ++i)
-        {
-            auto outputSize
-                = (xDims[2 + i] + 2 * padding[i] - dilations[i] * (wDims[2 + i] - 1) - 1)
-                      / strides[i]
-                  + 1;
-            dyDims.push_back(outputSize);
-        }
-        return dyDims;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const ConvWgradShapeCase& tc)
-    {
-        return os << tc.tag;
-    }
-};
 
 // ============================================================================
 // ConvWgradShapeSuite — parameterized fixture for shape-based GPU-vs-CPU tests
