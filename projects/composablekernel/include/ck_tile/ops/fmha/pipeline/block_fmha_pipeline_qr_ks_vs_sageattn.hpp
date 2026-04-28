@@ -380,7 +380,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         auto l     = MLBlockTileType{};
         auto cum_log_scale = MLBlockTileType{};
 
-        clear_tile(o_acc);
+        set_tile(o_acc, type_convert<OaccDataType>(0.0f));
         clear_tile(cum_log_scale);
         set_tile(m, -numeric<SMPLComputeDataType>::infinity());
         clear_tile(l);
