@@ -54,7 +54,12 @@
 #include <Tensile/hip/HipUtils.hpp>
 
 #include <atomic>
+#include <climits>
+#include <cmath>
 #include <complex>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <filesystem>
 #include <iomanip>
@@ -2747,6 +2752,254 @@ bool useRocRoller(rocblaslt_handle handle, const RocblasltContractionProblem& pr
 #endif
 
 /******************************************************************************
+ * NaN/Inf check on kernel output — enabled by HIPBLASLT_NAN_CHECK=1         *
+ * Syncs the stream, copies D to host, scans for special values.             *
+ * HIPBLASLT_NAN_CHECK_ABORT=1 calls abort() on first detection.             *
+ ******************************************************************************/
+static bool isNanCheckEnabled()
+{
+    static const bool enabled = []() {
+        const char* env = std::getenv("HIPBLASLT_NAN_CHECK");
+        return env != nullptr && std::string(env) != "0";
+    }();
+    return enabled;
+}
+
+static const char* hipDataTypeName(hipDataType dtype)
+{
+    switch(dtype)
+    {
+    case HIP_R_32F: return "f32";
+    case HIP_R_64F: return "f64";
+    case HIP_R_16F: return "f16";
+    case HIP_R_16BF: return "bf16";
+    case HIP_R_8F_E4M3: return "fp8e4m3";
+    case HIP_R_8F_E5M2: return "fp8e5m2";
+    default: return "unknown";
+    }
+}
+
+static size_t hipDataTypeBytes(hipDataType dtype)
+{
+    switch(dtype)
+    {
+    case HIP_R_32F: return 4;
+    case HIP_R_64F: return 8;
+    case HIP_R_16F: return 2;
+    case HIP_R_16BF: return 2;
+    case HIP_R_8F_E4M3: return 1;
+    case HIP_R_8F_E5M2: return 1;
+    default: return 0;
+    }
+}
+
+static bool nanCheckIsSpecial(const char* buf, hipDataType d_type, size_t idx,
+                               bool& isNan, bool& isInf)
+{
+    isNan = isInf = false;
+    switch(d_type)
+    {
+    case HIP_R_32F:
+    {
+        float v;
+        std::memcpy(&v, buf + idx * 4, 4);
+        isNan = std::isnan(v);
+        isInf = std::isinf(v);
+        break;
+    }
+    case HIP_R_64F:
+    {
+        double v;
+        std::memcpy(&v, buf + idx * 8, 8);
+        isNan = std::isnan(v);
+        isInf = std::isinf(v);
+        break;
+    }
+    case HIP_R_16F:
+    {
+        uint16_t bits;
+        std::memcpy(&bits, buf + idx * 2, 2);
+        uint16_t exp = (bits >> 10) & 0x1F;
+        if(exp == 0x1F)
+        {
+            isNan = (bits & 0x3FF) != 0;
+            isInf = !isNan;
+        }
+        break;
+    }
+    case HIP_R_16BF:
+    {
+        uint16_t bits;
+        std::memcpy(&bits, buf + idx * 2, 2);
+        uint16_t exp = (bits >> 7) & 0xFF;
+        if(exp == 0xFF)
+        {
+            isNan = (bits & 0x7F) != 0;
+            isInf = !isNan;
+        }
+        break;
+    }
+    default:
+        return false;
+    }
+    return isNan || isInf;
+}
+
+static void nanCheckScanOutput(void*              D,
+                                hipDataType        d_type,
+                                size_t             m,
+                                size_t             n,
+                                size_t             k,
+                                size_t             batch_count,
+                                size_t             ld_d,
+                                size_t             stride_d_batch,
+                                hipStream_t        stream,
+                                const std::string& kernelName,
+                                const std::string& solutionName)
+{
+    if(!isNanCheckEnabled() || D == nullptr)
+        return;
+
+    const size_t elemSize = hipDataTypeBytes(d_type);
+    if(elemSize == 0 || m == 0 || n == 0)
+        return;
+
+    const size_t batchCount  = std::max(batch_count, static_cast<size_t>(1));
+    const size_t ldd         = (ld_d >= m) ? ld_d : m;
+    const size_t batchStride = (stride_d_batch > 0 && batchCount > 1)
+                                   ? stride_d_batch
+                                   : ldd * n;
+
+    // Exact memory footprint: last valid element offset + 1
+    const size_t footprint = (batchCount - 1) * batchStride + (n - 1) * ldd + m;
+
+    size_t copyElems = footprint;
+    size_t copyBytes = copyElems * elemSize;
+    bool   truncated = false;
+    constexpr size_t kMaxCopyBytes = 256UL * 1024 * 1024;
+    if(copyBytes > kMaxCopyBytes)
+    {
+        copyElems = kMaxCopyBytes / elemSize;
+        copyBytes = copyElems * elemSize;
+        truncated = true;
+    }
+
+    hipError_t err = hipStreamSynchronize(stream);
+    if(err != hipSuccess)
+    {
+        std::fprintf(stderr,
+                     "[HIPBLASLT_NAN_CHECK] hipStreamSynchronize failed: %s\n",
+                     hipGetErrorString(err));
+        return;
+    }
+
+    std::vector<char> buf(copyBytes);
+    err = hipMemcpy(buf.data(), D, copyBytes, hipMemcpyDeviceToHost);
+    if(err != hipSuccess)
+    {
+        std::fprintf(stderr,
+                     "[HIPBLASLT_NAN_CHECK] hipMemcpy failed: %s\n",
+                     hipGetErrorString(err));
+        return;
+    }
+
+    size_t nanCount = 0, infCount = 0;
+    size_t firstNanB = 0, firstNanJ = 0, firstNanI = 0;
+    size_t firstInfB = 0, firstInfJ = 0, firstInfI = 0;
+    bool   haveFirstNan = false, haveFirstInf = false;
+    size_t checked          = 0;
+    const size_t totalValid = m * n * batchCount;
+
+    for(size_t b = 0; b < batchCount; b++)
+    {
+        for(size_t j = 0; j < n; j++)
+        {
+            for(size_t i = 0; i < m; i++)
+            {
+                size_t idx = b * batchStride + j * ldd + i;
+                if(idx >= copyElems)
+                    goto scan_done;
+
+                bool eNan, eInf;
+                if(nanCheckIsSpecial(buf.data(), d_type, idx, eNan, eInf))
+                {
+                    if(eNan)
+                    {
+                        nanCount++;
+                        if(!haveFirstNan)
+                        {
+                            firstNanB = b; firstNanJ = j; firstNanI = i;
+                            haveFirstNan = true;
+                        }
+                    }
+                    if(eInf)
+                    {
+                        infCount++;
+                        if(!haveFirstInf)
+                        {
+                            firstInfB = b; firstInfJ = j; firstInfI = i;
+                            haveFirstInf = true;
+                        }
+                    }
+                }
+                checked++;
+            }
+        }
+    }
+scan_done:
+
+    if(nanCount > 0 || infCount > 0)
+    {
+        char nanLoc[64] = "n/a";
+        char infLoc[64] = "n/a";
+        if(haveFirstNan)
+            std::snprintf(nanLoc, sizeof(nanLoc),
+                          "batch=%zu row=%zu col=%zu",
+                          firstNanB, firstNanI, firstNanJ);
+        if(haveFirstInf)
+            std::snprintf(infLoc, sizeof(infLoc),
+                          "batch=%zu row=%zu col=%zu",
+                          firstInfB, firstInfI, firstInfJ);
+
+        std::fprintf(stderr,
+                     "\n[HIPBLASLT_NAN_CHECK] *** NaN/Inf DETECTED ***\n"
+                     "  Kernel:    %s\n"
+                     "  Solution:  %s\n"
+                     "  Shape:     M=%zu, N=%zu, K=%zu, batch=%zu\n"
+                     "  ld_d:      %zu\n"
+                     "  D type:    %s\n"
+                     "  NaN count: %zu (first @ %s)\n"
+                     "  Inf count: %zu (first @ %s)\n"
+                     "  Checked:   %zu / %zu elements%s\n\n",
+                     kernelName.c_str(),
+                     solutionName.c_str(),
+                     m,
+                     n,
+                     k,
+                     batch_count,
+                     ldd,
+                     hipDataTypeName(d_type),
+                     nanCount,
+                     nanLoc,
+                     infCount,
+                     infLoc,
+                     checked,
+                     totalValid,
+                     truncated ? " (TRUNCATED)" : "");
+
+        static const bool abortOnNan = []() {
+            const char* env = std::getenv("HIPBLASLT_NAN_CHECK_ABORT");
+            return env != nullptr && std::string(env) != "0";
+        }();
+        if(abortOnNan)
+        {
+            std::fprintf(stderr, "[HIPBLASLT_NAN_CHECK] HIPBLASLT_NAN_CHECK_ABORT set — aborting.\n");
+            std::abort();
+        }
+    }
+}
+
+/******************************************************************************
  * runContractionProblem calls Tensile to run a contraction problem described *
  * by RocblasltContractionProblem *
  ******************************************************************************/
@@ -2952,6 +3205,18 @@ rocblaslt_status runContractionProblem(rocblaslt_handle                   handle
                 adapter->launchKernels(kernels, prob.stream, nullptr, nullptr, isPreloaded));
             if(rocblaslt::Debug::Instance().printLogAsMarker())
                 rocblaslt::Debug::Instance().logMarkerStop();
+            if(status == rocblaslt_status_success)
+                nanCheckScanOutput(prob.D,
+                                   prob.d_type,
+                                   prob.m,
+                                   prob.n,
+                                   prob.k,
+                                   prob.batch_count,
+                                   prob.col_stride_d,
+                                   prob.batch_stride_d,
+                                   prob.stream,
+                                   solution->kernelName,
+                                   solution->solutionName);
         }
     }
     catch(const std::exception& e)
@@ -3384,6 +3649,24 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
             status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, start, stop));
             if(rocblaslt::Debug::Instance().printLogAsMarker())
                 rocblaslt::Debug::Instance().logMarkerStop();
+            if(status == rocblaslt_status_success && isNanCheckEnabled())
+            {
+                auto sol = library->getSolutionByIndex(*hardware, data->algoIndex);
+                auto& prob = data->problem;
+                auto& dStrides = prob.d().strides();
+                nanCheckScanOutput(
+                    data->inputs.d,
+                    tensile2HipType(prob.d().dataType()),
+                    prob.c().sizes()[0],
+                    prob.c().sizes()[1],
+                    prob.a().sizes()[prob.boundIndices()[0].a],
+                    prob.batchSize(0),
+                    dStrides.size() > 1 ? dStrides[1] : prob.c().sizes()[0],
+                    dStrides.size() > 2 ? dStrides[2] : 0,
+                    stream,
+                    sol ? sol->kernelName : "unknown",
+                    sol ? sol->solutionName : "unknown");
+            }
         }
         else if(gemmType == rocblaslt::RocGemmType::ROCBLASLT_GROUPED_GEMM)
         {
@@ -3438,6 +3721,24 @@ rocblaslt_status runKernelFromInvocation(rocblaslt_handle       handle,
             status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, start, stop));
             if(rocblaslt::Debug::Instance().printLogAsMarker())
                 rocblaslt::Debug::Instance().logMarkerStop();
+            if(status == rocblaslt_status_success && isNanCheckEnabled()
+               && !data->problem.gemms.empty())
+            {
+                auto& g0 = data->problem.gemms[0];
+                auto& g0dStrides = g0.d().strides();
+                nanCheckScanOutput(
+                    data->inputs.grouped.empty() ? nullptr : data->inputs.grouped[0].d,
+                    tensile2HipType(g0.d().dataType()),
+                    g0.c().sizes()[0],
+                    g0.c().sizes()[1],
+                    g0.a().sizes()[g0.boundIndices()[0].a],
+                    1,
+                    g0dStrides.size() > 1 ? g0dStrides[1] : g0.c().sizes()[0],
+                    0,
+                    stream,
+                    solution ? solution->kernelName : "unknown",
+                    solution ? solution->solutionName : "unknown");
+            }
         }
         else
         {
@@ -3621,6 +3922,24 @@ rocblaslt_status runKernelFromNewDeviceUserArguments(rocblaslt_handle       hand
             status = hip2RocStatus(adapter->launchKernels(data->kernels, stream, nullptr, nullptr));
             if(rocblaslt::Debug::Instance().printLogAsMarker())
                 rocblaslt::Debug::Instance().logMarkerStop();
+            if(status == rocblaslt_status_success && isNanCheckEnabled()
+               && !data->problem.gemms.empty())
+            {
+                auto& g0 = data->problem.gemms[0];
+                auto& g0dS = g0.d().strides();
+                nanCheckScanOutput(
+                    data->inputs.grouped.empty() ? nullptr : data->inputs.grouped[0].d,
+                    tensile2HipType(g0.d().dataType()),
+                    g0.c().sizes()[0],
+                    g0.c().sizes()[1],
+                    g0.a().sizes()[g0.boundIndices()[0].a],
+                    1,
+                    g0dS.size() > 1 ? g0dS[1] : g0.c().sizes()[0],
+                    0,
+                    stream,
+                    solution ? solution->kernelName : "unknown",
+                    solution ? solution->solutionName : "unknown");
+            }
         }
         else
         {
@@ -3681,6 +4000,24 @@ rocblaslt_status runKernelFromDeviceUserArguments(rocblaslt_handle             h
             auto kernel = solution->solveGroupedGemmGPU(
                 data->problem.gemms, data->inputs, *hardware, deviceUserArgs, workspace, stream);
             status = hip2RocStatus(adapter->launchKernels(kernel, stream, nullptr, nullptr));
+            if(status == rocblaslt_status_success && isNanCheckEnabled()
+               && !data->problem.gemms.empty())
+            {
+                auto& g0 = data->problem.gemms[0];
+                auto& g0dS = g0.d().strides();
+                nanCheckScanOutput(
+                    data->inputs.grouped.empty() ? nullptr : data->inputs.grouped[0].d,
+                    tensile2HipType(g0.d().dataType()),
+                    g0.c().sizes()[0],
+                    g0.c().sizes()[1],
+                    g0.a().sizes()[g0.boundIndices()[0].a],
+                    1,
+                    g0dS.size() > 1 ? g0dS[1] : g0.c().sizes()[0],
+                    0,
+                    stream,
+                    solution ? solution->kernelName : "unknown",
+                    solution ? solution->solutionName : "unknown");
+            }
         }
         else
         {
