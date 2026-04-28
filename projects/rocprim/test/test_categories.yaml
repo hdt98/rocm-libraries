@@ -1,0 +1,88 @@
+test_categories:
+  quick:
+    description: "Fast sanity checks - Run pre-commit (target: < 5 min)"
+    test_patterns:
+      - "*ArgIndexIterator"
+      - "*BasicTests.GetVersion"
+      - "*BatchMemcpyTests/*"
+      - "*BlockScan"
+      - "*ConfigDispatchTests.*"
+      - "*ConstantIteratorTests/*"
+      - "*CountingIteratorTests/*"
+      - "*DeviceScanTests/*"
+      - "*DiscardIteratorTests.Less"
+      - "*ExchangeTests*"
+      - "*FirstPart"
+      - "*HipcubBlockRunLengthDecodeTest/*"
+      - "*Histogram*"
+      - "*HistogramAtomic*"
+      - "*HistogramSortInput*"
+      - "*IntrinsicsTests*"
+      - "*InvokeResultBinOpTests/*"
+      - "*InvokeResultUnOpTests/*"
+      - "*MergeTests/*"
+      - "*PartitionLargeInputTest/*"
+      - "*PartitionTests/*"
+      - "*PredicateIteratorTests.*"
+      - "*RadixKeyCodecTest.*"
+      - "*RadixMergeCompareTest/*"
+      - "*RadixSort/*"
+      - "*RadixSortIntegral/*"
+      - "*ReduceByKey*"
+      - "*ReduceInputArrayTestsFloating"
+      - "*ReduceInputArrayTestsIntegral/*"
+      - "*ReducePrecisionTests/*"
+      - "*ReduceSingleValueTestsFloating"
+      - "*ReduceSingleValueTestsIntegral"
+      - "*ReduceTests/*"
+      - "*ReverseIteratorTests.*"
+      - "*RunLengthEncode/*"
+      - "*SecondPart/*"
+      - "*SegmentedReduce/*"
+      - "*SelectLargeInputFlaggedTest/*"
+      - "*SelectTests/*"
+      - "*ShuffleTestsFloating/*"
+      - "*ShuffleTestsIntegral*"
+      - "*SortBitonicTestsIntegral/*"
+      - "*ThirdPart/*"
+      - "*ThreadOperationTests/*"
+      - "*ThreadTests/*"
+      - "*TransformIteratorTests/*"
+      - "*TransformTests/*"
+      - "*VectorizationTests*"
+      - "*WarpExchangeScatterTest/*"
+      - "*WarpExchangeTest/*"
+      - "*WarpLoadTest/*"
+      - "*WarpReduceTestsFloating/*"
+      - "*WarpReduceTestsIntegral/*"
+      - "*WarpScanTests*"
+      - "*WarpSortShuffleBasedTestsIntegral/*"
+      - "*ceIntegral/*"
+      - "*tyIntegral/*"
+      - "TestHipGraphBasic"
+ 
+    exclude:
+
+    labels:
+      - "quick"
+      - "pre-commit"
+      - "smoke"
+
+  standard:
+    description: "Full gtest run (filter '*') - shared across PR / nightly / weekly tiers"
+    test_patterns:
+      - "*"
+
+    exclude:
+
+    labels:
+      - "standard"
+      - "comprehensive"
+      - "full"
+
+execution_settings:
+  default_timeout: 300
+  timeout_multiplier: 1 # Multiplier for all timeouts (1, 1.5, 1.75, 2, etc.)
+  category_timeouts:
+    quick: 300          # 5 minutes
+    standard: 14400     # 4 hours (longest tier the standard entry serves)
