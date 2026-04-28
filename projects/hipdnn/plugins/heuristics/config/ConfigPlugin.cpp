@@ -13,8 +13,8 @@
  * not by hard-coded backend logic.
  */
 
-#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
 #include <flatbuffers/flatbuffers.h>
@@ -425,7 +425,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
             return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
 
-        auto graph = hipdnn_flatbuffers_sdk::data_objects::GetGraph(d->serializedGraphBuffer.data());
+        auto graph
+            = hipdnn_flatbuffers_sdk::data_objects::GetGraph(d->serializedGraphBuffer.data());
         if(graph == nullptr)
         {
             CONFIG_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: failed to get graph root");
