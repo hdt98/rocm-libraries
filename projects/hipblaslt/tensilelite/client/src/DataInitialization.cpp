@@ -1722,7 +1722,7 @@ namespace TensileLite
         {
             bool useMXGenerator = isMXFP4Problem(problem);
             if(useMXGenerator)
-                initializeMXDataForFP4(problem);
+                initializeMXData(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1811,13 +1811,34 @@ namespace TensileLite
                     return HIP_R_8F_UE8M0;
                 default:
                     throw std::runtime_error(
-                        "initializeMXDataForFP4: unsupported MX scale element type for generateMXInput");
+                        "initializeMXData: unsupported MX scale element type for generateMXInput");
                 }
             }
         } // namespace
 
-        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
+            // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
+            // can safely skip them. For MX-FP4 sides we drive mxDataGenerator (so the values
+            // are coordinated with their E8 scales); for any non-FP4 side (e.g. MX-B6 or non-MX
+            // mixed-mode) we fall back to the same initArray path the default loop would have
+            // taken, to avoid leaving the malloc'd buffers uninitialized.
+            auto const& tensors = problem.tensors();
+
+            auto initTensorFromDefault = [&](int i) {
+                for(auto& p : m_vdata[i].pristine)
+                {
+                    if(p.second.initDescriptor[0] != tensors[i])
+                    {
+                        p.second.initDescriptor[0] = tensors[i];
+                        initArray(p.first,
+                                  m_vdata[i].init,
+                                  p.second.cpuInput.valid.get(),
+                                  tensors[i]);
+                    }
+                }
+            };
+
             // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
             // the scale tensor into the GPU kernel's expected memory layout
             std::vector<size_t> preSwizzleA, preTileA, preSwizzleB, preTileB;
@@ -1889,6 +1910,15 @@ namespace TensileLite
                                 -1.0f,
                                 1.0f);
             }
+            else
+            {
+                // A is not FP4 (or mxBlockA == 0). The default-init loop will skip A and
+                // MXSA because useMXGenerator is true, so seed them here with the same
+                // initArray path the default loop would have used.
+                initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
+                if(problem.mxBlockA() > 0)
+                    initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
+            }
 
             if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
             {
@@ -1918,6 +1948,13 @@ namespace TensileLite
                                 "Bounded",
                                 -1.0f,
                                 1.0f);
+            }
+            else
+            {
+                // B is not FP4 (or mxBlockB == 0). Same fallback rationale as the A side.
+                initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
+                if(problem.mxBlockB() > 0)
+                    initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
             }
         }
 

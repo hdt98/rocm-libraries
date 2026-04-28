@@ -872,7 +872,7 @@ namespace TensileLite
                     bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
                     if(isMXFP4)
                     {
-                        initializeMXDataForFP4(*m_currentGemmProblem);
+                        initializeMXData(*m_currentGemmProblem);
                         copyValidToGPUBuffer(*m_currentGemmProblem);
                         copyInputs(m_gpuPtrs,
                                    m_gpuBatchPtrs,
@@ -999,7 +999,7 @@ namespace TensileLite
 
             void initializeConstantInputs(ContractionProblemGemm const& problem);
 
-            void initializeMXDataForFP4(ContractionProblemGemm const& problem);
+            void initializeMXData(ContractionProblemGemm const& problem);
 
             void copyInputs(std::vector<void*>&               ptrs,
                             std::vector<void**>&              batchPtrs,
