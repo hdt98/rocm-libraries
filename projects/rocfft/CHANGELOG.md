@@ -30,6 +30,8 @@ Documentation for rocFFT is available at
 * Moved library to C++20 standard.
 * Removed Boost as a dependency for clients and samples.
 * Split the precompiled kernel cache file (`rocfft_kernel_cache.db`) into per-architecture files (`rocfft_kernel_cache_gfx950.db`, `rocfft_kernel_cache_gfx1201.db`, etc).
+* Modified the `rocfft_plan_get_work_buffer_size` and `rocfft_execution_info_set_work_buffer` functions to get and set work memory for the current HIP device.
+  * Multi-device transforms can require work memory on any of the devices used for input or output bricks.  Users should loop over the set of devices used by the input/output of the transform and check the work memory requirements for each device.
 
 ### Resolved issues
 
