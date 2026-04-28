@@ -89,6 +89,10 @@ make_moe_sorted_inputs(int num_tokens,
 {
     if(num_tokens <= 0 || topk <= 0 || num_experts <= 0 || unit_size <= 0)
         throw std::runtime_error("make_moe_sorted_inputs: invalid problem size");
+    if(!forced_topk_ids.has_value() && topk > num_experts)
+        throw std::runtime_error(
+            "make_moe_sorted_inputs: topk must be <= num_experts when forced_topk_ids "
+            "is not provided because generated routing requires unique experts per token");
 
     // Worst-case sorted-output buffer; matches `moe_sorting_api`'s allocation
     // formula: every (token, topk) lands on a different expert, plus per-expert

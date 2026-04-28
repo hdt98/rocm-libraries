@@ -549,7 +549,7 @@ struct F8xMXF4FlatmmPipelineAgBgCrPolicy : UniversalFlatmmPipelineAgBgCrPolicy
         using ADataType                = remove_cvref_t<typename Problem::ADataType>;
         constexpr index_t num_access_v = std::is_same_v<ADataType, pk_fp4_t> ? 1 : 2;
 
-        constexpr int K1 = K_Thread / num_access_v; // 16
+        constexpr int K1 = K_Thread / num_access_v; // 32 for pk_fp4_t, 16 otherwise
 
         return make_static_tile_distribution(
             std::conditional_t<
