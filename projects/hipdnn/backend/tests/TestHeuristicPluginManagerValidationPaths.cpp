@@ -357,7 +357,8 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
     std::filesystem::create_directories(emptyNameDir);
 
     // Copy the empty name plugin to isolated directory
-    const std::string pluginFilename = hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
+    const std::string pluginFilename
+        = hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
     const auto srcPlugin = _testPluginPath / pluginFilename;
     const auto dstPlugin = emptyNameDir / pluginFilename;
     std::filesystem::copy_file(
