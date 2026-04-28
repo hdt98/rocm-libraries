@@ -183,6 +183,7 @@ include(getopt)
 # when building from a release tarball without a .git directory.
 find_package(Git)
 set(COMMIT_ID "unknown")
+set(CK_PARENT_COMMIT_ID "unknown")
 if(GIT_FOUND)
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" log -1 --format=%H -- .
@@ -194,6 +195,22 @@ if(GIT_FOUND)
     )
     if(GIT_LOG_RESULT EQUAL 0 AND GIT_COMMIT_ID)
         set(COMMIT_ID "${GIT_COMMIT_ID}")
+    endif()
+
+    # Containing-repo HEAD. Captures the surrounding repository's exact
+    # snapshot, including shared infrastructure that lives outside CK
+    # (e.g. rocm-libraries top-level CMake/codegen helpers). When CK is
+    # built standalone, this is just CK's own HEAD.
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        OUTPUT_VARIABLE GIT_REPO_HEAD
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE GIT_REV_PARSE_RESULT
+        ERROR_QUIET
+    )
+    if(GIT_REV_PARSE_RESULT EQUAL 0 AND GIT_REPO_HEAD)
+        set(CK_PARENT_COMMIT_ID "${GIT_REPO_HEAD}")
     endif()
 endif()
 configure_file(include/ck/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ck/version.h)
