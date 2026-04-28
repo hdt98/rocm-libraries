@@ -109,21 +109,18 @@ inline void run_large_k(Fixture& f)
 
 // One TYPED_TEST per scenario. Suite-name placement keeps the gtest filter
 // (`--gtest_filter=*Typical*` etc.) intuitive across dtype suites.
-#define MOE_FLATMM_DECLARE_SCENARIOS(SuiteName)                                                   \
-    TYPED_TEST(SuiteName, Typical) { test_moe_flatmm::run_typical(*this); }                       \
-    TYPED_TEST(SuiteName, SingleExpertDense) { test_moe_flatmm::run_single_expert_dense(*this); } \
-    TYPED_TEST(SuiteName, AllExpertsPopulated)                                                    \
-    {                                                                                             \
-        test_moe_flatmm::run_all_experts_populated(*this);                                        \
-    }                                                                                             \
-    TYPED_TEST(SuiteName, OneTokenPerTile) { test_moe_flatmm::run_one_token_per_tile(*this); }    \
-    TYPED_TEST(SuiteName, MultiTokenPerTile)                                                      \
-    {                                                                                             \
-        test_moe_flatmm::run_multi_token_per_tile(*this);                                         \
-    }                                                                                             \
-    TYPED_TEST(SuiteName, FullTileNoSentinels)                                                    \
-    {                                                                                             \
-        test_moe_flatmm::run_full_tile_no_sentinels(*this);                                       \
-    }                                                                                             \
-    TYPED_TEST(SuiteName, EmptyExperts) { test_moe_flatmm::run_empty_experts(*this); }            \
+#define MOE_FLATMM_DECLARE_SCENARIOS(SuiteName)                                                    \
+    TYPED_TEST(SuiteName, Typical) { test_moe_flatmm::run_typical(*this); }                        \
+    TYPED_TEST(SuiteName, SingleExpertDense) { test_moe_flatmm::run_single_expert_dense(*this); }  \
+    TYPED_TEST(SuiteName, AllExpertsPopulated)                                                     \
+    {                                                                                              \
+        test_moe_flatmm::run_all_experts_populated(*this);                                         \
+    }                                                                                              \
+    TYPED_TEST(SuiteName, OneTokenPerTile) { test_moe_flatmm::run_one_token_per_tile(*this); }     \
+    TYPED_TEST(SuiteName, MultiTokenPerTile) { test_moe_flatmm::run_multi_token_per_tile(*this); } \
+    TYPED_TEST(SuiteName, FullTileNoSentinels)                                                     \
+    {                                                                                              \
+        test_moe_flatmm::run_full_tile_no_sentinels(*this);                                        \
+    }                                                                                              \
+    TYPED_TEST(SuiteName, EmptyExperts) { test_moe_flatmm::run_empty_experts(*this); }             \
     TYPED_TEST(SuiteName, LargeK) { test_moe_flatmm::run_large_k(*this); }
