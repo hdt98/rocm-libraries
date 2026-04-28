@@ -345,6 +345,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
     // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Bad API version plugin should be rejected";
 
+    // Unload any resources before cleanup (Windows DLL safety)
+    _manager.reset();
+
     // Cleanup
     std::filesystem::remove_all(badPluginDir);
 }
@@ -369,6 +372,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 
     // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Empty policy name plugin should be rejected";
+
+    // Unload any resources before cleanup (Windows DLL safety)
+    _manager.reset();
 
     // Cleanup
     std::filesystem::remove_all(emptyNameDir);
@@ -403,6 +409,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsReject
 
         // Only one plugin should have loaded - the second should be rejected due to duplicate ID
         EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
+
+        // Unload plugins before cleanup (Windows keeps DLLs locked until unloaded)
+        _manager.reset();
 
         // Cleanup
         std::filesystem::remove_all(duplicateDir);
