@@ -1209,7 +1209,7 @@ ConvSolution InitInvokerFactoryNHWC(const ExecutionContext&,
                     // Kernel logging for CK kernels
                     if(IsLoggingKernel())
                     {
-                        AddKernelToJsonAccumulator(kernel_id, elapsed, false);
+                        AddKernelToJsonAccumulator(*kernel_id2, elapsed, false);
                     }
 
                     handle.ResetKernelTime();

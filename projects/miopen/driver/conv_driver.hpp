@@ -2403,12 +2403,9 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuFind(const bool is_transform)
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
@@ -2604,12 +2601,9 @@ int ConvDriver<Tgpu, Tref>::RunForwardGpuImmed(const bool is_transform)
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
@@ -3030,12 +3024,9 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuFind()
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
@@ -3378,12 +3369,9 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuFind()
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
@@ -3751,12 +3739,9 @@ int ConvDriver<Tgpu, Tref>::RunBackwardDataGpuImmed()
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
@@ -3928,12 +3913,9 @@ int ConvDriver<Tgpu, Tref>::RunBackwardWrwGpuImmed()
                 miopenGetKernelTime(GetHandle(), &time);
             }
             time_samples.push_back(time);
-            if(time_enabled)
-            {
-                kernel_total_time += time;
-                if(i == 0)
-                    kernel_first_time = time;
-            }
+            kernel_total_time += time;
+            if(i == 0)
+                kernel_first_time = time;
         }
     }
     FinalizeKernel();
