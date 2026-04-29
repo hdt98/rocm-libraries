@@ -25,6 +25,16 @@ test_categories:
     #Same tests run for comprehensive and full categories
       - "standard"
       - "comprehensive"
+
+  full:
+    description:"Includes all tests including multigpu"
+    test_patterns:
+      - "*"
+    exclude:
+    extra_args:
+      - "--test_prob"
+      - "0.02"
+    labels:
       - "full"
 
 execution_settings:
