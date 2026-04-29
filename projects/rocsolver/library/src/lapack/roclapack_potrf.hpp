@@ -39,6 +39,8 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
+bool constexpr use_syrk = false;
+
 // -----------------------------------------------
 // Note that the recursive routine passes in a
 // row_offset to adjust the info value, so the
@@ -738,6 +740,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         // --------------------------------
         // step 3a:  A22 = A22 - U12' * U12
         // --------------------------------
+        if(use_syrk)
         {
             I const nn = n2;
             I const kk = n1;
@@ -755,6 +758,43 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                 A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
 
                 batch_count);
+            if(istat != rocblas_status_success)
+            {
+                return istat;
+            }
+        }
+        else
+        {
+            I const mm = n2;
+            I const nn = n2;
+            I const kk = n1;
+
+            T alpha = -1;
+            T beta = 1;
+
+            T** work = nullptr;
+
+            I const inc1 = 1;
+            I const inc2 = 1;
+            I const inc3 = 1;
+
+            auto const istat = rocsolver_gemm(
+                handle, rocblas_operation_conjugate_transpose, rocblas_operation_none,
+
+                mm, nn, kk,
+
+                &alpha,
+
+                A, shiftA + idx2D(0, n1, lda), inc1, lda, strideA, // submatrix U12
+
+                A, shiftA + idx2D(0, n1, lda), inc2, lda, strideA, // submatrix U12
+
+                &beta,
+
+                A, shiftA + idx2D(n1, n1, lda), inc3, lda, strideA, // submatrix A22
+
+                batch_count, work);
+
             if(istat != rocblas_status_success)
             {
                 return istat;
@@ -850,6 +890,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         // ------------------------------------------
         // step 3a:  A22 <-  A22 - L21 * L21',   syrk
         // ------------------------------------------
+        if(use_syrk)
         {
             I const nn = n2;
             I const kk = n1;
@@ -867,6 +908,43 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                 A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
 
                 batch_count);
+            if(istat != rocblas_status_success)
+            {
+                return istat;
+            }
+        }
+        else
+        {
+            I const mm = n2;
+            I const nn = n2;
+            I const kk = n1;
+
+            T alpha = -1;
+            T beta = 1;
+
+            I const inc1 = 1;
+            I const inc2 = 1;
+            I const inc3 = 1;
+
+            T** work = nullptr;
+
+            auto const istat = rocsolver_gemm(
+                handle, rocblas_operation_none, rocblas_operation_conjugate_transpose,
+
+                mm, nn, kk,
+
+                &alpha,
+
+                A, shiftA + idx2D(n1, 0, lda), inc1, lda, strideA, // submatrix L21
+
+                A, shiftA + idx2D(n1, 0, lda), inc2, lda, strideA, // submatrix L21
+
+                &beta,
+
+                A, shiftA + idx2D(n1, n1, lda), inc3, lda, strideA, // submatrix A22
+
+                batch_count, work);
+
             if(istat != rocblas_status_success)
             {
                 return istat;
