@@ -5763,8 +5763,15 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
       self.ldsStartOffsetA = 0
       aTileInfo = self.states.a.tileInfo
+      bTileInfo = self.states.b.tileInfo
       numASubtiles = aTileInfo.globalSubtileGrid[0] * aTileInfo.globalSubtileGrid[1]
-      self.ldsStartOffsetB = numASubtiles * aTileInfo.subtileSize
+      numBSubtiles = bTileInfo.globalSubtileGrid[0] * bTileInfo.globalSubtileGrid[1]
+      readSize = 2*aTileInfo.subtileSize
+      # Align A and B sizes to readSize for DTL 2xsubtile reads
+      sizeA = ((numASubtiles * aTileInfo.subtileSize + readSize-1) // readSize) * readSize
+      sizeB = ((numBSubtiles * bTileInfo.subtileSize + readSize-1) // readSize) * readSize
+      self.ldsStartOffsetB = sizeA
+      kernel["LdsNumBytes"] = int((sizeA + sizeB) * kernel["NumLdsBlk"])
 
 
     #print(self.states.a.tileInfo.getLocalSubtileId(1,0))
@@ -8074,8 +8081,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if kernel["ProblemType"]["MXBlockB"] and kernel["LocalWriteUseSgprMXSB"]:
           self.defineSgpr("LocalWriteAddrMXSB", 1)
     else:
-      self.defineSgpr("LocalWriteBaseAddr", 1)
-      self.defineSgpr("LocalWriteDTLOffset", 1)
+      self.defineSgpr("LocalWriteBaseAddrA", 1)
+      self.defineSgpr("LocalWriteBaseAddrB", 1)
+      self.defineSgpr("LocalWriteDTLOffsetA", 1)
+      self.defineSgpr("LocalWriteDTLOffsetB", 1)
 
     # Allocate registers to swap between lds buffers
     if self.states.useCommonSgprSwap:
