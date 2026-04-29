@@ -75,6 +75,7 @@ def getSrcValueType(kernel, isTypeA):
     srcValueType = srcValueType.lower()
     return srcValueType
 
+
 # Creates kernel header, compatible with code object version 4 and up. V2 and V3 no longer supported.
 class SignatureDefault(Signature):
 
@@ -233,6 +234,7 @@ class SignatureDefault(Signature):
             signature.addArg("AddressScaleAlphaVec", SVK.SIG_GLOBALBUFFER, cptValueType, "generic")
             if kernel["ProblemType"]["UseScaleAlphaVec"] == 3:
                 userArgumentsInfo.factorDimSize =4
+
         userArgumentsInfo.scaleAlphaVecSize += 8
 
         if writer.states.useBias != DataDirection.NONE:
