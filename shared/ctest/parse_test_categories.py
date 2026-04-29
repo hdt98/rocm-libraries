@@ -12,37 +12,115 @@ _GTEST_PATTERN_RE = re.compile(r"^[\w\*\.\-/]+$")
 
 
 def validate_identifier(value):
-    """Validate that a value is a safe identifier (alphanumeric, hyphens, dots, underscores)."""
+    """Validate that a value is a safe identifier (alphanumerics, hyphens, dots, underscores).
+
+    Returns an error message string on failure, or None on success.
+    """
     if not isinstance(value, str):
-        print(
-            f"Error: Identifier must be a string, got {type(value).__name__}: {value!r}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        return f"Identifier must be a string, got {type(value).__name__}: {value!r}"
     if not _IDENTIFIER_RE.match(value):
-        print(
-            f"Error: Identifier contains unsafe characters: {value!r} "
-            f"(only alphanumerics, hyphens, dots, and underscores allowed)",
-            file=sys.stderr,
+        return (
+            f"Identifier contains unsafe characters: {value!r} "
+            f"(only alphanumerics, hyphens, dots, and underscores allowed)"
         )
-        sys.exit(1)
+    return None
 
 
 def validate_gtest_pattern(pattern):
-    """Validate that a gtest filter pattern contains only safe characters."""
+    """Validate that a gtest filter pattern contains only safe characters.
+
+    Returns an error message string on failure, or None on success.
+    """
     if not isinstance(pattern, str):
-        print(
-            f"Error: Pattern must be a string, got {type(pattern).__name__}: {pattern!r}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        return f"Pattern must be a string, got {type(pattern).__name__}: {pattern!r}"
     if not _GTEST_PATTERN_RE.match(pattern):
-        print(
-            f"Error: Invalid gtest pattern: {pattern!r} "
-            f"(only alphanumerics, wildcards, dots, hyphens, underscores, and slashes allowed)",
-            file=sys.stderr,
+        return (
+            f"Invalid gtest pattern: {pattern!r} "
+            f"(only alphanumerics, wildcards, dots, hyphens, underscores, and slashes allowed)"
         )
-        sys.exit(1)
+    return None
+
+
+def validate_config(categories, exclude_gpu_config, is_windows, is_linux):
+    """Validate all category and GPU-exclusion entries.
+
+    Returns a list of error message strings; empty if everything is valid.
+    All issues are collected so the caller can report them at once rather
+    than failing on the first one.
+    """
+    errors = []
+
+    if not isinstance(categories, dict):
+        errors.append(
+            f"test_categories must be a mapping, got {type(categories).__name__}"
+        )
+    else:
+        for category_name, category_info in categories.items():
+            err = validate_identifier(category_name)
+            if err is not None:
+                errors.append(f"category name {category_name!r}: {err}")
+
+            if not isinstance(category_info, dict):
+                errors.append(
+                    f"category {category_name!r}: entry must be a mapping, got "
+                    f"{type(category_info).__name__}"
+                )
+                continue
+
+            patterns = category_info.get("test_patterns", []) or []
+            exclude = category_info.get("exclude", []) or []
+            if is_windows:
+                exclude = exclude + (category_info.get("exclude_windows", []) or [])
+            if is_linux:
+                exclude = exclude + (category_info.get("exclude_linux", []) or [])
+
+            for p in patterns:
+                err = validate_gtest_pattern(p)
+                if err is not None:
+                    errors.append(f"category {category_name!r} test_patterns: {err}")
+            for e in exclude:
+                err = validate_gtest_pattern(e)
+                if err is not None:
+                    errors.append(f"category {category_name!r} exclude: {err}")
+            for label in category_info.get("labels", []) or []:
+                err = validate_identifier(label)
+                if err is not None:
+                    errors.append(f"category {category_name!r} label: {err}")
+
+    if exclude_gpu_config is None:
+        return errors
+    if not isinstance(exclude_gpu_config, dict):
+        errors.append(
+            f"exclude_gpu must be a mapping, got {type(exclude_gpu_config).__name__}"
+        )
+        return errors
+
+    for gpu_key, gpu_config in exclude_gpu_config.items():
+        err = validate_identifier(gpu_key)
+        if err is not None:
+            errors.append(f"exclude_gpu key {gpu_key!r}: {err}")
+
+        if not isinstance(gpu_config, dict):
+            errors.append(
+                f"exclude_gpu {gpu_key!r}: entry must be a mapping, got "
+                f"{type(gpu_config).__name__}"
+            )
+            continue
+
+        for p in gpu_config.get("test_patterns", []) or []:
+            # test_patterns may be either a flat list or list-of-lists.
+            sub_patterns = p if isinstance(p, list) else [p]
+            for sp in sub_patterns:
+                err = validate_gtest_pattern(sp)
+                if err is not None:
+                    errors.append(f"exclude_gpu {gpu_key!r} test_patterns: {err}")
+
+        for label in gpu_config.get("labels", []) or []:
+            err = validate_identifier(label)
+            if err is not None:
+                errors.append(f"exclude_gpu {gpu_key!r} label: {err}")
+
+    return errors
 
 
 def gpu_arch_matches(specific_arch, pattern_arch):
@@ -146,6 +224,20 @@ def main():
         is_windows = platform.system() == "Windows"
         is_linux = platform.system() == "Linux"
 
+        # Validate the categories before generating CMake code.
+        # If validation fails, no partial or intermediate CMake file will be written.
+        validation_errors = validate_config(
+            categories, exclude_gpu_config, is_windows, is_linux
+        )
+        if validation_errors:
+            print(
+                f"Error: {len(validation_errors)} validation error(s) in {yaml_file}:",
+                file=sys.stderr,
+            )
+            for msg in validation_errors:
+                print(f"  - {msg}", file=sys.stderr)
+            sys.exit(1)
+
         print("# Generated CMake code for test categories")
         print(f"# Detected OS: {platform.system()}")
         print(f"# Timeout multiplier: {timeout_multiplier}")
@@ -154,8 +246,6 @@ def main():
         category_data = {}
 
         for category_name, category_info in categories.items():
-            validate_identifier(category_name)
-
             patterns = category_info.get("test_patterns", [])
             if not patterns:
                 print(
@@ -178,13 +268,6 @@ def main():
                 exclude_linux = category_info.get("exclude_linux", [])
                 if exclude_linux:
                     exclude.extend(exclude_linux)
-
-            for p in patterns:
-                validate_gtest_pattern(p)
-            for e in exclude:
-                validate_gtest_pattern(e)
-            for label in labels:
-                validate_identifier(label)
 
             base_timeout = timeouts.get(category_name, 300)
             timeout = int(base_timeout * timeout_multiplier)
@@ -269,7 +352,6 @@ def main():
 
         ex_gpu_labels_to_process = set()
         for gpu_key, gpu_config in exclude_gpu_config.items():
-            validate_identifier(gpu_key)
             match = re.match(r"exclude_gpu_(gfx\w+)", gpu_key)
             if match:
                 gpu_labels = gpu_config.get("labels", [])
@@ -313,9 +395,6 @@ def main():
 
             if not all_applicable_patterns:
                 continue
-
-            for p in all_applicable_patterns:
-                validate_gtest_pattern(p)
 
             # Remove duplicates from all_applicable_patterns while preserving order
             seen = set()
