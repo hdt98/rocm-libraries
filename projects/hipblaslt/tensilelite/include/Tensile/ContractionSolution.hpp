@@ -51,6 +51,8 @@
 namespace TensileLite
 {
     #define CustomArgSemantic_MACRO \
+        X_MACRO(GemmCount) \
+        X_MACRO(NumWorkGroups) \
         X_MACRO(SizeFree0) \
         X_MACRO(SizeFree1) \
         X_MACRO(SizeFree2) \
@@ -59,8 +61,13 @@ namespace TensileLite
         X_MACRO(AddressB) \
         X_MACRO(AddressC) \
         X_MACRO(AddressD) \
+<<<<<<< HEAD
         X_MACRO(AddressScaleA) \
         X_MACRO(AddressScaleB) \
+=======
+        X_MACRO(AddressWorkspace) \
+        X_MACRO(AddressSynchronizer) \
+>>>>>>> GemmFromAnywhere_StreamKDemo
         X_MACRO(StrideA0) \
         X_MACRO(StrideA1) \
         X_MACRO(StrideB0) \
@@ -77,10 +84,22 @@ namespace TensileLite
         X_MACRO(StrideB0Bytes) \
         X_MACRO(StrideC0Bytes) \
         X_MACRO(StrideD0Bytes) \
+<<<<<<< HEAD
         X_MACRO(Alpha) \
         X_MACRO(Beta) \
         X_MACRO(SplitK) \
         X_MACRO(OutputBF16) \
+=======
+        X_MACRO(TensileInternalArg0) \
+        X_MACRO(TensileInternalArg1) \
+        X_MACRO(ItersPerTile) \
+        X_MACRO(MagicNumberItersPerTile) \
+        X_MACRO(MagicShiftItersPerTile) \
+        X_MACRO(TotalIters) \
+        X_MACRO(SKGrid) \
+        X_MACRO(SKTilesAndSplit) \
+        X_MACRO(SKItersPerWG) \
+>>>>>>> GemmFromAnywhere_StreamKDemo
         X_MACRO(Padding) \
         X_MACRO(DebugPattern)
 
@@ -127,6 +146,20 @@ namespace TensileLite
     std::ostream& operator<<(std::ostream& stream, const CustomGridSize& t);
     std::istream& operator>>(std::istream& stream, CustomGridSize& t);
 
+    enum CustomWorkspaceType
+    {
+        None,
+        SplitK,
+        StreamK,
+        StreamKWithReduction,
+        CustomWorkspaceType_Count,
+    };
+
+    std::string toString(CustomWorkspaceType type);
+    CustomWorkspaceType fromStringCustomWorkspaceType(std::string& str);
+    std::ostream& operator<<(std::ostream& stream, const CustomWorkspaceType& t);
+    std::istream& operator>>(std::istream& stream, CustomWorkspaceType& t);
+
     struct CustomKernel
     {
         std::string name;
@@ -134,6 +167,9 @@ namespace TensileLite
         dim3 macrotile;
         dim3 threads;
         vector3<CustomGridSize> grid;
+        CustomWorkspaceType workspaceType;
+        size_t workspaceSizePerElemC;
+        size_t workspaceSizePerElemBias;
     };
 
     template <typename TAct>
@@ -516,6 +552,19 @@ namespace TensileLite
                             dim3 const&              numWorkGroups,
                             KA&                      args,
                             StreamKSettings const&   sk) const;
+
+        template <bool T_Debug>
+        void calculateInternalArgs(uint32_t&                           internalArg0,
+                                   uint32_t&                           internalArg1,
+                                   Hardware const*                     hardware,
+                                   const ContractionProblemParameters& param,
+                                   int32_t                             autoWGM,
+                                   size_t                              autoWGMXCC,
+                                   size_t                              autoWGMXCCCHUNK,
+                                   size_t                              autoStaggerUMapping,
+                                   size_t                              autoStaggerU,
+                                   size_t                              autoStaggerUStrideShift,
+                                   uint32_t                            autoGsuVal) const;
 
         // Common kernel related arguments (e.g. gemm_count, arg type, MT, GSU...)
         template <bool T_Debug, bool Legacy, typename KA>
