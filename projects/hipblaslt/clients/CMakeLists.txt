@@ -29,7 +29,6 @@ target_link_libraries(hipblaslt-clients-common
         tensilelite::tensilelite-host
 )
 
-target_compile_features(hipblaslt-clients-common PRIVATE cxx_std_20)
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     # Re-export the macro PUBLIC so consumers of hipblaslt-clients-common
     # (hipblaslt-test, hipblaslt-bench, ...) see it through public headers
@@ -37,6 +36,9 @@ if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     # The helper target itself defines it PUBLIC, but we link it PRIVATE here
     # so the macro would otherwise stop at hipblaslt-clients-common.
     target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    # cxx_std_20 propagates from hipblaslt::mxdatagen's PUBLIC compile-features.
+    # When the option is OFF, hipblaslt-clients-common falls back to roc::hipblaslt's
+    # cxx_std_17 floor, matching the pre-PR develop branch behavior.
     target_link_libraries(hipblaslt-clients-common PRIVATE hipblaslt::mxdatagen)
 endif()
 

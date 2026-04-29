@@ -259,15 +259,61 @@ if(NOT ROCM_LIBS_SUPERBUILD)
     endif()
 endif()
 
+# Always-present helper target that owns the public hipblaslt API headers.
+#
+# Centralizing this through a target removes the need for any consumer to
+# manually add `library/include` (or its build-tree counterpart) to its
+# `target_include_directories`. In particular it eliminates the
+# `target_include_directories(<tgt> BEFORE PRIVATE .../library/include ...)`
+# that tensilelite-client and cpu-gemm-driver previously used to outrank a
+# system-installed copy of `hipblaslt/hipblaslt-types.h` (which lacks the
+# newer types defined in-tree, e.g. HIP_R_8F_E5M3_EXT). Order is now driven
+# by the build graph, not by path manipulation.
+#
+# `hip::host` is exposed as an INTERFACE link so consumers transitively pick
+# up the HIP search path their hipblaslt headers depend on.
+add_library(hipblaslt-headers INTERFACE)
+add_library(hipblaslt::headers ALIAS hipblaslt-headers)
+target_include_directories(hipblaslt-headers
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/library/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/library/include>
+)
+target_link_libraries(hipblaslt-headers INTERFACE hip::host)
+
+# Generate `hipblaslt-version.h` and `hipblaslt-export.h` for the
+# tensilelite-only build (no `hipblaslt` target exists, so we cannot call
+# `generate_export_header(hipblaslt ...)`). When HIPBLASLT_ENABLE_HOST=ON,
+# `library/include/CMakeLists.txt` regenerates the same files via
+# `generate_export_header(hipblaslt ...)`, which derives the attributes from
+# the actual library's visibility properties. The checked-in template under
+# `library/include/hipblaslt-export.h.in` matches what generate_export_header
+# produces for the default visibility settings used by hipblaslt.
+if(NOT HIPBLASLT_ENABLE_HOST)
+    block()
+        set(gen_dir "${CMAKE_CURRENT_BINARY_DIR}/library/include")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/library/include/hipblaslt-version.h.in"
+            "${gen_dir}/hipblaslt/hipblaslt-version.h"
+        )
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/library/include/hipblaslt-export.h.in"
+            "${gen_dir}/hipblaslt/hipblaslt-export.h"
+            COPYONLY
+        )
+    endblock()
+endif()
+
 # Centralized mxDataGenerator bootstrap and shared helper target.
 #
 # Run the find_package / add_subdirectory bootstrap exactly once, before any
 # subtree that consumes mxDataGenerator is added. Then expose a single
 # `hipblaslt::mxdatagen` OBJECT target that compiles `clients/common/src/mxDataGen.cpp`
 # once and propagates the include path, link to roc::mxDataGenerator, the
-# C++20 requirement, and the HIPBLASLT_ENABLE_MXDATAGENERATOR macro to every
-# consumer (hipblaslt-clients-common, tensilelite-client, cpu-gemm-driver,
-# tensilelite-tests).
+# C++20 requirement, the link to `hipblaslt::headers` (so consumers can find
+# `<hipblaslt/hipblaslt-export.h>` etc. that mxDataGen.hpp pulls in), and the
+# HIPBLASLT_ENABLE_MXDATAGENERATOR macro to every consumer
+# (hipblaslt-clients-common, tensilelite-client, cpu-gemm-driver, tensilelite-tests).
 #
 # Each consumer only needs `target_link_libraries(<tgt> PRIVATE hipblaslt::mxdatagen)`
 # inside `if(HIPBLASLT_ENABLE_MXDATAGENERATOR)`. This eliminates the
@@ -293,7 +339,17 @@ if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
         PUBLIC
             "${CMAKE_CURRENT_SOURCE_DIR}/clients/common/include"
     )
-    target_link_libraries(hipblaslt-mxdatagen PUBLIC roc::mxDataGenerator)
+    target_link_libraries(hipblaslt-mxdatagen
+        PUBLIC
+            hipblaslt::headers
+            roc::mxDataGenerator
+        PRIVATE
+            # `-x hip` (via hip::device's INTERFACE_COMPILE_OPTIONS) makes the
+            # translation unit compile through hipcc/clang. mxDataGen.cpp itself
+            # does not launch kernels, but the modern ROCm bf16 header it pulls
+            # in transitively uses clang-only builtins (e.g. __builtin_elementwise_rint).
+            hip::device
+    )
     target_compile_features(hipblaslt-mxdatagen PUBLIC cxx_std_20)
     target_compile_definitions(hipblaslt-mxdatagen PUBLIC HIPBLASLT_ENABLE_MXDATAGENERATOR)
     set_target_properties(hipblaslt-mxdatagen
@@ -302,42 +358,6 @@ if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
 endif()
 
 add_subdirectory(tensilelite)
-
-if(TENSILELITE_ENABLE_CLIENT AND NOT HIPBLASLT_ENABLE_HOST)
-    set(_hipblaslt_gen_include_dir "${CMAKE_CURRENT_BINARY_DIR}/library/include")
-
-    configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/library/include/hipblaslt-version.h.in"
-        "${_hipblaslt_gen_include_dir}/hipblaslt/hipblaslt-version.h"
-    )
-
-    file(WRITE "${_hipblaslt_gen_include_dir}/hipblaslt/hipblaslt-export.h" [=[
-#ifndef HIPBLASLT_EXPORT_H
-#define HIPBLASLT_EXPORT_H
-
-#ifndef HIPBLASLT_EXPORT
-#  define HIPBLASLT_EXPORT __attribute__((visibility("default")))
-#endif
-
-#ifndef HIPBLASLT_NO_EXPORT
-#  define HIPBLASLT_NO_EXPORT __attribute__((visibility("hidden")))
-#endif
-
-#ifndef HIPBLASLT_DEPRECATED
-#  define HIPBLASLT_DEPRECATED __attribute__((__deprecated__))
-#endif
-
-#ifndef HIPBLASLT_DEPRECATED_EXPORT
-#  define HIPBLASLT_DEPRECATED_EXPORT HIPBLASLT_EXPORT HIPBLASLT_DEPRECATED
-#endif
-
-#ifndef HIPBLASLT_DEPRECATED_NO_EXPORT
-#  define HIPBLASLT_DEPRECATED_NO_EXPORT HIPBLASLT_NO_EXPORT HIPBLASLT_DEPRECATED
-#endif
-
-#endif /* HIPBLASLT_EXPORT_H */
-]=])
-endif()
 
 if(HIPBLASLT_ENABLE_HOST)
     if(HIPBLASLT_BUILD_SHARED_LIBS)

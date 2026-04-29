@@ -1,48 +1,45 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-set(COMMON_CLIENT_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/BenchmarkTimer.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ClientProblemFactory.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ProgramOptions.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/DataInitialization.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/PerformanceReporter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMonitorListener.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TimingEvents.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMonitor.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ReferenceValidator.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ResultFileReporter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ResultReporter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/MetaRunListener.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Reference.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/ProgressListener.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/TypedId.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Rotating.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/CSVStackFile.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/SolutionIterator.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/LibraryUpdateReporter.cpp"
+target_sources(tensilelite-client-common
+    PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/BenchmarkTimer.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ClientProblemFactory.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ProgramOptions.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/DataInitialization.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/PerformanceReporter.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMonitorListener.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TimingEvents.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/HardwareMonitor.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ReferenceValidator.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ResultFileReporter.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ResultReporter.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/MetaRunListener.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Reference.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/ProgressListener.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/TypedId.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/Rotating.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/CSVStackFile.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/SolutionIterator.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/LibraryUpdateReporter.cpp"
 )
-
-target_sources(tensilelite-client PRIVATE ${COMMON_CLIENT_SOURCES})
-target_sources(cpu-gemm-driver PRIVATE ${COMMON_CLIENT_SOURCES})
 
 # DataInitialization.hpp #includes <mxDataGen.hpp> unconditionally. When
-# HIPBLASLT_ENABLE_MXDATAGENERATOR=OFF the header expands to nothing, but the
-# include path must still resolve, so this is added unconditionally rather
-# than picked up via hipblaslt::mxdatagen.
-foreach(_tgt tensilelite-client cpu-gemm-driver)
-    target_include_directories(${_tgt}
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
-    )
-endforeach()
-
-if (TENSILELITE_CLIENT_ENABLE_ROCPROFSDK)
-
-target_sources(tensilelite-client
+# HIPBLASLT_ENABLE_MXDATAGENERATOR=ON the path also propagates from
+# hipblaslt::mxdatagen, but it must remain reachable when the option is OFF
+# (the header still resolves; its content collapses to nothing under the
+# guard).
+target_include_directories(tensilelite-client-common
     PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/Profiler.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/RocProfiler.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
 )
 
+# Profiler sources only target tensilelite-client (cpu-gemm-driver does not
+# expose ROCprofiler counters).
+if(TENSILELITE_CLIENT_ENABLE_ROCPROFSDK)
+    target_sources(tensilelite-client
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/Profiler.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/RocProfiler.cpp"
+    )
 endif()
