@@ -5,12 +5,22 @@ add_executable(tensilelite-client "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp")
 
 add_executable(cpu-gemm-driver "${CMAKE_CURRENT_SOURCE_DIR}/cpu_gemm_driver.cpp")
 
+if(NOT TARGET roc::mxDataGenerator)
+    if(HIPBLASLT_ENABLE_THEROCK)
+        find_package(mxDataGenerator REQUIRED)
+    else()
+        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../../shared/mxdatagenerator"
+                         "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator")
+    endif()
+endif()
+
 set(COMMON_CLIENT_LIBS
     hip::device
     hip::host
     tensilelite::tensilelite-host
     rocisa::rocisa-cpp
     OpenMP::OpenMP_CXX
+    roc::mxDataGenerator
 )
 
 if(NOT WIN32)
@@ -30,7 +40,7 @@ foreach(target tensilelite-client cpu-gemm-driver)
     target_compile_definitions(${target} PRIVATE TENSILE_DEFAULT_SERIALIZATION)
 
     set_target_properties(${target} PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
     )

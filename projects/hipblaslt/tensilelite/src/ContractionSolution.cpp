@@ -37,6 +37,7 @@
 
 #include <Tensile/UtilsOrigami.hpp>
 #include <iostream>
+#include <mxDataGenerator/PreSwizzle.hpp>
 #include <origami/streamk.hpp>
 
 #include <algorithm>
@@ -63,7 +64,7 @@ namespace TensileLite
         };
         return CustomArgSemanticStrings[static_cast<int>(arg)];
     }
-    
+
     CustomArgSemantic fromStringCustomArgSemantic(std::string& str)
     {
         static const std::map<std::string, CustomArgSemantic> CustomArgSemanticMap = {
@@ -71,7 +72,7 @@ namespace TensileLite
             CustomArgSemantic_MACRO
             #undef X_MACRO
         };
-        
+
         auto it = CustomArgSemanticMap.find(str);
         if (it == CustomArgSemanticMap.end())
             throw std::runtime_error(concatenate("Invalid CustomArgSemantic value: ", str));
@@ -1740,7 +1741,14 @@ namespace TensileLite
                     break;
                 case CustomArgSemantic::SplitK:
                 {
-                    uint32_t splitK = (sizeMapping.globalSplitU > 0) ? sizeMapping.globalSplitU : 0;
+                    // AITER kernel expects log2(GSU) rather than the raw GSU value
+                    uint32_t gsu = sizeMapping.globalSplitU;
+                    uint32_t splitK = 0;
+                    if(gsu > 1)
+                    {
+                        while(gsu >>= 1)
+                            splitK++;
+                    }
                     rv.args.appendCustomType("SplitK", splitK, arg.type);
                     break;
                 }
@@ -1773,6 +1781,40 @@ namespace TensileLite
                     rv.args.template append<uint32_t>("DebugPattern", debugPattern);
                     ++debugPattern;
                     break;
+                case CustomArgSemantic::AddressScaleA:
+                    rv.args.template append<void const*>("AddressScaleA", inputs.mxsa);
+                    break;
+                case CustomArgSemantic::AddressScaleB:
+                    rv.args.template append<void const*>("AddressScaleB", inputs.mxsb);
+                    break;
+                case CustomArgSemantic::StrideScaleA0:
+                {
+                    size_t scaleStride = problem.boundSize(0) / problem.mxBlockA();
+                    rv.args.appendCustomType("StrideScaleA0", scaleStride, arg.type);
+                    break;
+                }
+                case CustomArgSemantic::StrideScaleA1:
+                {
+                    auto const& t = problem.mxsa();
+                    size_t batchStride
+                        = DGen::preSwizzleScalesGFX950PaddedSize(t.sizes()[1], t.sizes()[0]);
+                    rv.args.appendCustomType("StrideScaleA1", batchStride, arg.type);
+                    break;
+                }
+                case CustomArgSemantic::StrideScaleB0:
+                {
+                    size_t scaleStride = problem.boundSize(0) / problem.mxBlockB();
+                    rv.args.appendCustomType("StrideScaleB0", scaleStride, arg.type);
+                    break;
+                }
+                case CustomArgSemantic::StrideScaleB1:
+                {
+                    auto const& t = problem.mxsb();
+                    size_t batchStride
+                        = DGen::preSwizzleScalesGFX950PaddedSize(t.sizes()[1], t.sizes()[0]);
+                    rv.args.appendCustomType("StrideScaleB1", batchStride, arg.type);
+                    break;
+                }
                 default:
                     throw std::runtime_error(concatenate("Invalid kernel argument type: ", arg));
             }
@@ -3508,26 +3550,29 @@ namespace TensileLite
         auto cInfo = DataTypeInfo::Get(problemType.cType);
         auto dInfo = DataTypeInfo::Get(problemType.dType);
 
-        spm.memReadBytesA = multiplyElementSize((NumBatches * M * N * K) / MT1, aInfo.elementSize);
-        spm.memReadBytesB = multiplyElementSize((NumBatches * M * N * K) / MT0, bInfo.elementSize);
-        spm.memReadBytesC = multiplyElementSize((NumBatches * M * N) * betaReads, cInfo.elementSize);
+        spm.memReadBytesA = (NumBatches * M * N * K) * aInfo.elementSize / aInfo.packing / MT1;
+        spm.memReadBytesB = (NumBatches * M * N * K) * bInfo.elementSize / bInfo.packing / MT0;
+        spm.memReadBytesC = (NumBatches * M * N) * betaReads * cInfo.elementSize / cInfo.packing;
 
         if(GlobalSplitU == 1)
-            spm.memWriteBytesD = multiplyElementSize((NumBatches * M * N) * (1 + betaWrites), dInfo.elementSize);
+        {
+            spm.memWriteBytesD = (NumBatches * M * N) * (1 + betaWrites) * dInfo.elementSize;
+        }
         else
         {
             bool   hardwareAtomic   = false; // TODO-model
             double atomicOperations = hardwareAtomic ? 2 : 3; // read-mod-write or cas  //TODO-model
             double atomicCollisions = 1.0; // TODO-could be based on K, GSU
-            spm.memWriteBytesD      = multiplyElementSize((NumBatches * M * N)
+            spm.memWriteBytesD      = (NumBatches * M * N)
                                  * (betaWrites + atomicOperations * atomicCollisions)
-                                 , dInfo.elementSize);
+                                 * dInfo.elementSize;
         }
         spm.memReadBytes   = spm.memReadBytesA + spm.memReadBytesB + spm.memReadBytesC;
-        spm.memGlobalReads = divideElementSize(spm.memReadBytesA, aInfo.elementSize)
-                             + divideElementSize(spm.memReadBytesB, bInfo.elementSize)
-                             + divideElementSize(spm.memReadBytesC, cInfo.elementSize);
-        spm.memGlobalWrites = divideElementSize(spm.memWriteBytesD, dInfo.elementSize);
+
+        spm.memGlobalReads = spm.memReadBytesA * aInfo.packing / aInfo.elementSize
+                             + spm.memReadBytesB * bInfo.packing / bInfo.elementSize
+                             + spm.memReadBytesC * cInfo.packing / cInfo.elementSize;
+        spm.memGlobalWrites = spm.memWriteBytesD / dInfo.elementSize;
 
         return spm;
     }
