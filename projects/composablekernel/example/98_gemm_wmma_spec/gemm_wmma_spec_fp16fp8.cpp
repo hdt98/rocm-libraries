@@ -49,6 +49,7 @@ template <typename ALayout,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           ck::tensor_operation::device::GemmSpecialization GemmSpec,
+          ck::index_t NumPrefetch,
           ck::index_t BlockSize,
           ck::index_t MPerBlock,
           ck::index_t NPerBlock,
@@ -138,6 +139,7 @@ template <typename ALayout,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           ck::tensor_operation::device::GemmSpecialization GemmSpec,
+          ck::index_t NumPrefetch,
           ck::index_t BlockSize,
           ck::index_t MPerBlock,
           ck::index_t NPerBlock,
@@ -178,7 +180,7 @@ using DeviceGemm = ck::tensor_operation::device::DeviceGemm_Xdl_CShuffle_LdsDire
     BElementwiseOperation,
     CElementwiseOperation,
     GemmSpec,
-    1,
+    NumPrefetch,
     BlockSize,
     MPerBlock,
     NPerBlock,
@@ -220,6 +222,7 @@ template <typename ALayout,
           typename BElementwiseOperation,
           typename CElementwiseOperation,
           ck::tensor_operation::device::GemmSpecialization GemmSpec,
+          ck::index_t NumPrefetch,
           ck::index_t BlockSize,
           ck::index_t MPerBlock,
           ck::index_t NPerBlock,
@@ -260,7 +263,7 @@ using DeviceGemm = ck::tensor_operation::device::DeviceGemmWmma_CShuffle<
     BElementwiseOperation,
     CElementwiseOperation,
     GemmSpec,
-    1,
+    NumPrefetch,
     BlockSize,
     MPerBlock,
     NPerBlock,
@@ -305,6 +308,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,               // Prefetch stage
                512,             // BlockSize
                256,             // MPerBlock
                256,             // NPerBlock
@@ -320,14 +324,14 @@ using DeviceGemmInstance =
                2,               // ABlockTransferSrcVectorDim
                16,              // ABlockTransferSrcScalarPerVector
                16,              // ABlockTransferDstScalarPerVector_K1
-               false,           // ABlockLdsAddExtraM
+               false,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 64, 1>,     // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,      // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,      // BBlockTransferSrcAccessOrder
                2,               // BBlockTransferSrcVectorDim
                16,              // BBlockTransferSrcScalarPerVector
                16,              // BBlockTransferDstScalarPerVector_K1
-               false,           // BBlockLdsAddExtraN
+               false,           // BThreadTransferSrcResetCoordinateAfterRun
                2,               // CShuffleMRepeatPerStore
                4,               // CShuffleNRepeatPerStore
                S<1, 16, 1, 32>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -349,6 +353,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,               // Prefetch stage
                256,             // BlockSize
                256,             // MPerBlock
                256,             // NPerBlock
@@ -364,14 +369,14 @@ using DeviceGemmInstance =
                2,               // ABlockTransferSrcVectorDim
                16,              // ABlockTransferSrcScalarPerVector
                16,              // ABlockTransferDstScalarPerVector_K1
-               false,           // ABlockLdsAddExtraM
+               false,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 32, 1>,     // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,      // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,      // BBlockTransferSrcAccessOrder
                2,               // BBlockTransferSrcVectorDim
                16,              // BBlockTransferSrcScalarPerVector
                16,              // BBlockTransferDstScalarPerVector_K1
-               false,           // BBlockLdsAddExtraN
+               false,           // BThreadTransferSrcResetCoordinateAfterRun
                2,               // CShuffleMRepeatPerStore
                4,               // CShuffleNRepeatPerStore
                S<1, 16, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -393,6 +398,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                128,            // BlockSize
                16,             // MPerBlock
                192,            // NPerBlock
@@ -408,14 +414,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                16,             // ABlockTransferSrcScalarPerVector
                16,             // ABlockTransferDstScalarPerVector_K1
-               true,           // ABlockLdsAddExtraM
+               true,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 16, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                16,             // BBlockTransferSrcScalarPerVector
                16,             // BBlockTransferDstScalarPerVector_K1
-               true,           // BBlockLdsAddExtraN
+               true,           // BThreadTransferSrcResetCoordinateAfterRun
                1,              // CShuffleMRepeatPerStore
                1,              // CShuffleNRepeatPerStore
                S<1, 16, 1, 8>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -437,6 +443,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                256,            // BlockSize
                128,            // MPerBlock
                192,            // NPerBlock
@@ -452,14 +459,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                16,             // ABlockTransferSrcScalarPerVector
                16,             // ABlockTransferDstScalarPerVector_K1
-               true,           // ABlockLdsAddExtraM
+               true,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 32, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                16,             // BBlockTransferSrcScalarPerVector
                16,             // BBlockTransferDstScalarPerVector_K1
-               true,           // BBlockLdsAddExtraN
+               true,           // BThreadTransferSrcResetCoordinateAfterRun
                2,              // CShuffleMRepeatPerStore
                1,              // CShuffleNRepeatPerStore
                S<1, 32, 1, 8>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -485,6 +492,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,               // Prefetch stage
                256,             // BlockSize
                256,             // MPerBlock
                128,             // NPerBlock
@@ -500,14 +508,14 @@ using DeviceGemmInstance =
                2,               // ABlockTransferSrcVectorDim
                8,               // ABlockTransferSrcScalarPerVector
                8,               // ABlockTransferDstScalarPerVector_K1
-               true,            // ABlockLdsAddExtraM
+               true,            // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 32, 1>,     // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,      // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,      // BBlockTransferSrcAccessOrder
                2,               // BBlockTransferSrcVectorDim
                8,               // BBlockTransferSrcScalarPerVector
                8,               // BBlockTransferDstScalarPerVector_K1
-               true,            // BBlockLdsAddExtraN
+               true,            // BThreadTransferSrcResetCoordinateAfterRun
                2,               // CShuffleMRepeatPerStore
                4,               // CShuffleNRepeatPerStore
                S<1, 16, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -529,6 +537,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,               // Prefetch stage
                256,             // BlockSize
                256,             // MPerBlock
                256,             // NPerBlock
@@ -544,14 +553,14 @@ using DeviceGemmInstance =
                2,               // ABlockTransferSrcVectorDim
                8,               // ABlockTransferSrcScalarPerVector
                8,               // ABlockTransferDstScalarPerVector_K1
-               false,           // ABlockLdsAddExtraM
+               false,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 32, 1>,     // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,      // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,      // BBlockTransferSrcAccessOrder
                2,               // BBlockTransferSrcVectorDim
                8,               // BBlockTransferSrcScalarPerVector
                8,               // BBlockTransferDstScalarPerVector_K1
-               false,           // BBlockLdsAddExtraN
+               false,           // BThreadTransferSrcResetCoordinateAfterRun
                2,               // CShuffleMRepeatPerStore
                4,               // CShuffleNRepeatPerStore
                S<1, 16, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -573,6 +582,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                128,            // BlockSize
                128,            // MPerBlock
                256,            // NPerBlock
@@ -588,14 +598,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                8,              // ABlockTransferSrcScalarPerVector
                8,              // ABlockTransferDstScalarPerVector_K1
-               true,           // ABlockLdsAddExtraM
+               true,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 16, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                8,              // BBlockTransferSrcScalarPerVector
                8,              // BBlockTransferDstScalarPerVector_K1
-               true,           // BBlockLdsAddExtraN
+               true,           // BThreadTransferSrcResetCoordinateAfterRun
                2,              // CShuffleMRepeatPerStore
                4,              // CShuffleNRepeatPerStore
                S<1, 8, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -617,6 +627,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                256,            // BlockSize
                128,            // MPerBlock
                128,            // NPerBlock
@@ -632,14 +643,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                8,              // ABlockTransferSrcScalarPerVector
                8,              // ABlockTransferDstScalarPerVector_K1
-               true,           // ABlockLdsAddExtraM
+               true,           // AThreadTransferSrcResetCoordinateAfterRun
                S<4, 64, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                8,              // BBlockTransferSrcScalarPerVector
                8,              // BBlockTransferDstScalarPerVector_K1
-               true,           // BBlockLdsAddExtraN
+               true,           // BThreadTransferSrcResetCoordinateAfterRun
                1,              // CShuffleMRepeatPerStore
                1,              // CShuffleNRepeatPerStore
                S<1, 32, 1, 8>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -661,6 +672,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                128,            // BlockSize
                64,             // MPerBlock
                128,            // NPerBlock
@@ -676,14 +688,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                8,              // ABlockTransferSrcScalarPerVector
                8,              // ABlockTransferDstScalarPerVector_K1
-               true,           // ABlockLdsAddExtraM
+               true,           // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 16, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                8,              // BBlockTransferSrcScalarPerVector
                8,              // BBlockTransferDstScalarPerVector_K1
-               true,           // BBlockLdsAddExtraN
+               true,           // BThreadTransferSrcResetCoordinateAfterRun
                1,              // CShuffleMRepeatPerStore
                1,              // CShuffleNRepeatPerStore
                S<1, 32, 1, 4>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -705,6 +717,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                128,            // BlockSize
                256,            // MPerBlock
                256,            // NPerBlock
@@ -720,14 +733,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                8,              // ABlockTransferSrcScalarPerVector
                8,              // ABlockTransferDstScalarPerVector_K1
-               false,          // ABlockLdsAddExtraM
+               false,          // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 16, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                8,              // BBlockTransferSrcScalarPerVector
                8,              // BBlockTransferDstScalarPerVector_K1
-               false,          // BBlockLdsAddExtraN
+               false,          // BThreadTransferSrcResetCoordinateAfterRun
                2,              // CShuffleMRepeatPerStore
                4,              // CShuffleNRepeatPerStore
                S<1, 8, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock
@@ -749,6 +762,7 @@ using DeviceGemmInstance =
                BElementOp,
                CElementOp,
                GemmDefault,
+               1,              // Prefetch stage
                128,            // BlockSize
                256,            // MPerBlock
                256,            // NPerBlock
@@ -764,14 +778,14 @@ using DeviceGemmInstance =
                2,              // ABlockTransferSrcVectorDim
                16,             // ABlockTransferSrcScalarPerVector
                16,             // ABlockTransferDstScalarPerVector_K1
-               false,          // ABlockLdsAddExtraM
+               false,          // AThreadTransferSrcResetCoordinateAfterRun
                S<8, 16, 1>,    // BBlockTransferThreadClusterLengths_K0_N_K1
                S<1, 0, 2>,     // BBlockTransferThreadClusterArrangeOrder
                S<1, 0, 2>,     // BBlockTransferSrcAccessOrder
                2,              // BBlockTransferSrcVectorDim
                16,             // BBlockTransferSrcScalarPerVector
                16,             // BBlockTransferDstScalarPerVector_K1
-               false,          // BBlockLdsAddExtraN
+               false,          // BThreadTransferSrcResetCoordinateAfterRun
                2,              // CShuffleMRepeatPerStore
                4,              // CShuffleNRepeatPerStore
                S<1, 8, 1, 16>, // CBlockTransferClusterLengths_MBlock_MPerBlock_NBlock_NPerBlock

@@ -1683,6 +1683,8 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x32_bf8bf8_gfx13> : public mfma_type_g
 template <>
 struct mfma_type<MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13> : public mfma_type_gfx13_base
 {
+    static constexpr index_t k_per_blk = 32;
+
     template <index_t MPerWmma,
               index_t NPerWmma,
               typename AType,
@@ -1690,12 +1692,14 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13> : public mfma_type_g
               index_t ABlockSel,
               index_t BBlockSel,
               class FloatA,
+              class ScaleA,
               class FloatB,
+              class ScaleB,
               class FloatC>
     __device__ void run(const FloatA& a,
+                        const ScaleA& scale_a,
                         const FloatB& b,
-                        const int32_t& a_scale,
-                        const int32_t& b_scale,
+                        const ScaleB& scale_b,
                         FloatC& reg_c) const
     {
         intrin_wmma_f32_16x16_f8f6f4_w32<MPerWmma,
@@ -1704,7 +1708,11 @@ struct mfma_type<MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13> : public mfma_type_g
                                          BType,
                                          ABlockSel,
                                          BBlockSel,
-                                         false>::Run(a, b, a_scale, b_scale, reg_c);
+                                         false>::Run(a,
+                                                     b,
+                                                     bit_cast<int32_t>(scale_a),
+                                                     bit_cast<int32_t>(scale_b),
+                                                     reg_c);
     }
 };
 
@@ -2388,7 +2396,7 @@ struct MfmaSelector
 #elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_unsupport_16x16_gfx13;
+        return MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
@@ -2438,7 +2446,7 @@ struct MfmaSelector
 #elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_unsupport_16x16_gfx13;
+        return MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
@@ -2454,7 +2462,7 @@ struct MfmaSelector
 #elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_unsupport_16x16_gfx13;
+        return MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
@@ -2503,7 +2511,7 @@ struct MfmaSelector
 #elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_unsupport_16x16_gfx13;
+        return MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
@@ -2523,7 +2531,7 @@ struct MfmaSelector
 #elif defined(__gfx120__)
         return MfmaInstr::wmma_unsupport_16x16_gfx12;
 #elif defined(__gfx13__)
-        return MfmaInstr::wmma_unsupport_16x16_gfx13;
+        return MfmaInstr::wmma_f32_16x16x64_f8f6f4_gfx13;
 #elif defined(__gfx11__)
         return MfmaInstr::wmma_unsupport_16x16_gfx11;
 #else
@@ -3028,13 +3036,33 @@ struct XdlopsGemm
         static_for<0, KPack / mfma_instr.k_per_blk, 1>{}([&](auto k) {
             if constexpr(!TransposeC)
             {
+#if defined(__gfx13__)
+                mfma_instr.template run<MPerXdlops,
+                                        NPerXdlops,
+                                        base_type,
+                                        additional_type,
+                                        OpselA,
+                                        OpselB>(
+                    p_a_wave[k], a_scale_thread[k], p_b_wave[k], b_scale_thread[k], p_c_thread);
+#else
                 mfma_instr.template run<MPerXdlops, NPerXdlops, OpselA, OpselB>(
                     p_a_wave[k], a_scale_thread[k], p_b_wave[k], b_scale_thread[k], p_c_thread);
+#endif
             }
             else
             {
+#if defined(__gfx13__)
+                mfma_instr.template run<MPerXdlops,
+                                        NPerXdlops,
+                                        additional_type,
+                                        base_type,
+                                        OpselB,
+                                        OpselA>(
+                    p_b_wave[k], b_scale_thread[k], p_a_wave[k], a_scale_thread[k], p_c_thread);
+#else
                 mfma_instr.template run<MPerXdlops, NPerXdlops, OpselB, OpselA>(
                     p_b_wave[k], b_scale_thread[k], p_a_wave[k], a_scale_thread[k], p_c_thread);
+#endif
             }
         });
     }
