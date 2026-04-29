@@ -171,6 +171,11 @@ endif()
 set_target_properties(hipsolver-test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
 
 rocm_install(TARGETS hipsolver-test COMPONENT tests)
+rocm_install(
+  PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_hipsolver.py"
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  COMPONENT tests
+)
 
 if(WIN32)
   file(GLOB third_party_dlls

@@ -240,3 +240,8 @@ add_test(
 )
 
 rocm_install(TARGETS rocsolver-test COMPONENT tests)
+rocm_install(
+  PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_rocsolver.py"
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  COMPONENT tests
+)
