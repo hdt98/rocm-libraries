@@ -339,8 +339,8 @@ HIPBLAS_EXPORT hipblasStatus_t hipblasDestroy(hipblasHandle_t handle);
 
 /*! \brief Gets the hipBLAS library version number.
     \details
-    Returns version as integer: major * 1000 + minor * 100 + patch.
-    Example: version 2.3.1 returns 2301.
+    Returns version as integer: major * 10000 + minor * 100 + patch.
+    Example: version 3.5.1 returns 30501.
 
     Handle parameter can be NULL.
 
