@@ -282,6 +282,12 @@ foreach( target ${TEST_TARGETS} )
   rocm_install(TARGETS ${target} COMPONENT tests)
 endforeach()
 
+rocm_install(
+  PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_hipfft.py"
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  COMPONENT tests
+)
+
 find_package( GTest 1.11.0 )
 
 if( GTest_FOUND )

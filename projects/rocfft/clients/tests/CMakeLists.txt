@@ -383,6 +383,11 @@ set_target_properties(rtc_helper_crash
 
 
 rocm_install(TARGETS rocfft-test rtc_helper_crash COMPONENT tests)
+rocm_install(
+  PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_rocfft.py"
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  COMPONENT tests
+)
 
 if (WIN32)
 
