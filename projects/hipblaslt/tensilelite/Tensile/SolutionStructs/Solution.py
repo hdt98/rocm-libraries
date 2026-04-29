@@ -3385,10 +3385,6 @@ class Solution(collections.abc.Mapping):
                f"bpeB={bpeB})")
         return
 
-    if state["ProblemType"]["MXBlockB"]:
-      state["LVCMXSB"] = roundupRatio(state["LSCMXSB"] , state["GlobalReadVectorWidthMXSB"])
-      state["LVPMXSB"] = roundupRatio(state["LSPMXSB"] , state["GlobalReadVectorWidthMXSB"])
-
     if state["ProblemType"]["Sparse"] and not state["DirectToVgprSparseMetadata"]:
       state["LVCMetadata"] = roundupRatio(state["LSCMetadata"] , state["GlobalReadVectorWidthMetadata"])
       state["LVPMetadata"] = roundupRatio(state["LSPMetadata"] , state["GlobalReadVectorWidthMetadata"])
@@ -3415,7 +3411,7 @@ class Solution(collections.abc.Mapping):
     state["NoTailLoop"] = False
     if state["AssertSummationElementMultiple"] % state["DepthU"] == 0:
       state["NoTailLoop"] = True
-		
+
     # TailloopInNll optimization check
     if state["TailloopInNll"]:
       # Disable TailloopInNll
