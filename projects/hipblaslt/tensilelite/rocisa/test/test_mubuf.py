@@ -94,7 +94,6 @@ def _mubuf_off_asm() -> str:
 
 
 def test_mubuf_off_vaddr_stinkytofu(_mubuf_off_asm):
-    # Assembler rejects 'v[vgproff]'; 'off' must appear as the literal vaddr operand.
     assert re.search(r"buffer_store_b32 v12, off, s\[60:63\], s46", _mubuf_off_asm)
     assert re.search(r"buffer_store_b32 v13, off, s\[64:67\], null", _mubuf_off_asm)
 

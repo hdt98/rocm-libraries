@@ -138,6 +138,38 @@ stinkytofu::MUBUFModifiers buildMUBUFModifiersForBufferOp(
     return mod;
 }
 
+/// Returns true when vaddr is the MUBUF "off" keyword.
+bool isOffVaddrContainer(const rocisa::Container* vaddr) {
+    if (auto* regCont = dynamic_cast<const rocisa::RegisterContainer*>(vaddr)) {
+        return regCont->isOff;
+    }
+    return false;
+}
+
+/// Build modifiers matching rocisa's MUBUF address form: real vaddr operands
+/// use `offen`, while `off` keeps the no-vaddr form.
+stinkytofu::MUBUFModifiers buildMUBUFModifiersForBufferOp(
+    const std::optional<rocisa::MUBUFModifiers>& rocMubuf, const rocisa::Container* vaddr,
+    const std::map<std::string, int>& asmCaps) {
+    bool hasMUBUFConst = asmCaps.count("HasMUBUFConst") && asmCaps.at("HasMUBUFConst");
+    bool hasGLCModifier = asmCaps.count("HasGLCModifier") && asmCaps.at("HasGLCModifier");
+    bool hasSC0Modifier = asmCaps.count("HasSC0Modifier") && asmCaps.at("HasSC0Modifier");
+
+    stinkytofu::MUBUFModifiers mod = rocMubuf.has_value()
+                                         ? convertMUBUFModifiers(rocMubuf.value(), asmCaps)
+                                         : stinkytofu::MUBUFModifiers(
+                                               /*offen=*/false, /*offset12=*/0, /*glc=*/false,
+                                               /*slc=*/false, /*nt=*/false, /*lds=*/false,
+                                               /*isStore=*/false, hasMUBUFConst, hasGLCModifier,
+                                               hasSC0Modifier, /*hasSCOPEModifier=*/false,
+                                               stinkytofu::MUBUFScope::SCOPE_NONE);
+
+    if (!mod.offen && !isOffVaddrContainer(vaddr)) {
+        mod.offen = 1;
+    }
+    return mod;
+}
+
 stinkytofu::SMEMModifiers convertSMEMModifiers(const rocisa::SMEMModifiers& rocMod,
                                                const std::map<std::string, int>& asmCaps) {
     bool hasSCOPEModifier = asmCaps.count("HasSCOPEModifier") && asmCaps.at("HasSCOPEModifier");
