@@ -1,7 +1,8 @@
 # hipDNN GPU Reference Test Categories
 #
 # quick and nightly are disjoint and together cover all tests.
-# Both carry the unit_test label so ninja unit-check runs everything once.
+# Only quick carries unit_test so ninja unit-check is the fast developer path.
+# ninja check (bare ctest) runs both categories.
 #
 # Shapes are prefixed: Small* (quick), Medium*/Large* (nightly)
 # Standalone (non-parameterized) tests start with Test*
@@ -23,7 +24,6 @@ test_categories:
       - "Large*"
     labels:
       - "nightly"
-      - "unit_test"
 
 execution_settings:
   default_timeout: 300

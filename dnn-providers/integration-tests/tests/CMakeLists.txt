@@ -81,8 +81,8 @@ set_property(GLOBAL APPEND PROPERTY INTEGRATION_TESTS_TEST_TARGETS hipdnn_gpu_re
 install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # -- YAML-based test categories (generates ctest entries with gtest filters) --
-# quick and nightly are disjoint and together cover all tests. Both carry the
-# unit_test label so ninja unit-check (ctest -L unit_test) runs everything once.
+# quick and nightly are disjoint and together cover all tests. Only quick carries
+# unit_test so ninja unit-check is fast; ninja check (bare ctest) runs both.
 # See shared/ctest/README.md for the full architecture.
 include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
 apply_test_category_labels(

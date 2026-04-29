@@ -8,23 +8,12 @@ Integration tests for hipDNN provider implementations.
 
 | Command | What runs | Use case |
 |---------|-----------|----------|
-| `ninja check` | All tests | Full validation |
-| `ninja unit-check` | All unit tests | CI gate on every PR |
-| `ctest -L quick` | Quick tests only | Small shapes + standalone tests |
-| `ctest -L nightly` | Nightly tests only | Medium + Large shapes |
+| `ninja unit-check` | Quick tests only | Fast developer iteration |
+| `ninja check` | All tests (quick + nightly) | Full validation |
+| `ctest -L quick` | Quick gpu_ref only | Small shapes + standalone tests |
+| `ctest -L nightly` | Nightly gpu_ref only | Medium + Large shapes |
 
-### Filtering GPU reference tests by category
-
-All GPU reference shape tests live in a single binary (`hipdnn_gpu_ref_tests`).
-Test instantiation prefixes encode the shape size (`{Size}{Layout}{Dim}`):
-
-| Prefix | Size | Typical run |
-|--------|------|-------------|
-| `Small*` | Small shapes | Every PR (quick) |
-| `Medium*` | Medium shapes | Nightly |
-| `Large*` | Large shapes | Nightly |
-
-Use `--gtest_filter` to select manually:
+### Direct binary invocation
 
 ```bash
 # Quick only: small shapes + standalone tests
