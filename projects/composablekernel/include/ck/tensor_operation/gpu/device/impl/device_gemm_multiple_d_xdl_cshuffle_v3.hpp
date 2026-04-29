@@ -230,12 +230,13 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
             const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
             const index_t m_right = m - m_left;
 
-            const index_t a_right_offset = m_left * StrideA;
-            const index_t c_right_offset = m_left * StrideC;
+            const long_index_t a_right_offset = static_cast<long_index_t>(m_left) * StrideA;
+            const long_index_t c_right_offset = static_cast<long_index_t>(m_left) * StrideC;
 
             const auto ds_grid_right_ptr = generate_tuple(
                 [&](auto i) {
-                    const index_t ds_right_offset = m_left * StrideDs[i];
+                    const long_index_t ds_right_offset =
+                        static_cast<long_index_t>(m_left) * StrideDs[i];
                     return p_ds_grid_left(i) + ds_right_offset;
                 },
                 Number<NumDTensor>{});
@@ -262,7 +263,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
 
             // Algorithm:
             // While queue is not empty:
-            //  1. Get transformer from queue.
+            //  1. Get batch data from queue.
             //  2. If descs are smaller than 2GB push to result array.
             //  3. If descs are bigger than 2GB split into left and right transformer.
             //  and push the both into the queue.
@@ -273,6 +274,8 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 DsGridPointer ds_grid_ptr   = ds_grid_ptrs_queue.front();
                 CDataType* c_grid_ptr       = c_grid_ptrs_queue.front();
 
+                // m <= PartitionSize and descriptors larger then 2GB should not happen.
+                // If it does the gemm will be rejected when verifying its argument in the invoker.
                 if(areDescriptorsSmallerThan2GB(m) || (m <= PartitionSize))
                 {
                     ArgumentOut newArg{a_grid_ptr,

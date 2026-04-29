@@ -357,10 +357,11 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
             const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
             const index_t m_right = m - m_left;
 
-            const index_t a_right_offset = m_left * StrideA;
-            const index_t c_right_offset = m_left * StrideC;
-            const index_t a_scale_right_offset =
-                m_left * StrideScaleA / GridwiseGemm64::scale_pack_size_a;
+            const long_index_t a_right_offset       = static_cast<long_index_t>(m_left) * StrideA;
+            const long_index_t c_right_offset       = static_cast<long_index_t>(m_left) * StrideC;
+            const long_index_t a_scale_right_offset = static_cast<long_index_t>(m_left) *
+                                                      StrideScaleA /
+                                                      GridwiseGemm64::scale_pack_size_a;
 
             return ck::make_tuple(m_left,
                                   m_right,
@@ -384,7 +385,7 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
 
             // Algorithm:
             // While queue is not empty:
-            //  1. Get transformer from queue.
+            //  1. Get batch data from queue.
             //  2. If descs are smaller than 2GB push to result array.
             //  3. If descs are bigger than 2GB split into left and right transformer.
             //  and push the both into the queue.
@@ -395,6 +396,8 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                 const AScaleDataType* a_scale_grid_ptr = a_scale_grid_ptrs_queue.front();
                 CDataType* c_grid_ptr                  = c_grid_ptrs_queue.front();
 
+                // m <= PartitionSize and descriptors larger then 2GB should not happen.
+                // If it does the gemm will be rejected when verifying its argument in the invoker.
                 if(areDescriptorsSmallerThan2GB(m) || (m <= PartitionSize))
                 {
                     subArguments.push_back(ArgumentOut(a_grid_ptr,
