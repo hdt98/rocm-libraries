@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright Advanced Micro Devices, Inc.
 # SPDX-License-Identifier: MIT
 
@@ -7,14 +8,13 @@ import shlex
 import subprocess
 from pathlib import Path
 
-THEROCK_BIN_DIR = os.getenv("THEROCK_BIN_DIR")
-SCRIPT_DIR = Path(__file__).resolve().parent
-THEROCK_DIR = Path(
-    os.environ.get("THEROCK_DIR") or SCRIPT_DIR.parent.parent.parent
-).resolve()
 
 logging.basicConfig(level=logging.INFO)
 
+
+TEST_DIR_NAME = "rocRAND"
+
+# If quick tests are enabled, run quick tests only. Otherwise, run the full suite.
 QUICK_TESTS = [
     "*basic_tests*",
     "*config_dispatch_tests.*",
@@ -84,26 +84,43 @@ QUICK_TESTS = [
     "-*basic_tests/rocrand_basic_tests.rocrand_create_destroy_generator_test/10*",
 ]
 
-cmd = [
-    "ctest",
-    "--test-dir",
-    f"{THEROCK_BIN_DIR}/rocRAND",
-    "--output-on-failure",
-    "--parallel",
-    "8",
-    "--timeout",
-    "900",
-    "--repeat",
-    "until-pass:3",
-]
 
-# If quick tests are enabled, we run quick tests only.
-# Otherwise, we run the normal test suite
-environ_vars = os.environ.copy()
-test_type = os.getenv("TEST_TYPE", "full")
-if test_type == "quick":
-    environ_vars["GTEST_FILTER"] = ":".join(QUICK_TESTS)
+def derive_rocm_path(script_dir: Path) -> Path:
+    for candidate in (script_dir, *script_dir.parents):
+        if (candidate / "bin" / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
+            return candidate
+    if script_dir.name == TEST_DIR_NAME and script_dir.parent.name == "bin":
+        return script_dir.parent.parent
+    return script_dir.parent.parent
 
-logging.info(f"++ Exec [{THEROCK_DIR}]$ {shlex.join(cmd)}")
 
-subprocess.run(cmd, cwd=THEROCK_DIR, check=True, env=environ_vars)
+def main() -> None:
+    script_dir = Path(__file__).resolve().parent
+    rocm_path = Path(
+        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
+    ).resolve()
+    test_dir = rocm_path / "bin" / TEST_DIR_NAME
+
+    cmd = [
+        "ctest",
+        "--test-dir",
+        str(test_dir),
+        "--output-on-failure",
+        "--parallel",
+        "8",
+        "--timeout",
+        "900",
+        "--repeat",
+        "until-pass:3",
+    ]
+
+    env = os.environ.copy()
+    if os.getenv("TEST_TYPE", "full") == "quick":
+        env["GTEST_FILTER"] = ":".join(QUICK_TESTS)
+
+    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
+
+
+if __name__ == "__main__":
+    main()

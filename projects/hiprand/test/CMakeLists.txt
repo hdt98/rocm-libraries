@@ -182,3 +182,9 @@ rocm_install(
     COMPONENT tests
     RENAME "CTestTestfile.cmake"
 )
+
+rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_hiprand.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
+    COMPONENT tests
+)
