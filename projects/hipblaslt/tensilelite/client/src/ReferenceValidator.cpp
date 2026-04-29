@@ -745,36 +745,17 @@ namespace TensileLite
 
             auto copykind = isgpu ? hipMemcpyDeviceToHost : hipMemcpyHostToHost;
 
-            // For NaN bounds checking, the result pointer points to valid data (middle of buffer)
-            // We need to adjust it back to buffer start to copy the NaN padding
-            void const* copySource = result;
-            if(boundsCheck == BoundsCheckMode::NaN)
-            {
-                // Match the EXACT allocation logic in copyBadInputBuffers:
-                // dPadding = totalElements - descriptor.totalAllocatedElements()
-                // dPadding = multiplyElementSize(dPadding, descriptor.elementBytes())
-                // dPadding = (dPadding / (2*elementBytes)) * (2*elementBytes)  (ensure dPadding/2 is aligned)
-                // dstOffset = dst + dPadding / 2
-                ptrdiff_t paddingElements = maxElement - tensor.totalAllocatedElements();
-                size_t    paddingBytes    = multiplyElementSize(paddingElements, tensor.elementBytes());
-
-                // Ensure the half-offset is aligned to element boundaries
-                size_t elementBytes = static_cast<size_t>(tensor.elementBytes());
-                size_t doubleElement = 2 * elementBytes;
-                paddingBytes = (paddingBytes / doubleElement) * doubleElement;
-
-                size_t bytesBeforeData = paddingBytes / 2;
-                copySource = (uint8_t const*)result - bytesBeforeData;
-
-                // Calculate elementsBeforeData for bounds checking
-                elementsBeforeData = bytesBeforeData / elementBytes;
-                elementsAfterData
-                    = elementsToCopy - (tensor.totalAllocatedElements() + elementsBeforeData);
-            }
-
             {
                 ScopedTimer timer("validate_gpu_readback");
-                HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), copySource, bytesToCopy, copykind));
+                HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
+            }
+
+            if(boundsCheck == BoundsCheckMode::NaN)
+            {
+                ptrdiff_t bPadding = maxElement - tensor.totalAllocatedElements();
+                elementsBeforeData = bPadding / 2;
+                elementsAfterData
+                    = elementsToCopy - (tensor.totalAllocatedElements() + elementsBeforeData);
             }
             // If there was extra data allocated before the tensor to do bounds
             // checking, resultBuffer is the whole allocation, while resultData
