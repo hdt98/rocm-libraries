@@ -1816,7 +1816,26 @@ namespace TensileLite
             }
         } // namespace
 
-        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
+        static std::string_view initModeToMXMethod(InitMode mode)
+        {
+            switch(mode)
+            {
+            case InitMode::Zero:
+                return "Zeros";
+            case InitMode::One:
+                return "Ones";
+            case InitMode::Identity:
+                return "Identity";
+            case InitMode::SerialIdx:
+            case InitMode::SerialDim0:
+            case InitMode::SerialDim1:
+                return "Sequential";
+            default:
+                return "Bounded";
+            }
+        }
+
+        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
             // can safely skip them. For MX-FP4 sides we drive mxDataGenerator (so the values
@@ -1893,6 +1912,7 @@ namespace TensileLite
                 auto& pristineE8A
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
 
+                auto initA = m_vdata[ContractionProblemGemm::TENSOR::A].init;
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
                                 hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                 pristineA.cpuInput.valid.get(),
@@ -1906,7 +1926,7 @@ namespace TensileLite
                                 problem.mxBlockA(),
                                 1,
                                 true,
-                                "Bounded",
+                                initModeToMXMethod(initA),
                                 -1.0f,
                                 1.0f);
             }
@@ -1932,6 +1952,7 @@ namespace TensileLite
                 auto& pristineE8B
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
 
+                auto initB = m_vdata[ContractionProblemGemm::TENSOR::B].init;
                 generateMXInput((hipDataType)HIP_R_4F_E2M1,
                                 hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                 pristineB.cpuInput.valid.get(),
@@ -1945,7 +1966,7 @@ namespace TensileLite
                                 problem.mxBlockB(),
                                 1,
                                 false,
-                                "Bounded",
+                                initModeToMXMethod(initB),
                                 -1.0f,
                                 1.0f);
             }
