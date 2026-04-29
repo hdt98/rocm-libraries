@@ -667,7 +667,12 @@ def generateLogicDataAndSolutions(logicFiles, args, assembler: Assembler, isaInf
 
     # After all YAML files have been parsed and Solution objects created,
     # print a summary of any type mismatches that were collected.
-    printTypeMismatchSummary(len(logicFiles))
+    numMismatches = printTypeMismatchSummary(len(logicFiles))
+    if numMismatches > 0:
+        raise ValueError(
+            f"Aborting build: {numMismatches} YAML parameter type mismatch(es) detected. "
+            "Fix the parameters listed above to prevent std::bad_cast at runtime."
+        )
 
     # Sort masterLibraries to make global soln index values deterministic
     solnReIndex = 0
