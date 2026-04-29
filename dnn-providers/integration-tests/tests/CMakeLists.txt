@@ -77,15 +77,24 @@ set_target_properties(hipdnn_gpu_ref_tests PROPERTIES
         "\$ORIGIN/../${CMAKE_INSTALL_LIBDIR};\$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/engines"
     INSTALL_RPATH_USE_LINK_PATH TRUE
     BUILD_RPATH_USE_ORIGIN TRUE)
-set_property(GLOBAL APPEND PROPERTY INTEGRATION_TESTS_TEST_TARGETS hipdnn_gpu_ref_tests)
 install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # -- YAML-based test categories (generates ctest entries with gtest filters) --
 # quick and nightly are disjoint and together cover all tests. Only quick carries
 # unit_test so ninja unit-check is fast; ninja check (bare ctest) runs both.
 # See shared/ctest/README.md for the full architecture.
+#
+# We do NOT add hipdnn_gpu_ref_tests to INTEGRATION_TESTS_TEST_TARGETS because
+# install_integration_tests_ctest_files() would write a bare add_test() (no
+# gtest filter), causing the installed CTestTestfile to run ALL tests unfiltered.
+# Instead, the 4th parameter writes YAML-filtered entries to a staging file that
+# is appended to the installed CTestTestfile after install_integration_tests_ctest_files().
+set(GPU_REF_INSTALL_CTEST_STAGING "${CMAKE_BINARY_DIR}/gpu_ref_install_ctest.cmake.staging"
+    CACHE INTERNAL "Staging file for gpu_ref install-time ctest entries")
+file(WRITE "${GPU_REF_INSTALL_CTEST_STAGING}" "")
 include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
 apply_test_category_labels(
     hipdnn_gpu_ref_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/gpu_ref/test_categories.yaml"
-    "${CMAKE_CURRENT_BINARY_DIR}")
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "${GPU_REF_INSTALL_CTEST_STAGING}")
