@@ -269,9 +269,9 @@ private:
             size_t size = 0;
 #ifdef _WIN32
             MEMORYSTATUSEX mem_status;
-            mem_status.dsLength = sizeof(mem_status);
+            mem_status.dwLength = sizeof(mem_status);
             GlobalMemoryStatusEx(&mem_status);
-            size = status.ullTotalPhys;
+            size = mem_status.ullTotalPhys;
 #else
             size = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 #endif
