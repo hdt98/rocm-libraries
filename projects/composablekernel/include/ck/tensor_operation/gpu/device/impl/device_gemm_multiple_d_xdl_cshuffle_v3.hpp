@@ -160,7 +160,8 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
         std::array<index_t, NumDTensor> StrideDs;
         index_t StrideC;
 
-        static constexpr long_index_t TwoGB = (long_index_t{1} << 31);
+        static constexpr long_index_t TwoGB    = (long_index_t{1} << 31);
+        static constexpr index_t PartitionSize = 256;
 
         Partitioner() = default;
         Partitioner(index_t M_,
@@ -223,14 +224,9 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
 
         __host__ auto splitProblem(index_t m,
                                    const ADataType* p_a_grid_left,
-                                   DsGridPointer& p_ds_grid_left,
+                                   const DsGridPointer& p_ds_grid_left,
                                    CDataType* p_c_grid_left) const
         {
-            constexpr index_t PartitionSize = 256;
-            if(m <= PartitionSize)
-            {
-                throw std::runtime_error("Unable to split problem.");
-            }
             const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
             const index_t m_right = m - m_left;
 
@@ -277,7 +273,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 DsGridPointer ds_grid_ptr   = ds_grid_ptrs_queue.front();
                 CDataType* c_grid_ptr       = c_grid_ptrs_queue.front();
 
-                if(areDescriptorsSmallerThan2GB(m))
+                if(areDescriptorsSmallerThan2GB(m) || (m <= PartitionSize))
                 {
                     ArgumentOut newArg{a_grid_ptr,
                                        arg.p_b_grid,
@@ -880,9 +876,6 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
         // True if problem is partitionable or valid without partitioning.
         if(!partitioner.isPartitionable())
         {
-            std::cout
-                << "Problem is not partitionable into smaller problems that fit into 2GB limit."
-                << std::endl;
             return false;
         }
 

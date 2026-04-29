@@ -9,6 +9,7 @@
 #include <queue>
 #include <vector>
 #include <algorithm>
+#include <numeric>
 
 #include "ck/utility/common_header.hpp"
 
@@ -292,7 +293,8 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
         static constexpr index_t APackedSize = packed_size_v<ADataType>;
         static constexpr index_t BPackedSize = packed_size_v<BDataType>;
 
-        static constexpr long_index_t TwoGB = long_index_t{1} << 31;
+        static constexpr long_index_t TwoGB    = long_index_t{1} << 31;
+        static constexpr index_t PartitionSize = 256;
 
         index_t M;
         index_t N;
@@ -352,17 +354,13 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                                    const AScaleDataType* p_a_scale_grid_left,
                                    CDataType* p_c_grid_left) const
         {
-            constexpr index_t PartitionSize = 256;
-            if(m <= PartitionSize)
-            {
-                throw std::runtime_error("Unable to split problem.");
-            }
             const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
             const index_t m_right = m - m_left;
 
-            const index_t a_right_offset       = m_left * StrideA;
-            const index_t c_right_offset       = m_left * StrideC;
-            const index_t a_scale_right_offset = m_left * StrideScaleA / sizeof(AScaleDataType);
+            const index_t a_right_offset = m_left * StrideA;
+            const index_t c_right_offset = m_left * StrideC;
+            const index_t a_scale_right_offset =
+                m_left * StrideScaleA / GridwiseGemm64::scale_pack_size_a;
 
             return ck::make_tuple(m_left,
                                   m_right,
@@ -397,7 +395,7 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
                 const AScaleDataType* a_scale_grid_ptr = a_scale_grid_ptrs_queue.front();
                 CDataType* c_grid_ptr                  = c_grid_ptrs_queue.front();
 
-                if(areDescriptorsSmallerThan2GB(m))
+                if(areDescriptorsSmallerThan2GB(m) || (m <= PartitionSize))
                 {
                     subArguments.push_back(ArgumentOut(a_grid_ptr,
                                                        a_scale_grid_ptr,
@@ -676,9 +674,6 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
         // True if problem is partitionable or valid without partitioning.
         if(!partitioner.isPartitionable())
         {
-            std::cout
-                << "Problem is not partitionable into smaller problems that fit into 2GB limit."
-                << std::endl;
             return false;
         }
 
