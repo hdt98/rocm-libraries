@@ -21,7 +21,7 @@ namespace ck_tile {
 //
 //   Launch 0: SageAttnV3KMeanKernel
 //     Computes k_mean[b, h, d] = mean_n(K[b,h,n,d]), stored as InputT.
-//     Grid: (num_k_tiles, nhead, batch), BlockSize: kCols.
+//     Grid: (num_k_tiles, nhead, batch), BlockSize: kHeadDim.
 //     Requires k_mean_partial_buf (float) and counter_buf (int32) to be
 //     zero-initialised before launch (done here via hipMemsetAsync).
 //
@@ -45,8 +45,8 @@ namespace ck_tile {
 //
 // Template parameters:
 //   InputT:  fp16_t or bf16_t (matches Q / K / V element type)
-//   kRows:   tile rows for Q and K (kM0 == kN0)
-//   kCols:   hdim
+//   kQMeanGroupSize:   tile rows for Q and K (kM0 == kN0)
+//   kHeadDim:   hdim
 //
 // delta_s strides are derived from M=num_q_tiles, N=seqlen_k (no stride params needed).
 //
@@ -82,16 +82,16 @@ struct SageAttnV3PreprocessBufferSizes
     index_t num_k_tiles;
 };
 
-template <typename InputT, index_t kRows>
+template <typename InputT, index_t kQMeanGroupSize>
 SageAttnV3PreprocessBufferSizes get_buffer_sizes(
     index_t batch, index_t nhead, index_t seqlen_q, index_t seqlen_k, index_t hdim)
 {
     constexpr index_t kG = 32; // MXFP4 scale granularity
 
-    const index_t sq_pad = ((seqlen_q + kRows - 1) / kRows) * kRows;
-    const index_t sk_pad = ((seqlen_k + kRows - 1) / kRows) * kRows;
-    const index_t nqt    = sq_pad / kRows;
-    const index_t nkt    = sk_pad / kRows;
+    const index_t sq_pad = ((seqlen_q + kQMeanGroupSize - 1) / kQMeanGroupSize) * kQMeanGroupSize;
+    const index_t sk_pad = ((seqlen_k + kQMeanGroupSize - 1) / kQMeanGroupSize) * kQMeanGroupSize;
+    const index_t nqt    = sq_pad / kQMeanGroupSize;
+    const index_t nkt    = sk_pad / kQMeanGroupSize;
 
     SageAttnV3PreprocessBufferSizes s{};
     s.seqlen_q_padded = sq_pad;
@@ -130,7 +130,7 @@ using DeltaSV3GemmShape = std::conditional_t<
     TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32,  8>>,
     TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32, 16>>>;
 
-template <typename InputT, index_t kRows, index_t kCols>
+template <typename InputT, index_t kQMeanGroupSize, index_t kHeadDim>
 void sageattn_v3_preprocess_run(
     // InputT: fp16_t, bf16_t, or float.
     // ---- preprocess args ----
@@ -152,7 +152,7 @@ void sageattn_v3_preprocess_run(
     const index_t seqlen_k = prep_args.seqlen_k;
 
     // Compute padded dimensions.
-    const auto    bsz              = get_buffer_sizes<InputT, kRows>(batch, nhead, seqlen_q, seqlen_k, hdim);
+    const auto    bsz              = get_buffer_sizes<InputT, kQMeanGroupSize>(batch, nhead, seqlen_q, seqlen_k, hdim);
     const index_t seqlen_q_padded  = bsz.seqlen_q_padded;
     const index_t seqlen_k_padded  = bsz.seqlen_k_padded;
     const index_t num_q_tiles      = bsz.num_q_tiles;
@@ -165,7 +165,7 @@ void sageattn_v3_preprocess_run(
     (void)hipMemsetAsync(counter_buf,        0, batch * nhead * sizeof(int32_t),       stream);
 
     {
-        using KMeanKernel = SageAttnV3KMeanKernel<InputT, kRows, kCols>;
+        using KMeanKernel = SageAttnV3KMeanKernel<InputT, kQMeanGroupSize, kHeadDim>;
         using KMeanKargs  = typename KMeanKernel::Kargs;
 
         KMeanKargs kargs{};
@@ -196,7 +196,7 @@ void sageattn_v3_preprocess_run(
     // Launch 1: preprocess kernel (Q + K')
     // ------------------------------------------------------------------ //
     {
-        using PrepKernel = SageAttnV3PreprocessKernel<InputT, kRows, kCols>;
+        using PrepKernel = SageAttnV3PreprocessKernel<InputT, kQMeanGroupSize, kHeadDim>;
         using PrepKargs  = typename PrepKernel::Kargs;
 
         PrepKargs kargs{};

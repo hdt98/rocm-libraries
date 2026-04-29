@@ -154,11 +154,22 @@ using DeltaSV3GemmShape = std::conditional_t<
     TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32, 8>>,
     TileGemmShape<sequence<32, 64, 32>, sequence<1, 2, 1>, sequence<32, 32, 16>>>;
 
-template <typename InputT, index_t kRows, index_t kCols>
+template <typename InputT, index_t kQMeanGroupSize, index_t kHeadDim>
 struct SageAttnV3Preprocess
 {
     using Args        = SageAttnV3PreprocessArgs<InputT>;
     using BufferSizes = SageAttnV3PreprocessBufferSizes;
+
+    static constexpr index_t kFmhaTileN0       = 128;
+    static constexpr index_t kScaleGranularity  = 32;
+
+    static_assert(kFmhaTileN0 % kScaleGranularity == 0,
+                  "kFmhaTileN0 must be divisible by kScaleGranularity");
+    static_assert(kFmhaTileN0 % kQMeanGroupSize == 0 ||
+                  kQMeanGroupSize % kFmhaTileN0 == 0,
+                  "kQMeanGroupSize and kFmhaTileN0 must be multiples of each other");
+    static_assert(kHeadDim % kScaleGranularity == 0,
+                  "kHeadDim must be divisible by kScaleGranularity");
 
     static BufferSizes get_buffer_sizes(index_t batch,
                                         index_t nhead_q,
@@ -169,17 +180,14 @@ struct SageAttnV3Preprocess
     {
         constexpr index_t kG = 32; // MXFP4 scale granularity
 
-        // V preprocess kernel requires seqlen_k_padded divisible by kVGroup * kVGroupsPerBlock.
-        // kVGroupsPerBlock = R = sizeof(InputT)*2: fp16->4, float32->2.
-        // fp16: kVPad = 32*4 = 128; float32: kVPad = 32*2 = 64. Use 128 (covers both).
-        constexpr index_t kVPad = 128; // = kVGroup (32) * R_fp16 (4)
-        constexpr index_t kQPad = kRows;
-        constexpr index_t kKPad = (kVPad > kRows) ? kVPad : kRows; // lcm when both are powers of 2
+        constexpr index_t kQPad = kQMeanGroupSize;
+        constexpr index_t kKPad = (kFmhaTileN0 > kQMeanGroupSize) ? kFmhaTileN0
+                                                                    : kQMeanGroupSize;
 
         const index_t sq_pad = ((seqlen_q + kQPad - 1) / kQPad) * kQPad;
         const index_t sk_pad = ((seqlen_k + kKPad - 1) / kKPad) * kKPad;
-        const index_t nqt    = sq_pad / kRows;
-        const index_t nkt    = sk_pad / kRows;
+        const index_t nqt    = sq_pad / kQMeanGroupSize;
+        const index_t nkt    = sk_pad / kQMeanGroupSize;
 
         SageAttnV3PreprocessBufferSizes s{};
         s.seqlen_q_padded = sq_pad;
@@ -198,7 +206,7 @@ struct SageAttnV3Preprocess
         s.v_scale_bytes = static_cast<size_t>(batch * nhead_kv * hdim * (sk_pad / kG));
         // Packed scale sizes (depends on MFMA tile shape → kK0)
         {
-            constexpr index_t kK0_          = (kCols <= 128) ? 64 : 128;
+            constexpr index_t kK0_          = (kHeadDim <= 128) ? 64 : 128;
             using PackKernel                = SageAttnV3ScalePackKernel<kK0_>;
             const index_t k_packed_per_head = PackKernel::KPackedPerHead(sk_pad, hdim);
             const index_t v_packed_per_head = PackKernel::VPackedPerHead(sk_pad, hdim);
@@ -241,7 +249,7 @@ struct SageAttnV3Preprocess
         // ------------------------------------------------------------------ //
         if(stages & kSA3StageKMean)
         {
-            using KMeanKernel = SageAttnV3KMeanKernel<InputT, kRows, kCols>;
+            using KMeanKernel = SageAttnV3KMeanKernel<InputT, kQMeanGroupSize, kHeadDim>;
             using KMeanKargs  = typename KMeanKernel::Kargs;
 
             const std::size_t k_mean_float_bytes =
@@ -272,7 +280,7 @@ struct SageAttnV3Preprocess
         // ------------------------------------------------------------------ //
         if(stages & kSA3StageQPreprocess)
         {
-            using QKernel = SageAttnV3QPreprocessKernel<InputT, kRows, kCols>;
+            using QKernel = SageAttnV3QPreprocessKernel<InputT, kQMeanGroupSize, kHeadDim>;
             using QKargs  = typename QKernel::Kargs;
 
             QKargs kargs{};
@@ -309,7 +317,7 @@ struct SageAttnV3Preprocess
         // ------------------------------------------------------------------ //
         if(stages & kSA3StageKPreprocess)
         {
-            using KKernel = SageAttnV3KPreprocessKernel<InputT, kRows, kCols>;
+            using KKernel = SageAttnV3KPreprocessKernel<InputT, kQMeanGroupSize, kHeadDim>;
             using KKargs  = typename KKernel::Kargs;
 
             KKargs kargs{};
@@ -352,7 +360,7 @@ struct SageAttnV3Preprocess
             // Dispatch on hdim: kVHdimTile=hdim so each CTA covers the full hdim (y=1).
             // kBlockSize = R * kVGroup * kVHdimTile / kLoadVec (= 4*hdim for fp16).
             auto dispatch_v = [&](auto kVHdimTile_c) {
-                using VKernel = SageAttnV3VPreprocessKernel<InputT, 32, kVHdimTile_c.value>;
+                using VKernel = SageAttnV3VPreprocessKernel<InputT, kVHdimTile_c.value>;
                 using VKargs  = typename VKernel::Kargs;
 
                 VKargs kargs{};
@@ -521,7 +529,7 @@ struct SageAttnV3Preprocess
         if((stages & kSA3StageScalePack) && args.k_scale_packed_ptr != nullptr &&
            args.v_scale_packed_ptr != nullptr)
         {
-            constexpr index_t kK0_ = (kCols <= 128) ? 64 : 128;
+            constexpr index_t kK0_ = (kHeadDim <= 128) ? 64 : 128;
             using PackKernel       = SageAttnV3ScalePackKernel<kK0_>;
             using PackKargs        = typename PackKernel::Kargs;
 

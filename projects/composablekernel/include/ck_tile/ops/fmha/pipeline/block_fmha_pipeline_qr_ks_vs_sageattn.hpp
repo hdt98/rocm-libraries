@@ -247,9 +247,9 @@ struct BlockFmhaPipelineQRKSVSSageAttn
                const DeltaSDramBlockWindowTmp& delta_s_dram_block_window_tmp,
                float p_scale_factor,
                const float sink_v,
-               const int32_t* k_scale_packed_ptr = nullptr,
-               const int32_t* v_scale_packed_ptr = nullptr,
-               const float* delta_s_raw_ptr = nullptr) const
+               const int32_t* k_scale_packed_ptr,
+               const int32_t* v_scale_packed_ptr,
+               const float* delta_s_raw_ptr) const
     {
         (void)p_compute_element_func;
         (void)randval_dram_block_window_tmp;
@@ -433,9 +433,7 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         constexpr index_t kCMPerLane0    = BlockGemm0::CMPerLane;
         constexpr index_t kMIterPerWarp0 = BlockGemm0::MIterPerWarp;
 
-        auto delta_s_res = make_wave_buffer_resource(
-            delta_s_raw_ptr != nullptr ? delta_s_raw_ptr
-                                       : reinterpret_cast<const float*>(smem_ptr));
+        auto delta_s_res = make_wave_buffer_resource(delta_s_raw_ptr);
 
         // Packed K/V scale: per-block dwordx4 loading
         // Each dwordx4 holds scale for 1 block × 1 k_group:
@@ -453,12 +451,8 @@ struct BlockFmhaPipelineQRKSVSSageAttn
         const index_t k_group = get_lane_id() / (64 / kABScaleKLane0);
         const index_t lane_n  = get_lane_id() % kCNLane0;
 
-        auto k_scale_res = make_wave_buffer_resource(
-            k_scale_packed_ptr != nullptr ? k_scale_packed_ptr
-                                          : reinterpret_cast<const int32_t*>(smem_ptr));
-        auto v_scale_res = make_wave_buffer_resource(
-            v_scale_packed_ptr != nullptr ? v_scale_packed_ptr
-                                          : reinterpret_cast<const int32_t*>(smem_ptr));
+        auto k_scale_res = make_wave_buffer_resource(k_scale_packed_ptr);
+        auto v_scale_res = make_wave_buffer_resource(v_scale_packed_ptr);
 
         auto load_k_scale_dwordx4 = [&](index_t block_idx) {
             return llvm_amdgcn_raw_buffer_load_i32x4(

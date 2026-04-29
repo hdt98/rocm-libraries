@@ -14,8 +14,8 @@ struct SA3QKPrepPolicy
     using Problem = remove_cvref_t<Problem_>;
     using InputT  = typename Problem::InputT;
 
-    static constexpr index_t kRows             = Problem::kRows;
-    static constexpr index_t kCols             = Problem::kCols;
+    static constexpr index_t kQMeanGroupSize             = Problem::kQMeanGroupSize;
+    static constexpr index_t kHeadDim             = Problem::kHeadDim;
     static constexpr index_t kBlockSize        = Problem::kBlockSize;
     static constexpr index_t kScaleGranularity = Problem::kScaleGranularity;
     static constexpr index_t kGroups           = Problem::kGroups;
@@ -26,23 +26,23 @@ struct SA3QKPrepPolicy
 
     // kLdsPad=8 eliminates intra-warp LDS bank conflicts.
     static constexpr index_t kLdsPad       = 8;
-    static constexpr index_t kLdsRowStride = kCols + kLdsPad;
+    static constexpr index_t kLdsRowStride = kHeadDim + kLdsPad;
     static constexpr index_t kQTileBytes =
-        kRows * kLdsRowStride * static_cast<index_t>(sizeof(InputT));
+        kQMeanGroupSize * kLdsRowStride * static_cast<index_t>(sizeof(InputT));
 
-    // smem_mean: float[kCols] appended after Q tile; caches per-column mean for RunQQuantize.
+    // smem_mean: float[kHeadDim] appended after Q tile; caches per-column mean for RunQQuantize.
     static constexpr index_t kSmemMeanOffset = kQTileBytes;
-    static constexpr index_t kSmemMeanBytes  = kCols * static_cast<index_t>(sizeof(float));
+    static constexpr index_t kSmemMeanBytes  = kHeadDim * static_cast<index_t>(sizeof(float));
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize()
     {
         return kSmemMeanOffset + kSmemMeanBytes;
     }
 
-    // K kernel smem: kCols floats for k_mean cache.
+    // K kernel smem: kHeadDim floats for k_mean cache.
     CK_TILE_HOST_DEVICE static constexpr index_t GetKSmemSize()
     {
-        return kCols * static_cast<index_t>(sizeof(float));
+        return kHeadDim * static_cast<index_t>(sizeof(float));
     }
 
     CK_TILE_HOST_DEVICE static constexpr auto MakeQKTileDstr()
@@ -64,9 +64,9 @@ struct SA3QKPrepPolicy
     CK_TILE_HOST_DEVICE static constexpr auto MakeMeanReduceTileDstr()
     {
         constexpr index_t kWarps_      = kBlockSize / 64;
-        constexpr index_t kColsPerWarp = kCols / kWarps_;
+        constexpr index_t kColsPerWarp = kHeadDim / kWarps_;
         static_assert(kBlockSize % 64 == 0, "kBlockSize must be a multiple of 64");
-        static_assert(kCols % kWarps_ == 0, "kCols must be divisible by kWarps");
+        static_assert(kHeadDim % kWarps_ == 0, "kHeadDim must be divisible by kWarps");
         static_assert(kColsPerWarp * kThreadsPerCol == 64,
                       "kColsPerWarp * kThreadsPerCol must equal warp size (64)");
         return make_static_tile_distribution(
@@ -123,13 +123,13 @@ struct SA3VPrepPolicy
     using InputT  = typename Problem::InputT;
 
     static constexpr index_t kVHdimTile       = Problem::kVHdimTile;
-    static constexpr index_t kVGroup          = Problem::kVGroup;
+    static constexpr index_t kScaleGranularity          = Problem::kScaleGranularity;
     static constexpr index_t kBlockSize       = Problem::kBlockSize;
     static constexpr index_t kLoadVec         = Problem::kLoadVec;
-    static constexpr index_t kVGroupsPerBlock = Problem::kVGroupsPerBlock;
+    static constexpr index_t kScaleGroupsPerTile = Problem::kScaleGroupsPerTile;
 
     static constexpr index_t kSmemVBytes =
-        kVGroupsPerBlock * kVGroup * kVHdimTile * static_cast<index_t>(sizeof(InputT));
+        kScaleGroupsPerTile * kScaleGranularity * kVHdimTile * static_cast<index_t>(sizeof(InputT));
 
     CK_TILE_HOST_DEVICE static constexpr index_t GetSmemSize() { return kSmemVBytes; }
 
@@ -138,14 +138,14 @@ struct SA3VPrepPolicy
         constexpr index_t kDPacks        = kVHdimTile / kLoadVec;
         constexpr index_t kWarps         = kBlockSize / 64;
         constexpr index_t kRowsPerWarp   = 64 / kDPacks;
-        constexpr index_t kRowsPerThread = kVGroup / (kVGroupsPerBlock * kLoadVec);
+        constexpr index_t kRowsPerThread = kScaleGranularity / (kScaleGroupsPerTile * kLoadVec);
 
         static_assert(kBlockSize % 64 == 0, "kBlockSize must be multiple of 64");
         static_assert(64 % kDPacks == 0, "kDPacks must divide 64 for lane decomposition");
-        static_assert(kVGroup % (kVGroupsPerBlock * kLoadVec) == 0,
-                      "kVGroup must be divisible by R*kLoadVec");
-        static_assert(kWarps * kRowsPerWarp * kRowsPerThread == kVGroup,
-                      "Distribution must exactly cover kVGroup rows");
+        static_assert(kScaleGranularity % (kScaleGroupsPerTile * kLoadVec) == 0,
+                      "kScaleGranularity must be divisible by R*kLoadVec");
+        static_assert(kWarps * kRowsPerWarp * kRowsPerThread == kScaleGranularity,
+                      "Distribution must exactly cover kScaleGranularity rows");
 
         return make_static_tile_distribution(
             tile_distribution_encoding<

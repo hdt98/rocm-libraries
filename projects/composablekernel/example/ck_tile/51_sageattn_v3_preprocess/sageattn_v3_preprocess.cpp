@@ -104,10 +104,10 @@ static ck_tile::SageAttnV3PreprocessArgs<InputT> make_hargs(const RunShape& s,
     return a;
 }
 
-template <typename InputT, int kRows, int kCols>
+template <typename InputT, int kQMeanGroupSize, int kHeadDim>
 BenchResult run_benchmark(const RunShape& s)
 {
-    using SA3 = ck_tile::SageAttnV3Preprocess<InputT, kRows, kCols>;
+    using SA3 = ck_tile::SageAttnV3Preprocess<InputT, kQMeanGroupSize, kHeadDim>;
 
     const int b = s.batch, hq = s.nhead_q, hkv = s.nhead_kv;
     const int sq = s.seqlen_q, sk = s.seqlen_k, hd = s.hdim;
@@ -192,10 +192,10 @@ BenchResult run_benchmark(const RunShape& s)
     return res;
 }
 
-template <typename InputT, int kRows, int kCols>
+template <typename InputT, int kQMeanGroupSize, int kHeadDim>
 bool run_verify(const RunShape& s)
 {
-    using SA3 = ck_tile::SageAttnV3Preprocess<InputT, kRows, kCols>;
+    using SA3 = ck_tile::SageAttnV3Preprocess<InputT, kQMeanGroupSize, kHeadDim>;
 
     const int b = s.batch, hq = s.nhead_q, hkv = s.nhead_kv;
     const int sq = s.seqlen_q, sk = s.seqlen_k, hd = s.hdim;
@@ -243,7 +243,7 @@ bool run_verify(const RunShape& s)
                                                            hq,
                                                            sq,
                                                            hd,
-                                                           kRows);
+                                                           kQMeanGroupSize);
 
     std::vector<float> q_mean_rt = q_mean_ref;
     if constexpr(std::is_same_v<InputT, ck_tile::fp16_t>)
@@ -437,7 +437,7 @@ bool run_verify(const RunShape& s)
             for(int hi = 0; hi < hq; hi++)
                 for(int qi = 0; qi < num_q_tiles; qi++)
                 {
-                    const int rs = qi * kRows, re = std::min(rs + kRows, sq);
+                    const int rs = qi * kQMeanGroupSize, re = std::min(rs + kQMeanGroupSize, sq);
                     for(int n = rs; n < re; n++)
                         for(int d = 0; d < hd; d++)
                             q_smooth[bi * hq * sq * hd + hi * sq * hd + n * hd + d] =
@@ -633,7 +633,7 @@ static const std::vector<std::tuple<int, int, int, int, int, int>> kShapes = {
 };
 
 static const std::vector<std::tuple<int, int, int, int, int, int>> kVerifyShapes = {
-    // aligned seqlen (multiples of kRows=128)
+    // aligned seqlen (multiples of kQMeanGroupSize=128)
     {1, 1, 1, 128, 128, 64},
     {1, 1, 1, 65, 96, 64},
     {1, 1, 1, 256, 128, 128},
@@ -643,7 +643,7 @@ static const std::vector<std::tuple<int, int, int, int, int, int>> kVerifyShapes
     {1, 2, 2, 256, 256, 128},
     {1, 1, 1, 128, 128, 256},
     {1, 2, 2, 128, 256, 256},
-    // irregular seqlen (non-multiples of kRows=128)
+    // irregular seqlen (non-multiples of kQMeanGroupSize=128)
     {1, 1, 1, 65, 96, 128},
     {1, 1, 1, 127, 96, 128},
     {1, 2, 2, 130, 96, 128},

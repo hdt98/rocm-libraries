@@ -19,8 +19,8 @@ struct SA3QKPrepPipeline
     using Policy  = remove_cvref_t<Policy_>;
     using InputT  = typename Problem::InputT;
 
-    static constexpr index_t kRows             = Problem::kRows;
-    static constexpr index_t kCols             = Problem::kCols;
+    static constexpr index_t kQMeanGroupSize             = Problem::kQMeanGroupSize;
+    static constexpr index_t kHeadDim             = Problem::kHeadDim;
     static constexpr index_t kScaleGranularity = Problem::kScaleGranularity;
     static constexpr index_t kBlockSize        = Problem::kBlockSize;
     static constexpr index_t kGroups           = Problem::kGroups;
@@ -37,7 +37,7 @@ struct SA3QKPrepPipeline
 
     // K hat shuffle parameters for FMHA async K load (warp-interleaved LDS layout).
     // pk_fp4_t: KVector=16, kK0 depends on MFMA shape.
-    static constexpr index_t kFwdK0         = (kCols <= 128) ? 64 : 128;
+    static constexpr index_t kFwdK0         = (kHeadDim <= 128) ? 64 : 128;
     static constexpr index_t kFwdKVector    = 16;
     static constexpr index_t kFwdLanesPerK  = kFwdK0 / kFwdKVector;
     static constexpr index_t kFwdLaneGroups = 64 / kFwdLanesPerK;
@@ -62,22 +62,22 @@ struct SA3QKPrepPipeline
         constexpr auto dstr      = Policy::MakeQKTileDstr();
         const auto q_global_view = make_naive_tensor_view<address_space_enum::global>(
             q_ptr,
-            make_tuple(number<kRows>{}, number<kCols>{}),
-            make_tuple(static_cast<index_t>(kCols), number<1>{}),
+            make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}),
+            make_tuple(static_cast<index_t>(kHeadDim), number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto q_global_win = make_tile_window(
-            q_global_view, make_tuple(number<kRows>{}, number<kCols>{}), {0, 0}, dstr);
+            q_global_view, make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}), {0, 0}, dstr);
         const auto q_tile = load_tile(q_global_win);
 
         auto smem_q_view = make_naive_tensor_view<address_space_enum::lds>(
             smem_q,
-            make_tuple(number<kRows>{}, number<kCols>{}),
+            make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}),
             make_tuple(number<kLdsRowStride>{}, number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto smem_q_win = make_tile_window(
-            smem_q_view, make_tuple(number<kRows>{}, number<kCols>{}), {0, 0}, dstr);
+            smem_q_view, make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}), {0, 0}, dstr);
         store_tile(smem_q_win, q_tile);
     }
 
@@ -90,7 +90,7 @@ struct SA3QKPrepPipeline
             reinterpret_cast<float*>(reinterpret_cast<char*>(smem) + kSmemMeanOffset);
 
         constexpr index_t kWarps_      = kBlockSize / 64;
-        constexpr index_t kColsPerWarp = kCols / kWarps_;
+        constexpr index_t kColsPerWarp = kHeadDim / kWarps_;
         const index_t tid              = get_thread_id();
         const index_t warp_id          = tid / 64;
         const index_t lane_id          = tid % 64;
@@ -133,7 +133,7 @@ struct SA3QKPrepPipeline
         {
             dst_scale_ptr[row_idx * kNumGroups + grp_idx] = 0;
             uint8_t* hat_dst =
-                dst_hat_ptr + row_idx * (kCols / 2) + grp_idx * (kScaleGranularity / 2);
+                dst_hat_ptr + row_idx * (kHeadDim / 2) + grp_idx * (kScaleGranularity / 2);
             for(index_t j = 0; j < kScaleGranularity / 2; j++)
                 hat_dst[j] = 0;
             return;
@@ -144,12 +144,12 @@ struct SA3QKPrepPipeline
         constexpr auto dstr   = Policy::MakeQKTileDstr();
         const auto q_lds_view = make_naive_tensor_view<address_space_enum::lds>(
             smem_q,
-            make_tuple(number<kRows>{}, number<kCols>{}),
+            make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}),
             make_tuple(number<kLdsRowStride>{}, number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto q_lds_win = make_tile_window(
-            q_lds_view, make_tuple(number<kRows>{}, number<kCols>{}), {0, 0}, dstr);
+            q_lds_view, make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}), {0, 0}, dstr);
         const auto q_tile = load_tile(q_lds_win);
 
         float group_data[kScaleGranularity];
@@ -170,7 +170,7 @@ struct SA3QKPrepPipeline
             static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
         PackFP4Group<kScaleGranularity>(group_data,
-                                        dst_hat_ptr + row_idx * (kCols / 2) +
+                                        dst_hat_ptr + row_idx * (kHeadDim / 2) +
                                             grp_idx * (kScaleGranularity / 2),
                                         scale);
     }
@@ -188,7 +188,7 @@ struct SA3QKPrepPipeline
         const index_t tid = get_thread_id();
 
         float* smem_f = reinterpret_cast<float*>(smem);
-        for(index_t d = tid; d < kCols; d += kBlockSize)
+        for(index_t d = tid; d < kHeadDim; d += kBlockSize)
             smem_f[d] = k_mean_float[d] * seqlen_k_inv;
         block_sync_lds();
 
@@ -206,7 +206,7 @@ struct SA3QKPrepPipeline
                 dst_row[j] = InputT{0};
             dst_scale_ptr[srow * kNumGroups + grp_idx] = 0;
             uint8_t* hat_dst =
-                dst_hat_ptr + srow * (kCols / 2) + grp_idx * (kScaleGranularity / 2);
+                dst_hat_ptr + srow * (kHeadDim / 2) + grp_idx * (kScaleGranularity / 2);
             for(index_t j = 0; j < kScaleGranularity / 2; j++)
                 hat_dst[j] = 0;
             return;
@@ -217,12 +217,12 @@ struct SA3QKPrepPipeline
         constexpr auto dstr   = Policy::MakeQKTileDstr();
         const auto k_src_view = make_naive_tensor_view<address_space_enum::global>(
             src_ptr,
-            make_tuple(number<kRows>{}, number<kCols>{}),
-            make_tuple(static_cast<index_t>(kCols), number<1>{}),
+            make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}),
+            make_tuple(static_cast<index_t>(kHeadDim), number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto k_src_win = make_tile_window(
-            k_src_view, make_tuple(number<kRows>{}, number<kCols>{}), {0, 0}, dstr);
+            k_src_view, make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}), {0, 0}, dstr);
         const auto k_tile = load_tile(k_src_win);
 
         float group_data[kScaleGranularity];
@@ -239,12 +239,12 @@ struct SA3QKPrepPipeline
 
         const auto k_dst_view = make_naive_tensor_view<address_space_enum::global>(
             k_prime_ptr,
-            make_tuple(number<kRows>{}, number<kCols>{}),
+            make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}),
             make_tuple(k_prime_stride, number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto k_dst_win = make_tile_window(
-            k_dst_view, make_tuple(number<kRows>{}, number<kCols>{}), {0, 0}, dstr);
+            k_dst_view, make_tuple(number<kQMeanGroupSize>{}, number<kHeadDim>{}), {0, 0}, dstr);
         store_tile(k_dst_win, kprime_tile);
 
         const float scale = bit_cast<float>(
@@ -255,7 +255,7 @@ struct SA3QKPrepPipeline
             static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
         PackFP4Group<kScaleGranularity>(group_data,
-                                        dst_hat_ptr + srow * (kCols / 2) +
+                                        dst_hat_ptr + srow * (kHeadDim / 2) +
                                             grp_idx * (kScaleGranularity / 2),
                                         scale);
     }
@@ -269,7 +269,7 @@ struct SA3KMeanPipeline
     using Policy  = remove_cvref_t<Policy_>;
     using InputT  = typename Problem::InputT;
 
-    static constexpr index_t kCols         = Problem::kCols;
+    static constexpr index_t kHeadDim         = Problem::kHeadDim;
     static constexpr index_t kBlockSize    = Problem::kBlockSize;
     static constexpr index_t kVec          = Problem::kVec;
     static constexpr index_t kColsPerWarp  = Problem::kColsPerWarp;
@@ -290,13 +290,13 @@ struct SA3KMeanPipeline
 
         const auto k_view = make_naive_tensor_view<address_space_enum::global>(
             k_chunk,
-            make_tuple(num_rows, number<kCols>{}),
+            make_tuple(num_rows, number<kHeadDim>{}),
             make_tuple(stride_k, number<1>{}),
             number<kVec>{},
             number<1>{});
         auto k_window = make_tile_window(
             k_view,
-            make_tuple(number<kRowsPerGroup>{}, number<kCols>{}),
+            make_tuple(number<kRowsPerGroup>{}, number<kHeadDim>{}),
             {0, 0},
             k_dstr);
 
@@ -361,10 +361,10 @@ struct SA3VPrepPipeline
     using InputT  = typename Problem::InputT;
 
     static constexpr index_t kVHdimTile       = Problem::kVHdimTile;
-    static constexpr index_t kVGroup          = Problem::kVGroup;
+    static constexpr index_t kScaleGranularity          = Problem::kScaleGranularity;
     static constexpr index_t kBlockSize       = Problem::kBlockSize;
     static constexpr index_t kLoadVec         = Problem::kLoadVec;
-    static constexpr index_t kVGroupsPerBlock = Problem::kVGroupsPerBlock;
+    static constexpr index_t kScaleGroupsPerTile = Problem::kScaleGroupsPerTile;
 
     // V hat shuffle: same warp-interleaved logic as K, applied to hdim_v (N) dimension.
     static constexpr index_t kFwdK1         = (kVHdimTile <= 128) ? 64 : 128;
@@ -401,34 +401,34 @@ struct SA3VPrepPipeline
             number<1>{});
         auto v_global_win = make_tile_window(
             v_global_view,
-            make_tuple(number<kVGroup>{}, number<kVHdimTile>{}),
-            {g_abs_base * kVGroup, 0},
+            make_tuple(number<kScaleGranularity>{}, number<kVHdimTile>{}),
+            {g_abs_base * kScaleGranularity, 0},
             sg_load_dstr);
 
         auto smem_v_view = make_naive_tensor_view<address_space_enum::lds>(
             smem_v,
-            make_tuple(number<kVGroupsPerBlock * kVGroup>{}, number<kVHdimTile>{}),
+            make_tuple(number<kScaleGroupsPerTile * kScaleGranularity>{}, number<kVHdimTile>{}),
             make_tuple(number<kVHdimTile>{}, number<1>{}),
             number<kLoadVec>{},
             number<1>{});
         auto smem_v_win = make_tile_window(
             smem_v_view,
-            make_tuple(number<kVGroup>{}, number<kVHdimTile>{}),
+            make_tuple(number<kScaleGranularity>{}, number<kVHdimTile>{}),
             {0, 0},
             sg_load_dstr);
 
-        static_for<0, kVGroupsPerBlock, 1>{}([&](auto i_c) {
+        static_for<0, kScaleGroupsPerTile, 1>{}([&](auto i_c) {
             auto v_tile = load_tile(v_global_win);
 
-            const index_t sk_group_start = (g_abs_base + i_c.value) * kVGroup;
+            const index_t sk_group_start = (g_abs_base + i_c.value) * kScaleGranularity;
             if(sk_group_start >= seqlen_k_real)
             {
                 tile_elementwise_inout([](InputT& v) { v = InputT{0}; }, v_tile);
             }
 
             store_tile(smem_v_win, v_tile);
-            move_tile_window(v_global_win, {kVGroup, 0});
-            move_tile_window(smem_v_win, {kVGroup, 0});
+            move_tile_window(v_global_win, {kScaleGranularity, 0});
+            move_tile_window(smem_v_win, {kScaleGranularity, 0});
         });
     }
 
@@ -443,13 +443,13 @@ struct SA3VPrepPipeline
         const index_t group_id  = tid / kVHdimTile;
         const index_t col       = tid % kVHdimTile;
         const index_t scol      = shuffle_col(col);
-        const index_t row_start = group_id * kVGroup;
+        const index_t row_start = group_id * kScaleGranularity;
 
         constexpr float rcp_dst_max = 1.0f / 6.0f;
-        float group_data[kVGroup];
+        float group_data[kScaleGranularity];
         float max_abs = 0.0f;
 
-        for(index_t j = 0; j < kVGroup; j++)
+        for(index_t j = 0; j < kScaleGranularity; j++)
         {
             const float val = static_cast<float>(smem_v[(row_start + j) * kVHdimTile + col]);
             group_data[j]   = val;
@@ -465,9 +465,9 @@ struct SA3VPrepPipeline
         v_scale_base[scol * stride_v_scale + g_abs] =
             static_cast<uint8_t>(bit_cast<uint32_t>(scale) >> 23);
 
-        PackFP4Group<kVGroup>(
+        PackFP4Group<kScaleGranularity>(
             group_data,
-            v_hat_base + scol * stride_v_hat + g_abs * (kVGroup / 2),
+            v_hat_base + scol * stride_v_hat + g_abs * (kScaleGranularity / 2),
             scale);
     }
 };

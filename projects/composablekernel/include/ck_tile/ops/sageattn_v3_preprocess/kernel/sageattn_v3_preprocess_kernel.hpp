@@ -8,7 +8,7 @@
 
 namespace ck_tile {
 
-// Q preprocess kernel: grid=(num_q_tiles, nhead_q, batch), blocksize=kRows*(kCols/32).
+// Q preprocess kernel: grid=(num_q_tiles, nhead_q, batch), blocksize=kQMeanGroupSize*(kHeadDim/32).
 template <typename InputT>
 struct SageAttnV3QPreprocessKargs
 {
@@ -40,18 +40,18 @@ struct SageAttnV3QPreprocessKargs
 };
 
 template <typename InputT_,
-          index_t kRows_,
-          index_t kCols_,
-          index_t kBlockSize_ = kRows_ * (kCols_ / 32)>
+          index_t kQMeanGroupSize_,
+          index_t kHeadDim_,
+          index_t kBlockSize_ = kQMeanGroupSize_ * (kHeadDim_ / 32)>
 struct SageAttnV3QPreprocessKernel
 {
     using InputT = InputT_;
 
-    static constexpr index_t kRows      = kRows_;
-    static constexpr index_t kCols      = kCols_;
+    static constexpr index_t kQMeanGroupSize      = kQMeanGroupSize_;
+    static constexpr index_t kHeadDim      = kHeadDim_;
     static constexpr index_t kBlockSize = kBlockSize_;
 
-    using Problem  = SA3QKPrepProblem<InputT, kRows, kCols>;
+    using Problem  = SA3QKPrepProblem<InputT, kQMeanGroupSize, kHeadDim>;
     using Pipeline = SA3QKPrepPipeline<Problem>;
 
     using Kargs = SageAttnV3QPreprocessKargs<InputT>;
@@ -75,8 +75,8 @@ struct SageAttnV3QPreprocessKernel
 
         Pipeline pipeline{};
 
-        const index_t row_start = tile_x * static_cast<index_t>(kRows);
-        const index_t n_rows    = min(static_cast<index_t>(kRows), kargs.seqlen_q - row_start);
+        const index_t row_start = tile_x * static_cast<index_t>(kQMeanGroupSize);
+        const index_t n_rows    = min(static_cast<index_t>(kQMeanGroupSize), kargs.seqlen_q - row_start);
 
         const InputT* src_q = kargs.q_ptr + batch_idx * kargs.batch_stride_q +
                               head_idx * kargs.nhead_stride_q + row_start * kargs.stride_q;
@@ -101,7 +101,7 @@ struct SageAttnV3QPreprocessKernel
 };
 
 // K preprocess kernel: K' = K - k_mean, write K', MXFP4 quantize.
-// Grid: (num_k_tiles, nhead, batch), smem: kCols*sizeof(float) for k_mean cache.
+// Grid: (num_k_tiles, nhead, batch), smem: kHeadDim*sizeof(float) for k_mean cache.
 template <typename InputT>
 struct SageAttnV3KPreprocessKargs
 {
@@ -137,18 +137,18 @@ struct SageAttnV3KPreprocessKargs
 };
 
 template <typename InputT_,
-          index_t kRows_,
-          index_t kCols_,
-          index_t kBlockSize_ = kRows_ * (kCols_ / 32)>
+          index_t kQMeanGroupSize_,
+          index_t kHeadDim_,
+          index_t kBlockSize_ = kQMeanGroupSize_ * (kHeadDim_ / 32)>
 struct SageAttnV3KPreprocessKernel
 {
     using InputT = InputT_;
 
-    static constexpr index_t kRows      = kRows_;
-    static constexpr index_t kCols      = kCols_;
+    static constexpr index_t kQMeanGroupSize      = kQMeanGroupSize_;
+    static constexpr index_t kHeadDim      = kHeadDim_;
     static constexpr index_t kBlockSize = kBlockSize_;
 
-    using Problem  = SA3QKPrepProblem<InputT, kRows, kCols>;
+    using Problem  = SA3QKPrepProblem<InputT, kQMeanGroupSize, kHeadDim>;
     using Pipeline = SA3QKPrepPipeline<Problem>;
 
     using Kargs = SageAttnV3KPreprocessKargs<InputT>;
@@ -170,8 +170,8 @@ struct SageAttnV3KPreprocessKernel
 
         Pipeline pipeline{};
 
-        const index_t row_start = tile_x * static_cast<index_t>(kRows);
-        const index_t n_rows    = min(static_cast<index_t>(kRows), kargs.seqlen_k - row_start);
+        const index_t row_start = tile_x * static_cast<index_t>(kQMeanGroupSize);
+        const index_t n_rows    = min(static_cast<index_t>(kQMeanGroupSize), kargs.seqlen_k - row_start);
 
         const InputT* src_k = kargs.k_ptr + batch_idx * kargs.batch_stride_k +
                               head_idx * kargs.nhead_stride_k + row_start * kargs.stride_k;
@@ -223,16 +223,16 @@ struct SageAttnV3KMeanKargs
     index_t nhead;
 };
 
-template <typename InputT_, index_t kRows_, index_t kCols_>
+template <typename InputT_, index_t kQMeanGroupSize_, index_t kHeadDim_>
 struct SageAttnV3KMeanKernel
 {
     using InputT = InputT_;
 
-    // kRows_ for template-param consistency; KMean uses kChunkRows.
-    static constexpr index_t kRows = kRows_;
-    static constexpr index_t kCols = kCols_;
+    // kQMeanGroupSize_ for template-param consistency; KMean uses kChunkRows.
+    static constexpr index_t kQMeanGroupSize = kQMeanGroupSize_;
+    static constexpr index_t kHeadDim = kHeadDim_;
 
-    using Problem  = SA3KMeanProblem<InputT, kCols>;
+    using Problem  = SA3KMeanProblem<InputT, kHeadDim>;
     using Pipeline = SA3KMeanPipeline<Problem>;
 
     static constexpr index_t kBlockSize = Problem::kBlockSize;
@@ -273,8 +273,8 @@ struct SageAttnV3KMeanKernel
 };
 
 // V preprocess kernel: quantize V transposed layout via 2-phase LDS pipeline.
-// Grid: (seqlen_k/(kVGroup*kVGroupsPerBlock), 1, batch*nhead),
-// blocksize=kVGroupsPerBlock*kVHdimTile.
+// Grid: (seqlen_k/(kScaleGranularity*kScaleGroupsPerTile), 1, batch*nhead),
+// blocksize=kScaleGroupsPerTile*kVHdimTile.
 template <typename InputT>
 struct SageAttnV3VPreprocessKargs
 {
@@ -300,7 +300,6 @@ struct SageAttnV3VPreprocessKargs
 };
 
 template <typename InputT_,
-          index_t kVGroup_    = 32,
           index_t kVHdimTile_ = 128> // full hdim; set per-dispatch
 struct SageAttnV3VPreprocessKernel
 {
@@ -309,16 +308,16 @@ struct SageAttnV3VPreprocessKernel
     using Problem  = SA3VPrepProblem<InputT, kVHdimTile_>;
     using Pipeline = SA3VPrepPipeline<Problem>;
 
-    static constexpr index_t kVGroup          = Problem::kVGroup;
+    static constexpr index_t kScaleGranularity          = Problem::kScaleGranularity;
     static constexpr index_t kVHdimTile       = Problem::kVHdimTile;
-    static constexpr index_t kVGroupsPerBlock = Problem::kVGroupsPerBlock;
+    static constexpr index_t kScaleGroupsPerTile = Problem::kScaleGroupsPerTile;
     static constexpr index_t kBlockSize       = Problem::kBlockSize;
 
     using Kargs = SageAttnV3VPreprocessKargs<InputT>;
 
     CK_TILE_HOST static dim3 GridSize(const Kargs& k)
     {
-        return dim3(k.seqlen_k / (kVGroup * kVGroupsPerBlock), 1, k.batch * k.nhead);
+        return dim3(k.seqlen_k / (kScaleGranularity * kScaleGroupsPerTile), 1, k.batch * k.nhead);
     }
 
     CK_TILE_HOST static constexpr dim3 BlockSize() { return dim3(kBlockSize); }
@@ -330,7 +329,7 @@ struct SageAttnV3VPreprocessKernel
         const index_t bh_idx     = blockIdx.z;
         const index_t head_idx   = bh_idx % kargs.nhead;
         const index_t batch_idx  = bh_idx / kargs.nhead;
-        const index_t g_abs_base = blockIdx.x * kVGroupsPerBlock;
+        const index_t g_abs_base = blockIdx.x * kScaleGroupsPerTile;
 
         const InputT* v_base =
             kargs.v_ptr + batch_idx * kargs.batch_stride_v + head_idx * kargs.nhead_stride_v;
