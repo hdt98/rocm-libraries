@@ -23,6 +23,7 @@ struct BlockGemmASmemBSmemCRegPolicy
                      std::is_same_v<typename Problem::BDataType, half_t> &&
                      std::is_same_v<typename Problem::CDataType, float>)
         {
+            // Change to WarpGemmMfmaF16F16F32M32N32K16{} to compare without Transposed C
             return make_tuple(
                 WarpGemmMfmaF16F16F32M32N32K16TransposedCDistribution{}, kMWarp, kNWarp);
         }

@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
     using AccDataType = float;
     using CDataType   = ck_tile::half_t;
 
-    ck_tile::index_t verification = 0;
+    ck_tile::index_t verification = 1;
     ck_tile::index_t M            = 3328;
     ck_tile::index_t N            = 4096;
     ck_tile::index_t K            = 4096;
@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
     ck_tile::HostTensor<CDataType> c_host_dev(c_lengths, c_strides);
 
     ck_tile::FillUniformDistributionIntegerValue<ADataType>{-5.f, 5.f}(a_host);
-    ck_tile::FillUniformDistributionIntegerValue<BDataType>{-5.f, 5.f}(b_host);
+    ck_tile::FillUniformDistributionIntegerValue<BDataType>{-4.f, 4.f}(b_host);
 
     ck_tile::DeviceMem a_buf(a_host.get_element_space_size_in_bytes());
     ck_tile::DeviceMem b_buf(b_host.get_element_space_size_in_bytes());
@@ -97,7 +97,7 @@ int main(int argc, char* argv[])
     std::cout << "grid size " << kGridSize << std::endl;
 
     constexpr ck_tile::index_t kWarpSize     = 64; // AMD GPU warp size
-    constexpr ck_tile::index_t kWarpPerCu    = 8;  // 2 warps per SIMD
+    constexpr ck_tile::index_t kWarpPerCu    = 4;  // 2 warps per SIMD
     constexpr ck_tile::index_t kWarpPerBlock = kBlockSize / kWarpSize;
     constexpr ck_tile::index_t kBlockPerCu   = kWarpPerCu / kWarpPerBlock;
 
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
                                       kGemmKPerBlock>;
 
     float ave_time = ck_tile::launch_kernel(
-        ck_tile::stream_config{nullptr, true, 0, 5, 1000},
+        ck_tile::stream_config{nullptr, true, 0, 0, 1},
         ck_tile::make_kernel<kBlockPerCu>(gemm_kernel{},
                                           kGridSize,
                                           kBlockSize,
@@ -141,6 +141,25 @@ int main(int argc, char* argv[])
         c_buf.FromDevice(c_host_dev.mData.data());
         pass &= ck_tile::check_err(c_host_dev, c_host_ref);
         std::cout << "valid:" << (pass ? "y" : "n") << std::endl;
+    }
+
+    for(int col = 0; col < N; ++col)
+    {
+        printf("%4d ", col);
+    }
+    printf("\n");
+    for(int col = 0; col < N; ++col)
+    {
+        printf("-----");
+    }
+    printf("\n");
+    for(int row = 0; row < M; ++row)
+    {
+        for(int col = 0; col < N; ++col)
+        {
+            printf("%4.0f ", ck_tile::type_convert<float>(c_host_dev(row, col)));
+        }
+        printf("\n");
     }
 
     std::size_t flop = std::size_t(2) * M * N * K;

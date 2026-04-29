@@ -148,6 +148,30 @@ struct BlockGemmASmemBSmemCReg
                 });
             });
         });
+
+        // Add print here to see final elements thread 0 owns
+        if(threadIdx.x == 0)
+        {
+            printf("{%4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, %4.0f, "
+                   "%4.0f, %4.0f, %4.0f, %4.0f, %4.0f}\n",
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[0]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[1]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[2]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[3]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[4]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[5]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[6]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[7]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[8]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[9]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[10]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[11]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[12]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[13]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[14]),
+                   ck_tile::type_convert<float>(c_block_tensor.get_thread_buffer()[15]));
+        }
+        __syncthreads();
     }
 
     // C = A * B
