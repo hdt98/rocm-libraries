@@ -117,32 +117,32 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 #include <unistd.h>
 #endif
 
-// todo: remove templating
-template<bool continue_on_fail=true>
 class MemCheck
 {
 public:
-	struct SysInfo
-	{
-		// Other members are valid only when this is true.
-		bool is_initialized = false;
-
-		// Is this an APU or discrete GPU?
-		bool is_apu = false;
-
-		size_t host_mem_limit = 0;
-		size_t dev_mem_limit = 0;
-	};
-
 	// padding_factor is a value in [0, 1] that indicates how much of a buffer we should leave below
-	// the calculuated memory limits.
+	// the calculated memory limits.
 	// i.e when allocations are >= actual_limit * (1 - padding_factor), then assume we're out of memory.
 	MemCheck(const float padding_factor=0.1) :
 		host_usage(0), dev_usage(0), padding_factor(padding_factor)
     {
         std::cout << "*********** MemCheck() ***************" << std::endl;
-        if (!this->sys_info.is_initialized)
-            this->init_info();
+
+        std::cout << "*** init_info() ***" << std::endl;
+
+        size_t free_dev_mem;
+        HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_mem_limit));
+        std::cout << "total device memory: " << (dev_mem_limit >> 20) << std::endl;
+        dev_usage = dev_mem_limit - free_dev_mem;
+        std::cout << "       device usage: " << (dev_usage >> 20) << std::endl;
+
+        host_mem_limit = MemCheck::get_host_memory();
+        std::cout << "total host memory: " << (host_mem_limit >> 20) << std::endl;
+
+        hipDeviceProp_t props;
+        HIP_CHECK(hipGetDeviceProperties(&props, 0));
+        is_apu = static_cast<bool>(props.integrated);
+        std::cout << "is_apu: " << is_apu << std::endl;
     }
 
 	// Call this before host allocs. Must be inline to allow mem_check to issue continue/GTEST_SKIP() statements
@@ -211,14 +211,14 @@ private:
 
     bool mem_check_host()
     {
-        const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - padding_factor));
+        const size_t host_limit = static_cast<size_t>(host_mem_limit * (1 - padding_factor));
 
         std::cout << "mem_check_host()" << std::endl;
         std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
         std::cout << "    host limit: " << (host_limit >> 20) << std::endl;
 
         bool success = false;
-        if (MemCheck::sys_info.is_apu)
+        if (is_apu)
         {
             // assume all device usage is shared and subtracts from host memory
             std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
@@ -237,21 +237,21 @@ private:
 
     bool mem_check_device()
     {
-        const size_t dev_limit = static_cast<size_t>(MemCheck::sys_info.dev_mem_limit * (1 - padding_factor));
+        const size_t dev_limit = static_cast<size_t>(dev_mem_limit * (1 - padding_factor));
 
         std::cout << "mem_check_device()" << std::endl;
         std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
         std::cout << "    device limit: " << (dev_limit >> 20) << std::endl;
 
         bool success = false;
-        if (MemCheck::sys_info.is_apu)
+        if (is_apu)
         {
             // Any memory used in excess of host_limit - dev_limit will spill
             // into the device's shared memory, reducing the device limit.
             // Both subtractions below are guarded: if dev_limit > host_limit or
             // spill > dev_limit, the unsigned subtraction would wrap around to a
             // large value, making the check silently pass when memory is exhausted.
-            const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - padding_factor));
+            const size_t host_limit = static_cast<size_t>(host_mem_limit * (1 - padding_factor));
             size_t host_unshared_limit = dev_limit <= host_limit ? host_limit - dev_limit : 0UL;
             size_t spill = host_usage > host_unshared_limit ?
                            host_usage - host_unshared_limit : 0UL;
@@ -285,38 +285,13 @@ private:
             return static_cast<size_t>(size);
     }
 
-	// Do some runtime queries to see if we're on an APU, and retrieve the
-	// amount of available GPU and host memory.
-	static void init_info()
-    {
-        std::cout << "*** init_info() ***" << std::endl;
-
-        size_t free_dev_mem;
-        size_t total_dev_mem;
-        HIP_CHECK(hipMemGetInfo(&free_dev_mem, &total_dev_mem));
-        std::cout << "total device memory: " << (total_dev_mem >> 20) << std::endl;
-        MemCheck::sys_info.dev_mem_limit = total_dev_mem;
-
-        size_t total_host_mem = MemCheck::get_host_memory();
-        std::cout << "total host memory: " << (total_host_mem >> 20) << std::endl;
-        MemCheck::sys_info.host_mem_limit = total_host_mem;
-
-        hipDeviceProp_t props;
-        HIP_CHECK(hipGetDeviceProperties(&props, 0));
-        MemCheck::sys_info.is_apu = static_cast<bool>(props.integrated);
-        std::cout << "is_apu: " << MemCheck::sys_info.is_apu << std::endl;
- 
-        MemCheck::sys_info.is_initialized = true;
-    }
-
-	// This must be inline to prevent multiple definition errors
-    inline static SysInfo sys_info = {};
-	
+	bool is_apu = false;
+	size_t host_mem_limit = 0;
+	size_t dev_mem_limit = 0;
 	float padding_factor;
 	size_t host_usage;
 	size_t dev_usage;
 };
-
 
 }
 #endif // TEST_TEST_UTILS_MEMORY_CHECK_HPP_
