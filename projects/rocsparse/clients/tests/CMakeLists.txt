@@ -461,6 +461,11 @@ endif()
 set_target_properties(rocsparse-test PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/staging")
 
 rocm_install(TARGETS rocsparse-test COMPONENT tests)
+rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_rocsparse.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    COMPONENT tests
+)
 
 string(REGEX REPLACE ".cpp" ".yaml" ROCSPARSE_TEST_YAMLS "${ROCSPARSE_TEST_SOURCES}")
 

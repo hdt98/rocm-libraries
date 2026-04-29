@@ -248,6 +248,11 @@ add_dependencies(hipsparse-test hipsparse-test-data hipsparse-common)
 
 
 rocm_install(TARGETS hipsparse-test COMPONENT tests)
+rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_hipsparse.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    COMPONENT tests
+)
 rocm_install(FILES ${HIPSPARSE_TEST_DATA} DESTINATION "${CMAKE_INSTALL_DATADIR}/hipsparse/test" COMPONENT tests)
 
 
