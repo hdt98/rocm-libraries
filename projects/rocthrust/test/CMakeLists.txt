@@ -350,6 +350,12 @@ rocm_install(
     RENAME "CTestTestfile.cmake"
 )
 
+rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_rocthrust.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
+    COMPONENT tests
+)
+
 # Build the executable used for generating the resource spec file.
 add_executable(generate_resource_spec ${CMAKE_SOURCE_DIR}/test/generate_resource_spec.cpp)
 set_target_properties(generate_resource_spec PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")

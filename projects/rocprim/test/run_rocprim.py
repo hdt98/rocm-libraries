@@ -1,26 +1,22 @@
+#!/usr/bin/env python3
 # Copyright Advanced Micro Devices, Inc.
 # SPDX-License-Identifier: MIT
 
 import logging
 import os
+import platform
 import shlex
 import subprocess
 from pathlib import Path
-import platform
 
-THEROCK_BIN_DIR = os.getenv("THEROCK_BIN_DIR")
-SCRIPT_DIR = Path(__file__).resolve().parent
-THEROCK_DIR = Path(
-    os.environ.get("THEROCK_DIR") or SCRIPT_DIR.parent.parent.parent
-).resolve()
-
-AMDGPU_FAMILIES = os.getenv("AMDGPU_FAMILIES")
-os_type = platform.system().lower()
 
 logging.basicConfig(level=logging.INFO)
 
+
+TEST_DIR_NAME = "rocprim"
+
 TEST_TO_IGNORE = {
-    # TODO(#2836): Re-enable gfx110X tests once issues are resolved
+    # TODO(#2836): Re-enable gfx110X tests once issues are resolved.
     "gfx110X-all": {
         "windows": [
             "rocprim.block_discontinuity",
@@ -30,9 +26,9 @@ TEST_TO_IGNORE = {
     },
     "gfx1151": {
         "windows": [
-            # TODO(#2836): Re-enable test once issues are resolved
+            # TODO(#2836): Re-enable test once issues are resolved.
             "rocprim.device_merge_sort",
-            # TODO(#2836): Re-enable test once issues are resolved
+            # TODO(#2836): Re-enable test once issues are resolved.
             "rocprim.device_radix_sort",
         ]
     },
@@ -99,38 +95,56 @@ QUICK_TESTS = [
     "TestHipGraphBasic",
 ]
 
-# sharding
-shard_index = int(os.getenv("SHARD_INDEX", "1")) - 1
-total_shards = int(os.getenv("TOTAL_SHARDS", "1"))
+
+def derive_rocm_path(script_dir: Path) -> Path:
+    for candidate in (script_dir, *script_dir.parents):
+        if (candidate / "bin" / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
+            return candidate
+    if script_dir.name == TEST_DIR_NAME and script_dir.parent.name == "bin":
+        return script_dir.parent.parent
+    return script_dir.parent.parent
 
 
-cmd = [
-    "ctest",
-    "--test-dir",
-    f"{THEROCK_BIN_DIR}/rocprim",
-    "--output-on-failure",
-    "--parallel",
-    "8",
-    "--timeout",
-    "900",
-    "--repeat",
-    "until-pass:6",
-    # shards the tests by running a specific set of tests based on starting test (shard_index) and stride (total_shards)
-    "--tests-information",
-    f"{shard_index},,{total_shards}",
-]
+def main() -> None:
+    script_dir = Path(__file__).resolve().parent
+    rocm_path = Path(
+        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
+    ).resolve()
+    rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
+    test_dir = rocm_bin_dir / TEST_DIR_NAME
 
-if AMDGPU_FAMILIES in TEST_TO_IGNORE and os_type in TEST_TO_IGNORE[AMDGPU_FAMILIES]:
-    ignored_tests = TEST_TO_IGNORE[AMDGPU_FAMILIES][os_type]
-    cmd.extend(["--exclude-regex", "|".join(ignored_tests)])
+    shard_index = int(os.getenv("SHARD_INDEX", "1")) - 1
+    total_shards = int(os.getenv("TOTAL_SHARDS", "1"))
 
-# If quick tests are enabled, we run quick tests only.
-# Otherwise, we run the normal test suite
-environ_vars = os.environ.copy()
-test_type = os.getenv("TEST_TYPE", "full")
-if test_type == "quick":
-    environ_vars["GTEST_FILTER"] = ":".join(QUICK_TESTS)
+    cmd = [
+        "ctest",
+        "--test-dir",
+        str(test_dir),
+        "--output-on-failure",
+        "--parallel",
+        "8",
+        "--timeout",
+        "900",
+        "--repeat",
+        "until-pass:6",
+        # Start test and stride used for sharding.
+        "--tests-information",
+        f"{shard_index},,{total_shards}",
+    ]
 
-logging.info(f"++ Exec [{THEROCK_DIR}]$ {shlex.join(cmd)}")
+    amdgpu_families = os.getenv("AMDGPU_FAMILIES")
+    os_type = platform.system().lower()
+    if amdgpu_families in TEST_TO_IGNORE and os_type in TEST_TO_IGNORE[amdgpu_families]:
+        ignored_tests = TEST_TO_IGNORE[amdgpu_families][os_type]
+        cmd.extend(["--exclude-regex", "|".join(ignored_tests)])
 
-subprocess.run(cmd, cwd=THEROCK_DIR, check=True, env=environ_vars)
+    env = os.environ.copy()
+    if os.getenv("TEST_TYPE", "full") == "quick":
+        env["GTEST_FILTER"] = ":".join(QUICK_TESTS)
+
+    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
+
+
+if __name__ == "__main__":
+    main()

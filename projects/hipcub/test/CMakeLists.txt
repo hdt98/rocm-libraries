@@ -121,6 +121,12 @@ rocm_install(
     RENAME "CTestTestfile.cmake"
 )
 
+rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_hipcub.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
+    COMPONENT tests
+)
+
 # Install the executable using the standard install command instead of rocm_install
 # since we want to put it in a custom DESTINATION (rocm_install does not support
 # the DESTINATION option for TARGETS).
