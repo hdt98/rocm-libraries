@@ -1,0 +1,57 @@
+# rocWMMA Test Categories
+#
+# Defines test organization for CTest-based filtering in TheRock CI.
+#
+# rocWMMA tests use an "emulation" framework where lightweight CPU-emulated
+# tests are named with *Emulation*Smoke* or *Emulation*Regression* patterns.
+# Non-emulation tests are the full GPU validation tests.
+#
+# Categories build on each other (cumulative coverage):
+#   quick < standard < comprehensive < full
+#
+# Usage:
+#   ctest -L quick -LE ex_gpu          # Run quick tests (no GPU exclusions)
+#   ctest -L standard -LE ex_gpu       # Run standard tests
+#   ctest -L comprehensive -LE ex_gpu  # Run comprehensive tests
+#   ctest -L full -LE ex_gpu           # Run all tests
+
+test_categories:
+  quick:
+    description: "Fast sanity checks using smoke emulation tests (target: < 5 min)"
+    test_patterns:
+      - "*Emulation*Smoke*"
+    labels:
+      - "quick"
+      - "pre-commit"
+
+  standard:
+    description: "Core functionality using smoke + regression emulation tests (target: < 30 min)"
+    test_patterns:
+      - "*Emulation*Regression*"
+    labels:
+      - "standard"
+      - "pr"
+
+  comprehensive:
+    description: "Extended coverage including full GPU validation tests (target: < 2 hours)"
+    test_patterns:
+      - "-*Emulation*"
+    labels:
+      - "comprehensive"
+      - "nightly"
+
+  full:
+    description: "Exhaustive test coverage - all tests (target: 2+ hours)"
+    test_patterns:
+      - "-*Emulation*"
+    labels:
+      - "full"
+      - "weekly"
+
+execution_settings:
+  timeout_multiplier: 1
+  category_timeouts:
+    quick: 300
+    standard: 1800
+    comprehensive: 7200
+    full: 14400
