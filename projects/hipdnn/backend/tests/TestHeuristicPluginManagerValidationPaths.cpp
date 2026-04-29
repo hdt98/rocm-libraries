@@ -332,7 +332,8 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
     std::filesystem::create_directories(badPluginDir);
 
     // Copy the bad plugin to isolated directory
-    const std::string pluginFilename = std::string("lib") + BAD_API_VERSION_PLUGIN + ".so";
+    const std::string pluginFilename
+        = hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
     const auto srcPlugin = _testPluginPath / pluginFilename;
     const auto dstPlugin = badPluginDir / pluginFilename;
     std::filesystem::copy_file(
@@ -343,6 +344,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
 
     // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Bad API version plugin should be rejected";
+
+    // Unload any resources before cleanup (Windows DLL safety)
+    _manager.reset();
 
     // Cleanup
     std::filesystem::remove_all(badPluginDir);
@@ -356,7 +360,8 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
     std::filesystem::create_directories(emptyNameDir);
 
     // Copy the empty name plugin to isolated directory
-    const std::string pluginFilename = std::string("lib") + EMPTY_NAME_PLUGIN + ".so";
+    const std::string pluginFilename
+        = hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
     const auto srcPlugin = _testPluginPath / pluginFilename;
     const auto dstPlugin = emptyNameDir / pluginFilename;
     std::filesystem::copy_file(
@@ -367,6 +372,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 
     // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Empty policy name plugin should be rejected";
+
+    // Unload any resources before cleanup (Windows DLL safety)
+    _manager.reset();
 
     // Cleanup
     std::filesystem::remove_all(emptyNameDir);
@@ -380,8 +388,10 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsReject
     std::filesystem::create_directories(duplicateDir);
 
     // Copy both duplicate plugins to isolated directory
-    const std::string pluginFilenameA = std::string("lib") + DUPLICATE_POLICY_ID_A_PLUGIN + ".so";
-    const std::string pluginFilenameB = std::string("lib") + DUPLICATE_POLICY_ID_B_PLUGIN + ".so";
+    const std::string pluginFilenameA
+        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
+    const std::string pluginFilenameB
+        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
     const auto srcPluginA = _testPluginPath / pluginFilenameA;
     const auto srcPluginB = _testPluginPath / pluginFilenameB;
     const auto dstPluginA = duplicateDir / pluginFilenameA;
@@ -399,6 +409,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsReject
 
         // Only one plugin should have loaded - the second should be rejected due to duplicate ID
         EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
+
+        // Unload plugins before cleanup (Windows keeps DLLs locked until unloaded)
+        _manager.reset();
 
         // Cleanup
         std::filesystem::remove_all(duplicateDir);
