@@ -142,7 +142,7 @@ public:
         mem_status.dwLength = sizeof(mem_status);
         GlobalMemoryStatusEx(&mem_status);
         host_mem_limit = mem_status.ullTotalPhys;
-        // mem_status.ullAvailPhys?
+        host_usage = mem_status.ullTotalPhys - mem_status.ullAvailPhys;
 #else
         host_mem_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 /*
@@ -155,6 +155,7 @@ public:
 */
 #endif
         std::cout << "total host memory: " << (host_mem_limit >> 20) << std::endl;
+        std::cout << "host usage: " << (host_usage >> 20) << std::endl;
 
         hipDeviceProp_t props;
         HIP_CHECK(hipGetDeviceProperties(&props, 0));
@@ -232,7 +233,7 @@ private:
 
         std::cout << "mem_check_host()" << std::endl;
         std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
-        std::cout << "    host limit: " << (host_limit >> 20) << std::endl;
+        std::cout << "    host limit (padded): " << (host_limit >> 20) << std::endl;
 
         bool success = false;
         if (is_apu)
@@ -258,7 +259,7 @@ private:
 
         std::cout << "mem_check_device()" << std::endl;
         std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
-        std::cout << "    device limit: " << (dev_limit >> 20) << std::endl;
+        std::cout << "    device limit (padded): " << (dev_limit >> 20) << std::endl;
 
         bool success = false;
         if (is_apu)
