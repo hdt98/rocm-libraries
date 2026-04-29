@@ -603,7 +603,7 @@ _validMXGEMMTypes = [
     ("F6B6", "B", "S"),
     ("B6", "B", "S"),
     ("B6F6", "B", "S"),
-    # ("F4", "B", "S"),  # Removed: No C++ reference implementation available
+    ("F4", "B", "S"),
     ("F8", "F8", "S"),
     ("F8B8", "F8", "S"),
     ("B8", "F8", "S"),
