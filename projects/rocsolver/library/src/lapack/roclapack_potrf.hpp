@@ -111,6 +111,163 @@ static inline I potrf_get_block_size(I const n)
 }
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO = I>
+void rocsolver_potrf_recursion_getMemorySize(const I n,
+                                             const rocblas_fill uplo,
+                                             const I batch_count,
+
+                                             size_t* p_size_work1,
+                                             size_t* p_size_work2,
+                                             size_t* p_size_work3,
+                                             size_t* p_size_work4,
+                                             bool* optim_mem)
+{
+    size_t size_work1 = 0;
+    size_t size_work2 = 0;
+    size_t size_work3 = 0;
+    size_t size_work4 = 0;
+
+    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    if(n <= NB)
+    {
+        // terminate recursion
+    }
+    else
+    {
+        I const n1 = split_n<T>(n);
+        I const n2 = n - n1;
+
+        if(uplo == rocblas_fill_upper)
+        {
+            //  ----------------------------------------------
+            //  Cholesky factorization of A11 of size n1 by n1
+            //  ----------------------------------------------
+            {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
+                rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
+                    n1, uplo, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
+            }
+
+            // ----------------------------------
+            // U12 = U11' \ A12, note U12 has size n1 by n2
+            // ----------------------------------
+            {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
+                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                    rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
+            }
+
+            //  ----------------------------------------------
+            //  Cholesky factorization of A22 of size n2 by n2
+            //  ----------------------------------------------
+            {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
+                rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
+                    n2, uplo, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
+            }
+        }
+        else
+        {
+            //  ----------------------------------------------
+            //  Cholesky factorization of A11 of size n1 by n1
+            //  ----------------------------------------------
+            {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
+                rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
+                    n1, uplo, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
+            }
+
+            // ----------------------------------
+            // L21 = A21 / L11',  note L21 has size n2 by n1
+            // ----------------------------------
+
+            size_t lsize_work1 = 0;
+            size_t lsize_work2 = 0;
+            size_t lsize_work3 = 0;
+            size_t lsize_work4 = 0;
+
+            (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1, batch_count,
+
+                &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_work2 = std::max(size_work2, lsize_work2);
+            size_work3 = std::max(size_work3, lsize_work3);
+            size_work4 = std::max(size_work4, lsize_work4);
+
+            //  ----------------------------------------------
+            //  Cholesky factorization of A22 of size n2 by n2
+            //  ----------------------------------------------
+            {
+                size_t lsize_work1 = 0;
+                size_t lsize_work2 = 0;
+                size_t lsize_work3 = 0;
+                size_t lsize_work4 = 0;
+
+                rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
+                    n2, uplo, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+
+                size_work1 = std::max(size_work1, lsize_work1);
+                size_work2 = std::max(size_work2, lsize_work2);
+                size_work3 = std::max(size_work3, lsize_work3);
+                size_work4 = std::max(size_work4, lsize_work4);
+            }
+        }
+    }
+
+    *p_size_work1 = std::max(*p_size_work1, size_work1);
+    *p_size_work2 = std::max(*p_size_work2, size_work2);
+    *p_size_work3 = std::max(*p_size_work3, size_work3);
+    *p_size_work4 = std::max(*p_size_work4, size_work4);
+}
+
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO = I>
 void rocsolver_potrf_getMemorySize(const I n,
                                    const rocblas_fill uplo,
                                    const I batch_count,
@@ -142,73 +299,64 @@ void rocsolver_potrf_getMemorySize(const I n,
         return;
     }
 
-    I const nb = potrf_get_block_size<T>(n);
-    if(n <= POTRF_POTF2_SWITCHSIZE(T))
+    if(use_recursion_potrf)
     {
-        // requirements for calling a single POTF2
-        rocsolver_potf2_getMemorySize<T>(n, batch_count, p_size_scalars, p_size_work1, p_size_pivots);
-        *p_size_work2 = 0;
-        *p_size_work3 = 0;
-        *p_size_work4 = 0;
-        *p_size_iinfo = 0;
-        *optim_mem = true;
-    }
-    else
-    {
-        I const jb = nb;
-
         size_t size_work1 = 0;
         size_t size_work2 = 0;
         size_t size_work3 = 0;
         size_t size_work4 = 0;
 
-        // size to store info about positiveness of each subblock
-        if(use_iinfo)
-        {
-            *p_size_iinfo = sizeof(INFO) * batch_count;
-        }
+        rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
+            n, uplo, batch_count,
 
-        // requirements for calling POTF2 for the subblocks
-        {
-            size_t lsize_work1 = 0;
+            &size_work1, &size_work2, &size_work3, &size_work4, optim_mem);
 
-            rocsolver_potf2_getMemorySize<T>(jb, batch_count, p_size_scalars, &lsize_work1,
+        *p_size_work1 = std::max(*p_size_work1, size_work1);
+        *p_size_work2 = std::max(*p_size_work2, size_work2);
+        *p_size_work3 = std::max(*p_size_work3, size_work3);
+        *p_size_work4 = std::max(*p_size_work4, size_work4);
+    }
+    else
+    {
+        I const nb = potrf_get_block_size<T>(n);
+        if(n <= POTRF_POTF2_SWITCHSIZE(T))
+        {
+            // requirements for calling a single POTF2
+            rocsolver_potf2_getMemorySize<T>(n, batch_count, p_size_scalars, p_size_work1,
                                              p_size_pivots);
-
-            size_work1 = std::max(size_work1, lsize_work1);
+            *p_size_work2 = 0;
+            *p_size_work3 = 0;
+            *p_size_work4 = 0;
+            *p_size_iinfo = 0;
+            *optim_mem = true;
         }
-
-        // extra requirements for calling TRSM
-        if(uplo == rocblas_fill_upper)
+        else
         {
-            if(use_recursion_potrf)
+            I const jb = nb;
+
+            size_t size_work1 = 0;
+            size_t size_work2 = 0;
+            size_t size_work3 = 0;
+            size_t size_work4 = 0;
+
+            // size to store info about positiveness of each subblock
+            if(use_iinfo)
             {
-                I const n1 = split_n<T>(n);
-                I const n2 = n - n1;
+                *p_size_iinfo = sizeof(INFO) * batch_count;
+            }
 
-                // ----------------------------------
-                // U12 = U11' \ A12, note U12 has size n1 by n2
-                // ----------------------------------
-
+            // requirements for calling POTF2 for the subblocks
+            {
                 size_t lsize_work1 = 0;
-                size_t lsize_work2 = 0;
-                size_t lsize_work3 = 0;
-                size_t lsize_work4 = 0;
 
-                if((n1 >= 1) && (n2 >= 1))
-                {
-                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                        rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
-
-                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
-                }
+                rocsolver_potf2_getMemorySize<T>(jb, batch_count, p_size_scalars, &lsize_work1,
+                                                 p_size_pivots);
 
                 size_work1 = std::max(size_work1, lsize_work1);
-                size_work2 = std::max(size_work2, lsize_work2);
-                size_work3 = std::max(size_work3, lsize_work3);
-                size_work4 = std::max(size_work4, lsize_work4);
             }
-            else
+
+            // extra requirements for calling TRSM
+            if(uplo == rocblas_fill_upper)
             {
                 size_t lsize_work1 = 0;
                 size_t lsize_work2 = 0;
@@ -219,37 +367,6 @@ void rocsolver_potrf_getMemorySize(const I n,
                 {
                     (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
                         rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb,
-                        batch_count,
-
-                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
-                }
-
-                size_work1 = std::max(size_work1, lsize_work1);
-                size_work2 = std::max(size_work2, lsize_work2);
-                size_work3 = std::max(size_work3, lsize_work3);
-                size_work4 = std::max(size_work4, lsize_work4);
-            }
-        }
-        else
-        {
-            if(use_recursion_potrf)
-            {
-                I const n1 = split_n<T>(n);
-                I const n2 = n - n1;
-
-                // ----------------------------------
-                // L21 = A21 / L11',  note L21 has size n2 by n1
-                // ----------------------------------
-
-                size_t lsize_work1 = 0;
-                size_t lsize_work2 = 0;
-                size_t lsize_work3 = 0;
-                size_t lsize_work4 = 0;
-
-                if((n1 >= 1) && (n2 >= 1))
-                {
-                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                        rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1,
                         batch_count,
 
                         &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
@@ -281,12 +398,12 @@ void rocsolver_potrf_getMemorySize(const I n,
                 size_work3 = std::max(size_work3, lsize_work3);
                 size_work4 = std::max(size_work4, lsize_work4);
             }
-        }
 
-        *p_size_work1 = std::max(*p_size_work1, size_work1);
-        *p_size_work2 = std::max(*p_size_work2, size_work2);
-        *p_size_work3 = std::max(*p_size_work3, size_work3);
-        *p_size_work4 = std::max(*p_size_work4, size_work4);
+            *p_size_work1 = std::max(*p_size_work1, size_work1);
+            *p_size_work2 = std::max(*p_size_work2, size_work2);
+            *p_size_work3 = std::max(*p_size_work3, size_work3);
+            *p_size_work4 = std::max(*p_size_work4, size_work4);
+        }
     }
 }
 
