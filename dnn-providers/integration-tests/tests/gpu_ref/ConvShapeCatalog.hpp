@@ -120,6 +120,10 @@ inline std::vector<ConvShapeCase> getSmall3dConvCases()
         {{1, 1, 7, 7, 7}, {1, 1, 3, 3, 3}, {1, 1, 1}, {2, 2, 2}, {0, 0, 0}, 1, "Dilation2x3d"},
         // 3D multi-channel (3 in, 2 out)
         {{1, 3, 4, 4, 4}, {2, 3, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "MultiChan3d"},
+        // 3D depthwise (groups == input channels)
+        {{1, 3, 4, 4, 4}, {3, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 3, "Depthwise3d"},
+        // 3D pointwise (1x1x1 kernel — channel mixing only)
+        {{1, 8, 4, 4, 4}, {16, 8, 1, 1, 1}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Pointwise3d"},
     };
 }
 
@@ -202,6 +206,34 @@ inline std::vector<ConvShapeCase> getMedium3dConvCases()
         {{1, 16, 4, 14, 14}, {16, 16, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "NonCube3d"},
         // Large 5x5x5 kernel
         {{2, 16, 8, 8, 8}, {32, 16, 5, 5, 5}, {1, 1, 1}, {1, 1, 1}, {0, 0, 0}, 1, "Kernel5x5x5"},
+        // 3D depthwise at medium scale (MobileNet pattern)
+        {{4, 16, 8, 8, 8}, {16, 1, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 16, "Depthwise16x3d"},
+        // 3D pointwise channel expansion (1x1x1 bottleneck)
+        {{4, 16, 8, 8, 8},
+         {32, 16, 1, 1, 1},
+         {1, 1, 1},
+         {1, 1, 1},
+         {0, 0, 0},
+         1,
+         "Pointwise16to32x3d"},
+        // 8-group 3D — from MIOpen grouped conv3d (N=128,C=32,K=32,28³,G=8)
+        {{4, 32, 8, 8, 8}, {32, 4, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 8, "Grouped8x3d"},
+        // Stride-2 with real channels (downsampling block)
+        {{4, 16, 14, 14, 14},
+         {32, 16, 3, 3, 3},
+         {2, 2, 2},
+         {1, 1, 1},
+         {1, 1, 1},
+         1,
+         "Stride2Med3d"},
+        // Dilation=2 at medium scale
+        {{2, 16, 14, 14, 14},
+         {32, 16, 3, 3, 3},
+         {1, 1, 1},
+         {2, 2, 2},
+         {2, 2, 2},
+         1,
+         "Dilation2Med3d"},
     };
 }
 
@@ -313,13 +345,7 @@ inline std::vector<ConvShapeCase> getLarge3dConvCases()
          "Degenerate3dD1"},
         // 3D ResNet / C3D block — matches CK's standard 3D test shape
         // (CK: N=64,C=64,K=128,28³; scaled for reference impl)
-        {{8, 64, 14, 14, 14},
-         {128, 64, 3, 3, 3},
-         {1, 1, 1},
-         {1, 1, 1},
-         {1, 1, 1},
-         1,
-         "ResNet3d"},
+        {{8, 64, 14, 14, 14}, {128, 64, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "ResNet3d"},
         // Large-spatial 5x5x5 kernel — from MIOpen conv3d_test (N=2,C=16,50³,K=32)
         {{2, 16, 50, 50, 50},
          {32, 16, 5, 5, 5},
