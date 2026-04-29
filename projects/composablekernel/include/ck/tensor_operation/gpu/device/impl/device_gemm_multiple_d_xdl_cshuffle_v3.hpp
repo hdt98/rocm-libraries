@@ -151,7 +151,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
 
     struct Partitioner
     {
-        using DsGridPointer = GridwiseGemm64::DsGridPointer;
+        using DsGridPointer = typename GridwiseGemm64::DsGridPointer;
 
         index_t M;
         index_t N;
@@ -224,7 +224,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
 
         __host__ auto splitProblem(index_t m,
                                    const ADataType* p_a_grid_left,
-                                   const DsGridPointer& p_ds_grid_left,
+                                   DsGridPointer& p_ds_grid_left,
                                    CDataType* p_c_grid_left) const
         {
             const index_t m_left  = ck::math::integer_least_multiple(m / 2, PartitionSize);
