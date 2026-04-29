@@ -37,6 +37,10 @@ if(TEST_MOE_FLATMM_DTYPES)
         target_include_directories(test_tile_moe_flatmm_${DTYPE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
         target_compile_options(test_tile_moe_flatmm_${DTYPE}
                                PRIVATE ${TEST_MOE_FLATMM_COMPILE_OPTIONS})
+        if(DTYPE MATCHES "fp8|bf8" AND GPU_TARGETS MATCHES "gfx942")
+            target_compile_definitions(test_tile_moe_flatmm_${DTYPE}
+                                       PRIVATE CK_TILE_MOE_FLATMM_USE_GFX942_F8_CONFIGS)
+        endif()
         list(APPEND TEST_MOE_FLATMM_TARGETS test_tile_moe_flatmm_${DTYPE})
     endforeach()
 
