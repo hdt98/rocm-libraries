@@ -707,7 +707,7 @@ namespace TensileLite
             // process M in 32-element blocks have valid scale data for partial blocks.
             auto freeIdx = m_freeIndicesA[0].i;
             saSizes[freeIdx] = RoundUpToMultiple(saSizes[freeIdx], (size_t)32);
-            TensorDescriptor mxsa("mxScaleA", rocisa::DataType::MXScale, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
+            TensorDescriptor mxsa("mxScaleA", mxTypeA, saSizes.begin(), saSizes.end(), saStride.begin(), saStride.end());
             m_tensors[ContractionProblemGemm::TENSOR::MXSA] = mxsa;
         }
     }
@@ -730,7 +730,7 @@ namespace TensileLite
             // process N in 32-element blocks have valid scale data for partial blocks.
             auto freeIdx = m_freeIndicesB[0].i;
             sbSizes[freeIdx] = RoundUpToMultiple(sbSizes[freeIdx], (size_t)32);
-            TensorDescriptor mxsb("mxScaleB", rocisa::DataType::MXScale, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
+            TensorDescriptor mxsb("mxScaleB", mxTypeB, sbSizes.begin(), sbSizes.end(), sbStride.begin(), sbStride.end());
             m_tensors[ContractionProblemGemm::TENSOR::MXSB] = mxsb;
         }
     }

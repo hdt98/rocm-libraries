@@ -931,27 +931,13 @@ class ProblemType(Mapping):
   #   See the discussion in ValidParameters.py for validGEMMTypes
   ################################################################################
   def _checkIfSupportedGEMMType(self):
-    # Here we use "DataType" instead of "MacDataTypeA(B)" for validation. It is totally fine cause we passed "MacDataTypeA(B)" into Client side.
-    # Ex: MacDataTypeA: b6, MacDataTypeB: f4 -> we can either choose "DataType: f4" or "DataType: b6"
-    inType = self["DataType"]
+    inTypeA = self["MacDataTypeA"]
+    inTypeB = self["MacDataTypeB"]
     outType = self["DestDataType"]
     computeType = self["ComputeDataType"]
 
-    gemmType = ( inType.toChar(), outType.toChar(), computeType.toChar() )
-    if self["MXBlockA"] or self["MXBlockB"]:
-      if gemmType not in _validMXGEMMTypes:
-        raise Exception("This typed-MX-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet." % (gemmType[0], gemmType[1], gemmType[2]))
-      if self["MXBlockA"] == 0:
-        if self["MXBlockB"] not in _validMXGEMMBlock:
-          raise Exception("MXShape is not supported")
-      elif self["MXBlockB"] == 0:
-        if self["MXBlockA"] not in _validMXGEMMBlock:
-          raise Exception("MXShape is not supported")
-      elif (self["MXBlockA"] != self["MXBlockB"]):
-        raise Exception("MXShape is not supported")
-      elif (self["MXBlockA"] not in _validMXGEMMBlock):
-        raise Exception("MXShape is not supported")
-    elif gemmType not in _validGEMMTypes:
+    gemmType = ( inTypeA.toChar(), inTypeB.toChar(), outType.toChar(), computeType.toChar() )
+    if gemmType not in _validGEMMTypes:
       raise Exception("This typed-GEMM (Ti, To, Tc) = (%s, %s, %s) is not supported yet."%(gemmType[0], gemmType[1], gemmType[2]))
 
   ########################################

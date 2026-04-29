@@ -4340,6 +4340,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     # For subtile kernels, free SGPRs that were only needed during the main loop
     if kernel["UseSubtileImpl"]:
       module.add(self.undefineSubtileMainLoopSgprs(kernel))
+      # Remove SrdWS from the free pool before defineSgprIdx calls below,
+      # otherwise checkOutAligned can grab registers overlapping SrdWS.
+      if not self.states.doShadowInit and kernel["StreamK"] and kernel["StreamKAtomic"] == 0:
+        self.removeSgprVarFromPool("SrdWS")
       # Immediately allocate permanent SGPRs for subtile M/N guards.
       # Must be done here (before endSummation) so they get indices from
       # the freshly-freed swap/LocalWriteBaseAddr range.
@@ -5853,8 +5857,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
 
     self.asmAssert = Assert(self.states.laneSGPRCount, kernel["WavefrontSize"], self.db["EnableAsserts"])
 
-
-    print("================= Macro Tile config: %u x %u x %u ========================"%(kernel["MacroTile0"], kernel["MacroTile1"], kernel["DepthU"]))
 
     def initSubTileInfo(tc):
       tileMap = {

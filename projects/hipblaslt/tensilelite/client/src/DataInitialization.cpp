@@ -1940,6 +1940,7 @@ namespace TensileLite
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8A.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
                     generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                    hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                     dataPtr,
                                     scalePtr,
                                     rows,
@@ -2003,6 +2004,7 @@ namespace TensileLite
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8B.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
                     generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                                    hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                     dataPtr,
                                     scalePtr,
                                     rows,

@@ -4300,7 +4300,7 @@ class KernelWriterAssembly(KernelWriter):
                 else:
                   # (numLine * stride + DepthU) * bpe  -- mirrors scale path structure
                   module.add(SAddU32(dst=sgpr(stmp+0), src0=sgpr(stmp+0), src1=extra_bytes, comment="+ DepthU (one K step)"))
-                  module.add(scalarMultiplyBpe(sgpr("Srd%s+2"%tc), sgpr(stmp+0), tP["bpeGR"], comment="buffer_load limit for %s (tile-boundary, avoids 32-bit overflow)"%tc))
+                  module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp+0, float(tP["bpeGR"]), comment="buffer_load limit for %s (tile-boundary, avoids 32-bit overflow)"%tc))
           module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(tileStart), sgpr(tileStart+1), sgpr(tileStart+0), \
                     strideF, comment="tlu=0, scaled tile-offset by stride"))
 

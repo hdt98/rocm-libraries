@@ -26,7 +26,7 @@ GlobalParameters:
   #PrintSolutionRejectionReason: True
   #GenerateSourcesAndExit: False
   CpuThreads: 1
-  RotatingBufferSize: 512
+  RotatingBufferSize: 0
 
 BenchmarkProblems:
   ########################################
