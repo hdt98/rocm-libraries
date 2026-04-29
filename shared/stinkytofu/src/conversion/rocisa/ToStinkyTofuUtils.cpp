@@ -155,14 +155,13 @@ stinkytofu::MUBUFModifiers buildMUBUFModifiersForBufferOp(
     bool hasGLCModifier = asmCaps.count("HasGLCModifier") && asmCaps.at("HasGLCModifier");
     bool hasSC0Modifier = asmCaps.count("HasSC0Modifier") && asmCaps.at("HasSC0Modifier");
 
-    stinkytofu::MUBUFModifiers mod = rocMubuf.has_value()
-                                         ? convertMUBUFModifiers(rocMubuf.value(), asmCaps)
-                                         : stinkytofu::MUBUFModifiers(
-                                               /*offen=*/false, /*offset12=*/0, /*glc=*/false,
-                                               /*slc=*/false, /*nt=*/false, /*lds=*/false,
-                                               /*isStore=*/false, hasMUBUFConst, hasGLCModifier,
-                                               hasSC0Modifier, /*hasSCOPEModifier=*/false,
-                                               stinkytofu::MUBUFScope::SCOPE_NONE);
+    stinkytofu::MUBUFModifiers mod =
+        rocMubuf.has_value() ? convertMUBUFModifiers(rocMubuf.value(), asmCaps)
+                             : stinkytofu::MUBUFModifiers(
+                                   /*offen=*/false, /*offset12=*/0, /*glc=*/false,
+                                   /*slc=*/false, /*nt=*/false, /*lds=*/false,
+                                   /*isStore=*/false, hasMUBUFConst, hasGLCModifier, hasSC0Modifier,
+                                   /*hasSCOPEModifier=*/false, stinkytofu::MUBUFScope::SCOPE_NONE);
 
     if (!mod.offen && !isOffVaddrContainer(vaddr)) {
         mod.offen = 1;
