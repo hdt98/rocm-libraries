@@ -214,6 +214,11 @@ rocm_install(
     RENAME "CTestTestfile.cmake"
 )
 rocm_install(
+    PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/run_rocwmma.py"
+    DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}"
+    COMPONENT tests
+)
+rocm_install(
     FILES "${INSTALL_SMOKE_TEST_FILE}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME}/smoke"
     COMPONENT tests
