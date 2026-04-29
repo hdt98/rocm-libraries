@@ -55,7 +55,7 @@ __launch_bounds__(CK_MAX_THREAD_PER_BLOCK, MinimumOccupancy)
                                       const BElementwiseOperation b_element_op,
                                       const CDEElementwiseOperation cde_element_op)
 {
-#if defined(__gfx11__) || defined(__gfx12__)
+#if defined(__gfx11__) || defined(__gfx12__) || defined(__gfx13__)
     using EpilogueType = typename std::conditional<GridwiseGemm::IsBWaveTransferApplicable &&
                                                        GridwiseGemm::UseDirectStore,
                                                    typename GridwiseGemm::EpilogueDirectStore,
@@ -701,7 +701,7 @@ struct DeviceGroupedGemm_Wmma_Multi_ABD_Fixed_NK
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(!ck::is_gfx11_supported() && !ck::is_gfx12_supported())
+        if(!ck::is_gfx11_supported() && !ck::is_gfx12_supported() && !ck::is_gfx13_supported())
         {
             return false;
         }
