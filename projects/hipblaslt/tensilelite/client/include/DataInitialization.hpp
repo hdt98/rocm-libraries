@@ -863,10 +863,9 @@ namespace TensileLite
             virtual void preSolution(ContractionSolution* const solution) override
             {
                 m_currentSolution = solution;
-                // Re-init MX scale with preSwizzle now that solution (useScaleAB) is available
-                if(m_currentSolution != nullptr
-                   && !m_currentSolution->problemType.useScaleAB.empty()
-                   && m_currentGemmProblem != nullptr
+                // Re-init MX FP4 inputs once the solution is known (MI-based preSwizzle when enabled).
+                // Do not gate on useScaleAB: MX kernels may use MXSA/MXSB with empty useScaleAB.
+                if(m_currentSolution != nullptr && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
                     bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
@@ -880,6 +879,15 @@ namespace TensileLite
                                    m_groupedOffsets,
                                    *m_currentGemmProblem,
                                    hipMemcpyDeviceToDevice);
+                        // CPU reference uses m_cpuPtrs (current); initializeMXData wrote valid.
+                        // Keep CPU "current" in sync so SolveCPU matches GPU after per-solution MX layout.
+                        std::vector<void**> cpuDummyBatchPtrs;
+                        copyInputs(m_cpuPtrs,
+                                   cpuDummyBatchPtrs,
+                                   m_maxElements,
+                                   m_groupedOffsets,
+                                   *m_currentGemmProblem,
+                                   hipMemcpyHostToHost);
                     }
                 }
             }
