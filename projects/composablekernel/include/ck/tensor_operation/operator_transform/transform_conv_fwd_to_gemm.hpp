@@ -8,6 +8,7 @@
 #include "ck/tensor_description/tensor_descriptor_helper.hpp"
 #include "ck/tensor_operation/gpu/device/tensor_layout.hpp"
 #include "ck/tensor_operation/gpu/device/convolution_forward_specialization.hpp"
+#include "ck/utility/env.hpp"
 
 namespace ck {
 namespace tensor_operation {
@@ -384,6 +385,12 @@ struct TransformConvFwdToGemm
 
         bool is_a_descriptor_smaller_than_2GB = (in_desc_space_size * sizeof(ADataType)) <= TwoGB;
         bool is_c_descriptor_smaller_than_2GB = (out_desc_space_size * sizeof(CDataType)) <= TwoGB;
+
+        // if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)) && !(is_a_descriptor_smaller_than_2GB && is_c_descriptor_smaller_than_2GB))
+        // {
+            // std::cout << "A: " << in_desc_space_size * sizeof(ADataType) << " " << is_a_descriptor_smaller_than_2GB << " C:" << out_desc_space_size * sizeof(CDataType) << " " << is_c_descriptor_smaller_than_2GB << " In " << __FILE__ << ":" << __LINE__
+            //           << ", in function: " << __func__ << std::endl;
+        // }
 
         return is_a_descriptor_smaller_than_2GB && is_c_descriptor_smaller_than_2GB;
     }
@@ -1157,20 +1164,20 @@ struct TransformConvFwdToGemm
                     make_tuple(N_, Di_, Hi_, Wi_, C_),
                     make_tuple(NStrideTensorA_, DiStride_, HiStride_, WiStride_, CStrideTensorA_));
 
-                const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
-                    in_n_di_hi_wi_c_desc,
-                    make_tuple(make_pass_through_transform(N_),
-                               make_pad_transform(Di_, InLeftPadD_, InRightPadD_),
-                               make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
-                               make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
-                               make_pass_through_transform(C_)),
-                    make_tuple(
-                        Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}),
-                    make_tuple(
-                        Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}));
+                // const auto in_n_hip_wip_c_desc = transform_tensor_descriptor(
+                //     in_n_di_hi_wi_c_desc,
+                //     make_tuple(make_pass_through_transform(N_),
+                //                make_pad_transform(Di_, InLeftPadD_, InRightPadD_),
+                //                make_pad_transform(Hi_, InLeftPadH_, InRightPadH_),
+                //                make_pad_transform(Wi_, InLeftPadW_, InRightPadW_),
+                //                make_pass_through_transform(C_)),
+                //     make_tuple(
+                //         Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}),
+                //     make_tuple(
+                //         Sequence<0>{}, Sequence<1>{}, Sequence<2>{}, Sequence<3>{}, Sequence<4>{}));
 
                 const auto in_n_z_do_y_ho_x_wo_c_desc = transform_tensor_descriptor(
-                    in_n_hip_wip_c_desc,
+                    in_n_di_hi_wi_c_desc,//in_n_hip_wip_c_desc,
                     make_tuple(make_pass_through_transform(N_),
                                make_embed_transform(make_tuple(Z_, Do_),
                                                     make_tuple(ConvDilationD_, ConvStrideD_)),
