@@ -663,7 +663,8 @@ class Solution(collections.abc.Mapping):
   @staticmethod
   def setGlobalReadVectorWidth(state, tc, totalVectors, grvw, printRejectionReason: bool):
     validDepthU = True
-    if grvw not in [1,2,4,8,16,32]:
+    # Skip GRVW range check for subtile impl: scale uses serial*loadWidth DTL addressing, not standard GRVW chunks
+    if grvw not in [1,2,4,8,16,32] and not state["UseSubtileImpl"]:
       validDepthU = False
     if totalVectors % state["NumThreads"] != 0:
       reject(None, printRejectionReason, "totalVectors%s %u %% NumThreads %u != 0" \
@@ -1841,76 +1842,34 @@ class Solution(collections.abc.Mapping):
       state["StaggerU"] = 0
 
     if state["ProblemType"]["MXBlockA"]:
-      if state["UseSubtileImpl"]:
-        # Subtile impl handles scale loading separately; disable classic MXS path
-        state["DirectToVgprMXSA"] = False
-        state["DirectToLdsMXSA"] = False
-        state["LocalWriteUseSgprMXSA"] = False
-        state["NumLoadsCoalescedMXSA"] = 0
-        state["NumLoadsPerpendicularMXSA"] = 0
-        state["NumLoadsMXSA"] = 0
-        state["GlobalReadVectorWidthMXSA"] = 1
-        state["WaveSeparateGlobalReadMXSA"] = 0
-        state["LSCMXSA"] = 0
-        state["LSPMXSA"] = 0
-        state["LVCMXSA"] = 0
-        state["LVPMXSA"] = 0
-        state["VectorWidthMXSA"] = 1
-        state["MIWaveTileMXSA"] = state["MIWaveTileA"]
-        state["ThreadTileMXSA"] = state["ThreadTileA"]
-        state["SubGroupMXSA"] = state["SubGroupA"]
-        state["MacroTileMXSA"] = state["MacroTileA"]
-        state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
-      else:
-        state["DirectToVgprMXSA"] = state["DirectToVgprA"]
-        state["ThreadTileMXSA"] = state["ThreadTileA"]
-        state["SubGroupMXSA"] = state["SubGroupA"]
-        state["MacroTileMXSA"] = state["MacroTileA"]
-        state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
-        state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
-        state["DirectToLdsMXSA"] = state["DirectToLdsA"]
-        state["LocalWriteUseSgprMXSA"] = state["DirectToLdsMXSA"]
-        state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
-        state["VectorWidthMXSA"] = state["VectorWidthA"]
-        state["MIWaveTileMXSA"] = state["MIWaveTileA"]
-        state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
+      state["DirectToVgprMXSA"] = state["DirectToVgprA"]
+      state["ThreadTileMXSA"] = state["ThreadTileA"]
+      state["SubGroupMXSA"] = state["SubGroupA"]
+      state["MacroTileMXSA"] = state["MacroTileA"]
+      state["WaveSeparateGlobalReadMXSA"] = state["WaveSeparateGlobalReadA"]
+      state["NumLoadsCoalescedMXSA"] = state["NumLoadsCoalescedA"]
+      Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSA', printRejectionReason)
+      state["DirectToLdsMXSA"] = state["DirectToLdsA"]
+      state["LocalWriteUseSgprMXSA"] = state["DirectToLdsMXSA"]
+      state["ProblemType"]["MirrorDimsMXSA"] = list(state["ProblemType"]["MirrorDimsA"])
+      state["VectorWidthMXSA"] = state["VectorWidthA"]
+      state["MIWaveTileMXSA"] = state["MIWaveTileA"]
+      state["UnrollMajorLDSMXSA"] = state["UnrollMajorLDSA"]
 
     if state["ProblemType"]["MXBlockB"]:
-      if state["UseSubtileImpl"]:
-        # Subtile impl handles scale loading separately; disable classic MXS path
-        state["DirectToVgprMXSB"] = False
-        state["DirectToLdsMXSB"] = False
-        state["LocalWriteUseSgprMXSB"] = False
-        state["NumLoadsCoalescedMXSB"] = 0
-        state["NumLoadsPerpendicularMXSB"] = 0
-        state["NumLoadsMXSB"] = 0
-        state["GlobalReadVectorWidthMXSB"] = 1
-        state["WaveSeparateGlobalReadMXSB"] = 0
-        state["LSCMXSB"] = 0
-        state["LSPMXSB"] = 0
-        state["LVCMXSB"] = 0
-        state["LVPMXSB"] = 0
-        state["VectorWidthMXSB"] = 1
-        state["MIWaveTileMXSB"] = state["MIWaveTileB"]
-        state["ThreadTileMXSB"] = state["ThreadTileB"]
-        state["SubGroupMXSB"] = state["SubGroupB"]
-        state["MacroTileMXSB"] = state["MacroTileB"]
-        state["ProblemType"]["MirrorDimsMXSB"] = list(state["ProblemType"]["MirrorDimsB"])
-      else:
-        state["DirectToVgprMXSB"] = state["DirectToVgprB"]
-        state["ThreadTileMXSB"] = state["ThreadTileB"]
-        state["SubGroupMXSB"] = state["SubGroupB"]
-        state["MacroTileMXSB"] = state["MacroTileB"]
-        state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
-        state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
-        Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
-        state["DirectToLdsMXSB"] = state["DirectToLdsB"]
-        state["LocalWriteUseSgprMXSB"] = state["DirectToLdsMXSB"]
-        state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
-        state["VectorWidthMXSB"] = state["VectorWidthB"]
-        state["MIWaveTileMXSB"] = state["MIWaveTileB"]
-        state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
+      state["DirectToVgprMXSB"] = state["DirectToVgprB"]
+      state["ThreadTileMXSB"] = state["ThreadTileB"]
+      state["SubGroupMXSB"] = state["SubGroupB"]
+      state["MacroTileMXSB"] = state["MacroTileB"]
+      state["WaveSeparateGlobalReadMXSB"] = state["WaveSeparateGlobalReadB"]
+      state["NumLoadsCoalescedMXSB"] = state["NumLoadsCoalescedB"]
+      Solution.checkAndAssignWaveSeparateGlobalRead(state, 'MXSB', printRejectionReason)
+      state["DirectToLdsMXSB"] = state["DirectToLdsB"]
+      state["LocalWriteUseSgprMXSB"] = state["DirectToLdsMXSB"]
+      state["ProblemType"]["MirrorDimsMXSB"]  = list(state["ProblemType"]["MirrorDimsB"])
+      state["VectorWidthMXSB"] = state["VectorWidthB"]
+      state["MIWaveTileMXSB"] = state["MIWaveTileB"]
+      state["UnrollMajorLDSMXSB"] = state["UnrollMajorLDSB"]
 
     if state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]:
       if state["ProblemType"]["MXBlockA"]:
@@ -1980,8 +1939,9 @@ class Solution(collections.abc.Mapping):
     for key, value in state.items():
       if isinstance(value, int) and value < 0:
         backupValues.append([key, value])
-    # Skip this check for subtile impl..
-    while True:# and not state["UseSubtileImpl"]:
+    # Skip this check for subtile impl?
+    # TODO: Add this check back
+    while True:
       for backup in backupValues:
         state[backup[0]] = backup[1]
       state["ValidDepthU"] = True
@@ -2988,7 +2948,7 @@ class Solution(collections.abc.Mapping):
         totalVectorsCoalescedA = totalElementsCoalescedA // GlobalReadVectorWidthA
 
         # handle global read vector width MXSA
-        if state["ProblemType"]["MXBlockA"] and not state["UseSubtileImpl"]:
+        if state["ProblemType"]["MXBlockA"]:
           if state["ProblemType"]["TLUMXSA"]: # NT/NN
             totalElementsCoalescedMXSA = state["MacroTileMXSA"]
             totalElementsPerpMXSA = state["_DepthUMXSA"]
@@ -3064,7 +3024,7 @@ class Solution(collections.abc.Mapping):
         totalVectorsCoalescedB = totalElementsCoalescedB // GlobalReadVectorWidthB
 
         # handle global read vector width MXSB
-        if state["ProblemType"]["MXBlockB"] and not state["UseSubtileImpl"]:
+        if state["ProblemType"]["MXBlockB"]:
           if state["ProblemType"]["TLUMXSB"]: # NT/NN
             totalElementsCoalescedMXSB = state["MacroTileMXSB"]
             totalElementsPerpMXSB = state["_DepthUMXSB"]
@@ -3331,14 +3291,14 @@ class Solution(collections.abc.Mapping):
     if not Solution.setGlobalLoadTileDimClassic(state, "A", state["NumLoadsA"], \
         totalVectorsCoalescedA, totalElementsPerpA, state["_DepthUA"], printRejectionReason):
       return
-    if state["ProblemType"]["MXBlockA"] and not state["UseSubtileImpl"]:
+    if state["ProblemType"]["MXBlockA"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSA", state["NumLoadsMXSA"], \
           totalVectorsCoalescedMXSA, totalElementsPerpMXSA, state["_DepthUMXSA"], printRejectionReason):
         return
     if not Solution.setGlobalLoadTileDimClassic(state, "B", state["NumLoadsB"], \
         totalVectorsCoalescedB, totalElementsPerpB, state["_DepthUB"], printRejectionReason):
       return
-    if state["ProblemType"]["MXBlockB"] and not state["UseSubtileImpl"]:
+    if state["ProblemType"]["MXBlockB"]:
       if not Solution.setGlobalLoadTileDimClassic(state, "MXSB", state["NumLoadsMXSB"], \
           totalVectorsCoalescedMXSB, totalElementsPerpMXSB, state["_DepthUMXSB"], printRejectionReason):
         return
@@ -3406,14 +3366,14 @@ class Solution(collections.abc.Mapping):
     state["LVCA"] = roundupRatio(state["LSCA"] , state["GlobalReadVectorWidthA"])
     state["LVPA"] = roundupRatio(state["LSPA"] , state["GlobalReadVectorWidthA"])
 
-    if state["ProblemType"]["MXBlockA"] and not state["UseSubtileImpl"]:
+    if state["ProblemType"]["MXBlockA"]:
       state["LVCMXSA"] = roundupRatio(state["LSCMXSA"] , state["GlobalReadVectorWidthMXSA"])
       state["LVPMXSA"] = roundupRatio(state["LSPMXSA"] , state["GlobalReadVectorWidthMXSA"])
 
     state["LVCB"] = roundupRatio(state["LSCB"] , state["GlobalReadVectorWidthB"])
     state["LVPB"] = roundupRatio(state["LSPB"] , state["GlobalReadVectorWidthB"])
 
-    if state["ProblemType"]["MXBlockB"] and not state["UseSubtileImpl"]:
+    if state["ProblemType"]["MXBlockB"]:
       state["LVCMXSB"] = roundupRatio(state["LSCMXSB"] , state["GlobalReadVectorWidthMXSB"])
       state["LVPMXSB"] = roundupRatio(state["LSPMXSB"] , state["GlobalReadVectorWidthMXSB"])
 
@@ -3573,7 +3533,7 @@ class Solution(collections.abc.Mapping):
       #1LDS buffer must be 0 for DirectToLdsA
       state["1LDSBuffer"] = 0
     # MX case
-    if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]) and not state["UseSubtileImpl"]:
+    if (state["ProblemType"]["MXBlockA"] or state["ProblemType"]["MXBlockB"]):
       if state["DirectToLdsA"] != state["DirectToLdsMXSA"] or state["DirectToLdsB"] != state["DirectToLdsMXSB"]:
           reject(state, printRejectionReason, "DirectToLdsA/B and DirectToLdsMXSA/B should match")
       if state["DirectToLdsA"] != state["DirectToLdsB"]:

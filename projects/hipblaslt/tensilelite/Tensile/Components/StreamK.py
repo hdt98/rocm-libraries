@@ -121,10 +121,18 @@ class StreamK(Component):
 
         For MX scale tensors, DepthU is divided by the MX block size because
         there is one scale element per MXBlock data elements.
+        For MXSA/MXSB (MX swizzled/pre-shuffle case), the swizzled block size
+        is 32 * 256 so an additional *32 multiplier is needed.
         """
         key = "_DepthU%s" % tc
         if key in kernel:
-            return kernel[key]
+            _DepthU = kernel[key]
+            if tc in ("MXSA", "MXSB"):
+                # TODO: don't hardcode 32; derive from mxblock size
+                # MX swizzled(pre shuffle) case, swizzled block size is 32 * 256
+                # Number of block is DepthU // 256 (assuming DepthU is multiple of 256)
+                _DepthU = (_DepthU * 32)
+            return _DepthU
         return kernel["DepthU"]
 
     def shiftSrd(self, writer, srdIdx) -> Module:

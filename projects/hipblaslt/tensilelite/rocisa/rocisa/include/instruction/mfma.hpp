@@ -497,6 +497,7 @@ namespace rocisa
         std::shared_ptr<RegisterContainer> acc2;
         std::shared_ptr<RegisterContainer> mxsa;
         std::shared_ptr<RegisterContainer> mxsb;
+        std::optional<VOP3PModifiers>      vop3;
         int                                block;
 
         MXMFMAInstruction(InstType                                  instType,
@@ -508,6 +509,7 @@ namespace rocisa
                           const std::shared_ptr<RegisterContainer>& acc2         = nullptr,
                           const std::shared_ptr<RegisterContainer>& mxsa         = nullptr,
                           const std::shared_ptr<RegisterContainer>& mxsb         = nullptr,
+                          const std::optional<VOP3PModifiers>&      vop3         = std::nullopt,
                           InstType                                  mxScaleAType = InstType::INST_F32,
                           InstType                                  mxScaleBType = InstType::INST_F32,
                           int                                       block        = 0,
@@ -523,6 +525,7 @@ namespace rocisa
             , acc2(acc2 ? acc2 : acc)
             , mxsa(mxsa)
             , mxsb(mxsb)
+            , vop3(vop3)
             , block(block)
         {
         }
@@ -539,6 +542,7 @@ namespace rocisa
             , acc2(other.acc2 ? other.acc2->clone2() : nullptr)
             , mxsa(other.mxsa ? other.mxsa->clone2() : nullptr)
             , mxsb(other.mxsb ? other.mxsb->clone2() : nullptr)
+            , vop3(other.vop3)
             , block(other.block)
         {
         }
@@ -804,9 +808,15 @@ namespace rocisa
             {
                 std::string mxsaStr = mxsa ? mxsa->toString() : "";
                 std::string mxsbStr = mxsb ? mxsb->toString() : "";
-                return acc->toString() + ", " + a->toString() + ", " + b->toString() + ", "
-                       + acc2->toString() + ", " + mxsaStr + ", " + mxsbStr
-                       + mfmaInputPermuteStr();
+                // op_sel/op_sel_hi must appear before cbsz/blgp for the assembler
+                std::string result  = acc->toString() + ", " + a->toString() + ", " + b->toString()
+                                    + ", " + acc2->toString() + ", " + mxsaStr + ", " + mxsbStr;
+                if(vop3)
+                {
+                    result += vop3->toString();
+                }
+                result += mfmaInputPermuteStr();
+                return result;
             }
             else
             {
