@@ -275,6 +275,16 @@ namespace rocisa
         }
     };
 
+    /// Returns true when vaddr is the MUBUF "off" keyword.
+    inline bool isOffVAddr(const std::shared_ptr<Container>& vaddr)
+    {
+        if(auto* regCont = dynamic_cast<const RegisterContainer*>(vaddr.get()))
+        {
+            return regCont->isOff;
+        }
+        return false;
+    }
+
     struct MUBUFReadInstruction : public GlobalReadInstruction
     {
         std::shared_ptr<Container>    vaddr;
@@ -352,7 +362,7 @@ namespace rocisa
             {
                 kStr += mubuf->toString();
             }
-            if(!mubuf || !mubuf->offen)
+            if((!mubuf || !mubuf->offen) && !isOffVAddr(vaddr))
             {
                 kStr += " offen offset:0";
             }
@@ -718,7 +728,7 @@ namespace rocisa
             {
                 kStr += mubuf->toString();
             }
-            if(!mubuf || !mubuf->offen)
+            if((!mubuf || !mubuf->offen) && !isOffVAddr(vaddr))
             {
                 kStr += " offen offset:0";
             }
@@ -1624,6 +1634,10 @@ namespace rocisa
             std::string kStr = instStr + " " + getArgStr();
             if(mubuf)
                 kStr += mubuf->toString();
+            if((!mubuf || !mubuf->offen) && !isOffVAddr(vaddr))
+            {
+                kStr += " offen offset:0";
+            }
             kStr = formatWithComment(kStr);
             setMsb(kStr, {vaddr}, srcData);
             return kStr;

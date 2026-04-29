@@ -187,7 +187,6 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
                    MUBUFScope scope = MUBUFScope::SCOPE_NONE)
         : TypedModifier<MUBUFModifiers>(),
           offset12(offset12),
-          scope(scope),
           offen(offen),
           glc(glc),
           slc(slc),
@@ -197,10 +196,10 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
           hasMUBUFConst(hasMUBUFConst),
           hasGLCModifier(hasGLCModifier),
           hasSC0Modifier(hasSC0Modifier),
-          hasSCOPEModifier(hasSCOPEModifier) {}
+          hasSCOPEModifier(hasSCOPEModifier),
+          scope(scope) {}
 
     int offset12;
-    MUBUFScope scope;
     uint32_t offen : 1;
     uint32_t glc : 1;
     uint32_t slc : 1;
@@ -211,6 +210,7 @@ struct MUBUFModifiers : public TypedModifier<MUBUFModifiers> {
     uint32_t hasGLCModifier : 1;
     uint32_t hasSC0Modifier : 1;
     uint32_t hasSCOPEModifier : 1;
+    MUBUFScope scope;
 };
 
 struct SMEMModifiers : public TypedModifier<SMEMModifiers> {

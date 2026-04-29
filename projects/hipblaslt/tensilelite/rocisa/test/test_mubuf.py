@@ -29,7 +29,13 @@ import rocisa
 from rocisa.code import Module, SignatureBase
 from rocisa.container import MUBUFModifiers, sgpr, vgpr
 from rocisa.enum import CacheScope
-from rocisa.instruction import BufferLoadB32, BufferStoreB32
+from rocisa.instruction import (
+    BufferAtomicAddF32,
+    BufferLoadB32,
+    BufferLoadB64,
+    BufferLoadB128,
+    BufferStoreB32,
+)
 
 _ISA = (12, 5, 0)
 
@@ -60,6 +66,14 @@ def _mubuf_off_asm() -> str:
             soffset=sgpr(46),
         )
     )
+    mod.add(
+        BufferStoreB32(
+            src=vgpr(13),
+            vaddr=vgpr("off", isOff=True),
+            saddr=sgpr(64, 4),
+            soffset=0,
+        )
+    )
     mod.setParent()  # resolves symbolic register names before conversion
 
     sig = SignatureBase(
@@ -80,8 +94,8 @@ def _mubuf_off_asm() -> str:
 
 
 def test_mubuf_off_vaddr_stinkytofu(_mubuf_off_asm):
-    # Assembler rejects 'v[vgproff]'; 'off' must appear as the literal vaddr operand.
     assert re.search(r"buffer_store_b32 v12, off, s\[60:63\], s46", _mubuf_off_asm)
+    assert re.search(r"buffer_store_b32 v13, off, s\[64:67\], null", _mubuf_off_asm)
 
 
 @pytest.fixture(scope="module")
@@ -133,4 +147,121 @@ def test_mubuf_scope_modifiers_stinkytofu(_mubuf_scope_asm):
     assert re.search(
         r"buffer_load_b32 v13, v33, s\[64:67\], s47 offen offset:0 scope:SCOPE_DEV",
         _mubuf_scope_asm,
+    )
+
+
+def test_rocisa_load_null_soffset_adds_offen():
+    inst = BufferLoadB32(
+        dst=vgpr(13),
+        vaddr=vgpr(33),
+        saddr=sgpr(64, 4),
+        soffset=0,
+    )
+
+    assert str(inst).strip() == "buffer_load_b32 v13, v33, s[64:67], null offen offset:0"
+
+
+def test_rocisa_store_null_soffset_adds_offen():
+    inst = BufferStoreB32(
+        src=vgpr(12),
+        vaddr=vgpr(32),
+        saddr=sgpr(60, 4),
+        soffset=0,
+    )
+
+    assert str(inst).strip() == "buffer_store_b32 v12, v32, s[60:63], null offen offset:0"
+
+
+def test_rocisa_atomic_null_soffset_adds_offen():
+    inst = BufferAtomicAddF32(
+        src=vgpr(12),
+        vaddr=vgpr(32),
+        saddr=sgpr(60, 4),
+        soffset=0,
+    )
+
+    assert str(inst).strip() == "buffer_atomic_add_f32 v12, v32, s[60:63], null offen offset:0"
+
+
+def test_rocisa_off_vaddr_null_soffset():
+    inst = BufferStoreB32(
+        src=vgpr(12),
+        vaddr=vgpr("off", isOff=True),
+        saddr=sgpr(60, 4),
+        soffset=0,
+    )
+
+    assert str(inst).strip() == "buffer_store_b32 v12, off, s[60:63], null"
+
+
+@pytest.fixture(scope="module")
+def _mubuf_zero_soffset_asm() -> str:
+    mod = Module("mubuf_zero_soffset")
+    mod.add(
+        BufferLoadB128(
+            dst=vgpr(0, 4),
+            vaddr=vgpr(32),
+            saddr=sgpr(60, 4),
+            soffset=0,
+            mubuf=MUBUFModifiers(offen=True),
+            comment="G -> Reg 0_0_0_0",
+        )
+    )
+    mod.add(
+        BufferLoadB64(
+            dst=vgpr(4, 2),
+            vaddr=vgpr(33),
+            saddr=sgpr(60, 4),
+            soffset=0,
+            comment="G -> Reg 0_0_1_0",
+        )
+    )
+    mod.add(
+        BufferLoadB32(
+            dst=vgpr(6),
+            vaddr=vgpr(34),
+            saddr=sgpr(60, 4),
+            soffset=0,
+            mubuf=MUBUFModifiers(offen=False),
+            comment="G -> Reg 0_0_2_0",
+        )
+    )
+    mod.setParent()
+
+    sig = SignatureBase(
+        kernelName="mubuf_zero_soffset",
+        kernArgsVersion=1,
+        codeObjectVersion="4",
+        groupSegmentSize=0,
+        sgprWorkGroup=(1, 1, 0),
+        vgprWorkItem=0,
+        flatWorkGroupSize=64,
+        preloadKernArgs=False,
+    )
+
+    st = rocisa.toStinkyTofuModule(
+        mod, _ISA, "mubuf_zero_soffset", signature=sig, options={"OptLevel": 0}
+    )
+    st.runOptimizationPipeline()
+    return st.emitAssembly()
+
+
+def test_stinky_null_soffset_explicit_offen(_mubuf_zero_soffset_asm):
+    assert re.search(
+        r"buffer_load_b128 v\[0:3\], v32, s\[60:63\], null offen offset:0",
+        _mubuf_zero_soffset_asm,
+    )
+
+
+def test_stinky_null_soffset_default_mubuf(_mubuf_zero_soffset_asm):
+    assert re.search(
+        r"buffer_load_b64 v\[4:5\], v33, s\[60:63\], null offen offset:0",
+        _mubuf_zero_soffset_asm,
+    )
+
+
+def test_stinky_null_soffset_offen_false(_mubuf_zero_soffset_asm):
+    assert re.search(
+        r"buffer_load_b32 v6, v34, s\[60:63\], null offen offset:0",
+        _mubuf_zero_soffset_asm,
     )
