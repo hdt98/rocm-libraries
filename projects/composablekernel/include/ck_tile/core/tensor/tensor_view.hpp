@@ -58,6 +58,13 @@ struct tensor_view
     template <typename T>
     using vector_scalar_t = typename vector_traits<remove_cvref_t<T>>::scalar_type;
 
+    template <typename OffsetArg, typename LinearOffsetArg>
+    static constexpr void assert_offset_type()
+    {
+        static_assert(std::is_same_v<std::remove_const_t<OffsetArg>, OffsetType> &&
+                      std::is_same_v<LinearOffsetArg, OffsetType>);
+    }
+
     CK_TILE_HOST_DEVICE constexpr tensor_view() = default;
 
     CK_TILE_HOST_DEVICE constexpr tensor_view(const buffer_view& buffer_view,
@@ -93,12 +100,7 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {}) const
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
         return buf_.template get<X, OffsetType>(
             offset / PackedSize,
             linear_offset / PackedSize,
@@ -120,14 +122,9 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {}) const
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
-        return buf_.template get<X, OffsetType>(coord.get_offset() / PackedSize,
-                                                offset / PackedSize,
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
+        return buf_.template get<X, OffsetType>(offset / PackedSize,
+                                                linear_offset / PackedSize,
                                                 is_valid_element,
                                                 bool_constant<oob_conditional_check>{},
                                                 bool_constant<LargeTensor>{});
@@ -341,12 +338,7 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
 
         buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
             offset / PackedSize,
@@ -369,15 +361,10 @@ struct tensor_view
                             bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
 
         buf_.template set<X, OffsetType, oob_conditional_check, LargeTensor>(
-            offset, linear_offset, is_valid_element, x);
+            offset / PackedSize, linear_offset / PackedSize, is_valid_element, x);
     }
 
     template <typename X,
@@ -431,14 +418,9 @@ struct tensor_view
                                bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
 
-        buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
+        buf_.template update<DstInMemOp, X, OffsetType, LargeTensor, oob_conditional_check>(
             offset / PackedSize,
             linear_offset / PackedSize,
             coordinate_has_valid_offset_assuming_top_index_is_valid(desc_, coord),
@@ -459,14 +441,9 @@ struct tensor_view
                                bool_constant<oob_conditional_check> = {})
     {
         const OffsetType offset = coord.get_offset();
-        static_assert(!LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, long_index_t> &&
-                       std::is_same_v<decltype(linear_offset), long_index_t>));
-        static_assert(LargeTensor ||
-                      (std::is_same_v<std::remove_const_t<decltype(offset)>, index_t> &&
-                       std::is_same_v<decltype(linear_offset), index_t>));
+        assert_offset_type<decltype(offset), decltype(linear_offset)>();
 
-        buf_.template update<DstInMemOp, X, OffsetType, oob_conditional_check, LargeTensor>(
+        buf_.template update<DstInMemOp, X, OffsetType, LargeTensor, oob_conditional_check>(
             offset / PackedSize, linear_offset / PackedSize, is_valid_element, x);
     }
 

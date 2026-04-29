@@ -82,7 +82,7 @@ struct GemmPipelineProblemBase
     static constexpr bool DoubleSmemBuffer  = Traits::DoubleSmemBuffer;
     static constexpr auto Scheduler         = GemmPipelineScheduler::Intrawave;
     static constexpr index_t VectorLoadSize = Traits::_VectorSize;
-    static constexpr index_t LargeTensors   = Traits::LargeTensors;
+    static constexpr bool LargeTensors      = Traits::LargeTensors;
 
     // In the base situation, the Preshuffle setting should be false.
     static constexpr bool Preshuffle = false;
@@ -243,7 +243,7 @@ struct UniversalGemmPipelineProblem
 
     static constexpr bool FixedVectorSize = FixedVectorSize_;
 
-    static constexpr index_t LargeTensors = Traits::LargeTensors;
+    static constexpr bool LargeTensors = Traits::LargeTensors;
 
     using BlockGemmShape = remove_cvref_t<BlockGemmShape_>;
 

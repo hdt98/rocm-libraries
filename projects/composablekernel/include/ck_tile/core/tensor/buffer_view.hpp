@@ -503,7 +503,7 @@ struct buffer_view<address_space_enum::global,
     {
         if constexpr(Op == memory_operation_enum::set)
         {
-            this->template set<X, oob_conditional_check>(
+            this->template set<X, OffsetType, oob_conditional_check>(
                 i, linear_offset, is_valid_element, x, bool_constant<force_global_store>{});
         }
         else if constexpr(Op == memory_operation_enum::atomic_add)
