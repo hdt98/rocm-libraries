@@ -771,6 +771,13 @@ namespace TensileLite
             // Then, copy valid data to the middle section, overwriting the NaN padding in that region
             ptrdiff_t dPadding = totalElements - descriptor.totalAllocatedElements();
             dPadding           = multiplyElementSize(dPadding, descriptor.elementBytes());
+
+            // Ensure the half-offset (dPadding/2) is aligned to element boundaries
+            // Round dPadding to nearest even multiple of elementBytes
+            size_t elementBytes = static_cast<size_t>(descriptor.elementBytes());
+            size_t doubleElement = 2 * elementBytes;
+            dPadding = (dPadding / doubleElement) * doubleElement;
+
             void* dstOffset    = (void*)((uint8_t*)dst + dPadding / 2);
             TensileLite::hip::CopyTensorVoid(dstOffset, src, descriptor, kind);
             return dstOffset;
@@ -805,8 +812,18 @@ namespace TensileLite
                                size_t                  totalElements,
                                hipMemcpyKind           kind)
         {
-            // Skip copy if no elements to copy or if pointers are null (e.g., when UseBeta=false, tensor C may not be allocated)
-            if(totalElements > 0 && dst != nullptr && src != nullptr)
+            // If we have elements to copy, pointers must be valid
+            // Null pointers with non-zero totalElements indicates a bug upstream (allocation logic)
+            if(totalElements > 0 && (dst == nullptr || src == nullptr))
+            {
+                std::stringstream ss;
+                ss << "Invalid state in copyInputBuffers: totalElements=" << totalElements
+                   << " but dst=" << dst << " src=" << src
+                   << " for tensor " << descriptor.getName();
+                throw std::runtime_error(ss.str());
+            }
+
+            if(totalElements > 0)
             {
                 HIP_CHECK_EXC(hipMemcpy(
                     dst, src, multiplyElementSize(totalElements, descriptor.elementBytes()), kind));

@@ -366,24 +366,8 @@ namespace TensileLite
                                                       bool hasNullPointer,
                                                       bool hasZeroElements) const
         {
-            // Skip validation if pointers are null or no data to validate
-            if(!hasNullPointer && !hasZeroElements)
-                return false;
-
-            // Tensor C can be null when UseBeta=false (compile-time flag indicating C is not used)
-            // Since we don't have direct access to UseBeta here, we allow null C pointers
-            // The kernel will not have been given a C pointer if UseBeta=false
-            bool isTensorC = (tensorName == "C");
-
-            if(isTensorC && hasNullPointer)
-            {
-                // Allow null C tensor - this happens when UseBeta=false
-                if(Debug::Instance().printTensorInfo())
-                    std::cout << "Skipping validation for tensor C (null pointer, UseBeta=false)" << std::endl;
-                return true;
-            }
-
-            // For all other cases, null pointers or no data to validate is an error
+            // Only output tensors reach this function (filtered by isOutput() check)
+            // Output tensors should never have null pointers or zero elements
             return false;
         }
 
@@ -551,7 +535,7 @@ namespace TensileLite
 
             uint8_t* buffer;
             HIP_CHECK_EXC(hipHostMalloc((void**)&buffer, bytes, 0));
-            m_cpuResultBuffer.reset(buffer, [](uint8_t* p) { (void)hipFree(p); });
+            m_cpuResultBuffer.reset(buffer, [](uint8_t* p) { HIP_CHECK_EXC(hipHostFree(p)); });
             m_cpuResultBufferSize = bytes;
         }
 
@@ -591,8 +575,7 @@ namespace TensileLite
                 requiredBufferSize
                     = std::max(requiredBufferSize, problem.amaxd().totalAllocatedBytes());
 
-            if(m_cpuResultBufferSize < requiredBufferSize)
-                allocateResultBuffer(requiredBufferSize);
+            allocateResultBuffer(requiredBufferSize);
 
             if(m_printTensorA)
             {
@@ -758,8 +741,7 @@ namespace TensileLite
                 throw std::runtime_error(ss.str());
             }
 
-            if(m_cpuResultBufferSize < bytesToCopy || m_cpuResultBuffer.get() == nullptr)
-                allocateResultBuffer(bytesToCopy);
+            allocateResultBuffer(bytesToCopy);
 
             auto copykind = isgpu ? hipMemcpyDeviceToHost : hipMemcpyHostToHost;
 
@@ -768,13 +750,26 @@ namespace TensileLite
             void const* copySource = result;
             if(boundsCheck == BoundsCheckMode::NaN)
             {
-                ptrdiff_t bPadding = maxElement - tensor.totalAllocatedElements();
-                elementsBeforeData = bPadding / 2;
+                // Match the EXACT allocation logic in copyBadInputBuffers:
+                // dPadding = totalElements - descriptor.totalAllocatedElements()
+                // dPadding = multiplyElementSize(dPadding, descriptor.elementBytes())
+                // dPadding = (dPadding / (2*elementBytes)) * (2*elementBytes)  (ensure dPadding/2 is aligned)
+                // dstOffset = dst + dPadding / 2
+                ptrdiff_t paddingElements = maxElement - tensor.totalAllocatedElements();
+                size_t    paddingBytes    = multiplyElementSize(paddingElements, tensor.elementBytes());
+
+                // Ensure the half-offset is aligned to element boundaries
+                size_t elementBytes = static_cast<size_t>(tensor.elementBytes());
+                size_t doubleElement = 2 * elementBytes;
+                paddingBytes = (paddingBytes / doubleElement) * doubleElement;
+
+                size_t bytesBeforeData = paddingBytes / 2;
+                copySource = (uint8_t const*)result - bytesBeforeData;
+
+                // Calculate elementsBeforeData for bounds checking
+                elementsBeforeData = bytesBeforeData / elementBytes;
                 elementsAfterData
                     = elementsToCopy - (tensor.totalAllocatedElements() + elementsBeforeData);
-                // Adjust pointer back to buffer start (before the padding)
-                copySource = (uint8_t const*)result
-                             - elementsBeforeData * sizeof(ValidType);
             }
 
             {
