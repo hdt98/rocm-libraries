@@ -151,7 +151,8 @@ inline T gen_subnorm()
         denorm_bits |= Signed ? (gen_canonical<BitType>() << (sizeof(T) * 8 - 1)) : 0;
 
         // the proper way to do a type punning
-        std::memcpy(&denorm_val, &denorm_bits, sizeof(T));
+        std::memcpy(
+            reinterpret_cast<void*>(&denorm_val), reinterpret_cast<void*>(&denorm_bits), sizeof(T));
     }
     return denorm_val;
 }
