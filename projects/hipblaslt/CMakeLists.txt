@@ -259,6 +259,48 @@ if(NOT ROCM_LIBS_SUPERBUILD)
     endif()
 endif()
 
+# Centralized mxDataGenerator bootstrap and shared helper target.
+#
+# Run the find_package / add_subdirectory bootstrap exactly once, before any
+# subtree that consumes mxDataGenerator is added. Then expose a single
+# `hipblaslt::mxdatagen` OBJECT target that compiles `clients/common/src/mxDataGen.cpp`
+# once and propagates the include path, link to roc::mxDataGenerator, the
+# C++20 requirement, and the HIPBLASLT_ENABLE_MXDATAGENERATOR macro to every
+# consumer (hipblaslt-clients-common, tensilelite-client, cpu-gemm-driver,
+# tensilelite-tests).
+#
+# Each consumer only needs `target_link_libraries(<tgt> PRIVATE hipblaslt::mxdatagen)`
+# inside `if(HIPBLASLT_ENABLE_MXDATAGENERATOR)`. This eliminates the
+# `if(NOT TARGET roc::mxDataGenerator)` / `if(TARGET roc::mxDataGenerator)`
+# guards that previously coupled feature enablement to add_subdirectory order.
+if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    if(NOT ROCM_LIBS_SUPERBUILD)
+        if(HIPBLASLT_ENABLE_THEROCK)
+            find_package(mxDataGenerator REQUIRED)
+        else()
+            add_subdirectory(
+                "${CMAKE_CURRENT_SOURCE_DIR}/../../shared/mxdatagenerator"
+                "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator"
+            )
+        endif()
+    endif()
+
+    add_library(hipblaslt-mxdatagen OBJECT
+        "${CMAKE_CURRENT_SOURCE_DIR}/clients/common/src/mxDataGen.cpp"
+    )
+    add_library(hipblaslt::mxdatagen ALIAS hipblaslt-mxdatagen)
+    target_include_directories(hipblaslt-mxdatagen
+        PUBLIC
+            "${CMAKE_CURRENT_SOURCE_DIR}/clients/common/include"
+    )
+    target_link_libraries(hipblaslt-mxdatagen PUBLIC roc::mxDataGenerator)
+    target_compile_features(hipblaslt-mxdatagen PUBLIC cxx_std_20)
+    target_compile_definitions(hipblaslt-mxdatagen PUBLIC HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    set_target_properties(hipblaslt-mxdatagen
+        PROPERTIES POSITION_INDEPENDENT_CODE ON
+    )
+endif()
+
 add_subdirectory(tensilelite)
 
 if(TENSILELITE_ENABLE_CLIENT AND NOT HIPBLASLT_ENABLE_HOST)

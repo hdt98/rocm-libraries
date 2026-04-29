@@ -21,21 +21,21 @@ set(COMMON_CLIENT_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/CSVStackFile.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/SolutionIterator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/LibraryUpdateReporter.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/src/mxDataGen.cpp"
 )
 
 target_sources(tensilelite-client PRIVATE ${COMMON_CLIENT_SOURCES})
 target_sources(cpu-gemm-driver PRIVATE ${COMMON_CLIENT_SOURCES})
 
-target_include_directories(tensilelite-client
-    PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
-)
-
-target_include_directories(cpu-gemm-driver
-    PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
-)
+# DataInitialization.hpp #includes <mxDataGen.hpp> unconditionally. When
+# HIPBLASLT_ENABLE_MXDATAGENERATOR=OFF the header expands to nothing, but the
+# include path must still resolve, so this is added unconditionally rather
+# than picked up via hipblaslt::mxdatagen.
+foreach(_tgt tensilelite-client cpu-gemm-driver)
+    target_include_directories(${_tgt}
+        PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
+    )
+endforeach()
 
 if (TENSILELITE_CLIENT_ENABLE_ROCPROFSDK)
 

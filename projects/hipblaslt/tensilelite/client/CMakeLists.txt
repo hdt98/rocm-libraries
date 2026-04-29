@@ -13,11 +13,12 @@ set(COMMON_CLIENT_LIBS
     OpenMP::OpenMP_CXX
 )
 
-if(TARGET roc::mxDataGenerator)
-    target_compile_definitions(tensilelite-client PRIVATE HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    target_link_libraries(tensilelite-client PRIVATE roc::mxDataGenerator)
-    target_compile_definitions(cpu-gemm-driver PRIVATE HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    target_link_libraries(cpu-gemm-driver PRIVATE roc::mxDataGenerator)
+if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    # hipblaslt::mxdatagen propagates the link to roc::mxDataGenerator,
+    # the include path, the C++20 requirement, and the
+    # HIPBLASLT_ENABLE_MXDATAGENERATOR macro to each consumer.
+    target_link_libraries(tensilelite-client PRIVATE hipblaslt::mxdatagen)
+    target_link_libraries(cpu-gemm-driver    PRIVATE hipblaslt::mxdatagen)
 endif()
 
 if(NOT WIN32)

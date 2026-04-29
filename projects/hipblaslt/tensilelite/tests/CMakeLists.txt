@@ -46,23 +46,15 @@ target_link_libraries(tensilelite-tests
         ${CMAKE_DL_LIBS}
 )
 
-if(TARGET roc::mxDataGenerator)
+if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    # hipblaslt::mxdatagen compiles clients/common/src/mxDataGen.cpp once and
+    # propagates the include path, the link to roc::mxDataGenerator, the
+    # C++20 requirement, and HIPBLASLT_ENABLE_MXDATAGENERATOR.
     target_sources(tensilelite-tests
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/MXDataGen_test.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../clients/common/src/mxDataGen.cpp"
     )
-    target_include_directories(tensilelite-tests
-        PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/../../clients/common/include"
-    )
-    target_link_libraries(tensilelite-tests PRIVATE roc::mxDataGenerator)
-    set_target_properties(tensilelite-tests
-        PROPERTIES
-        CXX_STANDARD 20
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-    )
+    target_link_libraries(tensilelite-tests PRIVATE hipblaslt::mxdatagen)
 endif()
 
 gtest_discover_tests(tensilelite-tests WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} TIMEOUT 60)

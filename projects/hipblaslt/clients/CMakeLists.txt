@@ -29,17 +29,15 @@ target_link_libraries(hipblaslt-clients-common
         tensilelite::tensilelite-host
 )
 
-if(HIPBLASLT_ENABLE_MXDATAGENERATOR AND NOT ROCM_LIBS_SUPERBUILD)
-    if(HIPBLASLT_ENABLE_THEROCK)
-        find_package(mxDataGenerator REQUIRED)
-    else()
-        add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../../../shared/mxdatagenerator" "${CMAKE_CURRENT_BINARY_DIR}/mxdatagenerator")
-    endif()
-endif()
 target_compile_features(hipblaslt-clients-common PRIVATE cxx_std_20)
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
+    # Re-export the macro PUBLIC so consumers of hipblaslt-clients-common
+    # (hipblaslt-test, hipblaslt-bench, ...) see it through public headers
+    # such as testing_matmul.hpp, which guards mxDataGen.hpp on this macro.
+    # The helper target itself defines it PUBLIC, but we link it PRIVATE here
+    # so the macro would otherwise stop at hipblaslt-clients-common.
     target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    target_link_libraries(hipblaslt-clients-common PRIVATE roc::mxDataGenerator)
+    target_link_libraries(hipblaslt-clients-common PRIVATE hipblaslt::mxdatagen)
 endif()
 
 if(HIPBLASLT_ENABLE_ROCROLLER)
