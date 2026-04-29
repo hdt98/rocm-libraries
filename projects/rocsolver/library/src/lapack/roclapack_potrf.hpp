@@ -59,10 +59,33 @@ inline static bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[may
     return is_use_recursion;
 };
 
-template <typename I>
+template <typename T, typename I>
 static inline I split_n(I const n)
 {
-    return std::max(I(1), n / 2);
+    // return std::max(I(1), n / 2);
+    I const nb = POTF2_MAX_SMALL_SIZE(T);
+    I const n1 = (n <= nb)       ? std::max(I(1), n / 2)
+        : (n <= 2 * nb)          ? nb
+        : (n <= 4 * nb)          ? 2 * nb
+        : (n <= 8 * nb)          ? 4 * nb
+        : (n <= 16 * nb)         ? 8 * nb
+        : (n <= 32 * nb)         ? 16 * nb
+        : (n <= 64 * nb)         ? 32 * nb
+        : (n <= 128 * nb)        ? 64 * nb
+        : (n <= 256 * nb)        ? 128 * nb
+        : (n <= 512 * nb)        ? 256 * nb
+        : (n <= 1024 * nb)       ? 512 * nb
+        : (n <= 2 * 1024 * nb)   ? 1024 * nb
+        : (n <= 4 * 1024 * nb)   ? 2 * 1024 * nb
+        : (n <= 8 * 1024 * nb)   ? 4 * 1024 * nb
+        : (n <= 16 * 1024 * nb)  ? 8 * 1024 * nb
+        : (n <= 32 * 1024 * nb)  ? 16 * 1024 * nb
+        : (n <= 64 * 1024 * nb)  ? 32 * 1024 * nb
+        : (n <= 128 * 1024 * nb) ? 64 * 1024 * nb
+        : (n <= 256 * 1024 * nb) ? 128 * 1024 * nb
+                                 : 128 * 1024 * nb;
+
+    return n1;
 }
 
 template <typename I, typename INFO, typename U>
@@ -160,7 +183,7 @@ void rocsolver_potrf_getMemorySize(const I n,
         {
             if(use_recursion_potrf)
             {
-                I const n1 = split_n(n);
+                I const n1 = split_n<T>(n);
                 I const n2 = n - n1;
 
                 // ----------------------------------
@@ -211,7 +234,7 @@ void rocsolver_potrf_getMemorySize(const I n,
         {
             if(use_recursion_potrf)
             {
-                I const n1 = split_n(n);
+                I const n1 = split_n<T>(n);
                 I const n2 = n - n1;
 
                 // ----------------------------------
@@ -529,7 +552,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
     S s_minone = -1;
 
     bool const use_upper_part = (uplo == rocblas_fill_upper);
-    I const n1 = split_n(n);
+    I const n1 = split_n<T>(n);
     I const n2 = n - n1;
 
     if(use_upper_part)
