@@ -176,6 +176,53 @@ namespace TensileLite
         return stream;
     }
 
+    std::string toString(CustomWorkspaceType type)
+    {
+        switch(type)
+        {
+        case CustomWorkspaceType::None:
+            return "None";
+        case CustomWorkspaceType::SplitK:
+            return "SplitK";
+        case CustomWorkspaceType::StreamK:
+            return "StreamK";
+        case CustomWorkspaceType::StreamKWithReduction:
+            return "StreamKWithReduction";
+        case CustomWorkspaceType::CustomWorkspaceType_Count:
+            break;
+        }
+
+        throw std::runtime_error(concatenate("Invalid CustomWorkspaceType value: ", static_cast<int>(type)));
+    }
+
+    CustomWorkspaceType fromStringCustomWorkspaceType(std::string& str)
+    {
+        if(str == toString(CustomWorkspaceType::None))
+            return CustomWorkspaceType::None;
+        else if(str == toString(CustomWorkspaceType::SplitK))
+            return CustomWorkspaceType::SplitK;
+        else if(str == toString(CustomWorkspaceType::StreamK))
+            return CustomWorkspaceType::StreamK;
+        else if(str == toString(CustomWorkspaceType::StreamKWithReduction))
+            return CustomWorkspaceType::StreamKWithReduction;
+        else
+            throw std::runtime_error(concatenate("Invalid CustomWorkspaceType value: ", str));
+        return CustomWorkspaceType::CustomWorkspaceType_Count;
+    }
+
+    std::ostream& operator<<(std::ostream& stream, const CustomWorkspaceType& t)
+    {
+        return stream << toString(t);
+    }
+
+    std::istream& operator>>(std::istream& stream, CustomWorkspaceType& t)
+    {
+        std::string strValue;
+        stream >> strValue;
+        t = fromStringCustomWorkspaceType(strValue);
+        return stream;
+    }
+
     enum class KERNELARGTYPE
     {
         NORMAL   = 0,
@@ -1371,29 +1418,19 @@ namespace TensileLite
         return gsuVal;
     }
 
-    template <bool T_Debug, bool Legacy, typename KA>
-    void ContractionSolution::kernelArgs(uint32_t                            gemmCount,
-                                         uint32_t                            argType,
-                                         KA&                                 args,
-                                         uint32_t                            numWorkGroups,
-                                         Hardware const*                     hardware,
-                                         const ContractionProblemParameters& param,
-                                         int32_t                             autoWGM,
-                                         size_t                              autoWGMXCC,
-                                         size_t                              autoWGMXCCCHUNK,
-                                         size_t                              autoStaggerUMapping,
-                                         size_t                              autoStaggerU,
-                                         size_t   autoStaggerUStrideShift,
-                                         uint32_t autoGsuVal) const
+    template <bool T_Debug>
+    void ContractionSolution::calculateInternalArgs(uint32_t&                           internalArg0,
+                                                    uint32_t&                           internalArg1,
+                                                    Hardware const*                     hardware,
+                                                    const ContractionProblemParameters& param,
+                                                    int32_t                             autoWGM,
+                                                    size_t                              autoWGMXCC,
+                                                    size_t                              autoWGMXCCCHUNK,
+                                                    size_t                              autoStaggerUMapping,
+                                                    size_t                              autoStaggerU,
+                                                    size_t                              autoStaggerUStrideShift,
+                                                    uint32_t                            autoGsuVal) const
     {
-        if constexpr(!Legacy)
-        {
-            gemmCount = gemmCount & 0x3FFFFFFF;
-            // Currently 0 for kernel args, 1 for args located in HBM. This is a temporary slot.
-            gemmCount = gemmCount | (argType << 30);
-            args.template append<uint32_t>("gemm_count", gemmCount);
-        }
-
         uint32_t       gsu                 = param.gsu() > 0 ? param.gsu() : autoGsuVal;
         bool           gsuc                = false; // initialized false
         bool           gsuwgmrr            = false; // initialized false
@@ -1407,8 +1444,9 @@ namespace TensileLite
         const uint32_t mask16              = 0xFFFF;
         const uint32_t mask14              = 0x3FFF;
         const uint32_t mask8               = 0xFF;
-        uint32_t       internalArg0        = 0;
-        uint32_t       internalArg1        = 0;
+
+        internalArg0 = 0;
+        internalArg1 = 0;
 
         if(internalArgsSupport.wgm && internalArgsSupport.version == 0)
         {
@@ -1478,6 +1516,34 @@ namespace TensileLite
         }
         else if(T_Debug && Debug::Instance().disableStaggerU())
             std::cout << "solution doesn't support configurable staggerU" << std::endl;
+    }
+
+    template <bool T_Debug, bool Legacy, typename KA>
+    void ContractionSolution::kernelArgs(uint32_t                            gemmCount,
+                                         uint32_t                            argType,
+                                         KA&                                 args,
+                                         uint32_t                            numWorkGroups,
+                                         Hardware const*                     hardware,
+                                         const ContractionProblemParameters& param,
+                                         int32_t                             autoWGM,
+                                         size_t                              autoWGMXCC,
+                                         size_t                              autoWGMXCCCHUNK,
+                                         size_t                              autoStaggerUMapping,
+                                         size_t                              autoStaggerU,
+                                         size_t   autoStaggerUStrideShift,
+                                         uint32_t autoGsuVal) const
+    {
+        if constexpr(!Legacy)
+        {
+            gemmCount = gemmCount & 0x3FFFFFFF;
+            // Currently 0 for kernel args, 1 for args located in HBM. This is a temporary slot.
+            gemmCount = gemmCount | (argType << 30);
+            args.template append<uint32_t>("gemm_count", gemmCount);
+        }
+
+        uint32_t internalArg0;
+        uint32_t internalArg1;
+        calculateInternalArgs<T_Debug>(internalArg0, internalArg1, hardware, param, autoWGM, autoWGMXCC, autoWGMXCCCHUNK, autoStaggerUMapping, autoStaggerU, autoStaggerUStrideShift, autoGsuVal);
 
         args.template append<uint32_t>("internalArgs", internalArg0);
 
@@ -1571,7 +1637,7 @@ namespace TensileLite
         rv.args = KernelArguments(T_Debug);
         rv.args.reserve(1024, 128);
         rv.kernelName = kernelName;
-        
+
         AMDGPU const* pAMDGPU = dynamic_cast<AMDGPU const*>(&hardware);
         assert(pAMDGPU);
 
@@ -1657,6 +1723,54 @@ namespace TensileLite
         // uint32_t numWorkGroups = getNumWorkGroups(rv);
         // rv.args.template append<uint32_t>("numWorkGroups", numWorkGroups);
 
+        uint32_t autoGsuVal = calculateAutoGSU(problem, &hardware);
+        auto [autoWGM, autoWGMXCC, autoWGMXCCCHUNK] = calculateAutoWGM(problem, &hardware, sk.grid);
+        auto [autoStaggerUMapping, autoStaggerU, autoStaggerUStrideShift] = calculateAutoStaggerU(problem, &hardware, sk.grid, autoWGM);
+        uint32_t internalArg0 = 0;
+        uint32_t internalArg1 = 0;
+        calculateInternalArgs<T_Debug>(internalArg0, internalArg1, &hardware, problem.getParams(), autoWGM, autoWGMXCC, autoWGMXCCCHUNK, autoStaggerUMapping, autoStaggerU, autoStaggerUStrideShift, autoGsuVal);
+
+        auto itersPerTile = max(1, problem.getItersPerTile(sizeMapping));
+        uint32_t magicNumberItersPerTile;
+        uint32_t magicShiftItersPerTile;
+        magicNumberItersPerTile = magicNumber(2, itersPerTile, &magicShiftItersPerTile);
+
+        auto totalTiles = tiles.x * tiles.y * tiles.z;
+        uint32_t totalIters = totalTiles * itersPerTile;
+
+        uint32_t skSplit = 0;
+        uint32_t skTiles = 0;
+        uint32_t skItersPerWG = 0;
+        if(sk.grid > 0)
+        {
+            if(sk.reduction == origami::reduction_t::parallel)
+            {
+                skSplit = sk.grid / totalTiles;
+                skItersPerWG = itersPerTile / skSplit;
+            }
+            else
+            {
+                int fullTiles = pAMDGPU->skFullTiles;
+                bool bigEnough = totalTiles > sk.grid;
+                // skTiles is number of Stream-K tiles to complete
+                // Two-tile algorithm causes each WG to run an even number of Stream-K iterations,
+                // followed by an even number of data-parllel tiles.
+                // If total tiles is evenly divisble by grid size,
+                // then no Stream-K tiles are needed, all data-parallel
+                skTiles = sk.grid;
+                // If not evenly divisible, determine number of Stream-K tiles
+                if(totalTiles % sk.grid != 0)
+                {
+                    // Number of data-parallel tiles on each workgroup would be:
+                    // dpTilesPerWG = bigEnough ? (tiles - skTiles) / skGrid : 0;
+                    skTiles = bigEnough ? sk.grid * fullTiles + totalTiles % sk.grid : totalTiles;
+                    // Cap Stream-K tiles at total number of tiles in case of large multiplier
+                    skTiles = min(skTiles, totalTiles);
+                }
+                skItersPerWG = skTiles * itersPerTile / sk.grid;
+            }
+        }
+
         uint32_t debugPattern = 0xDB000001;
 
         if(T_Debug)
@@ -1669,6 +1783,16 @@ namespace TensileLite
 
             switch(arg.semantic)
             {
+                case CustomArgSemantic::GemmCount:
+                    // TODO GroupedGemm support
+                    rv.args.appendCustomType("GemmCount", 1, arg.type);
+                    break;
+                case CustomArgSemantic::NumWorkGroups:
+                {
+                    uint32_t numWGs = getNumWorkGroups(rv);
+                    rv.args.appendCustomType("NumWorkGroups", numWGs, arg.type);
+                    break;
+                }
                 case CustomArgSemantic::SizeFree0:
                     rv.args.appendCustomType("SizeFree0", problem.problemSizes()[0], arg.type);
                     break;
@@ -1692,6 +1816,12 @@ namespace TensileLite
                     break;
                 case CustomArgSemantic::AddressD:
                     rv.args.template append<void const*>("AddressD", inputs.d);
+                    break;
+                case CustomArgSemantic::AddressWorkspace:
+                    rv.args.template append<void const*>("AddressWorkspace", inputs.ws);
+                    break;
+                case CustomArgSemantic::AddressSynchronizer:
+                    rv.args.template append<void const*>("AddressSynchronizer", inputs.Synchronizer);
                     break;
                 case CustomArgSemantic::StrideA0:
                     rv.args.appendCustomType("StrideA0", problem.a().strides()[1], arg.type);
@@ -1750,6 +1880,36 @@ namespace TensileLite
                 case CustomArgSemantic::StrideD0Bytes:
                     rv.args.appendCustomType("StrideD0Bytes",
                         problem.d().strides()[1] * problem.d().elementBytes(), arg.type);
+                    break;
+                case CustomArgSemantic::TensileInternalArg0:
+                    rv.args.appendCustomType("TensileInternalArg0", internalArg0, arg.type);
+                    break;
+                case CustomArgSemantic::TensileInternalArg1:
+                    rv.args.appendCustomType("TensileInternalArg1", internalArg1, arg.type);
+                    break;
+                case CustomArgSemantic::ItersPerTile:
+                    rv.args.appendCustomType("ItersPerTile", itersPerTile, arg.type);
+                    break;
+                case CustomArgSemantic::MagicNumberItersPerTile:
+                    rv.args.appendCustomType("MagicNumberItersPerTile", magicNumberItersPerTile, arg.type);
+                    break;
+                case CustomArgSemantic::MagicShiftItersPerTile:
+                    rv.args.appendCustomType("MagicShiftItersPerTile", magicShiftItersPerTile, arg.type);
+                    break;
+                case CustomArgSemantic::TotalIters:
+                    rv.args.appendCustomType("TotalIters", totalIters, arg.type);
+                    break;
+                case CustomArgSemantic::SKGrid:
+                    rv.args.appendCustomType("SKGrid", sk.grid, arg.type);
+                    break;
+                case CustomArgSemantic::SKTilesAndSplit:
+                    if(sk.reduction == origami::reduction_t::parallel)
+                        rv.args.appendCustomType("SKTilesAndSplit", skSplit, arg.type);
+                    else
+                        rv.args.appendCustomType("SKTilesAndSplit", skTiles, arg.type);
+                    break;
+                case CustomArgSemantic::SKItersPerWG:
+                    rv.args.appendCustomType("SKItersPerWG", skItersPerWG, arg.type);
                     break;
                 case CustomArgSemantic::Padding:
                     rv.args.template append<uint32_t>("Padding", 0);
@@ -3120,10 +3280,19 @@ namespace TensileLite
         }
 
         StreamKSettings sk;
-        if(sizeMapping.streamK > 0)
+        bool customStreamK = customKernel.workspaceType == CustomWorkspaceType::StreamK || customKernel.workspaceType == CustomWorkspaceType::StreamKWithReduction;
+        if(sizeMapping.streamK > 0 || customStreamK)
         {
             sk.reduction         = getSKReduction(problem, hardware);
-            auto tiles           = problem.getNumTiles(sizeMapping, 1);
+            size_t tiles         =  0;
+            if (customKernel.name.empty())
+                tiles = problem.getNumTiles(sizeMapping, 1);
+            else
+            {
+                dim3 dimTiles;
+                calculateTiles(dimTiles, problem);
+                tiles = dimTiles.x * dimTiles.y * dimTiles.z;
+            }
             sk.grid              = getSKGrid(problem, hardware, tiles, sk.reduction);
             const bool streamKDP = Debug::Instance().useStreamKDataParrallel();
             if(sk.grid > 0
@@ -3164,8 +3333,6 @@ namespace TensileLite
             else
                 rv.push_back(generateCustomCall<false>(problem, inputs, hardware, sk));
         }
-
-        
 
         if(((sizeMapping.globalAccumulation != 3) && gsu > 1 && sizeMapping.globalAccumulation)
            || sk.reduction == origami::reduction_t::parallel)
@@ -3534,7 +3701,18 @@ namespace TensileLite
         size_t gsu
             = problem.getParams().gsu() > 0 ? problem.getParams().gsu() : sizeMapping.globalSplitU;
 
-        if(sizeMapping.streamK > 0 && sizeMapping.streamKAtomic == 0)
+        CustomWorkspaceType workspaceType = CustomWorkspaceType::None;
+        if(customKernel.name.empty())
+        {
+            if(sizeMapping.streamK > 0 && sizeMapping.streamKAtomic == 0)
+                workspaceType = CustomWorkspaceType::StreamKWithReduction;
+            else
+                workspaceType = CustomWorkspaceType::SplitK;
+        }
+        else
+            workspaceType = customKernel.workspaceType;
+
+        if(workspaceType == CustomWorkspaceType::StreamK || workspaceType == CustomWorkspaceType::StreamKWithReduction)
         {
             // SK doesn't care gsu
             if(gsu > 1)
@@ -3544,11 +3722,22 @@ namespace TensileLite
                 gsu = 1;
             }
             const bool streamKDP = Debug::Instance().useStreamKDataParrallel();
-            auto       tiles     = problem.getNumTiles(sizeMapping, 1);
+            size_t tiles = 0;
+            if (customKernel.name.empty())
+                tiles = problem.getNumTiles(sizeMapping, 1);
+            else
+            {
+                dim3 dimTiles;
+                calculateTiles(dimTiles, problem);
+                tiles = dimTiles.x * dimTiles.y * dimTiles.z;
+            }
+
             if(tiles > 0) // Grouped GEMM reports 0 tiles
             {
-                auto   reductionStrat = getSKReduction(problem, hardware);
-                size_t skGrid         = getSKGrid(problem, hardware, tiles, reductionStrat);
+                auto reductionStrat = origami::reduction_t::tree;
+                if(workspaceType == CustomWorkspaceType::StreamKWithReduction)
+                    reductionStrat = getSKReduction(problem, hardware);
+                size_t skGrid = getSKGrid(problem, hardware, tiles, reductionStrat);
                 // Get space required for partial tiles=
                 if(reductionStrat == origami::reduction_t::parallel)
                 {
@@ -3568,7 +3757,7 @@ namespace TensileLite
                 }
             }
         }
-        else
+        else if(workspaceType == CustomWorkspaceType::SplitK)
         {
             // TODO: Pass GSU from problem and change value[2] to gsu if gsu != default value
             size_t gsu = problem.getParams().gsu() > 0 ? problem.getParams().gsu()
@@ -3587,8 +3776,18 @@ namespace TensileLite
         size_t gsuMultiplier = gsu > 1 ? gsu : 0;
         size_t batch         = problem.d().sizes()[2];
         size_t tiles         = problem.getNumTiles(sizeMapping, gsu) * batch;
-        size_t tileSize
-            = sizeMapping.macroTile.x * sizeMapping.macroTile.y * sizeMapping.workspaceSizePerElemC;
+        size_t tileSize      = 0;
+        size_t workspaceSizePerElemBias = 0;
+        if(customKernel.name.empty())
+        {
+            tileSize = sizeMapping.macroTile.x * sizeMapping.macroTile.y * sizeMapping.workspaceSizePerElemC;
+            workspaceSizePerElemBias = sizeMapping.workspaceSizePerElemBias;
+        }
+        else
+        {
+            tileSize = customKernel.macrotile.x * customKernel.macrotile.y * customKernel.workspaceSizePerElemC;
+            workspaceSizePerElemBias = customKernel.workspaceSizePerElemBias;
+        }
         size_t bufSize = gsu > 1 ? tiles * tileSize : 0;
         size += bufSize;
 
@@ -3597,11 +3796,11 @@ namespace TensileLite
         {
             if(problem.biasSrc() == ContractionProblemGemm::TENSOR::A)
             {
-                size += problem.freeSizeA(0) * sizeMapping.workspaceSizePerElemBias * gsuMultiplier;
+                size += problem.freeSizeA(0) * workspaceSizePerElemBias * gsuMultiplier;
             }
             else if(problem.biasSrc() == ContractionProblemGemm::TENSOR::B)
             {
-                size += problem.freeSizeB(0) * sizeMapping.workspaceSizePerElemBias * gsuMultiplier;
+                size += problem.freeSizeB(0) * workspaceSizePerElemBias * gsuMultiplier;
             }
             else if(problem.biasSrc() == ContractionProblemGemm::TENSOR::D && (gsuMultiplier == 0))
             {
@@ -3612,6 +3811,7 @@ namespace TensileLite
         // workspace for amaxD
         if(problemType.outputAmaxD)
         {
+            // TODO custom kernel support for AmaxD
             auto numWGS = getNumWorkGroups(problem, sizeMapping);
             size += multiplyElementSize(numWGS, problem.amaxd().elementBytes());
         }

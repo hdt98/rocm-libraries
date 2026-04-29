@@ -1132,10 +1132,10 @@ class Solution(collections.abc.Mapping):
 
     # TODO Override workspace info for custom kernel
     computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
-    state["_WorkspaceSizePerElemC"] = computeBytes
+    state["_WorkspaceSizePerElemC"] = state["CustomKernel"]["workspaceSizePerElemC"]
     state["_WorkspaceSizePerElemBias"] = 0
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
-      state["_WorkspaceSizePerElemBias"] = computeBytes
+      state["_WorkspaceSizePerElemBias"] = state["CustomKernel"]["workspaceSizePerElemBias"]
     # state["WorkspaceCheck"] = [state["_WorkspaceSizePerElemC"], state["_WorkspaceSizePerElemBias"], state["GlobalSplitU"] if (state["GlobalSplitUAlgorithm"] == 'MultipleBuffer' or state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel') else 1]
 
     # state["MIWaveGroup"] = [state["SubGroup0"] // state["WavefrontSize"],  state["SubGroup1"]]
