@@ -52,8 +52,9 @@ ROCSOLVER_BEGIN_NAMESPACE
 template <typename T, typename I>
 inline static bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
 {
-    bool const is_use_recursion = ((sizeof(T) == 16) && (n >= 1024))
-        || ((sizeof(T) == 4) && (n >= 1024)) || ((sizeof(T) == 8) && (n > 1024));
+    // simple heuristic
+    // bool const is_use_recursion = (n >= 1024 );
+    bool const is_use_recursion = true;
 
     return is_use_recursion;
 };
@@ -79,14 +80,14 @@ ROCSOLVER_KERNEL void chk_positive(INFO* iinfo, INFO* info, I j, I batch_count)
 // Method to determine configuration for potrf block size depending on n
 // and the type
 // TODO: may need fine tuning
-template <typename T, typename I>
+template <typename T, typename I, typename INFO = I>
 static inline I potrf_get_block_size(I const n)
 {
     I const nb = std::max(I(POTF2_MAX_SMALL_SIZE(T)), I(POTRF_POTF2_SWITCHSIZE(T)));
     return std::min(n, nb);
 }
 
-template <bool BATCHED, bool STRIDED, typename T, typename I>
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO = I>
 void rocsolver_potrf_getMemorySize(const I n,
                                    const rocblas_fill uplo,
                                    const I batch_count,
@@ -141,7 +142,7 @@ void rocsolver_potrf_getMemorySize(const I n,
         // size to store info about positiveness of each subblock
         if(use_iinfo)
         {
-            *p_size_iinfo = sizeof(I) * batch_count;
+            *p_size_iinfo = sizeof(INFO) * batch_count;
         }
 
         // requirements for calling POTF2 for the subblocks
@@ -171,10 +172,13 @@ void rocsolver_potrf_getMemorySize(const I n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                    rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
+                if((n1 >= 1) && (n2 >= 1))
+                {
+                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                        rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
 
-                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -188,10 +192,14 @@ void rocsolver_potrf_getMemorySize(const I n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                    rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb, batch_count,
+                if(((n - jb) >= 1) && (jb >= 1))
+                {
+                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                        rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb,
+                        batch_count,
 
-                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -215,10 +223,14 @@ void rocsolver_potrf_getMemorySize(const I n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                    rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1, batch_count,
+                if((n1 >= 1) && (n2 >= 1))
+                {
+                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                        rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1,
+                        batch_count,
 
-                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -232,11 +244,14 @@ void rocsolver_potrf_getMemorySize(const I n,
                 size_t lsize_work3 = 0;
                 size_t lsize_work4 = 0;
 
-                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                    rocblas_side_right, rocblas_operation_conjugate_transpose, n - jb, jb,
-                    batch_count,
+                if(((n - jb) >= 1) && (jb >= 1))
+                {
+                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                        rocblas_side_right, rocblas_operation_conjugate_transpose, n - jb, jb,
+                        batch_count,
 
-                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+                }
 
                 size_work1 = std::max(size_work1, lsize_work1);
                 size_work2 = std::max(size_work2, lsize_work2);
@@ -484,36 +499,34 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                                                   void* work2,
                                                   void* work3,
                                                   void* work4,
-                                                  T* pivots,
-                                                  INFO* iinfo,
                                                   bool optim_mem,
                                                   const I row_offset_in)
 {
-    // constants for rocblas functions calls
-    S s_one = 1;
-    S s_minone = -1;
-
-    I const NB = POTRF_RECURSION_SWITCH_SIZE(T);
-    bool const is_small = (n <= NB);
-    if(is_small)
+    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    if(n <= NB)
     {
         // -------------------
         // terminate recursion
         // -------------------
-        bool const use_iinfo = false;
-        auto const istat = rocsolver_potrf_template_body<BATCHED, STRIDED, T, I, INFO, S, U>(
-            handle, uplo, n,
 
-            A, shiftA, lda, strideA,
+        // ----------------------
+        // use specialized kernel
+        // ----------------------
 
-            info, batch_count,
+        auto const istat = potf2_run_small<T>(handle, uplo, n,
 
-            scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
+                                              A, shiftA, lda, strideA,
 
-            row_offset_in, use_iinfo);
+                                              info, batch_count, row_offset_in);
 
         return istat;
     }
+
+    // ------------------------------------
+    // constants for rocblas functions calls
+    // ------------------------------------
+    S s_one = 1;
+    S s_minone = -1;
 
     bool const use_upper_part = (uplo == rocblas_fill_upper);
     I const n1 = split_n(n);
@@ -541,6 +554,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             // note A11 is n1 by n1
             // --------------------
             I const row_offset = 0 + row_offset_in;
+
             auto const istat = rocsolver_potrf_recursion_template<BATCHED, STRIDED, T, I, INFO, S, U>(
                 handle, uplo, n1,
 
@@ -548,7 +562,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 info, batch_count,
 
-                scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
+                scalars, work1, work2, work3, work4, optim_mem,
 
                 row_offset);
             if(istat != rocblas_status_success)
@@ -620,7 +634,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 info, batch_count,
 
-                scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
+                scalars, work1, work2, work3, work4, optim_mem,
 
                 row_offset);
             if(istat != rocblas_status_success)
@@ -658,7 +672,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 info, batch_count,
 
-                scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
+                scalars, work1, work2, work3, work4, optim_mem,
 
                 row_offset);
             if(istat != rocblas_status_success)
@@ -734,7 +748,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 info, batch_count,
 
-                scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem,
+                scalars, work1, work2, work3, work4, optim_mem,
 
                 row_offset);
             if(istat != rocblas_status_success)
@@ -806,7 +820,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
 
             info, batch_count,
 
-            scalars, work1, work2, work3, work4, pivots, iinfo, optim_mem, row_offset);
+            scalars, work1, work2, work3, work4, optim_mem, row_offset);
     }
     else
     {
