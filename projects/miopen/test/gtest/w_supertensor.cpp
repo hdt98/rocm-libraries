@@ -489,6 +489,11 @@ struct verify_w_tensor_set
 
 inline auto GenCases()
 {
+#if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+    // When Address Sanitizer is enabled, the process exceeds the allowable limit for virtual
+    // memory areas.  Another way around this is to set vm.max_map_count to something large in
+    // the environment (eg. vm.max_map_count=1048576).  However it was determined that while
+    // ASan is enabled, losing a small amount of edge case test coverage was acceptable.
     return testing::Combine(
         MakeNamedParameterValues<int>("batch_size", 2, 4),
         MakeNamedParameterValues<int>("num_layer", 2, 4),
@@ -500,6 +505,19 @@ inline auto GenCases()
         MakeNamedParameterValues<miopenRNNDirectionMode_t>(
             "directionMode", miopenRNNunidirection, miopenRNNbidirection),
         MakeNamedParameterValues<miopenRNNInputMode_t>("inMode", miopenRNNskip, miopenRNNlinear));
+#else
+    return testing::Combine(
+        MakeNamedParameterValues<int>("batch_size", 2, 4, 8),
+        MakeNamedParameterValues<int>("num_layer", 4, 8, 16),
+        MakeNamedParameterValues<int>("in_size", 2, 8, 16),
+        MakeNamedParameterValues<int>("wei_hh", 4, 8, 16),
+        MakeNamedParameterValues<miopenRNNMode_t>("mode", miopenRNNRELU, miopenLSTM, miopenGRU),
+        MakeNamedParameterValues<miopenRNNBiasMode_t>(
+            "biasMode", miopenRNNwithBias, miopenRNNNoBias),
+        MakeNamedParameterValues<miopenRNNDirectionMode_t>(
+            "directionMode", miopenRNNunidirection, miopenRNNbidirection),
+        MakeNamedParameterValues<miopenRNNInputMode_t>("inMode", miopenRNNskip, miopenRNNlinear));
+#endif
 }
 
 inline auto GetCases()
@@ -577,6 +595,12 @@ struct WSuperTensorTest : public testing::TestWithParam<TestCase>
         prng::reset_seed();
         std::tie(batch_size, num_layer, in_size, wei_hh, mode, biasMode, directionMode, inMode) =
             GetParam();
+
+        ASSERT_EQ(rnnDesc.getStatus(), miopenStatusSuccess);
+        ASSERT_EQ(inputTensor.getStatus(), miopenStatusSuccess);
+        ASSERT_EQ(weightTensor.getStatus(), miopenStatusSuccess);
+        ASSERT_EQ(paramTensor.getStatus(), miopenStatusSuccess);
+        ASSERT_EQ(biasTensor.getStatus(), miopenStatusSuccess);
     }
 
     void TearDown() override { DestroyDropoutDesc(); }
