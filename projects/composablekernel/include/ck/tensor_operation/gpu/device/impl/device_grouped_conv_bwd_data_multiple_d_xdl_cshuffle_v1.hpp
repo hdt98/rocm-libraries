@@ -89,7 +89,6 @@ __global__ void
 __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
 #endif
     kernel_grouped_conv_bwd_data_multiple_d_xdl_cshuffle(
-        const ABDataType* __restrict__ p_b_grid,
         DsPointer p_ds_grid,
         const std::array<GemmArgs, MaxGroupedGemmGroupsNum> gemm_kernel_args,
         const index_t gemms_count,
@@ -161,7 +160,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
         {
             GridwiseGemm::template Run<HasMainKBlockLoopInAllGemm, OutElementOp>(
                 current_args.p_a_grid_ + a_batch_offset + a_n_offset,
-                p_b_grid + b_batch_offset + b_n_offset,
+                current_args.p_b_grid_ + b_batch_offset + b_n_offset,
                 p_ds_grid_grp,
                 current_args.p_e_grid_ + e_batch_offset + e_n_offset,
                 p_shared,
@@ -182,7 +181,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
             {
                 GridwiseGemm::template Run<true, OutElementOp>(
                     current_args.p_a_grid_ + a_batch_offset + a_n_offset,
-                    p_b_grid + b_batch_offset + b_n_offset,
+                    current_args.p_b_grid_ + b_batch_offset + b_n_offset,
                     p_ds_grid_grp,
                     current_args.p_e_grid_ + e_batch_offset + e_n_offset,
                     p_shared,
@@ -201,7 +200,7 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
             {
                 GridwiseGemm::template Run<false, OutElementOp>(
                     current_args.p_a_grid_ + a_batch_offset + a_n_offset,
-                    p_b_grid + b_batch_offset + b_n_offset,
+                    current_args.p_b_grid_ + b_batch_offset + b_n_offset,
                     p_ds_grid_grp,
                     current_args.p_e_grid_ + e_batch_offset + e_n_offset,
                     p_shared,
@@ -219,7 +218,6 @@ __launch_bounds__(GridwiseGemm::MaxBlockSize, CK_MIN_BLOCK_PER_CU)
         }
     }
 #else
-    ignore = p_b_grid;
     ignore = p_ds_grid;
     ignore = gemm_kernel_args;
     ignore = gemms_count;
@@ -450,72 +448,81 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
     {
         using Entry = std::tuple<ConvToGemmBwdDataTransformD, const ADataType*, EDataType*>;
 
-        // Max number of splits — used to avoid infinite loop
-        constexpr index_t max_split_numbers = MaxGroupedGemmGroupsNum;
-
         std::vector<Entry> result;
 
-        // Queue for splitting
-        std::queue<ConvToGemmBwdDataTransformD> conv_to_gemm_transformers_queue(
-            {conv_to_gemm_transformer_base});
-        std::queue<const ADataType*> a_grid_ptrs_queue({a_grid_ptr_base});
-        std::queue<EDataType*> c_grid_ptrs_queue({c_grid_ptr_base});
-
-        index_t split_numbers = 0;
-        // Algorithm:
-        // While queue is not empty:
-        //  1. Get transformer from queue.
-        //  2. If descs are smaller than 2GB push to result vector.
-        //  3. If descs are bigger than 2GB split into left and right transformer
-        //     and push both into the queue.
-        while(!conv_to_gemm_transformers_queue.empty() && split_numbers < max_split_numbers)
+        if constexpr(CTranspose)
         {
-            const auto conv_to_gemm_transformer = conv_to_gemm_transformers_queue.front();
-            const ADataType* a_grid_ptr         = a_grid_ptrs_queue.front();
-            EDataType* c_grid_ptr               = c_grid_ptrs_queue.front();
-
-            conv_to_gemm_transformers_queue.pop();
-            a_grid_ptrs_queue.pop();
-            c_grid_ptrs_queue.pop();
-
-            // Check if convolution does not exceed 2GB
-            if(conv_to_gemm_transformer.AreDescriptorsSmallerThan2GB())
-            {
-                result.emplace_back(conv_to_gemm_transformer, a_grid_ptr, c_grid_ptr);
-            }
-            else
-            {
-                // Split into left and right convolutions
-                ConvToGemmBwdDataTransformD conv_to_gemm_transformers_left_part,
-                    conv_to_gemm_transformers_right_part;
-                const ADataType* a_grid_right_ptr;
-                EDataType* c_grid_right_ptr;
-
-                ck::tie(conv_to_gemm_transformers_left_part,
-                        conv_to_gemm_transformers_right_part,
-                        a_grid_right_ptr,
-                        c_grid_right_ptr) =
-                    conv_to_gemm_transformer.SplitConvProblem(a_grid_ptr, c_grid_ptr);
-
-                conv_to_gemm_transformers_queue.push(conv_to_gemm_transformers_left_part);
-                conv_to_gemm_transformers_queue.push(conv_to_gemm_transformers_right_part);
-                a_grid_ptrs_queue.push(a_grid_ptr);
-                a_grid_ptrs_queue.push(a_grid_right_ptr);
-                c_grid_ptrs_queue.push(c_grid_ptr);
-                c_grid_ptrs_queue.push(c_grid_right_ptr);
-                split_numbers++;
-            }
+            result.emplace_back(conv_to_gemm_transformer_base, a_grid_ptr_base, c_grid_ptr_base);
+            return std::make_pair(result, true);
         }
-
-        const bool is_split_valid = conv_to_gemm_transformers_queue.empty();
-
-        if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+        else
         {
-            std::cout << "GenerateConvToGemmTransforms: split_numbers=" << split_numbers
-                      << " is_split_valid=" << is_split_valid << std::endl;
-        }
 
-        return std::make_pair(result, is_split_valid);
+            // Max number of splits — used to avoid infinite loop
+            constexpr index_t max_split_numbers = MaxGroupedGemmGroupsNum;
+
+            // Queue for splitting
+            std::queue<ConvToGemmBwdDataTransformD> conv_to_gemm_transformers_queue(
+                {conv_to_gemm_transformer_base});
+            std::queue<const ADataType*> a_grid_ptrs_queue({a_grid_ptr_base});
+            std::queue<EDataType*> c_grid_ptrs_queue({c_grid_ptr_base});
+
+            index_t split_numbers = 0;
+            // Algorithm:
+            // While queue is not empty:
+            //  1. Get transformer from queue.
+            //  2. If descs are smaller than 2GB push to result vector.
+            //  3. If descs are bigger than 2GB split into left and right transformer
+            //     and push both into the queue.
+            while(!conv_to_gemm_transformers_queue.empty() && split_numbers < max_split_numbers)
+            {
+                const auto conv_to_gemm_transformer = conv_to_gemm_transformers_queue.front();
+                const ADataType* a_grid_ptr         = a_grid_ptrs_queue.front();
+                EDataType* c_grid_ptr               = c_grid_ptrs_queue.front();
+
+                conv_to_gemm_transformers_queue.pop();
+                a_grid_ptrs_queue.pop();
+                c_grid_ptrs_queue.pop();
+
+                // Check if convolution does not exceed 2GB
+                if(conv_to_gemm_transformer.AreDescriptorsSmallerThan2GB())
+                {
+                    result.emplace_back(conv_to_gemm_transformer, a_grid_ptr, c_grid_ptr);
+                }
+                else
+                {
+                    // Split into left and right convolutions
+                    ConvToGemmBwdDataTransformD conv_to_gemm_transformers_left_part,
+                        conv_to_gemm_transformers_right_part;
+                    const ADataType* a_grid_right_ptr;
+                    EDataType* c_grid_right_ptr;
+
+                    ck::tie(conv_to_gemm_transformers_left_part,
+                            conv_to_gemm_transformers_right_part,
+                            a_grid_right_ptr,
+                            c_grid_right_ptr) =
+                        conv_to_gemm_transformer.SplitConvProblem(a_grid_ptr, c_grid_ptr);
+
+                    conv_to_gemm_transformers_queue.push(conv_to_gemm_transformers_left_part);
+                    conv_to_gemm_transformers_queue.push(conv_to_gemm_transformers_right_part);
+                    a_grid_ptrs_queue.push(a_grid_ptr);
+                    a_grid_ptrs_queue.push(a_grid_right_ptr);
+                    c_grid_ptrs_queue.push(c_grid_ptr);
+                    c_grid_ptrs_queue.push(c_grid_right_ptr);
+                    split_numbers++;
+                }
+            }
+
+            const bool is_split_valid = conv_to_gemm_transformers_queue.empty();
+
+            if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
+            {
+                std::cout << "GenerateConvToGemmTransforms: split_numbers=" << split_numbers
+                          << " is_split_valid=" << is_split_valid << std::endl;
+            }
+
+            return std::make_pair(result, is_split_valid);
+        } // else (!CTranspose)
     }
 
 // GridwiseGemm
@@ -627,6 +634,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                  index_t BlockEnd,
                  bool HasMainKBlockLoop,
                  const ADataType* p_a_grid,
+                 const BDataType* p_b_grid,
                  EDataType* p_e_grid)
             : a_grid_desc_ak0_m_ak1_(a_grid_desc_ak0_m_ak1),
               b_grid_desc_bk0_n_bk1_(b_grid_desc_bk0_n_bk1),
@@ -643,6 +651,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
               BlockEnd_(BlockEnd),
               HasMainKBlockLoop_(HasMainKBlockLoop),
               p_a_grid_(p_a_grid),
+              p_b_grid_(p_b_grid),
               p_e_grid_(p_e_grid)
 
         {
@@ -661,6 +670,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
 
         // split pointers
         const ADataType* p_a_grid_;
+        const BDataType* p_b_grid_;
         EDataType* p_e_grid_;
     };
     using Block2TileMapInOutElementwise = BlockToCTileMap_M00_N0_M01Adapt<NPerBlock, MPerBlock>;
@@ -881,9 +891,9 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
             const auto XTilde = ConvStrideW / GcdStrideDilationW;
 
             index_t grid_size = 0;
-            // Allocate place for sets of gemms
-            gemm_kernel_args_.resize(
-                math::integer_divide_ceil(ZTilde * YTilde * XTilde, MaxGroupedGemmGroupsNum));
+            // Each tilde may produce up to MaxGroupedGemmGroupsNum splits, so reserve
+            // ZTilde*YTilde*XTilde outer slots (each holds MaxGroupedGemmGroupsNum entries).
+            gemm_kernel_args_.resize(ZTilde * YTilde * XTilde);
 
             for(index_t i_ztilde = 0; i_ztilde < ZTilde; ++i_ztilde)
             {
@@ -1051,7 +1061,10 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                                          BlockStart,
                                          BlockEnd,
                                          HasMainKBlockLoop,
-                                         p_a_grid_split,
+                                         CTranspose ? type_convert<const ADataType*>(p_b_grid_)
+                                                    : p_a_grid_split,
+                                         CTranspose ? type_convert<const BDataType*>(p_a_grid_split)
+                                                    : p_b_grid_,
                                          p_e_grid_split};
                             gemms_count_++;
                             if(gemms_count_ % MaxGroupedGemmGroupsNum == 0)
@@ -1256,7 +1269,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
             const index_t gdz = arg.num_workgroups_per_Conv_N_ * arg.k_batch_;
 
             const ADataType* p_a_grid_base = arg.p_a_grid_;
-            const BDataType* p_b_grid      = arg.p_b_grid_;
+            const BDataType* p_b_grid_base = arg.p_b_grid_;
             EDataType* p_e_grid_base       = arg.p_e_grid_;
             if constexpr(NeedTransposeKernel)
             {
@@ -1273,8 +1286,8 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                 if constexpr(is_NGCHW_GKCYX_NGKHW<ELayout, BLayout, ALayout>() ||
                              is_NGCDHW_GKCZYX_NGKDHW<ELayout, BLayout, ALayout>())
                 {
-                    p_b_grid = type_convert<const BDataType*>(arg.p_workspace_) +
-                               arg.GetWorkspaceATensorSizeBytes() / sizeof(BDataType);
+                    p_b_grid_base = type_convert<const BDataType*>(arg.p_workspace_) +
+                                    arg.GetWorkspaceATensorSizeBytes() / sizeof(BDataType);
                 }
             }
             for(std::size_t gemm_set_id = 0; gemm_set_id < arg.gemm_kernel_args_.size();
@@ -1285,16 +1298,32 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                     gemm_set_id == arg.gemm_kernel_args_.size() - 1
                         ? arg.gemms_count_ - MaxGroupedGemmGroupsNum * gemm_set_id
                         : MaxGroupedGemmGroupsNum;
-                // Make a mutable copy so we can redirect p_a_grid_/p_e_grid_ to workspace
+                // Make a mutable copy so we can redirect p_a_grid_/p_b_grid_/p_e_grid_ to workspace
                 // when NeedTransposeKernel remaps the base pointers at Run() time.
                 std::array<GemmArgs, MaxGroupedGemmGroupsNum> gemm_kernel_args =
                     arg.gemm_kernel_args_[gemm_set_id];
                 for(index_t i = 0; i < gemms_count_for_set; i++)
                 {
-                    gemm_kernel_args[i].p_a_grid_ =
-                        p_a_grid_base + (gemm_kernel_args[i].p_a_grid_ - arg.p_a_grid_);
-                    gemm_kernel_args[i].p_e_grid_ =
-                        p_e_grid_base + (gemm_kernel_args[i].p_e_grid_ - arg.p_e_grid_);
+                    if constexpr(CTranspose)
+                    {
+                        // p_a_grid_ stores weight ptr, p_b_grid_ stores output-image ptr
+                        // (swapped at GemmArgs construction to match swapped descriptors).
+                        // CTranspose never splits, so offsets are zero; just rebase.
+                        gemm_kernel_args[i].p_a_grid_ =
+                            type_convert<const ADataType*>(p_b_grid_base);
+                        gemm_kernel_args[i].p_b_grid_ =
+                            type_convert<const BDataType*>(p_a_grid_base);
+                        gemm_kernel_args[i].p_e_grid_ =
+                            p_e_grid_base + (gemm_kernel_args[i].p_e_grid_ - arg.p_e_grid_);
+                    }
+                    else
+                    {
+                        gemm_kernel_args[i].p_a_grid_ =
+                            p_a_grid_base + (gemm_kernel_args[i].p_a_grid_ - arg.p_a_grid_);
+                        gemm_kernel_args[i].p_b_grid_ = p_b_grid_base;
+                        gemm_kernel_args[i].p_e_grid_ =
+                            p_e_grid_base + (gemm_kernel_args[i].p_e_grid_ - arg.p_e_grid_);
+                    }
                 }
 
                 const auto clear_workspace = [&]() {
@@ -1343,7 +1372,6 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                                 dim3(gdx, gdy, gdz),
                                 dim3(BlockSize),
                                 0,
-                                p_b_grid,
                                 arg.p_ds_grid_,
                                 gemm_kernel_args,
                                 gemms_count_for_set,
@@ -1363,7 +1391,6 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                                 dim3(gdx, gdy, gdz),
                                 dim3(BlockSize),
                                 0,
-                                p_b_grid,
                                 arg.p_ds_grid_,
                                 gemm_kernel_args,
                                 gemms_count_for_set,
@@ -1402,7 +1429,6 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                                 dim3(gdx, gdy, gdz),
                                 dim3(BlockSize),
                                 0,
-                                p_b_grid,
                                 arg.p_ds_grid_,
                                 gemm_kernel_args,
                                 gemms_count_for_set,
@@ -1422,7 +1448,6 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
                                 dim3(gdx, gdy, gdz),
                                 dim3(BlockSize),
                                 0,
-                                p_b_grid,
                                 arg.p_ds_grid_,
                                 gemm_kernel_args,
                                 gemms_count_for_set,
