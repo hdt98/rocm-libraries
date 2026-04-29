@@ -230,18 +230,16 @@ def ds_write_b128(addr: RegisterSlice, src: RegisterSlice,
         raise RuntimeError(
             "ds_write_b128: source registers are not attached to a Block")
 
-    rocisa_inst = _DSStoreB128(
-        dstAddr=addr.container(),
-        src=src.container(),
-        ds=ds,
-        comment=comment,
-    )
-    op = Op(
-        inst="ds_write_b128",
-        dst=None,
-        srcs=[addr, src],
-        rocisa_inst=rocisa_inst,
-    )
+    def _build():
+        return _DSStoreB128(
+            dstAddr=addr.container(), src=src.container(),
+            ds=ds, comment=comment)
+
+    rocisa_inst = None
+    if not block.is_virtual:
+        rocisa_inst = _build()
+    op = Op(inst="ds_write_b128", dst=None, srcs=[addr, src],
+            rocisa_inst=rocisa_inst, build_fn=_build)
     block._append_op(op)
 
 
@@ -264,16 +262,14 @@ def ds_write_b32(addr: RegisterSlice, src: RegisterSlice,
         raise RuntimeError(
             "ds_write_b32: source registers are not attached to a Block")
 
-    rocisa_inst = _DSStoreB32(
-        dstAddr=addr.container(),
-        src=src.container(),
-        ds=ds,
-        comment=comment,
-    )
-    op = Op(
-        inst="ds_write_b32",
-        dst=None,
-        srcs=[addr, src],
-        rocisa_inst=rocisa_inst,
-    )
+    def _build():
+        return _DSStoreB32(
+            dstAddr=addr.container(), src=src.container(),
+            ds=ds, comment=comment)
+
+    rocisa_inst = None
+    if not block.is_virtual:
+        rocisa_inst = _build()
+    op = Op(inst="ds_write_b32", dst=None, srcs=[addr, src],
+            rocisa_inst=rocisa_inst, build_fn=_build)
     block._append_op(op)

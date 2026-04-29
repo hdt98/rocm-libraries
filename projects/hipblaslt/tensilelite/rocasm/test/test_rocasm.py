@@ -149,7 +149,7 @@ class TestRegisterArrays:
 
 # ---------- Block ----------
 
-from rocasm.block import Block
+from rocasm.block import Block, virtualize
 
 
 class TestBlock:
@@ -895,3 +895,295 @@ class TestDsWriteB32:
         data = VgprArray("Data", base=4, count=1)
         with pytest.raises(RuntimeError, match="not attached"):
             ds_write_b32(addr[0:1], data[0:1])
+
+
+# ---------- Virtual Register Support ----------
+
+
+class TestVirtualRegisters:
+
+    def test_virtual_array_creation(self):
+        """VgprArray(count=N) creates a virtual array with no physical base."""
+        A = VgprArray(count=16)
+        assert A.base is None
+        assert A.count == 16
+        assert A.is_virtual
+
+    def test_physical_array_not_virtual(self):
+        A = VgprArray(base=16, count=16)
+        assert not A.is_virtual
+
+    def test_virtual_phys_base_raises(self):
+        """Accessing phys_base on a virtual slice raises ValueError."""
+        A = VgprArray(count=16)
+        block = Block(A=A)
+        with pytest.raises(ValueError, match="virtual array"):
+            block.A[0:4].phys_base
+
+    def test_virtual_container_raises(self):
+        """Calling container() on a virtual slice raises ValueError."""
+        A = VgprArray(count=16)
+        block = Block(A=A)
+        with pytest.raises(ValueError, match="virtual array"):
+            block.A[0:4].container()
+
+    def test_virtual_block_is_virtual(self):
+        block = Block(
+            Acc=AccArray(count=64),
+            A=VgprArray(count=8),
+        )
+        assert block.is_virtual
+
+    def test_physical_block_not_virtual(self):
+        block = Block(
+            Acc=AccArray(base=0, count=64),
+            A=VgprArray(base=24, count=8),
+        )
+        assert not block.is_virtual
+
+    def test_mixed_virtual_physical_is_virtual(self):
+        """A block with some virtual and some physical arrays is virtual."""
+        block = Block(
+            Acc=AccArray(count=64),           # virtual
+            A=VgprArray(base=24, count=8),    # physical
+        )
+        assert block.is_virtual
+
+    def test_virtual_block_records_mfma(self):
+        """MFMA instructions on a virtual block record ops with correct metadata."""
+        block = Block(
+            Acc=AccArray(count=16),
+            A=VgprArray(count=8),
+            B=VgprArray(count=8),
+        )
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "v_mfma_f32_16x16x32_bf16"
+        assert op.dst is not None
+        assert op.dst.array.name == "Acc"
+        assert op.dst.start == 0
+        assert op.dst.count == 4
+        assert op.rocisa_inst is None  # deferred
+        assert op.build_fn is not None
+
+    def test_virtual_block_records_ds_read(self):
+        block = Block(
+            A=VgprArray(count=8),
+            Addr=VgprArray(count=1),
+        )
+        block.A[0:4] = ds_read_b128(block.Addr[0:1])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "ds_read_b128"
+        assert op.rocisa_inst is None
+
+    def test_virtual_block_records_ds_write(self):
+        block = Block(
+            Data=VgprArray(count=4),
+            Addr=VgprArray(count=1),
+        )
+        ds_write_b128(block.Addr[0:1], block.Data[0:4])
+        assert len(block) == 1
+        op = block.ops[0]
+        assert op.inst == "ds_write_b128"
+        assert op.rocisa_inst is None
+
+    def test_virtual_block_records_side_effects(self):
+        block = Block(Acc=AccArray(count=16))
+        block.s_waitcnt(dscnt=0)
+        block.s_barrier()
+        assert len(block) == 2
+        assert block.ops[0].rocisa_inst is None
+        assert block.ops[1].rocisa_inst is None
+
+    def test_virtual_block_op_count_full_schedule(self):
+        """A mix of MFMAs, ds_reads, ds_writes, and side-effects all record."""
+        block = Block(
+            Acc=AccArray(count=16),
+            A=VgprArray(count=8),
+            B=VgprArray(count=8),
+            G2L=VgprArray(count=4),
+            Addr=VgprArray(count=1),
+            WriteAddr=VgprArray(count=1),
+        )
+        block.s_waitcnt(dscnt=0)
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        block.A[0:4] = ds_read_b128(block.Addr[0:1])
+        ds_write_b128(block.WriteAddr[0:1], block.G2L[0:4])
+        block.s_barrier()
+        assert len(block) == 5
+
+    def test_virtual_block_emit_raises_without_map(self):
+        block = Block(Acc=AccArray(count=16))
+        block.s_barrier()
+        with pytest.raises(ValueError, match="virtual arrays"):
+            block.emit()
+
+    def test_virtual_block_emit_with_map(self):
+        """emit(register_map={...}) resolves virtual arrays and produces assembly."""
+        block = Block(
+            Acc=AccArray(count=16),
+            A=VgprArray(count=8),
+            B=VgprArray(count=8),
+        )
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        block.s_waitcnt(dscnt=0)
+
+        asm = block.emit(register_map={'Acc': 0, 'A': 24, 'B': 0})
+        assert "v_mfma_f32_16x16x32_bf16" in asm
+        assert "acc[0:3]" in asm
+        assert "v[0:3]" in asm
+        assert "v[24:27]" in asm
+        assert "lgkmcnt(0)" in asm
+
+    def test_virtual_block_emit_matches_physical(self):
+        """Virtual block + register_map produces identical assembly to physical block."""
+        def write_schedule(block):
+            block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+            block.Acc[4:8] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[4:8], block.Acc[4:8])
+            block.s_waitcnt(dscnt=0)
+            block.s_barrier()
+            block.Acc[8:12] = vmfma_f32_16x16x32_bf16(block.B[4:8], block.A[0:4], block.Acc[8:12])
+
+        # Physical block
+        phys = Block(
+            Acc=AccArray(base=0, count=16),
+            A=VgprArray(base=24, count=8),
+            B=VgprArray(base=0, count=8),
+        )
+        write_schedule(phys)
+        phys_asm = phys.emit()
+
+        # Virtual block with same register mapping
+        virt = Block(
+            Acc=AccArray(count=16),
+            A=VgprArray(count=8),
+            B=VgprArray(count=8),
+        )
+        write_schedule(virt)
+        virt_asm = virt.emit(register_map={'Acc': 0, 'A': 24, 'B': 0})
+
+        assert phys_asm == virt_asm
+
+    def test_virtual_slice_repr(self):
+        """repr() works correctly for virtual array slices."""
+        block = Block(A=VgprArray(count=8))
+        assert repr(block.A[0:4]) == "A[0:4]"
+
+    def test_virtual_array_repr(self):
+        A = VgprArray(count=16)
+        assert "count=16" in repr(A)
+        assert "base=" not in repr(A)
+
+    def test_virtual_schedule_identical(self):
+        """The same schedule function works with both virtual and physical blocks."""
+        def my_schedule(block):
+            Acc = block.Acc
+            A = block.A
+            B = block.B
+            s_waitcnt = block.s_waitcnt
+
+            s_waitcnt(dscnt=0)
+            Acc[0:4] = vmfma_f32_16x16x32_bf16(B[0:4], A[0:4], Acc[0:4])
+            Acc[4:8] = vmfma_f32_16x16x32_bf16(B[0:4], A[4:8], Acc[4:8])
+
+        # Both block types produce 3 ops with the same instruction names
+        phys = Block(Acc=AccArray(base=0, count=16), A=VgprArray(base=24, count=8), B=VgprArray(base=0, count=8))
+        my_schedule(phys)
+
+        virt = Block(Acc=AccArray(count=16), A=VgprArray(count=8), B=VgprArray(count=8))
+        my_schedule(virt)
+
+        assert len(phys) == len(virt) == 3
+        for p, v in zip(phys.ops, virt.ops):
+            assert p.inst == v.inst
+
+
+# ---------- virtualize() ----------
+
+
+class TestVirtualize:
+
+    def _make_physical_block_with_schedule(self):
+        block = Block(
+            Acc=AccArray(base=0, count=16),
+            A=VgprArray(base=24, count=8),
+            B=VgprArray(base=0, count=8),
+            G2L=VgprArray(base=32, count=4),
+            Addr=VgprArray(base=128, count=1),
+        )
+        block.s_waitcnt(dscnt=0)
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+        block.Acc[4:8] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[4:8], block.Acc[4:8])
+        block.A[0:4] = ds_read_b128(block.Addr[0:1])
+        ds_write_b128(block.Addr[0:1], block.G2L[0:4])
+        block.s_barrier()
+        return block
+
+    def test_virtualize_returns_register_map(self):
+        block = self._make_physical_block_with_schedule()
+        reg_map = virtualize(block)
+        assert reg_map == {'Acc': 0, 'A': 24, 'B': 0, 'G2L': 32, 'Addr': 128}
+
+    def test_virtualize_makes_block_virtual(self):
+        block = self._make_physical_block_with_schedule()
+        virtualize(block)
+        assert block.is_virtual
+
+    def test_virtualize_clears_rocisa_inst(self):
+        block = self._make_physical_block_with_schedule()
+        # Before: physical ops have rocisa_inst
+        assert all(op.rocisa_inst is not None for op in block._ops)
+        virtualize(block)
+        # After: all rocisa_inst cleared
+        assert all(op.rocisa_inst is None for op in block._ops)
+
+    def test_virtualize_preserves_ops(self):
+        block = self._make_physical_block_with_schedule()
+        virtualize(block)
+        assert len(block) == 6
+        insts = [op.inst for op in block.ops]
+        assert insts == ['s_waitcnt', 'v_mfma_f32_16x16x32_bf16',
+                         'v_mfma_f32_16x16x32_bf16', 'ds_read_b128',
+                         'ds_write_b128', 's_barrier']
+
+    def test_virtualize_preserves_build_fn(self):
+        block = self._make_physical_block_with_schedule()
+        virtualize(block)
+        assert all(op.build_fn is not None for op in block._ops)
+
+    def test_virtualize_round_trip(self):
+        """virtualize then emit with the returned map produces original assembly."""
+        block = self._make_physical_block_with_schedule()
+        original_asm = block.emit()
+        reg_map = virtualize(block)
+        restored_asm = block.emit(register_map=reg_map)
+        assert original_asm == restored_asm
+
+    def test_virtualize_emit_with_different_bases(self):
+        """After virtualizing, can re-emit with different physical register bases."""
+        block = Block(
+            Acc=AccArray(base=0, count=16),
+            A=VgprArray(base=24, count=8),
+            B=VgprArray(base=0, count=8),
+        )
+        block.Acc[0:4] = vmfma_f32_16x16x32_bf16(block.B[0:4], block.A[0:4], block.Acc[0:4])
+
+        original_asm = block.emit()
+        assert "acc[0:3]" in original_asm
+        assert "v[24:27]" in original_asm
+        assert "v[0:3]" in original_asm
+
+        virtualize(block)
+
+        # Re-emit with shifted register bases
+        new_asm = block.emit(register_map={'Acc': 16, 'A': 40, 'B': 8})
+        assert "acc[16:19]" in new_asm
+        assert "v[40:43]" in new_asm
+        assert "v[8:11]" in new_asm
+
+    def test_virtualize_already_virtual_raises(self):
+        block = Block(Acc=AccArray(count=16))
+        with pytest.raises(ValueError, match="already virtual"):
+            virtualize(block)

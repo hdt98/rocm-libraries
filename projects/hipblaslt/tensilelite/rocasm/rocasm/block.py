@@ -112,6 +112,11 @@ class Block:
             f"Block has no register array or side-effect instruction '{name}'")
 
     @property
+    def is_virtual(self) -> bool:
+        """True if any register array in this block has no physical base."""
+        return any(arr.is_virtual for arr in self._regs.values())
+
+    @property
     def ops(self) -> list[Op]:
         """The current instruction sequence (read-only view)."""
         return list(self._ops)
@@ -127,12 +132,16 @@ class Block:
         Label class adds it back automatically.
         """
         label_name = name[6:] if name.startswith("label_") else name
-        rocisa_label = Label(label_name, "")
+        rocisa_label = None
+        if not self.is_virtual:
+            rocisa_label = Label(label_name, "")
         op = Op(
             inst="label",
             dst=None,
             srcs=[],
             rocisa_inst=rocisa_label,
+            build_fn=Label,
+            build_args=(label_name, ""),
         )
         self._ops.append(op)
 
@@ -140,14 +149,22 @@ class Block:
         """Create and append an Op for a side-effect instruction (no destination).
 
         Called via closures: block.s_waitcnt(dscnt=0) → self._side_effect("s_waitcnt", dscnt=0)
+
+        Always stores build_fn so the Op can be re-materialized later.
+        When physical, also builds the rocisa instruction eagerly.
         """
         cls = _SIDE_EFFECT_INSTRUCTIONS[inst_name]
-        rocisa_inst = cls(*args, **kwargs)
+        rocisa_inst = None
+        if not self.is_virtual:
+            rocisa_inst = cls(*args, **kwargs)
         op = Op(
             inst=inst_name,
             dst=None,
             srcs=[],
             rocisa_inst=rocisa_inst,
+            build_fn=cls,
+            build_args=args,
+            build_kwargs=kwargs,
         )
         self._ops.append(op)
 
@@ -174,10 +191,30 @@ class Block:
         new._ops = list(self._ops)
         return new
 
-    def emit(self) -> str:
-        """Emit the instruction sequence as assembly text."""
+    def emit(self, register_map: dict[str, int] | None = None) -> str:
+        """Emit the instruction sequence as assembly text.
+
+        Args:
+            register_map: Optional mapping of register array names to physical
+                bases (e.g. ``{'A0': 16, 'B0': 48, 'Acc': 0}``).  Required
+                when the block contains virtual register arrays.
+
+        Raises:
+            ValueError: If the block is virtual and no register_map is provided.
+        """
+        if register_map:
+            for name, base in register_map.items():
+                if name in self._regs:
+                    self._regs[name].base = base
+        if self.is_virtual:
+            unresolved = [n for n, a in self._regs.items() if a.is_virtual]
+            raise ValueError(
+                f"Cannot emit: virtual arrays {unresolved} have no physical base. "
+                "Provide a register_map covering all virtual arrays.")
         lines = []
         for op in self._ops:
+            if op.rocisa_inst is None:
+                op.materialize()
             lines.append(str(op.rocisa_inst))
         return "".join(lines)
 
@@ -190,3 +227,40 @@ class Block:
             for name, arr in self._regs.items()
         )
         return f"Block({reg_desc}, ops={len(self._ops)})"
+
+
+def virtualize(block: Block) -> dict[str, int]:
+    """Convert a physical block to virtual by stripping physical register bases.
+
+    Returns the register map (name -> physical base) so the block can be
+    re-materialized later via ``block.emit(register_map=...)``.
+
+    After this call, ``block.is_virtual`` is True and all ops have their
+    ``rocisa_inst`` cleared (they will be rebuilt at emit time).
+
+    Example::
+
+        reg_map = virtualize(block)
+        # block is now virtual -- inspect ops, reorder, etc.
+        asm = block.emit(register_map=reg_map)  # round-trips to same assembly
+
+    Args:
+        block: A Block with physical register arrays.
+
+    Returns:
+        Dict mapping register array names to their original physical bases.
+
+    Raises:
+        ValueError: If the block is already virtual (some arrays have no base).
+    """
+    if block.is_virtual:
+        unresolved = [n for n, a in block._regs.items() if a.is_virtual]
+        raise ValueError(
+            f"Cannot virtualize: arrays {unresolved} are already virtual")
+    reg_map = {}
+    for name, arr in block._regs.items():
+        reg_map[name] = arr.base
+        arr.base = None
+    for op in block._ops:
+        op.rocisa_inst = None
+    return reg_map

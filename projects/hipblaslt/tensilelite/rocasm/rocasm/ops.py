@@ -31,7 +31,7 @@ the instruction name, destination, sources, and underlying rocisa object.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from rocasm.regs import RegisterSlice
@@ -39,11 +39,29 @@ if TYPE_CHECKING:
 
 @dataclass
 class Op:
-    """A single instruction record."""
-    inst: str                          # e.g. "v_mfma_f32_16x16x32_bf16"
-    dst: RegisterSlice | None          # what it writes
-    srcs: list[RegisterSlice]          # what it reads
-    rocisa_inst: object                # the underlying rocisa Instruction
+    """A single instruction record.
+
+    When ``rocisa_inst`` is provided, the instruction is fully materialized
+    (physical registers resolved).  When ``build_fn`` is provided instead,
+    the instruction is *deferred* — it will be materialized at emit time
+    once physical register bases are known.
+    """
+    inst: str                                    # e.g. "v_mfma_f32_16x16x32_bf16"
+    dst: RegisterSlice | None                    # what it writes
+    srcs: list[RegisterSlice]                    # what it reads
+    rocisa_inst: object = None                   # the underlying rocisa Instruction (None when deferred)
+    build_fn: Callable | None = None             # deferred constructor
+    build_args: tuple = ()                       # positional args for build_fn
+    build_kwargs: dict = field(default_factory=dict)  # keyword args for build_fn
+
+    def materialize(self):
+        """Build the rocisa instruction from the deferred constructor.
+
+        No-op if already materialized. Returns the rocisa instruction.
+        """
+        if self.rocisa_inst is None and self.build_fn is not None:
+            self.rocisa_inst = self.build_fn(*self.build_args, **self.build_kwargs)
+        return self.rocisa_inst
 
 
 class PendingOp:
@@ -61,12 +79,21 @@ class PendingOp:
         self._block = block
 
     def resolve(self, dst: RegisterSlice):
-        """Called by RegisterArray.__setitem__ to finalize the Op."""
-        rocisa_inst = self._build_fn(dst, self._srcs)
+        """Called by RegisterArray.__setitem__ to finalize the Op.
+
+        Always stores build_fn so the Op can be re-materialized later
+        (e.g. after virtualizing the block).  When the block is physical,
+        also builds the rocisa instruction eagerly.
+        """
+        rocisa_inst = None
+        if not self._block.is_virtual:
+            rocisa_inst = self._build_fn(dst, self._srcs)
         op = Op(
             inst=self._inst_name,
             dst=dst,
             srcs=list(self._srcs),
             rocisa_inst=rocisa_inst,
+            build_fn=self._build_fn,
+            build_args=(dst, self._srcs),
         )
         self._block._append_op(op)

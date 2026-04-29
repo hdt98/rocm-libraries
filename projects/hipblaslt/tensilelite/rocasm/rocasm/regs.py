@@ -56,10 +56,21 @@ class RegisterSlice:
 
     @property
     def phys_base(self) -> int:
+        if self.array.is_virtual:
+            raise ValueError(
+                f"Cannot get phys_base from virtual array {self.array.name!r}. "
+                "Assign physical bases via Block.emit(register_map=...)")
         return self.array.base + self.start
 
     def container(self):
-        """Return the rocisa RegisterContainer for this slice."""
+        """Return the rocisa RegisterContainer for this slice.
+
+        Raises ValueError if the array is virtual (no physical base assigned).
+        """
+        if self.array.is_virtual:
+            raise ValueError(
+                f"Cannot materialize container from virtual array {self.array.name!r}. "
+                "Assign physical bases via Block.emit(register_map=...)")
         return self.array._make_container(self.phys_base, self.count)
 
     def _parse_sub_key(self, key) -> tuple[int, int]:
@@ -111,13 +122,26 @@ class RegisterSlice:
 
 
 class _RegArray:
-    """Base class for typed register arrays."""
+    """Base class for typed register arrays.
 
-    def __init__(self, name: str = "", *, base: int, count: int, block: Block | None = None):
+    When ``base`` is provided, the array maps to specific physical registers
+    (e.g. ``VgprArray(base=16, count=16)`` → v[16:31]).
+
+    When ``base`` is omitted (``None``), the array is *virtual* — it declares
+    how many registers are needed but defers physical assignment to emit time.
+    """
+
+    def __init__(self, name: str = "", *, base: int | None = None, count: int,
+                 block: Block | None = None):
         self.name = name
         self.base = base
         self.count = count
         self.block = block
+
+    @property
+    def is_virtual(self) -> bool:
+        """True if this array has no physical register base assigned."""
+        return self.base is None
 
     def _make_container(self, phys_base: int, count: int):
         raise NotImplementedError
@@ -157,6 +181,8 @@ class _RegArray:
                 "Use an instruction function (e.g. vmfma_f32_16x16x32_bf16(...))")
 
     def __repr__(self):
+        if self.is_virtual:
+            return f"{type(self).__name__}({self.name}, count={self.count})"
         return f"{type(self).__name__}({self.name}, base={self.base}, count={self.count})"
 
 
