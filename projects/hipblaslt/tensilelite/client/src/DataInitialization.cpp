@@ -1722,7 +1722,7 @@ namespace TensileLite
         {
             bool useMXGenerator = isMXFP4Problem(problem);
             if(useMXGenerator)
-                initializeMXData(problem);
+                initializeMXDataForFP4(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
