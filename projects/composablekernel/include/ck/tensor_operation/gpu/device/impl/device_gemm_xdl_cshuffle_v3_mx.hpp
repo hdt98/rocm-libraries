@@ -681,25 +681,40 @@ struct DeviceGemmMX_Xdl_CShuffleV3 : public DeviceGemmMX<ALayout,
         {
             if constexpr(NXdlPerWave64 > 0)
             {
-                auto sub_arguments = partitioner.partitionGemmProblem(arg);
-                return std::all_of(
-                    sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
-                        return GridwiseGemm64::CheckValidity(sub_arg);
-                    });
+                if constexpr(std::is_same<ADataType, ck::f4x2_pk_t>::value)
+                {
+                    auto sub_arguments = partitioner.partitionGemmProblem(arg);
+                    return std::all_of(
+                        sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
+                            return GridwiseGemm64::CheckValidity(sub_arg);
+                        });
+                }
+                else
+                {
+                    return GridwiseGemm64::CheckValidity(arg);
+                }
             }
         }
         else
         {
             if constexpr(NXdlPerWave32 > 0)
             {
-                auto sub_arguments =
-                    partitioner.template partitionGemmProblem<typename GridwiseGemm64::Argument,
-                                                              typename GridwiseGemm32::Argument>(
-                        arg);
-                return std::all_of(
-                    sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
-                        return GridwiseGemm32::CheckValidity(sub_arg);
-                    });
+                if constexpr(std::is_same<ADataType, ck::f4x2_pk_t>::value)
+                {
+                    auto sub_arguments =
+                        partitioner
+                            .template partitionGemmProblem<typename GridwiseGemm64::Argument,
+                                                           typename GridwiseGemm32::Argument>(arg);
+                    return std::all_of(
+                        sub_arguments.begin(), sub_arguments.end(), [](const auto& sub_arg) {
+                            return GridwiseGemm32::CheckValidity(sub_arg);
+                        });
+                }
+                else
+                {
+                    return GridwiseGemm32::CheckValidity(
+                        reinterpret_cast<const typename GridwiseGemm32::Argument&>(arg));
+                }
             }
         }
         return false;
