@@ -222,7 +222,10 @@ private:
         {
             // assume all device usage is shared and subtracts from host memory
             std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
-            success = host_usage <= (host_limit - dev_usage);
+            // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
+            // the unsigned subtraction wraps around to a large value, causing the check to
+            // silently pass (false success) even when memory is exhausted.
+            success = dev_usage <= host_limit && host_usage <= (host_limit - dev_usage);
         }
         else
         {
@@ -244,16 +247,19 @@ private:
         if (MemCheck::sys_info.is_apu)
         {
             // Any memory used in excess of host_limit - dev_limit will spill
-            // into the device's shared memory, reducing the device limit
+            // into the device's shared memory, reducing the device limit.
+            // Both subtractions below are guarded: if dev_limit > host_limit or
+            // spill > dev_limit, the unsigned subtraction would wrap around to a
+            // large value, making the check silently pass when memory is exhausted.
             const size_t host_limit = static_cast<size_t>(MemCheck::sys_info.host_mem_limit * (1 - padding_factor));
-            size_t host_unshared_limit = host_limit - dev_limit;
-            size_t spill = host_usage > host_unshared_limit ? 
+            size_t host_unshared_limit = dev_limit <= host_limit ? host_limit - dev_limit : 0UL;
+            size_t spill = host_usage > host_unshared_limit ?
                            host_usage - host_unshared_limit : 0UL;
 
             std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
             std::cout << "    spill into device: " << (spill >> 20) << std::endl;
 
-            success = dev_usage <= dev_limit - spill;
+            success = spill <= dev_limit && dev_usage <= dev_limit - spill;
         }
         else
         {
