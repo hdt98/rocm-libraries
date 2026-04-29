@@ -245,13 +245,7 @@ protected:
         return data;
     }
 
-    static void ResetDbFile(TempFile& tmp_file)
-    {
-        std::error_code ec;
-        fs::remove(tmp_file.Path(), ec);
-        // File will be recreated on first write. Keep directory alive to avoid
-        // race with lingering file operations from previous tests.
-    }
+    static void ResetDbFile(TempFile& tmp_file) { tmp_file = TempFile{tmp_file.GetPathInfix()}; }
 
     void ResetDb() { ResetDbFile(temp_file); }
 
@@ -1043,10 +1037,10 @@ public:
 
     static void WorkItem(unsigned int id, const fs::path& db_path, bool write)
     {
-        {
-            auto& file_lock = miopen::LockFile::Get(LockFilePath(db_path));
-            std::lock_guard<miopen::LockFile> lock(file_lock);
-        }
+        // CRITICAL: Hold the lock for the ENTIRE duration of database operations
+        // to ensure proper multiprocess synchronization
+        auto& file_lock = miopen::LockFile::Get(LockFilePath(db_path));
+        std::lock_guard<miopen::LockFile> lock(file_lock);
 
         const auto c = [&db_path]()
             MIOPEN_RETURNS(GetDbInstance<TDb>(DbKinds::PerfDb, db_path, false));

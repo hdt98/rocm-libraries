@@ -259,6 +259,23 @@ bool PlainTextDb::FlushUnsafe(const DbRecord& record, const RecordPositions* pos
         from.close();
         to.close();
 
+        // Ensure the parent directory exists before attempting rename
+        // This handles the race condition where the directory may have been deleted
+        // by another process/test cleanup between temp file creation and rename
+        std::error_code dir_ec;
+        const auto parent_dir = filename.parent_path();
+        if(!parent_dir.empty() && !fs::exists(parent_dir, dir_ec))
+        {
+            fs::create_directories(parent_dir, dir_ec);
+            if(dir_ec)
+            {
+                MIOPEN_LOG_E("Failed to create parent directory for db file: "
+                             << dir_ec.message() << " [" << parent_dir << "]");
+                fs::remove(temp_name, dir_ec); // best-effort cleanup of temp file
+                return false;
+            }
+        }
+
         // rename atomically deletes and replaces filename
         std::error_code rename_ec;
         fs::rename(temp_name, filename, rename_ec);
