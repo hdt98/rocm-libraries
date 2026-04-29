@@ -31,6 +31,7 @@
 #include <fstream>
 #include <string>
 #include <iomanip>
+#include <sys/sysinfo.h>
 #endif
 
 #include "../../common/utils.hpp"
@@ -136,7 +137,23 @@ public:
         dev_usage = dev_mem_limit - free_dev_mem;
         std::cout << "       device usage: " << (dev_usage >> 20) << std::endl;
 
-        host_mem_limit = MemCheck::get_host_memory();
+#ifdef _WIN32
+        MEMORYSTATUSEX mem_status;
+        mem_status.dwLength = sizeof(mem_status);
+        GlobalMemoryStatusEx(&mem_status);
+        host_mem_limit = mem_status.ullTotalPhys;
+        // mem_status.ullAvailPhys?
+#else
+        host_mem_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+/*
+        struct sysinfo info;
+        size_t host_usage = 0;    
+        if (sysinfo(&info) == 0) {
+            host_usage = host_mem_limit - (size_t)((unsigned long long)info.freeram * info.mem_unit);
+        }
+        std::cout << "host usage: " << (host_usage >> 20) << std::endl;
+*/
+#endif
         std::cout << "total host memory: " << (host_mem_limit >> 20) << std::endl;
 
         hipDeviceProp_t props;
@@ -145,7 +162,7 @@ public:
         std::cout << "is_apu: " << is_apu << std::endl;
     }
 
-	// Call this before host allocs. Must be inline to allow mem_check to issue continue/GTEST_SKIP() statements
+	// Call this before host allocs
     template<typename T>
     inline bool alloc_host(const size_t size)
     {
@@ -267,22 +284,6 @@ private:
         }
         std::cout.flush();
         return success;
-    }
-
-	// Returns total system memory.
-	static size_t get_host_memory()
-    {
-            size_t size = 0;
-#ifdef _WIN32
-            MEMORYSTATUSEX mem_status;
-            mem_status.dwLength = sizeof(mem_status);
-            GlobalMemoryStatusEx(&mem_status);
-            size = mem_status.ullTotalPhys;
-#else
-            size = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
-#endif
-
-            return static_cast<size_t>(size);
     }
 
 	bool is_apu = false;
