@@ -1301,14 +1301,12 @@ inline void sort_keys_large_sizes()
     {
         SCOPED_TRACE(testing::Message() << "with size = " << size);
 
-std::cout << "testing with size: " << size << std::endl;
+        test_utils::MemCheck memcheck;
 
-test_utils::MemCheck memcheck;
-
-if (!memcheck.alloc_device<key_type>(size))
-{
-    break;
-}
+        if (!memcheck.alloc_device<key_type>(size))
+        {
+            break;
+        }
         common::device_ptr<key_type> d_keys;
         if(!d_keys.resize_with_memory_check(size))
         {
@@ -1318,14 +1316,14 @@ if (!memcheck.alloc_device<key_type>(size))
 
         // Generate data
         {
-if (!memcheck.alloc_host<key_type>(size))
-{
-    break;
-}
+            if (!memcheck.alloc_host<key_type>(size))
+            {
+                break;
+            }
             std::vector<key_type> keys_input(size);
             std::iota(keys_input.begin(), keys_input.end(), 0);
             d_keys.store(keys_input);
-memcheck.free_host<key_type>(size);
+            memcheck.free_host<key_type>(size);
         }
 
         size_t temporary_storage_bytes = 0;
@@ -1337,12 +1335,12 @@ memcheck.free_host<key_type>(size);
                                            start_bit,
                                            end_bit,
                                            stream));
+        ASSERT_GT(temporary_storage_bytes, 0U);
 
-if (!memcheck.alloc_device_bytes(temporary_storage_bytes))
-{
-    break;
-}
-    ASSERT_GT(temporary_storage_bytes, 0U);
+        if (!memcheck.alloc_device_bytes(temporary_storage_bytes))
+        {
+            break;
+        }
         common::device_ptr<void> d_temporary_storage;
         if(!d_temporary_storage.resize_with_memory_check(temporary_storage_bytes))
         {
@@ -1359,10 +1357,10 @@ if (!memcheck.alloc_device_bytes(temporary_storage_bytes))
                                            end_bit,
                                            stream));
 
-if (!memcheck.alloc_host_bytes(d_keys.msize()))
-{
-    break;
-}
+        if (!memcheck.alloc_host_bytes(d_keys.msize()))
+        {
+            break;
+        }
         const auto keys_output = d_keys.load();
 
         // Check if output values are as expected
