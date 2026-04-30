@@ -175,9 +175,16 @@ public:
         HIP_CHECK(rocprim::detail::host_target_arch(stream, arch));
         is_apu = test_utils::is_apu(arch);
 
+        // For APUs, OS will share up to half of system memory.  Assume half
+        // up to the total GPU memory.
+        dev_shared = std::min(dev_limit, host_limit / 2);
+        // The carved memory must be the difference between the total memory and shared.
+        dev_carved = dev_limit - dev_shared;
+
 #ifdef MEMCHECK_LOGGING
         std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
                   << " MiB, host " << toMB(host_usage) << "/" << toMB(host_limit)
+                  << " MiB, dev_shared: " << toMB(dev_shared) << " MiB, dev_carved: " << toMB(dev_carved)
                   << " MiB, is_apu=" << is_apu << std::endl;
 #endif
     }
@@ -280,22 +287,28 @@ private:
         bool success;
         if (is_apu)
         {
-            // Assume all device VRAM is shared and device allocations subtract from host memory.
-            // APUs often have BIOS carveouts for VRAM that reduce the available system RAM,
-            // and the rest of the VRAM is shared memory.
-            // Often, the shared memory is up to half the system memory, but I am not 100% sure
-            // it is always half.  Thus, we assume all VRAM is shared and there is no carveout.
-            // This will overestimate the amount of shared memory on systems with BIOS carveouts,
-            // but it will just cause this check to be more conservative than necessary.
-            // I.e. it will err on the safe side.
+            size_t spill = 0;
+            if (dev_usage > dev_carved) spill = dev_usage - dev_carved;
+
+            if (host_limit_padded > spill)
+            {
+                host_limit_padded -= spill;
+            }
+            else
+            {
+                host_limit_padded = 0;
+            }
+
+            success = host_usage <= host_limit_padded;
 
             // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
             // the unsigned subtraction wraps around to a large value, causing the check to
             // silently pass (false success) even when memory is exhausted.
-            success = dev_usage <= host_limit_padded && host_usage <= (host_limit_padded - dev_usage);
+            //success = dev_usage <= host_limit_padded && host_usage <= (host_limit_padded - dev_usage);
 #ifdef MEMCHECK_LOGGING
             std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
-                      << " MiB, device=" << toMB(dev_usage) << " MiB" << std::endl;
+                      << " MiB, device=" << toMB(dev_usage) << " MiB, spill=" << toMB(spill)
+                      << " MiB" << std::endl;
 #endif
         }
         else
@@ -321,17 +334,32 @@ private:
         bool success;
         if (is_apu)
         {
+            size_t host_unshared = host_limit - dev_shared;
+            size_t spill = 0;
+            if (host_usage > host_unshared) spill = host_usage - host_unshared; 
+
+            if (dev_limit_padded > spill)
+            {
+                dev_limit_padded -= spill;
+            }
+            else
+            {
+                dev_limit_padded = 0;
+            }
+
+            success = dev_usage <= dev_limit_padded;
+
             // Any memory used in excess of host_limit - dev_limit will spill
             // into the device's shared memory, reducing the device limit.
 
             // Both subtractions below are guarded: if dev_limit > host_limit or
             // spill > dev_limit, the unsigned subtraction would wrap around to a
             // large value, making the check silently pass when memory is exhausted.
-            size_t host_unshared_limit = dev_limit <= host_limit ? host_limit - dev_limit : 0UL;
-            size_t spill = host_usage > host_unshared_limit ?
-                           host_usage - host_unshared_limit : 0UL;
+            //size_t host_unshared_limit = dev_limit <= host_limit ? host_limit - dev_limit : 0UL;
+            //size_t spill = host_usage > host_unshared_limit ?
+            //               host_usage - host_unshared_limit : 0UL;
 
-            success = spill <= dev_limit_padded && dev_usage <= dev_limit_padded - spill;
+            //success = spill <= dev_limit_padded && dev_usage <= dev_limit_padded - spill;
 #ifdef MEMCHECK_LOGGING
             std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
                       << " MiB, host=" << toMB(host_usage) << " MiB, spill=" << toMB(spill)
@@ -356,6 +384,8 @@ private:
 	bool is_apu = false;
 	size_t host_limit = 0;
 	size_t dev_limit = 0;
+    size_t dev_shared = 0;
+    size_t dev_carved = 0;
 	float padding_factor;
 	size_t host_usage = 0;
 	size_t dev_usage = 0;
