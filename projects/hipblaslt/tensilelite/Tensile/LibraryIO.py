@@ -390,7 +390,7 @@ def parseLibraryLogicData(
     problemType = ProblemType(data["ProblemType"], printIndexAssignmentInfo)
 
     # unpack solution
-    def solutionStateToSolution(solutionState, assembler, isaInfoMap) -> Solution:
+    def solutionStateToSolution(solutionState, assembler, isaInfoMap) -> Optional[Solution]:
         if solutionState["KernelLanguage"] == "Assembly":
             solutionState["ISA"] = gfxToIsa(data["ArchitectureName"])
         solutionState["CUCount"] = data["CUCount"]
@@ -409,7 +409,12 @@ def parseLibraryLogicData(
             isp = {}
             if "InternalSupportParams" in solutionState:
                 isp = solutionState["InternalSupportParams"]
-            customConfig = getCustomKernelConfig(customKernelName, isp)
+            try:
+                customConfig = getCustomKernelConfig(customKernelName, isp)
+            except (RuntimeError, KeyError, TypeError) as e:
+                printWarning(f"Skipping custom kernel '{customKernelName}': "
+                             f"missing or invalid custom.config ({e})")
+                return None
             for key, value in customConfig.items():
                 solutionState[key] = value
 
@@ -445,7 +450,11 @@ def parseLibraryLogicData(
         return solutionObject
 
     resetTypeMismatchCollector()
-    solutions = [solutionStateToSolution(solutionState, assembler, isaInfoMap) for solutionState in data["Solutions"]]
+    allSolutions = [solutionStateToSolution(solutionState, assembler, isaInfoMap) for solutionState in data["Solutions"]]
+    skipped = sum(1 for s in allSolutions if s is None)
+    if skipped:
+        printWarning(f"Skipped {skipped} solution(s) due to missing or invalid custom.config")
+    solutions = [s for s in allSolutions if s is not None]
     typeMismatches = getTypeMismatchCollector()
 
     newLibrary, _ = SolutionLibrary.MasterSolutionLibrary.FromOriginalState(

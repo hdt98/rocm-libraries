@@ -36,7 +36,7 @@ from Tensile.AsmStoreState import VectorDataTypes
 from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     print2, printExit, printWarning, \
                     roundUp, INDEX_CHARS, IsaVersion, SemanticVersion, \
-                    roundUpToNearestMultiple
+                    roundUpToNearestMultiple, deriveWaveParams
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import defaultSolution, \
                                             defaultInternalSupportParams
@@ -1173,7 +1173,21 @@ class Solution(collections.abc.Mapping):
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
       state["_WorkspaceSizePerElemBias"] = ck.get("workspaceSizePerElemBias", 0)
 
-    state["MIWaveGroup"] = [0, 0]
+    mi = state.get("MatrixInstruction", [])
+    state.setdefault("EnableMatrixInstruction", isinstance(mi, list) and len(mi) >= 4)
+
+    if state["EnableMatrixInstruction"]:
+      wavefrontSize = state.get("WavefrontSize", 64)
+      macrotile = [state["MacroTile0"], state["MacroTile1"]]
+      waveGroup, waveTile = deriveWaveParams(mi, state["NumThreads"], macrotile, wavefrontSize)
+      if "MIWaveTile" not in state:
+        state["MIWaveTile"] = waveTile
+      if "MIWaveGroup" not in state or state["MIWaveGroup"] == [0, 0]:
+        state["MIWaveGroup"] = waveGroup
+    else:
+      state.setdefault("MIWaveTile", [0, 0])
+      state["MIWaveGroup"] = [0, 0]
+
     state["LocalSplitU"] = 1
     state["GlobalReadVectorWidthA"] = 1
     state["GlobalReadVectorWidthB"] = 1
