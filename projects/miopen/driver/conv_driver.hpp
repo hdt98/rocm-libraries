@@ -1890,7 +1890,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                                                                   miopen::conv::Direction::Forward);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
@@ -1971,7 +1971,7 @@ void ConvDriver<Tgpu, Tref>::PrintForwardTime(const float kernel_total_time,
                                                                   miopen::conv::Direction::Forward);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
@@ -3120,7 +3120,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time,
                                                  miopen::conv::Direction::BackwardData);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
@@ -3200,7 +3200,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardDataTime(float kernel_total_time,
                                                  miopen::conv::Direction::BackwardData);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
@@ -3465,7 +3465,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time,
                                                  miopen::conv::Direction::BackwardWeights);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
@@ -3545,7 +3545,7 @@ void ConvDriver<Tgpu, Tref>::PrintBackwardWrwTime(float kernel_total_time,
                                                  miopen::conv::Direction::BackwardWeights);
             std::ostringstream ss;
             problem.Serialize(ss);
-            const auto db_key      = ss.str();
+            const auto db_key = ss.str();
             const std::string perf_db_key =
                 miopen::DbRecord(miopen::DbKinds::PerfDb, problem).GetKey();
 
