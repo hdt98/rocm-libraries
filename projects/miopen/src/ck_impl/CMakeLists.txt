@@ -23,25 +23,21 @@ function(ck_impl_base_arch ARCH OUT_VAR)
     set(${OUT_VAR} "${_base}" PARENT_SCOPE)
 endfunction()
 
-# GPU base archs for which MIOpen has CK grouped conv kernels.
-# Note: this is narrower than CK's own supported arch list — e.g. gfx103x and
-# gfx11x are CK-capable but MIOpen does not yet provide CK grouped conv kernels
-# for them. Add arches here when MIOpen adds grouped conv support for them.
-set(_CK_SUPPORTED_ARCHS
-    gfx908 gfx90a gfx942 gfx950
-    gfx1100 gfx1101 gfx1102
-    gfx1150 gfx1151 gfx1152 gfx1153
-    gfx1200 gfx1201
-)
+# GPU base archs to exclude from CK grouped conv plugin builds.
+# When built via TheRock, this is populated from the composable_kernel
+# EXCLUDE_TARGET_PROJECTS entries in therock_amdgpu_targets.cmake.
+# The default covers archs that have never had CK grouped conv support.
+set(MIOPEN_CK_EXCLUDE_ARCHS "gfx900;gfx906;gfx90c" CACHE STRING
+    "GPU base architectures to exclude from MIOpen CK grouped conv plugin builds.")
 
-# Filter GPU_TARGETS to only those with MIOpen CK grouped conv support.
+# Filter GPU_TARGETS by removing excluded architectures.
 set(_CK_FILTERED_TARGETS)
 foreach(_gpu_target IN LISTS GPU_TARGETS)
     ck_impl_base_arch("${_gpu_target}" _base)
-    if(_base IN_LIST _CK_SUPPORTED_ARCHS)
-        list(APPEND _CK_FILTERED_TARGETS "${_gpu_target}")
+    if(_base IN_LIST MIOPEN_CK_EXCLUDE_ARCHS)
+        message(STATUS "MIOpen CK: skipping ${_gpu_target} (excluded via MIOPEN_CK_EXCLUDE_ARCHS)")
     else()
-        message(STATUS "MIOpen CK: skipping ${_gpu_target} (no MIOpen CK grouped conv support for this arch)")
+        list(APPEND _CK_FILTERED_TARGETS "${_gpu_target}")
     endif()
 endforeach()
 
