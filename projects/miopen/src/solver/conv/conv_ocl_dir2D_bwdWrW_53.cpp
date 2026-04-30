@@ -665,6 +665,7 @@ ConvSolution ConvOclBwdWrW53::GetSolution(const ExecutionContext& ctx,
         kernel.l_wk.push_back(1);
 
         int gbl_ut_wk0 = wei_bstride * problem.GetInChannels() / ut_read_unit;
+        gbl_ut_wk0     = ((gbl_ut_wk0 + UT_GRP_SZ0 - 1) / UT_GRP_SZ0) * UT_GRP_SZ0;
 
         kernel.g_wk.push_back(gbl_ut_wk0);
         kernel.g_wk.push_back(1);

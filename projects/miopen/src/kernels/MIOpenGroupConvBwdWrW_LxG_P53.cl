@@ -627,6 +627,12 @@ MIOpenCvBwdWrW_rdc(const __global _FLOAT* __restrict weight_df_tmp,
 {
     uint gbl_id   = get_global_id(0);
     uint wei_idx0 = gbl_id * MLO_UT_READ_UNIT;
+    uint wei_size = MLO_N_OUTPUTS * MLO_WEI_BATCH_STRIDE;
+
+    if(wei_idx0 >= wei_size)
+    {
+        return;
+    }
 
 #if MLO_WEI_CHANNEL_STRIDE & (MLO_WEI_CHANNEL_STRIDE - 1)
     uint wei_blk_idx = iDiv(wei_idx0, MLO_WEI_CHANNEL_STRIDE);

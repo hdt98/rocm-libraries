@@ -811,6 +811,12 @@ extern "C" __global__ void __launch_bounds__(MLO_UT_GRP_SZ0)
 {
     uint gbl_id   = blockIdx.x * blockDim.x + threadIdx.x;
     uint wei_idx0 = gbl_id * MLO_UT_READ_UNIT;
+    uint wei_size = MLO_N_OUTPUTS * MLO_WEI_BATCH_STRIDE;
+
+    if(wei_idx0 >= wei_size)
+    {
+        return;
+    }
 
 #if MLO_WEI_CHANNEL_STRIDE & (MLO_WEI_CHANNEL_STRIDE - 1)
     uint wei_blk_idx = iDiv(wei_idx0, MLO_WEI_CHANNEL_STRIDE);
