@@ -23,12 +23,12 @@
 
 #include <hip/hip_runtime.h>
 
-#if defined(WIN32)
+#ifdef _WIN32
 #include <windows.h>
-#include <tchar.h>
 #else
 #include <fstream>
 #include <string>
+#include <unistd.h>
 #endif
 
 #ifdef MEMCHECK_LOGGING
@@ -45,7 +45,7 @@ constexpr static size_t minimum_memory_required_bytes = 34359738368;
 inline unsigned long long get_total_system_memory(bool is_apu)
 {
     unsigned long long total_system_memory = 0;
-#if defined(WIN32)
+#ifdef _WIN32
     MEMORYSTATUSEX statex;
     statex.dwLength = sizeof(statex);
     GlobalMemoryStatusEx (&statex);
@@ -120,13 +120,6 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 //  tracking for the current size.
 //
 // Define MEMCHECK_LOGGING at compile time to enable diagnostic output.
-
-// OS-specific includes for detecting available host memory
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
 
 class MemCheck
 {
@@ -327,12 +320,12 @@ private:
         return success;
     }
 
-	bool is_apu;
-	size_t host_limit;
-	size_t dev_limit;
+	bool is_apu = false;
+	size_t host_limit = 0;
+	size_t dev_limit = 0;
 	float padding_factor;
-	size_t host_usage;
-	size_t dev_usage;
+	size_t host_usage = 0;
+	size_t dev_usage = 0;
 };
 
 }
