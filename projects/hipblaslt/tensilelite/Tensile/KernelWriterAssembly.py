@@ -4168,14 +4168,15 @@ class KernelWriterAssembly(KernelWriter):
     moduleLoadGeneralBatch = Module("computeLoadSrd-GeneralBatch")
     moduleLoadStridedBatch = Module("computeLoadSrd-StridedBatch")
     use64bShadowLimit = self.states.use64bShadowLimitMX if tc in ["MXSA", "MXSB"] else self.states.use64bShadowLimit
-    isMX = tc in ("MXSA", "MXSB")
+    isgfx950 = kernel["ISA"][:2] == (9, 5)
+    isgfx950mx = isgfx950 and ("MXS" in tc)
     # UseSubtileImpl uses a tile-boundary fixed Srd+2 for both MX scale and data A/B.
     # This avoids 32-bit overflow when computing the full tensor2dSize (N*K or M*K > 2^32).
     useSubtile = bool(kernel.get("UseSubtileImpl"))
     useFixedSrd2 = useSubtile
     isPreShuffledAB = tc in ("A", "B") and kernel["ProblemType"].get("SwizzleTensor%s" % tc, False)
-    isSwizzled = isMX or isPreShuffledAB
-    if isMX:
+    isSwizzledSubtile = (isgfx950 or isPreShuffledAB) and useSubtile
+    if isgfx950mx:
       useFixedSrd2 = True
       tcab = "A" if tc == "MXSA" else "B"
       mxBlock = kernel["ProblemType"]["MXBlock%s"%tcab]
@@ -4183,7 +4184,7 @@ class KernelWriterAssembly(KernelWriter):
       swizzleSize1 = 256 # K direction
       swizzleBlockSize = swizzleSize0 * swizzleSize1 // mxBlock
     else:
-      if isSwizzled:
+      if isSwizzledSubtile:
         swizzleSize0 = 16 # M,N direction
         swizzleSize1 = 32 # K direction for MXFP4 (TODO: use bpe to support different dataTypes)
       else:
@@ -4283,7 +4284,7 @@ class KernelWriterAssembly(KernelWriter):
               idx = indices[i]
               if idx == kernel["ProblemType"]["Index0"] or idx == kernel["ProblemType"]["Index1"]:
                 size = self.sizeRef(idx)
-                if isSwizzled:
+                if isSwizzledSubtile:
                   # tileStart already in block units (WG * roundUp(MT/swizzleSize0))
                   module.add(SAddU32(dst=sgpr(stmp+0), src0=size, src1=(swizzleSize0 - 1), comment="size + %u - 1"%swizzleSize0))
                   module.add(SLShiftRightB32(dst=sgpr(stmp+0), src=sgpr(stmp+0), shiftHex=log2(swizzleSize0), comment="roundup(size/%u)"%swizzleSize0))
@@ -4295,7 +4296,7 @@ class KernelWriterAssembly(KernelWriter):
                 module.add(SSubU32(dst=sgpr(stmp+0), src0=sgpr(stmp+0), src1=1, comment="numLine = min - 1 (0-based index)"))
                 module.addModuleAsFlatItems(self.s_mul_u64_u32(sgpr(stmp+0), sgpr(stmp+1), sgpr(stmp+0), \
                           strideF, comment="numLine * stride"))
-                if isMX:
+                if isgfx950mx:
                   module.add(SAddU32(dst=sgpr("Srd%s+2"%tc), src0=sgpr(stmp+0), src1=extra_bytes, comment="buffer_load limit for %s"%tc))
                 else:
                   # (numLine * stride + DepthU) * bpe  -- mirrors scale path structure

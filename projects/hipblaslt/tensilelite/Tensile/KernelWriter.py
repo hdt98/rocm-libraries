@@ -2742,9 +2742,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.dontAppendCode = False
       self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
-      ###########################################################################
-      # summations loops: open
-      ###########################################################################
+      # Add increment code
+      gsuComponent = Component.GSU.find(self)
+      module.add(gsuComponent.setupNewTile(self, kernel, tensorParametersA, tensorParametersB, tPM))
 
       #TODO: TDM wave separated
       if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
@@ -2758,8 +2758,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["ProblemType"]["MXBlockA"] and kernel["ProblemType"]["MXBlockB"]:
             module.add(self.tdmApplyStreamKOffsetWaveSeparated(kernel, tensorParametersA["MX"], tensorParametersB["MX"]))
 
+      ###########################################################################
+      # summations loops: open
+      ###########################################################################
 
-      self.dontAppendCode = self.dontAppendCode or forceNoTileCode
+      # declare loop num iter
+      if not forceNoTileCode:
+        module.addComment0("declare loop num iterations")
 
       # perform initC in the shadow of the prefetch
       # Prefetch occurs at start of unroll loop
@@ -2771,26 +2776,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
         module.add(self.initC(kernel))
         if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
           module.add(self.initSumUnroll(kernel))
-
-      # open non-unrolled summation loops
-      if not forceNoTileCode:
-        for i in range(kernel["ProblemType"]["NumIndicesSummation"]-1):
-          module.addComment1("summation loop %u"%i)
-          module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, i))
-          if self.states.actualSummationLoops>1:
-            module.add(self.openLoop(kernel, tensorParametersA, tensorParametersB, i))
-        module.add(self.calculateLoopNumIter(kernel, tensorParametersA, tensorParametersB, self.states.unrollIdx))
-
-      if not forceNoTileCode and self.states.staggerUCode:
-        module.add(self.declareStaggerParms(kernel))
-        module.add(self.calculateStagger(kernel, tensorParametersA))
-        if kernel["ProblemType"]["MXBlockA"]:
-          module.add(self.calculateStagger(kernel, tensorParametersA["MX"]))
-        if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-          module.add(self.calculateStagger(kernel,tPM))
-        if kernel["ProblemType"]["MXBlockB"]:
-          module.add(self.calculateStagger(kernel, tensorParametersB["MX"]))
-        module.add(self.calculateStagger(kernel, tensorParametersB))
 
       # open non-unrolled summation loops
       if not forceNoTileCode:
