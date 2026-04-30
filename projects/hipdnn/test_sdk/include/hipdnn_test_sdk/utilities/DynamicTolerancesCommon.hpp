@@ -91,6 +91,41 @@ double computeOutputCastingError(double maxOutputMagnitude)
 }
 
 /**
+ * @brief Computes the additional error when the engine under test may perform multiply-accumulate
+ * in InputType precision rather than the declared ComputeType.
+ *
+ * GEMM-based engines (e.g., MIOpen) may use native fp16/bf16 multiply-accumulate hardware even
+ * when ComputeType is float. Each product then incurs up to InputType::epsilon rounding error
+ * instead of ComputeType::epsilon, and this compounds across k accumulations.
+ *
+ * When InputType == ComputeType (e.g., float/float), the standard gamma term already covers
+ * this and the function returns 0.
+ *
+ * @tparam InputType   Data type of the input tensors (e.g., half, bfloat16).
+ * @tparam ComputeType Declared compute type for accumulation (e.g., float).
+ * @param numberOfAccumulations Number of multiply-accumulate operations per output element.
+ * @param maxProduct Upper bound on |a_i * b_i| for each product term.
+ * @return Additional tolerance due to possible native-precision computation, or 0.0 if not applicable.
+ */
+template <typename InputType, typename ComputeType>
+double computeEngineInputPrecisionError(uint64_t numberOfAccumulations, double maxProduct)
+{
+    auto inputEpsilon  = static_cast<double>(std::numeric_limits<InputType>::epsilon());
+    auto computeEpsilon = static_cast<double>(std::numeric_limits<ComputeType>::epsilon());
+
+    if(inputEpsilon > computeEpsilon)
+    {
+        // Engine may compute each product in InputType precision.
+        // Error per product: inputEpsilon * |product|.
+        // Over k accumulations (assuming statistical bound): sqrt(k) * inputEpsilon * maxProduct.
+        auto k = static_cast<double>(std::max(numberOfAccumulations, uint64_t{1}));
+        return std::sqrt(k) * inputEpsilon * maxProduct;
+    }
+
+    return 0.0;
+}
+
+/**
  * @brief Throws if the computed tolerance exceeds the maximum representable value of OutputType.
  *
  * @tparam OutputType Data type of the output tensor.

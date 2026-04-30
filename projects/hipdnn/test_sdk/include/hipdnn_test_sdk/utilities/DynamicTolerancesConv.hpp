@@ -87,6 +87,12 @@ float calculateConvWrwTolerance(double inputMin,
         += hipdnn_test_sdk::utilities::computeInputCastingError<InputType, ComputeType>(
             sumAbsProductBound);
 
+    // Engine compute-path error: the engine under test may perform multiply-accumulate
+    // in InputType precision (e.g., native fp16 GEMM) rather than ComputeType (fp32).
+    accumulatedTolerance
+        += hipdnn_test_sdk::utilities::computeEngineInputPrecisionError<InputType, ComputeType>(
+            numberOfAccumulations, maxProduct);
+
     // Output casting error
     const double outputCastError
         = hipdnn_test_sdk::utilities::computeOutputCastingError<OutputType, ComputeType>(
@@ -172,6 +178,14 @@ float calculateConvDgradTolerance(
         += hipdnn_test_sdk::utilities::computeInputCastingError<InputType, ComputeType>(
             sumAbsProductBound);
 
+    // Engine compute-path error: the engine under test may perform multiply-accumulate
+    // in InputType precision (e.g., native fp16 GEMM) rather than ComputeType (fp32).
+    // Each product can differ by up to InputType::epsilon * |product|, and this
+    // compounds across numberOfAccumulations terms.
+    accumulatedTolerance
+        += hipdnn_test_sdk::utilities::computeEngineInputPrecisionError<InputType, ComputeType>(
+            numberOfAccumulations, maxProduct);
+
     // Output casting error
     const double outputCastError
         = hipdnn_test_sdk::utilities::computeOutputCastingError<OutputType, ComputeType>(
@@ -252,6 +266,12 @@ float calculateConvFpropTolerance(
     accumulatedTolerance
         += hipdnn_test_sdk::utilities::computeInputCastingError<InputType, ComputeType>(
             sumAbsProductBound);
+
+    // Engine compute-path error: the engine under test may perform multiply-accumulate
+    // in InputType precision (e.g., native fp16 GEMM) rather than ComputeType (fp32).
+    accumulatedTolerance
+        += hipdnn_test_sdk::utilities::computeEngineInputPrecisionError<InputType, ComputeType>(
+            numberOfAccumulations, maxProduct);
 
     // Output casting error
     const double outputCastError
