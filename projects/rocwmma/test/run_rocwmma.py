@@ -22,17 +22,17 @@ def derive_rocm_path(script_dir: Path) -> Path:
     for candidate in (script_dir, *script_dir.parents):
         if (candidate / "bin" / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
             return candidate
-    if script_dir.name == TEST_DIR_NAME and script_dir.parent.name == "bin":
-        return script_dir.parent.parent
-    return script_dir.parent.parent
+    raise RuntimeError(
+        "Could not derive ROCM_PATH from an installed rocWMMA test layout. "
+        "Set ROCM_PATH explicitly."
+    )
 
 
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-    rocm_path = Path(
-        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
-    ).resolve()
-    rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
+    rocm_path_env = os.getenv("ROCM_PATH")
+    rocm_path = Path(rocm_path_env).resolve() if rocm_path_env else derive_rocm_path(script_dir)
+    rocm_bin_dir = Path(os.getenv("ROCM_BIN_DIR") or rocm_path / "bin").resolve()
 
     env = os.environ.copy()
     # GitHub Actions shard arrays are 1-indexed; GTest shard indexes are 0-indexed.
@@ -55,6 +55,9 @@ def main() -> None:
     test_dir = rocm_bin_dir / TEST_DIR_NAME
     if test_subdir:
         test_dir /= test_subdir
+    ctest_file = test_dir / "CTestTestfile.cmake"
+    if not ctest_file.is_file():
+        raise FileNotFoundError(f"Could not find CTest test file: {ctest_file}")
 
     cmd = [
         "ctest",
