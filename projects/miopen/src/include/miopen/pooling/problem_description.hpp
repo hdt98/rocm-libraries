@@ -66,8 +66,6 @@ struct ProblemDescription : ProblemDescriptionBase,
     const PoolingDescriptor& GetPooling() const { return pooling; }
     const TensorDescriptor& GetXDesc() const { return xDesc; }
     const TensorDescriptor& GetYDesc() const { return yDesc; }
-    TensorDescriptor& GetXDesc() { return xDesc; }
-    TensorDescriptor& GetYDesc() { return yDesc; }
 
     const TensorDescriptor& GetDXDesc() const
     {
@@ -140,8 +138,8 @@ struct ProblemDescription : ProblemDescriptionBase,
     // This declaration marks pooling as a primitive with tuning enabled.
     // Any tunable solver would be able pick it and fetch a db instance in ExecutePrimitive.
     // It has to be discoverable via ADL from problem description.
-    friend auto GetDb(const ExecutionContext& context, const ProblemDescriptionTag&)
-        -> PerformanceDb;
+    friend auto GetDb(const ExecutionContext& context,
+                      const ProblemDescriptionTag&) -> PerformanceDb;
 
 private:
     Direction direction;
@@ -183,16 +181,12 @@ private:
     }
     std::string GetDirectionStr() const
     {
-        std::string s;
-
         switch(direction)
         {
         case Direction::Forward: return "Fwd";
         case Direction::Backward: return "Bwd";
         default: MIOPEN_THROW(miopenStatusInvalidValue, "Wrong pooling direction provided");
         }
-
-        return s;
     }
     std::string GetModeStr() const
     {

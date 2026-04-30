@@ -1,28 +1,5 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright 2024-2025 AMD ROCm(TM) Software
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
- *******************************************************************************/
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier: MIT
 
 #pragma once
 
@@ -96,6 +73,46 @@ namespace DGen
         }
     };
 
+    struct Sequential
+    {
+        std::string toString() const
+        {
+            return "Sequential";
+        }
+    };
+
+    struct RowIndex
+    {
+        std::string toString() const
+        {
+            return "RowIndex";
+        }
+    };
+
+    struct ColIndex
+    {
+        std::string toString() const
+        {
+            return "ColIndex";
+        }
+    };
+
+    struct Checkerboard
+    {
+        std::string toString() const
+        {
+            return "Checkerboard";
+        }
+    };
+
+    struct ScaledDiagonal
+    {
+        std::string toString() const
+        {
+            return "ScaledDiagonal";
+        }
+    };
+
     struct TrigonometricFromFloat
     {
         std::string toString() const
@@ -121,6 +138,11 @@ namespace DGen
                                       Identity,
                                       Ones,
                                       Zeros,
+                                      Sequential,
+                                      RowIndex,
+                                      ColIndex,
+                                      Checkerboard,
+                                      ScaledDiagonal,
                                       TrigonometricFromFloat,
                                       NormalFromFloat>;
 
@@ -217,6 +239,16 @@ namespace DGen
         void generate_data_identity(const std::vector<index_t>& size,
                                     const std::vector<index_t>& stride);
         void generate_data_ones();
+        void generate_data_sequential(const std::vector<index_t>& size,
+                                      const std::vector<index_t>& stride);
+        void generate_data_row_index(const std::vector<index_t>& size,
+                                     const std::vector<index_t>& stride);
+        void generate_data_col_index(const std::vector<index_t>& size,
+                                     const std::vector<index_t>& stride);
+        void generate_data_checkerboard(const std::vector<index_t>& size,
+                                        const std::vector<index_t>& stride);
+        void generate_data_scaled_diagonal(const std::vector<index_t>& size,
+                                           const std::vector<index_t>& stride);
         void generate_data_trigonometric_from_float(const std::vector<index_t>& size);
         void generate_data_normal_from_float(const std::vector<index_t>& size,
                                              const float                 mean,
@@ -256,6 +288,13 @@ namespace DGen
                             [&](const Identity&) { generate_data_identity(size, stride); },
                             [&](const Ones&) { generate_data_ones(); },
                             [&](const Zeros&) {},
+                            [&](const Sequential&) { generate_data_sequential(size, stride); },
+                            [&](const RowIndex&) { generate_data_row_index(size, stride); },
+                            [&](const ColIndex&) { generate_data_col_index(size, stride); },
+                            [&](const Checkerboard&) { generate_data_checkerboard(size, stride); },
+                            [&](const ScaledDiagonal&) {
+                                generate_data_scaled_diagonal(size, stride);
+                            },
                             [&](const TrigonometricFromFloat&) {
                                 generate_data_trigonometric_from_float(size);
                             },
@@ -558,6 +597,22 @@ namespace DGen
                                             "number and zero is not include in the bounds.");
         }
 
+        // The requested range falls entirely below the type's minimum representable scale.
+        // This can happen when the scale format has a narrow exponent range (e.g. E4M3, E5M3)
+        // and the requested bounds are smaller than any value the type can represent.
+        // Since zero is within bounds, generate zeros.
+        if(max_scale < min_scale)
+        {
+            if(min <= 0 && 0 <= max)
+            {
+                post_sprinkle(size, min_exp);
+                return;
+            }
+            else
+                throw std::invalid_argument("Invalid bounds: the requested range is not "
+                                            "representable by this type's scale format.");
+        }
+
         std::uniform_int_distribution<> scale_dist(min_scale, max_scale);
 
         // other setup
@@ -585,9 +640,10 @@ namespace DGen
 
             if constexpr(isScaled<DTYPE>())
             {
-                ub_block_scale      = scale_dist(m_gen[tid]);
-                int32_t block_scale = ub_block_scale + scaleBias;
-                std::memcpy(&m_scaleBytes[scale_i], &block_scale, m_scaleDesc.byte_size);
+                ub_block_scale = scale_dist(m_gen[tid]);
+                int32_t stored_scale
+                    = (ub_block_scale + scaleBias) << getScaleMantissaBits<DTYPE>();
+                std::memcpy(&m_scaleBytes[scale_i], &stored_scale, m_scaleDesc.byte_size);
             }
 
             for(index_t block_i = 0; block_i < block_size; block_i++)
@@ -715,6 +771,13 @@ namespace DGen
         max_exp   = std::min(exp_of_max, max_exp);
         max_scale = std::min(exp_of_max, max_scale);
 
+        // The requested |max| falls below the type's minimum representable scale: return zeros.
+        if(max_scale < getScaleUnBiasedEMin<DTYPE>())
+        {
+            post_sprinkle(size, isScaled<DTYPE>() ? -F64BIAS : -F32BIAS);
+            return;
+        }
+
         std::uniform_int_distribution<> scale_dist(getScaleUnBiasedEMin<DTYPE>(), max_scale);
 
         // other setup
@@ -746,9 +809,10 @@ namespace DGen
             //
             if constexpr(isScaled<DTYPE>())
             {
-                ub_block_scale = scale_dist(m_gen[tid]);
-                block_scale    = ub_block_scale + getScaleBias<DTYPE>();
-                std::memcpy(&m_scaleBytes[scale_i], &block_scale, m_scaleDesc.byte_size);
+                ub_block_scale      = scale_dist(m_gen[tid]);
+                block_scale         = ub_block_scale + getScaleBias<DTYPE>();
+                int32_t stored_scale = block_scale << getScaleMantissaBits<DTYPE>();
+                std::memcpy(&m_scaleBytes[scale_i], &stored_scale, m_scaleDesc.byte_size);
             }
 
             for(index_t block_i = 0; block_i < block_size; block_i++)
@@ -896,8 +960,9 @@ namespace DGen
 
                     std::uniform_int_distribution<> scale_dist(scaleMin, scaleMax);
 
-                    const auto s = scale_dist(m_gen[tid]);
-                    std::memcpy(&m_scaleBytes[scale_i], &s, m_scaleDesc.byte_size);
+                    const auto biased_exp = scale_dist(m_gen[tid]);
+                    const int32_t stored  = biased_exp << getScaleMantissaBits<DTYPE>();
+                    std::memcpy(&m_scaleBytes[scale_i], &stored, m_scaleDesc.byte_size);
 
                     // reset per block values
                     max_exp = std::numeric_limits<int32_t>::min();
@@ -924,21 +989,22 @@ namespace DGen
 
         setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
 
+        // Set ALL scales to neutral (1.0) first - this is critical for MX types
+        // Without this, off-diagonal elements have scale=0 which corrupts data interpretation
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+        // Set diagonal elements to 1
 #pragma omp parallel for num_threads(m_num_threads)
         for(index_t i = 0; i < rank; i++)
         {
             const auto diag_index = i * stride[0] + i * stride[1];
             const auto data_index = diag_index * m_dataDesc.byte_size;
-            const auto scale_index
-                = isScaled<DTYPE>() ? (diag_index / m_options.blockScaling) * m_scaleDesc.byte_size
-                                    : 0;
 
             std::memcpy(&m_dataBytes[data_index], &d_one[0], m_dataDesc.byte_size);
-
-            if constexpr(isScaled<DTYPE>())
-            {
-                std::memcpy(&m_scaleBytes[scale_index], &s_one[0], m_scaleDesc.byte_size);
-            }
         }
     }
 
@@ -960,6 +1026,205 @@ namespace DGen
         for(index_t i = 0; i < m_scaleDesc.array_size; i++)
         {
             std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+    }
+
+    template <typename DTYPE>
+    void DataGenerator<DTYPE>::generate_data_sequential(const std::vector<index_t>& size,
+                                                        const std::vector<index_t>& stride)
+    {
+        if(size.size() != 2)
+            throw std::invalid_argument(
+                "Invalid dimensions: Sequential data pattern is valid only for two dimensions.");
+
+        const auto rows = size[0];
+        const auto cols = size[1];
+
+        // Set all scales to neutral (1.0)
+        std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
+        std::vector<uint8_t> d_one(m_dataDesc.byte_size, 0x00);
+        setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t row = 0; row < rows; row++)
+        {
+            for(index_t col = 0; col < cols; col++)
+            {
+                const auto flat_index = row * stride[0] + col * stride[1];
+                const auto data_index = flat_index * m_dataDesc.byte_size;
+
+                // Value = (row * cols + col) mod 256 to keep values small
+                float    value  = static_cast<float>((row * cols + col) % 256);
+                uint64_t result = satConvertToType<DTYPE>(value);
+
+                std::memcpy(&m_dataBytes[data_index], &result, m_dataDesc.byte_size);
+            }
+        }
+    }
+
+    template <typename DTYPE>
+    void DataGenerator<DTYPE>::generate_data_row_index(const std::vector<index_t>& size,
+                                                       const std::vector<index_t>& stride)
+    {
+        if(size.size() != 2)
+            throw std::invalid_argument(
+                "Invalid dimensions: RowIndex data pattern is valid only for two dimensions.");
+
+        const auto rows = size[0];
+        const auto cols = size[1];
+
+        // Set all scales to neutral (1.0)
+        std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
+        std::vector<uint8_t> d_one(m_dataDesc.byte_size, 0x00);
+        setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t row = 0; row < rows; row++)
+        {
+            // Value = row mod 256 to keep values small
+            float    value  = static_cast<float>(row % 256);
+            uint64_t result = satConvertToType<DTYPE>(value);
+
+            for(index_t col = 0; col < cols; col++)
+            {
+                const auto flat_index = row * stride[0] + col * stride[1];
+                const auto data_index = flat_index * m_dataDesc.byte_size;
+
+                std::memcpy(&m_dataBytes[data_index], &result, m_dataDesc.byte_size);
+            }
+        }
+    }
+
+    template <typename DTYPE>
+    void DataGenerator<DTYPE>::generate_data_col_index(const std::vector<index_t>& size,
+                                                       const std::vector<index_t>& stride)
+    {
+        if(size.size() != 2)
+            throw std::invalid_argument(
+                "Invalid dimensions: ColIndex data pattern is valid only for two dimensions.");
+
+        const auto rows = size[0];
+        const auto cols = size[1];
+
+        // Set all scales to neutral (1.0)
+        std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
+        std::vector<uint8_t> d_one(m_dataDesc.byte_size, 0x00);
+        setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t row = 0; row < rows; row++)
+        {
+            for(index_t col = 0; col < cols; col++)
+            {
+                const auto flat_index = row * stride[0] + col * stride[1];
+                const auto data_index = flat_index * m_dataDesc.byte_size;
+
+                // Value = col mod 256 to keep values small
+                float    value  = static_cast<float>(col % 256);
+                uint64_t result = satConvertToType<DTYPE>(value);
+
+                std::memcpy(&m_dataBytes[data_index], &result, m_dataDesc.byte_size);
+            }
+        }
+    }
+
+    template <typename DTYPE>
+    void DataGenerator<DTYPE>::generate_data_checkerboard(const std::vector<index_t>& size,
+                                                          const std::vector<index_t>& stride)
+    {
+        if(size.size() != 2)
+            throw std::invalid_argument(
+                "Invalid dimensions: Checkerboard data pattern is valid only for two dimensions.");
+
+        const auto rows = size[0];
+        const auto cols = size[1];
+
+        std::vector<uint8_t> d_one(m_dataDesc.byte_size, 0x00);
+        std::vector<uint8_t> d_zero(m_dataDesc.byte_size, 0x00);
+        std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
+
+        setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
+        setZero<DTYPE>(s_one.data(), d_zero.data(), 0, 0);
+
+        // Set all scales to neutral (1.0)
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t row = 0; row < rows; row++)
+        {
+            for(index_t col = 0; col < cols; col++)
+            {
+                const auto flat_index = row * stride[0] + col * stride[1];
+                const auto data_index = flat_index * m_dataDesc.byte_size;
+
+                // Checkerboard: (row + col) % 2
+                if((row + col) % 2 == 0)
+                {
+                    std::memcpy(&m_dataBytes[data_index], &d_one[0], m_dataDesc.byte_size);
+                }
+                else
+                {
+                    std::memcpy(&m_dataBytes[data_index], &d_zero[0], m_dataDesc.byte_size);
+                }
+            }
+        }
+    }
+
+    template <typename DTYPE>
+    void DataGenerator<DTYPE>::generate_data_scaled_diagonal(const std::vector<index_t>& size,
+                                                             const std::vector<index_t>& stride)
+    {
+        if(size.size() != 2)
+            throw std::invalid_argument(
+                "Invalid dimensions: ScaledDiagonal data pattern is valid only for two dimensions.");
+
+        const auto rank = std::min(size[0], size[1]);
+
+        // Set all scales to neutral (1.0)
+        std::vector<uint8_t> s_one(m_scaleDesc.byte_size, 0x00);
+        std::vector<uint8_t> d_one(m_dataDesc.byte_size, 0x00);
+        setOne<DTYPE>(s_one.data(), d_one.data(), 0, 0, m_options.forceDenorm);
+
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < m_scaleDesc.array_size; i++)
+        {
+            std::memcpy(&m_scaleBytes[i * m_scaleDesc.byte_size], &s_one[0], m_scaleDesc.byte_size);
+        }
+
+        // Set diagonal elements to (i+1)
+#pragma omp parallel for num_threads(m_num_threads)
+        for(index_t i = 0; i < rank; i++)
+        {
+            const auto diag_index = i * stride[0] + i * stride[1];
+            const auto data_index = diag_index * m_dataDesc.byte_size;
+
+            // Value = i + 1 (so diagonal is 1, 2, 3, 4, ...)
+            float    value  = static_cast<float>(i + 1);
+            uint64_t result = satConvertToType<DTYPE>(value);
+
+            std::memcpy(&m_dataBytes[data_index], &result, m_dataDesc.byte_size);
         }
     }
 
@@ -1352,7 +1617,7 @@ namespace DGen
             data[i] = d;
         }
 
-        return block_scale;
+        return static_cast<uint32_t>(block_scale) << getScaleMantissaBits<DTYPE>();
     }
 
     template <typename DTYPE>
@@ -1498,13 +1763,15 @@ namespace DGen
                         const auto target_scale_i = target_data_i / block_size;
 
                         // get scale
-                        uint32_t biased_scale = 0;
+                        uint32_t stored_scale = 0;
                         if constexpr(isScaled<DTYPE>())
-                            std::memcpy(&biased_scale,
+                            std::memcpy(&stored_scale,
                                         &m_scaleBytes[target_scale_i * m_scaleDesc.byte_size],
                                         m_scaleDesc.byte_size);
 
-                        int32_t unbiased_scale = biased_scale - getScaleBias<DTYPE>();
+                        int32_t unbiased_scale
+                            = static_cast<int32_t>(stored_scale >> getScaleMantissaBits<DTYPE>())
+                              - getScaleBias<DTYPE>();
                         int32_t exp_bound      = unbiased_scale + getDataUnBiasedEMin<DTYPE>();
 
                         if(unbiased_min_exp < exp_bound)

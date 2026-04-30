@@ -127,6 +127,8 @@ struct _rocblaslt_matrix_layout
     int32_t          batch_count  = 1;
     int64_t          batch_stride = 0;
     hipblasLtOrder_t order        = HIPBLASLT_ORDER_COL;
+    // Batch Mode
+    hipblasLtBatchMode_t batch_mode = HIPBLASLT_BATCH_MODE_STRIDED;    
 };
 
 /********************************************************************************
@@ -167,9 +169,9 @@ struct _rocblaslt_matmul_desc
     //
     rocblaslt_compute_type compute_type;
     rocblaslt_compute_type compute_type_original;
-    hipDataType            compute_input_typeA;
-    hipDataType            compute_input_typeB;
-    hipDataType            scale_type = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            compute_input_typeA = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            compute_input_typeB = HIPBLASLT_DATATYPE_INVALID;
+    hipDataType            scale_type          = HIPBLASLT_DATATYPE_INVALID;
 
     RocblasltContractionProblem::ScalingFormat scaleAType
         = RocblasltContractionProblem::ScalingFormat::None;

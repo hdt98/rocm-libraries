@@ -211,6 +211,8 @@ const char* rocblaslt_matrix_layout_attributes_to_string(rocblaslt_matrix_layout
         return "ROCBLASLT_MATRIX_LAYOUT_COLS";
     case ROCBLASLT_MATRIX_LAYOUT_LD:
         return "ROCBLASLT_MATRIX_LAYOUT_LD";
+    case ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE:
+        return "ROCBLASLT_MATRIX_LAYOUT_BATCH_MODE";        
     case ROCBLASLT_MATRIX_LAYOUT_MAX:
         return "ROCBLASLT_MATRIX_LAYOUT_MAX";
     default:
@@ -288,6 +290,35 @@ const char* hipblasOperation_to_string(hipblasOperation_t op)
     }
 }
 
+const char* rocblaslt_scaling_format_to_string(RocblasltContractionProblem::ScalingFormat type)
+{
+    switch(type)
+    {
+    case RocblasltContractionProblem::ScalingFormat::None:
+        return "None";
+    case RocblasltContractionProblem::ScalingFormat::Scalar:
+        return "Scalar";
+    case RocblasltContractionProblem::ScalingFormat::Vector:
+        return "Vector";
+    case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0:
+        return "Block_32_UE8M0";
+    case RocblasltContractionProblem::ScalingFormat::Block_32_UE8M0_32_8_EXT:
+        return "Block_32_UE8M0_32_8_EXT";
+    case RocblasltContractionProblem::ScalingFormat::Block_16_UE8M0:
+        return "Block_16_UE8M0";
+    case RocblasltContractionProblem::ScalingFormat::Block_32_UE4M3:
+        return "Block_32_UE4M3";
+    case RocblasltContractionProblem::ScalingFormat::Block_16_UE4M3:
+        return "Block_16_UE4M3";
+    case RocblasltContractionProblem::ScalingFormat::Block_32_UE5M3:
+        return "Block_32_UE5M3";
+    case RocblasltContractionProblem::ScalingFormat::Block_16_UE5M3:
+        return "Block_16_UE5M3";
+    default:
+        return "Invalid";
+    }
+}
+
 const char* rocblaslt_layer_mode2string(rocblaslt_layer_mode layer_mode)
 {
     switch(layer_mode)
@@ -335,6 +366,8 @@ const char* rocblaslt_epilogue_to_string(rocblaslt_epilogue epilogue)
         return "EPILOGUE_GELU";
     case ROCBLASLT_EPILOGUE_DGELU:
         return "EPILOGUE_DGELU";
+    case ROCBLASLT_EPILOGUE_DRELU:
+        return "EPILOGUE_DRELU";    
     case ROCBLASLT_EPILOGUE_GELU_BIAS:
         return "EPILOGUE_GELU_BIAS";
     case ROCBLASLT_EPILOGUE_GELU_AUX:
@@ -344,9 +377,11 @@ const char* rocblaslt_epilogue_to_string(rocblaslt_epilogue epilogue)
     case ROCBLASLT_EPILOGUE_DGELU_BGRAD:
         return "EPILOGUE_DGELU_BGRAD";
     case ROCBLASLT_EPILOGUE_BGRADA:
-        return "EPILOGUE_DGELU_BGRADA";
+        return "EPILOGUE_BGRADA";
     case ROCBLASLT_EPILOGUE_BGRADB:
-        return "EPILOGUE_DGELU_BGRADB";
+        return "EPILOGUE_BGRADB";
+    case ROCBLASLT_EPILOGUE_DRELU_BGRAD:
+        return "EPILOGUE_DRELU_BGRAD";
     case ROCBLASLT_EPILOGUE_SIGMOID:
         return "EPILOGUE_SIGMOID";        
     case ROCBLASLT_EPILOGUE_SWISH_EXT:
@@ -370,7 +405,7 @@ std::string rocblaslt_matrix_layout_to_string(rocblaslt_matrix_layout mat)
 {
     std::string             format = mat->batch_count <= 1
                                          ? "[type=%s rows=%d cols=%d ld=%d]\0"
-                                         : "[type=%s rows=%d cols=%d ld=%d batch_count=%d batch_stride=%d]\0";
+                                         : "[type=%s rows=%d cols=%d ld=%d batch_count=%d batch_stride=%d batch_mode=%d]\0";
     std::unique_ptr<char[]> buf(new char[255]);
     if(mat->batch_count <= 1)
         std::sprintf(
@@ -383,7 +418,8 @@ std::string rocblaslt_matrix_layout_to_string(rocblaslt_matrix_layout mat)
                      mat->n,
                      mat->ld,
                      mat->batch_count,
-                     mat->batch_stride);
+                     mat->batch_stride,
+                     mat->batch_mode);
     return std::string(buf.get());
 }
 std::string rocblaslt_matmul_desc_to_string(rocblaslt_matmul_desc matmul_desc)
