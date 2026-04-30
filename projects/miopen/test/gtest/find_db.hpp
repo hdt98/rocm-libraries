@@ -32,6 +32,20 @@ private:
     bool cached;
 };
 
+// Restore debug::testing_find_db_path_override() on scope exit. Without this, a
+// TempFile-backed override outlives the directory it points at, and any later
+// test that touches find-db reuses the cached RamDb (and its FSLockFile)
+// against a now-deleted parent directory.
+struct TestFindDbPathOverrideGuard
+{
+    TestFindDbPathOverrideGuard() : cached(debug::testing_find_db_path_override()) {}
+
+    ~TestFindDbPathOverrideGuard() { debug::testing_find_db_path_override() = cached; }
+
+private:
+    std::optional<fs::path> cached;
+};
+
 inline auto Duration(const std::function<void()>& func)
 {
     const auto start = std::chrono::steady_clock::now();
@@ -68,6 +82,7 @@ struct find_db_driver
         y_dev = handle.Write(y.data);
 
         const TempFile temp_file{"miopen.test.find_db"};
+        TestFindDbPathOverrideGuard find_db_path_override;
         debug::testing_find_db_path_override() = temp_file;
         TestRordbEmbedFsOverrideLock rordb_embed_fs_override;
 
