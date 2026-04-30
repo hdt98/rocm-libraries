@@ -129,18 +129,18 @@ public:
 		padding_factor(padding_factor)
     {
         size_t free_dev_mem;
-        HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_mem_limit));
-        dev_usage = dev_mem_limit - free_dev_mem;
+        HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_limit));
+        dev_usage = dev_limit - free_dev_mem;
 
 #ifdef _WIN32
         MEMORYSTATUSEX mem_status;
         mem_status.dwLength = sizeof(mem_status);
         GlobalMemoryStatusEx(&mem_status);
-        host_mem_limit = mem_status.ullTotalPhys;
+        host_limit = mem_status.ullTotalPhys;
         host_usage = mem_status.ullTotalPhys - mem_status.ullAvailPhys;
 #else
-        host_mem_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
-        host_usage = host_mem_limit - sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+        host_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+        host_usage = host_limit - sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 #endif
 
         hipDeviceProp_t props;
@@ -148,8 +148,8 @@ public:
         is_apu = static_cast<bool>(props.integrated);
 
 #ifdef MEMCHECK_LOGGING
-        std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_mem_limit)
-                  << " MiB, host " << toMB(host_usage) << "/" << toMB(host_mem_limit)
+        std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
+                  << " MiB, host " << toMB(host_usage) << "/" << toMB(host_limit)
                   << " MiB, is_apu=" << is_apu << std::endl;
 #endif
     }
@@ -238,7 +238,7 @@ private:
 
     bool mem_check_host()
     {
-        const size_t host_limit_padded = static_cast<size_t>(host_mem_limit * (1 - padding_factor));
+        const size_t host_limit_padded = static_cast<size_t>(host_limit * (1 - padding_factor));
 
         bool success;
         if (is_apu)
@@ -270,7 +270,7 @@ private:
 
     bool mem_check_device()
     {
-        const size_t dev_limit_padded = static_cast<size_t>(dev_mem_limit * (1 - padding_factor));
+        const size_t dev_limit_padded = static_cast<size_t>(dev_limit * (1 - padding_factor));
 
         bool success;
         if (is_apu)
@@ -280,7 +280,7 @@ private:
             // Both subtractions below are guarded: if dev_limit > host_limit or
             // spill > dev_limit, the unsigned subtraction would wrap around to a
             // large value, making the check silently pass when memory is exhausted.
-            const size_t host_limit = static_cast<size_t>(host_mem_limit * (1 - padding_factor));
+            const size_t host_limit = static_cast<size_t>(host_limit * (1 - padding_factor));
             size_t host_unshared_limit = dev_limit_padded <= host_limit ? host_limit - dev_limit_padded : 0UL;
             size_t spill = host_usage > host_unshared_limit ?
                            host_usage - host_unshared_limit : 0UL;
@@ -308,8 +308,8 @@ private:
     }
 
 	bool is_apu;
-	size_t host_mem_limit;
-	size_t dev_mem_limit;
+	size_t host_limit;
+	size_t dev_limit;
 	float padding_factor;
 	size_t host_usage;
 	size_t dev_usage;
