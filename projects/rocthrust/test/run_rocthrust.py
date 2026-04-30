@@ -95,12 +95,21 @@ def derive_rocm_path(script_dir: Path) -> Path:
     for candidate in (script_dir, *script_dir.parents):
         if (candidate / "bin" / TEST_DIR_NAME / "CTestTestfile.cmake").is_file():
             return candidate
-    if script_dir.name == TEST_DIR_NAME and script_dir.parent.name == "bin":
-        return script_dir.parent.parent
-    return script_dir.parent.parent
+    raise RuntimeError(
+        "ROCM_PATH is required when run_rocthrust.py is not executed from an "
+        "installed ROCm tree containing bin/rocthrust/CTestTestfile.cmake."
+    )
 
 
-def build_env(rocm_path: Path, rocm_bin_dir: Path) -> dict[str, str]:
+def get_rocm_lib_dir(rocm_path: Path) -> Path:
+    for name in ("lib", "lib64"):
+        lib_dir = rocm_path / name
+        if lib_dir.is_dir():
+            return lib_dir
+    return rocm_path / "lib"
+
+
+def build_env(rocm_path: Path, rocm_bin_dir: Path):
     env = os.environ.copy()
     env["PATH"] = (
         f"{rocm_bin_dir}{os.pathsep}{env['PATH']}"
@@ -109,7 +118,7 @@ def build_env(rocm_path: Path, rocm_bin_dir: Path) -> dict[str, str]:
     )
     env["ROCM_PATH"] = str(rocm_path)
 
-    lib_path = rocm_path / "lib"
+    lib_path = get_rocm_lib_dir(rocm_path)
     existing_ld_path = env.get("LD_LIBRARY_PATH")
     env["LD_LIBRARY_PATH"] = (
         f"{lib_path}{os.pathsep}{existing_ld_path}"
@@ -121,17 +130,28 @@ def build_env(rocm_path: Path, rocm_bin_dir: Path) -> dict[str, str]:
 
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-    rocm_path = Path(
-        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
-    ).resolve()
+    rocm_path_env = os.getenv("ROCM_PATH")
+    rocm_path = (
+        Path(rocm_path_env).resolve()
+        if rocm_path_env
+        else derive_rocm_path(script_dir)
+    )
     rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
     test_dir = rocm_bin_dir / TEST_DIR_NAME
     resource_spec_file = test_dir / "resources.json"
+    ctest_file = test_dir / "CTestTestfile.cmake"
+    resource_spec_generator = test_dir / exe_name("generate_resource_spec")
+    if not ctest_file.is_file():
+        raise FileNotFoundError(f"rocThrust CTest file not found at {ctest_file}")
+    if not resource_spec_generator.is_file():
+        raise FileNotFoundError(
+            f"rocThrust resource spec generator not found at {resource_spec_generator}"
+        )
 
     env = build_env(rocm_path, rocm_bin_dir)
 
     res_gen_cmd = [
-        str(test_dir / exe_name("generate_resource_spec")),
+        str(resource_spec_generator),
         str(resource_spec_file),
     ]
     logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(res_gen_cmd)}")
