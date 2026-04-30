@@ -331,10 +331,15 @@ struct CShuffleEpilogue
             }();
 #if defined(CK_GFX950_SUPPORT)
             // gfx950: 64-bank LDS needs 3-bit XOR, which requires VectorLen=4
+            // Only reduce VectorLen if it actually enables the 3-bit XOR; otherwise
+            // the reduction wastes load/store width without bank-spread benefit
+            // (e.g. fp16 4x1 with N=16 can never satisfy 3-bit XOR even at
+            // VectorLen=4, so we keep BaseVectorLen=8 for wider ds_read_b128).
             constexpr bool needs_vec_reduction_to_4 =
                 (MPerXdl == 16) &&
                 ((1 << (log2_base_vec + 3)) > NPerIterationShuffle) && // +3 for 3-bit XOR
-                (BaseVectorLen > 4);
+                (BaseVectorLen > 4) &&
+                (NPerIterationShuffle >= 32); // XOR must actually become applicable
             constexpr index_t VectorLen = needs_vec_reduction_to_4 ? 4 : BaseVectorLen;
 #else
             // gfx942: 32-bank LDS works with 2-bit XOR, VectorLen=8 is sufficient
