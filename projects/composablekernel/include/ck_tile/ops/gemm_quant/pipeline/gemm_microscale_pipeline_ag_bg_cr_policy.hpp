@@ -22,6 +22,16 @@ struct GemmMicroscalePipelineAgBgCrPolicy : public UniversalGemmPipelineAgBgCrPo
     using BLdsDataType_ = std::conditional_t<Problem::BCastPolicy == CastPolicy::BeforeLDSWrite,
                                              typename Problem::BComputeDataType,
                                              typename Problem::BDataType>;
+
+    template <typename Problem>
+    static constexpr bool is_b_load_tr =
+        Base::template is_b_load_tr<Problem>
+    // TODO: if enabled AttrNumAccess can enable this in gfx13
+#if defined(__gfx13__)
+        && std::is_same_v<BLdsDataType_<Problem>, typename Problem::BComputeDataType>
+#endif
+        ;
+
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto GetVectorSizeBQ()
     {

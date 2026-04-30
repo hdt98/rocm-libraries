@@ -84,7 +84,7 @@ struct UniversalGemmBasePolicy
     template <typename Problem>
     using BLdsDataType_ = typename LdsDataTypes_<Problem>::BType;
 
-#if defined(__gfx950__) || defined(__gfx125__)
+#if defined(__gfx950__) || defined(__gfx125__) || defined(__gfx13__)
     // The combination of pk_int4_t and transposed loading causes numerical errors.
     // Therefore do not use transposed loading in this case.
     // Also, transpose load (ds_read_tr) requires specific tile distribution patterns
@@ -93,9 +93,11 @@ struct UniversalGemmBasePolicy
     // - For 2-byte types (fp16/bf16): K warp tile <= 32
     template <typename T>
     static constexpr bool supports_transpose_load =
-        std::is_same_v<T, pk_fp4_t> || std::is_same_v<T, fp16_t> || std::is_same_v<T, bf16_t> ||
-        std::is_same_v<T, fp8_t> || std::is_same_v<T, bf8_t> || std::is_same_v<T, int8_t> ||
-        std::is_same_v<T, uint8_t>;
+#if !defined(__gfx13__)
+        std::is_same_v<T, pk_fp4_t> ||
+#endif
+        std::is_same_v<T, fp16_t> || std::is_same_v<T, bf16_t> || std::is_same_v<T, fp8_t> ||
+        std::is_same_v<T, bf8_t> || std::is_same_v<T, int8_t> || std::is_same_v<T, uint8_t>;
 
     template <typename Problem>
     static constexpr bool is_a_load_tr = []() {
@@ -108,7 +110,9 @@ struct UniversalGemmBasePolicy
             return false;
         else
         {
-#if defined(__gfx950__)
+            // TODO: disable gfx13's constraint after fixing tile_example_gemm_mixed_prec which tile
+            // shape is wrong
+#if defined(__gfx950__) || defined(__gfx13__)
             using WarpTile                  = typename Problem::BlockGemmShape::WarpTile;
             constexpr index_t kKWarpTile    = WarpTile::at(number<2>{});
             constexpr index_t kMaxKWarpTile = (sizeof(ADataType) == 1) ? 64 : 32;
@@ -130,7 +134,7 @@ struct UniversalGemmBasePolicy
             return false;
         else
         {
-#if defined(__gfx950__)
+#if defined(__gfx950__) || defined(__gfx13__)
             using WarpTile                  = typename Problem::BlockGemmShape::WarpTile;
             constexpr index_t kKWarpTile    = WarpTile::at(number<2>{});
             constexpr index_t kMaxKWarpTile = (sizeof(BLdsDataType) == 1) ? 64 : 32;
