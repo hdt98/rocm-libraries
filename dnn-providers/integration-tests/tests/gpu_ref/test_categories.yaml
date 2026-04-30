@@ -1,11 +1,14 @@
 # hipDNN GPU Reference Test Categories
 #
-# quick and nightly are disjoint and together cover all tests.
+# quick and comprehensive are disjoint and together cover all tests.
 # Only quick carries unit_test so ninja unit-check is the fast developer path.
 # ninja check (bare ctest) runs both categories.
 #
-# Shapes are prefixed: Small* (quick), Medium*/Large* (nightly)
+# Shapes are prefixed: Small* (quick), Medium*/Large* (comprehensive)
 # Standalone (non-parameterized) tests start with Test*
+#
+# Category names match test_runner.py VALID_TEST_CATEGORIES so TheRock CI
+# can run: TEST_TYPE=comprehensive to exercise medium/large shapes.
 
 test_categories:
   quick:
@@ -17,16 +20,16 @@ test_categories:
       - "quick"
       - "unit_test"
 
-  nightly:
-    description: "Medium + Large shapes - Run nightly"
+  comprehensive:
+    description: "Medium + Large shapes - Run via TEST_TYPE=comprehensive"
     test_patterns:
       - "Medium*"
       - "Large*"
     labels:
-      - "nightly"
+      - "comprehensive"
 
 execution_settings:
   default_timeout: 300
   category_timeouts:
     quick: 300
-    nightly: 1800
+    comprehensive: 1800

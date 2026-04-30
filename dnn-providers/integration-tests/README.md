@@ -9,9 +9,9 @@ Integration tests for hipDNN provider implementations.
 | Command | What runs | Use case |
 |---------|-----------|----------|
 | `ninja unit-check` | Quick tests only | Fast developer iteration |
-| `ninja check` | All tests (quick + nightly) | Full validation |
+| `ninja check` | All tests (quick + comprehensive) | Full validation |
 | `ctest -L quick` | Quick gpu_ref only | Small shapes + standalone tests |
-| `ctest -L nightly` | Nightly gpu_ref only | Medium + Large shapes |
+| `ctest -L comprehensive` | Comprehensive gpu_ref only | Medium + Large shapes |
 
 ### Direct binary invocation
 
@@ -19,7 +19,7 @@ Integration tests for hipDNN provider implementations.
 # Quick only: small shapes + standalone tests
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Small*:Test*"
 
-# Nightly only: medium + large shapes
+# Comprehensive only: medium + large shapes
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Medium*:Large*"
 
 # Run everything

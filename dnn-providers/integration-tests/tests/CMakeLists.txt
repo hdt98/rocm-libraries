@@ -80,21 +80,21 @@ set_target_properties(hipdnn_gpu_ref_tests PROPERTIES
 install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # -- YAML-based test categories (generates ctest entries with gtest filters) --
-# quick and nightly are disjoint and together cover all tests. Only quick carries
-# unit_test so ninja unit-check is fast; ninja check (bare ctest) runs both.
-# See shared/ctest/README.md for the full architecture.
-#
-# We do NOT add hipdnn_gpu_ref_tests to INTEGRATION_TESTS_TEST_TARGETS because
-# install_integration_tests_ctest_files() would write a bare add_test() (no
-# gtest filter), causing the installed CTestTestfile to run ALL tests unfiltered.
-# Instead, the 4th parameter writes YAML-filtered entries to a staging file that
-# is appended to the installed CTestTestfile after install_integration_tests_ctest_files().
-set(GPU_REF_INSTALL_CTEST_STAGING "${CMAKE_BINARY_DIR}/gpu_ref_install_ctest.cmake.staging"
-    CACHE INTERNAL "Staging file for gpu_ref install-time ctest entries")
-file(WRITE "${GPU_REF_INSTALL_CTEST_STAGING}" "")
+# quick and comprehensive are disjoint and together cover all tests. Only quick
+# carries unit_test so ninja unit-check is fast; ninja check (bare ctest) runs both.
 include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
 apply_test_category_labels(
     hipdnn_gpu_ref_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/gpu_ref/test_categories.yaml"
-    "${CMAKE_CURRENT_BINARY_DIR}"
-    "${GPU_REF_INSTALL_CTEST_STAGING}")
+    "${CMAKE_CURRENT_BINARY_DIR}")
+
+# -- Install staging: quick only --
+# TheRock CI runs bare ctest on the installed CTestTestfile (no -L filter).
+# Only quick entries are installed so comprehensive tests don't time out in CI.
+# Comprehensive tests still run locally via: ctest -L comprehensive
+# Source of truth for patterns: tests/gpu_ref/test_categories.yaml
+set(GPU_REF_INSTALL_CTEST_STAGING "${CMAKE_BINARY_DIR}/gpu_ref_install_ctest.cmake.staging"
+    CACHE INTERNAL "Staging file for gpu_ref install-time ctest entries")
+file(WRITE "${GPU_REF_INSTALL_CTEST_STAGING}"
+    "add_test(hipdnn_gpu_ref_tests_quick_suite \"../hipdnn_gpu_ref_tests\" --gtest_filter=Small*:Test*)\n"
+    "set_tests_properties(hipdnn_gpu_ref_tests_quick_suite PROPERTIES LABELS \"quick\;unit_test\" TIMEOUT 300)\n")
