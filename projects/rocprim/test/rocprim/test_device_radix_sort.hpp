@@ -1314,19 +1314,10 @@ std::cout << "testing with size: " << size << std::endl;
 
 test_utils::MemCheck memcheck;
 
-        // QA is also testing on APU platforms with only 32GB of system memory
-        // shared amongst the host and device.  Trim maximum size under these
-        // conditions.  This is a temporary coding workaround until we come up
-        // with a properly-engineered memory management system for the unit tests.
-//        bool is_apu = test_utils::is_apu(arch);
-//        if (is_apu && test_utils::get_total_system_memory(true) <= test_utils::minimum_memory_required_bytes
-//            && size >= (size_t{1} << 33))
-//        {
-//            std::cout << "Insufficient APU system memory. Skipping test for size = " << size << std::endl;
-//            break;
-//        }
-
-if (!memcheck.alloc_device<key_type>(size)) GTEST_SKIP() << "skip 1";
+if (!memcheck.alloc_device<key_type>(size))
+{
+    break;
+}
         common::device_ptr<key_type> d_keys;
         if(!d_keys.resize_with_memory_check(size))
         {
@@ -1336,7 +1327,10 @@ if (!memcheck.alloc_device<key_type>(size)) GTEST_SKIP() << "skip 1";
 
         // Generate data
         {
-if (!memcheck.alloc_host<key_type>(size)) GTEST_SKIP() << "skip 2";
+if (!memcheck.alloc_host<key_type>(size))
+{
+    break;
+}
             std::vector<key_type> keys_input(size);
             std::iota(keys_input.begin(), keys_input.end(), 0);
             d_keys.store(keys_input);
@@ -1353,8 +1347,11 @@ memcheck.free_host<key_type>(size);
                                            end_bit,
                                            stream));
 
-if (!memcheck.alloc_device_bytes(temporary_storage_bytes)) GTEST_SKIP() << "skip 3";
-        ASSERT_GT(temporary_storage_bytes, 0U);
+if (!memcheck.alloc_device_bytes(temporary_storage_bytes))
+{
+    break;
+}
+    ASSERT_GT(temporary_storage_bytes, 0U);
         common::device_ptr<void> d_temporary_storage;
         if(!d_temporary_storage.resize_with_memory_check(temporary_storage_bytes))
         {
@@ -1371,7 +1368,10 @@ if (!memcheck.alloc_device_bytes(temporary_storage_bytes)) GTEST_SKIP() << "skip
                                            end_bit,
                                            stream));
 
-if (!memcheck.alloc_host_bytes(d_keys.msize())) GTEST_SKIP() << "skip 4";
+if (!memcheck.alloc_host_bytes(d_keys.msize()))
+{
+    break;
+}
         const auto keys_output = d_keys.load();
 
         // Check if output values are as expected

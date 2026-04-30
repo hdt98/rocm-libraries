@@ -145,8 +145,8 @@ public:
         HIP_CHECK(hipGetDeviceProperties(&props, 0));
         is_apu = static_cast<bool>(props.integrated);
 
-        std::cout << "MemCheck: device " << (dev_usage >> 20) << "/" << (dev_mem_limit >> 20)
-                  << " MiB, host " << (host_usage >> 20) << "/" << (host_mem_limit >> 20)
+        std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_mem_limit)
+                  << " MiB, host " << toMB(host_usage) << "/" << toMB(host_mem_limit)
                   << " MiB, is_apu=" << is_apu << std::endl;
     }
 
@@ -155,14 +155,14 @@ public:
     inline bool alloc_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nAlloc host usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc host usage (sizeof(T): " << sizeof(T) << "): " << toMB(bytes) << std::endl;
         this->host_usage += bytes;
         return this->mem_check_host();
     }
 
     inline bool alloc_host_bytes(const size_t bytes)
     {
-        std::cout << "\nAlloc host usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc host usage: " << toMB(bytes) << std::endl;
         this->host_usage += bytes;
         return this->mem_check_host();
     }
@@ -171,13 +171,13 @@ public:
     inline void free_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nFree host usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nFree host usage: " << toMB(bytes) << std::endl;
         this->host_usage -= bytes;
     }
 
     inline void free_host_bytes(const size_t bytes)
     {
-        std::cout << "\nFree host usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nFree host usage: " << toMB(bytes) << std::endl;
         this->host_usage -= bytes;
     }
 
@@ -186,14 +186,14 @@ public:
     inline bool alloc_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nAlloc dev usage (sizeof(T): " << sizeof(T) << "): " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc dev usage (sizeof(T): " << sizeof(T) << "): " << toMB(bytes) << std::endl;
         this->dev_usage += bytes;
         return this->mem_check_device();
     }
 
     inline bool alloc_device_bytes(const size_t bytes)
     {
-        std::cout << "\nAlloc dev usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nAlloc dev usage: " << toMB(bytes) << std::endl;
         this->dev_usage += bytes;
         return this->mem_check_device();
     }
@@ -202,31 +202,33 @@ public:
     inline void free_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-        std::cout << "\nFree dev usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nFree dev usage: " << toMB(bytes) << std::endl;
         this->dev_usage -= bytes;
     }
 
     inline void free_device_bytes(const size_t bytes)
     {
-        std::cout << "\nFree dev usage: " << (bytes >> 20) << std::endl;
+        std::cout << "\nFree dev usage: " << toMB(bytes) << std::endl;
         this->dev_usage -= bytes;
     }
 
 private:
+
+    static size_t toMB(size_t bytes) { return bytes >> 20; }
 
     bool mem_check_host()
     {
         const size_t host_limit = static_cast<size_t>(host_mem_limit * (1 - padding_factor));
 
         std::cout << "mem_check_host()" << std::endl;
-        std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
-        std::cout << "    host limit (padded): " << (host_limit >> 20) << std::endl;
+        std::cout << "    host usage: " << toMB(host_usage) << std::endl;
+        std::cout << "    host limit (padded): " << toMB(host_limit) << std::endl;
 
         bool success = false;
         if (is_apu)
         {
             // assume all device usage is shared and subtracts from host memory
-            std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
+            std::cout << "    device usage: " << toMB(dev_usage) << std::endl;
             // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
             // the unsigned subtraction wraps around to a large value, causing the check to
             // silently pass (false success) even when memory is exhausted.
@@ -245,8 +247,8 @@ private:
         const size_t dev_limit = static_cast<size_t>(dev_mem_limit * (1 - padding_factor));
 
         std::cout << "mem_check_device()" << std::endl;
-        std::cout << "    device usage: " << (dev_usage >> 20) << std::endl;
-        std::cout << "    device limit (padded): " << (dev_limit >> 20) << std::endl;
+        std::cout << "    device usage: " << toMB(dev_usage) << std::endl;
+        std::cout << "    device limit (padded): " << toMB(dev_limit) << std::endl;
 
         bool success = false;
         if (is_apu)
@@ -261,8 +263,8 @@ private:
             size_t spill = host_usage > host_unshared_limit ?
                            host_usage - host_unshared_limit : 0UL;
 
-            std::cout << "    host usage: " << (host_usage >> 20) << std::endl;
-            std::cout << "    spill into device: " << (spill >> 20) << std::endl;
+            std::cout << "    host usage: " << toMB(host_usage) << std::endl;
+            std::cout << "    spill into device: " << toMB(spill) << std::endl;
 
             success = spill <= dev_limit && dev_usage <= dev_limit - spill;
         }
