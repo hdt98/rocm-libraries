@@ -1,0 +1,5 @@
+outs:
+- md5: 132a3130278a039fa2cda7174f781511
+  size: 1182
+  hash: md5
+  path: BNorm_Inference_Bench_1.tar.gz
