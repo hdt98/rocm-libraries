@@ -63,7 +63,7 @@ clang_tidy_check(hipdnn_gpu_ref_tests)
 
 # -- Infra setup (RPATH, install, test-name validation) --
 # We don't use add_unit_test_target() here because it registers an unfiltered
-# ctest entry that would overlap with the YAML-generated category suites,
+# ctest entry that would overlap with the filtered quick/comprehensive suites,
 # causing every test to run twice under ninja check / ninja unit-check.
 set(CHECK_DEPENDS_GLOBAL ${CHECK_DEPENDS_GLOBAL} hipdnn_gpu_ref_tests
     CACHE INTERNAL "Accumulated global dependencies for test name validation" FORCE)
@@ -79,22 +79,36 @@ set_target_properties(hipdnn_gpu_ref_tests PROPERTIES
     BUILD_RPATH_USE_ORIGIN TRUE)
 install(TARGETS hipdnn_gpu_ref_tests RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-# -- YAML-based test categories (generates ctest entries with gtest filters) --
-# quick and comprehensive are disjoint and together cover all tests. Only quick
-# carries unit_test so ninja unit-check is fast; ninja check (bare ctest) runs both.
-include(${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake)
-apply_test_category_labels(
-    hipdnn_gpu_ref_tests
-    "${CMAKE_CURRENT_SOURCE_DIR}/gpu_ref/test_categories.yaml"
-    "${CMAKE_CURRENT_BINARY_DIR}")
+# -- ctest entries with gtest filters (disjoint, label-based grouping) --
+# Each entry runs one prefix. Labels control which tiers include it.
+# ctest -L standard  →  runs quick + standard entries (both carry "standard" label).
+# No YAML needed — YAML can be adopted later for per-GPU exclusions or multiple binaries.
+add_test(NAME hipdnn_gpu_ref_tests_quick
+    COMMAND hipdnn_gpu_ref_tests --gtest_filter=Small*)
+set_tests_properties(hipdnn_gpu_ref_tests_quick PROPERTIES
+    LABELS "quick;standard;comprehensive;full;unit_test" TIMEOUT 300)
+
+add_test(NAME hipdnn_gpu_ref_tests_standard
+    COMMAND hipdnn_gpu_ref_tests --gtest_filter=Test*)
+set_tests_properties(hipdnn_gpu_ref_tests_standard PROPERTIES
+    LABELS "standard;comprehensive;full;unit_test" TIMEOUT 600)
+
+add_test(NAME hipdnn_gpu_ref_tests_comprehensive
+    COMMAND hipdnn_gpu_ref_tests --gtest_filter=Medium*)
+set_tests_properties(hipdnn_gpu_ref_tests_comprehensive PROPERTIES
+    LABELS "comprehensive;full" TIMEOUT 1800)
+
+add_test(NAME hipdnn_gpu_ref_tests_full
+    COMMAND hipdnn_gpu_ref_tests --gtest_filter=Large*)
+set_tests_properties(hipdnn_gpu_ref_tests_full PROPERTIES
+    LABELS "full" TIMEOUT 3600)
 
 # -- Install staging: quick only --
 # TheRock CI runs bare ctest on the installed CTestTestfile (no -L filter).
 # Only quick entries are installed so comprehensive tests don't time out in CI.
-# Comprehensive tests still run locally via: ctest -L comprehensive
-# Source of truth for patterns: tests/gpu_ref/test_categories.yaml
+# Other tiers run locally via: ctest -L standard / comprehensive / full
 set(GPU_REF_INSTALL_CTEST_STAGING "${CMAKE_BINARY_DIR}/gpu_ref_install_ctest.cmake.staging"
     CACHE INTERNAL "Staging file for gpu_ref install-time ctest entries")
 file(WRITE "${GPU_REF_INSTALL_CTEST_STAGING}"
-    "add_test(hipdnn_gpu_ref_tests_quick_suite \"../hipdnn_gpu_ref_tests\" --gtest_filter=Small*:Test*)\n"
-    "set_tests_properties(hipdnn_gpu_ref_tests_quick_suite PROPERTIES LABELS \"quick\;unit_test\" TIMEOUT 300)\n")
+    "add_test(hipdnn_gpu_ref_tests_quick \"../hipdnn_gpu_ref_tests\" --gtest_filter=Small*)\n"
+    "set_tests_properties(hipdnn_gpu_ref_tests_quick PROPERTIES LABELS \"quick\" TIMEOUT 300)\n")
