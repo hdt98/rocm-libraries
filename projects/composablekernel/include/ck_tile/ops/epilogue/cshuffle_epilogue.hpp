@@ -345,17 +345,47 @@ struct CShuffleEpilogue
 #endif
             constexpr index_t MLdsLayerRequired =
                 banks * BytesPerBank / NPerIterationShuffle / DataTypeSize;
-            // Cap MLdsLayer so v2 (= M / MLdsLayer) keeps at least 2 lane bits per
-            // wave -> the M-band high bits flow into the LDS row index and reach
-            // the bank-bit range. Without this cap, narrow-N configs (e.g. fp16
-            // 16x16 4x1 with MLdsLayer=8) push lane[4] above bank bit 4 into word
-            // bit 5, leaving bank with only 4 effective per-lane bits and forcing
-            // 2-way conflicts. Requires MLdsLayer * 4 <= MPerXdl * MWave (M_per_iter
-            // for one wave is MPerXdl; for the full block we conservatively use
-            // MPerXdl). This also makes the standard 3-bit XOR pattern non-degenerate
-            // in cases that previously needed the M[2]-reuse workaround.
+            // Narrow-N store-side fix:
+            //   For configs where the XOR transform cannot be applied
+            //   (NPerIterationShuffle too small to host xor_bits column bits),
+            //   a large MLdsLayer pushes the high M-band lane bit out of the
+            //   bank-index range, leaving v2 with only one per-lane bit and
+            //   forcing 2-way store conflicts. Cap MLdsLayer so v2 retains at
+            //   least 2 lane bits per wave (M_per_wave/MLdsLayer >= 4).
+            //
+            //   Only applied when:
+            //     1. The XOR can't help (otherwise the wider MLdsLayer is fine
+            //        and clamping introduces avoidable load-side conflicts)
+            //     2. sizeof(ODataType) >= 2 (fp8 stores byte-merge 4 lanes per
+            //        word, which already absorbs the bank pressure without
+            //        needing to clamp)
+            //
+            //   Concretely this targets fp16/bf16 16x16 4x1 (NWave=1, N=16,
+            //   no XOR available) without disturbing fp8/fp8 4x1 (already
+            //   conflict-free via byte-merge) or 2x2 cases (XOR works).
+            constexpr index_t log2_vec_for_xor_test = [] {
+                index_t v = VectorLen, l = 0;
+                while(v > 1)
+                {
+                    v >>= 1;
+                    ++l;
+                }
+                return l;
+            }();
+#if defined(CK_GFX950_SUPPORT)
+            constexpr index_t xor_bits_for_test = 3;
+#else
+            constexpr index_t xor_bits_for_test = 2;
+#endif
+            constexpr bool xor_branch_will_apply =
+                (MPerXdl == 16 || MPerXdl == 32) &&
+                ((1 << (log2_vec_for_xor_test + xor_bits_for_test)) <= NPerIterationShuffle);
+            constexpr bool needs_load_friendly_clamp =
+                !xor_branch_will_apply && (DataTypeSize >= 2);
             constexpr index_t MLdsLayerMaxByBankSpread = max(1, MPerXdl / 4);
-            constexpr auto MLdsLayer = max(1, min(MLdsLayerRequired, MLdsLayerMaxByBankSpread));
+            constexpr auto MLdsLayer =
+                needs_load_friendly_clamp ? max(1, min(MLdsLayerRequired, MLdsLayerMaxByBankSpread))
+                                          : max(1, MLdsLayerRequired);
 
             constexpr index_t BaseStrideElems = NPerIterationShuffle * MLdsLayer;
             static_assert((BaseStrideElems * DataTypeSize) % BytesPerBank == 0,
@@ -443,7 +473,18 @@ struct CShuffleEpilogue
 #if defined(CK_GFX950_SUPPORT)
                 // 16x16 XDL on gfx950: use 3-bit XOR for 64-bank LDS
                 // Conflicting rows 0,4,8,12,16,20,24,28 differ in bits 2,3,4
-                using RowBits = sequence<2, 3, 4>;
+                //
+                // Special case: when MLdsLayer*2 == MPerXdl AND NWave >= 2
+                // (e.g. fp8/fp8 16x16 2x2 on gfx950, MLdsLayer=8), the third
+                // (RowBit, ColBit) pair degenerates: M%MPerXdl bit 4 is always 0,
+                // and the wave-N split bit lands at col bit (col_bit_start + 2),
+                // so the third XOR has no per-lane variance. Reuse RowBit M[2]
+                // (= per-lane M-band low bit) for the third pair to inject lane
+                // variance into the wave-N col bit and restore 16-way bank spread.
+                constexpr bool needs_thirdbit_workaround =
+                    (MLdsLayer * 2 == MPerXdl) && (NWave >= 2);
+                using RowBits = std::
+                    conditional_t<needs_thirdbit_workaround, sequence<2, 3, 2>, sequence<2, 3, 4>>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1, col_bit_start + 2>;
 #else
                 // 16x16 XDL on gfx942: use 2-bit XOR for 32-bank LDS
