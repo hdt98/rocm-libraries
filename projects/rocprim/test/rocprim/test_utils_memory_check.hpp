@@ -281,11 +281,13 @@ private:
         if (is_apu)
         {
             // Assume all device VRAM is shared and device allocations subtract from host memory.
-            // Some APUs have BIOS carveouts for VRAM that reduce the available system RAM.  We don't
-            // have any way of querying that or inferring that in a way that works across different
-            // APUs.  Thus, we assume all VRAM is shared.  This overestimates the amount of shared
-            // VRAM on systems with BIOS carveouts, but it will just result in this check to be
-            // more conservative than necessary.  I.e. it will err on the safe side.
+            // APUs often have BIOS carveouts for VRAM that reduce the available system RAM,
+            // and the rest of the VRAM is shared memory.
+            // Often, the shared memory is up to half the system memory, but I am not 100% sure
+            // it is always half.  Thus, we assume all VRAM is shared and there is no carveout.
+            // This will overestimate the amount of shared memory on systems with BIOS carveouts,
+            // but it will just cause this check to be more conservative than necessary.
+            // I.e. it will err on the safe side.
 
             // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
             // the unsigned subtraction wraps around to a large value, causing the check to
