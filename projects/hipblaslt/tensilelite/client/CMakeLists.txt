@@ -28,15 +28,16 @@ target_link_libraries(tensilelite-client-common
         tensilelite::tensilelite-host
         rocisa::rocisa-cpp
         OpenMP::OpenMP_CXX
-        hipblaslt::headers
 )
 if(amd_smi_FOUND)
     target_link_libraries(tensilelite-client-common PUBLIC amd_smi)
 endif()
 
-# When mxDataGenerator is enabled, hipblaslt::mxdatagen propagates
-# the HIPBLASLT_ENABLE_MXDATAGENERATOR macro, the C++20 requirement,
-# clients/common/include, and the link to roc::mxDataGenerator.
+# When mxDataGenerator is enabled, hipblaslt::mxdatagen propagates the
+# HIPBLASLT_ENABLE_MXDATAGENERATOR macro, the C++20 floor, the include path
+# for `<mxDataGen.hpp>`, hipblaslt::headers (so `<hipblaslt/...>` API headers
+# resolve), and the link to roc::mxDataGenerator. PUBLIC so the executables
+# below pick the macro up too.
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     target_link_libraries(tensilelite-client-common PUBLIC hipblaslt::mxdatagen)
 endif()

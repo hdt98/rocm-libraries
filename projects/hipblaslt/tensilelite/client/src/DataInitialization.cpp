@@ -25,6 +25,10 @@
  *******************************************************************************/
 
 #include "DataInitialization.hpp"
+
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
+#include <mxDataGen.hpp>
+#endif
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
 // #include "DataInitializationTyped.hpp"
@@ -1821,6 +1825,7 @@ namespace TensileLite
             }
         }
 
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
         namespace
         {
             /** Maps Tensile MX scale element type to hipDataType for generateMXInput (mxDataGen). */
@@ -1983,6 +1988,16 @@ namespace TensileLite
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
             }
         }
+#else  // HIPBLASLT_ENABLE_MXDATAGENERATOR
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& /*problem*/)
+        {
+            // The MX data generator is disabled at build time. Reaching this
+            // path means a problem requiring MX FP4 initialization was issued
+            // against a build that doesn't include mxDataGenerator support.
+            throw std::runtime_error(
+                "MX data initialization requires HIPBLASLT_ENABLE_MXDATAGENERATOR=ON at build time");
+        }
+#endif // HIPBLASLT_ENABLE_MXDATAGENERATOR
 
         void DataInitialization::initializeConstantInputs(ContractionProblemGemm const& problem)
         {

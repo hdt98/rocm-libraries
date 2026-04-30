@@ -30,16 +30,11 @@ target_link_libraries(hipblaslt-clients-common
 )
 
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    # Re-export the macro PUBLIC so consumers of hipblaslt-clients-common
-    # (hipblaslt-test, hipblaslt-bench, ...) see it through public headers
-    # such as testing_matmul.hpp, which guards mxDataGen.hpp on this macro.
-    # The helper target itself defines it PUBLIC, but we link it PRIVATE here
-    # so the macro would otherwise stop at hipblaslt-clients-common.
-    target_compile_definitions(hipblaslt-clients-common PUBLIC HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    # cxx_std_20 propagates from hipblaslt::mxdatagen's PUBLIC compile-features.
-    # When the option is OFF, hipblaslt-clients-common falls back to roc::hipblaslt's
-    # cxx_std_17 floor, matching the pre-PR develop branch behavior.
-    target_link_libraries(hipblaslt-clients-common PRIVATE hipblaslt::mxdatagen)
+    # PUBLIC because public headers such as testing_matmul.hpp guard
+    # `<mxDataGen.hpp>` on `HIPBLASLT_ENABLE_MXDATAGENERATOR`, so downstream
+    # targets (hipblaslt-test, hipblaslt-bench, ...) need to see the macro,
+    # the include path, and the C++20 floor all the way through.
+    target_link_libraries(hipblaslt-clients-common PUBLIC hipblaslt::mxdatagen)
 endif()
 
 if(HIPBLASLT_ENABLE_ROCROLLER)
@@ -64,7 +59,13 @@ if(HIPBLASLT_ENABLE_OPENMP)
     target_link_libraries(hipblaslt-bench PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
-add_subdirectory(common)
+# `clients/common/CMakeLists.txt` itself only declares the mxdatagen helper
+# (which the project root already added when needed); the `include` and
+# `src` subdirectories populate hipblaslt-clients-common's sources, so they
+# are added directly here, avoiding a second `add_subdirectory(common)` that
+# would clash with the root-level one.
+add_subdirectory(common/include)
+add_subdirectory(common/src)
 add_subdirectory(bench)
 
 add_executable(hipblaslt-api-overhead "${CMAKE_CURRENT_SOURCE_DIR}/bench/src/client_api_overhead.cpp")

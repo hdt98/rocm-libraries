@@ -47,9 +47,6 @@ target_link_libraries(tensilelite-tests
 )
 
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
-    # hipblaslt::mxdatagen compiles clients/common/src/mxDataGen.cpp once and
-    # propagates the include path, the link to roc::mxDataGenerator, the
-    # C++20 requirement, and HIPBLASLT_ENABLE_MXDATAGENERATOR.
     target_sources(tensilelite-tests
         PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/MXDataGen_test.cpp"

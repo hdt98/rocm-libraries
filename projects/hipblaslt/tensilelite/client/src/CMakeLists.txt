@@ -24,16 +24,6 @@ target_sources(tensilelite-client-common
         "${CMAKE_CURRENT_SOURCE_DIR}/LibraryUpdateReporter.cpp"
 )
 
-# DataInitialization.hpp #includes <mxDataGen.hpp> unconditionally. When
-# HIPBLASLT_ENABLE_MXDATAGENERATOR=ON the path also propagates from
-# hipblaslt::mxdatagen, but it must remain reachable when the option is OFF
-# (the header still resolves; its content collapses to nothing under the
-# guard).
-target_include_directories(tensilelite-client-common
-    PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/../../../clients/common/include"
-)
-
 # Profiler sources only target tensilelite-client (cpu-gemm-driver does not
 # expose ROCprofiler counters).
 if(TENSILELITE_CLIENT_ENABLE_ROCPROFSDK)
