@@ -91,7 +91,9 @@ class TestCkTileGemmQuantBase : public ::testing::Test
     void TearDown() override { static_cast<Derived*>(this)->TearDownQuantTypeSpecific(); }
 
     // Common test execution logic
-    void invoke_quant_gemm(const ck_tile::QuantGemmHostArgs& args, const ck_tile::stream_config& s)
+    void invoke_quant_gemm(const ck_tile::QuantGemmHostArgs& args,
+                           const ck_tile::stream_config& s,
+                           bool allow_runtime_splitk_tail = false)
     {
         // WP pipeline requires per-thread tile size aligned to Problem::VectorLoadSize.
         // static_assert((WG::kM * WG::kK * sizeof(ADataType) * MIterPerWarp / WaveSize) %
@@ -127,9 +129,25 @@ class TestCkTileGemmQuantBase : public ::testing::Test
                                                                VectorSize>;
 
         // Let the derived class create the appropriate pipeline and epilogue
-        static_cast<Derived*>(this)
-            ->template run_quant_gemm_impl<CodegenGemmShape, TilePartitioner, CodegenGemmTraits>(
-                args, s);
+        auto* derived = static_cast<Derived*>(this);
+        if constexpr(requires {
+                         derived->template run_quant_gemm_impl<CodegenGemmShape,
+                                                                TilePartitioner,
+                                                                CodegenGemmTraits>(
+                             args, s, allow_runtime_splitk_tail);
+                     })
+        {
+            derived->template run_quant_gemm_impl<CodegenGemmShape,
+                                                  TilePartitioner,
+                                                  CodegenGemmTraits>(
+                args, s, allow_runtime_splitk_tail);
+        }
+        else
+        {
+            derived->template run_quant_gemm_impl<CodegenGemmShape,
+                                                  TilePartitioner,
+                                                  CodegenGemmTraits>(args, s);
+        }
     }
 
     void RunTest(ck_tile::index_t M, ck_tile::index_t N, ck_tile::index_t K)

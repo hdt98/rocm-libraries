@@ -392,7 +392,11 @@ class TestCkTileGemmAQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGem
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;
 
-        const ck_tile::index_t K_split  = (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile;
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
+        const ck_tile::index_t K_split =
+            args.k_batch == 1
+                ? (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile
+                : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
@@ -618,7 +622,11 @@ class TestCkTileGemmAQuantMem
                                                                            CodegenGemmTraits,
                                                                            ComputeDataType>;
         using BaseGemmPipeline          = ck_tile::BaseGemmPipelineAgBgCrMem<GemmPipelineProblem>;
-        const ck_tile::index_t K_split  = (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile;
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
+        const ck_tile::index_t K_split =
+            args.k_batch == 1
+                ? (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile
+                : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
@@ -904,7 +912,11 @@ class TestCkTileGemmBQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGem
             ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>,
             ck_tile::BaseWeightPreshufflePipelineAGmemBGmemCRegV2<GemmPipelineProblem>>;
 
-        const ck_tile::index_t K_split  = (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile;
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
+        const ck_tile::index_t K_split =
+            args.k_batch == 1
+                ? (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile
+                : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
@@ -1039,7 +1051,8 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                   ck_tile::index_t N,
                                   ck_tile::index_t K,
                                   ck_tile::index_t k_batch      = 1,
-                                  ck_tile::index_t stride_B_pad = 0)
+                                  ck_tile::index_t stride_B_pad = 0,
+                                  bool allow_runtime_splitk_tail = false)
     {
         const ck_tile::index_t stride_A =
             ck_tile::get_default_stride(M, K, 0, this->is_row_major(ALayout{}));
@@ -1183,7 +1196,7 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
 
         // Run the kernel
         ck_tile::stream_config stream_config{};
-        this->invoke_quant_gemm(args, stream_config);
+        this->invoke_quant_gemm(args, stream_config, allow_runtime_splitk_tail);
 
         // Validation using reference implementation
         ck_tile::HostTensor<CDataType> c_m_n_host_ref(
@@ -1236,7 +1249,8 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
     // ABQuant-specific pipeline implementation
     template <typename CodegenGemmShape, typename TilePartitioner, typename CodegenGemmTraits>
     void run_quant_gemm_impl(const ck_tile::QuantGemmHostArgs& args,
-                             const ck_tile::stream_config& s)
+                             const ck_tile::stream_config& s,
+                             bool allow_runtime_splitk_tail)
     {
 
         static_assert(std::is_same_v<CLayout, ck_tile::tensor_layout::gemm::RowMajor>);
@@ -1273,8 +1287,10 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
         }();
         using BaseGemmPipeline = std::decay_t<decltype(base_gemm_pipeline)>;
 
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
         const ck_tile::index_t K_split =
-            ck_tile::integer_least_multiple(args.K, GemmConfig::K_Tile);
+            args.k_batch == 1 ? ck_tile::integer_least_multiple(args.K, GemmConfig::K_Tile)
+                              : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop    = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop            = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
@@ -1345,23 +1361,35 @@ class TestCkTileGemmABQuant : public TestCkTileGemmQuantBase<Tuple, TestCkTileGe
                                                      Base::K_Warp_Tile,
                                                      transpose_c>>>;
 
-            using Kernel = ck_tile::QuantGemmKernel<TilePartitioner,
-                                                    GemmPipeline,
-                                                    GemmEpilogue,
-                                                    ck_tile::QuantType::ABQuantGrouped>;
+            const auto LaunchKernel = [&]<bool RuntimeSplitKTail>() {
+                using Kernel = ck_tile::QuantGemmKernel<TilePartitioner,
+                                                        GemmPipeline,
+                                                        GemmEpilogue,
+                                                        ck_tile::QuantType::ABQuantGrouped,
+                                                        RuntimeSplitKTail>;
 
-            auto kargs        = Kernel::MakeKernelArgs(args);
-            const dim3 grids  = Kernel::GridSize(args.M, args.N, args.k_batch);
-            const dim3 blocks = Kernel::BlockSize();
+                auto kargs        = Kernel::MakeKernelArgs(args);
+                const dim3 grids  = Kernel::GridSize(args.M, args.N, args.k_batch);
+                const dim3 blocks = Kernel::BlockSize();
 
-            if(!Kernel::IsSupportedArgument(kargs))
+                if(!Kernel::IsSupportedArgument(kargs))
+                {
+                    throw std::runtime_error("Arguments not supported for ABQuant kernel");
+                }
+                using k_attr_t = ck_tile::kernel_attr<eight_waves>;
+                ck_tile::launch_kernel(s,
+                                       ck_tile::make_kernel<GemmConfigBase::kBlockPerCu, k_attr_t>(
+                                           Kernel{}, grids, blocks, 0, kargs));
+            };
+
+            if(allow_runtime_splitk_tail)
             {
-                throw std::runtime_error("Arguments not supported for ABQuant kernel");
+                LaunchKernel.template operator()<true>();
             }
-            using k_attr_t = ck_tile::kernel_attr<eight_waves>;
-            ck_tile::launch_kernel(s,
-                                   ck_tile::make_kernel<GemmConfigBase::kBlockPerCu, k_attr_t>(
-                                       Kernel{}, grids, blocks, 0, kargs));
+            else
+            {
+                LaunchKernel.template operator()<false>();
+            }
         };
 
         return BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
@@ -1524,7 +1552,11 @@ class TestCkTileGemmRowColQuant
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;
 
-        const ck_tile::index_t K_split  = (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile;
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
+        const ck_tile::index_t K_split =
+            args.k_batch == 1
+                ? (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile
+                : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
@@ -1738,7 +1770,11 @@ class TestCkTileGemmTensorQuant
 
         using BaseGemmPipeline = ck_tile::BaseGemmPipelineAgBgCrCompV3<GemmPipelineProblem>;
 
-        const ck_tile::index_t K_split  = (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile;
+        constexpr auto K1 = CodegenGemmShape::WarpTile::at(ck_tile::number<2>{});
+        const ck_tile::index_t K_split =
+            args.k_batch == 1
+                ? (args.K + Base::K_Tile - 1) / Base::K_Tile * Base::K_Tile
+                : ck_tile::get_splitk_batch_k_read(args.K, args.k_batch, K1);
         const ck_tile::index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop         = BaseGemmPipeline::BlockHasHotloop(num_loop);
         const ck_tile::TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);

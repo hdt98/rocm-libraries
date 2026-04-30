@@ -110,3 +110,37 @@ TYPED_TEST(TestCkTileGemmABQuant, SplitK8_LargeK_LargeMN)
     // K=4096, larger M and N
     this->run_test_with_validation(48, 192, 4096, 8);
 }
+
+// Test one padded-K split shape whose earlier split-K batches and final batch would need
+// different compile-time pipeline tail handling. Fixed host-side tail selection rejects it.
+using ABQuantSplitKRejectTypes = ::testing::Types<std::tuple<RowMajor,
+                                                            ColumnMajor,
+                                                            RowMajor,
+                                                            RowMajor,
+                                                            FP8,
+                                                            FP8,
+                                                            float,
+                                                            Half,
+                                                            ABQuantGrouped,
+                                                            GemmConfigPadding,
+                                                            GroupSize1x1x128,
+                                                            GroupSize1x1x128,
+                                                            ColumnMajor>>;
+
+template <typename Tuple>
+class TestCkTileGemmABQuantSplitKReject : public TestCkTileGemmABQuant<Tuple>
+{
+};
+
+TYPED_TEST_SUITE(TestCkTileGemmABQuantSplitKReject, ABQuantSplitKRejectTypes);
+
+TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RejectsMismatchedTailSplitK)
+{
+    EXPECT_THROW(this->run_test_with_validation(32, 128, 1792, 5), std::runtime_error);
+}
+
+TYPED_TEST(TestCkTileGemmABQuantSplitKReject, RuntimeTailAllowsMismatchedTailSplitK)
+{
+    this->run_test_with_validation(
+        32, 128, 1792, 5, 0, true /* allow_runtime_splitk_tail */);
+}

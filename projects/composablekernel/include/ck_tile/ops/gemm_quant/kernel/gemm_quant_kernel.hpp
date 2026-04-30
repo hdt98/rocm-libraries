@@ -202,10 +202,24 @@ struct QuantGemmKernelArgs
     index_t k_batch;
 };
 
+CK_TILE_HOST_DEVICE auto
+get_splitk_batch_k_read(index_t K, index_t k_batch, index_t k_unit) noexcept -> index_t
+{
+    const index_t k_t = k_batch * k_unit;
+    return (K + k_t - 1) / k_t * k_unit;
+}
+
+CK_TILE_HOST_DEVICE auto
+get_splitk_last_batch_k(index_t K, index_t k_batch, index_t k_read) noexcept -> index_t
+{
+    return K - k_read * (k_batch - 1);
+}
+
 template <typename TilePartitioner_,
           typename GemmPipeline_,
           typename EpiloguePipeline_,
-          QuantType QuantType_>
+          QuantType QuantType_,
+          bool RuntimeSplitKTail_ = false>
 struct QuantGemmKernel
 {
     using TilePartitioner  = remove_cvref_t<TilePartitioner_>;
@@ -244,6 +258,7 @@ struct QuantGemmKernel
     static constexpr auto I4 = number<4>(); // C Tensor
 
     static constexpr auto kQuantType = QuantType_;
+    static constexpr bool RuntimeSplitKTail = RuntimeSplitKTail_;
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
@@ -385,11 +400,9 @@ struct QuantGemmKernel
         {
             constexpr auto K1 =
                 GemmPipeline::BlockGemmShape::WarpTile::at(I2); // smallest unit of K work per block
-            const index_t K_t = amd_wave_read_first_lane(
-                kargs.k_batch * K1); // amount of K elements consumed if every split-K batch
-                                     // performs exactly one "unit" (K1)
             const index_t KRead = amd_wave_read_first_lane(
-                (kargs.K + K_t - 1) / K_t * K1); // total k elements to be read in this batch
+                get_splitk_batch_k_read(kargs.K, kargs.k_batch, K1));
+            // total k elements to be read in this batch
             // offset not necessarily = KRead, because B can have packed elements (e.g. fp8i4)
             constexpr index_t BPackedSize =
                 ck_tile::numeric_traits<remove_cvref_t<BDataType>>::PackedSize;
@@ -1167,10 +1180,20 @@ struct QuantGemmKernel
             else
             {
                 constexpr auto K1   = GemmPipeline::BlockGemmShape::WarpTile::at(I2);
-                const index_t K_t   = kargs.k_batch * K1;
-                const index_t KRead = (kargs.K + K_t - 1) / K_t * K1; // per-batch K read size
+                const index_t KRead = get_splitk_batch_k_read(
+                    kargs.K, kargs.k_batch, K1); // per-batch K read size
+                const index_t KLast = get_splitk_last_batch_k(kargs.K, kargs.k_batch, KRead);
                 constexpr index_t BPackedSize =
                     ck_tile::numeric_traits<remove_cvref_t<BDataType>>::PackedSize;
+
+                if(KLast <= 0)
+                {
+                    if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                    {
+                        CK_TILE_ERROR("Split-K configuration produces an empty final K batch!");
+                    }
+                    return false;
+                }
 
                 // Constraint 1: KRead must align with B packing requirements.
                 // For packed data types, multiple K elements are stored in each storage unit.
@@ -1232,7 +1255,7 @@ struct QuantGemmKernel
                 // belonging to the next split-K batch, producing incorrect results.
                 {
                     const index_t per_batch_num_loop =
-                        KRead / static_cast<index_t>(TilePartitioner::KPerBlock);
+                        TilePartitioner::GetLoopNum(KRead);
                     if(per_batch_num_loop < 2)
                     {
                         if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
@@ -1246,6 +1269,33 @@ struct QuantGemmKernel
                                 ". Increase K or decrease k_batch.");
                         }
                         return false;
+                    }
+                }
+
+                // Host-side fixed tail selection is only valid when all split-K batches have
+                // the same hot-loop/tail classification. Earlier batches use KRead; the final
+                // batch may be shorter due to split rounding.
+                {
+                    const index_t first_num_loop = TilePartitioner::GetLoopNum(KRead);
+                    const index_t last_num_loop  = TilePartitioner::GetLoopNum(KLast);
+                    const bool first_hot_loop = GemmPipeline::BlockHasHotloop(first_num_loop);
+                    const bool last_hot_loop  = GemmPipeline::BlockHasHotloop(last_num_loop);
+                    const auto first_tail = GemmPipeline::GetBlockLoopTailNum(first_num_loop);
+                    const auto last_tail  = GemmPipeline::GetBlockLoopTailNum(last_num_loop);
+
+                    if constexpr(!RuntimeSplitKTail)
+                    {
+                        if(first_hot_loop != last_hot_loop || first_tail != last_tail)
+                        {
+                            if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                            {
+                                CK_TILE_ERROR(
+                                    "Split-K batches require different hot-loop/tail handling. "
+                                    "Use a K/k_batch combination that gives matching pipeline "
+                                    "tails or enable runtime split-K tail dispatch.");
+                            }
+                            return false;
+                        }
                     }
                 }
             }
@@ -1391,6 +1441,80 @@ struct QuantGemmKernel
         return true;
     }
 
+    template <typename ADramBlockWindow,
+              typename BDramBlockWindow,
+              typename BQDramBlockWindow>
+    CK_TILE_DEVICE static auto CallBQuantGemmPipeline(const ADramBlockWindow& a_block_window,
+                                                      const BDramBlockWindow& b_block_window,
+                                                      const BQDramBlockWindow& bq_block_window,
+                                                      const index_t num_loop,
+                                                      void* smem_ptr,
+                                                      const index_t n)
+    {
+        if constexpr(RuntimeSplitKTail)
+        {
+            static_assert(!PreshuffleB,
+                          "RuntimeSplitKTail is not implemented for preshuffle-B BQuant "
+                          "pipelines.");
+            const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
+            const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
+            return GemmPipeline{}(a_block_window,
+                                  b_block_window,
+                                  bq_block_window,
+                                  num_loop,
+                                  has_hot_loop,
+                                  tail_num,
+                                  smem_ptr,
+                                  n);
+        }
+        else
+        {
+            return GemmPipeline{}(
+                a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
+        }
+    }
+
+    template <typename ADramBlockWindow,
+              typename BDramBlockWindow,
+              typename AQDramBlockWindow,
+              typename BQDramBlockWindow>
+    CK_TILE_DEVICE static auto CallABQuantGemmPipeline(const ADramBlockWindow& a_block_window,
+                                                       const BDramBlockWindow& b_block_window,
+                                                       const AQDramBlockWindow& aq_block_window,
+                                                       const BQDramBlockWindow& bq_block_window,
+                                                       const index_t num_loop,
+                                                       void* smem_ptr,
+                                                       const index_t m,
+                                                       const index_t n)
+    {
+        if constexpr(RuntimeSplitKTail)
+        {
+            const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
+            const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
+            return GemmPipeline{}(a_block_window,
+                                  b_block_window,
+                                  aq_block_window,
+                                  bq_block_window,
+                                  num_loop,
+                                  has_hot_loop,
+                                  tail_num,
+                                  smem_ptr,
+                                  m,
+                                  n);
+        }
+        else
+        {
+            return GemmPipeline{}(a_block_window,
+                                  b_block_window,
+                                  aq_block_window,
+                                  bq_block_window,
+                                  num_loop,
+                                  smem_ptr,
+                                  m,
+                                  n);
+        }
+    }
+
     /**
      * @brief Runs single GEMM problem cooperatively by whole workgroup.
      *
@@ -1433,9 +1557,6 @@ struct QuantGemmKernel
 
         const index_t num_loop =
             amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
-        const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
-        const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
-
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile = [&]() {
             if constexpr(kQuantType == QuantType::AQuantGrouped)
@@ -1455,7 +1576,7 @@ struct QuantGemmKernel
                 {
                     n = kargs.N;
                 }
-                return GemmPipeline{}(
+                return CallBQuantGemmPipeline(
                     a_block_window, b_block_window, bq_block_window, num_loop, smem_ptr, n);
             }
             else if constexpr(kQuantType == QuantType::ABQuantGrouped)
@@ -1467,16 +1588,14 @@ struct QuantGemmKernel
                     // m = kargs.M;
                     n = kargs.N;
                 }
-                return GemmPipeline{}(a_block_window,
-                                      b_block_window,
-                                      aq_block_window,
-                                      bq_block_window,
-                                      num_loop,
-                                      has_hot_loop,
-                                      tail_num,
-                                      smem_ptr,
-                                      m,
-                                      n);
+                return CallABQuantGemmPipeline(a_block_window,
+                                               b_block_window,
+                                               aq_block_window,
+                                               bq_block_window,
+                                               num_loop,
+                                               smem_ptr,
+                                               m,
+                                               n);
             }
             else if constexpr(kQuantType == QuantType::RowColQuant ||
                               kQuantType == QuantType::TensorQuant)
