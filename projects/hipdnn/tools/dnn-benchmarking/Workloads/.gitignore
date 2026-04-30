@@ -1,5 +1,5 @@
-/BNorm_Backward_Bench_1.tar.gz
-/BNorm_Inference_Bench_1.tar.gz
-/Conv_Dgrad_Bench_1.tar.gz
-/Conv_Fwd_Bench_1.tar.gz
-/Conv_Wgrad_Bench_1.tar.gz
+/bnorm_backward.tar.gz
+/bnorm_fwd.tar.gz
+/conv_dgrad.tar.gz
+/conv_fwd.tar.gz
+/conv_wgrad.tar.gz

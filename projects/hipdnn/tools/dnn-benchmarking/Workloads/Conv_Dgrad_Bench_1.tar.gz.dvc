@@ -1,5 +1,0 @@
-outs:
-- md5: 6058e65db0f54e42cefbdac763e06548
-  size: 8611
-  hash: md5
-  path: Conv_Dgrad_Bench_1.tar.gz
