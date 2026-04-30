@@ -247,12 +247,19 @@ private:
 
     bool mem_check_host()
     {
+        // Reduce the host_limit by a padding factor as a safety margin.
         const size_t host_limit_padded = static_cast<size_t>(host_limit * (1 - padding_factor));
 
         bool success;
         if (is_apu)
         {
-            // assume all device usage is shared and subtracts from host memory
+            // Assume all device VRAM is shared and device allocations subtract from host memory.
+            // Some APUs have BIOS carveouts for VRAM that reduce the available system RAM.  We don't
+            // have any way of querying that or inferring that in a way that works across different
+            // APUs.  Thus, we assume all VRAM is shared.  This overestimates the amount of shared
+            // VRAM on systems with BIOS carveouts, but it will just result in this check to be
+            // more conservative than necessary.  I.e. it will err on the safe side.
+
             // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
             // the unsigned subtraction wraps around to a large value, causing the check to
             // silently pass (false success) even when memory is exhausted.
@@ -272,13 +279,14 @@ private:
         }
 #ifdef MEMCHECK_LOGGING
         if (!success)
-            std::cout << "mem_check_host: out of memory, skipping" << std::endl;
+            std::cout << "mem_check_host: out of memory" << std::endl;
 #endif
         return success;
     }
 
     bool mem_check_device()
     {
+        // Reduce the dev_limit by a padding factor as a safety margin.
         const size_t dev_limit_padded = static_cast<size_t>(dev_limit * (1 - padding_factor));
 
         bool success;
@@ -286,6 +294,7 @@ private:
         {
             // Any memory used in excess of host_limit - dev_limit will spill
             // into the device's shared memory, reducing the device limit.
+
             // Both subtractions below are guarded: if dev_limit > host_limit or
             // spill > dev_limit, the unsigned subtraction would wrap around to a
             // large value, making the check silently pass when memory is exhausted.
@@ -311,7 +320,7 @@ private:
         }
 #ifdef MEMCHECK_LOGGING
         if (!success)
-            std::cout << "mem_check_device: out of memory, skipping" << std::endl;
+            std::cout << "mem_check_device: out of memory" << std::endl;
 #endif
         return success;
     }
