@@ -76,20 +76,21 @@ void savetxt(const HostTensor<T>& tensor,
 {
     std::ofstream file(file_name);
 
+    if(dtype != "float" && dtype != "int" && dtype != "int8_t")
+    {
+        throw std::runtime_error(std::string("savetxt: unsupported dtype:") + dtype);
+    }
+
     if(file.is_open())
     {
         for(const auto& itm : tensor.mData)
         {
             if(dtype == "float")
-                file << type_convert<float>(itm) << std::endl;
+                file << type_convert<float>(itm) << '\n';
             else if(dtype == "int")
-                file << type_convert<int>(itm) << std::endl;
+                file << type_convert<int>(itm) << '\n';
             else if(dtype == "int8_t")
-                file << static_cast<int>(type_convert<ck_tile::int8_t>(itm)) << std::endl;
-            else
-                // TODO: we didn't implement operator<< for all custom
-                // data types, here fall back to float in case compile error
-                file << type_convert<float>(itm) << std::endl;
+                file << static_cast<int>(type_convert<ck_tile::int8_t>(itm)) << '\n';
         }
         file.close();
     }
