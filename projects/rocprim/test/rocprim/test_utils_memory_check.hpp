@@ -261,6 +261,12 @@ private:
 
     static size_t toMB(size_t bytes) { return bytes >> 20; }
 
+    // Returns true if there is enough memory, false if the caller should skip.
+    // GTEST_SKIP() cannot be called here because it only exits the immediate
+    // function, not the enclosing test body.  The caller must act on the
+    // return value directly from within the test.
+    // Making the function inline does not enable GTEST_SKIP() to work, because
+    // inline functions are still functions and not macros.
     bool mem_check_host()
     {
         // Reduce the host_limit by a padding factor as a safety margin.
