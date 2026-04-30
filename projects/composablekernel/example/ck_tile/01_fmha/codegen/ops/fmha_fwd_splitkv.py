@@ -1084,6 +1084,8 @@ def get_fwd_splitkv_blobs(
                         cond = dtype in ["fp16", "bf16"]
                         cond &= pipeline.F_vlayout == "row"
                         cond &= pipeline.F_bias in ["no", "alibi"]
+                        # FlashAttention splitkv paths use softcap-disabled kernels only.
+                        cond &= pipeline.F_logits == "f"
                         cond &= pipeline.F_squant == "f"
                         cond &= pipeline.F_sink == "f"
                         if not cond:
