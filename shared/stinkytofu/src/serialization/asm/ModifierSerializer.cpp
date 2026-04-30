@@ -159,7 +159,7 @@ bool serializeVisit(const MUBUFModifiers& mod, std::ostream& os) {
     os << " offen = " << (mod.offen ? "true" : "false") << ", offset12 = " << mod.offset12
        << ", glc = " << (mod.glc ? "true" : "false") << ", slc = " << (mod.slc ? "true" : "false")
        << ", nt = " << (mod.nt ? "true" : "false") << ", lds = " << (mod.lds ? "true" : "false");
-    if (mod.hasSCOPEModifier && mod.scope != MUBUFScope::SCOPE_NONE) {
+    if (mod.scope != MUBUFScope::SCOPE_NONE) {
         os << ", scope = \"" << toString(mod.scope) << "\"";
     }
     os << " }";
@@ -385,7 +385,7 @@ void deserializeVisit(StinkyInstruction* inst, const std::string& attrKey,
             MUBUFModifiers(getBool(fields, "offen", false), getInt(fields, "offset12", 0),
                            getBool(fields, "glc", false), getBool(fields, "slc", false),
                            getBool(fields, "nt", false), getBool(fields, "lds", false), false,
-                           false, false, false, scope != MUBUFScope::SCOPE_NONE, scope));
+                           false, false, false, scope));
     } else if (attrKey == "mod.smem") {
         inst->addModifier(SMEMModifiers(getBool(fields, "glc", false), getBool(fields, "nv", false),
                                         getInt(fields, "offset", 0)));
