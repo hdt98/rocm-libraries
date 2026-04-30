@@ -31,7 +31,6 @@
 #include <fstream>
 #include <string>
 #include <iomanip>
-#include <sys/sysinfo.h>
 #endif
 
 #include "../../common/utils.hpp"
@@ -145,14 +144,7 @@ public:
         host_usage = mem_status.ullTotalPhys - mem_status.ullAvailPhys;
 #else
         host_mem_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
-/*
-        struct sysinfo info;
-        size_t host_usage = 0;    
-        if (sysinfo(&info) == 0) {
-            host_usage = host_mem_limit - (size_t)((unsigned long long)info.freeram * info.mem_unit);
-        }
-        std::cout << "host usage: " << (host_usage >> 20) << std::endl;
-*/
+        host_usage = host_mem_limit - sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 #endif
         std::cout << "total host memory: " << (host_mem_limit >> 20) << std::endl;
         std::cout << "host usage: " << (host_usage >> 20) << std::endl;
