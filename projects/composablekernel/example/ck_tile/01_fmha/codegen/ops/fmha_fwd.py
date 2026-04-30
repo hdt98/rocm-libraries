@@ -978,7 +978,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                 ( 64,  64) : [FmhaFwdTileSize( 16,  32,  64,  64,  32,  64,  1, 1, 1,  1, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
                               FmhaFwdTileSize( 32,  32,  64,  64,  32,  64,  1, 1, 1,  1, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                               FmhaFwdTileSize(128,  64,  32,  64,  32,  64,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-                              FmhaFwdTileSize(256,  32,  64,  64,  32,  64,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
+                              FmhaFwdTileSize(256,  32,  64,  64,  32,  64,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],  # N0=32: gfx950 trload_v3 needs N0>=64 (overridden in Gfx950)
                 ( 80, 96)  : [FmhaFwdTileSize(128, 128,  16,  96,  32,  80,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 ( 96, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32,  96,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 (128, 128) : [FmhaFwdTileSize( 16,  32,  64, 128,  32, 128,  1, 1, 1,  1, 1, 1,  16, 16, 32,  16, 16, 32,  -1),
@@ -1112,6 +1112,10 @@ class KernelComponentFactoryGfx950(
             if (128, 128) in result.keys():
                 result[(128, 128)].append(
                     FmhaFwdTileSize(256, 64, 128, 128, 64, 128,  8, 1, 1,  8, 1, 1,  32, 32, 32,  32, 32, 32,  -1))  # fmt: skip
+        if dtype in cls._DT_FP16_BF16 and (64, 64) in result:
+            # gfx950 uses native ds_read_tr16_b64 with no register spilling at N0=64;
+            # override the 8-warp tile back to N0=64 (gfx942 uses N0=32 to avoid spilling)
+            result[(64, 64)][-1] = FmhaFwdTileSize(256,  64,  64,  64,  64,  64,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1)  # fmt: skip
         return result
 
     @classmethod
