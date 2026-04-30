@@ -1291,17 +1291,8 @@ inline void sort_keys_large_sizes()
 
     hipStream_t stream = 0;
 
-    // Currently, CI enforces a hard limit of 96 GB on memory allocations.
-    // Temporarily use sizes that will require less space than the limit.
-    // On Windows, sizes above 2^34 (that are still under the 96 GB limit)
-    // can hang due to issues that we can't currently catch by examining
-    // the hipMalloc return value or querying available memory. Workaround
-    // this for now by setting a different maximum size for that platform.
-#if defined(_WIN32)
-    const size_t max_pow2 = 34;
-#else
     const size_t max_pow2 = 35;
-#endif
+
     rocprim::detail::target_arch arch;
     HIP_CHECK(rocprim::detail::host_target_arch(stream, arch));
 
