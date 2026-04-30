@@ -47,8 +47,8 @@ set(FMHA_FWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
   --targets ${FMHA_TARGETS_ARG}
   --api ${FMHA_FWD_APIS}
-  --optdim 32,64,80,128,256
-  --filter *qr_async_trload_v3*nmask*nsink*
+  --optdim 64
+  --filter *d64*qr_async_trload_v3*nmask*nsink*
 )
 set(FMHA_BWD_CODE_GEN_COMMON_ARGS
   ${CMAKE_CURRENT_LIST_DIR}/generate.py
