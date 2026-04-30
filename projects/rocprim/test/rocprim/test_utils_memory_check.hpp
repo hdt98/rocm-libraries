@@ -129,7 +129,7 @@ public:
 	// padding_factor is a value in [0, 1] that indicates how much of a buffer we should leave below
 	// the calculated memory limits.
 	// i.e when allocations are >= actual_limit * (1 - padding_factor), then assume we're out of memory.
-	MemCheck(const float padding_factor=0.1) :
+	MemCheck(const float padding_factor = 0.1f) :
 		padding_factor(padding_factor)
     {
         size_t free_dev_mem;
@@ -198,6 +198,7 @@ public:
         return this->mem_check_host();
     }
 
+    // Call this before host frees
     template<typename T>
     inline void free_host(const size_t size)
     {
@@ -237,6 +238,7 @@ public:
         return this->mem_check_device();
     }
 
+    // Call this before dev frees
     template<typename T>
     inline void free_device(const size_t size)
     {
