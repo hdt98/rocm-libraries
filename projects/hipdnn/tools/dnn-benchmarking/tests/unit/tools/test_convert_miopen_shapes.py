@@ -6,45 +6,45 @@
 import pytest
 
 from dnn_benchmarking.tools.convert_miopen_shapes import (
-    _BNORM_FLAG_ALIASES,
-    _CONV_FLAG_ALIASES,
-    _ConvParams,
-    _build_bnorm_json,
-    _build_conv_json,
-    _conv_io_type,
-    _conv_out_dim,
-    _convert_line,
-    _is_flag,
-    _nchw_strides,
-    _ncdhw_strides,
-    _nhwc_strides,
-    _ndhwc_strides,
-    _normalize_args,
-    _parse_args,
-    _parse_line,
+    BNORM_FLAG_ALIASES,
+    CONV_FLAG_ALIASES,
+    ConvParams,
+    build_bnorm_json,
+    build_conv_json,
+    conv_io_type,
+    conv_out_dim,
+    convert_line,
+    is_flag,
+    nchw_strides,
+    ncdhw_strides,
+    nhwc_strides,
+    ndhwc_strides,
+    normalize_args,
+    parse_args,
+    parse_line,
 )
 
 
 class TestStrideHelpers:
     """Tests for stride computation helpers."""
 
-    def test_nchw_strides_known_values(self) -> None:
+    def testnchw_strides_known_values(self) -> None:
         """NCHW strides: innermost dim is 1, outermost is product of inner dims."""
         # N=2, C=3, H=4, W=5 → [C*H*W, H*W, W, 1] = [60, 20, 5, 1]
-        assert _nchw_strides(2, 3, 4, 5) == [60, 20, 5, 1]
+        assert nchw_strides(2, 3, 4, 5) == [60, 20, 5, 1]
 
-    def test_nhwc_strides_known_values(self) -> None:
+    def testnhwc_strides_known_values(self) -> None:
         """NHWC strides: C is innermost (stride 1), then W*C, H*W*C, etc."""
         # N=2, C=3, H=4, W=5 → [H*W*C, 1, W*C, C] = [60, 1, 15, 3]
-        assert _nhwc_strides(2, 3, 4, 5) == [60, 1, 15, 3]
+        assert nhwc_strides(2, 3, 4, 5) == [60, 1, 15, 3]
 
-    def test_ncdhw_strides_known_values(self) -> None:
+    def testncdhw_strides_known_values(self) -> None:
         # N=1, C=2, D=3, H=4, W=5 → [C*D*H*W, D*H*W, H*W, W, 1] = [120, 60, 20, 5, 1]
-        assert _ncdhw_strides(1, 2, 3, 4, 5) == [120, 60, 20, 5, 1]
+        assert ncdhw_strides(1, 2, 3, 4, 5) == [120, 60, 20, 5, 1]
 
-    def test_ndhwc_strides_known_values(self) -> None:
+    def testndhwc_strides_known_values(self) -> None:
         # N=1, C=2, D=3, H=4, W=5 → [D*H*W*C, 1, H*W*C, W*C, C] = [120, 1, 40, 10, 2]
-        assert _ndhwc_strides(1, 2, 3, 4, 5) == [120, 1, 40, 10, 2]
+        assert ndhwc_strides(1, 2, 3, 4, 5) == [120, 1, 40, 10, 2]
 
 
 class TestConvOutDim:
@@ -52,80 +52,80 @@ class TestConvOutDim:
 
     def test_no_pad_stride1_dil1(self) -> None:
         # floor((16 + 0 - 1*(3-1) - 1) / 1 + 1) = floor(14/1 + 1) = 15
-        assert _conv_out_dim(16, 0, 1, 3, 1) == 14
+        assert conv_out_dim(16, 0, 1, 3, 1) == 14
 
     def test_with_pad(self) -> None:
         # floor((16 + 2 - 1*(3-1) - 1) / 1 + 1) = floor(15/1 + 1) = 16
-        assert _conv_out_dim(16, 1, 1, 3, 1) == 16
+        assert conv_out_dim(16, 1, 1, 3, 1) == 16
 
     def test_with_stride(self) -> None:
         # floor((16 + 0 - 1*(1-1) - 1) / 2 + 1) = floor(15/2 + 1) = 8
-        assert _conv_out_dim(16, 0, 1, 1, 2) == 8
+        assert conv_out_dim(16, 0, 1, 1, 2) == 8
 
     def test_with_dilation(self) -> None:
         # floor((16 + 0 - 2*(3-1) - 1) / 1 + 1) = floor((16 - 4 - 1)/1 + 1) = 12
-        assert _conv_out_dim(16, 0, 2, 3, 1) == 12
+        assert conv_out_dim(16, 0, 2, 3, 1) == 12
 
     def test_stride_and_pad_combined(self) -> None:
         # floor((16 + 2 - 1*(3-1) - 1) / 2 + 1) = floor(15/2 + 1) = 8
-        assert _conv_out_dim(16, 1, 1, 3, 2) == 8
+        assert conv_out_dim(16, 1, 1, 3, 2) == 8
 
     def test_kernel_larger_than_input_with_pad(self) -> None:
         # Input 3, kernel 5, pad 2, dil 1, stride 1:
         # floor((3 + 4 - 1*(5-1) - 1) / 1 + 1) = floor(2/1 + 1) = 3
-        assert _conv_out_dim(3, 2, 1, 5, 1) == 3
+        assert conv_out_dim(3, 2, 1, 5, 1) == 3
 
     def test_kernel_equal_input_no_pad(self) -> None:
         # floor((4 + 0 - 1*(4-1) - 1) / 1 + 1) = floor(0/1 + 1) = 1
-        assert _conv_out_dim(4, 0, 1, 4, 1) == 1
+        assert conv_out_dim(4, 0, 1, 4, 1) == 1
 
 
 class TestIsFlag:
-    """Tests for _is_flag helper."""
+    """Tests for is_flag helper."""
 
     def test_normal_flag(self) -> None:
-        assert _is_flag("-n") is True
+        assert is_flag("-n") is True
 
     def test_long_flag(self) -> None:
-        assert _is_flag("--layout") is True
+        assert is_flag("--layout") is True
 
     def test_negative_integer_is_not_flag(self) -> None:
-        assert _is_flag("-1") is False
+        assert is_flag("-1") is False
 
     def test_negative_float_is_not_flag(self) -> None:
-        assert _is_flag("-0.5") is False
+        assert is_flag("-0.5") is False
 
     def test_non_flag_token(self) -> None:
-        assert _is_flag("value") is False
+        assert is_flag("value") is False
 
 
 class TestParseArgs:
-    """Tests for _parse_args."""
+    """Tests for parse_args."""
 
     def test_basic_flag_value_pairs(self) -> None:
-        result = _parse_args(["-n", "16", "-c", "64"])
+        result = parse_args(["-n", "16", "-c", "64"])
         assert result == {"-n": "16", "-c": "64"}
 
     def test_boolean_flag(self) -> None:
-        result = _parse_args(["--verbose"])
+        result = parse_args(["--verbose"])
         assert result == {"--verbose": "1"}
 
     def test_negative_value(self) -> None:
         # -p -1: -1 should be treated as a value, not a new flag
-        result = _parse_args(["-p", "-1"])
+        result = parse_args(["-p", "-1"])
         assert result == {"-p": "-1"}
 
     def test_mixed(self) -> None:
-        result = _parse_args(["-n", "4", "--verbose", "-c", "32"])
+        result = parse_args(["-n", "4", "--verbose", "-c", "32"])
         assert result["-n"] == "4"
         assert result["--verbose"] == "1"
         assert result["-c"] == "32"
 
 
 class TestBuildConvJson:
-    """Tests for _build_conv_json via _ConvParams."""
+    """Tests for build_conv_json via ConvParams."""
 
-    def _make_params(self, **overrides) -> _ConvParams:
+    def _make_params(self, **overrides) -> ConvParams:
         defaults = dict(
             N=2,
             C=32,
@@ -148,40 +148,40 @@ class TestBuildConvJson:
             out_layout="NCHW",
         )
         defaults.update(overrides)
-        return _ConvParams(**defaults)
+        return ConvParams(**defaults)
 
     def test_conv_fwd_node_type(self) -> None:
         p = self._make_params(F=1)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         assert graph["nodes"][0]["type"] == "ConvolutionFwdAttributes"
 
     def test_conv_fwd_tensor_wiring(self) -> None:
         p = self._make_params(F=1)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         node = graph["nodes"][0]
         assert node["inputs"] == {"x_tensor_uid": 1, "w_tensor_uid": 2}
         assert node["outputs"] == {"y_tensor_uid": 0}
 
     def test_conv_dgrad_node_type(self) -> None:
         p = self._make_params(F=2)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         assert graph["nodes"][0]["type"] == "ConvolutionBwdAttributes"
 
     def test_conv_dgrad_tensor_wiring(self) -> None:
         p = self._make_params(F=2)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         node = graph["nodes"][0]
         assert node["inputs"] == {"dy_tensor_uid": 1, "w_tensor_uid": 2}
         assert node["outputs"] == {"dx_tensor_uid": 0}
 
     def test_conv_wgrad_node_type(self) -> None:
         p = self._make_params(F=4)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         assert graph["nodes"][0]["type"] == "ConvolutionWrwAttributes"
 
     def test_conv_wgrad_tensor_wiring(self) -> None:
         p = self._make_params(F=4)
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         node = graph["nodes"][0]
         assert node["inputs"] == {"dy_tensor_uid": 1, "x_tensor_uid": 2}
         assert node["outputs"] == {"dw_tensor_uid": 0}
@@ -189,15 +189,15 @@ class TestBuildConvJson:
     def test_nhwc_layout_produces_different_strides(self) -> None:
         p_nchw = self._make_params(in_layout="NCHW")
         p_nhwc = self._make_params(in_layout="NHWC")
-        g_nchw = _build_conv_json(p_nchw)
-        g_nhwc = _build_conv_json(p_nhwc)
+        g_nchw = build_conv_json(p_nchw)
+        g_nhwc = build_conv_json(p_nhwc)
         # Input tensor (uid=1) strides should differ
         strides_nchw = next(t["strides"] for t in g_nchw["tensors"] if t["uid"] == 1)
         strides_nhwc = next(t["strides"] for t in g_nhwc["tensors"] if t["uid"] == 1)
         assert strides_nchw != strides_nhwc
 
     def test_3d_conv_produces_5d_dims(self) -> None:
-        p = _ConvParams(
+        p = ConvParams(
             N=1,
             C=4,
             H=4,
@@ -223,14 +223,14 @@ class TestBuildConvJson:
             stride_d=1,
             dil_d=1,
         )
-        graph = _build_conv_json(p)
+        graph = build_conv_json(p)
         x_tensor = next(t for t in graph["tensors"] if t["uid"] == 1)
         assert len(x_tensor["dims"]) == 5
         assert len(x_tensor["strides"]) == 5
 
 
 class TestBuildBnormJson:
-    """Tests for _build_bnorm_json."""
+    """Tests for build_bnorm_json."""
 
     def _base_args(self, **overrides) -> dict:
         defaults = {"-n": "2", "-c": "64", "-H": "14", "-W": "14"}
@@ -239,22 +239,22 @@ class TestBuildBnormJson:
 
     def test_inference_node_type(self) -> None:
         args = self._base_args(**{"--forw": "2"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         assert graph["nodes"][0]["type"] == "BatchnormInferenceAttributes"
 
     def test_inference_tensor_count(self) -> None:
         args = self._base_args(**{"--forw": "2"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         assert len(graph["tensors"]) == 6
 
     def test_fwd_training_node_type(self) -> None:
         args = self._base_args(**{"--forw": "1"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         assert graph["nodes"][0]["type"] == "BatchnormAttributes"
 
     def test_fwd_training_has_epsilon_tensor(self) -> None:
         args = self._base_args(**{"--forw": "1"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         node = graph["nodes"][0]
         assert "epsilon_tensor_uid" in node["inputs"]
         epsilon_uid = node["inputs"]["epsilon_tensor_uid"]
@@ -263,35 +263,35 @@ class TestBuildBnormJson:
 
     def test_backward_node_type(self) -> None:
         args = self._base_args(**{"--back": "1"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         assert graph["nodes"][0]["type"] == "BatchnormBackwardAttributes"
 
     def test_backward_tensor_count(self) -> None:
         args = self._base_args(**{"--back": "1"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         assert len(graph["tensors"]) == 8
 
     def test_backward_has_mean_and_inv_variance(self) -> None:
         args = self._base_args(**{"--back": "1"})
-        graph = _build_bnorm_json("bnorm", args)
+        graph = build_bnorm_json("bnorm", args)
         node = graph["nodes"][0]
         assert "mean_tensor_uid" in node["inputs"]
         assert "inv_variance_tensor_uid" in node["inputs"]
 
 
 class TestParseLine:
-    """Tests for _parse_line."""
+    """Tests for parse_line."""
 
     def test_blank_returns_none(self) -> None:
-        assert _parse_line("") is None
-        assert _parse_line("   ") is None
+        assert parse_line("") is None
+        assert parse_line("   ") is None
 
     def test_comment_returns_none(self) -> None:
-        assert _parse_line("# this is a comment") is None
+        assert parse_line("# this is a comment") is None
 
     def test_valid_conv_line(self) -> None:
         line = "./bin/MIOpenDriver convbfp16 -n 2 -c 64 -H 8 -W 8 -k 128 -y 3 -x 3 -F 1"
-        result = _parse_line(line)
+        result = parse_line(line)
         assert result is not None
         operation, args = result
         assert operation == "convbfp16"
@@ -302,21 +302,21 @@ class TestParseLine:
         line = (
             "     5  ./bin/MIOpenDriver convbfp16 -n 1 -c 32 -H 4 -W 4 -k 32 -y 1 -x 1"
         )
-        result = _parse_line(line)
+        result = parse_line(line)
         assert result is not None
         operation, _ = result
         assert operation == "convbfp16"
 
     def test_too_short_returns_none(self) -> None:
-        assert _parse_line("./bin/MIOpenDriver") is None
+        assert parse_line("./bin/MIOpenDriver") is None
 
 
 class TestConvertLine:
-    """Tests for _convert_line dispatcher."""
+    """Tests for convert_line dispatcher."""
 
     def test_unsupported_operation_raises(self) -> None:
         with pytest.raises(ValueError, match="Unsupported operation"):
-            _convert_line("matmul", {}, "prefix")
+            convert_line("matmul", {}, "prefix")
 
     def test_conv_operation_succeeds(self) -> None:
         args = {
@@ -329,38 +329,38 @@ class TestConvertLine:
             "-x": "1",
             "-F": "1",
         }
-        name_stem, graph = _convert_line("convbfp16", args, "test")
+        name_stem, graph = convert_line("convbfp16", args, "test")
         assert "conv" in name_stem
         assert graph["nodes"][0]["type"] == "ConvolutionFwdAttributes"
 
     def test_bnorm_operation_succeeds(self) -> None:
         args = {"-n": "1", "-c": "32", "-H": "8", "-W": "8", "--forw": "2"}
-        name_stem, graph = _convert_line("bnormbfp16", args, "test")
+        name_stem, graph = convert_line("bnormbfp16", args, "test")
         assert "bnorm" in name_stem
         assert graph["nodes"][0]["type"] == "BatchnormInferenceAttributes"
 
 
 class TestNormalizeArgs:
-    """Tests for _normalize_args helper."""
+    """Tests for normalize_args helper."""
 
     def test_alternative_key_mapped_to_canonical(self) -> None:
         aliases = {"--long": "-s"}
-        result = _normalize_args({"--long": "42"}, aliases)
+        result = normalize_args({"--long": "42"}, aliases)
         assert result == {"-s": "42"}
 
     def test_canonical_key_preserved_when_no_conflict(self) -> None:
         aliases = {"--long": "-s"}
-        result = _normalize_args({"-s": "42"}, aliases)
+        result = normalize_args({"-s": "42"}, aliases)
         assert result == {"-s": "42"}
 
     def test_canonical_wins_when_both_present(self) -> None:
         aliases = {"--long": "-s"}
-        result = _normalize_args({"--long": "99", "-s": "42"}, aliases)
+        result = normalize_args({"--long": "99", "-s": "42"}, aliases)
         assert result == {"-s": "42"}
 
     def test_unrelated_keys_untouched(self) -> None:
         aliases = {"--long": "-s"}
-        result = _normalize_args({"--other": "7"}, aliases)
+        result = normalize_args({"--other": "7"}, aliases)
         assert result == {"--other": "7"}
 
 
@@ -405,17 +405,17 @@ class TestConvFlagAliases:
     }
 
     def test_conv_short_and_long_produce_same_params(self) -> None:
-        short_p = _ConvParams.from_args(self._SHORT_ARGS)
-        long_p = _ConvParams.from_args(self._LONG_ARGS)
+        short_p = ConvParams.from_args(self._SHORT_ARGS)
+        long_p = ConvParams.from_args(self._LONG_ARGS)
         assert short_p == long_p
 
     def test_conv_short_and_long_produce_same_graph(self) -> None:
-        short_p = _ConvParams.from_args(self._SHORT_ARGS)
-        long_p = _ConvParams.from_args(self._LONG_ARGS)
-        assert _build_conv_json(short_p) == _build_conv_json(long_p)
+        short_p = ConvParams.from_args(self._SHORT_ARGS)
+        long_p = ConvParams.from_args(self._LONG_ARGS)
+        assert build_conv_json(short_p) == build_conv_json(long_p)
 
-    def test_convert_line_with_long_flags(self) -> None:
-        _, graph = _convert_line("convbfp16", dict(self._LONG_ARGS), "test")
+    def testconvert_line_with_long_flags(self) -> None:
+        _, graph = convert_line("convbfp16", dict(self._LONG_ARGS), "test")
         assert graph["nodes"][0]["type"] == "ConvolutionFwdAttributes"
 
     def test_3d_short_flags(self) -> None:
@@ -443,7 +443,7 @@ class TestConvFlagAliases:
             "-#": "1",
             "-^": "1",
         }
-        p = _ConvParams.from_args(args)
+        p = ConvParams.from_args(args)
         assert p.spatial_dim == 3
         assert p.D == 4
         assert p.D_f == 3
@@ -453,31 +453,69 @@ class TestConvFlagAliases:
 
     def test_3d_short_and_long_match(self) -> None:
         short_3d = {
-            "-n": "1", "-c": "4", "-H": "4", "-W": "4",
-            "-k": "8", "-y": "3", "-x": "3",
-            "-p": "1", "-q": "1", "-u": "1", "-v": "1",
-            "-l": "1", "-j": "1", "-g": "1", "-F": "1",
-            "-_": "3", "-!": "4", "-@": "3",
-            "-$": "1", "-#": "1", "-^": "1",
+            "-n": "1",
+            "-c": "4",
+            "-H": "4",
+            "-W": "4",
+            "-k": "8",
+            "-y": "3",
+            "-x": "3",
+            "-p": "1",
+            "-q": "1",
+            "-u": "1",
+            "-v": "1",
+            "-l": "1",
+            "-j": "1",
+            "-g": "1",
+            "-F": "1",
+            "-_": "3",
+            "-!": "4",
+            "-@": "3",
+            "-$": "1",
+            "-#": "1",
+            "-^": "1",
         }
         long_3d = {
-            "-n": "1", "-c": "4", "-H": "4", "-W": "4",
-            "-k": "8", "-y": "3", "-x": "3",
-            "-p": "1", "-q": "1", "-u": "1", "-v": "1",
-            "-l": "1", "-j": "1", "-g": "1", "-F": "1",
-            "--spatial_dim": "3", "--in_d": "4", "--fil_d": "3",
-            "--pad_d": "1", "--conv_stride_d": "1", "--dilation_d": "1",
+            "-n": "1",
+            "-c": "4",
+            "-H": "4",
+            "-W": "4",
+            "-k": "8",
+            "-y": "3",
+            "-x": "3",
+            "-p": "1",
+            "-q": "1",
+            "-u": "1",
+            "-v": "1",
+            "-l": "1",
+            "-j": "1",
+            "-g": "1",
+            "-F": "1",
+            "--spatial_dim": "3",
+            "--in_d": "4",
+            "--fil_d": "3",
+            "--pad_d": "1",
+            "--conv_stride_d": "1",
+            "--dilation_d": "1",
         }
-        assert _ConvParams.from_args(short_3d) == _ConvParams.from_args(long_3d)
+        assert ConvParams.from_args(short_3d) == ConvParams.from_args(long_3d)
 
     def test_layout_short_flags(self) -> None:
         """Short forms -I, -f, -O for layout flags."""
         args = {
-            "-n": "1", "-c": "4", "-H": "4", "-W": "4",
-            "-k": "8", "-y": "1", "-x": "1", "-F": "1",
-            "-I": "NHWC", "-f": "NHWC", "-O": "NHWC",
+            "-n": "1",
+            "-c": "4",
+            "-H": "4",
+            "-W": "4",
+            "-k": "8",
+            "-y": "1",
+            "-x": "1",
+            "-F": "1",
+            "-I": "NHWC",
+            "-f": "NHWC",
+            "-O": "NHWC",
         }
-        p = _ConvParams.from_args(args)
+        p = ConvParams.from_args(args)
         assert p.in_layout == "NHWC"
         assert p.fil_layout == "NHWC"
         assert p.out_layout == "NHWC"
@@ -496,15 +534,15 @@ class TestBnormFlagAliases:
             "--in_w": "16",
             "--forw": "2",
         }
-        short_graph = _build_bnorm_json("bnormbfp16", short_args)
-        long_graph = _build_bnorm_json("bnormbfp16", long_args)
+        short_graph = build_bnorm_json("bnormbfp16", short_args)
+        long_graph = build_bnorm_json("bnormbfp16", long_args)
         assert short_graph == long_graph
 
     def test_bnorm_short_forw_flag(self) -> None:
         """Using -F instead of --forw for bnorm."""
         args_long = {"-n": "4", "-c": "32", "-H": "8", "-W": "8", "--forw": "2"}
         args_short = {"-n": "4", "-c": "32", "-H": "8", "-W": "8", "-F": "2"}
-        assert _build_bnorm_json("bnorm", args_long) == _build_bnorm_json(
+        assert build_bnorm_json("bnorm", args_long) == build_bnorm_json(
             "bnorm", args_short
         )
 
@@ -512,7 +550,7 @@ class TestBnormFlagAliases:
         """Using -b instead of --back for bnorm backward."""
         args_long = {"-n": "4", "-c": "32", "-H": "8", "-W": "8", "--back": "1"}
         args_short = {"-n": "4", "-c": "32", "-H": "8", "-W": "8", "-b": "1"}
-        assert _build_bnorm_json("bnorm", args_long) == _build_bnorm_json(
+        assert build_bnorm_json("bnorm", args_long) == build_bnorm_json(
             "bnorm", args_short
         )
 
@@ -520,7 +558,7 @@ class TestBnormFlagAliases:
         """Using --in_d instead of -D for 3D batchnorm."""
         args_short = {"-n": "2", "-c": "16", "-H": "8", "-W": "8", "-D": "4"}
         args_long = {"-n": "2", "-c": "16", "-H": "8", "-W": "8", "--in_d": "4"}
-        assert _build_bnorm_json("bnorm", args_short) == _build_bnorm_json(
+        assert build_bnorm_json("bnorm", args_short) == build_bnorm_json(
             "bnorm", args_long
         )
 
@@ -528,8 +566,16 @@ class TestBnormFlagAliases:
 class TestConvDataTypes:
     """Verify conv operations map to correct hipDNN DataType enum strings."""
 
-    _BASIC_ARGS = {"-n": "1", "-c": "8", "-H": "4", "-W": "4", "-k": "16",
-                   "-y": "1", "-x": "1", "-F": "1"}
+    _BASIC_ARGS = {
+        "-n": "1",
+        "-c": "8",
+        "-H": "4",
+        "-W": "4",
+        "-k": "16",
+        "-y": "1",
+        "-x": "1",
+        "-F": "1",
+    }
 
     @pytest.mark.parametrize(
         "operation,expected_io_type",
@@ -540,8 +586,8 @@ class TestConvDataTypes:
             ("convfp32", "float"),
         ],
     )
-    def test_conv_io_type_mapping(self, operation: str, expected_io_type: str) -> None:
-        assert _conv_io_type(operation) == expected_io_type
+    def testconv_io_type_mapping(self, operation: str, expected_io_type: str) -> None:
+        assert conv_io_type(operation) == expected_io_type
 
     @pytest.mark.parametrize(
         "operation,expected_io_type",
@@ -551,10 +597,10 @@ class TestConvDataTypes:
             ("convbfp16", "bfloat16"),
         ],
     )
-    def test_convert_line_sets_correct_io_type(
+    def testconvert_line_sets_correct_io_type(
         self, operation: str, expected_io_type: str
     ) -> None:
-        _, graph = _convert_line(operation, dict(self._BASIC_ARGS), "test")
+        _, graph = convert_line(operation, dict(self._BASIC_ARGS), "test")
         assert graph["io_data_type"] == expected_io_type
 
     @pytest.mark.parametrize(
@@ -568,7 +614,7 @@ class TestConvDataTypes:
     def test_conv_tensor_data_types(
         self, operation: str, expected_io_type: str
     ) -> None:
-        _, graph = _convert_line(operation, dict(self._BASIC_ARGS), "test")
+        _, graph = convert_line(operation, dict(self._BASIC_ARGS), "test")
         for tensor in graph["tensors"]:
             assert tensor["data_type"] == expected_io_type
 
@@ -589,7 +635,7 @@ class TestBnormDataTypes:
     def test_bnorm_inference_tensor_types(
         self, operation: str, expected_io_type: str, expected_stat_type: str
     ) -> None:
-        graph = _build_bnorm_json(operation, dict(self._BASIC_ARGS))
+        graph = build_bnorm_json(operation, dict(self._BASIC_ARGS))
         assert graph["io_data_type"] == expected_io_type
         # x and y tensors should have io_type
         x_tensor = next(t for t in graph["tensors"] if t["name"] == "input_x")
@@ -613,6 +659,6 @@ class TestBnormDataTypes:
     def test_bnorm_scale_bias_types(
         self, operation: str, expected_scale_type: str
     ) -> None:
-        graph = _build_bnorm_json(operation, dict(self._BASIC_ARGS))
+        graph = build_bnorm_json(operation, dict(self._BASIC_ARGS))
         scale_tensor = next(t for t in graph["tensors"] if t["name"] == "scale")
         assert scale_tensor["data_type"] == expected_scale_type

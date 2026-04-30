@@ -66,7 +66,7 @@ def extract_tarball(tarball_path: str) -> Tuple[tempfile.TemporaryDirectory, Lis
                 )
             if not json_members:
                 raise GraphLoadError(f"No .json files found in tarball: {tarball_path}")
-            tf.extractall(path=tmpdir.name, members=json_members)
+            tf.extractall(path=tmpdir.name, members=json_members, filter="data")
     except GraphLoadError:
         tmpdir.cleanup()
         raise
@@ -131,40 +131,3 @@ def resolve_graph_files(
 
     resolved_files.extend(jsons)
     return tmpdirs, sorted(resolved_files), tarball_source
-
-
-def resolve_graph_files_multi(
-    graph_args: List[str],
-) -> Tuple[List[tempfile.TemporaryDirectory], List[str], Optional[str]]:
-    """Resolve multiple --graph arguments (shell-expanded or quoted globs).
-
-    Delegates each argument to ``resolve_graph_files`` and merges results,
-    deduplicating paths while preserving sorted order.
-
-    Args:
-        graph_args: List of raw --graph argument strings.
-
-    Returns:
-        Tuple of (list of TemporaryDirectory objects to keep alive,
-        sorted deduplicated list of resolved JSON file paths,
-        tarball_source string if any tarball was resolved, else None).
-
-    Raises:
-        GraphLoadError: If any tarball cannot be opened or extracted.
-    """
-    all_tmpdirs: List[tempfile.TemporaryDirectory] = []
-    seen: set = set()
-    all_files: List[str] = []
-    tarball_source: Optional[str] = None
-
-    for arg in graph_args:
-        tmpdirs, files, tb_source = resolve_graph_files(arg)
-        all_tmpdirs.extend(tmpdirs)
-        if tb_source is not None:
-            tarball_source = tb_source
-        for f in files:
-            if f not in seen:
-                seen.add(f)
-                all_files.append(f)
-
-    return all_tmpdirs, sorted(all_files), tarball_source

@@ -22,20 +22,20 @@ from typing import Any, Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 
 
-def _nchw_strides(N: int, C: int, H: int, W: int) -> List[int]:
+def nchw_strides(N: int, C: int, H: int, W: int) -> List[int]:
     return [C * H * W, H * W, W, 1]
 
 
-def _nhwc_strides(N: int, C: int, H: int, W: int) -> List[int]:
+def nhwc_strides(N: int, C: int, H: int, W: int) -> List[int]:
     # Dims stay as [N, C, H, W]; strides reflect NHWC memory order
     return [H * W * C, 1, W * C, C]
 
 
-def _ncdhw_strides(N: int, C: int, D: int, H: int, W: int) -> List[int]:
+def ncdhw_strides(N: int, C: int, D: int, H: int, W: int) -> List[int]:
     return [C * D * H * W, D * H * W, H * W, W, 1]
 
 
-def _ndhwc_strides(N: int, C: int, D: int, H: int, W: int) -> List[int]:
+def ndhwc_strides(N: int, C: int, D: int, H: int, W: int) -> List[int]:
     # Dims stay as [N, C, D, H, W]; strides reflect NDHWC memory order
     return [D * H * W * C, 1, H * W * C, W * C, C]
 
@@ -46,11 +46,11 @@ def _input_strides(
     """Return strides for an input tensor given its memory layout."""
     if D is not None:
         if layout == "NDHWC":
-            return _ndhwc_strides(N, C, D, H, W)
-        return _ncdhw_strides(N, C, D, H, W)
+            return ndhwc_strides(N, C, D, H, W)
+        return ncdhw_strides(N, C, D, H, W)
     if layout == "NHWC":
-        return _nhwc_strides(N, C, H, W)
-    return _nchw_strides(N, C, H, W)
+        return nhwc_strides(N, C, H, W)
+    return nchw_strides(N, C, H, W)
 
 
 def _weight_strides(
@@ -78,9 +78,7 @@ def _weight_strides(
 # ---------------------------------------------------------------------------
 
 
-def _conv_out_dim(
-    dim_in: int, pad: int, dilation: int, kernel: int, stride: int
-) -> int:
+def conv_out_dim(dim_in: int, pad: int, dilation: int, kernel: int, stride: int) -> int:
     return math.floor((dim_in + 2 * pad - dilation * (kernel - 1) - 1) / stride + 1)
 
 
@@ -89,7 +87,7 @@ def _conv_out_dim(
 # ---------------------------------------------------------------------------
 
 
-def _is_flag(token: str) -> bool:
+def is_flag(token: str) -> bool:
     """Return True if token looks like a CLI flag (e.g. -n, --layout).
 
     Negative numbers like -1 or -0.5 are values, not flags.
@@ -102,15 +100,15 @@ def _is_flag(token: str) -> bool:
     return True
 
 
-def _parse_args(tokens: List[str]) -> Dict[str, str]:
+def parse_args(tokens: List[str]) -> Dict[str, str]:
     """Parse a flat list of flag/value tokens into a dict."""
     result: Dict[str, str] = {}
     i = 0
     while i < len(tokens):
         tok = tokens[i]
-        if _is_flag(tok):
+        if is_flag(tok):
             # Check if next token is a value (not a flag)
-            if i + 1 < len(tokens) and not _is_flag(tokens[i + 1]):
+            if i + 1 < len(tokens) and not is_flag(tokens[i + 1]):
                 result[tok] = tokens[i + 1]
                 i += 2
             else:
@@ -133,9 +131,7 @@ def _int(args: Dict[str, str], key: str, default: int = 0) -> int:
 # that inputs written with either style are handled identically.
 
 
-def _normalize_args(
-    args: Dict[str, str], aliases: Dict[str, str]
-) -> Dict[str, str]:
+def normalize_args(args: Dict[str, str], aliases: Dict[str, str]) -> Dict[str, str]:
     """Merge flag aliases so both short and long forms are recognized.
 
     The canonical key (value in *aliases*) takes precedence when both the
@@ -151,8 +147,8 @@ def _normalize_args(
 
 
 # Convolution: maps every alternative flag to the canonical key used by
-# _ConvParams.from_args().
-_CONV_FLAG_ALIASES: Dict[str, str] = {
+# ConvParams.from_args().
+CONV_FLAG_ALIASES: Dict[str, str] = {
     # Long → short (2D parameters)
     "--batchsize": "-n",
     "--in_channels": "-c",
@@ -182,8 +178,8 @@ _CONV_FLAG_ALIASES: Dict[str, str] = {
 }
 
 # Batchnorm: maps every alternative flag to the canonical key used by
-# _build_bnorm_json() and _bnorm_filename().
-_BNORM_FLAG_ALIASES: Dict[str, str] = {
+# build_bnorm_json() and _bnorm_filename().
+BNORM_FLAG_ALIASES: Dict[str, str] = {
     # Long → short
     "--batchsize": "-n",
     "--in_channels": "-c",
@@ -250,7 +246,7 @@ def _make_scalar_tensor(
 
 
 @dataclasses.dataclass
-class _ConvParams:
+class ConvParams:
     """Parsed convolution parameters extracted from MIOpen driver args."""
 
     N: int
@@ -279,9 +275,9 @@ class _ConvParams:
     dil_d: int = 1
 
     @classmethod
-    def from_args(cls, args: Dict[str, str]) -> "_ConvParams":
-        """Parse MIOpen convolution args into a _ConvParams instance."""
-        args = _normalize_args(args, _CONV_FLAG_ALIASES)
+    def from_args(cls, args: Dict[str, str]) -> "ConvParams":
+        """Parse MIOpen convolution args into a ConvParams instance."""
+        args = normalize_args(args, CONV_FLAG_ALIASES)
         spatial_dim = _int(args, "--spatial_dim", 2)
         is_3d = spatial_dim == 3
         D: Optional[int] = None
@@ -351,17 +347,17 @@ def _conv_node_type(F: int) -> str:
     }.get(F, "ConvolutionFwdAttributes")
 
 
-def _build_conv_json(p: _ConvParams, io_type: str = "bfloat16") -> Dict[str, Any]:
-    """Build a hipDNN JSON graph dict from a _ConvParams instance."""
+def build_conv_json(p: ConvParams, io_type: str = "bfloat16") -> Dict[str, Any]:
+    """Build a hipDNN JSON graph dict from a ConvParams instance."""
     is_3d = p.spatial_dim == 3
     Cg = p.C // p.groups  # channels per group for weight tensor
 
     # Compute output spatial dims
-    H_out = _conv_out_dim(p.H, p.pad_h, p.dil_h, p.R, p.stride_h)
-    W_out = _conv_out_dim(p.W, p.pad_w, p.dil_w, p.S, p.stride_w)
+    H_out = conv_out_dim(p.H, p.pad_h, p.dil_h, p.R, p.stride_h)
+    W_out = conv_out_dim(p.W, p.pad_w, p.dil_w, p.S, p.stride_w)
     D_out: Optional[int] = None
     if is_3d and p.D is not None and p.D_f is not None:
-        D_out = _conv_out_dim(p.D, p.pad_d, p.dil_d, p.D_f, p.stride_d)
+        D_out = conv_out_dim(p.D, p.pad_d, p.dil_d, p.D_f, p.stride_d)
 
     # Build dims in canonical NCHW / NCDHW order
     if is_3d and p.D is not None and p.D_f is not None and D_out is not None:
@@ -420,7 +416,7 @@ def _build_conv_json(p: _ConvParams, io_type: str = "bfloat16") -> Dict[str, Any
         {
             "name": "conv_node",
             "type": node_type,
-            "compute_data_type": "unset",
+            "compute_data_type": "float",
             "inputs": node_inputs,
             "outputs": node_outputs,
             "parameters": {
@@ -447,7 +443,7 @@ def _join_prefix(prefix: str, rest: str) -> str:
     return f"{prefix}_{rest}" if prefix else rest
 
 
-def _conv_filename(prefix: str, p: _ConvParams) -> str:
+def _conv_filename(prefix: str, p: ConvParams) -> str:
     direction = _conv_direction_label(p.F)
 
     if p.spatial_dim == 3 and p.D is not None and p.D_f is not None:
@@ -527,7 +523,7 @@ def _bnorm_scale_bias_type(operation: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _build_bnorm_json(operation: str, args: Dict[str, str]) -> Dict[str, Any]:
+def build_bnorm_json(operation: str, args: Dict[str, str]) -> Dict[str, Any]:
     """Build a hipDNN JSON graph dict from parsed bnorm* driver args.
 
     MIOpen --forw / --back semantics (from bn_driver.hpp):
@@ -535,7 +531,7 @@ def _build_bnorm_json(operation: str, args: Dict[str, str]) -> Dict[str, Any]:
       --forw 2           → forward inference
       --back 1           → backward (requires --forw 0)
     """
-    args = _normalize_args(args, _BNORM_FLAG_ALIASES)
+    args = normalize_args(args, BNORM_FLAG_ALIASES)
     N = _int(args, "-n", 1)
     C = _int(args, "-c", 1)
     H = _int(args, "-H", 1)
@@ -621,7 +617,9 @@ def _build_bnorm_json(operation: str, args: Dict[str, str]) -> Dict[str, Any]:
             ),
             _make_scalar_tensor(4, "epsilon", 1e-5, data_type="float"),
             _make_tensor(5, "output_y", x_dims, x_strides, data_type=io_type),
-            _make_tensor(6, "saved_mean", scale_dims, scale_strides, data_type=stat_type),
+            _make_tensor(
+                6, "saved_mean", scale_dims, scale_strides, data_type=stat_type
+            ),
             _make_tensor(
                 7, "saved_inv_variance", scale_dims, scale_strides, data_type=stat_type
             ),
@@ -706,7 +704,7 @@ def _build_bnorm_json(operation: str, args: Dict[str, str]) -> Dict[str, Any]:
 
 
 def _bnorm_filename(prefix: str, operation: str, args: Dict[str, str]) -> str:
-    args = _normalize_args(args, _BNORM_FLAG_ALIASES)
+    args = normalize_args(args, BNORM_FLAG_ALIASES)
     N = _int(args, "-n", 1)
     C = _int(args, "-c", 1)
     H = _int(args, "-H", 1)
@@ -729,31 +727,8 @@ def _bnorm_filename(prefix: str, operation: str, args: Dict[str, str]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Line parser dispatcher
+# Supported operation sets
 # ---------------------------------------------------------------------------
-
-
-def _parse_line(line: str) -> Optional[Tuple[str, Dict[str, str]]]:
-    """Parse one shape file line. Returns (operation, args_dict) or None."""
-    line = line.strip()
-    if not line or line.startswith("#"):
-        return None
-
-    # Strip leading repeat count (e.g. "     5  ./bin/MIOpenDriver ...")
-    m = re.match(r"^\s*\d+\s+", line)
-    if m:
-        line = line[m.end() :]
-
-    parts = line.split()
-    # parts[0] is the executable path, parts[1] is the operation
-    if len(parts) < 2:
-        return None
-
-    operation = parts[1]  # e.g. "convbfp16" or "bnormbfp16"
-    flag_tokens = parts[2:]
-    args = _parse_args(flag_tokens)
-    return operation, args
-
 
 _BNORM_OPERATIONS = {
     "bnorm",
@@ -768,6 +743,48 @@ _BNORM_OPERATIONS = {
 
 _CONV_OPERATIONS = {"convbfp16", "conv", "convfp16", "convfp32"}
 
+_ALL_OPERATIONS = _CONV_OPERATIONS | _BNORM_OPERATIONS
+
+
+# ---------------------------------------------------------------------------
+# Line parser dispatcher
+# ---------------------------------------------------------------------------
+
+
+def parse_line(line: str) -> Optional[Tuple[str, Dict[str, str]]]:
+    """Parse one shape file line. Returns (operation, args_dict) or None.
+
+    Accepts lines with or without an executable prefix::
+
+        ./bin/MIOpenDriver convbfp16 -n 16 ...   # executable + operation
+        convbfp16 -n 16 ...                       # bare operation
+    """
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return None
+
+    # Strip leading repeat count (e.g. "     5  ./bin/MIOpenDriver ...")
+    m = re.match(r"^\s*\d+\s+", line)
+    if m:
+        line = line[m.end() :]
+
+    parts = line.split()
+    if not parts:
+        return None
+
+    if parts[0] in _ALL_OPERATIONS:
+        operation = parts[0]
+        flag_tokens = parts[1:]
+    elif len(parts) < 2:
+        return None
+    else:
+        operation = parts[1]
+        flag_tokens = parts[2:]
+
+    args = parse_args(flag_tokens)
+    return operation, args
+
+
 _CONV_IO_TYPE: Dict[str, str] = {
     "conv": "float",
     "convfp16": "half",
@@ -776,20 +793,20 @@ _CONV_IO_TYPE: Dict[str, str] = {
 }
 
 
-def _conv_io_type(operation: str) -> str:
+def conv_io_type(operation: str) -> str:
     return _CONV_IO_TYPE.get(operation, "bfloat16")
 
 
-def _convert_line(
+def convert_line(
     operation: str, args: Dict[str, str], prefix: str
 ) -> Tuple[str, Dict[str, Any]]:
     """Convert parsed MIOpen args to (filename_stem, json_dict)."""
     if operation in _CONV_OPERATIONS:
-        p = _ConvParams.from_args(args)
-        graph = _build_conv_json(p, io_type=_conv_io_type(operation))
+        p = ConvParams.from_args(args)
+        graph = build_conv_json(p, io_type=conv_io_type(operation))
         name_stem = _conv_filename(prefix, p)
     elif operation in _BNORM_OPERATIONS:
-        graph = _build_bnorm_json(operation, args)
+        graph = build_bnorm_json(operation, args)
         name_stem = _bnorm_filename(prefix, operation, args)
     else:
         raise ValueError(f"Unsupported operation: {operation!r}")
@@ -851,10 +868,10 @@ def _process_inline_args(args_str: str, output: Optional[str]) -> int:
 
     operation = parts[0]
     flag_tokens = parts[1:]
-    parsed_args = _parse_args(flag_tokens)
+    parsed_args = parse_args(flag_tokens)
 
     try:
-        name_stem, graph = _convert_line(operation, parsed_args, "")
+        name_stem, graph = convert_line(operation, parsed_args, "")
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
@@ -881,14 +898,14 @@ def _process_file(input_path: Path, outdir: Path) -> Tuple[int, int, int]:
     seen_stems: Dict[str, int] = {}
 
     for lineno, raw_line in enumerate(lines, start=1):
-        parsed = _parse_line(raw_line)
+        parsed = parse_line(raw_line)
         if parsed is None:
             skipped += 1
             continue
 
         operation, args = parsed
         try:
-            name_stem, graph = _convert_line(operation, args, prefix)
+            name_stem, graph = convert_line(operation, args, prefix)
         except Exception as exc:
             print(f"  WARNING line {lineno}: {exc}", file=sys.stderr)
             warnings += 1

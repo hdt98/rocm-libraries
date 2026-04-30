@@ -178,7 +178,9 @@ class GraphValidator:
 
         required = _REQUIRED_NODE_FIELDS.get(node_type)
         if required is None:
-            # Supported type with no field requirements (e.g. PointwiseAttributes).
+            # Supported type with no per-field requirements defined above (e.g.
+            # PointwiseAttributes).  Field validation is intentionally deferred
+            # to the hipDNN backend for these types.
             return
 
         known_uids = uid_to_dtype.keys()
