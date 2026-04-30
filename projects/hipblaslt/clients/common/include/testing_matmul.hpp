@@ -3807,6 +3807,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         // Number of sub-iterations per hot call (for averaging)
         const int num_sub_iterations = 5;
+        const int sleep_percent = 50;
 
         int    flush_iter      = 100000;
         double flush_time_used = 0;
@@ -3918,12 +3919,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
-                    }
-                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    
-                    // Calculate hot iteration times (average of 5 sub-iterations)
-                    for(int i = 0; i < number_hot_calls; i++)
-                    {
+
+                        // CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                        CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+
                         if(arg.use_gpu_timer)
                         {
                             float ms;
@@ -3931,6 +3930,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
+
+                        if(sleep_percent > 0)
+                        {
+                            auto sleepTime = hot_iter_times[i] * (sleep_percent / 100.0) * num_sub_iterations;
+                            std::this_thread::sleep_for(std::chrono::duration<double, std::micro>(sleepTime));
+                        }
                     }
                 }
                 else
@@ -4007,6 +4012,7 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                     // Hot iterations with per-iteration timing (C API, no pipeline stall)
                     // Each hot iteration runs 5 times and takes the average
+                    gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
                     {
                         if(arg.use_gpu_timer)
@@ -4048,13 +4054,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
-                    }
-                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    
-                    // Calculate hot iteration times (average of 5 sub-iterations)
-                    gpu_time_used = 0.0;
-                    for(int i = 0; i < number_hot_calls; i++)
-                    {
+
+                        // CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                        CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+
                         if(arg.use_gpu_timer)
                         {
                             float ms;
@@ -4062,6 +4065,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
+
+                        if(sleep_percent > 0)
+                        {
+                            auto sleepTime = hot_iter_times[i] * (sleep_percent / 100.0) * num_sub_iterations;
+                            std::this_thread::sleep_for(std::chrono::duration<double, std::micro>(sleepTime));
+                        }
                     }
                 }
                 perf_monitor->stop();
@@ -4132,8 +4141,8 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                     // Hot iterations with per-iteration timing (grouped gemm with user_args)
                     // Each hot iteration runs 5 times and takes the average
+                    gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
-                    
                     {
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
@@ -4146,13 +4155,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
-                    }
-                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    
-                    // Calculate hot iteration times (average of 5 sub-iterations)
-                    gpu_time_used = 0.0;
-                    for(int i = 0; i < number_hot_calls; i++)
-                    {
+
+                        // CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                        CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+
                         if(arg.use_gpu_timer)
                         {
                             float ms;
@@ -4160,6 +4166,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
+
+                        if(sleep_percent > 0)
+                        {
+                            auto sleepTime = hot_iter_times[i] * (sleep_percent / 100.0) * num_sub_iterations;
+                            std::this_thread::sleep_for(std::chrono::duration<double, std::micro>(sleepTime));
+                        }
                     }
                     perf_monitor->stop();
                 }
@@ -4219,8 +4231,8 @@ void testing_matmul_with_bias(const Arguments& arg,
 
                     // Hot iterations with per-iteration timing (grouped gemm)
                     // Each hot iteration runs 5 times and takes the average
+                    gpu_time_used = 0.0;
                     for(int i = 0; i < number_hot_calls; i++)
-                    
                     {
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_start[i], stream));
@@ -4232,13 +4244,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                         }
                         if(arg.use_gpu_timer)
                             CHECK_HIP_ERROR(hipEventRecord(hot_events_end[i], stream));
-                    }
-                    CHECK_HIP_ERROR(hipStreamSynchronize(stream));
-                    
-                    // Calculate hot iteration times (average of 5 sub-iterations)
-                    gpu_time_used = 0.0;
-                    for(int i = 0; i < number_hot_calls; i++)
-                    {
+
+                        // CHECK_HIP_ERROR(hipStreamSynchronize(stream));
+                        CHECK_HIP_ERROR(hipEventSynchronize(hot_events_end[i]));
+
                         if(arg.use_gpu_timer)
                         {
                             float ms;
@@ -4246,6 +4255,12 @@ void testing_matmul_with_bias(const Arguments& arg,
                             hot_iter_times[i] = (ms * 1000.0) / num_sub_iterations; // ms to us, then average
                         }
                         gpu_time_used += hot_iter_times[i];
+
+                        if(sleep_percent > 0)
+                        {
+                            auto sleepTime = hot_iter_times[i] * (sleep_percent / 100.0) * num_sub_iterations;
+                            std::this_thread::sleep_for(std::chrono::duration<double, std::micro>(sleepTime));
+                        }
                     }
                     perf_monitor->stop();
                 }
