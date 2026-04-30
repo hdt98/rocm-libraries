@@ -190,6 +190,8 @@ struct Arguments
     int32_t split_strategy;      // 17=M-split (Origami), 18=N-split (Origami)
     int32_t num_splits;           // Number of sub-problems (default 2)
     bool l2_cache_hints;          // Enable L2 cache persistence hints for shared matrices
+    bool origami_wgm;             // Use Origami's select_workgroup_mapping per sub-problem
+                                  // (switches multi-MT timing path from C-API to ext-API + GemmTuning)
 
     /*************************************************************************
      *                     End Of Arguments                                  *

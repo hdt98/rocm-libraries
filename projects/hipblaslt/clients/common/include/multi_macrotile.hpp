@@ -13,6 +13,8 @@
 #pragma once
 
 #include <hipblaslt/hipblaslt.h>
+#include <hipblaslt/hipblaslt-ext.hpp>
+#include <memory>
 #include <vector>
 #include <cstdint>
 #include <algorithm>
@@ -44,15 +46,51 @@ struct GemmSubProblem
 
 // Pre-created context used by the timing hot-loop (avoids per-iteration
 // layout create / destroy / heuristic query overhead).
+//
+// Two operating modes:
+//   (1) Default ("C-API mode"): matA/B/C/D + matmul_desc + algo + A/B/C/D_ptr
+//       are used with hipblasLtMatmul on the hot path.
+//   (2) "Ext-API mode" (when use_ext_gemm=true and ext_gemm is non-null):
+//       hipblasLtMatmul is bypassed and ext_gemm->run(stream) is called
+//       instead.  This is the only path that lets us override WGM at runtime
+//       via hipblaslt_ext::GemmTuning::setWgm().
 struct SubProblemContext
 {
+    // C-API state (always populated; used as fallback even in ext mode)
     hipblasLtMatrixLayout_t matA, matB, matC, matD;
     hipblasLtMatmulDesc_t   matmul_desc; // per-subproblem descriptor for correct kernel selection
     hipblasLtMatmulAlgo_t   algo;
     void *A_ptr, *B_ptr, *C_ptr, *D_ptr;
     bool valid;
     bool owns_matmul_desc; // true if we created matmul_desc and need to destroy it
+
+    // Ext-API state (populated only when --origami_wgm is set)
+    bool use_ext_gemm = false;
+    int16_t origami_wgm = 0;          // Origami-recommended WGM (0 = kernel default)
+    std::shared_ptr<hipblaslt_ext::Gemm> ext_gemm;          // initialized once
+    std::shared_ptr<hipblaslt_ext::GemmTuning> ext_tuning;  // setWgm(origami_wgm)
 };
+
+// Dispatch a single sub-problem on the given stream.  Picks ext_gemm.run()
+// if available (i.e. --origami_wgm path), otherwise falls back to the
+// classic C-API hipblasLtMatmul.
+inline hipblasStatus_t dispatchSubProblem(
+    hipblasLtHandle_t handle,
+    const SubProblemContext& ctx,
+    const void* alpha, const void* beta,
+    void* workspace, size_t workspace_size,
+    hipStream_t stream)
+{
+    if (ctx.use_ext_gemm && ctx.ext_gemm)
+    {
+        // Inputs were already bound during initialization; just run.
+        return ctx.ext_gemm->run(stream);
+    }
+    return hipblasLtMatmul(handle, ctx.matmul_desc, alpha,
+                           ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
+                           beta, ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
+                           &ctx.algo, workspace, workspace_size, stream);
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 

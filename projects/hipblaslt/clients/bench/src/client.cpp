@@ -638,6 +638,12 @@ try
         value<bool>(&arg.l2_cache_hints)->default_value(true),
         "Enable L2 cache persistence hints for shared matrices in multi-MacroTile")
 
+        ("origami_wgm",
+        value<bool>(&arg.origami_wgm)->default_value(false),
+        "Use Origami's select_workgroup_mapping to set the WGM tuning per sub-problem. "
+        "Switches the multi-MacroTile timing path from the C API to the extension API "
+        "(hipblaslt_ext::Gemm + GemmTuning) so the per-sub WGM can be applied at runtime.")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");

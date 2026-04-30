@@ -4067,11 +4067,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 {
                                     if(!spCtxs[sp].valid) continue;
                                     auto& ctx = spCtxs[sp];
-                                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                                   ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                                   &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
-                                                   &ctx.algo, *dWorkspace, workspace_size,
-                                                   warmup_streams[sp % warmup_streams.size()]);
+                                    dispatchSubProblem(handle, ctx,
+                                                       alpha_in[0], &(h_beta[0]),
+                                                       *dWorkspace, workspace_size,
+                                                       warmup_streams[sp % warmup_streams.size()]);
                                 }
                             }
                             for(size_t i = 0; i < warmup_streams.size(); i++)
@@ -4182,11 +4181,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                                 {
                                     if(!spCtxs[sp].valid) continue;
                                     auto& ctx = spCtxs[sp];
-                                    hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                                   ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                                   &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                                   ctx.D_ptr, ctx.matD,
-                                                   &ctx.algo, *dWorkspace, workspace_size, stream);
+                                    dispatchSubProblem(handle, ctx,
+                                                       alpha_in[0], &(h_beta[0]),
+                                                       *dWorkspace, workspace_size, stream);
                                 }
                             }
                         }
@@ -4728,6 +4725,120 @@ void testing_matmul_with_bias(const Arguments& arg,
                 ctx.B_ptr = static_cast<char*>(dB[0].buf()) + sub.offset_B_bytes;
                 ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
                 ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
+
+                // === --origami_wgm: build ext-API Gemm + GemmTuning ============
+                // Switches the hot-loop dispatch from hipblasLtMatmul (C API) to
+                // hipblaslt_ext::Gemm::run() (extension API), which is the only
+                // path that lets us override the workgroup-mapping per kernel
+                // via GemmTuning::setWgm.
+                if(arg.origami_wgm && ctx.valid)
+                {
+                    // 1. Get baseline kernel's MT/MI from the heuristic algo we just picked
+                    size_t bl_mt_m = 256, bl_mt_n = 256, bl_mt_k = 64;
+                    size_t bl_mi_m = 16, bl_mi_n = 16, bl_mi_k = 16;
+                    try {
+                        auto sol_name = hipblaslt_ext::getSolutionNameFromAlgo(handle, heur_tmp.algo);
+                        parseMacroTileFromName(sol_name, bl_mt_m, bl_mt_n, bl_mt_k);
+                        parseMatrixInstructionFromName(sol_name, bl_mi_m, bl_mi_n, bl_mi_k);
+                    } catch(...) {}
+
+                    // 2. Ask Origami for its recommended WGM for this sub-problem
+                    int dev_id = 0; hipGetDevice(&dev_id);
+                    int16_t wgm = selectOrigamiWgm(
+                        sub.m_size, sub.n_size, sub.k_size,
+                        bl_mt_m, bl_mt_n, bl_mt_k,
+                        bl_mi_m, bl_mi_n, bl_mi_k,
+                        transA, transB,
+                        arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                        dev_id);
+                    ctx.origami_wgm = wgm;
+
+                    hipblaslt_cout << "  WGM[" << sp << "] sub=" << sub.m_size << "x"
+                                  << sub.n_size << " baseline=MT" << bl_mt_m << "x"
+                                  << bl_mt_n << " MI=" << bl_mi_m << "x" << bl_mi_n
+                                  << " → Origami WGM=" << wgm;
+
+                    // 3. Build a hipblaslt_ext::Gemm with the same problem geometry
+                    auto gemm = std::make_shared<hipblaslt_ext::Gemm>(
+                        handle, transA, transB,
+                        arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                        arg.compute_type);
+
+                    hipblaslt_ext::GemmEpilogue epilogue;
+                    hipblaslt_ext::GemmInputs inputs;
+                    inputs.setA(ctx.A_ptr);
+                    inputs.setB(ctx.B_ptr);
+                    inputs.setC(ctx.C_ptr);
+                    inputs.setD(ctx.D_ptr);
+                    inputs.setAlpha(alpha_in[0]);
+                    inputs.setBeta(&(h_beta[0]));
+
+                    hipblasStatus_t s_setp = gemm->setProblem(
+                        sub.m_size, sub.n_size, sub.k_size, /*batch_count=*/1,
+                        epilogue, inputs);
+
+                    bool ext_ok = (s_setp == HIPBLAS_STATUS_SUCCESS);
+
+                    if(ext_ok)
+                    {
+                        auto tuning = std::make_shared<hipblaslt_ext::GemmTuning>();
+                        if(wgm != 0) tuning->setWgm(wgm);
+
+                        // 4. Find an algo that supports our tuning override.
+                        //    Prefer the heuristic-picked algo if it accepts the
+                        //    tuning; otherwise scan getAllAlgos for the first
+                        //    that does.
+                        size_t ws = 0;
+                        bool tuned_algo_set = false;
+                        if(gemm->isAlgoSupported(heur_tmp.algo, *tuning, ws)
+                           == HIPBLAS_STATUS_SUCCESS && ws <= workspace_size)
+                        {
+                            if(gemm->initialize(heur_tmp.algo, *tuning, *dWorkspace)
+                               == HIPBLAS_STATUS_SUCCESS)
+                            {
+                                tuned_algo_set = true;
+                            }
+                        }
+                        if(!tuned_algo_set)
+                        {
+                            std::vector<hipblasLtMatmulHeuristicResult_t> all_algos;
+                            hipblaslt_ext::getAllAlgos(
+                                handle, hipblaslt_ext::GemmType::HIPBLASLT_GEMM,
+                                transA, transB,
+                                arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                                arg.compute_type, all_algos);
+                            for(auto& h : all_algos)
+                            {
+                                size_t ws_i = 0;
+                                if(gemm->isAlgoSupported(h.algo, *tuning, ws_i)
+                                   != HIPBLAS_STATUS_SUCCESS) continue;
+                                if(ws_i > workspace_size) continue;
+                                if(gemm->initialize(h.algo, *tuning, *dWorkspace)
+                                   != HIPBLAS_STATUS_SUCCESS) continue;
+                                tuned_algo_set = true;
+                                break;
+                            }
+                        }
+
+                        if(tuned_algo_set)
+                        {
+                            ctx.ext_gemm = gemm;
+                            ctx.ext_tuning = tuning;
+                            ctx.use_ext_gemm = true;
+                            hipblaslt_cout << " [applied via ext-API]" << std::endl;
+                        }
+                        else
+                        {
+                            hipblaslt_cout << " [no algo supports this tuning, "
+                                          << "falling back to C-API path]" << std::endl;
+                        }
+                    }
+                    else
+                    {
+                        hipblaslt_cout << " [Gemm::setProblem failed; "
+                                      << "falling back to C-API path]" << std::endl;
+                    }
+                }
             }
 
             // Note: same-MT guard removed — the initial split (uniform 50/50) may use the
@@ -4748,11 +4859,10 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                       &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
-                                       &ctx.algo, *dWorkspace, workspace_size,
-                                       warmup_streams[sp % warmup_streams.size()]);
+                        dispatchSubProblem(handle, ctx,
+                                           alpha_in[0], &(h_beta[0]),
+                                           *dWorkspace, workspace_size,
+                                           warmup_streams[sp % warmup_streams.size()]);
                     }
                 }
                 for(size_t i = 0; i < warmup_streams.size(); i++)
@@ -4801,10 +4911,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                       ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                       &(h_beta[0]), ctx.C_ptr, ctx.matC, ctx.D_ptr, ctx.matD,
-                                       &ctx.algo, *dWorkspace, workspace_size, stream);
+                        dispatchSubProblem(handle, ctx,
+                                           alpha_in[0], &(h_beta[0]),
+                                           *dWorkspace, workspace_size, stream);
                     }
                 }
                 CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -4927,11 +5036,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                         {
                             if (!spCtxs[sp].valid) continue;
                             auto& ctx = spCtxs[sp];
-                            hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                            ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                            &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                            ctx.D_ptr, ctx.matD,
-                                            &ctx.algo, *dWorkspace, workspace_size, stream);
+                            dispatchSubProblem(handle, ctx,
+                                               alpha_in[0], &(h_beta[0]),
+                                               *dWorkspace, workspace_size, stream);
                         }
                     }
                     CHECK_HIP_ERROR(hipStreamSynchronize(stream));
@@ -4974,11 +5081,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                     {
                         if(!spCtxs[sp].valid) continue;
                         auto& ctx = spCtxs[sp];
-                        hipblasLtMatmul(handle, ctx.matmul_desc, alpha_in[0],
-                                        ctx.A_ptr, ctx.matA, ctx.B_ptr, ctx.matB,
-                                        &(h_beta[0]), ctx.C_ptr, ctx.matC,
-                                        ctx.D_ptr, ctx.matD,
-                                        &ctx.algo, *dWorkspace, workspace_size, stream);
+                        dispatchSubProblem(handle, ctx,
+                                           alpha_in[0], &(h_beta[0]),
+                                           *dWorkspace, workspace_size, stream);
                     }
                 }
                 CHECK_HIP_ERROR(hipStreamSynchronize(stream));

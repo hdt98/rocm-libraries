@@ -16,6 +16,7 @@
 #include <hipblaslt/hipblaslt-ext.hpp>
 #include <origami/gemm.hpp>
 #include <origami/hardware.hpp>
+#include <origami/origami.hpp>   // select_workgroup_mapping
 #include <origami/types.hpp>
 #include <vector>
 #include <string>
@@ -164,6 +165,82 @@ inline double querySubProblemLatency(
     hipblasLtMatrixLayoutDestroy(matA);
 
     return latency;
+}
+
+// Query Origami's select_workgroup_mapping for the optimal WGM of a sub-problem.
+// Returns Origami's recommended `wgm` (signed; 0 keeps the kernel's built-in WGM,
+// negative is a Tensile sign convention for "use numMT_M tiles per group").
+// On any internal failure, returns 0 (i.e., let the kernel default apply).
+//
+// MI dimensions need to be supplied — these come from parsing the heuristic-
+// selected algo's solution name (parseMacroTileFromName already gives MT_M/N/K;
+// the MI is encoded as "MI<m>x<n>x<k>" in the same name).
+inline int16_t selectOrigamiWgm(
+    int64_t M, int64_t N, int64_t K,
+    size_t mt_m, size_t mt_n, size_t mt_k,
+    size_t mi_m, size_t mi_n, size_t mi_k,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    int device_id)
+{
+    if (mt_m == 0 || mt_n == 0) return 0;
+    if (mi_m == 0 || mi_n == 0) { mi_m = 16; mi_n = 16; mi_k = 16; }
+    try
+    {
+        origami::problem_t problem;
+        problem.size = {(size_t)M, (size_t)N, (size_t)K};
+        problem.batch = 1;
+        problem.a_transpose = (transA == HIPBLAS_OP_T)
+                              ? origami::transpose_t::T : origami::transpose_t::N;
+        problem.b_transpose = (transB == HIPBLAS_OP_T)
+                              ? origami::transpose_t::T : origami::transpose_t::N;
+        problem.a_dtype = hipToOrigamiDtype(a_type);
+        problem.b_dtype = hipToOrigamiDtype(b_type);
+        problem.c_dtype = hipToOrigamiDtype(c_type);
+        problem.d_dtype = hipToOrigamiDtype(d_type);
+        problem.mi_dtype = origami::data_type_t::Float;
+
+        origami::config_t config;
+        config.mt = {mt_m, mt_n, mt_k};
+        config.mi = {mi_m, mi_n, mi_k};
+        config.occupancy = 1;
+
+        auto hardware = origami::hardware_t::get_hardware_for_device(device_id);
+
+        // skGrid = number of output tiles for the data-parallel grid
+        size_t n_tiles_m = (M + mt_m - 1) / mt_m;
+        size_t n_tiles_n = (N + mt_n - 1) / mt_n;
+        size_t skGrid    = n_tiles_m * n_tiles_n;
+
+        auto mapping = origami::select_workgroup_mapping(problem, hardware, config, skGrid);
+        // Clamp to int16_t range expected by hipblaslt GemmTuning::setWgm
+        long w = (long)mapping.wgm;
+        if (w >  32767) w =  32767;
+        if (w < -32768) w = -32768;
+        return (int16_t)w;
+    }
+    catch (...)
+    {
+        return 0;
+    }
+}
+
+// Parse "MI<m>x<n>x<k>" out of a Tensile solution name.
+// Returns false if the substring is absent.
+inline bool parseMatrixInstructionFromName(const std::string& name,
+                                           size_t& mi_m, size_t& mi_n, size_t& mi_k)
+{
+    std::regex re("MI(\\d+)x(\\d+)x(\\d+)");
+    std::smatch m;
+    if (std::regex_search(name, m, re) && m.size() == 4)
+    {
+        mi_m = std::stoull(m[1].str());
+        mi_n = std::stoull(m[2].str());
+        mi_k = std::stoull(m[3].str());
+        return true;
+    }
+    return false;
 }
 
 // MacroTile preservation check.

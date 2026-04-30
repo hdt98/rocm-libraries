@@ -67,15 +67,13 @@ inline bool captureFusedGraph(
     err = hipStreamBeginCapture(stream, hipStreamCaptureModeGlobal);
     if (err != hipSuccess) return false;
 
-    // Issue all sub-problem matmuls into the captured stream
+    // Issue all sub-problem matmuls into the captured stream.
+    // Use dispatchSubProblem so this path also honors --origami_wgm.
     for (size_t sp = 0; sp < spCtxs.size(); sp++)
     {
         if (!spCtxs[sp].valid) continue;
-        const auto& c = spCtxs[sp];
-        hipblasLtMatmul(handle, c.matmul_desc, alpha,
-                        c.A_ptr, c.matA, c.B_ptr, c.matB,
-                        beta, c.C_ptr, c.matC, c.D_ptr, c.matD,
-                        &c.algo, workspace, workspace_size, stream);
+        dispatchSubProblem(handle, spCtxs[sp],
+                           alpha, beta, workspace, workspace_size, stream);
     }
 
     // End capture → produces graph
