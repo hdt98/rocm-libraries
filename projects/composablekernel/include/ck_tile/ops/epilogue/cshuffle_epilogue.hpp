@@ -298,14 +298,14 @@ struct CShuffleEpilogue
     template <typename Problem>
     CK_TILE_HOST_DEVICE static constexpr auto MakeLdsBlockDescriptor()
     {
-        constexpr auto DataTypeSize      = sizeof(ODataType);
-        constexpr index_t BaseVectorLen  = GetVectorSizeC();
+        constexpr auto DataTypeSize     = sizeof(ODataType);
+        constexpr index_t BaseVectorLen = GetVectorSizeC();
         // Use compile-time constant for banks since get_n_lds_banks() depends on
         // __gfx950__ which is only defined during device compilation, not host.
 #if defined(CK_GFX950_SUPPORT)
-        constexpr index_t banks          = 64;  // gfx950 has 64 LDS banks
+        constexpr index_t banks = 64; // gfx950 has 64 LDS banks
 #else
-        constexpr index_t banks          = 32;  // gfx942 and others have 32 LDS banks
+        constexpr index_t banks = 32; // gfx942 and others have 32 LDS banks
 #endif
 
         constexpr index_t BytesPerBank = 4;
@@ -333,14 +333,13 @@ struct CShuffleEpilogue
             // gfx950: 64-bank LDS needs 3-bit XOR, which requires VectorLen=4
             constexpr bool needs_vec_reduction_to_4 =
                 (MPerXdl == 16) &&
-                ((1 << (log2_base_vec + 3)) > NPerIterationShuffle) &&  // +3 for 3-bit XOR
+                ((1 << (log2_base_vec + 3)) > NPerIterationShuffle) && // +3 for 3-bit XOR
                 (BaseVectorLen > 4);
             constexpr index_t VectorLen = needs_vec_reduction_to_4 ? 4 : BaseVectorLen;
 #else
             // gfx942: 32-bank LDS works with 2-bit XOR, VectorLen=8 is sufficient
             constexpr bool needs_vec_reduction =
-                (MPerXdl == 16) &&
-                ((1 << (log2_base_vec + 2)) > NPerIterationShuffle) &&
+                (MPerXdl == 16) && ((1 << (log2_base_vec + 2)) > NPerIterationShuffle) &&
                 (BaseVectorLen > 8);
             constexpr index_t VectorLen = needs_vec_reduction ? 8 : BaseVectorLen;
 #endif
@@ -360,11 +359,11 @@ struct CShuffleEpilogue
             constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
             constexpr bool needs_16x16_padding = (MPerXdl == 16);
 #if defined(CK_GFX950_SUPPORT)
-            constexpr auto ToWords       = [](index_t elems) constexpr {
+            constexpr auto ToWords = [](index_t elems) constexpr {
                 return (elems * DataTypeSize) / BytesPerBank;
             };
-            constexpr index_t BaseWords  = ToWords(BaseStrideElems);
-            constexpr index_t PadWords   = needs_16x16_padding ? 8 : (((BaseWords % 2) == 0) ? 1 : 0);
+            constexpr index_t BaseWords = ToWords(BaseStrideElems);
+            constexpr index_t PadWords = needs_16x16_padding ? 8 : (((BaseWords % 2) == 0) ? 1 : 0);
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
 #else
             constexpr auto PaddingAmount = needs_16x16_padding ? (8 * ElemsPer4B) : 0;
@@ -410,7 +409,11 @@ struct CShuffleEpilogue
             // MPerIterationShuffle > MPerXdl (e.g., 4x1 with MPerIterationShuffle=64)
             constexpr index_t log2_vec = [] {
                 index_t v = VectorLen, l = 0;
-                while(v > 1) { v >>= 1; ++l; }
+                while(v > 1)
+                {
+                    v >>= 1;
+                    ++l;
+                }
                 return l;
             }();
             constexpr index_t col_bit_start = log2_vec;
@@ -418,9 +421,9 @@ struct CShuffleEpilogue
             // Check if we have enough column bits for the XOR transform
             // gfx950 (64 banks) needs 3-bit XOR, others need 2-bit XOR
 #if defined(CK_GFX950_SUPPORT)
-            constexpr index_t xor_bits = 3;  // 8-way spread for 64-bank LDS
+            constexpr index_t xor_bits = 3; // 8-way spread for 64-bank LDS
 #else
-            constexpr index_t xor_bits = 2;  // 4-way spread for 32-bank LDS
+            constexpr index_t xor_bits = 2; // 4-way spread for 32-bank LDS
 #endif
             constexpr bool has_enough_col_bits =
                 (1 << (col_bit_start + xor_bits)) <= NPerIterationShuffle;
@@ -430,7 +433,18 @@ struct CShuffleEpilogue
 #if defined(CK_GFX950_SUPPORT)
                 // 16x16 XDL on gfx950: use 3-bit XOR for 64-bank LDS
                 // Conflicting rows 0,4,8,12,16,20,24,28 differ in bits 2,3,4
-                using RowBits = sequence<2, 3, 4>;
+                //
+                // Special case: when MLdsLayer*2 == MPerXdl AND NWave >= 2
+                // (e.g. fp8/fp8 16x16 2x2 on gfx950, MLdsLayer=8), the third
+                // (RowBit, ColBit) pair degenerates: M%MPerXdl bit 4 is always 0,
+                // and the wave-N split bit lands at col bit (col_bit_start + 2),
+                // so the third XOR has no per-lane variance. Reuse RowBit M[2]
+                // (= per-lane M-band low bit) for the third pair to inject lane
+                // variance into the wave-N col bit and restore 16-way bank spread.
+                constexpr bool needs_thirdbit_workaround =
+                    (MLdsLayer * 2 == MPerXdl) && (NWave >= 2);
+                using RowBits = std::
+                    conditional_t<needs_thirdbit_workaround, sequence<2, 3, 2>, sequence<2, 3, 4>>;
                 using ColBits = sequence<col_bit_start, col_bit_start + 1, col_bit_start + 2>;
 #else
                 // 16x16 XDL on gfx942: use 2-bit XOR for 32-bank LDS
@@ -440,8 +454,8 @@ struct CShuffleEpilogue
 #endif
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(make_tuple(
+                        number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
                     make_tuple(sequence<0, 1>{}),
                     make_tuple(sequence<0, 1>{}));
 
@@ -455,8 +469,8 @@ struct CShuffleEpilogue
 
                 constexpr auto lds_block_desc = transform_tensor_descriptor(
                     lds_block_desc_2,
-                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(
-                        make_tuple(number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
+                    make_tuple(make_xor_bits_transform<RowBits, ColBits, MPerXdl>(make_tuple(
+                        number<MPerIterationShuffle>{}, number<NPerIterationShuffle>{}))),
                     make_tuple(sequence<0, 1>{}),
                     make_tuple(sequence<0, 1>{}));
 
