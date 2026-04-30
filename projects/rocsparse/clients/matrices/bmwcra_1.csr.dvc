@@ -1,0 +1,5 @@
+outs:
+- md5: 5e31e795894b66518955da6cfc39e65d
+  size: 128323152
+  hash: md5
+  path: bmwcra_1.csr

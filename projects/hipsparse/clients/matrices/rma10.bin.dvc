@@ -1,0 +1,5 @@
+outs:
+- md5: 81aee193f47c5ed0656c2085cb537cd5
+  size: 28675368
+  hash: md5
+  path: rma10.bin

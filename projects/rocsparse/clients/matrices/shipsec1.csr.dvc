@@ -1,0 +1,5 @@
+outs:
+- md5: d6c579cfee6f87891fb5fc2c2a52a021
+  size: 94324392
+  hash: md5
+  path: shipsec1.csr

@@ -1,0 +1,5 @@
+outs:
+- md5: 7b4b99335ebabf0dabd6c0369c0496be
+  size: 58368
+  hash: md5
+  path: nos7.csr

@@ -1,0 +1,5 @@
+outs:
+- md5: e75be15d94b4162070cbddb1d3e1229d
+  size: 16106684
+  hash: md5
+  path: mac_econ_fwd500.bin

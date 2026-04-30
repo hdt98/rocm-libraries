@@ -1,0 +1,5 @@
+outs:
+- md5: bcc4fb84ae06832b6ccab756062c2a10
+  size: 32911668
+  hash: md5
+  path: ASIC_320k.bin

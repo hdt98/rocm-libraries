@@ -1,0 +1,5 @@
+outs:
+- md5: 6182c47190064464c0e260ca7f8c192e
+  size: 193984
+  hash: md5
+  path: nos3.bin

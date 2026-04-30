@@ -1,0 +1,5 @@
+outs:
+- md5: 814d0f263379df1f3fc60d868ea99636
+  size: 7576
+  hash: md5
+  path: nos4.csr

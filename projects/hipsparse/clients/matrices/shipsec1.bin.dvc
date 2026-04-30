@@ -1,0 +1,5 @@
+outs:
+- md5: 8e56e021f1d1394bb75a8be1b98d84db
+  size: 94324360
+  hash: md5
+  path: shipsec1.bin

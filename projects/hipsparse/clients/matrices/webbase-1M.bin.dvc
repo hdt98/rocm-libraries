@@ -1,0 +1,5 @@
+outs:
+- md5: 8aa2b1d8cbbb7209d5de79b01fd4f1cf
+  size: 41266468
+  hash: md5
+  path: webbase-1M.bin

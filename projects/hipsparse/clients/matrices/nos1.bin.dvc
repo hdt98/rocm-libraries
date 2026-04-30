@@ -1,0 +1,5 @@
+outs:
+- md5: 89e44379ad31c563e5b8b24ba25e38b7
+  size: 13168
+  hash: md5
+  path: nos1.bin

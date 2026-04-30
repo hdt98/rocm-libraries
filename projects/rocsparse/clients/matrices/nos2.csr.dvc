@@ -1,0 +1,5 @@
+outs:
+- md5: 8faa8885c881cfca26d7537d6535405b
+  size: 53520
+  hash: md5
+  path: nos2.csr

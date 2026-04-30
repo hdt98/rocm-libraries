@@ -1,0 +1,5 @@
+outs:
+- md5: 5d230c01e76ba508fb7b7d7219a82e13
+  size: 16106716
+  hash: md5
+  path: mac_econ_fwd500.csr

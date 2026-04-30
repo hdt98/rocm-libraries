@@ -1,0 +1,5 @@
+outs:
+- md5: 97ffbff6e0aa3f364d4e31bf67666322
+  size: 41266500
+  hash: md5
+  path: webbase-1M.csr

@@ -1,0 +1,5 @@
+outs:
+- md5: d02383cc562b0b2c8e38f852f7dd4e16
+  size: 2867696
+  hash: md5
+  path: mplate.csr

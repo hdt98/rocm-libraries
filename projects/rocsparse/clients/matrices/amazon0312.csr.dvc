@@ -1,0 +1,5 @@
+outs:
+- md5: 53ea2832dced67423511f47d2e72e766
+  size: 40008236
+  hash: md5
+  path: amazon0312.csr

@@ -1,0 +1,5 @@
+outs:
+- md5: 3f3029890433a099d04a0982475f0b3d
+  size: 32911700
+  hash: md5
+  path: ASIC_320k.csr

@@ -1,0 +1,5 @@
+outs:
+- md5: 96e0b4663982b366584686e4137f214b
+  size: 12191240
+  hash: md5
+  path: scircuit.bin

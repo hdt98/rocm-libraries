@@ -1,0 +1,5 @@
+outs:
+- md5: 7bf13f4ec622dbe82f1ec19384395419
+  size: 28675400
+  hash: md5
+  path: rma10.csr
