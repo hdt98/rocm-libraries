@@ -9,14 +9,8 @@
 #include "float_types.h"
 #include "hip_math_ops.hpp"
 
-// Disable FMA contraction so the inner-loop multiply-accumulate emits a
-// separate v_mul_f32 + v_add_f32 pair, matching what the OpenCL kernel
-// produces under -cl-std=CL2.0 without -cl-mad-enable. The HipVsOcl
-// regression test expects bit-exact agreement between the two backends.
-#pragma clang fp contract(off)
-
 #define UNUSED __attribute__((__unused__))
-using uint = uint;
+using uint = unsigned int;
 
 #define MLO_N_OUT_HORIZ_READS ((MLO_OUT_WIDTH + MLO_IN_TILE0 - 1) / MLO_IN_TILE0)
 #define MLO_N_SPANS_PER_SCAN (MLO_N_OUT_HORIZ_READS)
