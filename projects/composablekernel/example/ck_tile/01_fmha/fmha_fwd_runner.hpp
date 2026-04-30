@@ -1719,17 +1719,15 @@ fwd_result fmha_fwd_run(mode_enum mode,
             // TODO: Replace stdout capture/parsing with a direct query API, e.g.
             // fmha_fwd_splitkv_get_heuristic_kname(traits, args), to avoid depending
             // on log formatting and std::cout redirection.
-            heuristic_full_kname = capture_heuristic_kname(
-                "fmha_fwd_splitkv_",
-                [&]() {
-                    ck_tile::stream_config hsc{nullptr,
-                                               false,
-                                               /*log_level=*/1,
-                                               /*warmup=*/0,
-                                               /*repeat=*/1,
-                                               false};
-                    fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
-                });
+            heuristic_full_kname = capture_heuristic_kname("fmha_fwd_splitkv_", [&]() {
+                ck_tile::stream_config hsc{nullptr,
+                                           false,
+                                           /*log_level=*/1,
+                                           /*warmup=*/0,
+                                           /*repeat=*/1,
+                                           false};
+                fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
+            });
         }
         else
 #endif // CK_TILE_FMHA_FWD_SPLITKV_API
@@ -1745,17 +1743,15 @@ fwd_result fmha_fwd_run(mode_enum mode,
             // TODO: Replace stdout capture/parsing with a direct query API, e.g.
             // fmha_fwd_get_heuristic_kname(traits, args), to avoid depending on
             // log formatting and std::cout redirection.
-            heuristic_full_kname = capture_heuristic_kname(
-                "fmha_fwd_",
-                [&]() {
-                    ck_tile::stream_config hsc{nullptr,
-                                               false,
-                                               /*log_level=*/1,
-                                               /*warmup=*/0,
-                                               /*repeat=*/1,
-                                               false};
-                    fmha_fwd(fmha_traits, fmha_args, hsc);
-                });
+            heuristic_full_kname = capture_heuristic_kname("fmha_fwd_", [&]() {
+                ck_tile::stream_config hsc{nullptr,
+                                           false,
+                                           /*log_level=*/1,
+                                           /*warmup=*/0,
+                                           /*repeat=*/1,
+                                           false};
+                fmha_fwd(fmha_traits, fmha_args, hsc);
+            });
         }
 
         if(all_results.empty())
