@@ -11,7 +11,7 @@
 #include "ck_tile/core/utility/type_traits.hpp"
 #include "ck_tile/host/hip_check_error.hpp"
 
-#include "get_wave_size_helper.hpp"
+#include "get_cmake_targets_helper.hpp"
 
 using namespace ck_tile;
 using namespace ck_tile::core::arch;
@@ -480,7 +480,7 @@ TEST(TestAmdgcnMma, MmaSelector_F16_F16_F32_16x16x32_Real)
     HIP_CHECK_ERROR(hipMemcpy(d_b, h_b.data(), BSize, hipMemcpyHostToDevice));
     HIP_CHECK_ERROR(hipMemcpy(d_c, h_c.data(), CSize, hipMemcpyHostToDevice));
 
-    const auto wave_size = getDeviceWaveSize();
+    const auto wave_size = getCMakeWaveSize();
     test_accum_over_k<AType, BType, CType, WaveTileM, WaveTileN, WaveTileK>
         <<<1, wave_size>>>(d_a, d_b, d_c, d_out);
     HIP_CHECK_ERROR(hipDeviceSynchronize());
@@ -581,7 +581,7 @@ TEST(TestAmdgcnMma, MmaSelector_F16_F16_F32_112x112x128_Real)
     HIP_CHECK_ERROR(hipMemcpy(d_b, h_b.data(), BSize, hipMemcpyHostToDevice));
     HIP_CHECK_ERROR(hipMemcpy(d_c, h_c.data(), CSize, hipMemcpyHostToDevice));
 
-    const auto wave_size = getDeviceWaveSize();
+    const auto wave_size = getCMakeWaveSize();
     test_accum_over_k<AType, BType, CType, WaveTileM, WaveTileN, WaveTileK>
         <<<1, wave_size>>>(d_a, d_b, d_c, d_out);
     HIP_CHECK_ERROR(hipDeviceSynchronize());
