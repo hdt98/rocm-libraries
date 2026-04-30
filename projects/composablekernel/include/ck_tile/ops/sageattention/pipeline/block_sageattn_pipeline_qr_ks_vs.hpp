@@ -8,6 +8,7 @@
 #include "ck_tile/ops/sageattention/block/block_sageattention_quant_scale_enum.hpp"
 #include "ck_tile/ops/sageattention/pipeline/block_sageattn_pipeline_qr_ks_vs_default_policy.hpp"
 #include "ck_tile/ops/reduce/block/block_reduce.hpp"
+#include "ck_tile/ops/sageattention/pipeline/sageattn_packed_vector.hpp"
 
 namespace ck_tile {
 
@@ -222,10 +223,14 @@ struct BlockSageAttentionPipelineQRKSVS
         auto m     = MLBlockTileType{};
         auto l     = MLBlockTileType{};
 
+        // Phase 2: Cumulative log scale for deferred O rescale (DISABLED - has bugs)
+        // auto cum_log_scale = MLBlockTileType{};
+
         clear_tile(o_acc);
         {
             set_tile(m, -numeric<SMPLComputeDataType>::infinity());
             clear_tile(l);
+            // clear_tile(cum_log_scale); // Initialize to 0
         }
         const auto q_origin = q_dram_block_window_tmp.get_window_origin();
 
@@ -617,7 +622,9 @@ struct BlockSageAttentionPipelineQRKSVS
                 sequence<1>{},
                 f_max,
                 -numeric<SMPLComputeDataType>::infinity()); // m_local = rowmax(S{j})
-            block_tile_reduce_sync(m_local, f_max, bool_constant<false>{});
+
+            // Phase 1b optimization: XOR reduce (faster, no LDS traffic)
+            block_tile_reduce_xor_sync(m_local, f_max);
 
             const auto m_old = m; // m{j-1}
             tile_elementwise_inout(
@@ -658,17 +665,60 @@ struct BlockSageAttentionPipelineQRKSVS
                     row_max -= FNUZ_FP8_SHIFT;
 #endif
                 }
+                // Phase 2: Add cumulative log scale AFTER FP8 shift handling (DISABLED)
+                // row_max += cum_log_scale[i_idx];
+
+#ifndef CK_TILE_SAGEATTN_DISABLE_PACKED_VECTOR
+                // Optimized: Packed vector instructions (v_pk_fma_f32)
+                // Process 2 elements per instruction for better ILP and reduced VALU count
+                auto& s_buf = s.get_thread_buffer();
+                auto& p_buf = p_compute.get_thread_buffer();
+
+                // Prepare packed constants (replicate for both lanes)
+                const fp32x2_t scale_pk = {scale_s, scale_s};
+                const fp32x2_t neg_rowmax_pk = {-row_max, -row_max};
+
+                // Main loop: process 2 elements at a time
+                constexpr index_t kNumElements = decltype(s)::get_thread_buffer_size();
+                static_for<0, kNumElements / 2, 1>{}([&](auto i) {
+                    // Load 2 consecutive elements
+                    const fp32x2_t s_pk = {s_buf[number<2 * i>{}],
+                                           s_buf[number<2 * i + 1>{}]};
+
+                    // Packed FMA: scale_s * s - row_max (1 instruction for 2 ops)
+#ifdef CK_TILE_SAGEATTN_DEBUG_SCALAR
+                    auto exponent_pk = sageattn_pk::pk_fma_f32_debug(scale_pk, s_pk, neg_rowmax_pk);
+#else
+                    auto exponent_pk = sageattn_pk::pk_fma_f32(scale_pk, s_pk, neg_rowmax_pk);
+#endif
+
+                    // exp2 (still scalar - hardware limitation)
+                    p_buf(number<2 * i>{})     = exp2(exponent_pk[0]);
+                    p_buf(number<2 * i + 1>{}) = exp2(exponent_pk[1]);
+                });
+
+                // Tail: handle odd element if exists
+                if constexpr(kNumElements % 2 != 0)
+                {
+                    constexpr auto tail_idx = number<kNumElements - 1>{};
+                    p_buf(tail_idx) = exp2(scale_s * s_buf[tail_idx] - row_max);
+                }
+#else
+                // Fallback: original scalar implementation
                 sweep_tile_span(p_spans[number<1>{}], [&](auto idx1) {
                     constexpr auto i_j_idx = make_tuple(idx0, idx1);
                     p_compute(i_j_idx)     = exp2(scale_s * s[i_j_idx] - row_max);
                 });
+#endif
             });
 
             auto rowsum_p = block_tile_reduce<SMPLComputeDataType>(
                 p_compute, sequence<1>{}, f_sum, SMPLComputeDataType{0}); // rowsum(Pcompute{j})
 
-            block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
-            // l{j}, Oacc{j}
+            // Phase 1b optimization: XOR reduce (faster, no LDS traffic)
+            block_tile_reduce_xor_sync(rowsum_p, f_sum);
+
+            // l{j}, Oacc{j} (Phase 2 DISABLED - restoring original rescale logic)
             constexpr auto o_spans = decltype(o_acc)::get_distributed_spans();
             sweep_tile_span(o_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
