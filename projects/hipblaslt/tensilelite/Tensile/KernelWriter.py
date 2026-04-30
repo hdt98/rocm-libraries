@@ -444,6 +444,35 @@ class KernelWriter(metaclass=abc.ABCMeta):
   #__metaclass__=abc.ABCMeta
 
   ##############################################################################
+  # Capture-state shims — keep the old attribute names working for tests and
+  # external readers (CMSValidator, CustomSchedule). Internally everything
+  # routes through self._capture_context (a ScheduleCapture.CaptureContext).
+  ##############################################################################
+  @property
+  def _last_default_capture(self):
+    return self._capture_context.default
+
+  @_last_default_capture.setter
+  def _last_default_capture(self, value):
+    self._capture_context.default = value
+
+  @property
+  def _last_cms_capture(self):
+    return self._capture_context.cms
+
+  @_last_cms_capture.setter
+  def _last_cms_capture(self, value):
+    self._capture_context.cms = value
+
+  @property
+  def _last_default_main_capture(self):
+    return self._capture_context.default_main
+
+  @_last_default_main_capture.setter
+  def _last_default_main_capture(self, value):
+    self._capture_context.default_main = value
+
+  ##############################################################################
   # Init
   ##############################################################################
   def __init__(
@@ -576,6 +605,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.vgprs  = StateVgprs()
 
     self.exclasses = ExternClasses()
+
+    # Per-kernel capture lifecycle. See ScheduleCapture.CaptureContext.
+    from Tensile.Components.ScheduleCapture import CaptureContext
+    self._capture_context = CaptureContext()
 
   ##############################################################################
   # makeSchedule:  Schedule work into interations.
@@ -3637,9 +3670,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
       )
       finalized = shadow_capture.finalize()
       if isNGLL:
-        self.states._defaultNGLCapture = finalized
+        self._capture_context.default_n_gl = finalized
       else:
-        self.states._defaultNLLCapture = finalized
+        self._capture_context.default_n_ll = finalized
 
     # generate no Load Loop Body code
     module.add(self.noLoadLoopBody(kernel, tensorParametersA, tensorParametersB, pack, packPre, isOptNLL, isNGLL, NLLfirst, NLLlast, NLLindex=NLLindex, \
@@ -4320,9 +4353,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # perIterLocalWriteCanSkip) is mutated by the shadow; this only
         # affects shadow runs themselves and is benign for downstream code
         # (NLL/NGL short-circuit at KernelWriter.py:2858-2866).
-        if not hasattr(self.states, "_defaultCaptureBuilder") or self.states._defaultCaptureBuilder is None:
+        if self._capture_context.builder is None:
           from Tensile.Components.ScheduleCapture import LoopBodyCaptureBuilder
-          self.states._defaultCaptureBuilder = LoopBodyCaptureBuilder()
+          self._capture_context.builder = LoopBodyCaptureBuilder()
         from Tensile.Components.ScheduleCapture import (
           structural_clone, build_idmap, invert_idmap_to_id_to_category,
         )
@@ -4360,10 +4393,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # leaves land in UNKNOWN at categorize time because they never enter
         # PackCodeAAllIters. Snapshot is built in kernelBody's prefetch loop
         # when UseCustomMainLoopSchedule is set.
-        for _plrIdx, _prefetch_mod in enumerate(getattr(self.states, '_prefetchPackCodeA', [])):
+        for _plrIdx, _prefetch_mod in enumerate(self._capture_context.prefetch_pack_a):
           for _leaf in _prefetch_mod.flatitems():
             capture_id_to_cat.setdefault(id(_leaf), f"PackA{_plrIdx}")
-        for _plrIdx, _prefetch_mod in enumerate(getattr(self.states, '_prefetchPackCodeB', [])):
+        for _plrIdx, _prefetch_mod in enumerate(self._capture_context.prefetch_pack_b):
           for _leaf in _prefetch_mod.flatitems():
             capture_id_to_cat.setdefault(id(_leaf), f"PackB{_plrIdx}")
         # Pointer-math items (LRS/LWS) are tagged inside _makeSubIterSchedule
@@ -4378,7 +4411,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
           structural_clone(waitLWCode), structural_clone(syncCode),
           structural_clone(pack[packIdx]), structural_clone(packPre[packPreIdx]),
           module,
-          capture=self.states._defaultCaptureBuilder,
+          capture=self._capture_context.builder,
           capture_id_to_category=capture_id_to_cat,
         )
 
@@ -4423,7 +4456,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
       # _defaultNLLCapture. Cross-scheduler comparison moved to kernelBody for
       # the same reason.
       if getattr(self.states, "_captureDefaultSchedule", False):
-        builder = getattr(self.states, "_defaultCaptureBuilder", None)
+        builder = self._capture_context.builder
         if builder is not None:
           # Capture leftover pack[*] / packPre[*] content that wasn't
           # consumed by any iter's _makeSubIterSchedule. Under CMS the
@@ -4458,10 +4491,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           leftover_id_to_cat = invert_idmap_to_id_to_category(leftover_idmap)
           # Same prefetch-pack tagging as the per-iter capture path so leftover
           # leaves still in pack[*] from prefetch get categorized correctly.
-          for _plrIdx, _prefetch_mod in enumerate(getattr(self.states, '_prefetchPackCodeA', [])):
+          for _plrIdx, _prefetch_mod in enumerate(self._capture_context.prefetch_pack_a):
             for _leaf in _prefetch_mod.flatitems():
               leftover_id_to_cat.setdefault(id(_leaf), f"PackA{_plrIdx}")
-          for _plrIdx, _prefetch_mod in enumerate(getattr(self.states, '_prefetchPackCodeB', [])):
+          for _plrIdx, _prefetch_mod in enumerate(self._capture_context.prefetch_pack_b):
             for _leaf in _prefetch_mod.flatitems():
               leftover_id_to_cat.setdefault(id(_leaf), f"PackB{_plrIdx}")
           for buf in list(pack) + list(packPre):
@@ -4480,8 +4513,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 iteration=kernel["LoopIters"],
                 slot_kind=SLOT_KIND_POST_LOOP, mfma_index=-1,
               )
-          self._last_default_main_capture = builder.finalize()
-          self.states._defaultCaptureBuilder = None
+          self._capture_context.default_main = builder.finalize()
+          self._capture_context.builder = None
 
       optSchedule, numCodePath = customMainLoopSchedule(self, kernel, tensorParametersA, tensorParametersB, globalReadIncACode, globalReadIncBCode, \
                                                    LRCodeAAllIters, PackCodeAAllIters, LRCodeBAllIters, PackCodeBAllIters, \
@@ -4819,8 +4852,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         # land in UNKNOWN at categorize time.
         if kernel["UseCustomMainLoopSchedule"]:
           from rocisa.code import Module as _Module_for_prefetch_snap
-          self.states._prefetchPackCodeA = [_Module_for_prefetch_snap() for _ in range(self.states.numItersPLR)]
-          self.states._prefetchPackCodeB = [_Module_for_prefetch_snap() for _ in range(self.states.numItersPLR)]
+          self._capture_context.prefetch_pack_a = [_Module_for_prefetch_snap() for _ in range(self.states.numItersPLR)]
+          self._capture_context.prefetch_pack_b = [_Module_for_prefetch_snap() for _ in range(self.states.numItersPLR)]
         # in some cases need an extra copy of the LDS read with appropriate double buffer offsets
         for plrIdx in range(0, self.states.numItersPLR):
           packPre[plrIdx] = Module()
@@ -4841,7 +4874,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 else:
                   pack[plrIdx].add(packPreA)
                   if kernel["UseCustomMainLoopSchedule"]:
-                    self.states._prefetchPackCodeA[plrIdx].add(packPreA)
+                    self._capture_context.prefetch_pack_a[plrIdx].add(packPreA)
                 if usePLRPack:
                   # usePLRPack case, generate all pack code at prefetch phase
                   # CMS only needs 1st PLRPack code insertion in preLoop, but localReadDo returns only 1st PLRPack code.
@@ -4850,7 +4883,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 else:
                   pack[plrIdx].add(packCodeA)
                   if kernel["UseCustomMainLoopSchedule"]:
-                    self.states._prefetchPackCodeA[plrIdx].add(packCodeA)
+                    self._capture_context.prefetch_pack_a[plrIdx].add(packCodeA)
               if kernel["ProblemType"]["MXBlockA"]:
                 if iui*self.states.numReadsIterCoalescedMXSA < kernel["InnerUnroll"]:
                   module.addComment1("local read prefetch mxsa")
@@ -4880,7 +4913,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 else:
                   pack[plrIdx].add(packPreB)
                   if kernel["UseCustomMainLoopSchedule"]:
-                    self.states._prefetchPackCodeB[plrIdx].add(packPreB)
+                    self._capture_context.prefetch_pack_b[plrIdx].add(packPreB)
                 if usePLRPack:
                   # usePLRPack case, generate all pack code at prefetch phase
                   # CMS only needs 1st PLRPack code insertion in preLoop, but localReadDo returns only 1st PLRPack code.
@@ -4889,7 +4922,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
                 else:
                   pack[plrIdx].add(packCodeB)
                   if kernel["UseCustomMainLoopSchedule"]:
-                    self.states._prefetchPackCodeB[plrIdx].add(packCodeB)
+                    self._capture_context.prefetch_pack_b[plrIdx].add(packCodeB)
               if not kernel["ForceUnrollSubIter"] and (iui*self.states.numReadsIterCoalescedA < kernel["InnerUnroll"]):
                 module.addComment1("local read inc a")
                 module.add(self.localReadInc(kernel, iui, tensorParametersA))
@@ -5117,12 +5150,13 @@ class KernelWriter(metaclass=abc.ABCMeta):
         f"have re-bumped it. Capture machinery needs per-lc support."
       )
       try:
-        main = getattr(self, "_last_default_main_capture", None)
-        n_gl = getattr(self.states, "_defaultNGLCapture", LoopBodyCapture(instructions=[]))
-        n_ll = getattr(self.states, "_defaultNLLCapture", LoopBodyCapture(instructions=[]))
+        ctx = self._capture_context
+        main = ctx.default_main
+        n_gl = ctx.default_n_gl if ctx.default_n_gl is not None else LoopBodyCapture(instructions=[])
+        n_ll = ctx.default_n_ll if ctx.default_n_ll is not None else LoopBodyCapture(instructions=[])
         if main is not None:
           num_mfma = sum(1 for ti in main.instructions if ti.category == "MFMA")
-          self._last_default_capture = FourPartCapture(
+          ctx.default = FourPartCapture(
             main_loop={0: main},
             main_loop_prev={0: clone_loop_body(main)},
             n_gl={0: n_gl},
@@ -5132,12 +5166,12 @@ class KernelWriter(metaclass=abc.ABCMeta):
             source="default-sia3",
             num_mfma_per_iter=self.states.numMfmaPerIter,
           )
-          if getattr(self, "_last_cms_capture", None) is not None:
+          if ctx.cms is not None:
             kernel_label = (
               f"{kernel['MacroTile0']}x{kernel['MacroTile1']}x{kernel['DepthU']}"
             )
-            ref_graph = build_dataflow_graph(self._last_default_capture)
-            subj_graph = build_dataflow_graph(self._last_cms_capture)
+            ref_graph = build_dataflow_graph(ctx.default)
+            subj_graph = build_dataflow_graph(ctx.cms)
             graph_failures = compare_graphs(
               ref_graph, subj_graph, raise_on_unexplained=False,
             )
@@ -5145,7 +5179,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               f"Dataflow graph comparison failed for kernel {kernel_label}: "
               f"{len(graph_failures)} edge difference(s):\n  "
               + "\n  ".join(
-                f.format(self._last_cms_capture.main_loop.get(0))
+                f.format(ctx.cms.main_loop.get(0))
                 for f in graph_failures
               )
             )
@@ -5156,20 +5190,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
               f"Wait-coverage validation failed for kernel {kernel_label}: "
               f"{len(wait_failures)} failure(s):\n  "
               + "\n  ".join(
-                f.format(self._last_cms_capture.main_loop.get(0))
+                f.format(ctx.cms.main_loop.get(0))
                 for f in wait_failures
               )
             )
       finally:
-        # Reset capture state so it doesn't leak into the next kernel even
-        # if compare_graphs/validate_edge_wait_coverage raised. With auto-
-        # activation, ~2.7 MB per CMS kernel × 10k+ kernels in a tuning
-        # run would be a 27 GB peak leak otherwise.
-        self.states._defaultNGLCapture = None
-        self.states._defaultNLLCapture = None
-        self._last_default_main_capture = None
-        self.states._prefetchPackCodeA = []
-        self.states._prefetchPackCodeB = []
+        # Reset per-kernel scratch state so it doesn't leak into the next
+        # kernel even if compare_graphs / validate_edge_wait_coverage raised.
+        # ctx.default and ctx.cms are intentionally preserved (consumer-facing).
+        # With auto-activation, ~2.7 MB per CMS kernel × 10k+ kernels in a
+        # tuning run would be a 27 GB peak leak otherwise.
+        self._capture_context.reset()
 
     if self.states.actualSummationLoops>1 and self.states.staggerUCode:
       module.addComment1("remove stagger offsets")
@@ -5964,6 +5995,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
     self.sgprs  = collections.OrderedDict()
     self.codes  = CodeModules()
     self.labels = LabelManager()
+
+    # Per-kernel capture lifecycle. See ScheduleCapture.CaptureContext.
+    from Tensile.Components.ScheduleCapture import CaptureContext
+    self._capture_context = CaptureContext()
 
     # external classes
     if kernel["ProblemType"]["Gradient"] and kernel["ProblemType"]["UseBias"] and (kernel["ProblemType"]["BiasSrc"] == "A" or kernel["ProblemType"]["BiasSrc"] == "B"):
