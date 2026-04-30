@@ -130,6 +130,28 @@ __device__ static inline void readInput(uint lcl_id,
     __syncthreads();
 }
 
+// MLO_ACCUM_SZ is the number of scalar float accumulators.
+// Define it here (mirroring the local redefinition below) so AccumStore can use it.
+#ifndef MLO_ACCUM_SZ
+#define MLO_ACCUM_SZ (MLO_N_LCL_OUT_MAPS * MLO_N_LCL_IN_MAPS * MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0)
+#endif
+#define MLO_ACCUM_SZ_PAIR ((MLO_ACCUM_SZ + 1) / 2)
+
+// Wrapper to encourage clang's SROA to keep adjacent FLOAT_ACCUM elements
+// in <2 x float> SSA values, so the AMDGPU backend allocates them as VGPR pairs.
+// The union gives well-defined type-punning between the float2 pair view
+// (used for SROA-friendly init) and the flat scalar view (used by operator[]).
+struct AccumStore
+{
+    union
+    {
+        float2 pair[MLO_ACCUM_SZ_PAIR];
+        FLOAT_ACCUM flat[MLO_ACCUM_SZ_PAIR * 2];
+    };
+    __device__ FLOAT_ACCUM& operator[](uint i) { return flat[i]; }
+    __device__ FLOAT_ACCUM operator[](uint i) const { return flat[i]; }
+};
+
 /*
         core processing loop
         bot - input, from local (1 span)
@@ -142,7 +164,7 @@ Processing(UNUSED uint sc,
            uint sc_lcl_off,
            uint top_lim,
            int bot_lim, // bot_lim could be negative at lower boundary padding
-           FLOAT_ACCUM* __restrict__ pvt_accum,
+           AccumStore& pvt_accum,
            FLOAT* __restrict__ lcl_bot,
            FLOAT* __restrict__ top_dat)
 {
@@ -183,13 +205,12 @@ __device__ static inline void moveOutputUp(FLOAT* __restrict__ top_dat)
     // move up output to reduce overfetch
     for(uint k = 0; k < MLO_N_LCL_OUT_MAPS; ++k)
     {
+        const uint base = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1;
         for(uint j = 0; j < MLO_FILTER_SIZE1 - 1; ++j)
         {
             for(uint i = 0; i < MLO_IN_TILE0; ++i)
             {
-                uint pvt_off_n = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + j * MLO_IN_TILE0 + i;
-                uint pvt_off_o = k * MLO_IN_TILE0 * MLO_FILTER_SIZE1 + (j + 1) * MLO_IN_TILE0 + i;
-                top_dat[pvt_off_n] = top_dat[pvt_off_o];
+                top_dat[base + j * MLO_IN_TILE0 + i] = top_dat[base + (j + 1) * MLO_IN_TILE0 + i];
             }
         }
     }
@@ -325,10 +346,10 @@ extern "C" __global__ void __launch_bounds__((MLO_GRP_SZ0) * (MLO_GRP_SZ1) * (ML
         top_dat[i] = 0;
     }
 
-#define MLO_ACCUM_SZ (MLO_N_LCL_OUT_MAPS * MLO_N_LCL_IN_MAPS * MLO_FILTER_SIZE1 * MLO_FILTER_SIZE0)
+    AccumStore pvt_accum;
 
-    FLOAT_ACCUM pvt_accum[MLO_ACCUM_SZ];
-
+    // Zero-init through operator[] (same access path as reads/writes below)
+    // to avoid strict-aliasing dead-store elimination of a pair[]-typed init.
     for(uint i = 0; i < MLO_ACCUM_SZ; ++i)
     {
         pvt_accum[i] = 0;
