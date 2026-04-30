@@ -129,7 +129,7 @@ public:
 	// padding_factor is a value in [0, 1] that indicates how much of a buffer we should leave below
 	// the calculated memory limits.
 	// i.e when allocations are >= actual_limit * (1 - padding_factor), then assume we're out of memory.
-	MemCheck(const float padding_factor = 0.1f) :
+	MemCheck(const hipStream_t stream = 0, const float padding_factor = 0.1f) :
 		padding_factor(padding_factor)
     {
         // Some of this information could be queried once and stored as static data
@@ -171,9 +171,9 @@ public:
         host_usage = host_limit - mem_available;
 #endif
 
-        hipDeviceProp_t props;
-        HIP_CHECK(hipGetDeviceProperties(&props, 0));
-        is_apu = static_cast<bool>(props.integrated);
+        rocprim::detail::target_arch arch;
+        HIP_CHECK(rocprim::detail::host_target_arch(stream, arch));
+        is_apu = test_utils::is_apu(arch);
 
 #ifdef MEMCHECK_LOGGING
         std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
