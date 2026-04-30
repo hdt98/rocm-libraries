@@ -60,7 +60,7 @@ configure_file(include/stinkytofu/Config.h.in include/stinkytofu/Config/Config.h
 # This is a temporary solution until:
 # (1) stinkytofu designs a new rocisa IR to replace the original ones, or
 # (2) stinkytofu completely replaces rocisa IR with stinkyAsm IR.
-if(TARGET rocisa)
+if(TARGET _rocisa)
     add_subdirectory(src/conversion/rocisa)
 endif()
 
@@ -121,7 +121,9 @@ target_include_directories(stinkytofu
 add_dependencies(stinkytofu tablegen_generated)
 
 # dladdr() used in IntrinsicRegistry.cpp requires -ldl
-target_link_libraries(stinkytofu PRIVATE ${CMAKE_DL_LIBS})
+# Threads required for std::call_once (separate libpthread on glibc < 2.34)
+find_package(Threads REQUIRED)
+target_link_libraries(stinkytofu PRIVATE ${CMAKE_DL_LIBS} Threads::Threads)
 
 # Add source files from src/ subdirectory
 add_subdirectory(src)

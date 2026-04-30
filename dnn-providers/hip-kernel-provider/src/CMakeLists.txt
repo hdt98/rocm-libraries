@@ -17,6 +17,7 @@ add_library(
     engines/plans/batchnorm/BatchnormFwdInferenceWithVariancePlan.cpp
     engines/plans/batchnorm/BatchnormFwdTrainingPlan.cpp
     engines/plans/batchnorm/BatchnormApplicabilityChecks.cpp
+    engines/plans/batchnorm/BatchnormFwdTrainingPlanBuilder.cpp
     engines/plans/RMSnorm/RMSnormPlanBuilder.cpp
     engines/plans/RMSnorm/RMSnormFwdPlan.cpp
     engines/plans/RMSnorm/RMSnormApplicabilityChecks.cpp
@@ -37,7 +38,7 @@ target_include_directories(hip_kernel_provider_impl PUBLIC
     ${CMAKE_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/../kernels
 )
-hip_kernel_provider_generate_version_header(hip_kernel_provider hip_kernel_provider_impl)
+dnn_provider_generate_version_header(hip_kernel_provider hip_kernel_provider_impl ${CMAKE_CURRENT_LIST_DIR}/..)
 target_link_libraries(hip_kernel_provider_impl PUBLIC hip::host hipdnn_data_sdk hipdnn_flatbuffers_sdk hipdnn_plugin_sdk hiprtc::hiprtc)
 
 target_compile_options(hip_kernel_provider_impl PRIVATE ${HIPDNN_WARNING_COMPILE_OPTIONS})
