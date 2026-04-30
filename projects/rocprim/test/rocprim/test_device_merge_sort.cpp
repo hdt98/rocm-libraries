@@ -526,11 +526,11 @@ test_utils::MemCheck memcheck;
             = rocprim::make_transform_iterator(rocprim::make_counting_iterator<size_t>(0),
                                                rocprim::identity<key_type>());
 
+        key_type* d_output;
 if (!memcheck.alloc_device_bytes(size * sizeof(*d_output)))
 {
     break;
-}
-        key_type*  d_output;
+}    
         hipError_t malloc_status = common::hipMallocHelper(&d_output, size * sizeof(*d_output));
         if(malloc_status == hipErrorOutOfMemory)
         {
