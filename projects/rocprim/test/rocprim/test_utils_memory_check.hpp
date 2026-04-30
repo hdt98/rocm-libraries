@@ -126,15 +126,9 @@ public:
 	MemCheck(const float padding_factor=0.1) :
 		host_usage(0), dev_usage(0), padding_factor(padding_factor)
     {
-        std::cout << "*********** MemCheck() ***************" << std::endl;
-
-        std::cout << "*** init_info() ***" << std::endl;
-
         size_t free_dev_mem;
         HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_mem_limit));
-        std::cout << "total device memory: " << (dev_mem_limit >> 20) << std::endl;
         dev_usage = dev_mem_limit - free_dev_mem;
-        std::cout << "       device usage: " << (dev_usage >> 20) << std::endl;
 
 #ifdef _WIN32
         MEMORYSTATUSEX mem_status;
@@ -146,13 +140,14 @@ public:
         host_mem_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
         host_usage = host_mem_limit - sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
 #endif
-        std::cout << "total host memory: " << (host_mem_limit >> 20) << std::endl;
-        std::cout << "host usage: " << (host_usage >> 20) << std::endl;
 
         hipDeviceProp_t props;
         HIP_CHECK(hipGetDeviceProperties(&props, 0));
         is_apu = static_cast<bool>(props.integrated);
-        std::cout << "is_apu: " << is_apu << std::endl;
+
+        std::cout << "MemCheck: device " << (dev_usage >> 20) << "/" << (dev_mem_limit >> 20)
+                  << " MiB, host " << (host_usage >> 20) << "/" << (host_mem_limit >> 20)
+                  << " MiB, is_apu=" << is_apu << std::endl;
     }
 
 	// Call this before host allocs
