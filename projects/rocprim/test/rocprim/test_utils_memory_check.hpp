@@ -132,6 +132,11 @@ public:
 	MemCheck(const float padding_factor = 0.1f) :
 		padding_factor(padding_factor)
     {
+        // Some of this information could be queried once and stored as static data
+        // to be shared across multiple instances of MemCheck.
+        // This constructor is not meant to be in performance critical code so it's OK
+        // if we end up repeatedly querying the same data to keep things simpler.
+
         size_t free_dev_mem;
         HIP_CHECK(hipMemGetInfo(&free_dev_mem, &dev_limit));
         dev_usage = dev_limit - free_dev_mem;
