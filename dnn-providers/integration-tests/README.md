@@ -8,19 +8,27 @@ Integration tests for hipDNN provider implementations.
 
 | Command | What runs | Use case |
 |---------|-----------|----------|
-| `ninja unit-check` | Quick tests only | Fast developer iteration |
-| `ninja check` | All tests (quick + comprehensive) | Full validation |
-| `ctest -L quick` | Quick gpu_ref only | Small shapes + standalone tests |
-| `ctest -L comprehensive` | Comprehensive gpu_ref only | Medium + Large shapes |
+| `ninja unit-check` | Small shapes + standalone tests | Fast developer iteration |
+| `ninja check` | All tests (all four tiers) | Full validation |
+| `ctest -L quick` | Small shapes | Pre-commit sanity |
+| `ctest -L standard` | Small + standalone tests | PR validation |
+| `ctest -L comprehensive` | Small + standalone + medium | Nightly |
+| `ctest -L full` | All tests | Weekly |
 
 ### Direct binary invocation
 
 ```bash
-# Quick only: small shapes + standalone tests
-./bin/hipdnn_gpu_ref_tests --gtest_filter="Small*:Test*"
+# Small shapes only
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Small*"
 
-# Comprehensive only: medium + large shapes
-./bin/hipdnn_gpu_ref_tests --gtest_filter="Medium*:Large*"
+# Standalone tests only
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Test*"
+
+# Medium shapes only
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Medium*"
+
+# Large shapes only
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Large*"
 
 # Run everything
 ./bin/hipdnn_gpu_ref_tests
