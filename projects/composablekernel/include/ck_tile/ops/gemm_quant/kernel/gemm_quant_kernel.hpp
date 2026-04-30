@@ -461,12 +461,21 @@ struct QuantGemmKernel
                 using BQuantGroupSize = remove_cvref_t<typename GemmPipeline::BQuantGroupSize>;
 
                 // Compute AQ K-group offset for this split-K batch.
-                // AQ tensor layout is RowMajor [M, QK_A] with stride [stride_AQ, 1].
-                // Advancing to column aq_group_offset means a pointer offset of aq_group_offset
-                // elements (column stride = 1).
                 const index_t k_offset_aq = amd_wave_read_first_lane(k_id * KRead);
                 aq_group_offset   = amd_wave_read_first_lane(k_offset_aq / AQuantGroupSize::kK);
-                aq_k_split_offset = amd_wave_read_first_lane(aq_group_offset);
+                if constexpr(std::is_same_v<AQLayout, tensor_layout::gemm::RowMajor>)
+                {
+                    // RowMajor AQ is [M, QK_A] with stride [stride_AQ, 1].
+                    // Advancing to K-group column g is a pointer offset of g.
+                    aq_k_split_offset = amd_wave_read_first_lane(aq_group_offset);
+                }
+                else if constexpr(std::is_same_v<AQLayout, tensor_layout::gemm::ColumnMajor>)
+                {
+                    // ColumnMajor AQ is [QK_A, M] with K-group row stride stride_AQ.
+                    // Advancing to K-group row g is a pointer offset of g * stride_AQ.
+                    aq_k_split_offset =
+                        amd_wave_read_first_lane(aq_group_offset * kargs.stride_AQ);
+                }
 
                 // Compute BQ K-group offset for this split-K batch.
                 // BQ tensor layout is ColumnMajor [N/kN, K/kK] with stride [K/kK, 1] for
@@ -1424,6 +1433,8 @@ struct QuantGemmKernel
 
         const index_t num_loop =
             amd_wave_read_first_lane(TilePartitioner::GetLoopNum(splitk_batch_offset.splitted_k));
+        const bool has_hot_loop   = GemmPipeline::BlockHasHotloop(num_loop);
+        const TailNumber tail_num = GemmPipeline::GetBlockLoopTailNum(num_loop);
 
         // Run GEMM cooperatively by whole workgroup.
         const auto& c_block_tile = [&]() {
@@ -1461,6 +1472,8 @@ struct QuantGemmKernel
                                       aq_block_window,
                                       bq_block_window,
                                       num_loop,
+                                      has_hot_loop,
+                                      tail_num,
                                       smem_ptr,
                                       m,
                                       n);
