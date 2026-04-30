@@ -387,7 +387,14 @@ struct CShuffleEpilogue
                 ((1 << (log2_vec_for_xor_test + xor_bits_for_test)) <= NPerIterationShuffle);
             constexpr bool needs_load_friendly_clamp =
                 !xor_branch_will_apply && (DataTypeSize >= 2);
-            constexpr index_t MLdsLayerMaxByBankSpread = max(1, MPerXdl / 4);
+            // MLdsLayer cap depends on mfma layout (= how many M-band bits each
+            // lane contributes). For 16x16 and 64x4 mfma both have 4 lanes per
+            // M-band, so MPerXdl/4 gives the right cap (= 4 for 16x16, = 16 for
+            // 64x4). But 64x4 has 16 distinct M-bands per wave (vs 4 for 16x16),
+            // requiring a tighter cap so all 4 M-band bits flow into v2:
+            //   16x16: M_per_wave/2^band_bits = 16/4 = 4
+            //   64x4:  M_per_wave/2^band_bits = 64/16 = 4
+            constexpr index_t MLdsLayerMaxByBankSpread = (MPerXdl == 64) ? 4 : max(1, MPerXdl / 4);
             constexpr auto MLdsLayer =
                 needs_load_friendly_clamp ? max(1, min(MLdsLayerRequired, MLdsLayerMaxByBankSpread))
                                           : max(1, MLdsLayerRequired);
@@ -403,12 +410,22 @@ struct CShuffleEpilogue
             // different bank regions while preserving the load-friendly interleaved layout.
             constexpr index_t ElemsPer4B = BytesPerBank / ck_tile::gcd(BytesPerBank, DataTypeSize);
             constexpr bool needs_16x16_padding = (MPerXdl == 16);
+            // For 64x4 mfma + clamped MLdsLayer=4, choose stride_dwords mod 32 = 2
+            // so that the 16 M-bands × 2 N-pairs per ds_write hit 32 distinct banks
+            // bijectively (bank = (k*stride_dwords + p) mod 32 with k=0..15, p=0,1).
+            // PadWords adds (PadWords) dwords; we want (BaseWords + PadWords) mod 32 = 2.
+            constexpr bool needs_64x4_padding = (MPerXdl == 64) && needs_load_friendly_clamp;
 #if defined(CK_GFX950_SUPPORT)
             constexpr auto ToWords = [](index_t elems) constexpr {
                 return (elems * DataTypeSize) / BytesPerBank;
             };
             constexpr index_t BaseWords = ToWords(BaseStrideElems);
-            constexpr index_t PadWords = needs_16x16_padding ? 8 : (((BaseWords % 2) == 0) ? 1 : 0);
+            constexpr index_t PadWords =
+                needs_16x16_padding ? 8
+                : needs_64x4_padding
+                    ? ((2 - (BaseWords % 32) + 32) % 32 == 0 ? 32
+                                                             : (2 - (BaseWords % 32) + 32) % 32)
+                    : (((BaseWords % 2) == 0) ? 1 : 0);
             constexpr auto PaddingAmount = PadWords * ElemsPer4B;
 #else
             constexpr auto PaddingAmount = needs_16x16_padding ? (8 * ElemsPer4B) : 0;
