@@ -292,14 +292,16 @@ private:
         bool success;
         if (is_apu)
         {
+            // Reduce the host_limit by a padding factor as a safety margin.
+            const size_t host_limit_padded = static_cast<size_t>(host_limit * (1 - padding_factor));
+
             // Any memory used in excess of host_limit - dev_limit will spill
             // into the device's shared memory, reducing the device limit.
 
             // Both subtractions below are guarded: if dev_limit > host_limit or
             // spill > dev_limit, the unsigned subtraction would wrap around to a
             // large value, making the check silently pass when memory is exhausted.
-            const size_t host_limit = static_cast<size_t>(host_limit * (1 - padding_factor));
-            size_t host_unshared_limit = dev_limit_padded <= host_limit ? host_limit - dev_limit_padded : 0UL;
+            size_t host_unshared_limit = dev_limit_padded <= host_limit_padded ? host_limit_padded - dev_limit_padded : 0UL;
             size_t spill = host_usage > host_unshared_limit ?
                            host_usage - host_unshared_limit : 0UL;
 
