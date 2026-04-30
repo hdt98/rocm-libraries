@@ -84,33 +84,42 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 }
 
 
-// drop MemChk class in here
-// We need to be able to skip tests in 2 ways:
-// 1. Some tests loop though multiple input sizes.
-//    When we hit a size that causes out of memory, skip the size and continue the next iteration.
-// 2. Some tests only use a single input size. In this case, skip the entire test when we run out of memory.
+// MemCheck tracks host and device memory usage to skip test sizes that would
+// exceed available memory. This is needed on APU systems where CPU and GPU share
+// a single memory pool, making it easy to exhaust memory with large test inputs.
 //
-// Idea:
-// Class with a static member struct to store info about memory limits.
-// Instantiate it at the top of every GTest function.
-// Every time we want to allocate memory on host or device, first call
-// functions to log the allocation with the MemCheck instance.
-// The log functions check memory usage and, if it exceeds the threshold,
-// issue a `continue` (goto next iteration of enclosing loop)
-// or `GTEST_SKIP()` depending on the `continue_on_fail` template arg.
-// Eg:
-// MemCheck<continue_on_fail> checker;
+// The MemCheck alloc() functions are called before the actual memory allocation
+// so the code can gracefully handle an out-of-memory situation.
 //
-// // log host allocation
-// checker.log_host_usage(sizeof(type) * size);
-// std::vector<type> host_vec(size);
-// ...
-// // log device allocation
-// checker.log_dev_usage(sizeof(type) * size);
-// int d_ptr;
-// HIP_CHECK(hipMalloc(&d_ptr, sizeof(type) * size));
+// The MemCheck free() functions must be called when memory is freed before the
+// end of the MemCheck object's scope.
+// 
+// For tests with a single input size (skip the whole test):
 //
-// Haven't tested this much yet, but so far the limits don't seem quite right.
+//   MemCheck mem_check;
+//   if(!mem_check.alloc_device_bytes(sizeof(type) * size)) GTEST_SKIP();
+//
+// For tests with multiple input sizes (skip the size or break out):
+//
+//   for(auto size : sizes)
+//   {
+//       MemCheck mem_check;
+//       if(!mem_check.alloc_host_bytes(sizeof(type) * size)) continue;
+//       std::vector<type> host_vec(size);
+//       if(!mem_check.alloc_device_bytes(sizeof(type) * size)) continue;
+//       type* d_ptr;
+//       HIP_CHECK(hipMalloc(&d_ptr, sizeof(type) * size));
+//       // ... run test ...
+//       HIP_CHECK(hipFree(d_ptr));
+//   }
+//
+//  It is possible to create one MemCheck object outside of the size loop, but
+//  that introduces the possibility of forgetting to call free() on something
+//  allocated inside the loop, and thus incorrect memory tracking for subsequent
+//  loop iterations.  Creating a new MemCheck object each time ensures correct
+//  tracking for the current size.
+//
+// Define MEMCHECK_LOGGING at compile time to enable diagnostic output.
 
 // OS-specific includes for detecting available host memory
 #ifdef _WIN32
