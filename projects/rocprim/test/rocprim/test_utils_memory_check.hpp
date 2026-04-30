@@ -121,6 +121,8 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 //
 // Define MEMCHECK_LOGGING at compile time to enable diagnostic output.
 
+#define MEMCHECK_LOGGING
+
 class MemCheck
 {
 public:
@@ -142,7 +144,26 @@ public:
         host_usage = mem_status.ullTotalPhys - mem_status.ullAvailPhys;
 #else
         host_limit = sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
-        host_usage = host_limit - sysconf(_SC_AVPHYS_PAGES) * sysconf(_SC_PAGE_SIZE);
+
+        // MemAvailable accounts for reclaimable page cache and slab memory,
+        // so it more accurately reflects what the OS can give to a new allocation
+        // than MemFree alone.
+        size_t mem_available = 0;
+        {
+            std::ifstream meminfo("/proc/meminfo");
+            std::string label;
+            size_t value;
+            std::string unit;
+            while(meminfo >> label >> value >> unit)
+            {
+                if(label == "MemAvailable:")
+                {
+                    mem_available = value * 1024; // kB → bytes
+                    break;
+                }
+            }
+        }
+        host_usage = host_limit - mem_available;
 #endif
 
         hipDeviceProp_t props;
