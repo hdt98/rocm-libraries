@@ -280,7 +280,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                 {
                     ArgumentOut newArg{a_grid_ptr,
                                        arg.p_b_grid,
-                                       ds_grid_ptr,
+                                       {},
                                        c_grid_ptr,
                                        m,
                                        arg.N,
@@ -293,6 +293,7 @@ struct DeviceGemmMultiD_Xdl_CShuffle_V3 : public DeviceGemmMultipleDSplitK<ALayo
                                        arg.a_element_op,
                                        arg.b_element_op,
                                        arg.c_element_op};
+                    newArg.p_ds_grid = ds_grid_ptr;
                     sub_arguments.emplace_back(std::move(newArg));
                 }
                 else

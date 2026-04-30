@@ -765,31 +765,6 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
                 p_ds_grid(i) = static_cast<const DDataType_*>(p_ds_grid_[i]);
             });
         }
-        __host__ Argument(const ADataType* p_a_grid_,
-                          const BDataType* p_b_grid_,
-                          DsGridPointer p_ds_grid_,
-                          CDataType* p_c_grid_,
-                          index_t M_,
-                          index_t N_,
-                          index_t K_,
-                          index_t StrideA_,
-                          index_t StrideB_,
-                          std::array<index_t, NumDTensor> StrideDs_,
-                          index_t StrideC_,
-                          index_t k_batch_,
-                          AElementwiseOperation a_element_op_,
-                          BElementwiseOperation b_element_op_,
-                          CElementwiseOperation c_element_op_)
-            : Problem{M_, N_, K_, StrideA_, StrideB_, StrideDs_, StrideC_, k_batch_},
-              p_a_grid{p_a_grid_},
-              p_b_grid{p_b_grid_},
-              p_ds_grid{p_ds_grid_},
-              p_c_grid{p_c_grid_},
-              a_element_op{a_element_op_},
-              b_element_op{b_element_op_},
-              c_element_op{c_element_op_}
-        {
-        }
 
         const ADataType* p_a_grid;
         const BDataType* p_b_grid;

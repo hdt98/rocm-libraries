@@ -1816,7 +1816,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             {
                 typename GridwiseGemm64::Argument gemm_arg{nullptr,
                                                            nullptr,
-                                                           std::array<const void*, NumDTensor>(),
+                                                           {},
                                                            nullptr,
                                                            GemmM,
                                                            GemmN,
@@ -1838,7 +1838,7 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
             {
                 typename GridwiseGemm32::Argument gemm_arg{nullptr,
                                                            nullptr,
-                                                           std::array<const void*, NumDTensor>(),
+                                                           {},
                                                            nullptr,
                                                            GemmM,
                                                            GemmN,
