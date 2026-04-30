@@ -32,6 +32,8 @@
 #include <boost/program_options.hpp>
 
 #include <cstddef>
+#include <queue>
+#include <vector>
 
 namespace TensileLite
 {
@@ -66,6 +68,22 @@ namespace TensileLite
             void finalizeReport() override;
 
         private:
+            struct SolutionRecord
+            {
+                std::string name;
+                int64_t     index  = -1;
+                double      gflops = -1.0;
+            };
+
+            // Min-heap comparator so top() is the lowest GFLOPS among the kept top-K.
+            struct GreaterGFLOPS
+            {
+                bool operator()(SolutionRecord const& lhs, SolutionRecord const& rhs) const
+                {
+                    return lhs.gflops > rhs.gflops;
+                }
+            };
+
             template <typename T>
             void reportValue(std::string const& key, T const& value);
             void mergeRow(std::unordered_map<std::string, std::string>& newRow);
@@ -84,6 +102,11 @@ namespace TensileLite
             double      m_fasterTimeUS            = -1.0;
             double      m_fastestTilesPerCu       = -1.0;
             double      m_fastestTotalGranularity = -1.0;
+
+            static constexpr size_t kTopSolutionsToTrack = 5;
+            std::priority_queue<SolutionRecord, std::vector<SolutionRecord>, GreaterGFLOPS>
+                m_topSolutions;
+
             // for merge rows
             int64_t                                                         m_currProbID = -1;
             std::map<int64_t, std::unordered_map<std::string, std::string>> m_probMap;

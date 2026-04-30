@@ -27,6 +27,7 @@
 #include <ResultFileReporter.hpp>
 
 #include <cstddef>
+#include <iostream>
 
 namespace TensileLite
 {
@@ -114,6 +115,19 @@ namespace TensileLite
                         m_winnerSolution    = m_solutionName;
                         m_winnerSolutionIdx = m_currSolutionIdx;
                         m_fastestGflops     = gflops;
+                    }
+
+                    { // update top solutions
+                        SolutionRecord record{m_solutionName, m_currSolutionIdx, gflops};
+                        if(m_topSolutions.size() < kTopSolutionsToTrack)
+                        {
+                            m_topSolutions.push(record);
+                        }
+                        else if(gflops > m_topSolutions.top().gflops)
+                        {
+                            m_topSolutions.pop();
+                            m_topSolutions.push(record);
+                        }
                     }
                 }
             }
@@ -267,6 +281,14 @@ namespace TensileLite
 
         void ResultFileReporter::postProblem()
         {
+            while(!m_topSolutions.empty())
+            {
+                auto const& rec = m_topSolutions.top();
+                std::cout << "topk-sol," << rec.name << "," << rec.index << "," << rec.gflops
+                          << "\n";
+                m_topSolutions.pop();
+            }
+
             if(m_extraCol)
             {
                 // update winner
