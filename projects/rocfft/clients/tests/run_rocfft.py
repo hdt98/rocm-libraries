@@ -29,17 +29,24 @@ def derive_rocm_path(script_dir: Path) -> Path:
             return candidate
         if candidate.name == "bin" and (candidate / test_exe).is_file():
             return candidate.parent
-    if script_dir.name == "bin":
-        return script_dir.parent
-    return script_dir.parent
+    raise RuntimeError(
+        "ROCM_PATH is required when run_rocfft.py is not executed from an "
+        "installed ROCm tree containing bin/rocfft-test."
+    )
 
 
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-    rocm_path = Path(
-        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
-    ).resolve()
+    rocm_path_env = os.getenv("ROCM_PATH")
+    rocm_path = (
+        Path(rocm_path_env).resolve()
+        if rocm_path_env
+        else derive_rocm_path(script_dir)
+    )
     rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
+    test_exe = rocm_bin_dir / exe_name(TEST_EXE)
+    if not test_exe.is_file():
+        raise FileNotFoundError(f"rocFFT test executable not found at {test_exe}")
 
     env = os.environ.copy()
     # GitHub Actions shard arrays are 1-indexed; GTest shard indexes are 0-indexed.
@@ -56,7 +63,7 @@ def main() -> None:
             "0.02",
         ]
 
-    cmd = [str(rocm_bin_dir / exe_name(TEST_EXE)), *test_filter]
+    cmd = [str(test_exe), *test_filter]
     logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
