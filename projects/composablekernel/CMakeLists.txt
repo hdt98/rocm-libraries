@@ -210,16 +210,21 @@ else()
     set(USER_GPU_TARGETS 0)
 endif()
 
-# If GPU_TARGETS was explicitly set to an empty value (e.g., via a toolchain file)
-# and GPU_ARCHS is also not set, there are no GPU architectures to build for.
-# Skip the entire CK build to avoid errors from enable_language(HIP) with
-# an empty CMAKE_HIP_ARCHITECTURES.
+# If GPU_TARGETS was explicitly set to an empty value (e.g., via a toolchain
+# file) and GPU_ARCHS is also not set, there are no GPU architectures to build
+# for. Skip device library compilation but still install headers and the CMake
+# package config so that downstream find_package() calls succeed.
+set(CK_SKIP_DEVICE_BUILD FALSE)
 if(DEFINED GPU_TARGETS AND NOT GPU_TARGETS AND NOT GPU_ARCHS)
     message(WARNING "GPU_TARGETS is empty and GPU_ARCHS is not set. "
-                    "Skipping composable_kernel build.")
-    return()
+                    "Skipping composable_kernel device builds. "
+                    "Only headers and package config will be installed.")
+    set(CK_SKIP_DEVICE_BUILD TRUE)
+    # Generate config.h with no GPU features enabled (all #cmakedefine -> #undef)
+    configure_file(include/ck/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/include/ck/config.h)
 endif()
 
+if(NOT CK_SKIP_DEVICE_BUILD)
 find_package(hip REQUIRED)
 enable_language(HIP)
 
@@ -785,6 +790,17 @@ endif()
 
 if(CK_USE_CODEGEN AND (SUPPORTED_GPU_TARGETS MATCHES "gfx9" OR GPU_ARCHS))
   add_subdirectory(codegen)
+endif()
+endif() # NOT CK_SKIP_DEVICE_BUILD
+
+# When skipping device builds, the header install in library/ doesn't run,
+# so install them here instead.
+if(CK_SKIP_DEVICE_BUILD)
+    rocm_install(DIRECTORY
+        ${PROJECT_SOURCE_DIR}/include/ck/
+        ${PROJECT_SOURCE_DIR}/library/include/ck/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ck
+    )
 endif()
 
 #Create an interface target for the include only files and call it "composablekernels"
