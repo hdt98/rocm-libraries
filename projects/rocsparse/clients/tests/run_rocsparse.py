@@ -29,25 +29,30 @@ def derive_rocm_path(script_dir: Path) -> Path:
             return candidate
         if candidate.name == "bin" and (candidate / test_exe).is_file():
             return candidate.parent
-    if script_dir.name == "bin":
-        return script_dir.parent
-    return script_dir.parent
+    raise RuntimeError(
+        "Could not derive ROCM_PATH from an installed rocsparse-test layout. "
+        "Set ROCM_PATH explicitly."
+    )
 
 
 def main() -> None:
     script_dir = Path(__file__).resolve().parent
-    rocm_path = Path(
-        os.environ.get("ROCM_PATH", derive_rocm_path(script_dir))
-    ).resolve()
-    rocm_bin_dir = Path(os.environ.get("ROCM_BIN_DIR", rocm_path / "bin")).resolve()
+    rocm_path_env = os.getenv("ROCM_PATH")
+    rocm_path = Path(rocm_path_env).resolve() if rocm_path_env else derive_rocm_path(script_dir)
+    rocm_bin_dir = Path(os.getenv("ROCM_BIN_DIR") or rocm_path / "bin").resolve()
+    test_exe_path = rocm_bin_dir / exe_name(TEST_EXE)
     smoke_yaml = rocm_path / "share" / "rocsparse" / "test" / "rocsparse_smoke.yaml"
+    if not test_exe_path.is_file():
+        raise FileNotFoundError(f"Could not find test executable: {test_exe_path}")
+    if not smoke_yaml.is_file():
+        raise FileNotFoundError(f"Could not find smoke test data: {smoke_yaml}")
 
     env = os.environ.copy()
     # GitHub Actions shard arrays are 1-indexed; GTest shard indexes are 0-indexed.
     env["GTEST_SHARD_INDEX"] = str(int(os.getenv("SHARD_INDEX", "1")) - 1)
     env["GTEST_TOTAL_SHARDS"] = os.getenv("TOTAL_SHARDS", "1")
 
-    cmd = [str(rocm_bin_dir / exe_name(TEST_EXE))]
+    cmd = [str(test_exe_path)]
     output_artifacts_dir = os.getenv("OUTPUT_ARTIFACTS_DIR")
     if output_artifacts_dir:
         cmd.extend(
