@@ -356,7 +356,7 @@ class Solution(collections.abc.Mapping):
       for key in defaultInternalSupportParams:
         assignParameterWithDefault(self["InternalSupportParams"], key, config["InternalSupportParams"], defaultInternalSupportParams)
     else:
-      self["InternalSupportParams"] = defaultInternalSupportParams
+      self["InternalSupportParams"] = dict(defaultInternalSupportParams)
 
     # Assign solution state from config, filling missing from the defaultSolution
     for key in defaultSolution:
@@ -394,7 +394,15 @@ class Solution(collections.abc.Mapping):
       self["AssignedProblemIndependentDerivedParameters"] = False
     if "AssignedDerivedParameters" not in self._state:
       self["AssignedDerivedParameters"] = False
-    if "CustomKernel" not in self._state:
+    isHandwrittenCustomKernel = ("CustomKernel" in self._state
+        and self._state["CustomKernel"].get("name", "")
+        and not self._state["CustomKernel"].get("generated", False))
+
+    if isHandwrittenCustomKernel:
+      Solution._assignCustomKernelParameters(self._state)
+      self._name = self._state["CustomKernel"]["name"]
+    else:
+      savedCustomKernel = self._state.pop("CustomKernel", None) if "CustomKernel" in self._state else None
       Solution.assignDerivedParameters(
         self._state,
         splitGSU,
@@ -403,9 +411,9 @@ class Solution(collections.abc.Mapping):
         isaInfoMap,
         assembler.rocm_version
       )
-    else:
-      Solution.assignCustomKernelParameters(self._state)
-    self._name = config["CustomKernel"]["name"] if "CustomKernel" in config and config["CustomKernel"]["name"] else None
+      if savedCustomKernel:
+        self._state["CustomKernel"] = savedCustomKernel
+      self._name = None
 
   # these keys are copied from ProblemType to internal that may be overridden
   InternalKeys = ["UseSgprForGRO","VectorStore"]
@@ -1135,50 +1143,41 @@ class Solution(collections.abc.Mapping):
     return divisorName
 
   @staticmethod
-  def assignCustomKernelParameters(state):
-    # Store values in state so they can be saved in SizeMapping
-    # Not all SizeMapping values will be needed (or applicable) for custom kernels
+  def _assignCustomKernelParameters(state):
+    """Minimal parameter setup for handwritten custom kernels.
 
-    state["MacroTile0"] = state["CustomKernel"]["macrotile"][0]
-    state["MacroTile1"] = state["CustomKernel"]["macrotile"][1]
-    state["DepthU"] = state["CustomKernel"]["macrotile"][2]
+    These kernels carry their own argument layout and don't go through the
+    full assignDerivedParameters validation (which would reject them for
+    missing MatrixInstruction, etc.)."""
+    ck = state["CustomKernel"]
+    state["MacroTile0"] = ck["macrotile"][0]
+    state["MacroTile1"] = ck["macrotile"][1]
+    state["DepthU"]     = ck["macrotile"][2]
 
-    # TODO Temp values to allow serializing SizeMapping
     state["_GlobalAccumulation"]    = None
     state["CUOccupancy"]            = -1
     state["MathClocksUnrolledLoop"] = 0
     state["PackedC0IndicesX"] = []
     state["ThreadTile0"] = 0
     state["ThreadTile1"] = 0
-    state["NumThreads"] = state["CustomKernel"]["threads"][0] * state["CustomKernel"]["threads"][1] * state["CustomKernel"]["threads"][2]
+    state["NumThreads"] = ck["threads"][0] * ck["threads"][1] * ck["threads"][2]
 
-    # TODO LSU
-    # numElementsPerWorkGroup = state["MacroTile0"]*state["MacroTile1"]*state["NumWaveSplitK"]
     numElementsPerWorkGroup = state["MacroTile0"] * state["MacroTile1"]
     state["NumElementsPerThread"] = numElementsPerWorkGroup // state["NumThreads"]
 
-    # TODO Check what DTL affects in SizeMapping
     state["DirectToLdsA"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 2
     state["DirectToLdsB"] = state["DirectToLds"] == 1 or state["DirectToLds"] == 3
 
-    # TODO Override workspace info for custom kernel
-    computeBytes = state["ProblemType"]["ComputeDataType"].numBytes()
-    state["_WorkspaceSizePerElemC"] = state["CustomKernel"]["workspaceSizePerElemC"]
+    state["_WorkspaceSizePerElemC"] = ck.get("workspaceSizePerElemC", 0)
     state["_WorkspaceSizePerElemBias"] = 0
     if state["ProblemType"]["UseBias"] and state["ProblemType"]["Gradient"]:
-      state["_WorkspaceSizePerElemBias"] = state["CustomKernel"]["workspaceSizePerElemBias"]
-    # state["WorkspaceCheck"] = [state["_WorkspaceSizePerElemC"], state["_WorkspaceSizePerElemBias"], state["GlobalSplitU"] if (state["GlobalSplitUAlgorithm"] == 'MultipleBuffer' or state["_GlobalAccumulation"] == 'MultipleBufferSingleKernel') else 1]
+      state["_WorkspaceSizePerElemBias"] = ck.get("workspaceSizePerElemBias", 0)
 
-    # state["MIWaveGroup"] = [state["SubGroup0"] // state["WavefrontSize"],  state["SubGroup1"]]
     state["MIWaveGroup"] = [0, 0]
-
-    # state["LocalSplitU"] = state["WorkGroup"][2]
     state["LocalSplitU"] = 1
-
     state["GlobalReadVectorWidthA"] = 1
     state["GlobalReadVectorWidthB"] = 1
     state["StoreVectorWidth"] = 1
-
 
   ########################################
   # assign all derived parameters
@@ -1255,9 +1254,8 @@ class Solution(collections.abc.Mapping):
         #del state[s]
 
     # Force update _GlobalAccumulation
-    computeBytes = int(state["ProblemType"]["ComputeDataType"].numBytes())
     state["_GlobalAccumulation"] = None
-    computeName  = state["ProblemType"]["ComputeDataType"].toName()
+    computeName = state["ProblemType"]["ComputeDataType"].toName()
     if state["UseDotInstruction"] and state["GlobalSplitUAlgorithm"] == 'MultipleBufferSingleKernel':
       # dot2 kernel does not support MBSK
       state["GlobalSplitUAlgorithm"] = 'MultipleBuffer'
@@ -3636,7 +3634,10 @@ class Solution(collections.abc.Mapping):
           else:
             reject(state, printRejectionReason, "%s's padded address is inconisstent"%tc)
 
-    if(not ("CustomKernel" in state and state["CustomKernel"]["name"] != "")): #don't check the custom kernel.
+    isActualCustomKernel = bool(state.get("CustomKernelName", "")) or \
+        ("CustomKernel" in state and state["CustomKernel"]["name"] != ""
+         and not state["CustomKernel"].get("generated", False))
+    if(not isActualCustomKernel):
       checkLdsBlockSizePerPad("A")
       checkLdsBlockSizePerPad("B")
 
