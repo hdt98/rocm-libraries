@@ -210,6 +210,16 @@ else()
     set(USER_GPU_TARGETS 0)
 endif()
 
+# If GPU_TARGETS was explicitly set to an empty value (e.g., via a toolchain file)
+# and GPU_ARCHS is also not set, there are no GPU architectures to build for.
+# Skip the entire CK build to avoid errors from enable_language(HIP) with
+# an empty CMAKE_HIP_ARCHITECTURES.
+if(DEFINED GPU_TARGETS AND NOT GPU_TARGETS AND NOT GPU_ARCHS)
+    message(WARNING "GPU_TARGETS is empty and GPU_ARCHS is not set. "
+                    "Skipping composable_kernel build.")
+    return()
+endif()
+
 find_package(hip REQUIRED)
 enable_language(HIP)
 
