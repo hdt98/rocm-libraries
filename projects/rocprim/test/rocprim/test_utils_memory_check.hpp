@@ -282,7 +282,7 @@ private:
     bool mem_check_host()
     {
         // Reduce the host_limit by a padding factor as a safety margin.
-        const size_t host_limit_padded = static_cast<size_t>(host_limit * (1 - padding_factor));
+        size_t host_limit_padded = static_cast<size_t>(host_limit * (1 - padding_factor));
 
         bool success;
         if (is_apu)
@@ -329,7 +329,7 @@ private:
     bool mem_check_device()
     {
         // Reduce the dev_limit by a padding factor as a safety margin.
-        const size_t dev_limit_padded = static_cast<size_t>(dev_limit * (1 - padding_factor));
+        size_t dev_limit_padded = static_cast<size_t>(dev_limit * (1 - padding_factor));
 
         bool success;
         if (is_apu)
