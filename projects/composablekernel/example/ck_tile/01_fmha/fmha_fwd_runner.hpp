@@ -171,6 +171,40 @@ int override_num_splits_if_necessary(
     return num_splits;
 }
 
+// RAII guard for std::cout.rdbuf() redirect. Restores original buffer even if
+// the called function throws.
+struct rdbuf_guard
+{
+    std::ostream& os;
+    std::streambuf* orig;
+    rdbuf_guard(std::ostream& s, std::streambuf* buf) : os(s), orig(s.rdbuf(buf)) {}
+    ~rdbuf_guard() { os.rdbuf(orig); }
+};
+
+static std::string capture_heuristic_kname(const std::string& prefix,
+                                           const std::function<void()>& run_fn)
+{
+    std::ostringstream oss;
+    rdbuf_guard guard(std::cout, oss.rdbuf());
+    run_fn();
+
+    std::string captured = oss.str();
+    auto pos             = captured.find(prefix);
+    if(pos == std::string::npos)
+        return {};
+
+    std::string name = captured.substr(pos);
+    auto comma_pos   = name.find(", ");
+    if(comma_pos != std::string::npos)
+        name.resize(comma_pos);
+
+    auto end = name.find_last_not_of(" \n\r\t");
+    if(end != std::string::npos)
+        name.resize(end + 1);
+
+    return name;
+}
+
 template <typename SMPLComputeDataType>
 void copy_attention_scores_with_sink(const ck_tile::HostTensor<SMPLComputeDataType>& s_host_ref,
                                      const ck_tile::HostTensor<SMPLComputeDataType>& sink_host,
@@ -1658,19 +1692,14 @@ fwd_result fmha_fwd_run(mode_enum mode,
         return fmha_fwd(fmha_traits, fmha_args, sc);
     };
 
-    // RAII guard for std::cout.rdbuf() redirect — restores original buffer
-    // even if the called function throws.
-    struct rdbuf_guard
-    {
-        std::ostream& os;
-        std::streambuf* orig;
-        rdbuf_guard(std::ostream& s, std::streambuf* buf) : os(s), orig(s.rdbuf(buf)) {}
-        ~rdbuf_guard() { os.rdbuf(orig); }
-    };
-
     // --- run_all_kernels path: benchmark every matching instance ---
     if(run_all_kernels)
     {
+        if(do_validation)
+            std::cout << "[run_all_kernels] warning: validation (-v) is ignored "
+                         "in benchmark-all mode"
+                      << std::endl;
+
         std::vector<std::pair<std::string, float>> all_results;
         std::string heuristic_full_kname;
 
@@ -1687,32 +1716,20 @@ fwd_result fmha_fwd_run(mode_enum mode,
             all_results =
                 fmha_fwd_splitkv_all(fmha_splitkv_traits, fmha_splitkv_args, stream_config);
 
-            // Identify which kernel the heuristic would select
-            {
-                std::ostringstream oss;
-                rdbuf_guard guard(std::cout, oss.rdbuf());
-                ck_tile::stream_config hsc{nullptr,
-                                           false,
-                                           /*log_level=*/1,
-                                           /*warmup=*/0,
-                                           /*repeat=*/1,
-                                           false};
-                fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
-                std::string captured = oss.str();
-                auto pos             = captured.find("fmha_fwd_splitkv_");
-                if(pos != std::string::npos)
-                {
-                    // extract just the main kernel name (before the combine kernel name)
-                    heuristic_full_kname = captured.substr(pos);
-                    // the output has ", <combine_name>" after the main name
-                    auto comma_pos = heuristic_full_kname.find(", ");
-                    if(comma_pos != std::string::npos)
-                        heuristic_full_kname.resize(comma_pos);
-                    auto end = heuristic_full_kname.find_last_not_of(" \n\r\t");
-                    if(end != std::string::npos)
-                        heuristic_full_kname.resize(end + 1);
-                }
-            }
+            // TODO: Replace stdout capture/parsing with a direct query API, e.g.
+            // fmha_fwd_splitkv_get_heuristic_kname(traits, args), to avoid depending
+            // on log formatting and std::cout redirection.
+            heuristic_full_kname = capture_heuristic_kname(
+                "fmha_fwd_splitkv_",
+                [&]() {
+                    ck_tile::stream_config hsc{nullptr,
+                                               false,
+                                               /*log_level=*/1,
+                                               /*warmup=*/0,
+                                               /*repeat=*/1,
+                                               false};
+                    fmha_fwd_splitkv(fmha_splitkv_traits, fmha_splitkv_args, hsc);
+                });
         }
         else
 #endif // CK_TILE_FMHA_FWD_SPLITKV_API
@@ -1725,27 +1742,20 @@ fwd_result fmha_fwd_run(mode_enum mode,
 
             all_results = fmha_fwd_all(fmha_traits, fmha_args, stream_config);
 
-            // Identify which kernel the heuristic would select
-            {
-                std::ostringstream oss;
-                rdbuf_guard guard(std::cout, oss.rdbuf());
-                ck_tile::stream_config hsc{nullptr,
-                                           false,
-                                           /*log_level=*/1,
-                                           /*warmup=*/0,
-                                           /*repeat=*/1,
-                                           false};
-                fmha_fwd(fmha_traits, fmha_args, hsc);
-                std::string captured = oss.str();
-                auto pos             = captured.find("fmha_fwd_");
-                if(pos != std::string::npos)
-                {
-                    heuristic_full_kname = captured.substr(pos);
-                    auto end             = heuristic_full_kname.find_last_not_of(" \n\r\t");
-                    if(end != std::string::npos)
-                        heuristic_full_kname.resize(end + 1);
-                }
-            }
+            // TODO: Replace stdout capture/parsing with a direct query API, e.g.
+            // fmha_fwd_get_heuristic_kname(traits, args), to avoid depending on
+            // log formatting and std::cout redirection.
+            heuristic_full_kname = capture_heuristic_kname(
+                "fmha_fwd_",
+                [&]() {
+                    ck_tile::stream_config hsc{nullptr,
+                                               false,
+                                               /*log_level=*/1,
+                                               /*warmup=*/0,
+                                               /*repeat=*/1,
+                                               false};
+                    fmha_fwd(fmha_traits, fmha_args, hsc);
+                });
         }
 
         if(all_results.empty())
