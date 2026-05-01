@@ -65,7 +65,7 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
 
     auto idx_lower = [=](I const i, I const j) {
         auto const ipos
-            = ((static_cast<int64_t>(n) * j - static_cast<int64_t>(j) * (j + 1) / 2) + (i - j - 1));
+            = ((static_cast<int64_t>(j) * n - static_cast<int64_t>(j) * (j + 1) / 2) + (i - j - 1));
         return (ipos);
     };
 
@@ -397,13 +397,20 @@ void rocsolver_potrf_getMemorySize(const I n,
     {
         return;
     }
-    size_t size_scalars = 0;
+
+    // ----------------------------------------------------
+    // NOTE: set size_scalars even if using host_mode
+    // or scalars[] not used since
+    // some routines may assume size_scalars to be non-zero
+    // ----------------------------------------------------
+    size_t size_scalars = sizeof(T) * 3;
+
     size_t size_work1 = 0;
     size_t size_work2 = 0;
     size_t size_work3 = 0;
     size_t size_work4 = 0;
     size_t size_pivots = 0;
-    size_t size_iinfo = 0;
+    size_t size_iinfo = sizeof(INFO) * batch_count;
 
     if(use_recursion_potrf)
     {
@@ -432,6 +439,18 @@ void rocsolver_potrf_getMemorySize(const I n,
         size_work2 = std::max(size_work2, lsize_work2);
         size_work3 = std::max(size_work3, lsize_work3);
         size_work4 = std::max(size_work4, lsize_work4);
+
+        *p_size_scalars = std::max(*p_size_scalars, size_scalars);
+
+        *p_size_work1 = std::max(*p_size_work1, size_work1);
+        *p_size_work2 = std::max(*p_size_work2, size_work2);
+        *p_size_work3 = std::max(*p_size_work3, size_work3);
+        *p_size_work4 = std::max(*p_size_work4, size_work4);
+
+        *p_size_pivots = std::max(*p_size_pivots, size_pivots);
+        *p_size_iinfo = std::max(*p_size_iinfo, size_iinfo);
+
+        return;
     }
 
     I const nb = potrf_get_block_size<T>(n);
