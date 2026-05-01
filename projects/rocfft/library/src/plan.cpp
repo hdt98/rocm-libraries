@@ -1591,12 +1591,14 @@ std::unique_ptr<ExecPlan>
             // the fastest dimension.  So only apply a solution if
             // we're not doing even-length real, or if fastest dim
             // stride is 1.
-            const auto& realLength     = transformType == rocfft_transform_type_real_forward
-                                             ? execPlan.rootPlan->length
-                                             : execPlan.rootPlan->outputLength;
-            const bool  evenLengthReal = (transformType == rocfft_transform_type_real_forward
-                                         || transformType == rocfft_transform_type_real_inverse)
-                                        && realLength.front() % 2 == 0;
+            const auto& realLength
+                = rootPlanData.rootTransformType == rocfft_transform_type_real_forward
+                      ? execPlan.rootPlan->length
+                      : execPlan.rootPlan->outputLength;
+            const bool evenLengthReal
+                = (rootPlanData.rootTransformType == rocfft_transform_type_real_forward
+                   || rootPlanData.rootTransformType == rocfft_transform_type_real_inverse)
+                  && realLength.front() % 2 == 0;
             const bool stride1 = execPlan.rootPlan->inStride.front() == 1
                                  && execPlan.rootPlan->outStride.front() == 1;
             if(evenLengthReal && !stride1)
@@ -1673,13 +1675,13 @@ std::unique_ptr<ExecPlan>
 
         // We have the plan, set work memory requirements if this
         // plan will run on this rank
-        if(execPlan.workBufSize && local_comm_rank == location.comm_rank)
+        if(execPlan.workBufSize)
         {
             // note: workBufSize counts in complex elements, not bytes
             TempBufferLease workMemLease{
                 tempBuffers,
                 local_comm_rank,
-                {local_comm_rank, location.device},
+                location,
                 execPlan.workBufSize
                     * element_size(precision, rocfft_array_type_complex_interleaved)};
             execPlanMultiItem->workPtr = BufferPtr::temp(workMemLease.data());

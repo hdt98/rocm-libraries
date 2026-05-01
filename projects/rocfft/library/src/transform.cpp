@@ -424,23 +424,6 @@ void rocfft_plan_t::Execute(void*                                 in_buffer[],
     }
 }
 
-void rocfft_plan_t::AssignConcreteTempBuffers(rocfft_execution_info_internal& info) const
-{
-    // now ensure that each of the work buffers is big enough
-    info.ensure_work_buffer_size(tempBufferUserAllocs);
-
-    // go back through the temp buffers and assign concrete pointers for each of them
-    std::vector<size_t> offsets(tempBufferUserAllocs.size());
-
-    for(const auto& tempBuf : tempBuffers)
-    {
-        int device = tempBuf.second->get_location().device;
-        info.tempBufferPtrs.emplace(tempBuf.second.get(),
-                                    info.get_work_buffer(device).data_offset(offsets[device]));
-        offsets[device] += tempBuf.second->get_size_bytes();
-    }
-}
-
 rocfft_status rocfft_execute(const rocfft_plan     plan,
                              void*                 in_buffer[],
                              void*                 out_buffer[],

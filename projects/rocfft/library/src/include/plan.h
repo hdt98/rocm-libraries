@@ -352,12 +352,6 @@ struct rocfft_plan_t
     // log field layout at plan level
     static void LogFields(const char* description, const std::vector<rocfft_field_t>& fields);
 
-    // Assign concrete pointers to temp memory - this is tracked in the
-    // internal execution info so that we can point to work memory
-    // allocated by users.  If users did not provide work memory then
-    // we will allocate it here.
-    void AssignConcreteTempBuffers(rocfft_execution_info_internal& info) const;
-
     /**
      * @return The lengths provided by the user at creation of this object
      * @note Trivial unit-length dimensions are erased at plan creation,
@@ -376,6 +370,9 @@ struct rocfft_plan_t
     // at most alloc per device, but the plan internally can want
     // multiple separate buffers that can be glued together.
     void DetermineTempBufferUserAllocs();
+
+    // internal info needs to know pointers to temp buffer structs
+    friend struct rocfft_execution_info_internal;
 
 private:
     // Multi-node or multi-GPU plan is built up from a vector of plan

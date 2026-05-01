@@ -40,13 +40,28 @@ rocfft_execution_info_internal::rocfft_execution_info_internal(
     }
     else
     {
-        int deviceCount = 0;
-        if(hipGetDeviceCount(&deviceCount) != hipSuccess)
-            throw std::runtime_error("failed to get device count");
+        int deviceCount = rocfft_scoped_device::device_count();
         execWorkBuffers.resize(deviceCount);
     }
 
-    plan.AssignConcreteTempBuffers(*this);
+    // now ensure that each of the work buffers is big enough,
+    // allocating if necessary
+    ensure_work_buffer_size(plan.tempBufferUserAllocs);
+
+    // now that all of the work buffers is big enough, assign
+    // concrete pointers to each temp buffer that the plan uses
+
+    // go back through the temp buffers and assign concrete pointers for each of them
+    std::vector<size_t> offsets(plan.tempBufferUserAllocs.size());
+
+    for(const auto& tempBuf : plan.tempBuffers)
+    {
+        int device = tempBuf.second->get_location().device;
+        tempBufferPtrs.emplace(tempBuf.second.get(),
+                               get_work_buffer(device).data_offset(offsets[device]));
+
+        offsets[device] += tempBuf.second->get_size_bytes();
+    }
 }
 
 void rocfft_execution_info_internal::ensure_work_buffer_size(
@@ -86,6 +101,10 @@ void rocfft_execution_info_internal::ensure_work_buffer_size(
         }
 
         // no user work buffer was specified, allocate one
+        if(LOG_TRACE_ENABLED())
+            (*LogSingleton::GetInstance().GetTraceOS())
+                << "user work buffer not specified for device " << device << ", allocating size "
+                << size_bytes << std::endl;
         rocfft_scoped_device dev(device);
         if(execWorkBuffers[device].alloc(size_bytes) != hipSuccess)
             throw std::runtime_error("work buffer allocation failure");

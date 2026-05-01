@@ -65,12 +65,6 @@ struct rocfft_execution_info_internal
     rocfft_execution_info_internal(const rocfft_execution_info_t* user_info,
                                    const rocfft_plan_t&           plan);
 
-    // Ensure that we have a work buffer of the specified size for
-    // the specified device.  If the user specified one that's big
-    // enough, use that.  If the user specified one that's not big
-    // enough, throw invalid work buffer exception.  Otherwise
-    // allocate one.
-    void ensure_work_buffer_size(const std::vector<size_t>& sizes_bytes_per_device);
     // Get the work buffer for the specified device.
     const gpubuf& get_work_buffer(int device) const;
 
@@ -89,6 +83,13 @@ struct rocfft_execution_info_internal
     std::map<InternalTempBuffer*, void*> tempBufferPtrs;
 
 private:
+    // Ensure that we have a work buffer of the specified size for
+    // the specified device.  If the user specified one that's big
+    // enough, use that.  If the user specified one that's not big
+    // enough, throw invalid work buffer exception.  Otherwise
+    // allocate one.
+    void ensure_work_buffer_size(const std::vector<size_t>& sizes_bytes_per_device);
+
     // pointer to user-specified info - may be null if user never specified one
     const rocfft_execution_info_t* user_info = nullptr;
 

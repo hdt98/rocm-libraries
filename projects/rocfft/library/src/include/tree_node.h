@@ -225,8 +225,8 @@ struct rocfft_location_t
     int device    = 0;
 };
 
-// Internally-allocated temporary buffers (as opposed to
-// user-provided work/in/out buffers)
+// Conceptual representation of temporary buffers, e.g., for
+// workspaces or communications.
 class InternalTempBuffer
 {
 public:
