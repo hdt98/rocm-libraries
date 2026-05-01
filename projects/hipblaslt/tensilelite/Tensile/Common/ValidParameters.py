@@ -755,6 +755,10 @@ validParameters = { # we need to make sure this matches develop
     #   2 = No partials
     #   3 = Nofixup and no partials
     "DebugStreamK": [0, 1, 2, 3],
+    # Adds a 9th shared overflow queue used by all XCDs after their per-XCD queues are
+    # exhausted, reducing the staircase effect in StreamK=4 dynamic queue scheduling.
+    # Only applicable when StreamK=4.
+    "StreamKExtraSharedQueue": [0, 1],
     # Persistent-kernel debug: when True, the persistent loop never exits.
     # Used as a co-tenant load kernel for contended-perf benchmarking.
     # Termination is via process death. Requires StreamK = 1, 2, or 3.

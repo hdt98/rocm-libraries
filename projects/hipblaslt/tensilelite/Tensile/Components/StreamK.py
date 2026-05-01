@@ -2464,6 +2464,114 @@ class StreamKDynamic(StreamK):
 
         return module
 
+    def _graWorkGroup_perXCDOnly(self, writer, kernel, sQueueIdx, sWorkItemIdx):
+        """Per-XCD queue dequeue: atomic inc on per-XCD queue,
+        interleave local index into global tile index."""
+        numXCDs = kernel["NumXCDs"]
+        module = Module("StreamK Dynamic graWorkGroup perXCDOnly")
+
+        # Queue address
+        sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
+        module.add(SLShiftLeftB32(dst=sgpr(sAddress), src=sgpr(sQueueIdx), shiftHex=log2(256), comment="Stride queues to different cache lines"))
+        module.add(SAddU32(dst=sgpr(sAddress+0), src0=sgpr(sAddress+0), src1=sgpr("AddressFlags+0")))
+        module.add(SAddCU32(dst=sgpr(sAddress+1), src0=0, src1=sgpr("AddressFlags+1")))
+
+        # Tiles in queue
+        sTilesInQueue = writer.sgprPool.checkOut(1, "tilesInQueue")
+        module.add(SLShiftRightB32(dst=sgpr(sTilesInQueue), src=sgpr("TotalTiles"), shiftHex=log2(numXCDs)))
+        sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
+        module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sTilesInQueue), shiftHex=log2(numXCDs)))
+        module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=sgpr(sRemainder), comment="Remainder tiles"))
+        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
+        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
+        module.add(SAddU32(dst=sgpr(sTilesInQueue), src0=sgpr(sTilesInQueue), src1=sgpr(sRemainder)))
+        writer.sgprPool.checkIn(sRemainder)
+
+        # Workgroups in queue
+        sWorkgroupsInQueue = writer.sgprPool.checkOut(1, "workgroupsInQueue")
+        module.add(SLShiftRightB32(dst=sgpr(sWorkgroupsInQueue), src=sgpr("skGrid"), shiftHex=log2(numXCDs)))
+        sRemainder = writer.sgprPool.checkOut(1, "remainder workgroups")
+        module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sWorkgroupsInQueue), shiftHex=log2(numXCDs)))
+        module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("skGrid"), src1=sgpr(sRemainder), comment="Remainder workgroups"))
+        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
+        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
+        module.add(SAddU32(dst=sgpr(sWorkgroupsInQueue), src0=sgpr(sWorkgroupsInQueue), src1=sgpr(sRemainder)))
+        writer.sgprPool.checkIn(sRemainder)
+
+        # Fetch next work item index
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sTilesInQueue), src1=sgpr(sWorkgroupsInQueue), comment="Queue reset"))
+        module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=1))
+        writer.sgprPool.checkIn(sTilesInQueue)
+        writer.sgprPool.checkIn(sWorkgroupsInQueue)
+
+        # Fetch next work item
+        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
+        # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
+        module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
+        writer.sgprPool.checkIn(sAddress)
+
+        # Convert to global work item index (interleaved across numXCDs queues)
+        module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(numXCDs)))
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr(sQueueIdx)))
+
+        return module
+
+    def _graWorkGroup_extraSharedQueue(self, writer, kernel, sQueueIdx, sWorkItemIdx):
+        """numXCDs per-XCD queues + 1 shared overflow queue.
+        Tiles are split: each per-XCD queue gets TotalTiles/numXCDs tiles;
+        remainder goes to the shared queue that any XCD can pull from after
+        its private queue is exhausted."""
+        numXCDs = kernel["NumXCDs"]
+        module = Module("StreamK Dynamic graWorkGroup extraSharedQueue")
+
+        skSharedQueue = Label("SK_SharedQueue", "")
+        skBroadcastDone = Label("SK_BroadcastDone", "")
+
+        sPerXCDPerQueue = writer.sgprPool.checkOut(1, "PerXCDPerQueue")
+        sPerXCDTotal = writer.sgprPool.checkOut(1, "PerXCDTotal")
+        module.add(SLShiftRightB32(dst=sgpr(sPerXCDPerQueue), src=sgpr("TotalTiles"), shiftHex=log2(numXCDs), comment="perXCDPerQueue = TotalTiles / numXCDs"))
+        module.add(SLShiftLeftB32(dst=sgpr(sPerXCDTotal), src=sgpr(sPerXCDPerQueue), shiftHex=log2(numXCDs), comment="perXCDTotal = perXCDPerQueue * numXCDs"))
+
+        # --- Try per-XCD queue (queues 0..numXCDs-1) ---
+        sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
+        module.add(SLShiftLeftB32(dst=sgpr(sAddress), src=sgpr(sQueueIdx), shiftHex=log2(256), comment="Stride queues to different cache lines"))
+        module.add(SAddU32(dst=sgpr(sAddress+0), src0=sgpr(sAddress+0), src1=sgpr("AddressFlags+0")))
+        module.add(SAddCU32(dst=sgpr(sAddress+1), src0=0, src1=sgpr("AddressFlags+1")))
+
+        module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0x7FFFFFFF), comment="Large wrap value (no wrap)"))
+        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item from per-XCD queue"))
+        module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
+        writer.sgprPool.checkIn(sAddress)
+
+        module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr(sPerXCDPerQueue), comment="Check if per-XCD queue has work"))
+        module.add(SCBranchSCC0(labelName=skSharedQueue.getLabelName(), comment="Per-XCD queue exhausted, try shared"))
+
+        # Per-XCD hit: convert local index to interleaved global tile index
+        module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(numXCDs)))
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr(sQueueIdx), comment="globalIdx = localIdx * numXCDs + queueIdx"))
+        module.add(SBranch(labelName=skBroadcastDone.getLabelName(), comment="Got work from per-XCD queue"))
+
+        # --- Shared overflow queue (queue numXCDs) ---
+        module.add(skSharedQueue)
+        sSharedAddr = writer.sgprPool.checkOutAligned(2, 2, "SharedAddress")
+        module.add(SMovB32(dst=sgpr(sSharedAddr+0), src=sgpr("AddressFlags+0")))
+        module.add(SMovB32(dst=sgpr(sSharedAddr+1), src=sgpr("AddressFlags+1")))
+        module.add(SAddU32(dst=sgpr(sSharedAddr+0), src0=sgpr(sSharedAddr+0), src1=numXCDs * 256))
+        module.add(SAddCU32(dst=sgpr(sSharedAddr+1), src0=sgpr(sSharedAddr+1), src1=0, comment="Shared queue at offset %d" % (numXCDs * 256)))
+
+        module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0x7FFFFFFF), comment="Large wrap value (no wrap)"))
+        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sSharedAddr, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item from shared queue"))
+        module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
+        writer.sgprPool.checkIn(sSharedAddr)
+
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sPerXCDTotal), src1=sgpr(sWorkItemIdx), comment="globalIdx = perXCDTotal + sharedLocalIdx"))
+
+        module.add(skBroadcastDone)
+        writer.sgprPool.checkIn(sPerXCDPerQueue)
+        writer.sgprPool.checkIn(sPerXCDTotal)
+
+        return module
+
     def graWorkGroup(self, writer, kernel, tPA, tPB):
         module = Module("StreamK Dynamic graWorkGroup")
 
@@ -2490,86 +2598,29 @@ class StreamKDynamic(StreamK):
         module.add(SCmpEQU32(src0=sgpr(sWave), src1=0, comment="Check for wave 0"))
         module.add(SCBranchSCC0(labelName=skSkipWorkItem.getLabelName(), comment="Skip work item"))
         writer.sgprPool.checkIn(sWave)
-        
-        # Default queue index
+
+        # Queue index = StreamKIdx % numXCDs
+        numXCDs = kernel["NumXCDs"]
         sQueueIdx = writer.sgprPool.checkOut(1, "QueueIdx")
-        module.add(SLShiftRightB32(dst=sgpr(sQueueIdx), src=sgpr("StreamKIdx"), shiftHex=log2(8)))
-        module.add(SLShiftLeftB32(dst=sgpr(sQueueIdx), src=sgpr(sQueueIdx), shiftHex=log2(8)))
-        module.add(SSubU32(dst=sgpr(sQueueIdx), src0=sgpr("StreamKIdx"), src1=sgpr(sQueueIdx), comment="Default queue index"))
+        module.add(SLShiftRightB32(dst=sgpr(sQueueIdx), src=sgpr("StreamKIdx"), shiftHex=log2(numXCDs)))
+        module.add(SLShiftLeftB32(dst=sgpr(sQueueIdx), src=sgpr(sQueueIdx), shiftHex=log2(numXCDs)))
+        module.add(SSubU32(dst=sgpr(sQueueIdx), src0=sgpr("StreamKIdx"), src1=sgpr(sQueueIdx), comment="queueIdx = StreamKIdx %% %d" % numXCDs))
 
-        # Queue address
-        sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
-        module.add(SLShiftLeftB32(dst=sgpr(sAddress), src=sgpr(sQueueIdx), shiftHex=log2(256), comment="Stride queues to different cache lines"))
-        module.add(SAddU32(dst=sgpr(sAddress+0), src0=sgpr(sAddress+0), src1=sgpr("AddressFlags+0")))
-        module.add(SAddCU32(dst=sgpr(sAddress+1), src0=0, src1=sgpr("AddressFlags+1")))
-
-        # Tiles in queue
-        sTilesInQueue = writer.sgprPool.checkOut(1, "tilesInQueue")
-        module.add(SLShiftRightB32(dst=sgpr(sTilesInQueue), src=sgpr("TotalTiles"), shiftHex=log2(8)))
-        sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
-        module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sTilesInQueue), shiftHex=log2(8)))
-        module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=sgpr(sRemainder), comment="Remainder tiles"))
-        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
-        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
-        module.add(SAddU32(dst=sgpr(sTilesInQueue), src0=sgpr(sTilesInQueue), src1=sgpr(sRemainder)))
-        writer.sgprPool.checkIn(sRemainder)
-
-        # Workgroups in queue
-        sWorkgroupsInQueue = writer.sgprPool.checkOut(1, "workgroupsInQueue")
-        module.add(SLShiftRightB32(dst=sgpr(sWorkgroupsInQueue), src=sgpr("skGrid"), shiftHex=log2(8)))
-        sRemainder = writer.sgprPool.checkOut(1, "remainder workgroups")
-        module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sWorkgroupsInQueue), shiftHex=log2(8)))
-        module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("skGrid"), src1=sgpr(sRemainder), comment="Remainder workgroups"))
-        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
-        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
-        module.add(SAddU32(dst=sgpr(sWorkgroupsInQueue), src0=sgpr(sWorkgroupsInQueue), src1=sgpr(sRemainder)))
-        writer.sgprPool.checkIn(sRemainder)
-
-        # Fetch next work item index
         sWorkItemIdx = writer.sgprPool.checkOut(1, "nextWorkItemIdx")
-        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sTilesInQueue), src1=sgpr(sWorkgroupsInQueue), comment="Queue reset"))
-        module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=1))
-        writer.sgprPool.checkIn(sTilesInQueue)
-        writer.sgprPool.checkIn(sWorkgroupsInQueue)
 
-        # Fetch next work item
-        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
-        # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
-        module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        writer.sgprPool.checkIn(sAddress)
+        if kernel["StreamKExtraSharedQueue"]:
+            module.add(self._graWorkGroup_extraSharedQueue(writer, kernel, sQueueIdx, sWorkItemIdx))
+        else:
+            module.add(self._graWorkGroup_perXCDOnly(writer, kernel, sQueueIdx, sWorkItemIdx))
 
-        # Convert to global work item index
-        # TODO test the other work distribution order
-        module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
-        # module.add(SMulI32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=38))
-        # module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr(sTilesInQueue), comment="Check if work item index is valid"))
-        # module.add(SCSelectB32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr("TotalTiles")))
-        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr(sQueueIdx)))
         writer.sgprPool.checkIn(sQueueIdx)
-        # writer.sgprPool.checkIn(sTilesInQueue)
-
-
 
         # TODO Testing impact of atomic inc
         # module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr("TotalTiles"), src1=sgpr("skGrid")))
         # module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=1))
 
-        # TODO Test multi-queue
-        # sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
-        # module.add(SMovB64(dst=sgpr(sAddress, 2), src=sgpr("AddressFlags", 2)))
-        # module.add(SLShiftRightB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0"), shiftHex=log2(8)))
-        # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
-        # module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr("WorkGroup0"), src1=sgpr(sWorkItemIdx)))
-        # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(256)))
-        # module.add(SAddU32(dst=sgpr(sAddress), src0=sgpr(sAddress), src1=sgpr(sWorkItemIdx)))
-        # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=0, comment="Prevent atomic inc reset"))
-        # module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
-        # # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
-        # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        # writer.sgprPool.checkIn(sAddress)
-
         # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
-        # Share work item index with all waves
+        # Share work item index with all waves via LDS + barrier
         vWaveWorkItemIdx = writer.vgprPool.checkOut(1, "WaveWorkItemIdx")
         module.add(VMovB32(dst=vgpr(vWaveWorkItemIdx), src=sgpr(sWorkItemIdx), comment="Move work item index to vgpr"))
         module.add(DSStoreB32(dstAddr=vgpr(vLocalAddress), src=vgpr(vWaveWorkItemIdx), ds=DSModifiers(offset=0)))
@@ -2779,59 +2830,81 @@ class StreamKDynamic(StreamK):
     def kernelEnd(self, writer, kernel):
         module = Module("StreamK Dynamic kernelEnd")
 
-        # We don't need to track completed kernels if we know total tiles and grid size
-        # Reset is baked into the atomic_inc at the top of the loop
-        # TODO will need to reset the rest of the synchronizer if tiles were split
-        # Remaining reset can be done if workitem = grid + total - 1
-        
-        
+        if not kernel["StreamKExtraSharedQueue"]:
+            # perXCDOnly: auto-resetting counters via wrap value — no cleanup needed.
+            # We don't need to track completed kernels if we know total tiles and grid size
+            # Reset is baked into the atomic_inc at the top of the loop
+            # TODO will need to reset the rest of the synchronizer if tiles were split
+            # Remaining reset can be done if workitem = grid + total - 1
 
+            # # This block tests atomic write to different locations to check if delay is caused by contention
+            # sWorkItemIdx = writer.sgprPool.checkOut(1, "nextWorkItemIdx")
+            # sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
+            # module.add(SMovB64(dst=sgpr(sAddress, 2), src=sgpr("AddressFlags", 2)))
+            # module.add(SLShiftRightB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0"), shiftHex=log2(8)))
+            # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
+            # module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr("WorkGroup0"), src1=sgpr(sWorkItemIdx)))
+            # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(256)))
+            # module.add(SAddU32(dst=sgpr(sAddress), src0=sgpr(sAddress), src1=sgpr(sWorkItemIdx)))
+            # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=0, comment="Prevent atomic inc reset"))
+            # module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
+            # # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
+            # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
+            # module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
+            # # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
+            # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
+            # writer.sgprPool.checkIn(sAddress)
+            # writer.sgprPool.checkIn(sWorkItemIdx)
 
+            return module
 
-        # skSkipWGIncrement = Label("SK_SkipWGIncrement", "")
-        # sWave = writer.sgprPool.checkOut(1, "Wave")
-        # module.add(VReadfirstlaneB32(dst=sgpr(sWave), src=vgpr("Serial"), comment="Wave 0 updates flags"))
-        # module.add(SCmpEQU32(src0=sgpr(sWave), src1=0, comment="Check for wave 0"))
-        # module.add(SCBranchSCC0(labelName=skSkipWGIncrement.getLabelName(), comment="Skip WG increment"))
-        # writer.sgprPool.checkIn(sWave)
+        numXCDs = kernel["NumXCDs"]
+        # ESQ ON uses monotonic counters (wrap=0x7FFFFFFF) that don't auto-reset.
+        # The last WG to exit must zero all queue counters + the completion
+        # counter so the next kernel invocation starts from fresh counters.
+        #
+        # Completion counter at AddressFlags + numXCDs*256.
+        # Queue counters at offsets 0, 256, ..., (numXCDs-1)*256 (per-XCD)
+        # plus numXCDs*256 (shared queue), so numXCDs+2 counters total.
+        numCounters = numXCDs + 2
 
-        # # This block tests atomic write to different locations to check if delay is caused by contention
-        # sWorkItemIdx = writer.sgprPool.checkOut(1, "nextWorkItemIdx")
-        # sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
-        # module.add(SMovB64(dst=sgpr(sAddress, 2), src=sgpr("AddressFlags", 2)))
-        # module.add(SLShiftRightB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0"), shiftHex=log2(8)))
-        # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
-        # module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr("WorkGroup0"), src1=sgpr(sWorkItemIdx)))
-        # module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(256)))
-        # module.add(SAddU32(dst=sgpr(sAddress), src0=sgpr(sAddress), src1=sgpr(sWorkItemIdx)))
-        # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=0, comment="Prevent atomic inc reset"))
-        # module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
-        # # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
-        # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        # module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
-        # # module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("WorkGroup0")))
-        # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        # writer.sgprPool.checkIn(sAddress)
-        # writer.sgprPool.checkIn(sWorkItemIdx)
+        skExitLabel = Label("SK_ExitESQ", "")
 
-        # # Count completed workgroups
-        # sCompletedWGs = writer.sgprPool.checkOut(1, "completedWGs")
-        # module.add(SMovB32(dst=sgpr(sCompletedWGs), src=hex(0xFFFFFFFF), comment="Prevent atomic inc reset"))
-        # module.add(SAtomicInc(dst=sgpr(sCompletedWGs), base=sgpr("AddressFlags", 2), soffset=4, smem=SMEMModifiers(glc=True), comment="Count completed workgroups"))
-        # module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        # module.add(SAddU32(dst=sgpr(sCompletedWGs), src0=sgpr(sCompletedWGs), src1=1, comment="Get total"))
-        # module.add(SCmpEQU32(src0=sgpr(sCompletedWGs), src1=sgpr("skGrid"), comment="Check if all workgroups are completed"))
-        # writer.sgprPool.checkIn(sCompletedWGs)
+        sWave = writer.sgprPool.checkOut(1, "Wave")
+        module.add(VReadfirstlaneB32(dst=sgpr(sWave), src=vgpr("Serial"), comment="Wave 0 does sync"))
+        module.add(SCmpEQU32(src0=sgpr(sWave), src1=0, comment="Check for wave 0"))
+        module.add(SCBranchSCC0(labelName=skExitLabel.getLabelName(), comment="Non-wave-0 skips"))
+        writer.sgprPool.checkIn(sWave)
 
-        # skExitLabel = Label("SK_Exit", "")
-        # module.add(SCBranchSCC0(labelName=skExitLabel.getLabelName(), comment="Exit kernel"))
-        
-        # # Last work group to exit should reset the synchronizer
-        # module.add(SMovB32(dst=sgpr("skGrid"), src=0, comment="Clear synchronizer"))
-        # module.add(SStoreB32(src=sgpr("skGrid"), base=sgpr("AddressFlags", 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Reset synchronizer"))
-        # module.add(SStoreB32(src=sgpr("skGrid"), base=sgpr("AddressFlags", 2), soffset=4, smem=SMEMModifiers(glc=True), comment="Reset synchronizer"))
+        completionOffset = (numXCDs + 1) * 256
+        sCompletedWGs = writer.sgprPool.checkOut(1, "completedWGs")
+        module.add(SMovB32(dst=sgpr(sCompletedWGs), src=hex(0x7FFFFFFF), comment="Large wrap (no wrap)"))
+        module.add(SAtomicInc(dst=sgpr(sCompletedWGs), base=sgpr("AddressFlags", 2),
+                              soffset=completionOffset, smem=SMEMModifiers(glc=True),
+                              comment="Count completed WG"))
+        module.add(SWaitCnt(dscnt=0, comment="Wait for atomic"))
+        module.add(SAddU32(dst=sgpr(sCompletedWGs), src0=sgpr(sCompletedWGs), src1=1,
+                           comment="Returned old value; +1 = current total"))
+        module.add(SCmpEQU32(src0=sgpr(sCompletedWGs), src1=sgpr("skGrid"),
+                             comment="All WGs done?"))
+        writer.sgprPool.checkIn(sCompletedWGs)
+        module.add(SCBranchSCC0(labelName=skExitLabel.getLabelName(), comment="Not last WG"))
 
-        # module.add(skSkipWGIncrement)
-        # module.add(skExitLabel)
+        sZero = writer.sgprPool.checkOut(1, "zero")
+        module.add(SMovB32(dst=sgpr(sZero), src=0))
+        for i in range(numCounters):
+            if i < numXCDs:
+                cmt = "Reset per-XCD queue %d counter" % i
+            elif i == numXCDs:
+                cmt = "Reset shared queue counter"
+            else:
+                cmt = "Reset completion counter"
+            module.add(SStoreB32(src=sgpr(sZero), base=sgpr("AddressFlags", 2),
+                                 soffset=i * 256, smem=SMEMModifiers(glc=True),
+                                 comment=cmt))
+        module.add(SWaitCnt(dscnt=0, comment="Ensure stores land"))
+        writer.sgprPool.checkIn(sZero)
+
+        module.add(skExitLabel)
 
         return module

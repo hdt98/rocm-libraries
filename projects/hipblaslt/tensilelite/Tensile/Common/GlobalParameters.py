@@ -438,6 +438,7 @@ defaultBenchmarkCommonParameters = [
     {"StreamKXCCMapping": [0]},
     {"StreamKFixupTreeReduction": [0]},
     {"DebugStreamK": [0]},
+    {"StreamKExtraSharedQueue": [0]},
     {"DebugPersistentKernelLoopForever": [False]},
     {"ActivationFused": [True]},
     {"ActivationFuncCall": [True]},
