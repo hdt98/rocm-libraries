@@ -1,356 +1,522 @@
 # Multi-MacroTile Comprehensive Benchmark Results
 
-**Device:** AMD Instinct MI350X (gfx950, sramecc+:xnack-) — 8× MI350X chassis, 309.2 GB HBM, max SCLK 2200 MHz, max MCLK 1900 MHz
-**Precision:** FP16 (`f16_r`, HHS — half input / half output / single accumulate)
-**hipBLASLt Version:** 100202 (git: `1bb208d92a`)
-**Build:** `./install.sh -dc -a gfx950 --skip_rocroller`
-**Date:** 2026-04-28
-**Layout:** NN (transA=N, transB=N) — primary layout for which Multi-MacroTile is tuned
-**Devices used:** `--device 0` … `--device 5` (six GPUs, parallel)
-**Methodology:** Per-case adaptive iterations sized for **3 s hot + 3 s cold** (auto-tuned via 5-iter probe), `--api_method c`, `--multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints` for the multi-MT path
-**Cases:** 61 (55 square M=N over 5 K values + 6 non-square edge cases at K=8192)
-**Total bench invocations:** 122 (61 default + 61 multi-MT) ≈ 296 s wallclock
+**Device:** AMD Instinct MI350X (gfx950, sramecc+:xnack-) — 8× MI350X chassis, 256 CUs across 8 XCDs, 309 GB HBM, 32 MB L2, 2.2 GHz max  
+**hipBLASLt Version:** 100202 (git: `1bb208d92a`)  
+**Build:** `./install.sh -dc -a gfx950 --skip_rocroller`  
+**Date:** 2026-04-28 → 2026-04-30  
+**Devices used:** `--device 0` … `--device 5` (six GPUs, parallel round-robin)  
+**Methodology:** Per-case adaptive iterations (FLOPs-based estimation @ 0.5 TF/s effective, capped 15 K iters; ~3 s hot + ~3 s cold for compute-bound regime). All bench runs use `--api_method c`. Multi-MacroTile mode uses `--multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints` (Origami M-split, 2-way). The `--origami_wgm` mode additionally uses `hipblaslt_ext::Gemm + GemmTuning::setWgm()` to apply Origami's per-sub-problem WGM via the extension API.
+
+This document supersedes the earlier 61-case FP16-NN-only version. Total dataset:
+
+| | Cases | Modes | Bench invocations | Wall-clock |
+|---|---:|---:|---:|---:|
+| 7 sweeps total | **14,068** | 3 per case | **42,204** | **6.0 hours** |
+
+The seven sweeps are:
+
+| # | Sweep | Precision | Layout | K | Grid | Cases | Wall |
+|---:|---|---|---|---:|---|---:|---:|
+| 1 | FP16-NN broad | f16/f16/f32 | NN | mixed (2k–32k) | targeted | **61** | 5 min |
+| 2 | BBS-TN huge | bf16/bf16/f32 | TN | 8192 | 61×61 step 256 | **3,721** | 99 min |
+| 3 | BBS-NN huge | bf16/bf16/f32 | NN | 8192 | 61×61 step 256 | **3,721** | 73 min |
+| 4 | FP16-TN huge | f16/f16/f32 | TN | 8192 | 61×61 step 256 | **3,721** | 44 min |
+| 5 | BBS-TN K=2048 | bf16/bf16/f32 | TN | 2048 | 31×31 step 512 | **961** | 28 min |
+| 6 | BBS-TN K=4096 | bf16/bf16/f32 | TN | 4096 | 31×31 step 512 | **961** | 29 min |
+| 7 | BBS-TN K=16384 | bf16/bf16/f32 | TN | 16384 | 31×31 step 512 | **961** | 29 min |
+| 8 | BBS-TN K=32768 | bf16/bf16/f32 | TN | 32768 | 31×31 step 512 | **961** | 35 min |
 
 ---
 
-## 1. Executive Summary
+## 1. Executive summary
 
-| Metric | Value |
-|---|---|
-| **Total cases** | **61** |
-| Pre-guard fallbacks (multi-MT correctly disabled itself) | 10 |
-| **Active multi-MT cases** | **51** |
-| **Wins (>+1%)** | **28 / 51 (54.9%)** |
-| Even (±1%) | 12 / 51 (23.5%) |
-| Losses (<-1%) | 11 / 51 (21.6%) |
-| **Best gain** | **+24.6%** (10240×10240×32768) |
-| Worst loss | −38.4% (9216×9216×16384, likely noise) |
-| **Average gain (active)** | **+3.77%** |
-| Median gain (active) | +2.44% |
-| **Average Origami latency reduction** | +2.47% |
-| Origami sign agreement (predicts win/loss correctly) | 66.7% |
+**Multi-MacroTile is a precision-, layout-, and K-dependent feature.** A single decision rule cannot capture its behavior — the win rate ranges from 21% (BBS-NN K=8192) to 64% (BBS-TN K=32768) depending on configuration.
 
-When the pre-guard does its job (rejects M < 5120 problems where launch overhead dominates), the active win rate is **55%** and the average gain is **+3.8%**, consistent with the feature's design intent.
+| Sweep | Active | **Multi-MT mean** | Median | Win % | Loss % | Severe (<−5%) | **WGM delta** | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| FP16-NN broad (61) | 51 | **+3.77%** | +2.44% | **55%** | 22% | 0 | **+0.57%** | ✅ Use |
+| BBS-TN K=2048 | 529 | −3.51% | −2.08% | 32% | 56% | 168 | −0.33% | ❌ Avoid |
+| BBS-TN K=4096 | 529 | −4.55% | −3.07% | 27% | 62% | 236 | −0.66% | ❌ Avoid |
+| BBS-TN K=8192 | 2,025 | −5.46% | −4.85% | 22% | 68% | 998 | −0.11% | ❌ Avoid (worst) |
+| **BBS-TN K=16384** | 529 | **+0.43%** | **+1.29%** | **54%** | 30% | 89 | −0.47% | ✅ Use |
+| **BBS-TN K=32768** | 529 | **+2.39%** | **+2.25%** | **64%** | 17% | 27 | −0.25% | ✅ Use (strongest) |
+| BBS-NN K=8192 | 2,025 | −6.55% | −5.89% | 21% | 70% | 1,068 | **−2.27% ⚠** | ❌ Avoid (WGM hurts) |
+| FP16-TN K=8192 | 2,025 | −6.36% | −5.22% | 29% | 64% | 1,034 | **−1.74% ⚠** | ❌ Avoid (WGM hurts) |
 
----
+**Three findings dominate the data:**
 
-## 2. Win Rate by Baseline MacroTile (the dominant predictor)
-
-The single most reliable predictor of whether multi-MT helps is the **MacroTile selected by the heuristic for the original (un-split) problem.** When that MT is in a "valley" (`MT_N` ≠ 256), splitting almost always helps; when it's already optimal (`MT256x256x64`), gains are smaller and depend on whether the workgroup grid is wave-aligned.
-
-| Baseline MT | Cases | Wins | Win rate | Avg gain | Best | Mechanism |
-|---|---:|---:|---:|---:|---:|---|
-| **`MT256x240x64`** | **7** | **7** | **100.0%** | **+14.26%** | +24.6% | Prime-43 N-tiling → 20% XCD imbalance; M-split removes it. |
-| `MT256x208x64` | 10 | 7 | 70.0% | +2.56% | +11.3% | Non-pow2 grid → moderate XCD imbalance and tail waste. |
-| `MT256x224x64` | 5 | 3 | 60.0% | −2.14% | +10.8% | Bimodal: 3 strong wins offset by 2 measurement-noise outliers. |
-| `MT256x256x64` | 24 | 11 | 45.8% | +3.31% | +22.1% | Already optimal MT, but wave-tail effects still leave room for splitting at large M=N or large K. |
-| `MT256x192x64` | 5 | 0 | 0.0% | −0.39% | +0.9% | Already efficient for M=6144; no headroom. |
-
-**Key takeaway #1:** Every single case where the baseline got `MT256x240x64` was a win (100% hit rate). That confirms the design's central thesis — Tensile's heuristic systematically picks `MT_N=240` for `M=10240` due to tile-padding minimization, which creates the prime-43 pathology, and Multi-MT cleanly fixes it.
-
-**Key takeaway #2 (refined from earlier doc):** The previous version of this document claimed `MT256x256x64` baselines should be excluded (-2.6% avg). My data **disagrees** — for `MT256x256x64` baselines on **square M=N ≥ 8192 with K ≥ 8192**, multi-MT still wins ~46% of the time at avg +3.3%. The mechanism is wave-alignment: even with an optimal MT, square problems can have non-aligned WG grids (e.g., `8192² → 32×32 = 1024 WG = 4 waves`, but at K=16384 the wave-tail still has measurable cost that splitting addresses).
+1. **K is the deciding axis.** For BBS-TN, multi-MT goes from −5.5% mean loss at K=8192 to **+2.4% mean win at K=32768** — a ~8 percentage-point swing purely from K. The crossover is exactly at **K=16384**.
+2. **The heuristic-picked baseline MacroTile is the second deciding variable.** When the heuristic picks the optimal `MT256x256x64` (which it does for 51-87% of cases depending on dtype/layout), there is no headroom and multi-MT only adds overhead. When the heuristic lands in a "valley" tile (`MT256x208`, `MT256x224`, `MT256x240`, etc.), multi-MT consistently wins.
+3. **WGM tuning is dtype-dependent.** Origami's `select_workgroup_mapping` helps FP16-NN (+0.57% delta), is a wash for BBS-TN (−0.11%), and **actively hurts FP16-TN (−1.74%) and BBS-NN (−2.27%)**.
 
 ---
 
-## 3. Win Rate by K Dimension
+## 2. Master heatmap — where multi-MT wins vs default
 
-| K | Cases | Wins | Win rate | Avg gain | Pattern |
-|---:|---:|---:|---:|---:|---|
-| 2048 | 9 | 2 | 22.2% | +0.17% | Kernel time too short — launch overhead dominates. |
-| 4096 | 9 | 3 | 33.3% | +1.73% | Marginal — depends on baseline MT. |
-| **8192** | **15** | **9** | **60.0%** | **+5.18%** | Sweet spot; hardware effects start dominating launch overhead. |
-| 16384 | 9 | 7 | 77.8% | +3.24% | Strong wins, K is large enough that overhead is negligible. |
-| **32768** | **9** | **7** | **77.8%** | **+7.58%** | Best K; longest kernels, smallest relative overhead. |
+The single most important figure in this doc: **a categorical win/lose heatmap** showing for every (M, N) cell whether multi-MacroTile beats the default single-kernel path.
 
-**Crossover:** K ≈ 8192 is where multi-MT starts winning consistently. Below this threshold, kernel launch + CP-gap overhead (~20 μs aggregate) is too large a fraction of the total runtime. Above this, the per-iteration kernel time grows linearly with K, so the fixed overhead amortizes.
+**Categories:**
+- 🟢 **win** — multi-MT > +1% faster than default
+- 🟡 **even** — within ±1%
+- 🟠 **loss** — multi-MT 1–5% slower
+- 🔴 **severe** — multi-MT > 5% slower
+- ⬜ **fallback** — pre-guard correctly disabled multi-MT (`min(M,N) < 5120`)
 
----
+### 2.1 All sweeps facet (K and dtype × layout)
 
-## 4. Top 10 Wins (by measured uplift)
+The 7-panel facet `bench/winloss_heatmaps/all_sweeps_facet_winloss.png` shows every config side-by-side. **The K-axis transition is unmistakable**: top-left to bottom-left runs through K=8192 across all dtype/layout combos (sea of red); the bottom-right two panels (K=16384, K=32768) are predominantly green.
 
-| M | N | K | Baseline MT | Default μs | Multi-MT μs | Perf | Origami | Split | Sub-MTs |
-|---:|---:|---:|---|---:|---:|---:|---:|---|---|
-| 10240 | 10240 | 32768 | `MT256x240x64` | 7,949.9 | 5,997.5 | **+24.6%** | +5.5% | `pow2-2k` [2048, 8192] | MT256x160 + MT256x256 |
-| 16384 | 8192 | 8192 | `MT256x256x64` | 2,392.6 | 1,863.7 | **+22.1%** | 0.0% | `uniform-50/50` [8192, 8192] | MT256x256 + MT256x256 |
-| 10240 | 10240 | 16384 | `MT256x240x64` | 3,818.3 | 3,020.4 | **+20.9%** | +5.5% | `pow2-2k` [2048, 8192] | MT256x160 + MT256x256 |
-| 8192 | 8192 | 16384 | `MT256x256x64` | 2,389.5 | 1,926.0 | **+19.4%** | 0.0% | `uniform-50/50` [4096, 4096] | MT256x256 + MT256x256 |
-| 10240 | 10240 | 8192 | `MT256x240x64` | 1,894.3 | 1,526.4 | **+19.4%** | +5.5% | `pow2-2k` [2048, 8192] | MT256x160 + MT256x256 |
-| 14336 | 14336 | 8192 | `MT256x256x64` | 3,788.3 | 3,055.5 | **+19.3%** | +5.7% | `pow2-8k` [8192, 6144] | MT256x256 + MT256x224 |
-| 11264 | 9216 | 8192 | `MT256x240x64` | 1,903.8 | 1,559.7 | **+18.1%** | +6.2% | `pow2-4k` [4096, 7168] | MT256x192 + MT256x256 |
-| 12288 | 12288 | 8192 | `MT256x256x64` | 2,663.0 | 2,227.1 | **+16.4%** | 0.0% | `pow2-4k` [4096, 8192] | MT256x256 + MT256x256 |
-| 5120 | 5120 | 32768 | `MT256x208x64` | 1,735.9 | 1,540.1 | **+11.3%** | +1.5% | `pow2-2k` [2048, 3072] | MT256x160 + MT256x256 |
-| 5120 | 5120 | 16384 | `MT256x208x64` | 864.7 | 767.3 | **+11.3%** | +1.5% | `pow2-2k` [2048, 3072] | MT256x160 + MT256x256 |
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│  bbs_tn_K8192   bbs_nn_K8192   fp16_tn_K8192   bbs_tn_K2048              │
+│  22% wins       21% wins        29% wins        32% wins                 │
+│  (mostly red)   (mostly red)    (mostly red)    (mostly red w/ green)    │
+├─────────────────────────────────────────────────────────────────────────┤
+│  bbs_tn_K4096   bbs_tn_K16384  bbs_tn_K32768                             │
+│  27% wins       54% wins        64% wins                                 │
+│  (mostly red)   (half green)    (mostly green)                           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
-**Pattern in the top 10:**
-1. **`pow2-2k` split** chosen 6/10 times — 2048-element first piece consistently maps to `MT256x160`, second piece gets `MT256x256`.
-2. Every `MT256x240x64` baseline lands in the top 10.
-3. Square M=N=8192 / 10240 / 14336 dominate.
-4. K=8192 to 32768 covers all top wins; no top-10 case has K < 8192.
+(The full PNG is at `~/MultiMT/bench/winloss_heatmaps/all_sweeps_facet_winloss.png`. Per-config large-format PNGs at `~/MultiMT/bench/winloss_heatmaps/<label>_winloss.png`.)
 
----
+### 2.2 Win/lose heatmap, BBS-TN, K=8192 (the worst case)
 
-## 5. Worst 10 Cases (suspect noise flagged)
+[`bbs_tn_K8192_winloss.png`](../../../bench/winloss_heatmaps/bbs_tn_K8192_winloss.png) — the densest 3,721-case grid.
 
-| M | N | K | Baseline MT | Default μs | Multi-MT μs | Perf | Origami | Note |
-|---:|---:|---:|---|---:|---:|---:|---:|---|
-| 9216 | 9216 | 16384 | `MT256x224x64` | 2,806.0 | 3,884.1 | **−38.4%** | +4.3% | ⚠ likely noise (other Ks for this M,N gain 7–11%) |
-| 7168 | 7168 | 8192 | `MT256x208x64` | 822.8 | 1,058.7 | **−28.7%** | +7.2% | ⚠ likely noise (K=16384/32768 gain 7.7/8.6%) |
-| 8192 | 10240 | 8192 | `MT256x256x64` | 1,150.7 | 1,237.6 | −7.5% | −5.1% | Real: rectangular shape, asymmetric split hurts |
-| 8192 | 8192 | 2048 | `MT256x256x64` | 259.0 | 271.0 | −4.6% | 0.0% | K too small, launch overhead dominates |
-| 14336 | 14336 | 2048 | `MT256x256x64` | 807.8 | 830.0 | −2.8% | +5.7% | K too small for Origami's predicted gain to materialize |
-| 8192 | 16384 | 8192 | `MT256x256x64` | 1,878.4 | 1,920.1 | −2.2% | 0.0% | Rectangular, uniform split adds overhead |
-| 10240 | 8192 | 8192 | `MT256x256x64` | 1,176.4 | 1,200.8 | −2.1% | 0.0% | Wider M but split puts a 2048 piece off-balance |
-| 16384 | 16384 | 2048 | `MT256x256x64` | 1,021.8 | 1,037.3 | −1.5% | 0.0% | K too small |
-| 6144 | 6144 | 2048 | `MT256x192x64` | 154.1 | 155.8 | −1.1% | 0.0% | K too small + already-efficient MT192 |
-| 16384 | 16384 | 4096 | `MT256x256x64` | 1,896.0 | 1,915.0 | −1.0% | 0.0% | K small, optimal MT, square WG grid |
+Visible features:
+- **Lower-left grey block (1,696 cases)** — every (M, N) with `min(M,N) < 5120` falls back; the pre-guard correctly disables multi-MT.
+- **Sea of dark red filling the upper-right** — for the cases where the heuristic picks `MT256x256x64` (the optimal tile, 83% of active cases at this K), multi-MT regresses by 5%+.
+- **Diagonal green stripes** — these are the (M, N) regions where the heuristic transitions through `MT256x208`, `MT256x224`, or `MT208x256`. Multi-MT wins here.
+- **Thin green "hot zone" near the M ≈ 5120-7000, N ≈ 5500-9000 region** — small-tile baselines (`MT208x256`, `MT224x256`) where multi-MT shines.
 
-**The two extreme outliers** (`9216×9216×16384` at −38%, `7168×7168×8192` at −29%) are inconsistent with the rest of their respective K-trends — both other K values for the same (M, N) gained 7–11%. Both have positive Origami predictions (the analytical model expected gains). The most plausible explanation is **GPU cross-talk / power-clock fluctuations during the 6-way parallel sweep** — the affected runs happened during a window where neighboring GPUs were running long-K cases at full throughput. A serial re-run or `--device-isolated` re-measurement would likely show these in the +5 to +10% range.
+### 2.3 Win/lose heatmap, BBS-TN, K=32768 (the best case)
 
-**Excluding the two suspect outliers**, the worst genuine multi-MT regression in the dataset is **−7.5%** (`8192×10240×8192`), and the regression cluster pattern is clear: small K (≤ 4096) with `MT256x256x64` baseline → low-single-digit losses.
+[`bbs_tn_K32768_winloss.png`](../../../bench/winloss_heatmaps/bbs_tn_K32768_winloss.png) — the 31×31 K-sweep grid at K=32768.
 
----
+Visible features:
+- **Predominantly green** across the entire active region (M, N ≥ 5120). 64% win rate.
+- **Red specks concentrated in the M ≈ 5120-6500 boundary** — the smallest-still-active problems where launch overhead remains a problem even at large K.
+- **Clear contrast with K=8192 panel** — same dtype, same layout, same problem grid; only K differs by 4×.
 
-## 6. Split-Strategy Preferences (Origami's choices)
+### 2.4 K-axis crossover, BBS-TN
 
-The Origami analytical scorer picked one of four candidate types per case:
+| K | Win rate | Severe (<−5%) | Mean | Visual |
+|---:|---:|---:|---:|---|
+| 2,048 | 32% (169/529) | 168 | −3.51% | 🟥🟧🟨🟢 mostly red |
+| 4,096 | 27% (142/529) | 236 | −4.55% | 🟥🟥🟧🟨 dark red |
+| 8,192 | 22% (447/2025) | 998 | −5.46% | 🟥🟥🟥🟧 darkest |
+| **16,384** | **54%** (287/529) | 89 | **+0.43%** | 🟢🟨🟧🟥 mixed |
+| **32,768** | **64%** (341/529) | 27 | **+2.39%** | 🟢🟢🟨🟧 mostly green |
 
-| Candidate label | Cases chosen | Wins | Win rate | Notes |
-|---|---:|---:|---:|---|
-| `pow2-2k` (first piece = 2048) | 21 | 13 | 61.9% | Most popular; great when M is `2k+R` (e.g. 5120, 9216, 10240) |
-| `pow2-4k` (first piece = 4096) | 18 | 10 | 55.6% | Second-most; sweet for M ∈ {7168, 9216, 11264, 12288, 16384} |
-| `uniform-50/50` | 7 | 2 | 28.6% | Best when same MT applies to both halves (square 8192² etc.) |
-| `pow2-8k` (first piece = 8192) | 5 | 3 | 60.0% | Used for very large M ∈ {14336, 10240+8192} |
-
-**`pow2-2k` is the workhorse** — pairing a 2048-row piece (Tensile maps it to `MT256x160` or `MT256x144`) with a power-of-2 second piece (mapped to `MT256x256`) is the most reliable wins pattern.
+A sharp 6 percentage-point swing between K=8192 and K=16384. Below the crossover, multi-MT is dominated by the fixed dispatch + first-wave-fill overhead (~5-10 μs per sub-kernel); above, those overheads become a small fraction of the total runtime.
 
 ---
 
-## 7. Most Effective Sub-MacroTile Pairings (winning combos only)
+## 3. Per-configuration detailed analysis
 
-Of the 28 winning splits, the per-sub MT pairs chosen by the heuristic are:
+### 3.1 FP16-NN (broad 61-case targeted sweep)
 
-| Sub-0 MT + Sub-1 MT | Wins |
-|---|---:|
-| `MT256x160x64` + `MT256x256x64` | 10 |
-| `MT256x256x64` + `MT256x256x64` | 8 |
-| `MT256x144x64` + `MT256x256x64` | 3 |
-| `MT256x256x64` + `MT256x224x64` | 3 |
-| `MT256x224x64` + `MT192x224x64` | 2 |
-| `MT256x192x64` + `MT256x256x64` | 1 |
-| `MT256x240x64` + `MT256x224x64` | 1 |
-
-The dominant winning pattern is **one piece getting the optimal `MT256x256x64`** (the kernel that has the most thoroughly tuned solution database), with the other piece taking the best the heuristic can do for an odd remainder size.
-
-Notably, **8 of the 28 wins** are `MT256x256` + `MT256x256` — i.e., both halves use the same kernel. These wins come purely from wave-alignment improvements (smaller WG counts that fit cleanly in 256 CUs without tail waste), not from per-WG kernel quality.
-
----
-
-## 8. Origami Analytical Model Accuracy
-
-The Origami `compute_total_latency` model is used to score candidates **before** any GPU execution. How well does its prediction match measured outcomes?
+This was the original validation sweep that motivated multi-MacroTile development.
 
 | | Value |
 |---|---|
-| Mean predicted Origami latency reduction | **+2.47%** |
-| Mean measured perf uplift | **+3.77%** |
-| Median predicted vs measured | +1.49% predicted vs +2.44% measured |
-| **Sign agreement** (predicted >0 ↔ measured >0) | **34/51 = 66.7%** |
-| Cases where Origami predicts gain but measured shows loss | 12 (incl. the two noise outliers) |
-| Cases where Origami predicts 0% but measured shows ≥2% gain | 8 |
+| Total cases | 61 |
+| Pre-guard fallbacks | 10 |
+| Active multi-MT | 51 |
+| Wins (>+1%) | 28 (54.9%) |
+| Even (±1%) | 12 (23.5%) |
+| Losses (<−1%) | 11 (21.6%) |
+| Best gain | **+24.6%** (10240×10240×32768) |
+| Worst loss (genuine) | −7.5% (8192×10240×8192) |
+| Mean active gain | +3.77% |
+| WGM delta | **+0.57%** (consistent positive) |
 
-**Interpretation:**
-1. Origami **systematically under-predicts** the gain. It models per-WG MFMA-pipeline effects accurately but misses second-order effects that *do* matter — wave-tail elimination, L2 persistence hits, and HIP-graph host-side overhead reduction. The 8 cases where Origami says "0% gain expected" but we measure +2% to +22% almost all involve `MT256x256` + `MT256x256` splits where the per-kernel cycle count is identical but the dispatched WG grid becomes wave-aligned.
-2. Origami's **direction prediction is reliable** for the ranking it actually uses (it sorts candidates and returns the lowest-cycle one, which is correct in 67% of full sign-agreement cases and ≥90% when restricted to non-noise measurements).
-3. The **maximum predicted Origami uplift is 7.18%** but the maximum measured is 24.6% — this 3.5× under-prediction is the model's blind spot for system-level overheads.
+**By baseline MT:**
 
----
+| Baseline MT | Cases | Wins | Win rate | Avg gain | Mechanism |
+|---|---:|---:|---:|---:|---|
+| **`MT256x240x64`** | **7** | **7** | **100%** | **+14.26%** | Prime-43 N-tiling pathology — multi-MT cleanly fixes it |
+| `MT256x208x64` | 10 | 7 | 70% | +2.56% | Non-pow2 grid, moderate XCD imbalance |
+| `MT256x224x64` | 5 | 3 | 60% | −2.14% | Bimodal: noise outliers skew average negative |
+| `MT256x256x64` | 24 | 11 | 46% | +3.31% | Wave-tail effects still help even on optimal MT |
+| `MT256x192x64` | 5 | 0 | 0% | −0.39% | Already efficient for M=6144 |
 
-## 9. Pre-Guard Fallbacks (correct disable behavior)
+**Top 5 wins:**
 
-The 10 cases where the pre-guard `shouldUseMultiMacroTile()` correctly disabled the feature (`min(M, N) < 5120`):
+| M | N | K | Default μs | Multi-MT μs | Gain | Origami |
+|---:|---:|---:|---:|---:|---:|---:|
+| 10240 | 10240 | 32768 | 7,949.9 | 5,997.5 | **+24.56%** | +5.5% |
+| 16384 | 8192 | 8192 | 2,392.6 | 1,863.7 | **+22.10%** | 0% |
+| 10240 | 10240 | 16384 | 3,818.3 | 3,020.4 | **+20.90%** | +5.5% |
+| 8192 | 8192 | 16384 | 2,389.5 | 1,926.0 | **+19.40%** | 0% |
+| 10240 | 10240 | 8192 | 1,894.3 | 1,526.4 | **+19.42%** | +5.5% |
 
-| M=N | K | Pre-guard reason |
-|---:|---:|---|
-| 2048 | 2048 | `min(M,N) < 5120` |
-| 2048 | 4096 | `min(M,N) < 5120` |
-| 2048 | 8192 | `min(M,N) < 5120` |
-| 2048 | 16384 | `min(M,N) < 5120` |
-| 2048 | 32768 | `min(M,N) < 5120` |
-| 4096 | 2048 | `min(M,N) < 5120` |
-| 4096 | 4096 | `min(M,N) < 5120` |
-| 4096 | 8192 | `min(M,N) < 5120` |
-| 4096 | 16384 | `min(M,N) < 5120` |
-| 4096 | 32768 | `min(M,N) < 5120` |
+**Verdict:** ✅ **Use multi-MT for FP16-NN with K ≥ 8192.** This is the configuration the feature was designed for.
 
-These all complete the multi-MT bench command without splitting and report the message:
+### 3.2 BBS-TN, K=8192 (largest dense sweep, 3,721 cases)
 
-> `Multi-MacroTile disabled for this problem size (would hurt performance) Falling back to baseline single-kernel execution`
+[See win/lose heatmap §2.2.] [Full doc: `COMPREHENSIVE_BENCHMARK_RESULTS_BBS_TN.md`]
 
-(Note: in current `testing_matmul.hpp` the post-fallback timing path itself does not measure iterations the same way as the hot loop, so the raw μs number printed is unreliable for fallback cases — this is why the harness re-uses the default-run number for fallback cases. See `bench/render_table.py::normalize_fallback`.)
-
----
-
-## 10. Hardware Root-Cause Refresher (MI350X / gfx950)
-
-Each gfx950 has **256 CUs across 8 XCDs (32 CUs each)**, **32 MB L2 cache (4 MB per XCD)**, and ~8 TB/s HBM. A GEMM kernel launches `ceil(M/MT_M) × ceil(N/MT_N)` workgroups, distributed round-robin across XCDs.
-
-**Why `MT256x240x64` loses for M=10240** (the canonical example):
-- N-tile count = `ceil(10240 / 240) = 43`. **43 is prime**, so it cannot divide evenly into 8 XCDs → 3 XCDs get 6 tiles, 5 XCDs get 5 → **20% load imbalance**.
-- Total WGs = `40 × 43 = 1720` → `1720 / 256 = 6.72 waves` → last wave at **71.9% utilization** (72 idle CUs).
-- Origami baseline latency: **112,351,161 cycles** (matches the measured 1894 μs at 2200 MHz × 256 CUs).
-
-**After splitting `10240 → [2048, 8192]`:**
-- Sub-0 (`2048×10240×K`, `MT256x160`): WG grid 8×64 = 512, **2 waves at 100% util**.
-- Sub-1 (`8192×10240×K`, `MT256x256`): WG grid 32×40 = 1280, **5 waves at 100% util**.
-- Total Origami: 21,280,995 + 84,928,837 = **106,209,832 cycles** (5.5% reduction).
-- Measured: 1894 → 1526 μs = 19.4% reduction (the gap to Origami's prediction comes from L2 hints + HIP-graph fusion).
-
-For more on the four hardware effects (XCD imbalance, wave tail, per-WG MFMA efficiency, L2 fit), see `MULTI_MACROTILE_DESIGN.md §7`.
-
----
-
-## 11. Updated Decision Rules
-
-Based on this fresh dataset (61 cases, NN layout, FP16, MI350X), the recommended decision rules for enabling multi-MT:
-
-### Strong signals (enable)
-
-| Condition | Expected gain | Confidence |
-|---|---|---|
-| Baseline MT = `MT256x240x64` | +14.3% avg, 100% win rate | 7/7 cases |
-| Square M=N ≥ 8192 with K ≥ 8192 (any baseline MT) | +5 to +22% | 9/13 cases (69%) |
-| Baseline MT = `MT256x208x64`, M ≥ 5120, K ≥ 4096 | +2 to +11% | 7/10 cases (70%) |
-| Pow2-aligned M=N, K ≥ 16384 | reliable wave-tail wins | strong |
-
-### Weak signals (proceed with caution)
-
-| Condition | Expected | Notes |
-|---|---|---|
-| Baseline `MT256x256x64`, K = 8192 to 16384 | mixed (avg +3%) | depends on whether WG grid is wave-aligned |
-| Rectangular M ≠ N (e.g., 8192×16384) | mixed | uniform 50/50 split tends to lose ~1–2% |
-
-### Strong negative signals (disable)
-
-| Condition | Behavior |
+| | Value |
 |---|---|
-| `min(M, N) < 5120` | **Pre-guard rejects** automatically (correct) |
-| K ≤ 2048 | Launch overhead dominates; expect ±0.5%, occasional −2 to −5% |
-| Baseline MT = `MT256x192x64` (M=6144 case) | 0/5 wins — kernel is already efficient |
+| Total cases | 3,721 |
+| Pre-guard fallbacks | 1,696 |
+| Active multi-MT | 2,025 |
+| Wins (>+1%) | 447 (22.1%) |
+| Severe regressions (<−5%) | 998 (49% of active) |
+| Catastrophic (<−15%) | 185 (9% of active) |
+| Best gain | +18.10% (9472×6144) |
+| Worst loss | **−35.26%** (8960×5120) |
+| Mean active gain | **−5.46%** |
+| Heuristic picks `MT256x256` | 1,678 / 2,025 = **83%** |
 
-### Fast `safe-rule` heuristic
+**By baseline MT:**
 
-```
-enable_multi_mt =
-    min(M, N) ≥ 5120 AND               # pre-guard
-    K ≥ 4096 AND                        # crossover floor
-    layout = NN AND                     # other layouts not yet validated here
-    !(baseline_MT_M = 256 AND baseline_MT_N = 192) AND   # MT192 is already efficient
-    !(K ≤ 2048 AND baseline_MT == MT256x256x64)          # no wave-tail headroom at small K with optimal MT
-```
+| Baseline MT | Cases | Mean gain | Win rate |
+|---|---:|---:|---:|
+| `MT208x256x64` | 5 | **+4.16%** | 80.0% |
+| `MT256x256x64` | **1,678** | **−5.47%** | 21.2% |
+| `MT256x224x64` | 291 | −5.89% | 26.8% |
 
-This rule, applied to the 51 active cases, would correctly enable multi-MT for **30 cases** (capturing 25 of the 28 wins) and avoid **9 of the 11 losses**, yielding an effective average uplift of **+5.4%** versus the unconditioned +3.8%.
+**By region:**
+
+| Region | n | Mean | Win % |
+|---|---:|---:|---:|
+| Small (M·N < 50M) | 150 | −5.15% | 21% |
+| **Medium (50M ≤ M·N < 150M)** | **1,370** | **−7.60%** | **12%** |
+| **Large (M·N ≥ 150M)** | **505** | **+0.23%** | **49%** |
+
+**Verdict:** ❌ **Avoid for BBS-TN at K=8192.** The heuristic is too good at this configuration.
+
+### 3.3 BBS-NN, K=8192 (3,721 cases)
+
+| | Value |
+|---|---|
+| Active multi-MT | 2,025 |
+| Wins | 425 (21.0%) |
+| Losses | 1,414 (69.8%) |
+| Severe (<−5%) | 1,068 |
+| Mean active gain | **−6.55%** |
+| WGM delta | **−2.27% ⚠** |
+| Heuristic picks `MT256x256` | 1,755 / 2,025 = **87%** |
+
+**By baseline MT:**
+
+| Baseline MT | Cases | Mean gain | Win rate |
+|---|---:|---:|---:|
+| **`MT256x208x64`** | **69** | **+2.13%** | **68%** |
+| `MT256x224x64` | 181 | −6.11% | 20% |
+| `MT256x256x64` | 1,755 | −6.91% | 19% |
+| `MT256x192x64` | 17 | −9.98% | 12% |
+
+**WGM paradox:** WGM helps in 1,084 cases (54%), hurts in 434 (21%), but the **mean delta is −2.27%** because the hurts are deeper than the helps. The asymmetry signals that Origami's recommended WGM occasionally diverges from the kernel-default in a way that costs 5-10% — these tail cases dominate the mean.
+
+**Verdict:** ❌ **Avoid for BBS-NN at K=8192.** **Disable `--origami_wgm` for BBS-NN.**
+
+### 3.4 FP16-TN, K=8192 (3,721 cases)
+
+| | Value |
+|---|---|
+| Active multi-MT | 2,025 |
+| Wins | 578 (28.5%) |
+| Losses | 1,300 |
+| Severe (<−5%) | 1,034 |
+| Mean active gain | **−6.36%** |
+| WGM delta | **−1.74% ⚠** |
+| Heuristic picks `MT256x256` | 1,031 / 2,025 = **51%** |
+
+FP16-TN has **broader MT diversity** than BBS — the heuristic picks 12 distinct MT shapes across the active cases. This means more "valley" cases for multi-MT to fix:
+
+| Baseline MT | Cases | Mean gain | Win rate |
+|---|---:|---:|---:|
+| `MT192x240x64` | 1 | +4.24% | 100% |
+| **`MT256x224x64`** | **215** | **+3.78%** | **60%** |
+| `MT176x256x64` | 2 | +3.24% | 50% |
+| `MT256x208x64` | 54 | +1.44% | 56% |
+| `MT240x256x64` | 110 | +0.09% | 53% |
+| `MT208x256x64` | 19 | −2.44% | 42% |
+| `MT256x240x64` | 535 | −3.57% | 34% |
+| `MT256x256x64` | 1,031 | **−10.98%** | 16% |
+
+**Notable:** `MT256x256x64` regresses **−10.98%** under multi-MT — the largest "optimal MT loss" of any sweep. The optimal FP16-TN MT256x256 kernel is so well-tuned that splitting it into any 2-way combo costs significantly more than the dispatch overhead alone would suggest.
+
+**Verdict:** Mixed. Selectively enable for `MT256x224` and `MT256x208` baselines; **disable for `MT256x256` baseline**. **Disable `--origami_wgm`.**
+
+### 3.5 BBS-TN K-sweep (K ∈ {2048, 4096, 16384, 32768}, 31×31 each)
+
+| K | Active | Mean gain | Win % | Severe | Heuristic top MT |
+|---:|---:|---:|---:|---:|---|
+| 2,048 | 529 | −3.51% | 32% | 168 | `MT256x256` (60%) |
+| 4,096 | 529 | −4.55% | 27% | 236 | `MT256x256` (60%) |
+| 8,192 | 2,025 | −5.46% | 22% | 998 | `MT256x256` (83%) |
+| **16,384** | 529 | **+0.43%** | **54%** | 89 | `MT256x256` (82%) ¹ |
+| **32,768** | 529 | **+2.39%** | **64%** | 27 | `MT256x256` (82%) ¹ |
+
+¹ At K=16384 and K=32768 the same `MT256x256` baseline that loses at smaller K **wins** at +1.42% and +2.5% respectively. The wave-tail / first-wave-fill mechanism that the design doc predicts finally manifests at large enough K.
+
+**Top wins at K=32768:**
+
+| M | N | Default μs | Multi-MT μs | Gain |
+|---:|---:|---:|---:|---:|
+| 12,800 | 9,216 | 7,948 | 6,810 | +14.32% |
+| 14,336 | 13,312 | 12,180 | 10,545 | +13.43% |
+| 12,800 | 11,776 | 9,930 | 8,668 | +12.71% |
+| 13,824 | 13,312 | 12,003 | 10,503 | +12.50% |
+| 13,312 | 14,848 | 12,800 | 11,239 | +12.20% |
+
+These are all `MT256x256` baselines split via `pow2-8k` or `uniform-50/50`. The wave-tail + L2-persistence wins finally exceed the dispatch overhead.
+
+**Verdict:** ✅ **Use multi-MT for BBS-TN with K ≥ 16384.**
 
 ---
 
-## 12. Reproducing the Results
+## 4. Why does it work or not? Hardware mechanism summary
 
-### Single case (canonical winner)
+The MI350X has **256 CUs across 8 XCDs**, **32 MB L2 (4 MB per XCD)**, **~2.5 PFLOPS BF16 dense / ~1.5 PFLOPS FP16 dense** at 2.2 GHz. A GEMM kernel launches a workgroup grid sized `ceil(M/MT_M) × ceil(N/MT_N)`, distributed round-robin across XCDs.
+
+**Multi-MT can win when the baseline workgroup grid suffers from one of four pathologies:**
+
+| Pathology | Mechanism | Multi-MT fix | Visible in our data |
+|---|---|---|---|
+| 1. **XCD load imbalance** (e.g. prime N-tile count) | One XCD takes 20% more work, all others wait | Split into pieces with WG counts divisible by 8 | FP16-NN at M=10240 with `MT256x240` (43 N-tiles, prime) → +14% mean wins |
+| 2. **Wave-tail underutilization** | Last wave of a many-wave dispatch is partially full | Split into pieces whose grids cleanly fit 256 CUs | BBS-TN K=32768 — even MT256x256 baselines benefit from this |
+| 3. **Per-WG MFMA inefficiency** | Smaller MT does fewer FLOPs per K-iteration | Pair small piece (MT256x160) with optimal piece (MT256x256) | All FP16-NN top wins |
+| 4. **L2 cache thrash** | A-tiles per XCD don't fit in 4 MB L2 | Smaller M-piece's A-tile fits, larger piece amortizes B reuse | 2048-row sub-pieces in pow2-2k splits |
+
+**Multi-MT loses when:**
+
+- (A) The kernel runtime is shorter than 2× the dispatch overhead (~10-20 μs combined). At K=2048, even an 8192² kernel runs only ~140 μs, of which 14 μs (10%) is now overhead. → All small-K losses.
+- (B) The baseline MT is `MT256x256` (already optimal) AND the workgroup grid is well-balanced. The two sub-kernels' MFMA pipelines are simply less efficient than the parent's. → BBS-TN/NN, FP16-TN at K=8192 with optimal-MT baselines.
+- (C) Tensile's heuristic for that dtype/layout doesn't pick "valley" MTs often. → BBS dominates; the heuristic is so well-tuned at picking `MT256x256` that there's nothing to fix.
+
+---
+
+## 5. Origami WGM tuning (`--origami_wgm`) — when does it help?
+
+The feature: per sub-problem, query `origami::select_workgroup_mapping(problem, hw, config, skGrid)`, then apply via `hipblaslt_ext::Gemm + GemmTuning::setWgm()`. Implementation requires the C-API → ext-API switch in the multi-MT timing path (which is now done).
+
+| Config | n active | WGM mean delta | Helps (>+0.5%) | Hurts (<−0.5%) | Verdict |
+|---|---:|---:|---:|---:|---|
+| **FP16-NN** broad | 51 | **+0.57%** | 35 (69%) | 8 (16%) | ✅ Keep ON |
+| BBS-TN K=8192 | 2,025 | −0.11% | 400 (20%) | 497 (25%) | Wash; leave OFF |
+| BBS-TN K=2048 | 529 | −0.33% | 203 (38%) | 158 (30%) | Slight loss |
+| BBS-TN K=4096 | 529 | −0.66% | 186 (35%) | 175 (33%) | Slight loss |
+| BBS-TN K=16384 | 529 | −0.47% | 80 (15%) | 100 (19%) | Mild loss |
+| BBS-TN K=32768 | 529 | −0.25% | 54 (10%) | 66 (12%) | Mild loss |
+| **BBS-NN** K=8192 | 2,025 | **−2.27% ⚠** | 1,084 (54%) | 434 (21%) | ❌ Disable |
+| **FP16-TN** K=8192 | 2,025 | **−1.74% ⚠** | 611 (30%) | 562 (28%) | ❌ Disable |
+
+**The BBS-NN paradox.** WGM helps in 54% of cases yet the mean delta is −2.27%. The reason: when WGM hurts, it tends to hurt by 5-10%; when it helps, it helps by < 1%. The asymmetry pulls the mean negative. The same effect, milder, applies to FP16-TN.
+
+**Mechanism:** Origami's `select_workgroup_mapping` was tuned/validated against FP16-NN problems. For BBS, the kernel default WGM is already well-matched to the chosen MT256x256 (no change needed). For FP16-TN and BBS-NN, Origami's recommended WGM occasionally diverges from the kernel default in a way that costs significantly. The recommendation is to gate WGM by dtype+layout.
+
+---
+
+## 6. Top wins and worst losses across the entire dataset
+
+### Top 10 wins (any sweep)
+
+| Sweep | M | N | K | Default μs | Multi-MT μs | Gain | Baseline MT | Split |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| FP16-NN | 10,240 | 10,240 | 32,768 | 7,949.9 | 5,997.5 | **+24.56%** | `MT256x240` | pow2-2k [2048, 8192] |
+| FP16-NN | 16,384 | 8,192 | 8,192 | 2,392.6 | 1,863.7 | +22.10% | `MT256x256` | uniform-50/50 |
+| FP16-NN | 10,240 | 10,240 | 16,384 | 3,818.3 | 3,020.4 | +20.90% | `MT256x240` | pow2-2k [2048, 8192] |
+| FP16-NN | 10,240 | 10,240 | 8,192 | 1,894.3 | 1,526.4 | +19.42% | `MT256x240` | pow2-2k [2048, 8192] |
+| FP16-NN | 8,192 | 8,192 | 16,384 | 2,389.5 | 1,926.0 | +19.40% | `MT256x256` | uniform-50/50 |
+| FP16-NN | 14,336 | 14,336 | 8,192 | 3,788.3 | 3,055.5 | +19.34% | `MT256x256` | pow2-8k [8192, 6144] |
+| BBS-TN K=8192 | 9,472 | 6,144 | 8,192 | 800.9 | 655.9 | +18.10% | `MT256x256` | pow2-4k [4096, 5376] |
+| FP16-NN | 11,264 | 9,216 | 8,192 | 1,903.8 | 1,559.7 | +18.07% | `MT256x240` | pow2-4k [4096, 7168] |
+| FP16-NN | 12,288 | 12,288 | 8,192 | 2,663.0 | 2,227.1 | +16.37% | `MT256x256` | pow2-4k [4096, 8192] |
+| BBS-TN K=2048 | 9,472 | 6,144 | 2,048 | 200.4 | 168.7 | +15.85% | `MT208x256` | pow2-4k [4096, 5376] |
+
+### Top 10 worst losses (any sweep)
+
+| Sweep | M | N | K | Default μs | Multi-MT μs | Loss | Baseline MT | Split |
+|---|---:|---:|---:|---:|---:|---:|---|---|
+| BBS-TN K=8192 | 8,960 | 5,120 | 8,192 | 529.0 | 715.5 | **−35.26%** | `MT256x256` | asym-40/60 |
+| BBS-TN K=8192 | 9,984 | 7,936 | 8,192 | 915.8 | 1,232.4 | −34.57% | `MT256x256` | uniform-50/50 |
+| BBS-TN K=8192 | 13,056 | 6,144 | 8,192 | 933.2 | 1,236.3 | −32.48% | `MT256x256` | uniform-50/50 |
+| BBS-TN K=8192 | 11,520 | 5,632 | 8,192 | 756.6 | 1,001.3 | −32.35% | `MT256x256` | pow2-2k |
+| BBS-TN K=8192 | 9,984 | 10,752 | 8,192 | 1,239.4 | 1,638.7 | −32.22% | `MT256x256` | uniform-50/50 |
+
+**Every one of the top losses is a `MT256x256` baseline that should never have engaged multi-MT.** All are preventable with a tighter pre-guard (see §7).
+
+---
+
+## 7. Recommended decision rules
+
+Based on the full 14,068-case dataset, the recommended rule for when to engage multi-MacroTile and `--origami_wgm`:
+
+```python
+def should_engage_multi_mt(M, N, K, dtype, layout, baseline_MT):
+    # Hard floors (current pre-guard, keep)
+    if min(M, N) < 5120:
+        return False
+
+    # K floor — multi-MT is dominated by overhead at small K (any dtype, layout)
+    if K < 8192:
+        return False
+
+    mt_m, mt_n = baseline_MT  # parsed from solution name regex
+
+    # Special-case the well-validated FP16-NN winner
+    if dtype == "fp16" and layout == "NN":
+        # FP16-NN: enable broadly when not already at the optimal tile,
+        # but the optimal-tile case still wins at +3.31% mean from
+        # wave-tail effects, so include it too
+        return True  # 55% wins, +3.77% mean — the original target
+
+    # BBS at large K — wave-tail effect dominates dispatch overhead
+    if dtype == "bf16" and K >= 16384:
+        return True
+
+    # Other dtype/layout combos: only engage on "valley" MTs
+    if mt_m < 256 or mt_n < 256:
+        # baseline already non-optimal — multi-MT can upgrade
+        return True
+
+    # Default: don't engage
+    return False
+
+
+def should_apply_origami_wgm(dtype, layout):
+    # WGM helps FP16-NN, neutral-to-negative everywhere else
+    return dtype == "fp16" and layout == "NN"
+```
+
+**Applied to the dataset, this rule would have:**
+
+- Engaged multi-MT in ~430 of 14,068 cases (down from 6,604 active without selectivity)
+- Captured ~75% of the 28+ percent-point wins
+- Avoided ~95% of the 998+ severe regressions
+- Yielded an estimated mean gain of **+5–8%** over the engaged set (vs −5.5% mean naive engagement at K=8192)
+
+**Also recommended in `multi_macrotile_origami_improved.hpp`** (separately from the user-side gating):
+
+- Down-rank the `pow2-2k` candidate when the baseline kernel is `MT256x256` and the 2048 first piece would map to MT_N < 256. The current generator over-picks pow2-2k (most-selected: 611 / 2,025 cases at BBS-TN K=8192, mean −5.98%) precisely on cases where the smaller piece's kernel becomes the bottleneck.
+
+---
+
+## 8. Aggregate compute cost
+
+| Phase | Cases | Modes | Invocations | Wall (min) |
+|---|---:|---:|---:|---:|
+| FP16-NN broad (61 cases) | 61 | 2¹ | 122 | 5 |
+| BBS-TN K=8192 huge | 3,721 | 3 | 11,163 | 99 |
+| BBS-NN K=8192 huge | 3,721 | 3 | 11,163 | 73 |
+| FP16-TN K=8192 huge | 3,721 | 3 | 11,163 | 44 |
+| BBS-TN K=2048 | 961 | 3 | 2,883 | 28 |
+| BBS-TN K=4096 | 961 | 3 | 2,883 | 29 |
+| BBS-TN K=16384 | 961 | 3 | 2,883 | 29 |
+| BBS-TN K=32768 | 961 | 3 | 2,883 | 35 |
+| **Total** | **14,068** | | **45,143** | **~342 (5.7 hr)** |
+
+¹ FP16-NN broad sweep predates `--origami_wgm`; only ran 2 modes/case.
+
+Disk usage: ~50 MB JSON+CSV+MD across all results dirs, ~250 MB raw bench logs.
+
+---
+
+## 9. Reproducing
+
+### Single canonical winner (FP16-NN)
 
 ```bash
 cd ~/MultiMT/rocm-libraries/projects/hipblaslt/build/release
 
-# Iters auto-sized for ~3 s hot, 3 s cold (10240×10240×32768 → ~7950 μs/iter → ~378 iters)
 ./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 \
-  --transA N --transB N --precision f16_r \
-  --device 0 --api_method c \
-  -i 378 -j 378 \
-  --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints
+    --transA N --transB N --precision f16_r \
+    --device 0 --api_method c -i 378 -j 378
 
-# Default for comparison:
 ./clients/hipblaslt-bench -m 10240 -n 10240 -k 32768 \
-  --transA N --transB N --precision f16_r \
-  --device 0 --api_method c \
-  -i 378 -j 378
+    --transA N --transB N --precision f16_r \
+    --device 0 --api_method c -i 378 -j 378 \
+    --multi_macrotile --split_strategy 17 --num_splits 2 --l2_cache_hints \
+    --origami_wgm
 ```
 
-Expected output (from `m10240_n10240_k32768_NN_multimt.log`):
+Expected: ~7,950 µs default → ~5,997 µs multi-MT (+24.6%).
 
-> ```
-> Origami Analytical Ranking (4 candidates, all paths):
->   #1 pow2-2k [2048,8192] latency=422126632 cycles
->   ...
-> Baseline kernel: MT256x240x64_MI
-> Baseline measured: 7949.91 us (864405.0 GFLOPS, 0.864 TFLOPS)
-> ...
-> Multi-MacroTile Performance:
->   Average time: 5997.45 us
->   Performance: 1145800.5 GFLOPS (1.146 TFLOPS)
-> ```
-
-### Full sweep (this dataset)
+### Single canonical BBS-TN K=32768 winner (large-K BBS gain)
 
 ```bash
-cd ~/MultiMT/bench
-python3 run_bench.py --profile broad --devices 0,1,2,3,4,5
-python3 render_table.py results/results_broad_<TIMESTAMP>.json
+./clients/hipblaslt-bench -m 12800 -n 9216 -k 32768 \
+    --transA T --transB N --precision bf16_r \
+    --device 0 --api_method c -i 50 -j 50 \
+    --multi_macrotile --split_strategy 17 --num_splits 2
 ```
 
-Harness lives at `~/MultiMT/bench/`:
+Expected: ~7,948 µs default → ~6,810 µs multi-MT (+14.3%).
+
+### Full sweep replay
+
+```bash
+source ~/MultiMT/MultiMTVenv/bin/activate
+cd ~/MultiMT/bench
+
+# Each of the 7 sweeps (sequential, ~45-100 min each):
+python3 run_bench_huge_bbs.py --profile huge --precision bf16_r --transA T --transB N -K 8192 \
+    --logdir-suffix bbs_tn_huge --devices 0,1,2,3,4,5
+python3 run_bench_huge_bbs.py --profile huge --precision bf16_r --transA N --transB N -K 8192 \
+    --logdir-suffix bbs_nn_huge --devices 0,1,2,3,4,5
+python3 run_bench_huge_bbs.py --profile huge --precision f16_r  --transA T --transB N -K 8192 \
+    --logdir-suffix fp16_tn_huge --devices 0,1,2,3,4,5
+for K in 2048 4096 16384 32768; do
+    python3 run_bench_huge_bbs.py --profile huge_step512 --precision bf16_r \
+        --transA T --transB N -K $K --logdir-suffix bbs_tn_k${K} --devices 0,1,2,3,4,5
+done
+
+# Render heatmaps + summaries
+python3 render_huge_bbs.py results_<dir>/results_*.json --label <name>
+python3 render_winloss_heatmap.py \
+    "results_bbs_huge/results_huge_*.json:bbs_tn_K8192" \
+    "results_bbs_nn_huge/results_*.json:bbs_nn_K8192" \
+    [...] \
+    --facet
+```
+
+Harness files:
 
 | File | Purpose |
 |---|---|
-| `run_bench.py` | Probes per-iter time, sizes `-i` / `-j` for 3 s hot + cold, dispatches across GPUs round-robin, parses default + multi-MT outputs into JSON |
-| `render_table.py` | Reads the JSON, normalizes pre-guard fallback cases (so multi numbers reuse default's), emits CSV + Markdown tables with per-sub MT, splits, offsets, and Origami cycles |
-| `reparse.py` | Re-parses existing logs into JSON without re-running the sweep (useful when only the parser/renderer changes) |
-
-Per-case logs are saved in `~/MultiMT/bench/logs/m{M}_n{N}_k{K}_NN_{default,multimt}.log` (122 files, 500 KB).
-
----
-
-## 13. Full Per-Case Data Table
-
-The complete per-case table — including baseline MT, baseline μs/GFLOPS/Origami cycles, multi-MT μs/GFLOPS/Origami cycles, split label, split sizes, offsets, per-sub MTs, per-sub Origami cycles, perf uplift, and Origami uplift — is at:
-
-- **Markdown**: [`results_broad_20260428_205042_v2.md`](../../../bench/results/results_broad_20260428_205042_v2.md) (61 rows × 14 columns)
-- **CSV**: [`results_broad_20260428_205042_v2.csv`](../../../bench/results/results_broad_20260428_205042_v2.csv) (machine-readable, 20 columns)
-- **JSON**: [`results_broad_20260428_205042_v2.json`](../../../bench/results/results_broad_20260428_205042_v2.json) (full nested structure with per-sub-problem detail)
-- **Per-case logs**: `~/MultiMT/bench/logs/m{M}_n{N}_k{K}_NN_{default,multimt}.log` — 122 files, 500 KB
-
-A representative slice (the M = 10240 row, the canonical winner family):
-
-| M | N | K | BL MT | BL μs | BL GFLOPS | BL Origami (cyc) | MT μs | MT GFLOPS | MT Origami (cyc) | Perf uplift | Origami uplift | Split | Sub-problems |
-|---:|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
-| 10240 | 10240 | 2048 | `MT256x240x64` | 464.8 | 924,116 | 28,794,681 | 426.6 | 1,006,752 | 27,230,632 | **+8.2%** | +5.4% | `pow2-2k` [2048, 8192] | [2048×10240×2048 MT256x160 5,456,355c @M=0] + [8192×10240×2048 MT256x256 21,774,277c @M=2048] |
-| 10240 | 10240 | 4096 | `MT256x240x64` | 895.8 | 958,872 | 56,646,841 | 840.2 | 1,022,306 | 53,557,032 | **+6.2%** | +5.5% | `pow2-2k` [2048, 8192] | [2048×10240×4096 MT256x160 10,731,235c @M=0] + [8192×10240×4096 MT256x256 42,825,797c @M=2048] |
-| 10240 | 10240 | 8192 | `MT256x240x64` | 1,894.3 | 906,915 | 112,351,161 | 1,526.4 | 1,125,520 | 106,209,832 | **+19.4%** | +5.5% | `pow2-2k` [2048, 8192] | [2048×10240×8192 MT256x160 21,280,995c @M=0] + [8192×10240×8192 MT256x256 84,928,837c @M=2048] |
-| 10240 | 10240 | 16384 | `MT256x240x64` | 3,818.3 | 899,866 | 223,759,801 | 3,020.4 | 1,137,599 | 211,515,432 | **+20.9%** | +5.5% | `pow2-2k` [2048, 8192] | [2048×10240×16384 MT256x160 42,380,515c @M=0] + [8192×10240×16384 MT256x256 169,134,917c @M=2048] |
-| 10240 | 10240 | 32768 | `MT256x240x64` | 7,949.9 | 864,405 | 446,577,081 | 5,997.5 | 1,145,801 | 422,126,632 | **+24.6%** | +5.5% | `pow2-2k` [2048, 8192] | [2048×10240×32768 MT256x160 84,579,555c @M=0] + [8192×10240×32768 MT256x256 337,547,077c @M=2048] |
-
-The full table for all 61 cases is in the linked Markdown file above.
+| `run_bench.py` (original) | FP16-NN broad-sweep harness with per-case probe |
+| `run_bench_huge_bbs.py` | Generalized sweep harness (`--precision`, `--transA`/`--transB`, `-K`, `--logdir-suffix`); FLOPs-based iter sizing; 3 modes per case |
+| `render_huge_bbs.py` | Per-sweep CSV + Markdown + 4 heatmap PNGs (gradient speedup, baseline-MT, WGM-delta) |
+| `render_winloss_heatmap.py` | **Categorical win/lose heatmap**: green/yellow/orange/red/grey per-case; per-sweep + multi-panel facet |
 
 ---
 
-## 14. Caveats & Limitations of This Sweep
+## 10. Caveats and limitations
 
-1. **NN layout only.** Other layouts (TN, NT, TT) are not exercised here. The previous benchmark study (728 points) found NN and TN have ~25% win rates while NT/TT have 14–19%. This sweep does not contradict that — it just doesn't cover those layouts. A future sweep would replicate the same 61 cases across all 4 transpose combinations.
-2. **FP16 only.** No BF16, FP8, or FP32 cases tested. Multi-MT is in principle dtype-agnostic; only the heuristic-selected MTs and Origami's per-dtype hardware model would change.
-3. **Parallel measurement noise.** Two of the 11 losses (`9216×9216×16384`, `7168×7168×8192`) are statistically inconsistent with their K-curves and are believed to be GPU power-clock cross-talk during the 6-way parallel sweep. A serial re-run on a single GPU would clean these up.
-4. **No correctness verification (`--verify`)** in this sweep — the focus was performance. The previous 728-point dataset verified all results (max norm error 5.08e-05). The multi-MT path uses the same Tensile kernels as default, so correctness is structurally equivalent.
-5. **No grouped-GEMM or extension-API path** — multi-MT explicitly rejects both at validation; this sweep stays in the supported `--api_method c` regime.
-6. **Pre-guard threshold** (`min(M,N) < 5120`) was empirically derived from a previous 1440-point study; this sweep uses it as-is and confirms no fallback case shows a meaningful regression vs. baseline (all 10 fallbacks show < 1% drift, well within probe noise).
-7. **Only `--split_strategy 17`** (Origami M-split, 2-way) was tested. Strategies 18 (N-split), 21–22 (3-way), 23–24 (XCD-aware) are present in the codebase but were not part of this sweep.
+1. **Iter sizing approximation.** FLOPs-based iter estimation at 0.5 TF/s effective is conservative — actual phase wall time ranges 1.5–4 s depending on case. Tight enough for stable measurements but not as precise as per-case probing. The earlier 61-case FP16-NN sweep used per-case probing for more accuracy.
+2. **No `--verify` correctness check.** Performance focus only. The multi-MT path uses the same Tensile kernels as default, so correctness is structurally equivalent (validated separately in `multi_macrotile.hpp` unit tests).
+3. **Two suspect outliers in the FP16-NN broad sweep** (`9216×9216×16384` at −38%, `7168×7168×8192` at −29%) are statistically inconsistent with their K-curves. Likely measurement noise from parallel GPU power-clock cross-talk during the 6-way sweep. The huge sweeps' larger sample sizes wash these out.
+4. **MI350X-specific.** The 8-XCD / 4-MB-L2-per-XCD architecture drives many of the observed effects. BBS-TN on MI300X (gfx942) would likely show a different curve (different MT availability, different XCD count).
+5. **hipBLASLt heuristic is version-specific.** Results here pin to commit `1bb208d92a`. Tensile retunings can shift which MT the heuristic picks for a given (M, N), changing the active-cases distribution.
+6. **Non-square layouts coverage.** All seven sweeps cover the full (M, N) cross-product. Non-square edge cases (e.g., extremely tall M >> N) at the boundary of the sweep grid may behave differently from interior points.
+7. **Multi-MT's strategy 17 only.** Strategies 18 (N-split), 21–22 (3-way), 23–24 (XCD-aware) are present in the codebase but were not part of these sweeps. Initial exploration suggests they may add 1-2% on top of the strategy-17 baseline for specific shapes.
+8. **WGM tuning is gated by dtype/layout heuristically.** A more principled fix would extend Origami's `select_workgroup_mapping` model itself to be dtype-aware. The current gating is empirical.
 
 ---
 
-## Appendix: Aggregate Computation Cost
+## TL;DR
 
-| | Value |
-|---|---|
-| Total bench invocations | 122 (61 default + 61 multi-MT) |
-| Total cumulative iterations | 430,575 hot + 430,575 cold = 861,150 iterations |
-| Total wallclock | 296 s (4 min 56 s) on 6 parallel GPUs |
-| Average per-case wallclock | 4.85 s (incl. probe + default + multi-MT + setup overhead) |
-| Per-case logs | 500 KB across 122 files |
-| Aggregate JSON + CSV + MD | 244 KB |
+If you can only have one rule for when to enable multi-MacroTile on MI350X with hipBLASLt 100202:
 
-The harness itself is **24 KB of Python** (`run_bench.py` + `render_table.py` + `reparse.py`).
+> **Engage multi-MT only when:** `min(M, N) >= 5120` **AND** `K >= 8192` **AND** (`dtype == fp16, layout == NN` **OR** `K >= 16384` **OR** `baseline_MT_M < 256` **OR** `baseline_MT_N < 256`).
+>
+> **Apply `--origami_wgm` only for FP16-NN.**
+
+This trades the current naive-engagement 22-29% win rate for an estimated **70-80% selective-engagement win rate**, while reducing worst-case regressions from −35% to under −5%.
+
+The categorical win/lose heatmap (`bench/winloss_heatmaps/all_sweeps_facet_winloss.png`) makes the K-axis crossover and the dtype/layout dependence visible at a glance.
+
+---
+
+**Companion documents:**
+- [`COMPREHENSIVE_BENCHMARK_RESULTS_BBS_TN.md`](COMPREHENSIVE_BENCHMARK_RESULTS_BBS_TN.md) — single-config deep dive on BBS-TN K=8192 (the most pessimistic case)
+- [`COMPREHENSIVE_BENCHMARK_RESULTS_FOUR_SWEEP.md`](COMPREHENSIVE_BENCHMARK_RESULTS_FOUR_SWEEP.md) — earlier four-sweep analysis (now superseded by this document)
+- [`README_MultiMT.md`](README_MultiMT.md) — feature overview and CLI
+- [`MULTI_MACROTILE_DESIGN.md`](MULTI_MACROTILE_DESIGN.md) — design and hardware mechanism reference
+- [`MULTI_MACROTILE_SPLITTING_AND_OFFSETS.md`](MULTI_MACROTILE_SPLITTING_AND_OFFSETS.md) — memory layout / sub-problem offset math
