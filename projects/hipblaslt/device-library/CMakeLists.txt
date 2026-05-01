@@ -87,6 +87,45 @@ add_custom_target(tensilelite-device-libraries ALL
     DEPENDS "${output_stamp}"
 )
 
+# Multi-arch install invariants (post-build static audit).
+#
+# Catches regressions of the kpack shard-collision bug class fixed by
+# commit a76afda531 (per-arch fallback rename + idempotent consumer-side
+# filename construction). Walks the just-built tensilelite library
+# directory and verifies the file naming, .dat metadata, and
+# runtime-lookup contract that proves the rename + idempotency hold.
+#
+# Gated on HIPBLASLT_ENABLE_LAZY_LOAD because the bug class only applies
+# to the flat, arch-suffixed lazy layout. Non-lazy installs use per-arch
+# subdirectories that naturally namespace files, so kpack cannot collide.
+#
+# See ../../../shared/tensile/Tensile/Tests/integration/test_install_invariants.py
+# and the spec in the same directory.
+list(LENGTH GPU_TARGETS _hipblaslt_invariants_arch_count)
+if(HIPBLASLT_ENABLE_LAZY_LOAD AND _hipblaslt_invariants_arch_count GREATER 1)
+    set(_hipblaslt_invariants_stamp
+        "${HIPBLASLT_TENSILE_LIBPATH}/.invariants.stamp")
+    set(_hipblaslt_invariants_args
+        --library-dir "${HIPBLASLT_TENSILE_LIBPATH}/library"
+        --flavor tensilelite
+        --check A1 --check A2 --check A3 --check A6 --check A7 --check A8)
+    foreach(_arch IN LISTS GPU_TARGETS)
+        list(APPEND _hipblaslt_invariants_args --arch "${_arch}")
+    endforeach()
+    add_custom_command(
+        OUTPUT "${_hipblaslt_invariants_stamp}"
+        DEPENDS "${output_stamp}"
+        COMMAND ${HIPBLASLT_PYTHON_COMMAND}
+                "${hipblaslt_SOURCE_DIR}/../../shared/tensile/Tensile/Tests/integration/test_install_invariants.py"
+                ${_hipblaslt_invariants_args}
+        COMMAND ${CMAKE_COMMAND} -E touch "${_hipblaslt_invariants_stamp}"
+        COMMENT "Verifying tensilelite multi-arch install invariants"
+        VERBATIM)
+    add_custom_target(hipblaslt_tensile_invariants ALL
+        DEPENDS "${_hipblaslt_invariants_stamp}")
+    add_dependencies(hipblaslt_tensile_invariants tensilelite-device-libraries)
+endif()
+
 if(HIPBLASLT_ENABLE_EXTOPS)
     add_subdirectory(extops)
 endif()
