@@ -66,6 +66,34 @@ auto GetGroupedConvTestCases(miopenDataType_t datatype)
     };
 }
 
+// Mirrors the expanded driver-based verify matrix in
+// WIP/verify_convoclbwdwrw53.sh so the FP32 Hip-vs-Ocl gtest compares
+// exactly the same grouped/non-grouped shapes, including no-reduction
+// runs, reduction tails with different remainders, and exact-multiple
+// reduction sizes.
+auto GetHipVsOclVerifyScriptTestCases(miopenDataType_t datatype)
+{
+    using TestCase = miopen::unit_tests::ConvTestCase;
+
+    return std::vector{
+        // --- non-grouped --------------------------------------------------
+        TestCase{{16, 1, 7, 7}, {1, 1, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{16, 8, 7, 7}, {16, 8, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{16, 8, 14, 14}, {16, 8, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{16, 8, 12, 12}, {16, 8, 5, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{1, 8, 7, 7}, {16, 8, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{16, 8, 7, 7}, {8, 8, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        TestCase{{16, 16, 7, 7}, {16, 16, 3, 3}, {0, 0}, {1, 1}, {1, 1}, datatype},
+        // --- grouped ------------------------------------------------------
+        TestCase{{16, 8, 7, 7}, {16, 2, 3, 3}, {0, 0}, {1, 1}, {1, 1}, 4, datatype},
+        TestCase{{16, 8, 14, 14}, {16, 2, 3, 3}, {0, 0}, {1, 1}, {1, 1}, 4, datatype},
+        TestCase{{16, 8, 12, 12}, {16, 2, 5, 3}, {0, 0}, {1, 1}, {1, 1}, 4, datatype},
+        TestCase{{1, 8, 7, 7}, {16, 2, 3, 3}, {0, 0}, {1, 1}, {1, 1}, 4, datatype},
+        TestCase{{16, 8, 7, 7}, {8, 4, 3, 3}, {0, 0}, {1, 1}, {1, 1}, 2, datatype},
+        TestCase{{16, 16, 7, 7}, {32, 8, 3, 3}, {0, 0}, {1, 1}, {1, 1}, 2, datatype},
+    };
+}
+
 const auto& GetTestParams()
 {
     static const auto params = [] {
@@ -447,12 +475,6 @@ INSTANTIATE_TEST_SUITE_P(Smoke_G1,
                                           testing::Values(miopenConvolutionAlgoDirect),
                                           testing::ValuesIn(GetConvTestCases(miopenBFloat16))));
 
-INSTANTIATE_TEST_SUITE_P(Smoke_G1,
-                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32,
-                         testing::Combine(testing::Values(GetTestParams()),
-                                          testing::Values(miopenConvolutionAlgoDirect),
-                                          testing::ValuesIn(GetConvTestCases(miopenFloat))));
-
 // Grouped (group=2) instantiations exercising the
 // MIOpenGroupConvBwdWrW_LxG_P53{,Hip} kernel path.
 INSTANTIATE_TEST_SUITE_P(Smoke_G2,
@@ -468,8 +490,11 @@ INSTANTIATE_TEST_SUITE_P(
                      testing::Values(miopenConvolutionAlgoDirect),
                      testing::ValuesIn(GetGroupedConvTestCases(miopenBFloat16))));
 
-INSTANTIATE_TEST_SUITE_P(Smoke_G2,
-                         GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32,
-                         testing::Combine(testing::Values(GetTestParams()),
-                                          testing::Values(miopenConvolutionAlgoDirect),
-                                          testing::ValuesIn(GetGroupedConvTestCases(miopenFloat))));
+// FP32 compare coverage mirrors the expanded verify-script shape matrix
+// exactly, rather than using the smaller smoke-only split above.
+INSTANTIATE_TEST_SUITE_P(
+    VerifyScriptShapes,
+    GPU_UnitTestConvSolverOclBwdWrW53_HipVsOcl_FP32,
+    testing::Combine(testing::Values(GetTestParams()),
+                     testing::Values(miopenConvolutionAlgoDirect),
+                     testing::ValuesIn(GetHipVsOclVerifyScriptTestCases(miopenFloat))));
