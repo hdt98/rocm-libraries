@@ -97,6 +97,8 @@ jobs:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "linux"
           AMDGPU_FAMILIES_INPUT: ${{ inputs.linux_amdgpu_families }}
+          USE_PREBUILT_ARTIFACTS: ${{ inputs.linux_use_prebuilt_artifacts }}
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
         run: |
           python .github/scripts/therock_configure_ci.py
 
@@ -106,6 +108,8 @@ jobs:
           PROJECTS: ${{ inputs.projects }}
           PLATFORM: "windows"
           AMDGPU_FAMILIES_INPUT: ${{ inputs.windows_amdgpu_families }}
+          USE_PREBUILT_ARTIFACTS: ${{ inputs.windows_use_prebuilt_artifacts }}
+          ARTIFACT_RUN_ID: ${{ inputs.artifact_run_id }}
         run: |
           python .github/scripts/therock_configure_ci.py
 

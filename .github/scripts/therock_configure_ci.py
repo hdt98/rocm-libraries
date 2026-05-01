@@ -200,8 +200,26 @@ def retrieve_projects(args):
     return project_to_run, test_type
 
 
+def validate_prebuilt_artifacts_config(args):
+    """Validates that artifact_run_id is provided when use_prebuilt_artifacts is enabled."""
+    use_prebuilt = args.get("use_prebuilt_artifacts", "false")
+    artifact_run_id = args.get("artifact_run_id", "")
+    platform = args.get("platform")
+
+    if use_prebuilt == "true" and not artifact_run_id:
+        logging.error(
+            f"Prebuilt artifacts option is enabled for {platform} but artifact_run_id is empty. "
+            "When using prebuilt artifacts, you must provide the artifact_run_id of a previous "
+            "workflow run that contains the build artifacts."
+        )
+        sys.exit(1)
+
+
 def run(args):
     platform = args.get("platform")
+
+    # Validate prebuilt artifacts configuration
+    validate_prebuilt_artifacts_config(args)
 
     # For workflow_dispatch: skip platform if amdgpu_families_input is empty
     if args.get("is_workflow_dispatch"):
@@ -237,6 +255,8 @@ if __name__ == "__main__":
     args["input_projects"] = input_projects
 
     args["amdgpu_families_input"] = os.getenv("AMDGPU_FAMILIES_INPUT", "")
+    args["use_prebuilt_artifacts"] = os.getenv("USE_PREBUILT_ARTIFACTS", "false")
+    args["artifact_run_id"] = os.getenv("ARTIFACT_RUN_ID", "")
 
     args["base_ref"] = os.environ.get("BASE_REF", "HEAD^")
 
