@@ -175,11 +175,13 @@ public:
         HIP_CHECK(rocprim::detail::host_target_arch(stream, arch));
         is_apu = test_utils::is_apu(arch);
 
-        // For APUs, OS will share up to half of system memory.  Assume half
-        // up to the total GPU memory.
-        dev_shared = std::min(dev_limit, host_limit / 2);
-        // The carved memory must be the difference between the total memory and shared.
-        dev_carved = dev_limit - dev_shared;
+        if (is_apu) {
+            // For APUs, OS will share up to half of system memory, not exceeding the
+            // amount of reported device memory.
+            dev_shared = std::min(dev_limit, host_limit / 2);
+            // The carved memory is the difference between the total memory and shared.
+            dev_carved = dev_limit - dev_shared;
+        }
 
 #ifdef MEMCHECK_LOGGING
         std::cout << "MemCheck: device " << toMB(dev_usage) << "/" << toMB(dev_limit)
@@ -296,6 +298,8 @@ private:
             }
             else
             {
+                // The amount we're spilling exceeds the host memory,
+                //  something is likely wrong but we need to handle it cleanly.
                 host_limit_padded = 0;
             }
 
@@ -335,6 +339,9 @@ private:
         if (is_apu)
         {
             size_t host_unshared = host_limit - dev_shared;
+
+            // The spill into shared memory is the amount of memory used that exceeds the host's
+            //  unshared memory.
             size_t spill = 0;
             if (host_usage > host_unshared) spill = host_usage - host_unshared; 
 
@@ -344,6 +351,8 @@ private:
             }
             else
             {
+                // The amount we're spilling exceeds the shared memory,
+                //  something is likely wrong but we need to handle it cleanly.
                 dev_limit_padded = 0;
             }
 
