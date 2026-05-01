@@ -241,7 +241,15 @@ public:
     void ensure_size_bytes(size_t in)
     {
         if(in > size_bytes)
+        {
             size_bytes = in;
+            // Round size up to nearest multiple of 16 bytes, to
+            // ensure that if we satisfy two temp buffer requests
+            // with a single allocation, neither one will be
+            // unexpectedly misaligned.
+            auto remainder = size_bytes % 16;
+            size_bytes += remainder ? 16 - remainder : 0;
+        }
     }
 
     size_t get_size_bytes() const
