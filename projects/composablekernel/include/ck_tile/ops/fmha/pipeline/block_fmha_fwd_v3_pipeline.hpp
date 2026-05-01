@@ -276,6 +276,31 @@ CK_TILE_DEVICE fp32x2_t pk_mul_f32(fp32x2_t lhs, fp32x2_t rhs)
     return result;
 }
 
+CK_TILE_DEVICE bf16x2_t cvt_pk_bf16_f32(float a, float b)
+{
+#if defined(__gfx950__)
+    bf16x2_t result;
+    asm volatile("v_cvt_pk_bf16_f32 %[result], %[a], %[b]"
+                 : [result] "=v"(result)
+                 : [a] "v"(a), [b] "v"(b));
+    return result;
+#else
+    // NaN-free RNE rounding — softmax output is in [0,1], skip expensive NaN check emulation
+    uint32_t result;
+    uint32_t tmp_a, tmp_b;
+    constexpr uint32_t rne_bias = 0x7fffu;
+    asm volatile("v_bfe_u32 %[ta], %[a], 16, 1\n"
+                 "v_bfe_u32 %[tb], %[b], 16, 1\n"
+                 "v_add3_u32 %[a], %[a], %[ta], %[bias]\n"
+                 "v_add3_u32 %[b], %[b], %[tb], %[bias]\n"
+                 "v_perm_b32 %[r], %[b], %[a], %[sel]"
+                 : [r] "=v"(result), [ta] "=&v"(tmp_a), [tb] "=&v"(tmp_b),
+                   [a] "+v"(a), [b] "+v"(b)
+                 : [bias] "s"(rne_bias), [sel] "s"(0x07060302));
+    return bit_cast<bf16x2_t>(result);
+#endif
+}
+
 /// FP8 packed conversion with asm volatile to prevent code sinking.
 /// This anchors the conversion instruction in Phase 0, and all predecessor
 /// instructions (scale, saturate, NaN check) will automatically stay in Phase 0.
@@ -739,7 +764,7 @@ struct BlockFmhaFwdV3Pipeline
                 }
                 else if constexpr(std::is_same_v<PDataType, bf16_t>)
                 {
-                    auto casted                           = ck_tile::cvt_pk_bf16_f32(x, y);
+                    auto casted                           = detail::cvt_pk_bf16_f32(x, y);
                     sp(sp_reg_idx).p.thread_buf_[idx]     = casted.x;
                     sp(sp_reg_idx).p.thread_buf_[idx + 1] = casted.y;
                 }
