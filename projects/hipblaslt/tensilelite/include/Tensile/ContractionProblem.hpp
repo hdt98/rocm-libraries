@@ -39,6 +39,7 @@
 #include <Tensile/TensorOps.hpp>
 #include <Tensile/Utils.hpp>
 
+TENSILE_HIDDEN_BEGIN
 namespace TensileLite
 {
     /**
@@ -180,7 +181,7 @@ namespace TensileLite
         rocisa::DataType dataType;
     };
 
-    class ContractionProblem : public Problem
+    class TENSILE_API ContractionProblem : public Problem
     {
     public:
         ContractionProblem(size_t size, size_t workspaceSize = 0);
@@ -297,7 +298,7 @@ namespace TensileLite
      * summations, etc. This is decoupled from any particular pointers, which
      * are provided in ContractionInputs objects.
      */
-    class ContractionProblemGemm : public ContractionProblem
+    class TENSILE_API ContractionProblemGemm : public ContractionProblem
     {
     public:
         enum TENSOR : int
@@ -331,6 +332,12 @@ namespace TensileLite
             CONST_COUNT
         };
 
+        enum BATCHMODE : int
+        {
+            STRIDED = 0,
+            POINTER_ARRAY = 1,
+            BATCHMODE_COUNT
+        };
         using Solution = ContractionSolution;
         using Inputs   = ContractionInputs;
 
@@ -899,6 +906,16 @@ namespace TensileLite
             return m_stridedBatched;
         }
 
+        void setBatchMode(ContractionProblemGemm::BATCHMODE value)
+        {
+            batch_Mode = value;
+        }
+
+        ContractionProblemGemm::BATCHMODE batchMode() const
+        {
+            return batch_Mode;
+        }
+
         void setGroupedGemm(bool value)
         {
             m_groupedGemm = value;
@@ -1412,6 +1429,7 @@ namespace TensileLite
 
         std::string getOperationIdentifier() const;
         std::string getOperationDescription() const;
+        ContractionProblemGemm::BATCHMODE batch_Mode = ContractionProblemGemm::BATCHMODE::STRIDED;        
     };
 
     class ContractionProblemGroupedGemm : public ContractionProblem
@@ -1543,3 +1561,4 @@ namespace TensileLite
      * @}
      */
 } // namespace TensileLite
+TENSILE_HIDDEN_END
