@@ -959,20 +959,17 @@ void Real3DEvenNode::BuildTree_internal(SchemeTreeVec& child_scheme_trees)
 {
     Build_solution();
 
-    // The solution map's tuned tree may not match the decomposition
-    // Build_solution picks for these strides (e.g. a REAL_2D_SINGLE_SBCC
-    // entry reused with non-unit strides that force INPLACE_SBCC). In
-    // that case drop the tuned tree and fall back to the default build;
-    // ProcessNode's SanityCheck already handles the resulting kernel
-    // mismatch by retrying without solution kernels.
+    // Build_solution here is stride-conditional, but solution-map keys
+    // (min_token) ignore strides, so a tuned tree may not match the
+    // decomposition picked for the current strides (e.g. REAL_2D_SINGLE_SBCC
+    // reused with non-unit strides that force INPLACE_SBCC). Drop the
+    // mismatched tree; SanityCheck retries without solution kernels.
     if(!child_scheme_trees.empty())
     {
         size_t expectedChildren = 0;
         switch(solution)
         {
         case REAL_2D_SINGLE_SBCC:
-            // BuildTree_internal_2D_SINGLE_CC doesn't consume the tuned
-            // tree at all, so any size here is fine to drop.
             expectedChildren = 2;
             break;
         case INPLACE_SBCC:
