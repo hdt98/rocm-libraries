@@ -23,10 +23,12 @@ target_include_directories(hipdnn_heuristic_config PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Link against hipdnn_plugin_sdk (for C ABI types) and hipdnn_data_sdk (for FlatBuffers)
+# Link against hipdnn_plugin_sdk (C ABI types), hipdnn_data_sdk (utilities),
+# and hipdnn_flatbuffers_sdk (graph FlatBuffer schema + FlatBuffers headers).
 target_link_libraries(hipdnn_heuristic_config PRIVATE
     hipdnn_plugin_sdk
     hipdnn_data_sdk
+    hipdnn_flatbuffers_sdk
 )
 
 # Compiler options

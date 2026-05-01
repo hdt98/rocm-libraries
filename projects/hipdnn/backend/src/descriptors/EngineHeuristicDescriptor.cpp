@@ -277,6 +277,26 @@ void EngineHeuristicDescriptor::finalize()
                                     e.what());
             continue;
         }
+        catch(const std::exception& e)
+        {
+            // Plugin code is external and may throw any std-derived exception type.
+            // Treat the same as HipdnnException: log and continue.
+            HIPDNN_BACKEND_LOG_WARN("Heuristic policy at slot {} (ID {}) threw exception: {}. "
+                                    "Continuing to next policy.",
+                                    i,
+                                    _orderedPolicyIds[i],
+                                    e.what());
+            continue;
+        }
+        catch(...)
+        {
+            // Plugin may throw a non-std-derived exception; never let it cross the C ABI.
+            HIPDNN_BACKEND_LOG_WARN("Heuristic policy at slot {} (ID {}) threw unknown exception. "
+                                    "Continuing to next policy.",
+                                    i,
+                                    _orderedPolicyIds[i]);
+            continue;
+        }
     }
 
     // RFC 0007 Section 14.2: If no policy succeeded, throw exception
