@@ -39,7 +39,8 @@ from Tensile.Common import assignParameterWithDefault, IsaInfo, \
                     roundUpToNearestMultiple
 from Tensile.Common.DataType import DataType
 from Tensile.Common.GlobalParameters import defaultSolution, \
-                                            defaultInternalSupportParams
+                                            defaultInternalSupportParams, \
+                                            globalParameters
 from Tensile.Common.ValidParameters import validParameters
 from Tensile.SolutionStructs.Naming import getSolutionNameFull
 from Tensile.SolutionStructs.Problem import ProblemType
@@ -1091,6 +1092,8 @@ class Solution(collections.abc.Mapping):
     rocmVersion: SemanticVersion
   ):
     isa = tuple(state["ISA"])
+
+    state["NumXCDs"] = isaInfoMap[isa].archCaps["NumXCDs"]
 
     if state["MaxLDS"] == -1:
       state["MaxLDS"] = isaInfoMap[isa].archCaps["DeviceLDS"]

@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "helper.hpp"
+#include <origami/hardware.hpp>
 
 inline bool tryAssembler(const IsaVersion&  isaVersion,
                          const std::string& assemblerPath,
@@ -416,6 +417,12 @@ inline std::map<std::string, int> initArchCaps(const IsaVersion& isaVersion)
     if(checkInList(isaVersion, {{9, 0, 8}, {9, 0, 10}}))
         vL1DCacheLineBytes = 64;
     rv["vL1DCacheLineBytes"] = vL1DCacheLineBytes;
+
+    auto origamiArch = origami::hardware_t::arch_name_to_enum(getGfxNameTuple(isaVersion));
+    int numXCDs = 1;
+    if(origamiArch != origami::hardware_t::architecture_t::Count)
+        numXCDs = origami::hardware_t::get_arch_constants(origamiArch).num_xcds;
+    rv["NumXCDs"] = numXCDs;
 
     return rv;
 }
