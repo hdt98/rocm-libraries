@@ -78,9 +78,14 @@ struct rocfft_execution_info_internal
     // get user-specified stream
     hipStream_t get_user_stream(int device) const;
 
-    // map InternalTempBuffers from a plan to actual pointers - this
-    // map is set during rocfft_execute.
-    std::map<InternalTempBuffer*, void*> tempBufferPtrs;
+    // Given a pointer to a plan's conceptual temp buffer, turn that
+    // into a concrete pointer to device memory.  Throws
+    // std::out_of_range if the conceptual buffer is not known and
+    // can't be mapped.
+    void* get_concrete_ptr(const InternalTempBuffer* buf) const
+    {
+        return tempBufferPtrs.at(buf);
+    }
 
 private:
     // Ensure that we have a work buffer of the specified size for
@@ -95,6 +100,10 @@ private:
 
     // gpubufs that we own and allocate during execution
     std::vector<gpubuf> execWorkBuffers;
+
+    // map InternalTempBuffers from a plan to actual pointers - this
+    // map is set during rocfft_execute.
+    std::map<const InternalTempBuffer*, void*> tempBufferPtrs;
 };
 
 #endif

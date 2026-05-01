@@ -337,7 +337,7 @@ public:
         case PTR_USER_OUT:
             return out_buffer[idx];
         case PTR_TEMP:
-            return info.tempBufferPtrs.find(temp_ptr.get())->second;
+            return info.get_concrete_ptr(temp_ptr.get());
         }
     }
 
