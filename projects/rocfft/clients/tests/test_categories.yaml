@@ -27,7 +27,7 @@ test_categories:
       - "comprehensive"
 
   full:
-    description:"Includes all tests including multigpu"
+    description: "Includes all tests including multigpu"
     test_patterns:
       - "*"
     exclude:
