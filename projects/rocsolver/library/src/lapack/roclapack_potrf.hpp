@@ -39,7 +39,104 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-bool constexpr use_syrk = false;
+static bool constexpr use_syrk = false;
+
+template <typename T, typename I, typename Istride, typename UA>
+__global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
+                                                bool const is_restore,
+                                                I const n,
+
+                                                UA A,
+                                                Istride const shiftA,
+                                                I const lda,
+                                                Istride const strideA,
+
+                                                T* const save_A,
+                                                I const batch_count)
+{
+    I const bid_start = blockIdx.z;
+    I const bid_inc = gridDim.z;
+
+    I const j_start = threadIdx.y + blockIdx.y * blockDim.y;
+    I const j_inc = gridDim.y * blockDim.y;
+
+    I const i_start = threadIdx.x + blockIdx.x + blockDim.x;
+    I const i_inc = gridDim.x * blockDim.x;
+
+    auto idx_lower = [=](I const i, I const j) {
+        auto const ipos
+            = ((static_cast<int64_t>(n) * j - static_cast<int64_t>(j) * (j + 1) / 2) + (i - j - 1));
+        return (ipos);
+    };
+
+    auto idx_upper = [=](I const i, I const j) {
+        auto ipos = (static_cast<int64_t>(j) * (j - 1) / 2 + i);
+        return (ipos);
+    };
+
+    auto idx2D = [](auto i, auto j, auto lda) { return (i + j * static_cast<int64_t>(lda)); };
+
+    for(I bid = 0 + bid_start; bid < batch_count; bid += bid_inc)
+    {
+        T* const A_bid = load_ptr_batch<T>(A, bid, shiftA, strideA);
+
+        size_t const size_triangle = size_t(n) * (n - 1) / 2;
+        T* const save_A_bid = save_A + size_triangle * bid;
+
+        for(I j = 0 + j_start; j < n; j += j_inc)
+        {
+            I const row_start = (is_strictly_lower) ? (j + 1) : 0;
+            I const row_end = (is_strictly_lower) ? (n - 1) : (j - 1);
+
+            for(I i = row_start + i_start; i <= row_end; i += i_inc)
+            {
+                auto const ipos = (is_strictly_lower) ? idx_lower(i, j) : idx_upper(i, j);
+                auto const ij = idx2D(i, j, lda);
+
+                if(is_restore)
+                {
+                    A_bid[ij] = save_A_bid[ipos];
+                }
+                else
+                {
+                    save_A_bid[ipos] = A_bid[ij];
+                }
+            } // end for i
+        } // end for j
+    } // end for bid
+}
+
+template <typename T, typename I, typename Istride, typename UA>
+static inline void copy_strictly_triangular(bool const is_strictly_lower,
+                                            bool const is_restore,
+                                            I const n,
+
+                                            UA A,
+                                            Istride const shiftA,
+                                            I const lda,
+                                            Istride const strideA,
+
+                                            T* const save_A,
+                                            I const batch_count)
+{
+    auto ceildiv = [](auto n, auto nx) { return ((n <= 0) ? 0 : (n + nx - 1) / nx); };
+
+    I const nx = 64;
+    I const ny = 4;
+    I const nz = 1;
+
+    I const max_blocks = 64 * 1024 - 3;
+    I const nbz = std::min(max_blocks, batch_count);
+    I const nbx = std::min(max_blocks, ceildiv(n, nx));
+    I const nby = std::min(max_blocks, ceildiv(n, ny));
+
+    copy_strictly_triangular_kernel<T, I, Istride, UA>
+        <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz)>>>(is_strictly_lower, is_restore, n,
+
+                                                    A, shiftA, lda, strideA,
+
+                                                    save_A, batch_count);
+}
 
 // -----------------------------------------------
 // Note that the recursive routine passes in a
@@ -52,7 +149,7 @@ bool constexpr use_syrk = false;
 // TODO: need further fine tuning
 // --------------------------------------------------------
 template <typename T, typename I>
-inline static bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
+static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
 {
     // simple heuristic
     // bool const is_use_recursion = (n >= 1024 );
@@ -300,113 +397,135 @@ void rocsolver_potrf_getMemorySize(const I n,
     {
         return;
     }
+    size_t size_scalars = 0;
+    size_t size_work1 = 0;
+    size_t size_work2 = 0;
+    size_t size_work3 = 0;
+    size_t size_work4 = 0;
+    size_t size_pivots = 0;
+    size_t size_iinfo = 0;
 
     if(use_recursion_potrf)
     {
-        size_t size_work1 = 0;
-        size_t size_work2 = 0;
-        size_t size_work3 = 0;
-        size_t size_work4 = 0;
+        size_t lsize_work1 = 0;
+        size_t lsize_work2 = 0;
+        size_t lsize_work3 = 0;
+        size_t lsize_work4 = 0;
 
         rocsolver_potrf_recursion_getMemorySize<BATCHED, STRIDED, T, I, INFO>(
             n, uplo, batch_count,
 
-            &size_work1, &size_work2, &size_work3, &size_work4, optim_mem);
+            &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
 
-        *p_size_work1 = std::max(*p_size_work1, size_work1);
-        *p_size_work2 = std::max(*p_size_work2, size_work2);
-        *p_size_work3 = std::max(*p_size_work3, size_work3);
-        *p_size_work4 = std::max(*p_size_work4, size_work4);
+        bool const use_gemm = !use_syrk;
+        if(use_gemm)
+        {
+            // ----------------------------------------------------
+            // reuse storage in work1 to
+            // save the strictly lower or upper triangular part in work1
+            // ----------------------------------------------------
+            size_t const size_save_A = sizeof(T) * (size_t(n) * (n - 1) / 2) * batch_count;
+            lsize_work1 += size_save_A;
+        }
+
+        size_work1 = std::max(size_work1, lsize_work1);
+        size_work2 = std::max(size_work2, lsize_work2);
+        size_work3 = std::max(size_work3, lsize_work3);
+        size_work4 = std::max(size_work4, lsize_work4);
+    }
+
+    I const nb = potrf_get_block_size<T>(n);
+    if(n <= POTRF_POTF2_SWITCHSIZE(T))
+    {
+        // requirements for calling a single POTF2
+        size_t lsize_scalars = 0;
+        size_t lsize_work1 = 0;
+        size_t lsize_pivots = 0;
+
+        rocsolver_potf2_getMemorySize<T>(n, batch_count, &lsize_scalars, &lsize_work1, &lsize_pivots);
+
+        size_scalars = std::max(size_scalars, lsize_scalars);
+        size_work1 = std::max(size_work1, lsize_work1);
+        size_pivots = std::max(size_pivots, lsize_pivots);
     }
     else
     {
-        I const nb = potrf_get_block_size<T>(n);
-        if(n <= POTRF_POTF2_SWITCHSIZE(T))
+        I const jb = nb;
+
+        // size to store info about positiveness of each subblock
+        if(use_iinfo)
         {
-            // requirements for calling a single POTF2
-            rocsolver_potf2_getMemorySize<T>(n, batch_count, p_size_scalars, p_size_work1,
-                                             p_size_pivots);
-            *p_size_work2 = 0;
-            *p_size_work3 = 0;
-            *p_size_work4 = 0;
-            *p_size_iinfo = 0;
-            *optim_mem = true;
+            size_t lsize_iinfo = sizeof(INFO) * batch_count;
+            size_iinfo = std::max(size_iinfo, lsize_iinfo);
+        }
+
+        // requirements for calling POTF2 for the subblocks
+        {
+            size_t lsize_scalars = 0;
+            size_t lsize_work1 = 0;
+            size_t lsize_pivots = 0;
+
+            rocsolver_potf2_getMemorySize<T>(jb, batch_count, &lsize_scalars, &lsize_work1,
+                                             &lsize_pivots);
+
+            size_scalars = std::max(size_scalars, lsize_scalars);
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_pivots = std::max(size_pivots, lsize_pivots);
+        }
+
+        // extra requirements for calling TRSM
+        if(uplo == rocblas_fill_upper)
+        {
+            size_t lsize_work1 = 0;
+            size_t lsize_work2 = 0;
+            size_t lsize_work3 = 0;
+            size_t lsize_work4 = 0;
+
+            if(((n - jb) >= 1) && (jb >= 1))
+            {
+                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                    rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+            }
+
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_work2 = std::max(size_work2, lsize_work2);
+            size_work3 = std::max(size_work3, lsize_work3);
+            size_work4 = std::max(size_work4, lsize_work4);
         }
         else
         {
-            I const jb = nb;
+            size_t lsize_work1 = 0;
+            size_t lsize_work2 = 0;
+            size_t lsize_work3 = 0;
+            size_t lsize_work4 = 0;
 
-            size_t size_work1 = 0;
-            size_t size_work2 = 0;
-            size_t size_work3 = 0;
-            size_t size_work4 = 0;
-
-            // size to store info about positiveness of each subblock
-            if(use_iinfo)
+            if(((n - jb) >= 1) && (jb >= 1))
             {
-                *p_size_iinfo = sizeof(INFO) * batch_count;
+                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                    rocblas_side_right, rocblas_operation_conjugate_transpose, n - jb, jb,
+                    batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
             }
 
-            // requirements for calling POTF2 for the subblocks
-            {
-                size_t lsize_work1 = 0;
-
-                rocsolver_potf2_getMemorySize<T>(jb, batch_count, p_size_scalars, &lsize_work1,
-                                                 p_size_pivots);
-
-                size_work1 = std::max(size_work1, lsize_work1);
-            }
-
-            // extra requirements for calling TRSM
-            if(uplo == rocblas_fill_upper)
-            {
-                size_t lsize_work1 = 0;
-                size_t lsize_work2 = 0;
-                size_t lsize_work3 = 0;
-                size_t lsize_work4 = 0;
-
-                if(((n - jb) >= 1) && (jb >= 1))
-                {
-                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                        rocblas_side_left, rocblas_operation_conjugate_transpose, jb, n - jb,
-                        batch_count,
-
-                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
-                }
-
-                size_work1 = std::max(size_work1, lsize_work1);
-                size_work2 = std::max(size_work2, lsize_work2);
-                size_work3 = std::max(size_work3, lsize_work3);
-                size_work4 = std::max(size_work4, lsize_work4);
-            }
-            else
-            {
-                size_t lsize_work1 = 0;
-                size_t lsize_work2 = 0;
-                size_t lsize_work3 = 0;
-                size_t lsize_work4 = 0;
-
-                if(((n - jb) >= 1) && (jb >= 1))
-                {
-                    (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
-                        rocblas_side_right, rocblas_operation_conjugate_transpose, n - jb, jb,
-                        batch_count,
-
-                        &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
-                }
-
-                size_work1 = std::max(size_work1, lsize_work1);
-                size_work2 = std::max(size_work2, lsize_work2);
-                size_work3 = std::max(size_work3, lsize_work3);
-                size_work4 = std::max(size_work4, lsize_work4);
-            }
-
-            *p_size_work1 = std::max(*p_size_work1, size_work1);
-            *p_size_work2 = std::max(*p_size_work2, size_work2);
-            *p_size_work3 = std::max(*p_size_work3, size_work3);
-            *p_size_work4 = std::max(*p_size_work4, size_work4);
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_work2 = std::max(size_work2, lsize_work2);
+            size_work3 = std::max(size_work3, lsize_work3);
+            size_work4 = std::max(size_work4, lsize_work4);
         }
     }
+
+    *p_size_scalars = std::max(*p_size_scalars, size_scalars);
+
+    *p_size_work1 = std::max(*p_size_work1, size_work1);
+    *p_size_work2 = std::max(*p_size_work2, size_work2);
+    *p_size_work3 = std::max(*p_size_work3, size_work3);
+    *p_size_work4 = std::max(*p_size_work4, size_work4);
+
+    *p_size_pivots = std::max(*p_size_pivots, size_pivots);
+    *p_size_iinfo = std::max(*p_size_iinfo, size_iinfo);
 }
 
 // --------------------------------------------------------------
@@ -990,7 +1109,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
                                         INFO* info,
                                         const I batch_count,
                                         T* scalars,
-                                        void* work1,
+                                        void* work1_arg,
                                         void* work2,
                                         void* work3,
                                         void* work4,
@@ -1021,6 +1140,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     }
 
     bool const use_recursion_potrf = use_recursion<T>(uplo, n);
+    void* work1 = work1_arg;
 
     // everything must be executed with scalars on the host
     rocblas_pointer_mode old_mode;
@@ -1030,6 +1150,40 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
     rocblas_status istat = rocblas_status_success;
     if(use_recursion_potrf)
     {
+        T* save_A = nullptr;
+        bool const use_gemm = (!use_syrk);
+        if(use_gemm)
+        {
+            // ------------------------------
+            // get scratch storage from work1
+            // ------------------------------
+            std::byte* pfree = reinterpret_cast<std::byte*>(work1_arg);
+            size_t const size_save_A = sizeof(T) * (size_t(n) * (n - 1) / 2) * batch_count;
+
+            save_A = reinterpret_cast<T*>(pfree);
+            pfree += size_save_A;
+            work1 = reinterpret_cast<void*>(pfree);
+        }
+
+        if(use_gemm)
+        {
+            // ----------------------------------------------------------------
+            // save a copy of the  strictly lower or upper triangular part of A
+            // ----------------------------------------------------------------
+
+            // ---------------------------------------------------------------
+            // if factorizing the upper part, then need to save the lower part
+            // before it is destroyed in the GEMM operation
+            // ---------------------------------------------------------------
+            bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
+            bool const is_restore = false;
+            copy_strictly_triangular(is_copy_strictly_lower, is_restore, n,
+
+                                     A, shiftA, lda, strideA,
+
+                                     save_A, batch_count);
+        }
+
         I const row_offset = 0;
         istat = rocsolver_potrf_recursion_template<BATCHED, STRIDED, T, I, INFO, S, U>(
             handle, uplo, n,
@@ -1039,6 +1193,21 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             info, batch_count,
 
             scalars, work1, work2, work3, work4, optim_mem, row_offset);
+
+        if(use_gemm)
+        {
+            // --------------------------------------------------------------------
+            // restore the copy of the strictly lower or upper triangular part of A
+            // --------------------------------------------------------------------
+            bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
+            bool const is_restore = true;
+
+            copy_strictly_triangular(is_copy_strictly_lower, is_restore, n,
+
+                                     A, shiftA, lda, strideA,
+
+                                     save_A, batch_count);
+        }
     }
     else
     {
