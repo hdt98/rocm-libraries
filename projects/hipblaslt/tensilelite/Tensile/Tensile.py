@@ -113,7 +113,7 @@ def executeStepsInConfig(
             backend_cfg["Config"] = {}
         if not isinstance(backend_cfg["Config"], dict):
             printExit("Invalid backend configuration: 'Config' must be a dictionary.")
-
+       
         with timing_context("python_benchmark_problems"):
             BenchmarkProblems.main(
                 backend_cfg,
@@ -589,7 +589,7 @@ def Tensile(userArgs):
             }]
         }
         config["BenchmarkProblems"] = [[base["ProblemType"], solParams]]
-
+    
     config["UseCache"] = useCache
     globalParameters["ConfigPath"] = configPaths
 
