@@ -1885,6 +1885,180 @@ class _NoDataflowRule:
         return (), ()
 
 
+# =============================================================================
+# SCC sentinel resource (bead mrj.1)
+# =============================================================================
+# SCC is a single-bit hardware status register, written implicitly by most
+# scalar ALU and compare ops and read by SCSelect/SCMov/SCBranchSCC*. To
+# model it as a first-class graph resource we use a module-level singleton
+# RegisterContainer with `regType="scc"` (a fresh regType, distinct from
+# "v"/"s"/"acc"/"m"). This rides on existing register machinery:
+#
+#   * `_is_register` accepts it (has regType + regIdx).
+#   * `_reg_intersection` short-circuits on `regType` mismatch, so SCC
+#     never accidentally aliases vgpr/sgpr.
+#   * For two SCC instances `_reg_intersection` falls into the numeric
+#     branch and looks up `_NUMERIC_REG_FACTORIES["scc"]`, which we
+#     register below as a constant-returning factory (always returns the
+#     singleton — SCC is a single bit, regIdx=0, regNum=1).
+#   * `_byte_keys_for_resource` keys it as `("scc", 0)`, giving the
+#     per-byte latest-writer resolver one slot to track.
+#
+# Lazy initialization avoids a top-level rocisa import (the module's
+# convention; the numeric factories follow the same pattern).
+_SCC_SENTINEL = None
+
+
+def _get_scc_sentinel():
+    """Return the module-level SCC RegisterContainer singleton.
+
+    Constructed by mutating a fresh `vgpr(0)` because the nanobind binding
+    for `RegisterContainer.__init__` requires a non-None `regName: RegName`
+    even though the underlying C++ field is `std::optional<RegName>`. The
+    `vgpr` factory bottoms out in the C++ `std::nullopt` overload and
+    leaves `regName` as None on the Python side; mutating `regType` after
+    construction is safe (the field is `def_rw`).
+    """
+    global _SCC_SENTINEL
+    if _SCC_SENTINEL is None:
+        from rocisa.container import vgpr
+        sentinel = vgpr(0)
+        sentinel.regType = "scc"
+        _SCC_SENTINEL = sentinel
+    return _SCC_SENTINEL
+
+
+# Source of truth for which scalar opcodes touch SCC. Class-name keyed
+# (matches `type(inst).__name__`) -> (reads_scc, writes_scc).
+#
+# Hand-curated from KernelWriterAssembly.py emissions and the rocisa
+# rocisa/include/instruction/{cmp,common,branch}.hpp class definitions.
+# The companion epic doc (`br show rocm-libraries-mrj`) traces these
+# back to the gfxIsa.inc IF_ImplicitReadSCC/IF_ImplicitWriteSCC flags.
+#
+# Three shape categories:
+#   - "no_dst": SCmp* / SCBranchSCC* — no sgpr dst, all register params
+#     are reads (override of _GenericALURule's params[0]=write default).
+#   - "dst_then_srcs": SAdd/SSub/SCSelect/SCMov/SAnd/SOr/etc — write at
+#     params[0], reads in params[1:] (same shape as _GenericALURule, but
+#     this rule gets first dibs so it can attach SCC reads/writes too).
+_SCC_OPCODE_FLAGS = {
+    # writes-only: implicit-write SOPC/SOP2 family.
+    # SOPC compare (no sgpr dst).
+    "SCmpEQU32":   ("no_dst",        False, True),
+    "SCmpEQU64":   ("no_dst",        False, True),
+    "SCmpEQI32":   ("no_dst",        False, True),
+    "SCmpGeU32":   ("no_dst",        False, True),
+    "SCmpGeI32":   ("no_dst",        False, True),
+    "SCmpGtU32":   ("no_dst",        False, True),
+    "SCmpGtI32":   ("no_dst",        False, True),
+    "SCmpLeU32":   ("no_dst",        False, True),
+    "SCmpLeI32":   ("no_dst",        False, True),
+    "SCmpLgU32":   ("no_dst",        False, True),
+    "SCmpLtU32":   ("no_dst",        False, True),
+    "SCmpLtI32":   ("no_dst",        False, True),
+    # SOPK compare (no sgpr dst, K is an immediate baked into the opcode).
+    "SCmpKEQU32":  ("no_dst",        False, True),
+    "SCmpKGeU32":  ("no_dst",        False, True),
+    "SCmpKGtU32":  ("no_dst",        False, True),
+    "SCmpKLGU32":  ("no_dst",        False, True),
+    # SOP2 with sgpr dst, implicit write SCC.
+    "SAddU32":             ("dst_then_srcs", False, True),
+    "SAddI32":             ("dst_then_srcs", False, True),
+    "SSubU32":             ("dst_then_srcs", False, True),
+    "SSubI32":             ("dst_then_srcs", False, True),
+    "SAndB32":             ("dst_then_srcs", False, True),
+    "SAndB64":             ("dst_then_srcs", False, True),
+    "SAndN2B32":           ("dst_then_srcs", False, True),
+    "SOrB32":              ("dst_then_srcs", False, True),
+    "SXorB32":             ("dst_then_srcs", False, True),
+    "SAbsI32":             ("dst_then_srcs", False, True),
+    "SAShiftRightI32":     ("dst_then_srcs", False, True),
+    "SLShiftLeftB32":      ("dst_then_srcs", False, True),
+    "SLShiftLeftB64":      ("dst_then_srcs", False, True),
+    "SLShiftRightB32":     ("dst_then_srcs", False, True),
+    "SLShiftRightB64":     ("dst_then_srcs", False, True),
+    "SLShiftLeft2AddU32":  ("dst_then_srcs", False, True),
+    # read+write: carry/borrow chain ops.
+    "SAddCU32":            ("dst_then_srcs", True,  True),
+    "SSubBU32":            ("dst_then_srcs", True,  True),
+    # SAndSaveExec/SOrSaveExec write SCC (per gfx ISA: condition produced
+    # from the resulting EXEC mask) and consume the implicit EXEC src,
+    # but importantly do NOT read SCC — leave reads_scc=False. Kept here
+    # so they're claimed by _SCCRule for the SCC-write modeling.
+    "SAndSaveExecB32":     ("dst_then_srcs", False, True),
+    "SAndSaveExecB64":     ("dst_then_srcs", False, True),
+    "SOrSaveExecB32":      ("dst_then_srcs", False, True),
+    "SOrSaveExecB64":      ("dst_then_srcs", False, True),
+    # reads-only: SCC consumers.
+    "SCSelectB32":         ("dst_then_srcs", True,  False),
+    "SCMovB32":            ("dst_then_srcs", True,  False),
+    "SCBranchSCC0":        ("no_dst",        True,  False),
+    "SCBranchSCC1":        ("no_dst",        True,  False),
+}
+
+
+class _SCCRule:
+    """Per-opcode SCC read/write publisher (bead mrj.1).
+
+    Placed BEFORE `_GenericALURule` in `_OPERAND_RULES`: claims every
+    SCC-touching scalar opcode (per `_SCC_OPCODE_FLAGS`) and emits its
+    register reads/writes plus the SCC sentinel where appropriate.
+
+    Two extract shapes drive the register-side handling:
+
+      * "dst_then_srcs" — same convention as `_GenericALURule`
+        (params[0]=write, params[1:]=reads). Used for SAdd/SSub/SCSelect/
+        SAndSaveExec/etc.
+
+      * "no_dst" — all register params are reads, no register write.
+        Used for SCmp* (which have `dst=nullptr` in rocisa, so
+        `getParams()` returns just `[src0, src1]`) and SCBranchSCC*
+        (label-only). This avoids the `_GenericALURule` quirk where
+        SCmp's src0 would land at params[0] and be misclassified as a
+        write.
+
+    For SCC itself, the sentinel singleton is appended to reads/writes
+    per `(reads_scc, writes_scc)` — the per-byte latest-writer resolver
+    (Phase 2 of build_dataflow_graph) then naturally emits SCC RAW edges
+    between producers and consumers, and an intervening SCC clobber
+    becomes the new latest writer that breaks the producer's edge to the
+    later consumer.
+
+    This sub-task (mrj.1) ONLY publishes the edges. Failure-shape
+    wiring (turning the missing SCC edge into a typed Failure via
+    `diagnose_missing_edge`) is sub-task mrj.2.
+    """
+
+    def applies(self, inst, category=None):
+        return type(inst).__name__ in _SCC_OPCODE_FLAGS
+
+    def extract(self, inst, category=None):
+        cls = type(inst).__name__
+        shape, reads_scc, writes_scc = _SCC_OPCODE_FLAGS[cls]
+        try:
+            params = list(inst.getParams())
+        except Exception:
+            params = []
+
+        if shape == "no_dst":
+            reg_reads = tuple(p for p in params if _is_register(p))
+            reg_writes = ()
+        else:  # "dst_then_srcs"
+            if params and _is_register(params[0]):
+                reg_writes = (params[0],)
+                reg_reads = tuple(p for p in params[1:] if _is_register(p))
+            else:
+                reg_writes = ()
+                reg_reads = tuple(p for p in params if _is_register(p))
+
+        if reads_scc:
+            reg_reads = reg_reads + (_get_scc_sentinel(),)
+        if writes_scc:
+            reg_writes = reg_writes + (_get_scc_sentinel(),)
+        return reg_reads, reg_writes
+
+
 class _GenericALURule:
     """Catch-all for vgpr/sgpr ALU instructions not absorbed by an earlier
     rule.
@@ -1928,13 +2102,16 @@ class _GenericALURule:
 
     NOT covered here (deliberate scope cut, see downstream beads):
       - VCC carry-out / carry-in (regType=None) — bead wx9.9.
-      - SCC implicit read/write — bead mrj.1 (adds dedicated _SCCRule).
       - VSwap symmetric R+W (both operands read AND written) — bead wx9.8.
-      - SCmp* writing only SCC and no sgpr dst — the generic rule will
-        misclassify src0 as a "write" because it sits at params[0]; that
-        false write is harmless for now (no consumer reads sgpr 50/51 in
-        practice as a comparison-output) but will be cleaned up by
-        mrj.1's per-opcode flag table.
+
+    Cleaned up by `_SCCRule` (mrj.1):
+      - SCC implicit read/write for SOPC/SOP1/SOP2/SOPK/branch ops. The
+        SCC sentinel resource is published in reads/writes per opcode.
+      - SCmp* false-write quirk: SCmp* has no sgpr dst (`dst=nullptr` in
+        rocisa) but `getParams()` skips the absent dst and returns just
+        `[src0, src1]`, so the generic rule would misclassify `src0` as a
+        write at params[0]. `_SCCRule` claims SCmp* opcodes BEFORE the
+        generic rule and treats every register-shaped param as a read.
     """
     def applies(self, inst, category=None):
         # Only real rocisa CommonInstruction-shaped objects expose
@@ -1958,6 +2135,9 @@ class _GenericALURule:
 
 # Order matters: more specific rules first; _GenericALURule is the
 # catch-all and MUST come last so earlier rules claim their classes.
+# `_SCCRule` (mrj.1) sits BEFORE `_GenericALURule` so it claims SCC-touching
+# scalar opcodes and attaches the SCC sentinel to their reads/writes — also
+# fixes the SCmp* false-write quirk noted in `_GenericALURule`'s docstring.
 _OPERAND_RULES = (
     _DSLoadRule(),
     _DSStoreRule(),
@@ -1965,6 +2145,7 @@ _OPERAND_RULES = (
     _BufferLoadRule(),
     _MFMARule(),
     _NoDataflowRule(),
+    _SCCRule(),
     _GenericALURule(),
 )
 
@@ -2070,6 +2251,11 @@ def _ensure_numeric_factories():
         "acc": accvgpr,
         # mgpr's count is fixed at 1 in practice (m0). Wrap for uniform call shape.
         "m": lambda idx, count=1: mgpr(idx),
+        # SCC sentinel (bead mrj.1): single-bit hardware status register,
+        # modeled as a singleton RegisterContainer with regType="scc". The
+        # factory always returns the singleton so equality/hashing across
+        # producer-write and consumer-read containers stays stable.
+        "scc": lambda idx, count=1: _get_scc_sentinel(),
     }
 
 
