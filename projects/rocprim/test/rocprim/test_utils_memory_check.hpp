@@ -121,7 +121,7 @@ inline unsigned long long get_total_system_memory(bool is_apu)
 //
 // Define MEMCHECK_LOGGING at compile time to enable diagnostic output.
 
-#define MEMCHECK_LOGGING
+// #define MEMCHECK_LOGGING
 
 class MemCheck
 {
@@ -289,26 +289,25 @@ private:
         bool success;
         if (is_apu)
         {
+            // The spill into shared memory is the device memory used that exceeds
+            // the device's carved memory.
             size_t spill = 0;
             if (dev_usage > dev_carved) spill = dev_usage - dev_carved;
 
             if (host_limit_padded > spill)
             {
+                // reduce the host limit by the amount of spill into shared memory
                 host_limit_padded -= spill;
             }
             else
             {
-                // The amount we're spilling exceeds the host memory,
+                // The amount we're spilling exceeds the total padded host memory,
                 //  something is likely wrong but we need to handle it cleanly.
                 host_limit_padded = 0;
             }
 
             success = host_usage <= host_limit_padded;
 
-            // Guard dev_usage <= host_limit before subtracting: if dev_usage exceeds host_limit,
-            // the unsigned subtraction wraps around to a large value, causing the check to
-            // silently pass (false success) even when memory is exhausted.
-            //success = dev_usage <= host_limit_padded && host_usage <= (host_limit_padded - dev_usage);
 #ifdef MEMCHECK_LOGGING
             std::cout << "mem_check_host: host=" << toMB(host_usage) << "/" << toMB(host_limit_padded)
                       << " MiB, device=" << toMB(dev_usage) << " MiB, spill=" << toMB(spill)
@@ -347,28 +346,18 @@ private:
 
             if (dev_limit_padded > spill)
             {
+                // reduce the device limit by the amount of spill into shared memory
                 dev_limit_padded -= spill;
             }
             else
             {
-                // The amount we're spilling exceeds the shared memory,
+                // The amount we're spilling exceeds the total device padded memory,
                 //  something is likely wrong but we need to handle it cleanly.
                 dev_limit_padded = 0;
             }
 
             success = dev_usage <= dev_limit_padded;
 
-            // Any memory used in excess of host_limit - dev_limit will spill
-            // into the device's shared memory, reducing the device limit.
-
-            // Both subtractions below are guarded: if dev_limit > host_limit or
-            // spill > dev_limit, the unsigned subtraction would wrap around to a
-            // large value, making the check silently pass when memory is exhausted.
-            //size_t host_unshared_limit = dev_limit <= host_limit ? host_limit - dev_limit : 0UL;
-            //size_t spill = host_usage > host_unshared_limit ?
-            //               host_usage - host_unshared_limit : 0UL;
-
-            //success = spill <= dev_limit_padded && dev_usage <= dev_limit_padded - spill;
 #ifdef MEMCHECK_LOGGING
             std::cout << "mem_check_device: device=" << toMB(dev_usage) << "/" << toMB(dev_limit_padded)
                       << " MiB, host=" << toMB(host_usage) << " MiB, spill=" << toMB(spill)
