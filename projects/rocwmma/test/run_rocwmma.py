@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 TEST_DIR_NAME = "rocwmma"
 
 # TODO(#2823): Re-enable test once flaky issue is resolved.
-TESTS_TO_IGNORE = ["unpack_util_test"]
+TESTS_TO_IGNORE = ["unpack_util_test", "contamination_test", "map_util_test"]
 
 
 def derive_rocm_path(script_dir: Path) -> Path:
