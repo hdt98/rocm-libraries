@@ -307,15 +307,15 @@ protected:
 } // namespace
 
 // ============================================================================
-// Type aliases for the 2 tested solvers (BF16)
+// Type aliases for the 2 tested solvers (BFP16)
 // ============================================================================
 
-using GPU_Deterministic_FwdV4R4Xdlops_BF16 =
+using GPU_Deterministic_FwdV4R4Xdlops_BFP16 =
     GPU_ConvDeterministicImplicitGemm<bfloat16,
                                       Direction::Forward,
                                       miopen::solver::conv::ConvHipImplicitGemmForwardV4R4Xdlops>;
 
-using GPU_Deterministic_WrwV4R4Xdlops_BF16 =
+using GPU_Deterministic_WrwV4R4Xdlops_BFP16 =
     GPU_ConvDeterministicImplicitGemm<bfloat16,
                                       Direction::BackwardWeights,
                                       miopen::solver::conv::ConvHipImplicitGemmWrwV4R4Xdlops>;
@@ -324,16 +324,16 @@ using GPU_Deterministic_WrwV4R4Xdlops_BF16 =
 // Test definitions
 // ============================================================================
 
-TEST_P(GPU_Deterministic_FwdV4R4Xdlops_BF16, DeterministicTest) { this->RunTest(); };
-TEST_P(GPU_Deterministic_WrwV4R4Xdlops_BF16, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_FwdV4R4Xdlops_BFP16, DeterministicTest) { this->RunTest(); };
+TEST_P(GPU_Deterministic_WrwV4R4Xdlops_BFP16, DeterministicTest) { this->RunTest(); };
 
 // Config format: {N, C, K, H, W, y, x, pad_h, pad_w, stride_h, stride_w, dilation_h, dilation_w}
 
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_Deterministic_FwdV4R4Xdlops_BF16,
+                         GPU_Deterministic_FwdV4R4Xdlops_BFP16,
                          testing::Values(DeterministicTestConfig{
                              128, 48, 192, 13, 13, 1, 1, 0, 0, 1, 1, 1, 1}));
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         GPU_Deterministic_WrwV4R4Xdlops_BF16,
+                         GPU_Deterministic_WrwV4R4Xdlops_BFP16,
                          testing::Values(DeterministicTestConfig{
                              1, 192, 16, 28, 28, 1, 1, 0, 0, 1, 1, 1, 1}));
