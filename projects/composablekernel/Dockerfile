@@ -39,7 +39,7 @@ RUN if [ "$compiler_version" = "therock" ]; then \
                 | sort -V | tail -1)" && \
             echo "Found: $TARBALL_URL" ; \
         fi && \
-        wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/rocm.tar.gz "$TARBALL_URL" && \
+        wget -q --tries=3 --retry-connrefused --waitretry=5 --retry-on-http-error=502,503,504 -O /tmp/rocm.tar.gz "$TARBALL_URL" && \
         tar -xzf /tmp/rocm.tar.gz -C /opt/rocm --strip-components=1 && \
         rm /tmp/rocm.tar.gz ; \
     else echo "using the release compiler" && \
@@ -56,7 +56,7 @@ ENV SCCACHE_INSTALL_LOCATION=/usr/local/.cargo/bin
 ENV PATH=$PATH:${SCCACHE_INSTALL_LOCATION}
 RUN set -x && \
     mkdir -p ${SCCACHE_INSTALL_LOCATION} && \
-    wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/sccache.tar.gz \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 --retry-on-http-error=502,503,504 -O /tmp/sccache.tar.gz \
         "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" && \
     tar -xzf /tmp/sccache.tar.gz --strip-components=1 -C ${SCCACHE_INSTALL_LOCATION} && \
     rm /tmp/sccache.tar.gz && \
@@ -98,7 +98,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-
     cd ccache && mkdir build && cd build && cmake .. && make install && \
 #Install ninja build tracing tools
     cd / && \
-    wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/ninja-linux.zip \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 --retry-on-http-error=502,503,504 -O /tmp/ninja-linux.zip \
         "https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip" && \
     unzip -o /tmp/ninja-linux.zip -d /usr/local/bin && \
     rm /tmp/ninja-linux.zip && \
@@ -113,9 +113,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-
     cd cppcheck && mkdir build && cd build && cmake .. && cmake --build . && \
     cd / && \
 # Install an init system
-    wget -q --tries=3 --retry-connrefused --waitretry=5 -O dumb-init.deb \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 --retry-on-http-error=502,503,504 -O /tmp/dumb-init.deb \
         "https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64.deb" && \
-    dpkg -i dumb-init.deb && rm dumb-init.deb && \
+    dpkg -i /tmp/dumb-init.deb && rm /tmp/dumb-init.deb && \
 # Install packages for processing the performance results
     pip3 install --break-system-packages --upgrade pytest pymysql pandas==2.2.3 sqlalchemy==2.0.3 setuptools-rust setuptools sshtunnel==0.4.0 && \
 # Add render group
