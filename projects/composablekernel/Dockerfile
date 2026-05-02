@@ -39,7 +39,7 @@ RUN if [ "$compiler_version" = "therock" ]; then \
                 | sort -V | tail -1)" && \
             echo "Found: $TARBALL_URL" ; \
         fi && \
-        wget -q -O /tmp/rocm.tar.gz "$TARBALL_URL" && \
+        wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/rocm.tar.gz "$TARBALL_URL" && \
         tar -xzf /tmp/rocm.tar.gz -C /opt/rocm --strip-components=1 && \
         rm /tmp/rocm.tar.gz ; \
     else echo "using the release compiler" && \
@@ -56,8 +56,10 @@ ENV SCCACHE_INSTALL_LOCATION=/usr/local/.cargo/bin
 ENV PATH=$PATH:${SCCACHE_INSTALL_LOCATION}
 RUN set -x && \
     mkdir -p ${SCCACHE_INSTALL_LOCATION} && \
-    wget -qO sccache.tar.gz https://github.com/mozilla/sccache/releases/download/v$SCCACHE_VERSION/sccache-v$SCCACHE_VERSION-x86_64-unknown-linux-musl.tar.gz && \
-    tar -xzf sccache.tar.gz --strip-components=1 -C ${SCCACHE_INSTALL_LOCATION} && \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/sccache.tar.gz \
+        "https://github.com/mozilla/sccache/releases/download/v${SCCACHE_VERSION}/sccache-v${SCCACHE_VERSION}-x86_64-unknown-linux-musl.tar.gz" && \
+    tar -xzf /tmp/sccache.tar.gz --strip-components=1 -C ${SCCACHE_INSTALL_LOCATION} && \
+    rm /tmp/sccache.tar.gz && \
     chmod +x ${SCCACHE_INSTALL_LOCATION}/sccache
 
 # Install dependencies
@@ -82,6 +84,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-
     vim \
     nano \
     zlib1g-dev \
+    unzip \
     zip \
     libzstd-dev \
     openssh-server \
@@ -95,8 +98,10 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-
     cd ccache && mkdir build && cd build && cmake .. && make install && \
 #Install ninja build tracing tools
     cd / && \
-    wget -qO /usr/local/bin/ninja.gz https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip && \
-    gunzip /usr/local/bin/ninja.gz && \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 -O /tmp/ninja-linux.zip \
+        "https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip" && \
+    unzip -o /tmp/ninja-linux.zip -d /usr/local/bin && \
+    rm /tmp/ninja-linux.zip && \
     chmod a+x /usr/local/bin/ninja && \
 #Install ClangBuildAnalyzer
     git clone https://github.com/aras-p/ClangBuildAnalyzer.git && \
@@ -108,8 +113,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --allow-
     cd cppcheck && mkdir build && cd build && cmake .. && cmake --build . && \
     cd / && \
 # Install an init system
-    wget https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64.deb && \
-    dpkg -i dumb-init_*.deb && rm dumb-init_*.deb && \
+    wget -q --tries=3 --retry-connrefused --waitretry=5 -O dumb-init.deb \
+        "https://github.com/Yelp/dumb-init/releases/download/v1.2.0/dumb-init_1.2.0_amd64.deb" && \
+    dpkg -i dumb-init.deb && rm dumb-init.deb && \
 # Install packages for processing the performance results
     pip3 install --break-system-packages --upgrade pytest pymysql pandas==2.2.3 sqlalchemy==2.0.3 setuptools-rust setuptools sshtunnel==0.4.0 && \
 # Add render group
