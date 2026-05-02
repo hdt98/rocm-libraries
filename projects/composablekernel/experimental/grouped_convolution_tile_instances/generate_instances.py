@@ -212,7 +212,7 @@ def parse_fwd_instances(instances, problem_name):
         args = parse_instance_string(params_str)
 
         is_v3_instance = instance.find("Xdl_CShuffle_V3") != -1
-        large_tensors = instance.find("Large_Tensor") != -1
+        large_tensors = instance.find("Large") != -1
 
         if is_v3_instance:
             spec = args[14]
@@ -249,7 +249,7 @@ def parse_fwd_instances(instances, problem_name):
             scheduler = "Intrawave"
             pipeline_version = "v1"
             direct_load = 0
-            num_groups_to_merge = 0 if large_tensors else int(args[48])
+            num_groups_to_merge = int(args[48])
 
         double_smem_buffer = pipeline_version == "v4"
         num_wave_groups = 1
@@ -271,9 +271,6 @@ def parse_fwd_instances(instances, problem_name):
         dtype = get_dtype(problem_name)
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
-        if large_tensors:
-            print(f"Skipping instance {instance_id} with large_tensors since it's not supported yet.")
-            continue
         if pipeline_version == "V5":
             print(f"Skipping instance {instance_id} with V5 since it's not supported yet.")
             continue
@@ -498,7 +495,7 @@ def parse_bwd_data_instances(instances, problem_name):
         params_str = instance[start:end]
         args = parse_instance_string(params_str)
 
-        is_v1_instance = instance.find("Xdl_CShuffle<") != -1
+        is_v1_instance = instance.find("Xdl_CShuffle<") != -1 or instance.find("Xdl_CShuffleLarge<") != -1
         
         if is_v1_instance:
             if len(args) != 51:
@@ -528,7 +525,7 @@ def parse_bwd_data_instances(instances, problem_name):
         k1 = min(ak1, bk1)
 
         # TODO: Do we need split image for 3D bwd data convs?
-        large_tensors = False
+        large_tensors = instance.find("Large") != -1
 
         # Default optimization parameters
         num_groups_to_merge = 1

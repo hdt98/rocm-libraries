@@ -84,9 +84,8 @@ struct ConvTileFactory
         GroupedConvTraitsType::FixedGemmParams::Persistent,
         BLOCK_GEMM.num_wave_groups,
         GroupedConvTraitsType::FixedGemmParams::Preshuffle,
-        GroupedConvTraitsType::FixedGemmParams::LDSLoadSize,
-        OPTIMIZATIONS.large_tensors
-        >;
+        GroupedConvTraitsType::FixedGemmParams::LDSVectorSize,
+        OPTIMIZATIONS.large_tensors>;
 
     using UniversalGemmProblem = ck_tile::UniversalGemmPipelineProblem<
         typename Types::ADataType,

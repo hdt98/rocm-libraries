@@ -178,6 +178,34 @@ struct GroupedConvTraits
     using ImplicitGemmDsLayout                    = decltype(generate_implicit_gemm_layout());
 };
 
+/// @brief Checks that no convolution tensor exceeds the 2GB size limit.
+///
+/// @par Overview
+///      Returns false (unsupported) when any tensor exceeds the limit.
+///
+/// @tparam InDataType   Input tensor element type
+/// @tparam WeiDataType  Weight tensor element type
+/// @tparam OutDataType  Output tensor element type
+template <typename InDataType, typename WeiDataType, typename OutDataType, index_t NumElems>
+CK_TILE_HOST bool IsConvTensorSizeSupported(const array<index_t, NumElems>& in_g_n_c_wis_lengths,
+                                            const array<index_t, NumElems>& wei_g_k_c_xs_lengths,
+                                            const array<index_t, NumElems>& out_g_n_k_wos_lengths)
+{
+    constexpr long_index_t TwoGB = (long_index_t{1} << 31);
+    auto tensor_size             = [](const array<index_t, NumElems>& lengths) -> long_index_t {
+        long_index_t n = 1;
+        for(index_t i = 0; i < NumElems; ++i)
+            n *= lengths[i];
+        return n;
+    };
+    return tensor_size(in_g_n_c_wis_lengths) * static_cast<long_index_t>(sizeof(InDataType)) <=
+               TwoGB &&
+           tensor_size(wei_g_k_c_xs_lengths) * static_cast<long_index_t>(sizeof(WeiDataType)) <=
+               TwoGB &&
+           tensor_size(out_g_n_k_wos_lengths) * static_cast<long_index_t>(sizeof(OutDataType)) <=
+               TwoGB;
+}
+
 /// @brief Helper struct for split-image piece information
 ///
 /// @par Overview

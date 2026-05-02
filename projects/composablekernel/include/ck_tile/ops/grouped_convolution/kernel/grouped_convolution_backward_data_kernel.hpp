@@ -559,7 +559,7 @@ struct GroupedConvolutionBackwardDataKernel
 
     [[nodiscard]] CK_TILE_HOST static const std::string GetName()
     {
-        constexpr auto NumGroupsToMerge        = GroupedConvTraitsType_::NumGroupsToMerge;
+        constexpr auto NumGroupsToMerge = GroupedConvTraitsType_::NumGroupsToMerge;
         // clang-format off
         return concat('_', "grouped_convolution_backward_data", 
             gemm_prec_str<OutDataType, WeiDataType>(), 
@@ -759,6 +759,21 @@ struct GroupedConvolutionBackwardDataKernel
     CK_TILE_HOST static bool
     IsSupportedArgument(const GroupedConvBwdDataKernelArgsSpecialized& kargs)
     {
+        if constexpr(!LargeTensors)
+        {
+            if(!IsConvTensorSizeSupported<InDataType, WeiDataType, OutDataType>(
+                   kargs.in_g_n_c_wis_lengths,
+                   kargs.wei_g_k_c_xs_lengths,
+                   kargs.out_g_n_k_wos_lengths))
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("Tensor size exceeds 2GB limit. Use a Large Tensor kernel.");
+                }
+                return false;
+            }
+        }
+
         if constexpr(GemmPipeline_::Async)
         {
             if(get_device_name() != "gfx950")

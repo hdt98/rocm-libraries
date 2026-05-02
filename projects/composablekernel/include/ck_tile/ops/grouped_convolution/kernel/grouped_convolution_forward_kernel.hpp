@@ -447,7 +447,7 @@ template <typename GroupedConvTraitsType_,
           typename EpiloguePipeline_>
 struct GroupedConvolutionForwardKernel
 {
-    static constexpr index_t NDimSpatial   = GroupedConvTraitsType_::NDimSpatial;
+    static constexpr index_t NDimSpatial = GroupedConvTraitsType_::NDimSpatial;
     static constexpr ConvolutionSpecialization ConvSpecialization =
         GroupedConvTraitsType_::ConvSpecialization;
     using TilePartitioner  = remove_cvref_t<TilePartitioner_>;
@@ -632,6 +632,21 @@ struct GroupedConvolutionForwardKernel
 
     CK_TILE_HOST static bool IsSupportedArgument(const GroupedConvFwdKernelArgsSpecialized& kargs)
     {
+        if constexpr(!LargeTensors)
+        {
+            if(!IsConvTensorSizeSupported<InDataType, WeiDataType, OutDataType>(
+                   kargs.in_g_n_c_wis_lengths,
+                   kargs.wei_g_k_c_xs_lengths,
+                   kargs.out_g_n_k_wos_lengths))
+            {
+                if(ck_tile::EnvIsEnabled(CK_TILE_ENV(CK_TILE_LOGGING)))
+                {
+                    CK_TILE_ERROR("Tensor size exceeds 2GB limit. Use a Large Tensor kernel.");
+                }
+                return false;
+            }
+        }
+
         if constexpr(GemmPipeline_::Async)
         {
             if(get_device_name() != "gfx950")
@@ -1167,7 +1182,7 @@ struct GroupedConvolutionForwardKernel
             const index_t block_id = static_cast<index_t>(blockIdX);
             // No spatial offsets needed for regular path
             const InDataType* a_ptr = base_a_ptr;
-            OutDataType* c_ptr = base_c_ptr;
+            OutDataType* c_ptr      = base_c_ptr;
 
             // No split-image: use standard tile partitioning
             const auto [iM, iN] =

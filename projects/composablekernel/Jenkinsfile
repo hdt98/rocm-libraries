@@ -1610,6 +1610,24 @@ pipeline {
                         cleanWs()
                     }
                 }
+                stage("Run Grouped Conv Tile Large Case Tests on gfx90a")
+                {
+                    when {
+                        beforeAgent true
+                        expression { params.RUN_GROUPED_CONV_LARGE_CASES_TESTS.toBoolean() }
+                    }
+                    agent{ label rocmnode("gfx90a")}
+                    environment{
+                        setup_args = "NO_CK_BUILD"
+                        execute_args = """ cmake .. --preset dev-gfx90a -DCK_EXPERIMENTAL_BUILDER=ON && \
+                                           make -j64 test_grouped_convnd_fwd_tile_large_cases test_grouped_convnd_bwd_data_tile_large_cases test_grouped_convnd_bwd_weight_tile_large_cases && \
+                                           ./bin/test_grouped_convnd_fwd_tile_large_cases && ./bin/test_grouped_convnd_bwd_data_tile_large_cases && ./bin/test_grouped_convnd_bwd_weight_tile_large_cases"""
+                    }
+                    steps{
+                        buildHipClangJobAndReboot(setup_args:setup_args, build_type: 'Release', execute_cmd: execute_args)
+                        cleanWs()
+                    }
+                }
             }
         }
         stage("Run Comprehensive Convolution Dataset Tests")
