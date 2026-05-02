@@ -65,6 +65,10 @@ def cloneUpdateRefRepo() {
         def fetchCommand = """
             set -ex
             cd ${refRepoPath}
+            git config gc.autoDetach true
+            # Remove stale gc.log left by a previously killed background gc.
+            # Only delete if older than 2 hours to avoid racing with a gc still in progress.
+            find ${refRepoPath} -name gc.log -mmin +120 -delete 2>/dev/null || true
             git remote prune origin
             git remote update
         """
