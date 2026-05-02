@@ -993,7 +993,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
 
                         if(!is_split_valid)
                         {
-                            split_failed_ = true;
+                            split_valid_ = false;
                         }
 
                         for(const auto& [conv_to_gemm_transform_split,
@@ -1247,7 +1247,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
         index_t gemms_count_ = 0;
         std::vector<std::array<GemmArgs, MaxGroupedGemmGroupsNum>> gemm_kernel_args_;
         bool tensors_splitted_ = false;
-        bool split_failed_     = false;
+        bool split_valid_      = true;
 
         bool bwd_needs_zero_out;
         long_index_t e_space_size_bytes;
@@ -1666,7 +1666,7 @@ struct DeviceGroupedConvBwdDataMultipleD_Xdl_CShuffle_v1
 
     static bool IsSupportedArgument(const Argument& arg)
     {
-        if(arg.split_failed_)
+        if(!arg.split_valid_)
         {
             return false;
         }

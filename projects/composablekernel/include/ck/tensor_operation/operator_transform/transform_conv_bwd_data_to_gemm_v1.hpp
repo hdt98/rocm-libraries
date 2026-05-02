@@ -325,11 +325,11 @@ struct TransformConvBwdDataToGemm_v1
 
         // First output pixel whose receptive field starts at or after Di_/2
         const IndexType do_right_start = math::integer_divide_ceil(
-            (Di_ / 2) + InLeftPadD_ - (Z_ - 1) * ConvDilationD_, ConvStrideD_);
+            math::max(I0, (Di_ / 2) + InLeftPadD_ - (Z_ - 1) * ConvDilationD_), ConvStrideD_);
         const IndexType ho_right_start = math::integer_divide_ceil(
-            (Hi_ / 2) + InLeftPadH_ - (Y_ - 1) * ConvDilationH_, ConvStrideH_);
+            math::max(I0, (Hi_ / 2) + InLeftPadH_ - (Y_ - 1) * ConvDilationH_), ConvStrideH_);
         const IndexType wo_right_start = math::integer_divide_ceil(
-            (Wi_ / 2) + InLeftPadW_ - (X_ - 1) * ConvDilationW_, ConvStrideW_);
+            math::max(I0, (Wi_ / 2) + InLeftPadW_ - (X_ - 1) * ConvDilationW_), ConvStrideW_);
 
         // Count of grad_output pixels that have any receptive field contribution
         // to grad_input pixels in [0, Di_/2), [0, Hi_/2), [0, Wi_/2) respectively.
