@@ -39,7 +39,32 @@
 #include "hipblaslt_test.hpp"
 #include "hipblaslt_vector.hpp"
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
-#include "mxDataGen.hpp"
+#include <mxDataGenerator/mxDataGen.hpp>
+inline DGen::DataFormat toDataFormat(hipDataType t)
+{
+    switch(t)
+    {
+    case HIP_R_4F_E2M1: return DGen::DataFormat::Fp4;
+    case HIP_R_6F_E2M3: return DGen::DataFormat::Fp6E2M3;
+    case HIP_R_6F_E3M2: return DGen::DataFormat::Fp6E3M2;
+    case HIP_R_8F_E4M3: return DGen::DataFormat::Fp8E4M3;
+    case HIP_R_8F_E5M2: return DGen::DataFormat::Fp8E5M2;
+    default:
+        throw std::runtime_error(
+            "toDataFormat: unsupported hipDataType for MX data generation");
+    }
+}
+inline DGen::ScaleType toScaleType(hipDataType t)
+{
+    switch(static_cast<int>(t))
+    {
+    case static_cast<int>(HIP_R_8F_E4M3): return DGen::ScaleType::E4M3;
+    case HIP_R_8F_E5M3_EXT:               return DGen::ScaleType::E5M3;
+    case static_cast<int>(HIP_R_8F_UE8M0):
+    default:
+        return DGen::ScaleType::E8M0;
+    }
+}
 #endif
 #include "near.hpp"
 #include "norm.hpp"
@@ -2529,8 +2554,8 @@ void testing_matmul_with_bias(const Arguments& arg,
             {
                 auto* dataPtr  = reinterpret_cast<uint8_t*>(hA[i].buf()) + b * dataBatchBytesA;
                 auto* scalePtr = reinterpret_cast<uint8_t*>(hScaleA[i].buf()) + b * scaleBatchBytesA;
-                auto batchRef = generateMXInput(TiA,
-                                                scaleDataType(arg.scaleA),
+                auto batchRef = generateMXInput(toDataFormat(TiA),
+                                                toScaleType(scaleDataType(arg.scaleA)),
                                                 dataPtr,
                                                 scalePtr,
                                                 A_row[i],
@@ -2641,8 +2666,8 @@ void testing_matmul_with_bias(const Arguments& arg,
             {
                 auto* dataPtr  = reinterpret_cast<uint8_t*>(hB[i].buf()) + b * dataBatchBytesB;
                 auto* scalePtr = reinterpret_cast<uint8_t*>(hScaleB[i].buf()) + b * scaleBatchBytesB;
-                auto batchRef = generateMXInput(TiB,
-                                                scaleDataType(arg.scaleB),
+                auto batchRef = generateMXInput(toDataFormat(TiB),
+                                                toScaleType(scaleDataType(arg.scaleB)),
                                                 dataPtr,
                                                 scalePtr,
                                                 B_row[i],

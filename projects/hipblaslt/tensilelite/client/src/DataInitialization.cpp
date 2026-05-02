@@ -27,7 +27,7 @@
 #include "DataInitialization.hpp"
 
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
-#include <mxDataGen.hpp>
+#include <mxDataGenerator/mxDataGen.hpp>
 #endif
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
@@ -1834,18 +1834,18 @@ namespace TensileLite
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
         namespace
         {
-            /** Maps Tensile MX scale element type to hipDataType for generateMXInput (mxDataGen). */
-            hipDataType hipMxScaleTypeForDataGenerator(rocisa::DataType mxType)
+            /** Maps Tensile MX scale element type to DGen::ScaleType for generateMXInput. */
+            DGen::ScaleType scaleTypeForDataGenerator(rocisa::DataType mxType)
             {
                 switch(mxType)
                 {
                 case rocisa::DataType::Float8:
-                    return HIP_R_8F_E4M3;
+                    return DGen::ScaleType::E4M3;
                 case rocisa::DataType::E5M3:
-                    return static_cast<hipDataType>(HIP_R_8F_E5M3_EXT);
+                    return DGen::ScaleType::E5M3;
                 case rocisa::DataType::E8:
                 case rocisa::DataType::None:
-                    return HIP_R_8F_UE8M0;
+                    return DGen::ScaleType::E8M0;
                 default:
                     throw std::runtime_error(
                         "initializeMXData: unsupported MX scale element type for generateMXInput");
@@ -1976,8 +1976,8 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8A.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
-                                    hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
+                    generateMXInput(DGen::DataFormat::Fp4,
+                                    scaleTypeForDataGenerator(problem.mxTypeA()),
                                     dataPtr,
                                     scalePtr,
                                     rows,
@@ -2040,8 +2040,8 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8B.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
-                                    hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
+                    generateMXInput(DGen::DataFormat::Fp4,
+                                    scaleTypeForDataGenerator(problem.mxTypeB()),
                                     dataPtr,
                                     scalePtr,
                                     rows,

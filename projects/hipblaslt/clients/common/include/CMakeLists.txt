@@ -21,7 +21,6 @@ target_sources(hipblaslt-clients-common
         "${CMAKE_CURRENT_SOURCE_DIR}/hipblaslt_test.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/host_vector.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/hipBuffer.hpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/mxDataGen.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/near.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/norm.hpp"
         "${CMAKE_CURRENT_SOURCE_DIR}/singletons.hpp"
