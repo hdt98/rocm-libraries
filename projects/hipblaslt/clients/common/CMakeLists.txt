@@ -1,13 +1,25 @@
 # Copyright Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 #
-# Thin INTERFACE wrapper around `roc::mxDataGenerator`.
+# Declares the `hipblaslt::mxdatagen` INTERFACE wrapper around
+# roc::mxDataGenerator. There is no compiled source here any more - the
+# generateMXInput implementation lives in
+# shared/mxdatagenerator/lib/include/mxDataGenerator/mxDataGen.hpp; the
+# adapter helpers (toDataFormat / toScaleType in testing_matmul.hpp,
+# scaleTypeForDataGenerator in DataInitialization.cpp) live next to their
+# consumers.
 #
-# This file is added by the project root via `add_subdirectory(clients/common)`
-# only when:
-#   * HIPBLASLT_ENABLE_MXDATAGENERATOR is ON, and
-#   * at least one consumer subtree is enabled (HIPBLASLT_ENABLE_CLIENT,
-#     TENSILELITE_ENABLE_CLIENT, or TENSILELITE_BUILD_TESTING).
+# This file is added by the project root via add_subdirectory(clients/common)
+# only when HIPBLASLT_ENABLE_MXDATAGENERATOR is ON and at least one consumer
+# subtree (hipblaslt clients, tensilelite client, or tensilelite tests) is
+# being built.
+#
+# Consumers should
+#     target_link_libraries(<tgt> PUBLIC hipblaslt::mxdatagen)
+# (PRIVATE if no further consumer needs the macro). Linking propagates:
+#   * HIPBLASLT_ENABLE_MXDATAGENERATOR
+#   * the link to roc::mxDataGenerator (which carries the
+#     <mxDataGenerator/...> include path).
 if(NOT ROCM_LIBS_SUPERBUILD)
     if(HIPBLASLT_ENABLE_THEROCK)
         find_package(mxDataGenerator REQUIRED)
@@ -30,6 +42,11 @@ target_link_libraries(hipblaslt-mxdatagen
     INTERFACE
         roc::mxDataGenerator
 )
-
-target_compile_features(hipblaslt-mxdatagen INTERFACE cxx_std_20)
-target_compile_definitions(hipblaslt-mxdatagen INTERFACE HIPBLASLT_ENABLE_MXDATAGENERATOR)
+target_compile_features(hipblaslt-mxdatagen
+    INTERFACE
+        cxx_std_20
+  )
+target_compile_definitions(hipblaslt-mxdatagen
+    INTERFACE
+        HIPBLASLT_ENABLE_MXDATAGENERATOR
+)

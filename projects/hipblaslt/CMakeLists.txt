@@ -285,11 +285,13 @@ configure_file(
     "${CMAKE_CURRENT_BINARY_DIR}/library/include/hipblaslt/hipblaslt-version.h"
 )
 
-# `hipblaslt::mxdatagen` lives in clients/common (next to its source), and is
-# only built when at least one consumer needs it. tensilelite/client and
-# tensilelite/tests reach for it on the same condition, so we drive the
-# subdir from here to keep the dependency wiring close to the gate that
-# decides whether to build it at all.
+# `hipblaslt::mxdatagen` is an INTERFACE wrapper around roc::mxDataGenerator
+# (its definitions live in shared/mxdatagenerator). It is declared in
+# clients/common/CMakeLists.txt next to the per-consumer adapter code that
+# converts hipDataType to DGen::DataFormat / DGen::ScaleType. The wrapper
+# only needs to exist when at least one consumer (hipblaslt clients,
+# tensilelite client, or tensilelite tests) is being built, so we skip
+# the whole subdir otherwise to avoid pulling in shared/mxdatagenerator.
 set(_hipblaslt_mxdatagen_enabled FALSE)
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR
         AND (HIPBLASLT_ENABLE_CLIENT

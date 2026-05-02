@@ -31,9 +31,10 @@ target_link_libraries(hipblaslt-clients-common
 
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     # PUBLIC because public headers such as testing_matmul.hpp guard
-    # `<mxDataGen.hpp>` on `HIPBLASLT_ENABLE_MXDATAGENERATOR`, so downstream
-    # targets (hipblaslt-test, hipblaslt-bench, ...) need to see the macro,
-    # the include path, and the C++20 floor all the way through.
+    # `<mxDataGenerator/mxDataGen.hpp>` on `HIPBLASLT_ENABLE_MXDATAGENERATOR`,
+    # so downstream targets (hipblaslt-test, hipblaslt-bench, ...) need to see
+    # the macro, the mxDataGenerator include path, and the C++20 floor all
+    # the way through.
     target_link_libraries(hipblaslt-clients-common PUBLIC hipblaslt::mxdatagen)
 endif()
 

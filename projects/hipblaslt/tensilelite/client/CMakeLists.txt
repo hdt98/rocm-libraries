@@ -34,10 +34,10 @@ if(amd_smi_FOUND)
 endif()
 
 # When mxDataGenerator is enabled, hipblaslt::mxdatagen propagates the
-# HIPBLASLT_ENABLE_MXDATAGENERATOR macro, the C++20 floor, the include path
-# for `<mxDataGen.hpp>`, hipblaslt::headers (so `<hipblaslt/...>` API headers
-# resolve), and the link to roc::mxDataGenerator. PUBLIC so the executables
-# below pick the macro up too.
+# HIPBLASLT_ENABLE_MXDATAGENERATOR macro, the C++20 floor, and the link to
+# roc::mxDataGenerator (which carries the include path for
+# <mxDataGenerator/...>). PUBLIC so the executables below pick the
+# macro up too.
 if(HIPBLASLT_ENABLE_MXDATAGENERATOR)
     target_link_libraries(tensilelite-client-common PUBLIC hipblaslt::mxdatagen)
 endif()
