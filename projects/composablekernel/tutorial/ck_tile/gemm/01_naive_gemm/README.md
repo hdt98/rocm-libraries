@@ -152,17 +152,11 @@ The main program (`practice_gemm.cpp`) is the entry point for the runtime flow:
 ```bash
 # From composable_kernel root directory
 mkdir build && cd build
-sh ../script/cmake-ck-dev.sh ../ <arch>
+../script/cmake-ck-dev.sh ../ <arch>
 make tile_tutorial_naive_gemm -j
 
-# Run with default sizes (M=3328, N=4096, K=4096)
+# Run with sample sizes
 ./bin/tile_tutorial_naive_gemm
-
-# Run with verification enabled
-./bin/tile_tutorial_naive_gemm 1
-
-# Run with custom sizes (verification M N K)
-./bin/tile_tutorial_naive_gemm 1 512 256 64
 ```
 
 This example serves as a foundation for understanding more complex GEMM implementations and optimization strategies in the CK Tile framework.
