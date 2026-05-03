@@ -147,14 +147,6 @@ finalize_test_targets("${PROJECT_NAME}")
 # For standalone builds we need to install the ctest files
 if(NOT ROCM_LIBS_SUPERBUILD)
     install_integration_tests_ctest_files()
-    # Append quick-only gpu_ref entries (with gtest filters and labels) to the
-    # installed CTestTestfile. TheRock CI runs bare ctest (no -L filter), so only
-    # quick tests are installed. Comprehensive tests run locally via ctest -L comprehensive.
-    # The staging file is written in tests/CMakeLists.txt.
-    if(DEFINED GPU_REF_INSTALL_CTEST_STAGING AND EXISTS "${GPU_REF_INSTALL_CTEST_STAGING}")
-        file(READ "${GPU_REF_INSTALL_CTEST_STAGING}" _gpu_ref_entries)
-        file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/CTestTestfile.cmake.install" "${_gpu_ref_entries}")
-    endif()
 endif()
 
 include(CMakePackageConfigHelpers)

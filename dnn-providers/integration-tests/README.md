@@ -38,7 +38,16 @@ Each operation owns its own shape catalog (e.g., convolution uses
 `ConvShapeCatalog.hpp`). New operations should create a similar catalog
 following the same small / medium / largeEdge / largeStress pattern.
 
-New parameterized test suites **must** define all four tiers explicitly:
+**Step 1 — CMake registration.** Register the test binary with
+`add_tiered_test_target()` in `tests/CMakeLists.txt`. This creates
+the four ctest entries, install staging, and RPATH setup automatically:
+
+```cmake
+add_tiered_test_target(hipdnn_my_new_op_tests ${CMAKE_CURRENT_BINARY_DIR})
+```
+
+**Step 2 — C++ test tiers.** New parameterized test suites **must** define
+all four tiers explicitly:
 
 ```cpp
 // Smoke — small shapes for fast smoke testing
