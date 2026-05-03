@@ -125,6 +125,18 @@ struct GemmPipelineAgBgCrImplBase
         store_tile(lds_tile_window, src_block_tile);
     }
 
+    // Returns a tile_window_with_static_distribution whose pre_computed_coords_ are computed
+    // once at construction time, avoiding redundant coord recomputation on each store call.
+    template <typename CopyLdsWindow, typename TileDistribution>
+    CK_TILE_DEVICE static auto MakeCachedLdsStoreWindow(CopyLdsWindow& copy_lds_window,
+                                                        TileDistribution dstr)
+    {
+        return make_tile_window(copy_lds_window.get_bottom_tensor_view(),
+                                copy_lds_window.get_window_lengths(),
+                                copy_lds_window.get_window_origin(),
+                                dstr);
+    }
+
     template <typename DstBlockTile, typename SrcTileWindow, bool LoadTranspose = false>
     CK_TILE_DEVICE void LocalPrefetch(DstBlockTile& dst_block_tile,
                                       const SrcTileWindow& lds_tile_window,
