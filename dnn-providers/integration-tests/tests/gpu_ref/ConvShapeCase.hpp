@@ -3,8 +3,11 @@
 
 #pragma once
 
+#include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
+#include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 
+#include <cassert>
 #include <cstdint>
 #include <ostream>
 #include <string>
@@ -36,8 +39,10 @@ struct ConvShapeCase
     const TensorLayout* layout = nullptr;
 
     // Computes the forward output dimensions (= dy dims for dgrad/wgrad).
+    // Requires rank >= 3 (N, C, and at least one spatial dimension).
     std::vector<int64_t> computeOutputDims() const
     {
+        assert(xDims.size() >= 3 && "ConvShapeCase requires at least 3 dims (N, C, spatial)");
         auto numSpatialDims = xDims.size() - 2;
         std::vector<int64_t> yDims = {xDims[0], wDims[0]};
         for(size_t i = 0; i < numSpatialDims; ++i)
@@ -62,6 +67,18 @@ struct ConvShapeCase
 inline auto byTag()
 {
     return [](const auto& info) { return info.param.tag; };
+}
+
+// Validates that two tensors are element-wise close using the standard allClose validator.
+// Handles NaN/Inf detection, stride-aware indexing, and parallel comparison.
+// Shared across fwd/dgrad/wgrad fixture headers.
+template <typename T>
+void assertAllClose(hipdnn_data_sdk::utilities::TensorBase<T>& expected,
+                    hipdnn_data_sdk::utilities::TensorBase<T>& actual,
+                    float tolerance)
+{
+    auto validator = hipdnn_test_sdk::utilities::CpuFpReferenceValidation<T>(tolerance, 0.0f);
+    ASSERT_TRUE(validator.allClose(expected, actual));
 }
 
 } // namespace gpu_conv_ref_test

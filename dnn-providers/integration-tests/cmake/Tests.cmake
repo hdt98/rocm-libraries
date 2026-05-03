@@ -312,27 +312,33 @@ function(add_tiered_test_target TARGET WORKING_DIR)
     # INSTANTIATE_TEST_SUITE_P with a minimal case rather than removing the guard.
     set(_no_tests_re "Running 0 tests from 0 test suites")
 
-    # Smoke: catch-all exclusion (everything not Standard/Comprehensive/Full)
+    # Smoke: catch-all exclusion (everything not Standard/Comprehensive/Full).
+    # The "unit_test" label is intentional — smoke tests are quick enough to
+    # run in the unit-check target alongside real unit tests.
     add_test(NAME ${TARGET}_quick
-        COMMAND ${TARGET} --gtest_filter=-Standard*:Comprehensive*:Full*)
+        COMMAND ${TARGET} --gtest_filter=-Standard*:Comprehensive*:Full*
+        WORKING_DIRECTORY ${WORKING_DIR})
     set_tests_properties(${TARGET}_quick PROPERTIES
         LABELS "quick;standard;comprehensive;full;unit_test" TIMEOUT ${ARG_SMOKE_TIMEOUT}
         FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_standard
-        COMMAND ${TARGET} --gtest_filter=Standard*)
+        COMMAND ${TARGET} --gtest_filter=Standard*
+        WORKING_DIRECTORY ${WORKING_DIR})
     set_tests_properties(${TARGET}_standard PROPERTIES
         LABELS "standard;comprehensive;full" TIMEOUT ${ARG_STANDARD_TIMEOUT}
         FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_comprehensive
-        COMMAND ${TARGET} --gtest_filter=Comprehensive*)
+        COMMAND ${TARGET} --gtest_filter=Comprehensive*
+        WORKING_DIRECTORY ${WORKING_DIR})
     set_tests_properties(${TARGET}_comprehensive PROPERTIES
         LABELS "comprehensive;full" TIMEOUT ${ARG_COMPREHENSIVE_TIMEOUT}
         FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_full
-        COMMAND ${TARGET} --gtest_filter=Full*)
+        COMMAND ${TARGET} --gtest_filter=Full*
+        WORKING_DIRECTORY ${WORKING_DIR})
     set_tests_properties(${TARGET}_full PROPERTIES
         LABELS "full" TIMEOUT ${ARG_FULL_TIMEOUT}
         FAIL_REGULAR_EXPRESSION "${_no_tests_re}")

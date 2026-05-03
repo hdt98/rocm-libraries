@@ -10,7 +10,6 @@
 
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceConvolution.hpp>
-#include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 
@@ -35,15 +34,8 @@ using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_gpu_ref;
 
 using gpu_conv_ref_test::ConvShapeCase;
+using gpu_conv_ref_test::assertAllClose;
 using ConvBwdShapeCase = ConvShapeCase;
-
-// Validates that two tensors are element-wise close using the standard allClose validator.
-template <typename T>
-void assertAllClose(TensorBase<T>& expected, TensorBase<T>& actual, float tolerance)
-{
-    auto validator = CpuFpReferenceValidation<T>(tolerance, 0.0f);
-    ASSERT_TRUE(validator.allClose(expected, actual));
-}
 
 // Core helper: fills tensors, runs GPU and CPU dgrad, compares results.
 template <typename DxDataType, typename WDataType, typename DyDataType, typename ComputeDataType>
@@ -141,7 +133,7 @@ using TestGpuConvBwdRefShapesFp16 = ConvBwdShapeSuite<half>;
 using TestGpuConvBwdRefShapesBfp16 = ConvBwdShapeSuite<bfloat16>;
 
 // One-liner subclasses — each creates a distinct GTest-visible type so that
-// INSTANTIATE_TEST_SUITE_P can use clean tier-only prefixes (Smoke, Medium, Full)
+// INSTANTIATE_TEST_SUITE_P can use clean tier-only prefixes (Smoke, Standard, Comprehensive, Full)
 // while the suite name itself carries dimensionality and layout information.
 
 // Default layout (NCL / NCHW / NCDHW)

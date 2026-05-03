@@ -20,7 +20,6 @@
 //                                              asymmetric filters, prime K)
 // getLargeStress*()       → Full            → Real-workload shapes (ResNeXt,
 //                                              DeepSpeech, large stem)
-// getLarge*ConvCases()    → (union)         → Edge + stress combined
 //
 // Organization: Small (1D, 2D, 3D) → Medium (1D, 2D, 3D) → Large (1D, 2D, 3D)
 //
@@ -139,7 +138,7 @@ inline std::vector<ConvShapeCase> getSmall3dConvCases()
 }
 
 // ============================================================================
-// Medium shapes — slow binary (nightly)
+// Medium shapes — Standard tier (PR gate)
 // ============================================================================
 
 // Medium 1D shapes [fwd, wgrad] — dgrad uses getMedium1dDgradCases() instead
@@ -198,8 +197,8 @@ inline std::vector<ConvShapeCase> getMedium2dConvCases()
         {{8, 128, 28, 28}, {128, 16, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 8, "Grouped8MidRes"},
         // Bottleneck 1x1 channel expansion
         {{2, 256, 14, 14}, {256, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "Bottleneck1x1Expand"},
-        // Small depthwise (4 channels)
-        {{4, 4, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 4, "Depthwise4Chan"},
+        // 4-group convolution (C=4, K=16, C/G=1 per group, but K/G=4 output channels per group)
+        {{4, 4, 48, 48}, {16, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 4, "Grouped4Chan"},
         // Odd channel count grouped (7 groups)
         {{8, 7, 14, 14}, {63, 1, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 7, "OddChanGrouped7"},
         // Dilation=2 at medium scale
@@ -257,7 +256,6 @@ inline std::vector<ConvShapeCase> getMedium3dConvCases()
 // Stress tests: real-workload shapes (ResNeXt, DeepSpeech, WaveNet, medical
 //               imaging) — genuinely expensive to run.
 //
-// getLarge*() returns the union of both subsets for convenience.
 // ============================================================================
 
 // Large 1D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
@@ -288,15 +286,6 @@ inline std::vector<ConvShapeCase> getLargeStress1dConvCases()
         // Large dilation on long sequence
         {{4, 16, 2048}, {32, 16, 3}, {1}, {4}, {4}, 1, "Dilation4Long1d"},
     };
-}
-
-// All large 1D shapes (edge + stress)
-inline std::vector<ConvShapeCase> getLarge1dConvCases()
-{
-    auto all = getLargeEdge1dConvCases();
-    auto stress = getLargeStress1dConvCases();
-    all.insert(all.end(), stress.begin(), stress.end());
-    return all;
 }
 
 // Large 2D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
@@ -339,15 +328,6 @@ inline std::vector<ConvShapeCase> getLargeStress2dConvCases()
         // DeepSpeech-like non-square spatial (161x700)
         {{4, 4, 161, 700}, {32, 1, 5, 20}, {2, 2}, {1, 1}, {0, 0}, 4, "DeepSpeechNonSquare"},
     };
-}
-
-// All large 2D shapes (edge + stress)
-inline std::vector<ConvShapeCase> getLarge2dConvCases()
-{
-    auto all = getLargeEdge2dConvCases();
-    auto stress = getLargeStress2dConvCases();
-    all.insert(all.end(), stress.begin(), stress.end());
-    return all;
 }
 
 // Large 3D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
@@ -421,15 +401,6 @@ inline std::vector<ConvShapeCase> getLargeStress3dConvCases()
          1,
          "VideoTemporal"},
     };
-}
-
-// All large 3D shapes (edge + stress)
-inline std::vector<ConvShapeCase> getLarge3dConvCases()
-{
-    auto all = getLargeEdge3dConvCases();
-    auto stress = getLargeStress3dConvCases();
-    all.insert(all.end(), stress.begin(), stress.end());
-    return all;
 }
 
 } // namespace gpu_conv_ref_test
