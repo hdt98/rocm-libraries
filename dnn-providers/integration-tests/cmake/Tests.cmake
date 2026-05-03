@@ -305,26 +305,36 @@ function(add_tiered_test_target TARGET WORKING_DIR)
     install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
     # -- Four ctest entries with cumulative labels --
+    # Every entry uses FAIL_REGULAR_EXPRESSION to catch the case where someone
+    # registers a tiered target but forgets to define INSTANTIATE_TEST_SUITE_P
+    # for one or more tiers.  GTest prints "Running 0 tests from 0 test suites"
+    # and exits 0 — this makes ctest fail loudly instead of silently passing.
+    set(_no_tests_re "Running 0 tests from 0 test suites")
+
     # Smoke: catch-all exclusion (everything not Standard/Comprehensive/Full)
     add_test(NAME ${TARGET}_quick
         COMMAND ${TARGET} --gtest_filter=-Standard*:Comprehensive*:Full*)
     set_tests_properties(${TARGET}_quick PROPERTIES
-        LABELS "quick;standard;comprehensive;full;unit_test" TIMEOUT ${ARG_SMOKE_TIMEOUT})
+        LABELS "quick;standard;comprehensive;full;unit_test" TIMEOUT ${ARG_SMOKE_TIMEOUT}
+        FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_standard
         COMMAND ${TARGET} --gtest_filter=Standard*)
     set_tests_properties(${TARGET}_standard PROPERTIES
-        LABELS "standard;comprehensive;full" TIMEOUT ${ARG_STANDARD_TIMEOUT})
+        LABELS "standard;comprehensive;full" TIMEOUT ${ARG_STANDARD_TIMEOUT}
+        FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_comprehensive
         COMMAND ${TARGET} --gtest_filter=Comprehensive*)
     set_tests_properties(${TARGET}_comprehensive PROPERTIES
-        LABELS "comprehensive;full" TIMEOUT ${ARG_COMPREHENSIVE_TIMEOUT})
+        LABELS "comprehensive;full" TIMEOUT ${ARG_COMPREHENSIVE_TIMEOUT}
+        FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     add_test(NAME ${TARGET}_full
         COMMAND ${TARGET} --gtest_filter=Full*)
     set_tests_properties(${TARGET}_full PROPERTIES
-        LABELS "full" TIMEOUT ${ARG_FULL_TIMEOUT})
+        LABELS "full" TIMEOUT ${ARG_FULL_TIMEOUT}
+        FAIL_REGULAR_EXPRESSION "${_no_tests_re}")
 
     # -- Install staging: smoke only --
     # Accumulated in a global property so install_integration_tests_ctest_files()
