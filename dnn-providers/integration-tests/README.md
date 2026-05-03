@@ -77,17 +77,10 @@ INSTANTIATE_TEST_SUITE_P(Full,
 
 ### Adding a new convolution shape
 
-Convolution shapes live in `ConvShapeCatalog.hpp`. Add to the appropriate
-function — the existing `INSTANTIATE_TEST_SUITE_P` calls pick it up
-automatically for forward, dgrad, and wgrad.
-
-| Function family | Tier | Purpose |
-|----------------|------|---------|
-| `getSmall*ConvCases()` | Smoke | Minimal shapes, fast |
-| `getMedium*ConvCases()` | Standard | Moderate shapes, PR-level coverage |
-| `getLargeEdge*ConvCases()` | Comprehensive | Corner cases (odd channels, asymmetric filters, prime K) |
-| `getLargeStress*ConvCases()` | Full | Real-workload shapes (ResNeXt, DeepSpeech, large stem) |
-| `getLarge*ConvCases()` | *(union)* | Returns edge + stress combined (backward compat) |
+Add to the appropriate function in
+`tests/gpu_ref/ConvShapeCatalog.hpp` — the function-to-tier mapping is
+documented in its file header. The existing `INSTANTIATE_TEST_SUITE_P`
+calls pick up new shapes automatically for forward, dgrad, and wgrad.
 
 ## Running Tests
 

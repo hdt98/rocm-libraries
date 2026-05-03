@@ -10,6 +10,17 @@
 // ============================================================================
 // Shape Catalog — centralized convolution shapes shared across all directions
 // (forward, dgrad, wgrad). Adding a new shape = editing this one file.
+// The existing INSTANTIATE_TEST_SUITE_P calls pick it up automatically.
+//
+// Function family         → Tier            → Purpose
+// ──────────────────────────────────────────────────────────────────────
+// getSmall*ConvCases()    → Smoke           → Minimal shapes, fast
+// getMedium*ConvCases()   → Standard        → Moderate shapes, PR-level
+// getLargeEdge*ConvCases()→ Comprehensive   → Corner cases (odd channels,
+//                                              asymmetric filters, prime K)
+// getLargeStress*()       → Full            → Real-workload shapes (ResNeXt,
+//                                              DeepSpeech, large stem)
+// getLarge*ConvCases()    → (union)         → Edge + stress combined
 //
 // Organization: Small (1D, 2D, 3D) → Medium (1D, 2D, 3D) → Large (1D, 2D, 3D)
 //
