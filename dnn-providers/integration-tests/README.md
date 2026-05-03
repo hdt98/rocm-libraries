@@ -1,95 +1,112 @@
 # Integration Tests
 
 Shared integration tests for hipDNN provider implementations.
-Providers are expected to follow the same prefix convention so that a single
-`GTEST_FILTER` value works across the superbuild and all sub-projects.
 
 ## Test Tiers
 
-Tests are categorized by how long they take to run. Only slow tests need
-explicit prefixes — everything else runs by default.
+Tests use four tiers, controlled by the first argument of
+`INSTANTIATE_TEST_SUITE_P`. The quick ctest entry uses an **exclusion filter**
+(`-Standard*:Comprehensive*:Full*`), so standalone `TEST()` / `TEST_F()` /
+`TYPED_TEST()` suites run in quick by default — no prefix needed.
 
-| Tier | GTest prefix | What it covers | CI cadence |
-|------|-------------|----------------|------------|
-| Quick | *(default)* | Smoke shapes, standalone tests, TYPED_TESTs | Every PR |
-| Comprehensive | `Medium` | Medium shapes | Nightly |
-| Full | `Full` | Large shapes | Weekly |
+| Tier | GTest prefix | Shape catalog | CI cadence |
+|------|-------------|---------------|------------|
+| Quick | `Smoke` *(or no prefix)* | `getSmall*()` | Every commit / PR |
+| Standard | `Standard` | `getMedium*()` | PR gate |
+| Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly |
+| Full | `Full` | `getLargeStress*()` | Weekly |
 
-**Design principle: opt-in to slow, everything else runs by default.**
-The quick tier uses an exclusion filter (`-Medium*:-Full*`) instead of a
-positive match. This means any test — `TEST()`, `TEST_F()`, `TYPED_TEST()`,
-or `INSTANTIATE_TEST_SUITE_P` with a non-slow prefix — automatically runs
-in quick without needing a specific naming convention. No test is silently
-dropped.
+**Cumulative labels** — each higher tier includes all lower tiers:
 
-**Only two prefixes to learn:** `Medium` and `Full`. The `Smoke` prefix is
-used in `INSTANTIATE_TEST_SUITE_P` for readability (marks quick parameterized
-tests) but the ctest filter does not depend on it.
+```
+ctest -L quick           # quick only
+ctest -L standard        # quick + standard
+ctest -L comprehensive   # quick + standard + comprehensive
+ctest -L full            # everything
+```
 
-**Current CI reality:** TheRock CI already runs with `GTEST_FILTER=-Full*`
-via `test_miopenprovider.py`. The tier system adds finer granularity on top
-of that existing split.
+### Adding a new operation
 
-### How to assign a tier
-
-For parameterized tests, set the first argument of `INSTANTIATE_TEST_SUITE_P`:
+New parameterized test suites **must** define all four tiers explicitly:
 
 ```cpp
-// Quick — use Smoke (or any prefix that isn't Medium/Full)
+// Quick — small shapes for fast smoke testing
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         TestGpuConvFwdRef2dFp32,
-                         ::testing::ValuesIn(getSmall2dConvCases()),
+                         MyNewOpTestFp32,
+                         ::testing::ValuesIn(getSmall2dCases()),
                          byTag());
 
-// Comprehensive — use Medium
-INSTANTIATE_TEST_SUITE_P(Medium,
-                         TestGpuConvFwdRef2dFp32,
-                         ::testing::ValuesIn(getMedium2dConvCases()),
+// Standard — medium shapes for PR validation
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         MyNewOpTestFp32,
+                         ::testing::ValuesIn(getMedium2dCases()),
                          byTag());
 
-// Full — use Full
+// Comprehensive — large edge-case shapes for nightly
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         MyNewOpTestFp32,
+                         ::testing::ValuesIn(getLargeEdge2dCases()),
+                         byTag());
+
+// Full — large stress-test shapes for weekly
 INSTANTIATE_TEST_SUITE_P(Full,
-                         TestGpuConvFwdRef2dFp32,
-                         ::testing::ValuesIn(getLarge2dConvCases()),
+                         MyNewOpTestFp32,
+                         ::testing::ValuesIn(getLargeStress2dCases()),
                          byTag());
 ```
 
-Standalone `TEST()` / `TEST_F()` / `TYPED_TEST()` suites are quick by default.
-No prefix or annotation needed.
-
 ### Adding a new shape
 
-Add it to the appropriate function in `ConvShapeCatalog.hpp`
-(e.g. `getSmall2dConvCases()` for smoke, `getLarge2dConvCases()` for full).
-The existing `INSTANTIATE_TEST_SUITE_P` picks it up — no other changes needed.
+Add shapes to the appropriate function in `ConvShapeCatalog.hpp`:
+
+| Function family | Tier | Purpose |
+|----------------|------|---------|
+| `getSmall*()` | Quick | Minimal shapes, fast |
+| `getMedium*()` | Standard | Moderate shapes, PR-level coverage |
+| `getLargeEdge*()` | Comprehensive | Corner cases (odd channels, asymmetric filters, prime K) |
+| `getLargeStress*()` | Full | Real-workload shapes (ResNeXt, DeepSpeech, large stem) |
+| `getLarge*()` | *(union)* | Returns edge + stress combined (backward compat) |
+
+The existing `INSTANTIATE_TEST_SUITE_P` calls pick up new shapes automatically.
 
 ## Running Tests
 
-### Build & run
+### Via ctest (recommended)
 
-| Command | What runs | Use case |
-|---------|-----------|----------|
-| `ninja unit-check` | Quick tier (smoke + standalone) | Fast developer iteration |
-| `ninja check` | All tiers | Full validation |
-| `ctest -L quick` | Quick tier | Pre-commit / PR |
-| `ctest -L comprehensive` | Quick + medium | Nightly |
-| `ctest -L full` | All tiers | Weekly |
+| Command | What runs |
+|---------|-----------|
+| `ctest -L quick` | Quick tier (smoke + standalone) |
+| `ctest -L standard` | Quick + standard |
+| `ctest -L comprehensive` | Quick + standard + comprehensive |
+| `ctest -L full` | All tiers |
+
+### Via ninja targets
+
+| Command | What runs |
+|---------|-----------|
+| `ninja unit-check` | Quick tier |
+| `ninja check` | All tiers |
 
 ### Direct binary invocation
 
 ```bash
-# Quick tier (everything except medium/full)
-./bin/hipdnn_gpu_ref_tests --gtest_filter="-Medium*:-Full*"
+# Quick tier (everything except standard/comprehensive/full)
+./bin/hipdnn_gpu_ref_tests --gtest_filter="-Standard*:Comprehensive*:Full*"
 
-# Smoke shapes only
+# Specific tier only
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Smoke*"
-
-# Medium shapes only
-./bin/hipdnn_gpu_ref_tests --gtest_filter="Medium*"
-
-# Full shapes only
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Standard*"
+./bin/hipdnn_gpu_ref_tests --gtest_filter="Comprehensive*"
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="Full*"
 
 # Run everything
 ./bin/hipdnn_gpu_ref_tests
 ```
+
+### GTest filter syntax note
+
+The quick exclusion filter uses `-Standard*:Comprehensive*:Full*` (single
+leading dash). In GTest, only the **first** `-` starts the negative section;
+all colon-separated patterns after it are excluded. Using `:-` between
+patterns (e.g., `:-Comprehensive*`) does **not** negate — the dash becomes a
+literal character in the pattern name.
