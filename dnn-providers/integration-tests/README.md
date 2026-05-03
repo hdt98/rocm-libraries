@@ -6,7 +6,7 @@ Shared integration tests for hipDNN provider implementations.
 
 | Tier | GTest prefix | Shape catalog | CI cadence | Timeout |
 |------|-------------|---------------|------------|---------|
-| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR | 600s (10 min) |
+| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` + standalone tests | Every commit / PR | 600s (10 min) |
 | Standard | `Standard` | `getMedium*()` | PR gate | 1800s (30 min) |
 | Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly | 3600s (60 min) |
 | Full | `Full` | `getLargeStress*()` | Weekly | 7200s (120 min) |
