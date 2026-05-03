@@ -4,12 +4,16 @@ Shared integration tests for hipDNN provider implementations.
 
 ## Test Tiers
 
-| Tier | GTest prefix | Shape catalog | CI cadence |
-|------|-------------|---------------|------------|
-| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR |
-| Standard | `Standard` | `getMedium*()` | PR gate |
-| Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly |
-| Full | `Full` | `getLargeStress*()` | Weekly |
+| Tier | GTest prefix | Shape catalog | CI cadence | Timeout |
+|------|-------------|---------------|------------|---------|
+| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR | 600s |
+| Standard | `Standard` | `getMedium*()` | PR gate | 1800s |
+| Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly | 3600s |
+| Full | `Full` | `getLargeStress*()` | Weekly | 7200s |
+
+Timeouts are defaults and can be overridden per binary via
+`SMOKE_TIMEOUT`, `STANDARD_TIMEOUT`, `COMPREHENSIVE_TIMEOUT`, and
+`FULL_TIMEOUT` arguments to `add_tiered_test_target()`.
 
 **Smoke is a catch-all.** The smoke ctest entry uses an exclusion filter
 (`-Standard*:Comprehensive*:Full*`). Every test that does not start with

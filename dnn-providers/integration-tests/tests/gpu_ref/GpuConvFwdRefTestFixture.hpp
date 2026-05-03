@@ -156,25 +156,61 @@ using TestGpuConvFwdRefShapesBfp16 = ConvFwdShapeSuite<bfloat16>;
 // while the suite name itself carries dimensionality and layout information.
 
 // Default layout (NCL / NCHW / NCDHW)
-class TestGpuConvFwdRef1dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRef2dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRef3dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRef1dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRef2dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRef3dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRef1dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
-class TestGpuConvFwdRef2dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
-class TestGpuConvFwdRef3dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
+class TestGpuConvFwdRef1dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRef2dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRef3dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRef1dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRef2dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRef3dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRef1dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
+class TestGpuConvFwdRef2dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
+class TestGpuConvFwdRef3dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
 
 // Channel-last layout (NLC / NHWC / NDHWC)
-class TestGpuConvFwdRefNlc1dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRefNhwc2dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRefNdhwc3dFp32 : public ConvFwdShapeSuite<float> {};
-class TestGpuConvFwdRefNlc1dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRefNhwc2dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRefNdhwc3dFp16 : public ConvFwdShapeSuite<half> {};
-class TestGpuConvFwdRefNlc1dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
-class TestGpuConvFwdRefNhwc2dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
-class TestGpuConvFwdRefNdhwc3dBfp16 : public ConvFwdShapeSuite<bfloat16> {};
+class TestGpuConvFwdRefNlc1dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRefNhwc2dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRefNdhwc3dFp32 : public ConvFwdShapeSuite<float>
+{
+};
+class TestGpuConvFwdRefNlc1dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRefNhwc2dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRefNdhwc3dFp16 : public ConvFwdShapeSuite<half>
+{
+};
+class TestGpuConvFwdRefNlc1dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
+class TestGpuConvFwdRefNhwc2dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
+class TestGpuConvFwdRefNdhwc3dBfp16 : public ConvFwdShapeSuite<bfloat16>
+{
+};
 
 } // namespace gpu_conv_fwd_ref_test

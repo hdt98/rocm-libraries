@@ -273,26 +273,80 @@ TEST(TestGpuConvBwdRefMixedType, HalfDxFloatWeight)
 // ============================================================================
 
 // Default layout (NCL / NCHW / NCDHW)
-TEST_P(TestGpuConvBwdRef1dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef2dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef3dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef1dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef2dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef3dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef1dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef2dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRef3dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
+TEST_P(TestGpuConvBwdRef1dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef2dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef3dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef1dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef2dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef3dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef1dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef2dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRef3dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
 
 // Channel-last layout (NLC / NHWC / NDHWC)
-TEST_P(TestGpuConvBwdRefNlc1dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNhwc2dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNdhwc3dFp32, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNlc1dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNhwc2dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNdhwc3dFp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNlc1dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNhwc2dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
-TEST_P(TestGpuConvBwdRefNdhwc3dBfp16, MatchesCpuRef) { this->runConvBwdShapeTest(); }
+TEST_P(TestGpuConvBwdRefNlc1dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNhwc2dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNdhwc3dFp32, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNlc1dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNhwc2dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNdhwc3dFp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNlc1dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNhwc2dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
+TEST_P(TestGpuConvBwdRefNdhwc3dBfp16, MatchesCpuRef)
+{
+    this->runConvBwdShapeTest();
+}
 
 // ============================================================================
 // Default layout (NCHW/NCDHW/NCL) instantiations.

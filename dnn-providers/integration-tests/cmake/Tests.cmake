@@ -305,10 +305,11 @@ function(add_tiered_test_target TARGET WORKING_DIR)
     install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
     # -- Four ctest entries with cumulative labels --
-    # Every entry uses FAIL_REGULAR_EXPRESSION to catch the case where someone
-    # registers a tiered target but forgets to define INSTANTIATE_TEST_SUITE_P
-    # for one or more tiers.  GTest prints "Running 0 tests from 0 test suites"
-    # and exits 0 — this makes ctest fail loudly instead of silently passing.
+    # Each tier gets a FAIL_REGULAR_EXPRESSION guard.  GTest prints "Running 0
+    # tests from 0 test suites" and exits 0 when no tests match a filter — the
+    # guard turns that silent pass into a ctest failure so accidentally empty
+    # tiers are caught early.  If a tier is intentionally empty, add a single
+    # INSTANTIATE_TEST_SUITE_P with a minimal case rather than removing the guard.
     set(_no_tests_re "Running 0 tests from 0 test suites")
 
     # Smoke: catch-all exclusion (everything not Standard/Comprehensive/Full)
