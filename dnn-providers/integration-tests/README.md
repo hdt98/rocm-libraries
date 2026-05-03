@@ -6,27 +6,29 @@ Shared integration tests for hipDNN provider implementations.
 
 | Tier | GTest prefix | Shape catalog | CI cadence |
 |------|-------------|---------------|------------|
-| Quick | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR |
+| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR |
 | Standard | `Standard` | `getMedium*()` | PR gate |
 | Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly |
 | Full | `Full` | `getLargeStress*()` | Weekly |
 
-**Quick is a catch-all.** The quick ctest entry uses an exclusion filter
+**Smoke is a catch-all.** The smoke ctest entry uses an exclusion filter
 (`-Standard*:Comprehensive*:Full*`). Every test that does not start with
-`Standard`, `Comprehensive`, or `Full` runs in quick automatically —
+`Standard`, `Comprehensive`, or `Full` runs in smoke automatically —
 including standalone `TEST()`, `TEST_F()`, `TYPED_TEST()`, and any
 `INSTANTIATE_TEST_SUITE_P` with a `Smoke` prefix.
 
-**The 600-second timeout on quick is a safety net.** If quick starts timing
+**The 600-second timeout on smoke is a safety net.** If smoke starts timing
 out, it means a large shape is missing its tier prefix and running where it
-shouldn't. Treat a quick timeout as a signal to check tier categorization.
+shouldn't. Treat a smoke timeout as a signal to check tier categorization.
 
-**Cumulative labels** — each higher tier includes all lower tiers:
+**Cumulative ctest labels** — each higher tier includes all lower tiers.
+The ctest label names use `quick` for the smoke tier (backlog: rename to
+`smoke` for consistency):
 
 ```
-ctest -L quick           # quick only
-ctest -L standard        # quick + standard
-ctest -L comprehensive   # quick + standard + comprehensive
+ctest -L quick           # smoke only
+ctest -L standard        # smoke + standard
+ctest -L comprehensive   # smoke + standard + comprehensive
 ctest -L full            # everything
 ```
 
@@ -39,7 +41,7 @@ following the same small / medium / largeEdge / largeStress pattern.
 New parameterized test suites **must** define all four tiers explicitly:
 
 ```cpp
-// Quick — small shapes for fast smoke testing
+// Smoke — small shapes for fast smoke testing
 INSTANTIATE_TEST_SUITE_P(Smoke,
                          MyNewOp2dTestFp32,
                          ::testing::ValuesIn(getSmallMyNewOp2dCases()),
@@ -72,7 +74,7 @@ automatically for forward, dgrad, and wgrad.
 
 | Function family | Tier | Purpose |
 |----------------|------|---------|
-| `getSmall*ConvCases()` | Quick | Minimal shapes, fast |
+| `getSmall*ConvCases()` | Smoke | Minimal shapes, fast |
 | `getMedium*ConvCases()` | Standard | Moderate shapes, PR-level coverage |
 | `getLargeEdge*ConvCases()` | Comprehensive | Corner cases (odd channels, asymmetric filters, prime K) |
 | `getLargeStress*ConvCases()` | Full | Real-workload shapes (ResNeXt, DeepSpeech, large stem) |
@@ -84,22 +86,22 @@ automatically for forward, dgrad, and wgrad.
 
 | Command | What runs |
 |---------|-----------|
-| `ctest -L quick` | Quick tier (smoke + standalone) |
-| `ctest -L standard` | Quick + standard |
-| `ctest -L comprehensive` | Quick + standard + comprehensive |
+| `ctest -L quick` | Smoke tier (smoke + standalone) |
+| `ctest -L standard` | Smoke + standard |
+| `ctest -L comprehensive` | Smoke + standard + comprehensive |
 | `ctest -L full` | All tiers |
 
 ### Via ninja targets
 
 | Command | What runs |
 |---------|-----------|
-| `ninja unit-check` | Quick tier |
+| `ninja unit-check` | Smoke tier |
 | `ninja check` | All tiers |
 
 ### Direct binary invocation
 
 ```bash
-# Quick tier (everything except standard/comprehensive/full)
+# Smoke tier (everything except standard/comprehensive/full)
 ./bin/hipdnn_gpu_ref_tests --gtest_filter="-Standard*:Comprehensive*:Full*"
 
 # Specific tier only
@@ -114,7 +116,7 @@ automatically for forward, dgrad, and wgrad.
 
 ### GTest filter syntax note
 
-The quick exclusion filter uses `-Standard*:Comprehensive*:Full*` (single
+The smoke exclusion filter uses `-Standard*:Comprehensive*:Full*` (single
 leading dash). In GTest, only the **first** `-` starts the negative section;
 all colon-separated patterns after it are excluded. Using `:-` between
 patterns (e.g., `:-Comprehensive*`) does **not** negate — the dash becomes a
