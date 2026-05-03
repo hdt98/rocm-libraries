@@ -4,17 +4,22 @@ Shared integration tests for hipDNN provider implementations.
 
 ## Test Tiers
 
-Tests use four tiers, controlled by the first argument of
-`INSTANTIATE_TEST_SUITE_P`. The quick ctest entry uses an **exclusion filter**
-(`-Standard*:Comprehensive*:Full*`), so standalone `TEST()` / `TEST_F()` /
-`TYPED_TEST()` suites run in quick by default — no prefix needed.
-
 | Tier | GTest prefix | Shape catalog | CI cadence |
 |------|-------------|---------------|------------|
-| Quick | `Smoke` *(or no prefix)* | `getSmall*()` | Every commit / PR |
+| Quick | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR |
 | Standard | `Standard` | `getMedium*()` | PR gate |
 | Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly |
 | Full | `Full` | `getLargeStress*()` | Weekly |
+
+**Quick is a catch-all.** The quick ctest entry uses an exclusion filter
+(`-Standard*:Comprehensive*:Full*`). Every test that does not start with
+`Standard`, `Comprehensive`, or `Full` runs in quick automatically —
+including standalone `TEST()`, `TEST_F()`, `TYPED_TEST()`, and any
+`INSTANTIATE_TEST_SUITE_P` with a `Smoke` prefix.
+
+**The 600-second timeout on quick is a safety net.** If quick starts timing
+out, it means a large shape is missing its tier prefix and running where it
+shouldn't. Treat a quick timeout as a signal to check tier categorization.
 
 **Cumulative labels** — each higher tier includes all lower tiers:
 
@@ -27,47 +32,51 @@ ctest -L full            # everything
 
 ### Adding a new operation
 
+Each operation owns its own shape catalog (e.g., convolution uses
+`ConvShapeCatalog.hpp`). New operations should create a similar catalog
+following the same small / medium / largeEdge / largeStress pattern.
+
 New parameterized test suites **must** define all four tiers explicitly:
 
 ```cpp
 // Quick — small shapes for fast smoke testing
 INSTANTIATE_TEST_SUITE_P(Smoke,
-                         MyNewOpTestFp32,
-                         ::testing::ValuesIn(getSmall2dCases()),
+                         MyNewOp2dTestFp32,
+                         ::testing::ValuesIn(getSmallMyNewOp2dCases()),
                          byTag());
 
 // Standard — medium shapes for PR validation
 INSTANTIATE_TEST_SUITE_P(Standard,
-                         MyNewOpTestFp32,
-                         ::testing::ValuesIn(getMedium2dCases()),
+                         MyNewOp2dTestFp32,
+                         ::testing::ValuesIn(getMediumMyNewOp2dCases()),
                          byTag());
 
 // Comprehensive — large edge-case shapes for nightly
 INSTANTIATE_TEST_SUITE_P(Comprehensive,
-                         MyNewOpTestFp32,
-                         ::testing::ValuesIn(getLargeEdge2dCases()),
+                         MyNewOp2dTestFp32,
+                         ::testing::ValuesIn(getLargeEdgeMyNewOp2dCases()),
                          byTag());
 
 // Full — large stress-test shapes for weekly
 INSTANTIATE_TEST_SUITE_P(Full,
-                         MyNewOpTestFp32,
-                         ::testing::ValuesIn(getLargeStress2dCases()),
+                         MyNewOp2dTestFp32,
+                         ::testing::ValuesIn(getLargeStressMyNewOp2dCases()),
                          byTag());
 ```
 
-### Adding a new shape
+### Adding a new convolution shape
 
-Add shapes to the appropriate function in `ConvShapeCatalog.hpp`:
+Convolution shapes live in `ConvShapeCatalog.hpp`. Add to the appropriate
+function — the existing `INSTANTIATE_TEST_SUITE_P` calls pick it up
+automatically for forward, dgrad, and wgrad.
 
 | Function family | Tier | Purpose |
 |----------------|------|---------|
-| `getSmall*()` | Quick | Minimal shapes, fast |
-| `getMedium*()` | Standard | Moderate shapes, PR-level coverage |
-| `getLargeEdge*()` | Comprehensive | Corner cases (odd channels, asymmetric filters, prime K) |
-| `getLargeStress*()` | Full | Real-workload shapes (ResNeXt, DeepSpeech, large stem) |
-| `getLarge*()` | *(union)* | Returns edge + stress combined (backward compat) |
-
-The existing `INSTANTIATE_TEST_SUITE_P` calls pick up new shapes automatically.
+| `getSmall*ConvCases()` | Quick | Minimal shapes, fast |
+| `getMedium*ConvCases()` | Standard | Moderate shapes, PR-level coverage |
+| `getLargeEdge*ConvCases()` | Comprehensive | Corner cases (odd channels, asymmetric filters, prime K) |
+| `getLargeStress*ConvCases()` | Full | Real-workload shapes (ResNeXt, DeepSpeech, large stem) |
+| `getLarge*ConvCases()` | *(union)* | Returns edge + stress combined (backward compat) |
 
 ## Running Tests
 
