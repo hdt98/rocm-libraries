@@ -238,11 +238,34 @@ inline std::vector<ConvShapeCase> getMedium3dConvCases()
 }
 
 // ============================================================================
-// Large shapes — slow binary (nightly)
+// Large shapes — split into edge cases (Comprehensive / nightly) and
+// stress tests (Full / weekly) for tiered CI execution.
+//
+// Edge cases: odd channels, tiny output, prime K, asymmetric filters — shapes
+//             that exercise corner cases at larger-than-medium scale.
+// Stress tests: real-workload shapes (ResNeXt, DeepSpeech, WaveNet, medical
+//               imaging) — genuinely expensive to run.
+//
+// getLarge*() returns the union of both subsets for convenience.
 // ============================================================================
 
-// Large 1D shapes: stress tests for audio/speech workloads [fwd, dgrad, wgrad]
-inline std::vector<ConvShapeCase> getLarge1dConvCases()
+// Large 1D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeEdge1dConvCases()
+{
+    return {
+        // 8-group on medium-long sequence
+        {{16, 64, 512}, {64, 8, 5}, {1}, {1}, {2}, 8, "Grouped8Kernel5"},
+        // Odd input channels — vector alignment edge case (SWDEV-502833 pattern)
+        {{8, 5, 512}, {32, 5, 3}, {1}, {1}, {1}, 1, "OddChan5x1d"},
+        // Kernel = spatial → output length 1
+        {{4, 32, 7}, {64, 32, 7}, {1}, {1}, {0}, 1, "Output1x1d"},
+        // Prime output channels — non-power-of-2 K
+        {{8, 32, 256}, {127, 32, 5}, {1}, {1}, {2}, 1, "PrimeK127x1d"},
+    };
+}
+
+// Large 1D stress tests — heavy real-workload shapes [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeStress1dConvCases()
 {
     return {
         // WaveNet-style high-channel long sequence
@@ -251,21 +274,43 @@ inline std::vector<ConvShapeCase> getLarge1dConvCases()
         {{16, 64, 2048}, {64, 1, 3}, {1}, {1}, {1}, 64, "Depthwise64Long"},
         // Stride-2 on long sequence with large kernel
         {{8, 32, 4096}, {64, 32, 7}, {2}, {1}, {3}, 1, "Stride2LargeKernel7"},
-        // 8-group on medium-long sequence
-        {{16, 64, 512}, {64, 8, 5}, {1}, {1}, {2}, 8, "Grouped8Kernel5"},
-        // Odd input channels — vector alignment edge case (SWDEV-502833 pattern)
-        {{8, 5, 512}, {32, 5, 3}, {1}, {1}, {1}, 1, "OddChan5x1d"},
-        // Kernel = spatial → output length 1
-        {{4, 32, 7}, {64, 32, 7}, {1}, {1}, {0}, 1, "Output1x1d"},
         // Large dilation on long sequence
         {{4, 16, 2048}, {32, 16, 3}, {1}, {4}, {4}, 1, "Dilation4Long1d"},
-        // Prime output channels — non-power-of-2 K
-        {{8, 32, 256}, {127, 32, 5}, {1}, {1}, {2}, 1, "PrimeK127x1d"},
     };
 }
 
-// Large 2D shapes: stress tests matching real workloads [fwd, dgrad, wgrad]
-inline std::vector<ConvShapeCase> getLarge2dConvCases()
+// All large 1D shapes (edge + stress)
+inline std::vector<ConvShapeCase> getLarge1dConvCases()
+{
+    auto all = getLargeEdge1dConvCases();
+    auto stress = getLargeStress1dConvCases();
+    all.insert(all.end(), stress.begin(), stress.end());
+    return all;
+}
+
+// Large 2D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeEdge2dConvCases()
+{
+    return {
+        // Odd input channels C=5 — vector alignment (SWDEV-502833)
+        {{8, 5, 56, 56}, {32, 5, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "OddChanIn5"},
+        // Asymmetric filter 5x10 (MIOpen #540)
+        {{4, 32, 79, 141}, {64, 32, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 1, "AsymFilter5x10"},
+        // Stride-2 on tiny spatial → output 1x1 (ho=wo=1)
+        {{16, 128, 2, 2}, {256, 128, 1, 1}, {2, 2}, {1, 1}, {0, 0}, 1, "Output1x1Stride2"},
+        // Prime output channels K=127
+        {{8, 64, 14, 14}, {127, 64, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "PrimeK127"},
+        // High-channel 1x1 reduction (MIOpen #2012 / SWDEV-305815)
+        {{8, 256, 14, 14}, {128, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "HiChan1x1Reduce"},
+        // Asymmetric stride (1,2) — CK edge case
+        {{8, 32, 28, 56}, {64, 32, 3, 3}, {1, 2}, {1, 1}, {1, 1}, 1, "AsymStride1x2"},
+        // Non-square spatial with 2-group (79x341)
+        {{8, 32, 79, 341}, {32, 16, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 2, "NonSquareGrouped2"},
+    };
+}
+
+// Large 2D stress tests — heavy real-workload shapes [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeStress2dConvCases()
 {
     return {
         // ResNeXt-32x4d high-resolution block
@@ -282,25 +327,20 @@ inline std::vector<ConvShapeCase> getLarge2dConvCases()
         {{16, 192, 28, 28}, {32, 12, 5, 5}, {1, 1}, {1, 1}, {2, 2}, 16, "Inception5x5x16Group"},
         // DeepSpeech-like non-square spatial (161x700)
         {{4, 4, 161, 700}, {32, 1, 5, 20}, {2, 2}, {1, 1}, {0, 0}, 4, "DeepSpeechNonSquare"},
-        // Non-square spatial with 2-group (79x341)
-        {{8, 32, 79, 341}, {32, 16, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 2, "NonSquareGrouped2"},
-        // Odd input channels C=5 — vector alignment (SWDEV-502833)
-        {{8, 5, 56, 56}, {32, 5, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "OddChanIn5"},
-        // Asymmetric filter 5x10 (MIOpen #540)
-        {{4, 32, 79, 141}, {64, 32, 5, 10}, {2, 2}, {1, 1}, {0, 0}, 1, "AsymFilter5x10"},
-        // Stride-2 on tiny spatial → output 1x1 (ho=wo=1)
-        {{16, 128, 2, 2}, {256, 128, 1, 1}, {2, 2}, {1, 1}, {0, 0}, 1, "Output1x1Stride2"},
-        // Prime output channels K=127
-        {{8, 64, 14, 14}, {127, 64, 3, 3}, {1, 1}, {1, 1}, {1, 1}, 1, "PrimeK127"},
-        // High-channel 1x1 reduction (MIOpen #2012 / SWDEV-305815)
-        {{8, 256, 14, 14}, {128, 256, 1, 1}, {1, 1}, {1, 1}, {0, 0}, 1, "HiChan1x1Reduce"},
-        // Asymmetric stride (1,2) — CK edge case
-        {{8, 32, 28, 56}, {64, 32, 3, 3}, {1, 2}, {1, 1}, {1, 1}, 1, "AsymStride1x2"},
     };
 }
 
-// Large 3D shapes: stress tests for volumetric/video workloads [fwd, dgrad, wgrad]
-inline std::vector<ConvShapeCase> getLarge3dConvCases()
+// All large 2D shapes (edge + stress)
+inline std::vector<ConvShapeCase> getLarge2dConvCases()
+{
+    auto all = getLargeEdge2dConvCases();
+    auto stress = getLargeStress2dConvCases();
+    all.insert(all.end(), stress.begin(), stress.end());
+    return all;
+}
+
+// Large 3D edge cases — moderate-cost shapes that exercise corner cases [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeEdge3dConvCases()
 {
     return {
         // 3D medical imaging style: 16ch, 32x32x32
@@ -327,14 +367,6 @@ inline std::vector<ConvShapeCase> getLarge3dConvCases()
          {1, 1, 1},
          4,
          "Grouped4x3dLarge"},
-        // 3D non-cube spatial (8x32x32)
-        {{4, 16, 8, 32, 32},
-         {32, 16, 3, 3, 3},
-         {1, 1, 1},
-         {1, 1, 1},
-         {1, 1, 1},
-         1,
-         "NonCube3dLarge"},
         // D=1 degeneracy — collapses depth to 2D-like behavior
         {{4, 16, 1, 32, 32},
          {32, 16, 1, 3, 3},
@@ -343,6 +375,21 @@ inline std::vector<ConvShapeCase> getLarge3dConvCases()
          {0, 1, 1},
          1,
          "Degenerate3dD1"},
+    };
+}
+
+// Large 3D stress tests — heavy real-workload shapes [fwd, dgrad, wgrad]
+inline std::vector<ConvShapeCase> getLargeStress3dConvCases()
+{
+    return {
+        // 3D non-cube spatial (8x32x32)
+        {{4, 16, 8, 32, 32},
+         {32, 16, 3, 3, 3},
+         {1, 1, 1},
+         {1, 1, 1},
+         {1, 1, 1},
+         1,
+         "NonCube3dLarge"},
         // 3D ResNet / C3D block — matches CK's standard 3D test shape
         // (CK: N=64,C=64,K=128,28³; scaled for reference impl)
         {{8, 64, 14, 14, 14}, {128, 64, 3, 3, 3}, {1, 1, 1}, {1, 1, 1}, {1, 1, 1}, 1, "ResNet3d"},
@@ -363,6 +410,15 @@ inline std::vector<ConvShapeCase> getLarge3dConvCases()
          1,
          "VideoTemporal"},
     };
+}
+
+// All large 3D shapes (edge + stress)
+inline std::vector<ConvShapeCase> getLarge3dConvCases()
+{
+    auto all = getLargeEdge3dConvCases();
+    auto stress = getLargeStress3dConvCases();
+    all.insert(all.end(), stress.begin(), stress.end());
+    return all;
 }
 
 } // namespace gpu_conv_ref_test

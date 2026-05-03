@@ -57,4 +57,11 @@ struct ConvShapeCase
     }
 };
 
+// Name generator for parameterized tests — extracts the tag from ConvShapeCase.
+// Usage: INSTANTIATE_TEST_SUITE_P(Smoke, Suite, ::testing::ValuesIn(cases), byTag());
+inline auto byTag()
+{
+    return [](const auto& info) { return info.param.tag; };
+}
+
 } // namespace gpu_conv_ref_test

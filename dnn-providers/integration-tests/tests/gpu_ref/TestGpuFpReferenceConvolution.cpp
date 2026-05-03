@@ -722,383 +722,354 @@ TEST(TestGpuConvFwdRefMixedType, HalfInputFloatWeight)
 // TEST_P definitions for the fixture classes from the shared header.
 // ============================================================================
 
-TEST_P(TestGpuConvFwdRefShapesFp32, MatchesCpuRef)
-{
-    this->runConvFwdShapeTest();
-}
-TEST_P(TestGpuConvFwdRefShapesFp16, MatchesCpuRef)
-{
-    this->runConvFwdShapeTest();
-}
-TEST_P(TestGpuConvFwdRefShapesBfp16, MatchesCpuRef)
-{
-    this->runConvFwdShapeTest();
-}
+// Default layout (NCL / NCHW / NCDHW)
+TEST_P(TestGpuConvFwdRef1dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef2dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef3dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef1dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef2dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef3dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef1dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef2dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRef3dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+
+// Channel-last layout (NLC / NHWC / NDHWC)
+TEST_P(TestGpuConvFwdRefNlc1dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNhwc2dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNdhwc3dFp32, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNlc1dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNhwc2dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNdhwc3dFp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNlc1dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNhwc2dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
+TEST_P(TestGpuConvFwdRefNdhwc3dBfp16, MatchesCpuRef) { this->runConvFwdShapeTest(); }
 
 // ============================================================================
 // Default layout (NCHW/NCDHW/NCL) instantiations — packed strides, no layout set.
-// Small shapes run on every PR; Medium/Large shapes filtered via --gtest_filter for nightly.
+// Smoke shapes run on every commit; Standard/Full shapes filtered via --gtest_filter.
 // ============================================================================
 
-// fp32 NCHW/NCDHW
-INSTANTIATE_TEST_SUITE_P(Small2d,
-                         TestGpuConvFwdRefShapesFp32,
+// fp32
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef2dFp32,
                          ::testing::ValuesIn(getSmall2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Small3d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef3dFp32,
                          ::testing::ValuesIn(getSmall3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-
-// fp32 NCL: 1D shapes
-INSTANTIATE_TEST_SUITE_P(Small1d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef1dFp32,
                          ::testing::ValuesIn(getSmall1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
-// fp16 NCHW/NCDHW/NCL
-INSTANTIATE_TEST_SUITE_P(Small2d,
-                         TestGpuConvFwdRefShapesFp16,
+// fp16
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef2dFp16,
                          ::testing::ValuesIn(getSmall2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Small1d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef1dFp16,
                          ::testing::ValuesIn(getSmall1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Small3d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef3dFp16,
                          ::testing::ValuesIn(getSmall3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
-// bfp16 NCHW/NCDHW/NCL
-INSTANTIATE_TEST_SUITE_P(Small2d,
-                         TestGpuConvFwdRefShapesBfp16,
+// bfp16
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef2dBfp16,
                          ::testing::ValuesIn(getSmall2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Small1d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef1dBfp16,
                          ::testing::ValuesIn(getSmall1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Small3d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRef3dBfp16,
                          ::testing::ValuesIn(getSmall3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
 // ============================================================================
 // Channel-last (NLC/NHWC/NDHWC) instantiations — small shapes.
 // ============================================================================
 
 // fp32 NLC/NHWC/NDHWC
-INSTANTIATE_TEST_SUITE_P(SmallNlc1d,
-                         TestGpuConvFwdRefShapesFp32,
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNlc1dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNhwc2d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNhwc2dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNdhwc3d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNdhwc3dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
 // fp16 NLC/NHWC/NDHWC
-INSTANTIATE_TEST_SUITE_P(SmallNlc1d,
-                         TestGpuConvFwdRefShapesFp16,
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNlc1dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNhwc2d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNhwc2dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNdhwc3d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNdhwc3dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
 // bfp16 NLC/NHWC/NDHWC
-INSTANTIATE_TEST_SUITE_P(SmallNlc1d,
-                         TestGpuConvFwdRefShapesBfp16,
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNlc1dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNhwc2d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNhwc2dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(SmallNdhwc3d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,
+                         TestGpuConvFwdRefNdhwc3dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getSmall3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
 
 // ============================================================================
-// Default layout (NCL/NCHW/NCDHW) — medium/large shapes.
-// Filter with --gtest_filter="Medium*:Large*" or --gtest_filter="-*Medium*-*Large*"
+// Default layout (NCL/NCHW/NCDHW) — standard/comprehensive/full shapes.
+// Filter with --gtest_filter="-Standard*:Comprehensive*:Full*" for quick runs.
 // ============================================================================
 
 // fp32
-INSTANTIATE_TEST_SUITE_P(Medium1d,
-                         TestGpuConvFwdRefShapesFp32,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef1dFp32,
                          ::testing::ValuesIn(getMedium1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium2d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef2dFp32,
                          ::testing::ValuesIn(getMedium2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium3d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef3dFp32,
                          ::testing::ValuesIn(getMedium3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large1d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(getLarge1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large2d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(getLarge2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large3d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(getLarge3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef1dFp32,
+                         ::testing::ValuesIn(getLargeEdge1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef2dFp32,
+                         ::testing::ValuesIn(getLargeEdge2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef3dFp32,
+                         ::testing::ValuesIn(getLargeEdge3dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef1dFp32,
+                         ::testing::ValuesIn(getLargeStress1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef2dFp32,
+                         ::testing::ValuesIn(getLargeStress2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef3dFp32,
+                         ::testing::ValuesIn(getLargeStress3dConvCases()),
+                         byTag());
 
 // fp16
-INSTANTIATE_TEST_SUITE_P(Medium1d,
-                         TestGpuConvFwdRefShapesFp16,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef1dFp16,
                          ::testing::ValuesIn(getMedium1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium2d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef2dFp16,
                          ::testing::ValuesIn(getMedium2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium3d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef3dFp16,
                          ::testing::ValuesIn(getMedium3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large1d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(getLarge1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large2d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(getLarge2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large3d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(getLarge3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef1dFp16,
+                         ::testing::ValuesIn(getLargeEdge1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef2dFp16,
+                         ::testing::ValuesIn(getLargeEdge2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef3dFp16,
+                         ::testing::ValuesIn(getLargeEdge3dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef1dFp16,
+                         ::testing::ValuesIn(getLargeStress1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef2dFp16,
+                         ::testing::ValuesIn(getLargeStress2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef3dFp16,
+                         ::testing::ValuesIn(getLargeStress3dConvCases()),
+                         byTag());
 
 // bfp16
-INSTANTIATE_TEST_SUITE_P(Medium1d,
-                         TestGpuConvFwdRefShapesBfp16,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef1dBfp16,
                          ::testing::ValuesIn(getMedium1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium2d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef2dBfp16,
                          ::testing::ValuesIn(getMedium2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Medium3d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRef3dBfp16,
                          ::testing::ValuesIn(getMedium3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large1d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(getLarge1dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large2d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(getLarge2dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(Large3d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(getLarge3dConvCases()),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef1dBfp16,
+                         ::testing::ValuesIn(getLargeEdge1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef2dBfp16,
+                         ::testing::ValuesIn(getLargeEdge2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRef3dBfp16,
+                         ::testing::ValuesIn(getLargeEdge3dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef1dBfp16,
+                         ::testing::ValuesIn(getLargeStress1dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef2dBfp16,
+                         ::testing::ValuesIn(getLargeStress2dConvCases()),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRef3dBfp16,
+                         ::testing::ValuesIn(getLargeStress3dConvCases()),
+                         byTag());
 
 // ============================================================================
-// Channel-last (NLC/NHWC/NDHWC) — medium/large shapes.
+// Channel-last (NLC/NHWC/NDHWC) — standard/comprehensive/full shapes.
 // ============================================================================
 
 // fp32
-INSTANTIATE_TEST_SUITE_P(MediumNlc1d,
-                         TestGpuConvFwdRefShapesFp32,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNlc1dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNhwc2d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNhwc2dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNdhwc3d,
-                         TestGpuConvFwdRefShapesFp32,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNdhwc3dFp32,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNlc1d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNhwc2d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNdhwc3d,
-                         TestGpuConvFwdRefShapesFp32,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNlc1dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNhwc2dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNdhwc3dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge3dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNlc1dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNhwc2dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNdhwc3dFp32,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress3dConvCases())),
+                         byTag());
 
 // fp16
-INSTANTIATE_TEST_SUITE_P(MediumNlc1d,
-                         TestGpuConvFwdRefShapesFp16,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNlc1dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNhwc2d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNhwc2dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNdhwc3d,
-                         TestGpuConvFwdRefShapesFp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNdhwc3dFp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNlc1d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNhwc2d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNdhwc3d,
-                         TestGpuConvFwdRefShapesFp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNlc1dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNhwc2dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNdhwc3dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge3dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNlc1dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNhwc2dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNdhwc3dFp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress3dConvCases())),
+                         byTag());
 
 // bfp16
-INSTANTIATE_TEST_SUITE_P(MediumNlc1d,
-                         TestGpuConvFwdRefShapesBfp16,
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNlc1dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNhwc2d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNhwc2dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(MediumNdhwc3d,
-                         TestGpuConvFwdRefShapesBfp16,
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,
+                         TestGpuConvFwdRefNdhwc3dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getMedium3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNlc1d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge1dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNhwc2d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge2dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
-INSTANTIATE_TEST_SUITE_P(LargeNdhwc3d,
-                         TestGpuConvFwdRefShapesBfp16,
-                         ::testing::ValuesIn(withChannelLastLayout(getLarge3dConvCases())),
-                         [](const ::testing::TestParamInfo<ConvFwdShapeCase>& info) {
-                             return info.param.tag;
-                         });
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNlc1dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNhwc2dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive,
+                         TestGpuConvFwdRefNdhwc3dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeEdge3dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNlc1dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress1dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNhwc2dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress2dConvCases())),
+                         byTag());
+INSTANTIATE_TEST_SUITE_P(Full,
+                         TestGpuConvFwdRefNdhwc3dBfp16,
+                         ::testing::ValuesIn(withChannelLastLayout(getLargeStress3dConvCases())),
+                         byTag());
