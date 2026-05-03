@@ -6,10 +6,10 @@ Shared integration tests for hipDNN provider implementations.
 
 | Tier | GTest prefix | Shape catalog | CI cadence | Timeout |
 |------|-------------|---------------|------------|---------|
-| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR | 600s |
-| Standard | `Standard` | `getMedium*()` | PR gate | 1800s |
-| Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly | 3600s |
-| Full | `Full` | `getLargeStress*()` | Weekly | 7200s |
+| Smoke | `Smoke` *(or no prefix)* — **catch-all** | `getSmall*()` | Every commit / PR | 600s (10 min) |
+| Standard | `Standard` | `getMedium*()` | PR gate | 1800s (30 min) |
+| Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly | 3600s (60 min) |
+| Full | `Full` | `getLargeStress*()` | Weekly | 7200s (120 min) |
 
 Timeouts are defaults and can be overridden per binary via
 `SMOKE_TIMEOUT`, `STANDARD_TIMEOUT`, `COMPREHENSIVE_TIMEOUT`, and
