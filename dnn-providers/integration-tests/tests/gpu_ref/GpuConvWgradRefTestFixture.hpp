@@ -33,8 +33,8 @@ using namespace hipdnn_data_sdk::types;
 using namespace hipdnn_test_sdk::utilities;
 using namespace hipdnn_gpu_ref;
 
-using gpu_conv_ref_test::ConvShapeCase;
 using gpu_conv_ref_test::assertAllClose;
+using gpu_conv_ref_test::ConvShapeCase;
 using ConvWgradShapeCase = ConvShapeCase;
 
 // Core helper: fills x and dy tensors, runs GPU and CPU wgrad, compares dw results.
