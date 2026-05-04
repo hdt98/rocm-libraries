@@ -104,7 +104,7 @@ ConvSolution OpTensorFwdBias::GetSolution([[maybe_unused]] const ExecutionContex
     int max_num_wg = 4096;
 
     auto&& [num_wg_orig, work_per_wg, incr_wg, bitmap, local_threads, global_threads] =
-        Get4dParams(problem, false);
+        Get4dParams(problem, true);
 
     const std::array<size_t, 3> vld{local_threads, 1, 1};
     const std::array<size_t, 3> vgd{global_threads, 1, 1};
@@ -133,8 +133,8 @@ ConvSolution OpTensorFwdBias::GetSolution([[maybe_unused]] const ExecutionContex
         kernel.kernel_name = "OpTensorFwdBiasGeneric";
     }
 
-    kernel.comp_options = build_params.GenerateFor(kbp::OpenCL{});
-    kernel.kernel_file  = "MIOpenTensorKernels.cl";
+    kernel.comp_options = build_params.GenerateFor(kbp::HIP{});
+    kernel.kernel_file  = "MIOpenTensorKernelsHip.cpp";
 
     using std::begin, std::end;
 
