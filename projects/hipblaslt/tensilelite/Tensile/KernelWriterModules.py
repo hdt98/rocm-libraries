@@ -204,6 +204,22 @@ def accToArchMapper(kernel):
                 arch2acc[dst] = src
   return acc2arch, arch2acc
 
+##############################################################################
+# hasSequentialValuC
+# Check if WMMA/MFMA output is already in sequential order (no reorder needed)
+# When True, we can skip the reorder and use alpha directly in conversion.
+##############################################################################
+def hasSequentialValuC(kernel):
+  """
+  Returns True if valuC registers are already in sequential order after WMMA/MFMA.
+  """
+  acc2arch, _ = accToArchMapper(kernel)
+
+  for i in range(len(acc2arch)):
+    if acc2arch[i] != i:
+      return False
+  return True
+
 def accVgprImagNumOffset(kernel):
   acc2arch, _ = accToArchMapper(kernel)
   return len(acc2arch) * kernel["MIRegPerOut"]

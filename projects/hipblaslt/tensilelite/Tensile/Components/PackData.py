@@ -377,7 +377,10 @@ class PackData_INT8(PackData):
 
 class PackData_FLOAT8_SR(PackData):
     kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8), "StochasticRounding": True}}
-    def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, vgprTmp, inputPrefix="", prefixOffset=0):
+    def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, vgprTmp, inputPrefix="", prefixOffset=0, alphaScale=1.0):
+        """
+        Pack F32 data to FP8 with stochastic rounding.
+        """
         ti = rocIsa.getInstance()
         vgprFp8NanInf = fp8CVTVgprStruct.vgprFp8NanInf
         vgprFp8Temp   = fp8CVTVgprStruct.vgprFp8Temp
@@ -412,7 +415,7 @@ class PackData_FLOAT8_SR(PackData):
                 srcStartVgpr = formatting(elementSumIdx + groupIdx * 8, inputPrefix, prefixOffset)
                 addTruncateAndPRNG(srcStartVgpr)
                 d = destIdx + groupIdx * 2  # Each group outputs 2 VGPRs (64-bit aligned)
-                module.add(VCvtScaleSRPkF32toFP8(dst=vgpr(d, 2), src0=vgpr(srcStartVgpr, 8), src1=vgpr(vRand), scale=1.0))
+                module.add(VCvtScaleSRPkF32toFP8(dst=vgpr(d, 2), src0=vgpr(srcStartVgpr, 8), src1=vgpr(vRand), scale=alphaScale))
         else:
             # Scalar path: convert one element at a time
             for vi in range(gwvw):
