@@ -3842,6 +3842,20 @@ class Solution(collections.abc.Mapping):
       else:
         state["VectorWidthB"] = 1
 
+    # gfx1250: reject when the user explicitly pinned LdsPad=-1 (auto)
+    # together with LdsBlockSizePerPad=0 (no block padding)
+    if isa[:2] == (12, 5):
+      padPairs = [("A", True), ("B", True),
+                  ("MXSA", bool(state["ProblemType"]["MXBlockA"])),
+                  ("MXSB", bool(state["ProblemType"]["MXBlockB"]))]
+      for tc, active in padPairs:
+        if not active:
+          continue
+        if state["LdsPad%s" % tc] == -1 and state["LdsBlockSizePerPad%s" % tc] == 0:
+          reject(state, printRejectionReason,
+                 f"gfx1250: LdsPad{tc}=-1 with LdsBlockSizePerPad{tc}=0 is not supported")
+          return False
+
     auto_LdsBlockSizePerPadA_for_mix = 0
     if state["LdsBlockSizePerPadA"] == -1:
       auto_LdsBlockSizePerPadA_for_mix = 1
