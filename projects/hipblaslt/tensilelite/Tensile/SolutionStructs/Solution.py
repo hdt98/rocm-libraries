@@ -714,6 +714,8 @@ class Solution(collections.abc.Mapping):
         reject(state, printRejectionReason, "UseSubtileImpl=1 does not support ScheduleIterAlg")
       if state["StreamK"] == 0:
         reject(state, printRejectionReason, "UseSubtileImpl=1 supports StreamK only (no support for GSU)")
+      if state["PrefetchAcrossPersistent"]:
+        reject(state, printRejectionReason, "UseSubtileImpl=1 does not support PrefetchAcrossPersistent")
 
     # done
     state["AssignedProblemIndependentDerivedParameters"] = True
