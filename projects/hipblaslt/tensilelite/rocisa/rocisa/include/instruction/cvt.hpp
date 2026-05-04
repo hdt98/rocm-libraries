@@ -820,4 +820,54 @@ namespace rocisa
             return std::make_shared<VCvtPkF32toBF16>(*this);
         }
     };
+
+    struct VCvtScalePk8F32toFP8 : public VCvtInstruction
+    {
+        VCvtScalePk8F32toFP8(const std::shared_ptr<RegisterContainer>& dst,
+                             const std::shared_ptr<Container>&         src,
+                             const InstructionInput&                   scale,
+                             std::optional<SDWAModifiers>              sdwa    = std::nullopt,
+                             std::optional<VOP3PModifiers>             vop3    = std::nullopt,
+                             const std::string&                        comment = "")
+            : VCvtInstruction(
+                CvtType::CVT_SCALEF32_PK8_FP8_F32, dst, {src, scale}, sdwa, vop3, std::vector<int>({}), comment)
+        {
+            setInst("v_cvt_scalef32_pk8_fp8_f32");
+        }
+
+        VCvtScalePk8F32toFP8(const VCvtScalePk8F32toFP8& other)
+            : VCvtInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<VCvtScalePk8F32toFP8>(*this);
+        }
+    };
+
+    struct VCvtScalePk8F32toBF8 : public VCvtInstruction
+    {
+        VCvtScalePk8F32toBF8(const std::shared_ptr<RegisterContainer>& dst,
+                             const std::shared_ptr<Container>&         src,
+                             const InstructionInput&                   scale,
+                             std::optional<SDWAModifiers>              sdwa    = std::nullopt,
+                             std::optional<VOP3PModifiers>             vop3    = std::nullopt,
+                             const std::string&                        comment = "")
+            : VCvtInstruction(
+                CvtType::CVT_SCALEF32_PK8_BF8_F32, dst, {src, scale}, sdwa, vop3, std::vector<int>({}), comment)
+        {
+            setInst("v_cvt_scalef32_pk8_bf8_f32");
+        }
+
+        VCvtScalePk8F32toBF8(const VCvtScalePk8F32toBF8& other)
+            : VCvtInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<VCvtScalePk8F32toBF8>(*this);
+        }
+    };
 } // namespace rocisa

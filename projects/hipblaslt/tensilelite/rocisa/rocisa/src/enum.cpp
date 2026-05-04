@@ -183,6 +183,8 @@ void init_enum(nb::module_ m)
         .value("CVT_PK_F32_to_BF8", rocisa::CvtType::CVT_PK_F32_to_BF8)
         .value("CVT_SR_F32_to_FP8", rocisa::CvtType::CVT_SR_F32_to_FP8)
         .value("CVT_SR_F32_to_BF8", rocisa::CvtType::CVT_SR_F32_to_BF8)
+        .value("CVT_SCALEF32_PK8_FP8_F32", rocisa::CvtType::CVT_SCALEF32_PK8_FP8_F32)
+        .value("CVT_SCALEF32_PK8_BF8_F32", rocisa::CvtType::CVT_SCALEF32_PK8_BF8_F32)
         .export_values();
 
     nb::enum_<rocisa::ArgType>(m_enum, "ArgType")
