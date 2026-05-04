@@ -96,6 +96,7 @@ def parse_test_labels(pr_labels: List[str]) -> tuple[List[str], Optional[str]]:
                     projects_to_test.append(mapped_project)
             else:
                 logging.warning(f"Unknown project in label: {label}")
+                continue
 
         # Parse test_type:* labels
         elif label.startswith("test_type:"):

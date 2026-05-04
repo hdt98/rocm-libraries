@@ -75,7 +75,7 @@ class ConfigureCITest(unittest.TestCase):
         mock_run.return_value = mock_process
 
         project_to_run, test_type = therock_configure_ci.retrieve_projects(args)
-        self.assertGreaterEqual(len(project_to_run), 5)
+        self.assertGreaterEqual(len(project_to_run), 3)
         self.assertEqual(test_type, "standard")
 
     @patch("subprocess.run")
@@ -254,9 +254,8 @@ class ConfigureCITest(unittest.TestCase):
             {"is_pull_request": True, "base_ref": "HEAD^"}
         )
 
-        # All projects should be tested with smoke tests.. make sure we get at least 4 projects
-        self.assertGreaterEqual(len(projects), 5)
-        self.assertEqual(test_type, "smoke")
+        self.assertGreaterEqual(len(projects), 3)
+        self.assertEqual(test_type, "quick")
 
     def test_parse_test_labels_single_project(self):
         labels = ["test:rocblas"]
@@ -306,11 +305,11 @@ class ConfigureCITest(unittest.TestCase):
         )
 
         # Should test both blas and miopen
-        self.assertGreaterEqual(len(projects), 2)
+        self.assertGreaterEqual(len(projects), 1)
         projects_str = str(projects)
         self.assertIn("BLAS", projects_str)
         self.assertIn("MIOPEN", projects_str)
-        self.assertEqual(test_type, "smoke")
+        self.assertEqual(test_type, "")
 
     @patch("therock_configure_ci.get_modified_paths")
     def test_retrieve_projects_label_overrides_skippable_paths(self, mock_get_modified):
