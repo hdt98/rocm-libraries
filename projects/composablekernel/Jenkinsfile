@@ -860,7 +860,8 @@ def buildHipClangJob(Map conf=[:]){
         def retimage
         (retimage, image) = getDockerImage(conf)
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
             withDockerContainer(image: image, args: dockerOpts) {
                 timeout(time: 20, unit: 'HOURS')
                 {
@@ -890,7 +891,8 @@ def Build_CK(Map conf=[:]){
         def image
         def retimage
 
-        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
             try {
                 (retimage, image) = getDockerImage(conf)
                 withDockerContainer(image: image, args: dockerOpts) {
@@ -987,7 +989,8 @@ def process_results(Map conf=[:]){
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
-    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
         try
         {
             echo "Pulling image: ${image}"
@@ -1126,7 +1129,8 @@ def run_downstream_tests(Map conf=[:]){
     checkoutComposableKernel()
     def dockerOpts = get_docker_options() + ' --group-add irc '
 
-    gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+    withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
         try
         {
             echo "Pulling image: ${conf.image}"
@@ -1408,6 +1412,7 @@ pipeline {
         dbsshuser = "${dbsshuser}"
         dbsshpassword = "${dbsshpassword}"
         ck_git_creds = "${ck_git_creds}"
+        ck_git_credentials = "${ck_git_credentials}"
         gerrit_cred="${gerrit_cred}"
         DOCKER_BUILDKIT = "1"
     }
@@ -2041,7 +2046,8 @@ pipeline {
                 success {
                     script {
                         // Report the parent stage build ck and run tests status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
+                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
                             echo "Reporting success status for build ck and run tests"
                         }
                     }
@@ -2068,11 +2074,13 @@ pipeline {
                 success {
                     script {
                         // Report the skipped parent's stage status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process Performance Test Results", account: 'ROCm', repo: 'rocm-libraries') {
+                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process Performance Test Results", account: 'ROCm', repo: 'rocm-libraries') {
+                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
                             echo "Process Performance Test Results stage skipped."
                         }
                         // Report the skipped stage's status
-                        gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process results", account: 'ROCm', repo: 'rocm-libraries') {
+                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process results", account: 'ROCm', repo: 'rocm-libraries') {
+                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
                             echo "Process Performance Test Results stage skipped."
                         }
                     }
