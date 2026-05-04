@@ -1,5 +1,5 @@
 TestParameters:
-  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx942, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201]
+  marks: [skip-gfx900, skip-gfx906, skip-gfx908, skip-gfx90a, skip-gfx940, skip-gfx941, skip-gfx942, skip-gfx950, skip-gfx1010, skip-gfx1011, skip-gfx1012, skip-gfx1030, skip-gfx1100, skip-gfx1101, skip-gfx1102, skip-gfx1200, skip-gfx1201]
 
 GlobalParameters:
   NumElementsToValidate: -1
@@ -65,57 +65,55 @@ BenchmarkProblems:
           - Exact: [519, 263, 1, 4103]
           - Exact: [263, 519, 1, 4103]
 
-  # FFM: Epilogues group does not terminate in FFM (codegen too slow for BBS TN with epilogue features).
-  # Requires TENSILE_STREAMK_FIXED_GRID >= 2*num_tiles to exercise StreamK path with parallel reduction.
-  #- # Epilogues
-  #  - # BBS TN
-  #    OperationType: GEMM
-  #    DataType: b
-  #    DestDataType: b
-  #    ComputeDataType: s
-  #    HighPrecisionAccumulate: True
-  #    TransposeA: True
-  #    TransposeB: False
-  #    UseBeta: True
-  #    Batched: True
-  #    UseBias: 1
-  #    BiasDataTypeList: [s,b]
-  #    Activation: True
-  #    ActivationType: all
-  #    UseScaleAlphaVec: 1
-  #
-  #  - # Grid
-  #    InitialSolutionParameters:
-  #    BenchmarkCommonParameters:
-  #      - KernelLanguage: ['Assembly']
-  #    ForkParameters:
-  #      - MatrixInstruction:
-  #        - [16, 16, 32, 1, 1, 4,4, 1,2]
-  #      - 1LDSBuffer: [-1]
-  #      - DepthU: [32]
-  #      - ExpandPointerSwap: [0]
-  #      - GlobalReadVectorWidthA: [4]
-  #      - GlobalReadVectorWidthB: [8]
-  #      - LocalReadVectorWidth: [8]
-  #      - MIArchVgpr: [0]
-  #      - PrefetchGlobalRead: [2]
-  #      - PrefetchLocalRead: [1]
-  #      - ScheduleIterAlg: [3]
-  #      - SourceSwap: [True]
-  #      - StaggerU: [0]
-  #      - StoreVectorWidth: [-1]
-  #      - StreamK: [3]
-  #      - TransposeLDS: [0]
-  #      - UseSgprForGRO: [0]
-  #      - WavefrontSize: [32]
-  #      - WorkGroupMapping: [6]
-  #    BenchmarkFinalParameters:
-  #      - ProblemSizes:
-  #        - Exact: [256, 256, 1, 4096]
-  #        - Exact: [263, 263, 1, 4103]
-  #      - BiasTypeArgs: ['s', 'b']
-  #      - ActivationArgs:
-  #        - [Enum: gelu]
+  - # Epilogues
+    - # BBS TN
+      OperationType: GEMM
+      DataType: b
+      DestDataType: b
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: True
+      TransposeB: False
+      UseBeta: True
+      Batched: True
+      UseBias: 1
+      BiasDataTypeList: [s,b]
+      Activation: True
+      ActivationType: all
+      UseScaleAlphaVec: 1
+
+    - # Grid
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ['Assembly']
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 32, 1, 1, 4,4, 1,2]
+        - 1LDSBuffer: [-1]
+        - DepthU: [32]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [4]
+        - GlobalReadVectorWidthB: [8]
+        - LocalReadVectorWidth: [8]
+        - MIArchVgpr: [0]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [True]
+        - StaggerU: [0]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - TransposeLDS: [0]
+        - UseSgprForGRO: [0]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [6]
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [256, 256, 1, 4096]
+          - Exact: [263, 263, 1, 4103]
+        - BiasTypeArgs: ['s', 'b']
+        - ActivationArgs:
+          - [Enum: gelu]
 
   - # Test cases for LSU, uninitialized workspace, and even work division
     - # HHS NT
@@ -167,91 +165,89 @@ BenchmarkProblems:
           #- Exact: [32, 8, 1, 4576]
           #- Exact: [32, 8, 1, 4832]
 
-  # FFM: Large LD group does not terminate in FFM (codegen too slow for FP32 S TN with large leading dimensions)
-  #- # Large leading dimensions
-  #  - # S TN
-  #    OperationType: GEMM
-  #    DataType: s
-  #    DestDataType: s
-  #    ComputeDataType: s
-  #    TransposeA: True
-  #    TransposeB: False
-  #    UseBeta: True
-  #    Batched: True
-  #
-  #  - # Grid
-  #    InitialSolutionParameters:
-  #    BenchmarkCommonParameters:
-  #      - KernelLanguage: ['Assembly']
-  #    ForkParameters:
-  #      - MatrixInstruction:
-  #        - [16, 16, 4, 1, 1, 4,4, 1,2]
-  #      - 1LDSBuffer: [-1]
-  #      - DepthU: [16]
-  #      - ExpandPointerSwap: [0]
-  #      - GlobalReadVectorWidthA: [4]
-  #      - GlobalReadVectorWidthB: [4]
-  #      - LocalReadVectorWidth: [4]
-  #      - MIArchVgpr: [0]
-  #      - PrefetchGlobalRead: [2]
-  #      - PrefetchLocalRead: [1]
-  #      - ScheduleIterAlg: [3]
-  #      - SourceSwap: [True]
-  #      - StaggerU: [0]
-  #      - StoreVectorWidth: [-1]
-  #      - StreamK: [3]
-  #      - StreamKFixupTreeReduction: [0]
-  #      - TransposeLDS: [0]
-  #      - UseSgprForGRO: [0]
-  #      - VectorWidthA: [1]
-  #      - VectorWidthB: [1]
-  #      - WavefrontSize: [32]
-  #      - WorkGroupMapping: [6]
-  #    BenchmarkFinalParameters:
-  #      - ProblemSizes:
-  #        - Exact: [320, 1024, 1, 4096, 138080, 138080, 29280, 29280]
+  - # Large leading dimensions
+    - # S TN
+      OperationType: GEMM
+      DataType: s
+      DestDataType: s
+      ComputeDataType: s
+      TransposeA: True
+      TransposeB: False
+      UseBeta: True
+      Batched: True
 
-  # FFM: Small LD group does not terminate in FFM (codegen too slow for BBS NT with small leading dimensions)
-  #- # Small leading dimensions
-  #  - # BBS NT
-  #    OperationType: GEMM
-  #    DataType: b
-  #    DestDataType: b
-  #    ComputeDataType: s
-  #    HighPrecisionAccumulate: True
-  #    TransposeA: False
-  #    TransposeB: True
-  #    UseBeta: True
-  #    Batched: True
-  #
-  #  - # Grid
-  #    InitialSolutionParameters:
-  #    BenchmarkCommonParameters:
-  #      - KernelLanguage: ["Assembly"]
-  #      - PrefetchLocalRead: [True]
-  #    ForkParameters:
-  #      - 1LDSBuffer: [0]
-  #      - DepthU: [64]
-  #      - ExpandPointerSwap: [False]
-  #      - GlobalReadVectorWidthA: [8]
-  #      - GlobalReadVectorWidthB: [8]
-  #      - GlobalSplitU: [0]
-  #      - MatrixInstruction:
-  #        - [16, 16, 32, 1, 1, 4,4, 1,2]
-  #      - MIArchVgpr: [0]
-  #      - PrefetchGlobalRead: [2]
-  #      - PrefetchLocalRead: [1]
-  #      - ScheduleIterAlg: [3]
-  #      - SourceSwap: [True]
-  #      - StoreRemapVectorWidth: [0]
-  #      - StreamK: [3]
-  #      - TransposeLDS: [0]
-  #      - WavefrontSize: [32]
-  #      - WorkGroupMapping: [1]
-  #
-  #    BenchmarkForkParameters:
-  #    JoinParameters:
-  #    BenchmarkJoinParameters:
-  #    BenchmarkFinalParameters:
-  #      - ProblemSizes:
-  #        - Exact: [1164, 185, 1, 8192, 1216, 1216, 1216, 185]
+    - # Grid
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ['Assembly']
+      ForkParameters:
+        - MatrixInstruction:
+          - [16, 16, 4, 1, 1, 4,4, 1,2]
+        - 1LDSBuffer: [-1]
+        - DepthU: [16]
+        - ExpandPointerSwap: [0]
+        - GlobalReadVectorWidthA: [4]
+        - GlobalReadVectorWidthB: [4]
+        - LocalReadVectorWidth: [4]
+        - MIArchVgpr: [0]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [True]
+        - StaggerU: [0]
+        - StoreVectorWidth: [-1]
+        - StreamK: [3]
+        - StreamKFixupTreeReduction: [0]
+        - TransposeLDS: [0]
+        - UseSgprForGRO: [0]
+        - VectorWidthA: [1]
+        - VectorWidthB: [1]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [6]
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [320, 1024, 1, 4096, 138080, 138080, 29280, 29280]
+
+  - # Small leading dimensions
+    - # BBS NT
+      OperationType: GEMM
+      DataType: b
+      DestDataType: b
+      ComputeDataType: s
+      HighPrecisionAccumulate: True
+      TransposeA: False
+      TransposeB: True
+      UseBeta: True
+      Batched: True
+
+    - # Grid
+      InitialSolutionParameters:
+      BenchmarkCommonParameters:
+        - KernelLanguage: ["Assembly"]
+        - PrefetchLocalRead: [True]
+      ForkParameters:
+        - 1LDSBuffer: [0]
+        - DepthU: [64]
+        - ExpandPointerSwap: [False]
+        - GlobalReadVectorWidthA: [8]
+        - GlobalReadVectorWidthB: [8]
+        - GlobalSplitU: [0]
+        - MatrixInstruction:
+          - [16, 16, 32, 1, 1, 4,4, 1,2]
+        - MIArchVgpr: [0]
+        - PrefetchGlobalRead: [2]
+        - PrefetchLocalRead: [1]
+        - ScheduleIterAlg: [3]
+        - SourceSwap: [True]
+        - StoreRemapVectorWidth: [0]
+        - StreamK: [3]
+        - TransposeLDS: [0]
+        - WavefrontSize: [32]
+        - WorkGroupMapping: [1]
+
+      BenchmarkForkParameters:
+      JoinParameters:
+      BenchmarkJoinParameters:
+      BenchmarkFinalParameters:
+        - ProblemSizes:
+          - Exact: [1164, 185, 1, 8192, 1216, 1216, 1216, 185]
