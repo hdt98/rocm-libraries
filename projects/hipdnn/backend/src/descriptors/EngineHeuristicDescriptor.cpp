@@ -105,29 +105,21 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
     auto handle = _graph->getHandle();
     auto heurRm = handle->getHeuristicPluginResourceManager();
 
-    // Create one SelectionHeuristic per policy slot
+    // Create one SelectionHeuristic per policy slot. The slot holds a
+    // shared_ptr to the resource manager so the underlying plugin and handle
+    // cannot be destroyed while the slot is alive; lookups happen by policy
+    // ID inside SelectionHeuristic.
     for(const int64_t policyId : orderedPolicyIds)
     {
-        auto pluginHandle = heurRm->getHeuristicHandleForPolicyId(policyId);
-        if(pluginHandle == nullptr)
+        if(heurRm->getHeuristicHandleForPolicyId(policyId) == nullptr)
         {
             // Policy not loaded - add null placeholder
             _policySlots.push_back(nullptr);
             continue;
         }
 
-        // Get the HeuristicPlugin for this policy
-        auto plugin = heurRm->getPluginForPolicyId(policyId);
-        if(plugin == nullptr)
-        {
-            // This shouldn't happen if handle exists, but be defensive
-            _policySlots.push_back(nullptr);
-            continue;
-        }
-
-        // Create SelectionHeuristic for this policy slot
         _policySlots.push_back(
-            std::make_unique<heuristics::SelectionHeuristic>(plugin, pluginHandle));
+            std::make_unique<heuristics::SelectionHeuristic>(heurRm, policyId));
     }
 }
 

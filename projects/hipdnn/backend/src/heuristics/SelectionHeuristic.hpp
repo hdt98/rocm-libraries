@@ -13,7 +13,8 @@
 namespace hipdnn_backend::plugin
 {
 class HeuristicPlugin;
-}
+class HeuristicPluginResourceManager;
+} // namespace hipdnn_backend::plugin
 
 namespace hipdnn_backend::heuristics
 {
@@ -35,6 +36,13 @@ namespace hipdnn_backend::heuristics
  * Lifecycle: Owned by EngineHeuristicDescriptor, one per resolved policy slot.
  * Created when the policy list is established, destroyed with the descriptor.
  *
+ * Ownership: Holds a shared_ptr to the HeuristicPluginResourceManager and a
+ * policy ID rather than a raw HeuristicPlugin pointer. The shared_ptr keeps
+ * the manager (and transitively the loaded plugin) alive for the descriptor's
+ * lifetime; plugin and handle lookups happen by policy ID through the
+ * manager. This protects against the manager being destroyed while a slot
+ * still holds the descriptor.
+ *
  * RFC 0007 Reference: Section 7
  */
 class SelectionHeuristic
@@ -43,15 +51,20 @@ public:
     /**
      * @brief Constructs a SelectionHeuristic for a given policy.
      *
-     * Creates the underlying hipdnnHeuristicPolicyDescriptor_t by calling
-     * hipdnnHeuristicPolicyDescriptorCreate with the plugin handle.
+     * Resolves the HeuristicPlugin and hipdnnHeuristicHandle_t through the
+     * resource manager using the policy ID, and creates the underlying
+     * hipdnnHeuristicPolicyDescriptor_t.
      *
-     * @param plugin Pointer to the HeuristicPlugin that implements this policy.
-     *               Must remain valid for the lifetime of this object.
-     * @param pluginHandle The hipdnnHeuristicHandle_t for this policy's module.
-     *                     Created by HeuristicPluginResourceManager.
+     * @param resourceManager Shared pointer to the resource manager that owns
+     *                        the plugin handles. Kept alive for the lifetime
+     *                        of this object so the resolved plugin/handle
+     *                        cannot dangle.
+     * @param policyId Stable int64_t policy ID identifying the policy this
+     *                 slot represents (engineNameToId hash).
      */
-    SelectionHeuristic(const plugin::HeuristicPlugin* plugin, hipdnnHeuristicHandle_t pluginHandle);
+    SelectionHeuristic(
+        std::shared_ptr<plugin::HeuristicPluginResourceManager> resourceManager,
+        int64_t policyId);
 
     /**
      * @brief Destroys the SelectionHeuristic and releases the policy descriptor.
@@ -129,7 +142,14 @@ public:
     std::vector<int64_t> getSortedEngineIds();
 
 private:
-    const plugin::HeuristicPlugin* _plugin;
+    // Look up the plugin for _policyId via _resourceManager. Returns nullptr
+    // if the policy is no longer registered (e.g. plugin was removed). All
+    // operations route through the resource manager so the plugin lookup
+    // stays consistent with the manager's current state.
+    const plugin::HeuristicPlugin* lookupPlugin() const;
+
+    std::shared_ptr<plugin::HeuristicPluginResourceManager> _resourceManager;
+    int64_t _policyId = 0;
     hipdnnHeuristicPolicyDescriptor_t _descriptor = nullptr;
 };
 
