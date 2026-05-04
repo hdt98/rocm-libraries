@@ -95,7 +95,8 @@ using WarpGemmMfmaF16F16F32M32N32K16 = WarpGemmImpl<WarpGemmAttributeMfmaIterate
     WarpGemmAttributeMfmaImplF16F16F32M32N32K8<WGAttrCtlEnum::Default_>,
     2,
     AttrNumAccessA,
-    AttrNumAccessB>>;
+    AttrNumAccessB,
+    PackNumAccess>>;
 #endif
 
 #if defined(__gfx950__)
