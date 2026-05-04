@@ -72,7 +72,7 @@ TensorDescriptor BuildReshaped4DTensorDescriptor(const miopen::TensorDescriptor&
     auto layout_opt = tDesc.GetLayoutEnum();
     if(!layout_opt)
     {
-        MIOPEN_THROW(miopenStatusInternalError, "Unset layout");
+        MIOPEN_THROW(miopenStatusInternalError, "Unknown layout");
     }
 
     auto layout = layout_opt.value();
