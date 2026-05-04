@@ -38,6 +38,19 @@ def show_node_info() {
     """
 }
 
+def setGithubStatus(String context, String state, String description) {
+    def sha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+    def statusUrl = "https://api.github.com/repos/ROCm/rocm-libraries/statuses/${sha}"
+    withCredentials([usernamePassword(credentialsId: 'github-app-composable-kernel', usernameVariable: 'GITHUB_APP', passwordVariable: 'GITHUB_TOKEN')]) {
+        sh(script: """
+            curl -s -o /dev/null -w "%{http_code}" -X POST '${statusUrl}' \\
+                -H "Authorization: token \$GITHUB_TOKEN" \\
+                -H 'Content-Type: application/json' \\
+                -d '{"state":"${state}","context":"${context}","description":"${description}","target_url":"${env.BUILD_URL}"}'
+        """)
+    }
+}
+
 def cloneUpdateRefRepo() {
     def refRepoPath = "/var/jenkins/ref-repo/rocm-libraries"
     def lockLabel = "git ref repo lock - ${env.NODE_NAME}"
@@ -861,13 +874,18 @@ def buildHipClangJob(Map conf=[:]){
         (retimage, image) = getDockerImage(conf)
 
         //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+        setGithubStatus("${env.STAGE_NAME}", 'pending', "Starting ${env.STAGE_NAME}")
+        try {
             withDockerContainer(image: image, args: dockerOpts) {
                 timeout(time: 20, unit: 'HOURS')
                 {
                     cmake_build(conf)
                 }
             }
+        }
+        catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
+                throw e
         }
         return retimage
 }
@@ -892,7 +910,8 @@ def Build_CK(Map conf=[:]){
         def retimage
 
         //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+        setGithubStatus("${env.STAGE_NAME}", 'pending', 'Building CK...')
+        try {
             try {
                 (retimage, image) = getDockerImage(conf)
                 withDockerContainer(image: image, args: dockerOpts) {
@@ -909,6 +928,7 @@ def Build_CK(Map conf=[:]){
             }
             catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
                 echo "The job was cancelled or aborted"
+                setGithubStatus("${env.STAGE_NAME}", 'failure', 'Build stage failed')
                 throw e
             }
             withDockerContainer(image: image, args: dockerOpts) {
@@ -969,6 +989,12 @@ def Build_CK(Map conf=[:]){
                     }
                 }
             }
+            setGithubStatus("${env.STAGE_NAME}", 'success', 'Completed successfully')
+        }
+        catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
+                echo "The job was cancelled or aborted"
+                setGithubStatus("${env.STAGE_NAME}", 'error', 'Build stage failed')
+                throw e
         }
         return retimage
 }
@@ -990,7 +1016,8 @@ def process_results(Map conf=[:]){
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
     //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-    withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+    setGithubStatus("${env.STAGE_NAME}", 'pending', 'Processing results...')
+    try {
         try
         {
             echo "Pulling image: ${image}"
@@ -1111,10 +1138,12 @@ def process_results(Map conf=[:]){
                     // process the logs
                     sh "./process_perf_data.sh"
                 }
+                setGithubStatus("${env.STAGE_NAME}", 'success', 'Completed successfully')
             }
             catch(e){
                 echo "Throwing error exception while processing performance test results"
                 echo 'Exception occurred: ' + e.toString()
+                setGithubStatus("${env.STAGE_NAME}", 'error', 'Processing results failed')
                 throw e
             }
             finally{
@@ -1130,7 +1159,8 @@ def run_downstream_tests(Map conf=[:]){
     def dockerOpts = get_docker_options() + ' --group-add irc '
 
     //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-    withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+    setGithubStatus("${env.STAGE_NAME}", 'pending', "Starting ${env.STAGE_NAME}")
+    try {
         try
         {
             echo "Pulling image: ${conf.image}"
@@ -1157,6 +1187,7 @@ def run_downstream_tests(Map conf=[:]){
             catch(e){
                 echo "Throwing error exception while running ${env.STAGE_NAME}"
                 echo 'Exception occurred: ' + e.toString()
+                setGithubStatus("${env.STAGE_NAME}", 'error', "Running ${env.STAGE_NAME} failed")
                 throw e
             }
             finally{
