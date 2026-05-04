@@ -15,7 +15,7 @@ rocblas_status rocsolver_syevd_heevd_impl(rocblas_handle handle,
                                           const I lda,
                                           S* D,
                                           S* E,
-                                          rocblas_int* info)
+                                          I* info)
 {
     const char* name = (!rocblas_is_complex<T> ? "syevd" : "heevd");
     ROCSOLVER_ENTER_TOP(name, "--evect", evect, "--uplo", uplo, "-n", n, "--lda", lda);
@@ -163,7 +163,7 @@ rocblas_status rocsolver_ssyevd_64(rocblas_handle handle,
                                    const int64_t lda,
                                    float* D,
                                    float* E,
-                                   rocblas_int* info)
+                                   int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -181,7 +181,7 @@ rocblas_status rocsolver_dsyevd_64(rocblas_handle handle,
                                    const int64_t lda,
                                    double* D,
                                    double* E,
-                                   rocblas_int* info)
+                                   int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -199,7 +199,7 @@ rocblas_status rocsolver_cheevd_64(rocblas_handle handle,
                                    const int64_t lda,
                                    float* D,
                                    float* E,
-                                   rocblas_int* info)
+                                   int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -218,7 +218,7 @@ rocblas_status rocsolver_zheevd_64(rocblas_handle handle,
                                    const int64_t lda,
                                    double* D,
                                    double* E,
-                                   rocblas_int* info)
+                                   int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 

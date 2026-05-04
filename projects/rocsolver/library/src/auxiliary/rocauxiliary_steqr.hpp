@@ -4,7 +4,7 @@
  *     Univ. of Tennessee, Univ. of California Berkeley,
  *     Univ. of Colorado Denver and NAG Ltd..
  *     December 2016
- * Copyright (C) 2019-2025 Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (C) 2019-2026 Advanced Micro Devices, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,21 +44,21 @@ ROCSOLVER_BEGIN_NAMESPACE
 /** STEQR_KERNEL/RUN_STEQR implements the main loop of the sterf algorithm
     to compute the eigenvalues of a symmetric tridiagonal matrix given by D
     and E **/
-template <typename T, typename S, typename U>
+template <typename T, typename S, typename U, typename I>
 rocblas_status run_steqr_hybrid(rocblas_handle handle,
-                                rocblas_int n,
+                                I n,
                                 S* dD,
                                 const rocblas_stride strideD,
                                 S* dE,
                                 const rocblas_stride strideE,
                                 U dC,
                                 const rocblas_stride shiftC,
-                                const rocblas_int ldc,
+                                const I ldc,
                                 const rocblas_stride strideC,
-                                const rocblas_int batch_count,
-                                rocblas_int* dInfo,
+                                const I batch_count,
+                                I* dInfo,
                                 S* dWork,
-                                const rocblas_int max_iters,
+                                const I max_iters,
                                 const S eps,
                                 const S ssfmin,
                                 const S ssfmax,
@@ -67,18 +67,18 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
     hipStream_t stream;
     rocblas_get_stream(handle, &stream);
 
-    rocblas_int m, l, lsv, lend, lendsv;
-    rocblas_int l1;
-    rocblas_int iters;
+    I m, l, lsv, lend, lendsv;
+    I l1;
+    I iters;
     S anorm, p;
 
     rocblas_stride strideW = 2 * n;
 
-    rocsolver_hybrid_storage<S, rocblas_int, S*> hD;
-    rocsolver_hybrid_storage<S, rocblas_int, S*> hE;
-    rocsolver_hybrid_storage<rocblas_int, rocblas_int, rocblas_int*> hInfo;
-    rocsolver_hybrid_storage<S, rocblas_int, S*> hWork;
-    rocsolver_hybrid_storage<T, rocblas_int, U> hC;
+    rocsolver_hybrid_storage<S, I, S*> hD;
+    rocsolver_hybrid_storage<S, I, S*> hE;
+    rocsolver_hybrid_storage<I, I, I*> hInfo;
+    rocsolver_hybrid_storage<S, I, S*> hWork;
+    rocsolver_hybrid_storage<T, I, U> hC;
 
     ROCBLAS_CHECK(hD.init_async(n, dD, 0, strideD, batch_count, stream));
     ROCBLAS_CHECK(hE.init_async(n - 1, dE, 0, strideE, batch_count, stream));
@@ -87,13 +87,13 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
     ROCBLAS_CHECK(hC.init_pointers_only(dC, shiftC, strideC, batch_count, stream));
     HIP_CHECK(hipStreamSynchronize(stream));
 
-    rocblas_int blocks = (n - 1) / BS1 + 1;
+    I blocks = (n - 1) / BS1 + 1;
 
-    for(rocblas_int b = 0; b < batch_count; b++)
+    for(I b = 0; b < batch_count; b++)
     {
         S* D = hD[b];
         S* E = hE[b];
-        rocblas_int* info = hInfo[b];
+        I* info = hInfo[b];
         S* work = hWork[0];
         T* C = hC[b] + shiftC;
 
@@ -190,7 +190,7 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
                         s = 1;
                         p = 0;
 
-                        for(int i = m - 1; i >= l; i--)
+                        for(I i = m - 1; i >= l; i--)
                         {
                             f = s * E[i];
                             b = c * E[i];
@@ -221,7 +221,7 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
                         ROCBLAS_CHECK(rocsolver_lasr_template<T, S>(
                             handle, rocblas_side_right, rocblas_pivot_variable,
                             rocblas_backward_direction, n, m - lsv + 1, dWork + lsv, strideW,
-                            dWork + n - 1 + lsv, strideW, C, lsv * ldc, ldc, strideC, 1));
+                            dWork + n - 1 + lsv, strideW, C, lsv * ldc, ldc, strideC, (I)1));
                     }
                 }
             }
@@ -277,7 +277,7 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
                         s = 1;
                         p = 0;
 
-                        for(int i = m; i <= l - 1; i++)
+                        for(I i = m; i <= l - 1; i++)
                         {
                             f = s * E[i];
                             b = c * E[i];
@@ -308,7 +308,7 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
                         ROCBLAS_CHECK(rocsolver_lasr_template<T, S>(
                             handle, rocblas_side_right, rocblas_pivot_variable,
                             rocblas_forward_direction, n, lsv - m + 1, dWork + m, strideW,
-                            dWork + n - 1 + m, strideW, C, m * ldc, ldc, strideC, 1));
+                            dWork + n - 1 + m, strideW, C, m * ldc, ldc, strideC, (I)1));
                     }
                 }
             }
@@ -321,19 +321,19 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
         }
 
         // Check for convergence
-        for(int i = 0; i < n - 1; i++)
+        for(I i = 0; i < n - 1; i++)
             if(E[i] != 0)
                 *info = *info + 1;
 
         // Sort eigenvalues and eigenvectors by selection sort
         if(ordered)
         {
-            for(int ii = 1; ii < n; ii++)
+            for(I ii = 1; ii < n; ii++)
             {
                 l = ii - 1;
                 m = l;
                 p = D[l];
-                for(int j = ii; j < n; j++)
+                for(I j = ii; j < n; j++)
                 {
                     if(D[j] < p)
                     {
@@ -349,8 +349,8 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
 
                 if(m != l)
                 {
-                    ROCSOLVER_LAUNCH_KERNEL(swap_kernel<T>, dim3(blocks), dim3(BS1), 0, stream, n,
-                                            C + l * ldc, 1, C + m * ldc, 1);
+                    ROCSOLVER_LAUNCH_KERNEL(swap_kernel<T>, dim3(blocks), dim3(BS1), (I)0, stream,
+                                            n, C + l * ldc, (I)1, C + m * ldc, (I)1);
                 }
             }
         }
@@ -367,25 +367,25 @@ rocblas_status run_steqr_hybrid(rocblas_handle handle,
 /** STEQR_KERNEL/RUN_STEQR implements the main loop of the sterf algorithm
     to compute the eigenvalues of a symmetric tridiagonal matrix given by D
     and E **/
-template <typename T, typename S>
-__device__ void run_steqr(const rocblas_int tid,
-                          const rocblas_int tid_inc,
-                          const rocblas_int n,
+template <typename T, typename S, typename I>
+__device__ void run_steqr(const I tid,
+                          const I tid_inc,
+                          const I n,
                           S* D,
                           S* E,
                           T* C,
-                          const rocblas_int ldc,
-                          rocblas_int* info,
+                          const I ldc,
+                          I* info,
                           S* work,
-                          const rocblas_int max_iters,
+                          const I max_iters,
                           const S eps,
                           const S ssfmin,
                           const S ssfmax,
                           const bool ordered = true)
 {
-    __shared__ rocblas_int m, l, lsv, lend, lendsv;
-    __shared__ rocblas_int l1;
-    __shared__ rocblas_int iters;
+    __shared__ I m, l, lsv, lend, lendsv;
+    __shared__ I l1;
+    __shared__ I iters;
     __shared__ S anorm, p;
 
     if(tid == 0)
@@ -492,7 +492,7 @@ __device__ void run_steqr(const rocblas_int tid,
                         s = 1;
                         p = 0;
 
-                        for(int i = m - 1; i >= l; i--)
+                        for(I i = m - 1; i >= l; i--)
                         {
                             f = s * E[i];
                             b = c * E[i];
@@ -582,7 +582,7 @@ __device__ void run_steqr(const rocblas_int tid,
                         s = 1;
                         p = 0;
 
-                        for(int i = m; i <= l - 1; i++)
+                        for(I i = m; i <= l - 1; i++)
                         {
                             f = s * E[i];
                             b = c * E[i];
@@ -629,21 +629,21 @@ __device__ void run_steqr(const rocblas_int tid,
     }
 
     // Check for convergence
-    for(int i = tid; i < n - 1; i += tid_inc)
+    for(I i = tid; i < n - 1; i += tid_inc)
         if(E[i] != 0)
-            atomicAdd(info, 1);
+            atomicAdd(reinterpret_cast<unsigned long*>(info), 1);
 
     // Sort eigenvalues and eigenvectors by selection sort
     if(ordered)
     {
-        for(int ii = 1; ii < n; ii++)
+        for(I ii = 1; ii < n; ii++)
         {
             if(tid == 0)
             {
                 l = ii - 1;
                 m = l;
                 p = D[l];
-                for(int j = ii; j < n; j++)
+                for(I j = ii; j < n; j++)
                 {
                     if(D[j] < p)
                     {
@@ -661,7 +661,7 @@ __device__ void run_steqr(const rocblas_int tid,
 
             if(m != l)
             {
-                for(int j = 0; j < n; j++)
+                for(I j = 0; j < n; j++)
                     swap(C[j + l * ldc], C[j + m * ldc]);
             }
             __syncthreads();
@@ -669,34 +669,34 @@ __device__ void run_steqr(const rocblas_int tid,
     }
 }
 
-template <typename T, typename S, typename U>
-ROCSOLVER_KERNEL void steqr_kernel(const rocblas_int n,
+template <typename T, typename S, typename U, typename I>
+ROCSOLVER_KERNEL void steqr_kernel(const I n,
                                    S* DD,
                                    const rocblas_stride strideD,
                                    S* EE,
                                    const rocblas_stride strideE,
                                    U CC,
-                                   const rocblas_int shiftC,
-                                   const rocblas_int ldc,
+                                   const rocblas_stride shiftC,
+                                   const I ldc,
                                    const rocblas_stride strideC,
-                                   rocblas_int* iinfo,
+                                   I* iinfo,
                                    S* WW,
-                                   const rocblas_int max_iters,
+                                   const I max_iters,
                                    const S eps,
                                    const S ssfmin,
                                    const S ssfmax)
 {
     // select bacth instance
-    rocblas_int tid = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
-    rocblas_int tid_inc = hipGridDim_x * hipBlockDim_x;
-    rocblas_int bid = hipBlockIdx_y;
+    I tid = hipBlockIdx_x * hipBlockDim_x + hipThreadIdx_x;
+    I tid_inc = hipGridDim_x * hipBlockDim_x;
+    I bid = hipBlockIdx_y;
     rocblas_stride strideW = 2 * n;
 
     S* D = DD + (bid * strideD);
     S* E = EE + (bid * strideE);
     T* C = load_ptr_batch<T>(CC, bid, shiftC, strideC);
     S* work = WW + (bid * strideW);
-    rocblas_int* info = iinfo + bid;
+    I* info = iinfo + bid;
 
     // execute
     run_steqr(tid, tid_inc, n, D, E, C, ldc, info, work, max_iters, eps, ssfmin, ssfmax);
@@ -756,22 +756,22 @@ rocblas_status rocsolver_steqr_argCheck(rocblas_handle handle,
     return rocblas_status_continue;
 }
 
-template <typename T, typename S, typename U>
+template <typename T, typename S, typename U, typename I>
 rocblas_status rocsolver_steqr_template(rocblas_handle handle,
                                         const rocblas_evect evect,
-                                        const rocblas_int n,
+                                        const I n,
                                         S* D,
-                                        const rocblas_int shiftD,
+                                        const rocblas_stride shiftD,
                                         const rocblas_stride strideD,
                                         S* E,
-                                        const rocblas_int shiftE,
+                                        const rocblas_stride shiftE,
                                         const rocblas_stride strideE,
                                         U C,
-                                        const rocblas_int shiftC,
-                                        const rocblas_int ldc,
+                                        const rocblas_stride shiftC,
+                                        const I ldc,
                                         const rocblas_stride strideC,
-                                        rocblas_int* info,
-                                        const rocblas_int batch_count,
+                                        I* info,
+                                        const I batch_count,
                                         void* work_stack)
 {
     ROCSOLVER_ENTER("steqr", "evect:", evect, "n:", n, "shiftD:", shiftD, "shiftE:", shiftE,
@@ -787,7 +787,7 @@ rocblas_status rocsolver_steqr_template(rocblas_handle handle,
     rocsolver_alg_mode alg_mode;
     ROCBLAS_CHECK(rocsolver_get_alg_mode(handle, rocsolver_function_steqr, &alg_mode));
 
-    rocblas_int blocksReset = (batch_count - 1) / BS1 + 1;
+    I blocksReset = (batch_count - 1) / BS1 + 1;
     dim3 gridReset(blocksReset, 1, 1);
     dim3 threads(BS1, 1, 1);
 
@@ -804,7 +804,7 @@ rocblas_status rocsolver_steqr_template(rocblas_handle handle,
     // Initialize identity matrix
     if(evect == rocblas_evect_tridiagonal)
     {
-        rocblas_int blocks = (n - 1) / BS2 + 1;
+        I blocks = (n - 1) / BS2 + 1;
         ROCSOLVER_LAUNCH_KERNEL(init_ident<T>, dim3(blocks, blocks, batch_count), dim3(BS2, BS2), 0,
                                 stream, n, n, C, shiftC, ldc, strideC);
     }
@@ -817,8 +817,8 @@ rocblas_status rocsolver_steqr_template(rocblas_handle handle,
 
     if(evect == rocblas_evect_none)
         ROCSOLVER_LAUNCH_KERNEL(sterf_kernel<S>, dim3(batch_count), dim3(1), 0, stream, n,
-                                D + shiftD, strideD, E + shiftE, strideE, info,
-                                (rocblas_int*)work_stack, 30 * n, eps, ssfmin, ssfmax);
+                                D + shiftD, strideD, E + shiftE, strideE, info, (I*)work_stack,
+                                30 * n, eps, ssfmin, ssfmax);
     else
     {
         if(alg_mode == rocsolver_alg_mode_hybrid)

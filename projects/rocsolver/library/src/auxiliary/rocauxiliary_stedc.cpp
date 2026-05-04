@@ -37,7 +37,7 @@ rocblas_status rocsolver_stedc_impl(rocblas_handle handle,
                                     S* E,
                                     T* C,
                                     const I ldc,
-                                    rocblas_int* info)
+                                    I* info)
 {
     ROCSOLVER_ENTER_TOP("stedc", "--evect", evect, "-n", n, "--ldc", ldc);
 

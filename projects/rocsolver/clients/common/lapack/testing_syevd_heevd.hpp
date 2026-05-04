@@ -736,8 +736,8 @@ void testing_syevd_heevd(Arguments& argus)
     rocblas_local_handle handle;
     char evectC = argus.get<char>("evect");
     char uploC = argus.get<char>("uplo");
-    I n = argus.get<rocblas_int>("n");
-    I lda = argus.get<rocblas_int>("lda", n);
+    rocblas_int n = argus.get<rocblas_int>("n");
+    rocblas_int lda = argus.get<rocblas_int>("lda", n);
     rocblas_stride stA = argus.get<rocblas_stride>("strideA", lda * n);
     rocblas_stride stD = argus.get<rocblas_stride>("strideD", n);
     rocblas_stride stE = argus.get<rocblas_stride>("strideE", n);
@@ -764,14 +764,14 @@ void testing_syevd_heevd(Arguments& argus)
     if(uplo == rocblas_fill_full || evect == rocblas_evect_tridiagonal)
     {
         if(BATCHED)
-            EXPECT_ROCBLAS_STATUS(
-                rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n, (T* const*)nullptr, lda, stA,
-                                      (S*)nullptr, stD, (S*)nullptr, stE, (rocblas_int*)nullptr, bc),
-                rocblas_status_invalid_value);
+            EXPECT_ROCBLAS_STATUS(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n,
+                                                        (T* const*)nullptr, lda, stA, (S*)nullptr,
+                                                        stD, (S*)nullptr, stE, (I*)nullptr, bc),
+                                  rocblas_status_invalid_value);
         else
             EXPECT_ROCBLAS_STATUS(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n,
                                                         (T*)nullptr, lda, stA, (S*)nullptr, stD,
-                                                        (S*)nullptr, stE, (rocblas_int*)nullptr, bc),
+                                                        (S*)nullptr, stE, (I*)nullptr, bc),
                                   rocblas_status_invalid_value);
 
         if(argus.timing)
@@ -794,14 +794,14 @@ void testing_syevd_heevd(Arguments& argus)
     if(invalid_size)
     {
         if(BATCHED)
-            EXPECT_ROCBLAS_STATUS(
-                rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n, (T* const*)nullptr, lda, stA,
-                                      (S*)nullptr, stD, (S*)nullptr, stE, (rocblas_int*)nullptr, bc),
-                rocblas_status_invalid_size);
+            EXPECT_ROCBLAS_STATUS(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n,
+                                                        (T* const*)nullptr, lda, stA, (S*)nullptr,
+                                                        stD, (S*)nullptr, stE, (I*)nullptr, bc),
+                                  rocblas_status_invalid_size);
         else
             EXPECT_ROCBLAS_STATUS(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n,
                                                         (T*)nullptr, lda, stA, (S*)nullptr, stD,
-                                                        (S*)nullptr, stE, (rocblas_int*)nullptr, bc),
+                                                        (S*)nullptr, stE, (I*)nullptr, bc),
                                   rocblas_status_invalid_size);
 
         if(argus.timing)
@@ -817,11 +817,11 @@ void testing_syevd_heevd(Arguments& argus)
         if(BATCHED)
             CHECK_ALLOC_QUERY(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n,
                                                     (T* const*)nullptr, lda, stA, (S*)nullptr, stD,
-                                                    (S*)nullptr, stE, (rocblas_int*)nullptr, bc));
+                                                    (S*)nullptr, stE, (I*)nullptr, bc));
         else
             CHECK_ALLOC_QUERY(rocsolver_syevd_heevd(STRIDED, handle, evect, uplo, n, (T*)nullptr,
                                                     lda, stA, (S*)nullptr, stD, (S*)nullptr, stE,
-                                                    (rocblas_int*)nullptr, bc));
+                                                    (I*)nullptr, bc));
 
         size_t size;
         CHECK_ROCBLAS_ERROR(rocblas_stop_device_memory_size_query(handle, &size));
@@ -833,13 +833,13 @@ void testing_syevd_heevd(Arguments& argus)
     // memory allocations (all cases)
     // host
     host_strided_batch_vector<S> hD(size_D, 1, stD, bc);
-    host_strided_batch_vector<rocblas_int> hinfo(1, 1, 1, bc);
-    host_strided_batch_vector<rocblas_int> hinfoRes(1, 1, 1, bc);
+    host_strided_batch_vector<I> hinfo(1, 1, 1, bc);
+    host_strided_batch_vector<I> hinfoRes(1, 1, 1, bc);
     host_strided_batch_vector<S> hDres(size_Dres, 1, stD, bc);
     // device
     device_strided_batch_vector<S> dE(size_E, 1, stE, bc);
     device_strided_batch_vector<S> dD(size_D, 1, stD, bc);
-    device_strided_batch_vector<rocblas_int> dinfo(1, 1, 1, bc);
+    device_strided_batch_vector<I> dinfo(1, 1, 1, bc);
     if(size_E)
         CHECK_HIP_ERROR(dE.memcheck());
     if(size_D)

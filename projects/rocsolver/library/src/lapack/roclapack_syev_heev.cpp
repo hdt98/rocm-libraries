@@ -29,16 +29,16 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-template <typename T, typename S, typename W>
+template <typename T, typename S, typename W, typename I>
 rocblas_status rocsolver_syev_heev_impl(rocblas_handle handle,
                                         const rocblas_evect evect,
                                         const rocblas_fill uplo,
-                                        const rocblas_int n,
+                                        const I n,
                                         W A,
-                                        const rocblas_int lda,
+                                        const I lda,
                                         S* D,
                                         S* E,
-                                        rocblas_int* info)
+                                        I* info)
 {
     const char* name = (!rocblas_is_complex<T> ? "syev" : "heev");
     ROCSOLVER_ENTER_TOP(name, "--evect", evect, "--uplo", uplo, "-n", n, "--lda", lda);
@@ -52,13 +52,13 @@ rocblas_status rocsolver_syev_heev_impl(rocblas_handle handle,
         return st;
 
     // working with unshifted arrays
-    rocblas_int shiftA = 0;
+    rocblas_stride shiftA = 0;
 
     // normal (non-batched non-strided) execution
     rocblas_stride strideA = 0;
     rocblas_stride strideD = 0;
     rocblas_stride strideE = 0;
-    rocblas_int batch_count = 1;
+    I batch_count = 1;
 
     // memory workspace sizes:
     // size for constants in rocblas calls
@@ -176,7 +176,7 @@ rocblas_status rocsolver_ssyev_64(rocblas_handle handle,
                                   const int64_t lda,
                                   float* D,
                                   float* E,
-                                  rocblas_int* info)
+                                  int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -194,7 +194,7 @@ rocblas_status rocsolver_dsyev_64(rocblas_handle handle,
                                   const int64_t lda,
                                   double* D,
                                   double* E,
-                                  rocblas_int* info)
+                                  int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -212,7 +212,7 @@ rocblas_status rocsolver_cheev_64(rocblas_handle handle,
                                   const int64_t lda,
                                   float* D,
                                   float* E,
-                                  rocblas_int* info)
+                                  int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 
@@ -231,7 +231,7 @@ rocblas_status rocsolver_zheev_64(rocblas_handle handle,
                                   const int64_t lda,
                                   double* D,
                                   double* E,
-                                  rocblas_int* info)
+                                  int64_t* info)
 {
 #ifdef HAVE_ROCBLAS_64
 

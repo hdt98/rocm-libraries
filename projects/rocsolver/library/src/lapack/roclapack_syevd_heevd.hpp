@@ -134,7 +134,7 @@ rocblas_status rocsolver_syevd_heevd_argCheck(rocblas_handle handle,
                                               const I lda,
                                               S* D,
                                               S* E,
-                                              rocblas_int* info,
+                                              I* info,
                                               const I batch_count = 1)
 {
     // order is important for unit tests:
@@ -257,7 +257,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
                                               const rocblas_stride strideD,
                                               S* E,
                                               const rocblas_stride strideE,
-                                              rocblas_int* info,
+                                              I* info,
                                               const I batch_count,
                                               T* scalars,
                                               void* work1,
@@ -312,7 +312,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
     rocsolver_alg_mode sterf_mode;
     ROCBLAS_CHECK(rocsolver_get_alg_mode(handle, rocsolver_function_sterf, &sterf_mode));
 
-    rocblas_int blocksReset = (batch_count - 1) / BS1 + 1;
+    I blocksReset = (batch_count - 1) / BS1 + 1;
     dim3 gridReset(blocksReset, 1, 1);
     dim3 threads(BS1, 1, 1);
 
@@ -387,7 +387,7 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
                                               const rocblas_stride strideD,
                                               S* E,
                                               const rocblas_stride strideE,
-                                              rocblas_int* info,
+                                              I* info,
                                               const I batch_count,
                                               T* scalars,
                                               void* work1,
@@ -476,8 +476,8 @@ rocblas_status rocsolver_syevd_heevd_template(rocblas_handle handle,
     if(sterf_mode == rocsolver_alg_mode_hybrid && evect != rocblas_evect_original)
     {
         // only in hybrid mode, compute eigenvalues using sterf
-        rocsolver_sterf_template<S>(handle, n, D, 0, strideD, E, 0, strideE, info, batch_count,
-                                    (rocblas_int*)work1);
+        rocsolver_sterf_template<S>(handle, n, D, (I)0, strideD, E, (I)0, strideE, info,
+                                    batch_count, (I*)work1);
     }
     else
     {

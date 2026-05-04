@@ -110,7 +110,7 @@ rocblas_status rocsolver_syev_heev_argCheck(rocblas_handle handle,
                                             const I lda,
                                             S* D,
                                             S* E,
-                                            rocblas_int* info,
+                                            I* info,
                                             const I batch_count = 1)
 {
     // order is important for unit tests:
@@ -148,7 +148,7 @@ rocblas_status rocsolver_syev_heev_template(rocblas_handle handle,
                                             const rocblas_stride strideD,
                                             S* E,
                                             const rocblas_stride strideE,
-                                            rocblas_int* info,
+                                            I* info,
                                             const I batch_count,
                                             T* scalars,
                                             void* work_stack,
@@ -195,7 +195,7 @@ rocblas_status rocsolver_syev_heev_template(rocblas_handle handle,
     {
         // only compute eigenvalues
         rocsolver_sterf_template<S>(handle, n, D, (I)0, strideD, E, (I)0, strideE, info,
-                                    batch_count, (rocblas_int*)work_stack);
+                                    batch_count, (I*)work_stack);
     }
     else
     {

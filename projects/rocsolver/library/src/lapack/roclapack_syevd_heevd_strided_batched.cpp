@@ -41,7 +41,7 @@ rocblas_status rocsolver_syevd_heevd_strided_batched_impl(rocblas_handle handle,
                                                           const rocblas_stride strideD,
                                                           S* E,
                                                           const rocblas_stride strideE,
-                                                          rocblas_int* info,
+                                                          I* info,
                                                           const I batch_count)
 {
     const char* name = (!rocblas_is_complex<T> ? "syevd_strided_batched" : "heevd_strided_batched");
@@ -208,7 +208,7 @@ rocblas_status rocsolver_ssyevd_strided_batched_64(rocblas_handle handle,
                                                    const rocblas_stride strideD,
                                                    float* E,
                                                    const rocblas_stride strideE,
-                                                   rocblas_int* info,
+                                                   int64_t* info,
                                                    const int64_t batch_count)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -231,7 +231,7 @@ rocblas_status rocsolver_dsyevd_strided_batched_64(rocblas_handle handle,
                                                    const rocblas_stride strideD,
                                                    double* E,
                                                    const rocblas_stride strideE,
-                                                   rocblas_int* info,
+                                                   int64_t* info,
                                                    const int64_t batch_count)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -254,7 +254,7 @@ rocblas_status rocsolver_cheevd_strided_batched_64(rocblas_handle handle,
                                                    const rocblas_stride strideD,
                                                    float* E,
                                                    const rocblas_stride strideE,
-                                                   rocblas_int* info,
+                                                   int64_t* info,
                                                    const int64_t batch_count)
 {
 #ifdef HAVE_ROCBLAS_64
@@ -277,7 +277,7 @@ rocblas_status rocsolver_zheevd_strided_batched_64(rocblas_handle handle,
                                                    const rocblas_stride strideD,
                                                    double* E,
                                                    const rocblas_stride strideE,
-                                                   rocblas_int* info,
+                                                   int64_t* info,
                                                    const int64_t batch_count)
 {
 #ifdef HAVE_ROCBLAS_64
