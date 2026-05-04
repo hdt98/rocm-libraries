@@ -361,3 +361,190 @@ namespace DGen
         throw std::runtime_error("Unsupported data types in MX data generation!");
     }
 } // namespace DGen
+
+// =============================================================================
+// Optional GPU init backend.
+//
+// Visible only to consumers that compile their TU through hipcc/clang in HIP
+// mode (as signalled by `__HIPCC__`). A host-only TU that just wants the
+// HIP-free CPU `generateMXInput` above is unaffected.
+//
+// Adds:
+//   * `DGen::MXInitDevice` enum (Cpu/Gpu).
+//   * An overload of `generateMXInput` that takes an `MXInitDevice initDevice`
+//     argument. When `Cpu`, behaves exactly like the host overload above
+//     (host pointers, std::memcpy). When `Gpu`, `data` and `scale` are
+//     expected to be device pointers and `DataGeneratorGPU` writes to them
+//     directly without any host round-trip - which is dramatically faster
+//     for large matrices but produces statistically equivalent (not
+//     bit-identical) output.
+// =============================================================================
+#if defined(__HIPCC__)
+
+#include <mxDataGenerator/DataGeneratorGPU.hpp>
+#include <hip/hip_runtime.h>
+
+namespace DGen
+{
+    enum class MXInitDevice
+    {
+        Cpu = 0,
+        Gpu = 1,
+    };
+
+    namespace detail
+    {
+        template <typename DT>
+        std::vector<float> generateDataGpu(void*                       data,
+                                           void*                       scale,
+                                           std::vector<index_t> const& sizes,
+                                           std::vector<index_t> const& strides,
+                                           uint32_t                    seed,
+                                           DataGeneratorOptions const& opt,
+                                           int                         elementsPerMXBlock,
+                                           std::vector<size_t> const&  preSwizzleTile)
+        {
+            (void)elementsPerMXBlock; // unused for non-pre-swizzle paths.
+
+            // The on-device generator writes packed `data` and `scale` straight
+            // into the caller's device buffers. We allocate scratch on the
+            // generator (`generate`) so we can `preSwizzleScalesGFX950Device`
+            // in place when needed, then copy the (possibly swizzled) scale
+            // and data back to the caller's buffers.
+            //
+            // Note: `generateInto` would let us skip the intermediate alloc
+            // for the no-pre-swizzle path; doing both in one call keeps the
+            // implementation simple and the swizzle helper happy. The hot
+            // path (no pre-swizzle, gfx1250) takes the same number of HIP
+            // copies as the chunxlin CPU path's host->device hipMemcpy.
+            DataGeneratorGPU<DT> dgen;
+            dgen.setSeed(seed);
+            dgen.generate(sizes, strides, opt);
+
+            size_t const dataBytesCount = DataGeneratorGPU<DT>::getDataBufferBytes(sizes, opt);
+            size_t const scaleBytesCount
+                = DataGeneratorGPU<DT>::getScaleBufferBytes(sizes, opt);
+
+            if(preSwizzleTile.size() == 3)
+            {
+                size_t const scaleRows = sizes[0] / opt.blockScaling;
+                size_t const scaleCols = sizes[1];
+                dgen.preSwizzleScalesGFX950Device({scaleCols, scaleRows});
+            }
+
+            (void)hipMemcpy(data,
+                            dgen.getDataBytesDevice(),
+                            dataBytesCount,
+                            hipMemcpyDeviceToDevice);
+            if(scale != nullptr && scaleBytesCount > 0)
+            {
+                (void)hipMemcpy(scale,
+                                dgen.getScaleBytesDevice(),
+                                scaleBytesCount,
+                                hipMemcpyDeviceToDevice);
+            }
+
+            return dgen.getReferenceFloat();
+        }
+    } // namespace detail
+
+    inline std::vector<float>
+        generateMXInput(DataFormat                 dataType,
+                        ScaleType                  scaleType,
+                        void*                      data,
+                        void*                      scale,
+                        uint64_t                   row,
+                        uint64_t                   col,
+                        uint64_t                   stride,
+                        bool                       isTranspose,
+                        std::vector<size_t> const& preSwizzleTile,
+                        std::vector<size_t> const& preTile,
+                        int const                  scaleBlockRowSize,
+                        int const                  scaleBlockColSize,
+                        bool                       isMatrixA,
+                        MXInitDevice               initDevice,
+                        std::string_view const     initMethod = "Bounded",
+                        float                      min_val    = -1.0f,
+                        float                      max_val    = 1.0f)
+    {
+        if(initDevice == MXInitDevice::Cpu)
+        {
+            // Delegate to chunxlin's host overload (HIP-free, std::memcpy).
+            return generateMXInput(dataType,
+                                   scaleType,
+                                   data,
+                                   scale,
+                                   row,
+                                   col,
+                                   stride,
+                                   isTranspose,
+                                   preSwizzleTile,
+                                   preTile,
+                                   scaleBlockRowSize,
+                                   scaleBlockColSize,
+                                   isMatrixA,
+                                   initMethod,
+                                   min_val,
+                                   max_val);
+        }
+
+        // GPU init path. The caller MUST have allocated `data` and `scale` on
+        // the device. The generator writes directly into those buffers; no
+        // host round-trip is performed.
+        DataGeneratorOptions opt;
+        opt.min          = initMethod == "uniform_01" ? 0. : (initMethod == "hpl" ? -.5 : min_val);
+        opt.max          = initMethod == "uniform_01" ? 1. : (initMethod == "hpl" ? .5 : max_val);
+        opt.blockScaling = scaleBlockRowSize * scaleBlockColSize;
+        opt.forceDenorm  = false;
+        if(initMethod == "Sequential")            opt.initMode = DataInitMode(Sequential{});
+        else if(initMethod == "RowIndex")         opt.initMode = DataInitMode(RowIndex{});
+        else if(initMethod == "ColIndex")         opt.initMode = DataInitMode(ColIndex{});
+        else if(initMethod == "Checkerboard")     opt.initMode = DataInitMode(Checkerboard{});
+        else if(initMethod == "ScaledDiagonal")   opt.initMode = DataInitMode(ScaledDiagonal{});
+        else if(initMethod == "Identity")         opt.initMode = DataInitMode(Identity{});
+        else if(initMethod == "Ones")             opt.initMode = DataInitMode(Ones{});
+        else if(initMethod == "Zeros")            opt.initMode = DataInitMode(Zeros{});
+        else if(initMethod == "Bounded" || initMethod == "uniform_01")
+            opt.initMode = DataInitMode(Bounded{});
+        else
+            opt.initMode = DataInitMode(TrigonometricFromFloat{});
+
+        constexpr uint32_t   seed = 1713573849;
+        std::vector<index_t> sizes
+            = {static_cast<index_t>(row), static_cast<index_t>(col)};
+        std::vector<index_t> strides
+            = {static_cast<index_t>(1), static_cast<index_t>(stride)};
+        int const elementsPerMXBlock = scaleBlockRowSize * scaleBlockColSize;
+        (void)preTile;     // matches CPU path; reserved for future tiling layouts.
+        (void)isTranspose; // GPU backend writes raw blocks; alignment handled
+                           // by callers when needed.
+        (void)isMatrixA;
+
+        if(dataType == DataFormat::Fp8E5M2)
+            return detail::generateDataGpu<ocp_e5m2_mxfp8>(
+                data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+        if(dataType == DataFormat::Fp8E4M3)
+            return detail::generateDataGpu<ocp_e4m3_mxfp8>(
+                data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+        if(dataType == DataFormat::Fp6E2M3)
+            return detail::generateDataGpu<ocp_e2m3_mxfp6>(
+                data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+        if(dataType == DataFormat::Fp6E3M2)
+            return detail::generateDataGpu<ocp_e3m2_mxfp6>(
+                data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+        if(dataType == DataFormat::Fp4)
+        {
+            if(scaleType == ScaleType::E4M3)
+                return detail::generateDataGpu<ocp_e2m1_mxfp4_e4m3>(
+                    data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+            if(scaleType == ScaleType::E5M3)
+                return detail::generateDataGpu<ocp_e2m1_mxfp4_e5m3>(
+                    data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+            return detail::generateDataGpu<ocp_e2m1_mxfp4>(
+                data, scale, sizes, strides, seed, opt, elementsPerMXBlock, preSwizzleTile);
+        }
+        throw std::runtime_error("Unsupported data types in MX data generation!");
+    }
+} // namespace DGen
+
+#endif // __HIPCC__

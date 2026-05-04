@@ -2662,6 +2662,30 @@ Tests:
   requested_solution_num: 1
   gpu_arch: '950'
 
+# Same as matmul_subtile_fp4_basic but exercises the CPU mxDataGenerator init
+# backend (mx_init_device=0). Catches regressions in the CPU code path
+# without doubling the gfx950 subtile coverage matrix above (which now uses
+# the default mx_init_device=1, the on-device backend).
+- name: matmul_subtile_fp4_basic_cpu_init
+  category: pre_checkin
+  function:
+    matmul:
+    - { a_type: f4_r, b_type: f4_r, c_type: bf16_r, d_type: bf16_r, compute_type: c_f32_r, scaleA: 1001, scaleB: 1001, scale_type: f32_r}
+  M: [256]
+  N: [256]
+  K: [256]
+  transA: T
+  transB: N
+  alpha: 1.0
+  beta: 0.0
+  batch_count: [1]
+  initialization: hpl
+  mx_init_device: 0
+  unit_check: 0
+  norm_check: 1
+  requested_solution_num: 1
+  gpu_arch: '950'
+
 # Edge cases — k*64, non-multiple-of-32 (mult of 16)
 - name: matmul_subtile_fp4_edges
   category: pre_checkin

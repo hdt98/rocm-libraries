@@ -128,6 +128,7 @@ void Arguments::init()
     rotating                 = 0;
     use_gpu_timer            = false;
     skip_slow_solution_ratio = 0.0;
+    mx_init_device           = 1;
 
     // tuning
     gsu_vector[0] = 0;

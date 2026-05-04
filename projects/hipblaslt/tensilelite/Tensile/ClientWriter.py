@@ -217,6 +217,11 @@ def runNewClient(scriptPath, clientParametersPath, cxxCompiler: str, cCompiler: 
   if globalParameters["MXScaleFormat"]:
     args.extend(["--mx-scale-format", str(globalParameters["MXScaleFormat"])])
 
+  # Select MX block-scaled init backend (0=cpu mxDataGenerator + memcpy,
+  # 1=on-device mxDataGenerator). Default 0 keeps deterministic test output.
+  if globalParameters.get("MXInitDevice", 0):
+    args.extend(["--mx-init-device", str(globalParameters["MXInitDevice"])])
+
   try:
     subprocess.run(args, check=True)
   except (subprocess.CalledProcessError, OSError) as e:
@@ -333,8 +338,9 @@ def writeRunScript(path, forBenchmark, enableTileSelection, cxxCompiler: str, cC
     clientExe = getClientExecutablePath()
     timingFlag = " --timing-instrumentation" if globalParameters["TimingInstrumentation"] else ""
     mxScaleFormatFlag = " --mx-scale-format {}".format(globalParameters["MXScaleFormat"]) if globalParameters["MXScaleFormat"] else ""
+    mxInitDeviceFlag = " --mx-init-device {}".format(globalParameters["MXInitDevice"]) if globalParameters.get("MXInitDevice", 0) else ""
     for configFile in configPaths:
-      runScriptFile.write("{} --config-file {}{}{}\n".format(clientExe, configFile, timingFlag, mxScaleFormatFlag))
+      runScriptFile.write("{} --config-file {}{}{}{}\n".format(clientExe, configFile, timingFlag, mxScaleFormatFlag, mxInitDeviceFlag))
     runScriptFile.write("ERR2=$?\n\n")
 
     runScriptFile.write("""
@@ -357,8 +363,9 @@ fi
         runScriptFile.write("%s -d 0 --setfan 50\n" % globalParameters["ROCmSMIPath"])
   else:
     mxScaleFormatFlag = " --mx-scale-format {}".format(globalParameters["MXScaleFormat"]) if globalParameters["MXScaleFormat"] else ""
+    mxInitDeviceFlag = " --mx-init-device {}".format(globalParameters["MXInitDevice"]) if globalParameters.get("MXInitDevice", 0) else ""
     for configFile in configPaths:
-      runScriptFile.write("{} --config-file {} --best-solution 1{}\n".format(getClientExecutablePath(), configFile, mxScaleFormatFlag))
+      runScriptFile.write("{} --config-file {} --best-solution 1{}{}\n".format(getClientExecutablePath(), configFile, mxScaleFormatFlag, mxInitDeviceFlag))
 
   if os.name != "nt":
     runScriptFile.write("exit $ERR\n")

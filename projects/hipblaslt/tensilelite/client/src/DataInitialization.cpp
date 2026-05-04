@@ -913,6 +913,7 @@ namespace TensileLite
             , m_workspaceSize(problemFactory.workspaceSize())
             , m_pruneMode(args["prune-mode"].as<PruneSparseMode>())
             , m_mxScaleFormat(args["mx-scale-format"].as<int>())
+            , m_mxInitDevice(args["mx-init-device"].as<int>())
 
         {
             m_rotatingBuffer
@@ -1756,9 +1757,9 @@ namespace TensileLite
             // bytes the kernel sees are identical to the bytes the reference reads. We
             // gate on m_mxScaleFormat > 0 because that is the user-visible signal that
             // they opted into the subtile / pre-swizzle layout.
-            bool useMXGenerator = isMXFP4Problem(problem) && m_mxScaleFormat > 0;
+            bool useMXGenerator = isMXProblem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
-                initializeMXDataForFP4(problem);
+                initializeMXData(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1851,6 +1852,27 @@ namespace TensileLite
                         "initializeMXData: unsupported MX scale element type for generateMXInput");
                 }
             }
+
+            /** Maps Tensile MX data element type to DGen::DataFormat for generateMXInput. */
+            DGen::DataFormat dataFormatForDataGenerator(rocisa::DataType dt)
+            {
+                switch(dt)
+                {
+                case rocisa::DataType::Float4:
+                    return DGen::DataFormat::Fp4;
+                case rocisa::DataType::Float6:
+                    return DGen::DataFormat::Fp6E2M3;
+                case rocisa::DataType::BFloat6:
+                    return DGen::DataFormat::Fp6E3M2;
+                case rocisa::DataType::Float8:
+                    return DGen::DataFormat::Fp8E4M3;
+                case rocisa::DataType::BFloat8:
+                    return DGen::DataFormat::Fp8E5M2;
+                default:
+                    throw std::runtime_error(
+                        "initializeMXData: unsupported MX data element type for generateMXInput");
+                }
+            }
         } // namespace
 
         static std::string_view initModeToMXMethod(InitMode mode)
@@ -1872,13 +1894,13 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXData(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
-            // can safely skip them. For MX-FP4 sides we drive mxDataGenerator (so the values
-            // are coordinated with their E8 scales); for any non-FP4 side (e.g. MX-B6 or non-MX
-            // mixed-mode) we fall back to the same initArray path the default loop would have
-            // taken, to avoid leaving the malloc'd buffers uninitialized.
+            // can safely skip them. For MX sides we drive mxDataGenerator (so the values
+            // are coordinated with their scales); for any non-MX side or for MX sides whose
+            // dtype isn't supported we fall back to the same initArray path the default loop
+            // would have taken, to avoid leaving the malloc'd buffers uninitialized.
             auto const& tensors = problem.tensors();
 
             auto initTensorFromDefault = [&](int i) {
@@ -1896,175 +1918,143 @@ namespace TensileLite
             };
 
             // Compute preSwizzle parameters from the solution's matrix instruction to rearrange
-            // the scale tensor into the GPU kernel's expected memory layout
+            // the scale tensor into the GPU kernel's expected memory layout. Only meaningful
+            // when m_mxScaleFormat > 0 (gfx950 shuffled layout).
             std::vector<size_t> preSwizzleA, preTileA, preSwizzleB, preTileB;
-
             if(m_mxScaleFormat > 0 && m_currentSolution != nullptr)
             {
                 auto const&      mi            = m_currentSolution->sizeMapping.matrixInstruction;
                 size_t           MiK           = static_cast<size_t>(mi[2]);
-                constexpr size_t swizzleTileMN = 32; // 2 SIMDs * 16 lanes per wave for MN access
-                constexpr size_t tileK         = 256 / swizzleTileMN; // scale blocks per wave in K
+                constexpr size_t swizzleTileMN = 32;
+                constexpr size_t tileK         = 256 / swizzleTileMN;
 
                 if(MiK > 0)
                 {
                     if(problem.mxBlockA() > 0 && MiK % problem.mxBlockA() == 0)
                     {
-                        // Scale tensor dimensions from setMXScaleA are already padded
-                        // (K/mxBlock to multiple of 8, M to multiple of 32)
                         auto const& mxsaSizes = problem.mxsa().sizes();
-                        size_t scaleRowsA = mxsaSizes[0];
-                        size_t scaleColsA = mxsaSizes[1];
-                        if(scaleRowsA % tileK == 0 && scaleColsA % swizzleTileMN == 0)
+                        if(mxsaSizes[0] % tileK == 0 && mxsaSizes[1] % swizzleTileMN == 0)
                         {
-                            size_t subTileK = MiK / problem.mxBlockA();
-                            preSwizzleA     = {swizzleTileMN, tileK, subTileK};
-                            preTileA        = {tileK, swizzleTileMN};
+                            preSwizzleA = {swizzleTileMN, tileK, MiK / problem.mxBlockA()};
+                            preTileA    = {tileK, swizzleTileMN};
                         }
                     }
-
                     if(problem.mxBlockB() > 0 && MiK % problem.mxBlockB() == 0)
                     {
-                        // Scale tensor dimensions from setMXScaleB are already padded
-                        // (K/mxBlock to multiple of 8, N to multiple of 32)
                         auto const& mxsbSizes = problem.mxsb().sizes();
-                        size_t scaleRowsB = mxsbSizes[0];
-                        size_t scaleColsB = mxsbSizes[1];
-                        if(scaleRowsB % tileK == 0 && scaleColsB % swizzleTileMN == 0)
+                        if(mxsbSizes[0] % tileK == 0 && mxsbSizes[1] % swizzleTileMN == 0)
                         {
-                            size_t subTileK = MiK / problem.mxBlockB();
-                            preSwizzleB     = {swizzleTileMN, tileK, subTileK};
-                            preTileB        = {tileK, swizzleTileMN};
+                            preSwizzleB = {swizzleTileMN, tileK, MiK / problem.mxBlockB()};
+                            preTileB    = {tileK, swizzleTileMN};
                         }
                     }
                 }
             }
 
-            if(isMXFP4Tensor(problem.a(), problem.mxBlockA()))
-            {
-                auto const& tensorA = problem.a();
-                auto        rows    = tensorA.sizes()[0];
-                auto        cols    = tensorA.sizes()[1];
-                auto        stride  = tensorA.strides()[1];
-                size_t      batchCount = tensorA.sizes().size() > 2 ? tensorA.sizes()[2] : 1;
+            // Map element bit-width to the byte stride per packed K row.
+            // FP4 packs 2 elements/byte; FP6 packs 4 elements per 3 bytes; FP8 is 1B per element.
+            auto packedBatchBytes = [](rocisa::DataType dt, size_t elements) -> size_t {
+                switch(dt)
+                {
+                case rocisa::DataType::Float4: return elements / 2;
+                case rocisa::DataType::Float6:
+                case rocisa::DataType::BFloat6: return (elements * 6 + 7) / 8;
+                case rocisa::DataType::Float8:
+                case rocisa::DataType::BFloat8: return elements;
+                default:
+                    throw std::runtime_error(
+                        "initializeMXData: unsupported MX data element type for packing");
+                }
+            };
 
-                auto& pristineA
-                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[rocisa::DataType::Float4];
-                auto& pristineE8A
-                    = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
+            DGen::MXInitDevice initDevice = (m_mxInitDevice == 1)
+                                                ? DGen::MXInitDevice::Gpu
+                                                : DGen::MXInitDevice::Cpu;
 
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
-                size_t dataBatchStrideBytes = 0;
+            auto initSide = [&](int                tensorIdx,
+                                int                scaleIdx,
+                                bool               isMatrixA,
+                                int                mxBlock,
+                                rocisa::DataType   mxScaleType,
+                                bool               isTranspose,
+                                std::vector<size_t> const& preSwizzle,
+                                std::vector<size_t> const& preTile) {
+                auto const& tensor    = problem.tensors()[tensorIdx];
+                if(!isMXTensor(tensor, mxBlock))
+                {
+                    initTensorFromDefault(tensorIdx);
+                    if(mxBlock > 0)
+                        initTensorFromDefault(scaleIdx);
+                    return;
+                }
+
+                auto const& scaleTensor = problem.tensors()[scaleIdx];
+                rocisa::DataType dataDt = tensor.dataType();
+                size_t           rows   = tensor.sizes()[0];
+                size_t           cols   = tensor.sizes()[1];
+                size_t           stride = tensor.strides()[1];
+                size_t           batchCount = tensor.sizes().size() > 2 ? tensor.sizes()[2] : 1;
+
+                size_t dataBatchStrideBytes  = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
                 {
-                    dataBatchStrideBytes  = tensorA.strides()[2] / 2;
-                    auto const& mxsaTensor = problem.mxsa();
-                    scaleBatchStrideBytes = mxsaTensor.strides()[mxsaTensor.sizes().size() - 1];
+                    dataBatchStrideBytes  = packedBatchBytes(dataDt, tensor.strides()[2]);
+                    scaleBatchStrideBytes
+                        = scaleTensor.strides()[scaleTensor.sizes().size() - 1];
                 }
 
-                auto initA = m_vdata[ContractionProblemGemm::TENSOR::A].init;
+                auto& pristine     = m_vdata[tensorIdx].pristine[dataDt];
+                auto& pristineScale
+                    = m_vdata[scaleIdx].pristine[scaleTensor.dataType()];
 
-                // Zero the scale buffer; padding beyond the valid region stays 0x00
-                std::memset(pristineE8A.cpuInput.valid.get(),
+                auto initMode = m_vdata[tensorIdx].init;
+                std::memset(pristineScale.cpuInput.valid.get(),
                             0x00,
-                            problem.mxsa().totalAllocatedElements());
+                            scaleTensor.totalAllocatedElements());
 
                 for(size_t b = 0; b < batchCount; b++)
                 {
-                    auto* dataPtr  = static_cast<uint8_t*>(pristineA.cpuInput.valid.get())
+                    auto* dataPtr  = static_cast<uint8_t*>(pristine.cpuInput.valid.get())
                                      + b * dataBatchStrideBytes;
-                    auto* scalePtr = static_cast<uint8_t*>(pristineE8A.cpuInput.valid.get())
+                    auto* scalePtr = static_cast<uint8_t*>(pristineScale.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput(DGen::DataFormat::Fp4,
-                                    scaleTypeForDataGenerator(problem.mxTypeA()),
+                    generateMXInput(dataFormatForDataGenerator(dataDt),
+                                    scaleTypeForDataGenerator(mxScaleType),
                                     dataPtr,
                                     scalePtr,
                                     rows,
                                     cols,
                                     stride,
-                                    problem.transA(),
-                                    preSwizzleA,
-                                    preTileA,
-                                    problem.mxBlockA(),
+                                    isTranspose,
+                                    preSwizzle,
+                                    preTile,
+                                    mxBlock,
                                     1,
-                                    true,
-                                    initModeToMXMethod(initA),
+                                    isMatrixA,
+                                    initDevice,
+                                    initModeToMXMethod(initMode),
                                     -1.0f,
                                     1.0f);
                 }
-            }
-            else
-            {
-                // A is not FP4 (or mxBlockA == 0). The default-init loop will skip A and
-                // MXSA because useMXGenerator is true, so seed them here with the same
-                // initArray path the default loop would have used.
-                initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
-                if(problem.mxBlockA() > 0)
-                    initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
-            }
+            };
 
-            if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
-            {
-                auto const& tensorB = problem.b();
-                auto        rows    = tensorB.sizes()[0];
-                auto        cols    = tensorB.sizes()[1];
-                auto        stride  = tensorB.strides()[1];
-                size_t      batchCount = tensorB.sizes().size() > 2 ? tensorB.sizes()[2] : 1;
-
-                auto& pristineB
-                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[rocisa::DataType::Float4];
-                auto& pristineE8B
-                    = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
-
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
-                size_t dataBatchStrideBytes = 0;
-                size_t scaleBatchStrideBytes = 0;
-                if(batchCount > 1)
-                {
-                    dataBatchStrideBytes  = tensorB.strides()[2] / 2;
-                    auto const& mxsbTensor = problem.mxsb();
-                    scaleBatchStrideBytes = mxsbTensor.strides()[mxsbTensor.sizes().size() - 1];
-                }
-
-                auto initB = m_vdata[ContractionProblemGemm::TENSOR::B].init;
-
-                // Zero the scale buffer; padding beyond the valid region stays 0x00
-                std::memset(pristineE8B.cpuInput.valid.get(),
-                            0x00,
-                            problem.mxsb().totalAllocatedElements());
-
-                for(size_t b = 0; b < batchCount; b++)
-                {
-                    auto* dataPtr  = static_cast<uint8_t*>(pristineB.cpuInput.valid.get())
-                                     + b * dataBatchStrideBytes;
-                    auto* scalePtr = static_cast<uint8_t*>(pristineE8B.cpuInput.valid.get())
-                                     + b * scaleBatchStrideBytes;
-                    generateMXInput(DGen::DataFormat::Fp4,
-                                    scaleTypeForDataGenerator(problem.mxTypeB()),
-                                    dataPtr,
-                                    scalePtr,
-                                    rows,
-                                    cols,
-                                    stride,
-                                    problem.transB(),
-                                    preSwizzleB,
-                                    preTileB,
-                                    problem.mxBlockB(),
-                                    1,
-                                    false,
-                                    initModeToMXMethod(initB),
-                                    -1.0f,
-                                    1.0f);
-                }
-            }
-            else
-            {
-                // B is not FP4 (or mxBlockB == 0). Same fallback rationale as the A side.
-                initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
-                if(problem.mxBlockB() > 0)
-                    initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
-            }
+            initSide(ContractionProblemGemm::TENSOR::A,
+                     ContractionProblemGemm::TENSOR::MXSA,
+                     /*isMatrixA*/ true,
+                     problem.mxBlockA(),
+                     problem.mxTypeA(),
+                     problem.transA(),
+                     preSwizzleA,
+                     preTileA);
+            initSide(ContractionProblemGemm::TENSOR::B,
+                     ContractionProblemGemm::TENSOR::MXSB,
+                     /*isMatrixA*/ false,
+                     problem.mxBlockB(),
+                     problem.mxTypeB(),
+                     problem.transB(),
+                     preSwizzleB,
+                     preTileB);
         }
 #else  // HIPBLASLT_ENABLE_MXDATAGENERATOR
         void DataInitialization::initializeMXData(ContractionProblemGemm const& /*problem*/)

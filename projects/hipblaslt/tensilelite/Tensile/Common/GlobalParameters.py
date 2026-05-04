@@ -138,6 +138,7 @@ globalParameters["CMakeBuildType"] = (
 globalParameters["LogicFormat"] = "yaml"  # set library backend (yaml, or json)
 globalParameters["LibraryFormat"] = "yaml"  # set library backend (yaml, or msgpack)
 globalParameters["MXScaleFormat"] = 0  # MX scale data format (0=none, 1=pre-swizzle for GPU kernel layout). Only the gfx950 subtile MX kernels need the pre-swizzle; gfx1250 reads canonical scales. The two gfx950 yamls that need it set MXScaleFormat: 1 explicitly.
+globalParameters["MXInitDevice"] = 1  # MX block-scaled init backend used by the tensilelite client (1=on-device mxDataGenerator, default; faster, statistically equivalent; 0=cpu mxDataGenerator + memcpy, deterministic, slower).
 
 # True/False: CSV will/won't export WinnerGFlops, WinnerTimeUS, WinnerIdx, WinnerName.
 # TODO - if no side-effect, we can set default to True. This can make analyzing "LibraryLogic" (AddFromCSV) faster

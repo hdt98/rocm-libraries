@@ -605,6 +605,12 @@ try
           "Skip condition: (current solution's warm up time * ratio) > best solution's warm up time. "
           "Ratio range: 0 ~ 1. 0 means no skip.")
 
+        ("mx_init_device",
+         value<int32_t>(&arg.mx_init_device)->default_value(1),
+         "Backend used to seed MX block-scaled inputs (FP4/FP6/FP8). "
+         "1 = on-device mxDataGenerator (default; faster, statistically equivalent); "
+         "0 = CPU mxDataGenerator + hipMemcpy (deterministic, slower for large matrices).")
+
         ("splitk",
          valueVec<uint32_t>(&gsu_vector),
          "[Tuning parameter] Set split K for a solution, 0 is use solution's default value. (Only support GEMM + api_method mix or cpp)")

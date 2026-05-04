@@ -18,9 +18,32 @@ target_include_directories(mxDataGenerator
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+# Optional HIP/GPU backend (`DGen::DataGeneratorGPU`). The implementation is
+# header-only; consumers must compile their TU with hipcc/clang in HIP mode.
+# When ON, we add `hip::device` to the INTERFACE link if available, so plain
+# `target_link_libraries(<tgt> PUBLIC roc::mxDataGenerator)` brings the HIP
+# runtime headers along.
+option(MXDATAGENERATOR_ENABLE_GPU
+       "Enable header-only HIP/GPU backend in mxDataGenerator" ON)
+if(MXDATAGENERATOR_ENABLE_GPU)
+    find_package(hip QUIET CONFIG)
+    if(hip_FOUND)
+        target_link_libraries(mxDataGenerator INTERFACE hip::device)
+        # Enable HIP language only if we'll actually build GPU tests; this keeps
+        # host-only consumers (e.g. the existing `mxDataGeneratorTests`) decoupled
+        # from the HIP toolchain.
+        if(MXDATAGENERATOR_BUILD_TESTING)
+            enable_language(HIP)
+        endif()
+    endif()
+endif()
+
 target_sources(mxDataGenerator
     INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/DataGenerator.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/DataGeneratorGPU.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/DataGeneratorGPU_impl.hpp>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/mxDataGen.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/bf16.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/bf16_impl.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/dataTypeInfo.hpp>
@@ -43,8 +66,10 @@ target_sources(mxDataGenerator
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/ocp_e5m2_mxfp8_impl.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/packing.hpp>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/PreSwizzle.hpp>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lib/include/mxDataGenerator/mxDataGen.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/DataGenerator.hpp>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/DataGeneratorGPU.hpp>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/DataGeneratorGPU_impl.hpp>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/mxDataGen.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/bf16.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/bf16_impl.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/dataTypeInfo.hpp>
@@ -67,7 +92,6 @@ target_sources(mxDataGenerator
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/ocp_e5m2_mxfp8_impl.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/packing.hpp>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/PreSwizzle.hpp>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/mxDataGenerator/mxDataGen.hpp>
 )
 
 if(MXDATAGENERATOR_BUILD_TESTING)
@@ -108,6 +132,31 @@ if(MXDATAGENERATOR_BUILD_TESTING)
     )
     include(GoogleTest)
     gtest_discover_tests(mxDataGeneratorTests DISCOVERY_MODE PRE_TEST)
+
+    # GPU backend tests live in a separate executable because they require the
+    # TU to be compiled in HIP mode (`-x hip`). We only build them if the GPU
+    # backend is enabled and a HIP runtime is available; this keeps host-only
+    # CI builds (and the legacy `mxDataGeneratorTests` target) decoupled from
+    # the HIP toolchain.
+    if(MXDATAGENERATOR_ENABLE_GPU AND hip_FOUND)
+        add_executable(
+          mxDataGeneratorGPUTests
+          test/data_generator_gpu_test.cpp
+        )
+        # Force HIP compilation regardless of file extension.
+        set_source_files_properties(
+            test/data_generator_gpu_test.cpp
+            PROPERTIES LANGUAGE HIP
+        )
+        target_link_libraries(
+          mxDataGeneratorGPUTests PRIVATE
+          GTest::gtest_main
+          mxDataGenerator
+          hip::device
+          OpenMP::OpenMP_CXX
+        )
+        gtest_discover_tests(mxDataGeneratorGPUTests DISCOVERY_MODE PRE_TEST)
+    endif()
 endif()
 
 get_target_property(mxdatagenerator_headers_public mxDataGenerator INTERFACE_SOURCES)

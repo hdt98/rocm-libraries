@@ -43,15 +43,32 @@ namespace TensileLite
 {
     namespace Client
     {
-        inline bool isMXFP4Tensor(const TensorDescriptor& tensor, size_t mxBlock)
+        // True iff `tensor` is one of the MX-family packed dtypes (FP4/FP6/FP8 with
+        // block scaling) AND a block-scale length was specified for that side. The
+        // `mxBlock > 0` predicate is what gates the use of the mxDataGenerator init
+        // path - if mxBlock == 0 the tensor isn't being treated as MX even if its
+        // dtype could carry a scale.
+        inline bool isMXTensor(const TensorDescriptor& tensor, size_t mxBlock)
         {
-            return tensor.dataType() == rocisa::DataType::Float4 && mxBlock > 0;
+            if(mxBlock == 0)
+                return false;
+            switch(tensor.dataType())
+            {
+            case rocisa::DataType::Float4:
+            case rocisa::DataType::Float6:
+            case rocisa::DataType::BFloat6:
+            case rocisa::DataType::Float8:
+            case rocisa::DataType::BFloat8:
+                return true;
+            default:
+                return false;
+            }
         }
 
-        inline bool isMXFP4Problem(const ContractionProblemGemm& problem)
+        inline bool isMXProblem(const ContractionProblemGemm& problem)
         {
-            return isMXFP4Tensor(problem.a(), problem.mxBlockA())
-                || isMXFP4Tensor(problem.b(), problem.mxBlockB());
+            return isMXTensor(problem.a(), problem.mxBlockA())
+                || isMXTensor(problem.b(), problem.mxBlockB());
         }
 
         // Problem-indept. from 0~7, and 16, and 23~26 (fixed values for every problem)
@@ -874,10 +891,9 @@ namespace TensileLite
                    && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
-                    bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
-                    if(isMXFP4)
+                    if(isMXProblem(*m_currentGemmProblem))
                     {
-                        initializeMXDataForFP4(*m_currentGemmProblem);
+                        initializeMXData(*m_currentGemmProblem);
                         copyValidToGPUBuffer(*m_currentGemmProblem);
                         copyInputs(m_gpuPtrs,
                                    m_gpuBatchPtrs,
@@ -1004,7 +1020,7 @@ namespace TensileLite
 
             void initializeConstantInputs(ContractionProblemGemm const& problem);
 
-            void initializeMXDataForFP4(ContractionProblemGemm const& problem);
+            void initializeMXData(ContractionProblemGemm const& problem);
 
             void copyInputs(std::vector<void*>&               ptrs,
                             std::vector<void**>&              batchPtrs,
@@ -1104,6 +1120,13 @@ namespace TensileLite
             ContractionProblemGemm const* m_currentGemmProblem = nullptr;
 
             int m_mxScaleFormat = 0;
+
+            // 0=cpu, 1=gpu. Selects whether mxDataGenerator writes the
+            // packed `data`/`scale` buffers via the host (std::memcpy into
+            // pristine, then synchronize to device) or writes them straight
+            // into device memory via the GPU backend. Default is 1 (GPU);
+            // see hipblaslt_arguments::mx_init_device for the wiring.
+            int m_mxInitDevice = 1;
         };
 
         template <>

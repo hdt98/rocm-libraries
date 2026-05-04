@@ -2517,14 +2517,9 @@ void testing_matmul_with_bias(const Arguments& arg,
 
         hipblaslt_seedrand();
 
-        size_t scaleA_row = ((transA == HIPBLAS_OP_T) ? blockSize(arg.scaleA) : 1);
-        size_t scaleA_col = ((transA == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleA));
-        // TODO: mxDataGenerator can only generate data on CPU. Using
-        //       GPU to generate data might be more efficient and avoid
-        //       unnecessary hipMemCpy when CPU verification is not needed.
         if(isBlockScaling(arg.scaleA))
         {
-#ifdef HIPBLASLT_USE_ROCROLLER
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2540,20 +2535,29 @@ void testing_matmul_with_bias(const Arguments& arg,
                 return;
             }
             // For MX format, use mxDataGenerator to generate input data
-            // (consists of data part and scale part)
+            // (consists of data part and scale part).
             // preTile for A: {tileK, tileM} - swap from preTileSizeForScaleA which returns {tileM, tileK}
             auto preTileATmp = preTileSizeForScaleA(arg.scaleA);
             auto preTileA = (preTileATmp.size() == 2) ? std::vector<size_t>{preTileATmp[1], preTileATmp[0]} : std::vector<size_t>{};
-            // Compute batch strides in bytes for data and scale buffers.
             size_t dataBatchBytesA  = (num_batches[i] > 1) ? elementsToBytes(stride_a[i], TiA) : 0;
             size_t scaleBatchBytesA = (num_batches[i] > 1) ? size_scaleAVec[i] : 0;
-            // Generate MX data for each batch and collect reference floats
             std::vector<float> refAAll;
             refAAll.reserve(static_cast<size_t>(A_row[i]) * A_col[i] * num_batches[i]);
+            // GPU init writes directly into the device buffers and skips the
+            // host->device copy. CPU init falls back to chunxlin's host
+            // overload (std::memcpy into host pristine buffers, then a single
+            // synchronize pair).
+            DGen::MXInitDevice mxDeviceA = (arg.mx_init_device == 1)
+                                               ? DGen::MXInitDevice::Gpu
+                                               : DGen::MXInitDevice::Cpu;
             for(int64_t b = 0; b < num_batches[i]; b++)
             {
-                auto* dataPtr  = reinterpret_cast<uint8_t*>(hA[i].buf()) + b * dataBatchBytesA;
-                auto* scalePtr = reinterpret_cast<uint8_t*>(hScaleA[i].buf()) + b * scaleBatchBytesA;
+                auto* dataPtr  = (mxDeviceA == DGen::MXInitDevice::Gpu)
+                                     ? reinterpret_cast<uint8_t*>(dA[i].buf()) + b * dataBatchBytesA
+                                     : reinterpret_cast<uint8_t*>(hA[i].buf()) + b * dataBatchBytesA;
+                auto* scalePtr = (mxDeviceA == DGen::MXInitDevice::Gpu)
+                                     ? reinterpret_cast<uint8_t*>(dScaleA[i].buf()) + b * scaleBatchBytesA
+                                     : reinterpret_cast<uint8_t*>(hScaleA[i].buf()) + b * scaleBatchBytesA;
                 auto batchRef = generateMXInput(toDataFormat(TiA),
                                                 toScaleType(scaleDataType(arg.scaleA)),
                                                 dataPtr,
@@ -2567,35 +2571,26 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                 blockSize(arg.scaleA),
                                                 1,
                                                 true,
+                                                mxDeviceA,
                                                 hipblaslt_initialization2string(arg.initialization));
                 refAAll.insert(refAAll.end(), batchRef.begin(), batchRef.end());
             }
             refA.emplace_back(std::move(refAAll));
-            // Copy data and scale to device buffers
-            CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
-            CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
+            if(mxDeviceA != DGen::MXInitDevice::Gpu)
+            {
+                CHECK_HIP_ERROR(synchronize(dA[i], hA[i], block_count));
+                CHECK_HIP_ERROR(synchronize(dScaleA[i], hScaleA[i], block_count));
+            }
 #else
-            hipblaslt_init_device(ABC_dims::A,
-                                  arg.initialization,
-                                  alpha_isnan_type(arg, Talpha),
-                                  dA[i].buf(),
-                                  A_row[i],
-                                  A_col[i],
-                                  (arg.swizzle_a) ? A_row[i] : lda[i],
-                                  TiA,
-                                  (arg.swizzle_a) ? A_row[i] * A_col[i] : stride_a[i],
-                                  num_batches[i]);
-
-            hipblaslt_init_device(ABC_dims::A,
-                                  arg.initialization,
-                                  alpha_isnan_type(arg, Talpha),
-                                  dScaleA[i].buf(),
-                                  A_row[i] / scaleA_row,
-                                  A_col[i] / scaleA_col,
-                                  lda[i] / scaleA_row,
-                                  scaleDataType(arg.scaleA),
-                                  stride_a[i] / scaleA_row / scaleA_col,
-                                  num_batches[i]);
+            // mxDataGenerator-disabled builds (notably Windows). The legacy
+            // GPU init path produced uncoordinated data + scales (~50% of FP4
+            // values collapsed to zero); rather than fall back to that, skip
+            // the run so the user can rebuild with HIPBLASLT_ENABLE_MXDATAGENERATOR=ON.
+            hipblaslt_cout
+                << "Block-scaled MX inputs require HIPBLASLT_ENABLE_MXDATAGENERATOR=ON; "
+                   "skipping."
+                << std::endl;
+            return;
 #endif
         }
         else
@@ -2633,11 +2628,9 @@ void testing_matmul_with_bias(const Arguments& arg,
             }
         }
 
-        size_t scaleB_row = ((transB == HIPBLAS_OP_T) ? 1 : blockSize(arg.scaleB));
-        size_t scaleB_col = ((transB == HIPBLAS_OP_T) ? blockSize(arg.scaleB) : 1);
         if(isBlockScaling(arg.scaleB))
         {
-#ifdef HIPBLASLT_USE_ROCROLLER
+#if HIPBLASLT_ENABLE_MXDATAGENERATOR
             if(arg.initialization != hipblaslt_initialization::hpl
                && arg.initialization != hipblaslt_initialization::trig_float
                && arg.initialization != hipblaslt_initialization::uniform_01)
@@ -2652,20 +2645,23 @@ void testing_matmul_with_bias(const Arguments& arg,
                 hipblaslt_cout << "MX data types do not support algorithm \"all\"" << std::endl;
                 return;
             }
-            // For MX format, use mxDataGenerator to generate
-            // input data (consists of data part and scale part)
             // preTile for B: {tileK, tileN}
             auto preTileB = preTileSizeForScaleB(arg.scaleB);
-            // Compute batch strides in bytes for data and scale buffers.
             size_t dataBatchBytesB  = (num_batches[i] > 1) ? elementsToBytes(stride_b[i], TiB) : 0;
             size_t scaleBatchBytesB = (num_batches[i] > 1) ? size_scaleBVec[i] : 0;
-            // Generate MX data for each batch and collect reference floats
             std::vector<float> refBAll;
             refBAll.reserve(static_cast<size_t>(B_row[i]) * B_col[i] * num_batches[i]);
+            DGen::MXInitDevice mxDeviceB = (arg.mx_init_device == 1)
+                                               ? DGen::MXInitDevice::Gpu
+                                               : DGen::MXInitDevice::Cpu;
             for(int64_t b = 0; b < num_batches[i]; b++)
             {
-                auto* dataPtr  = reinterpret_cast<uint8_t*>(hB[i].buf()) + b * dataBatchBytesB;
-                auto* scalePtr = reinterpret_cast<uint8_t*>(hScaleB[i].buf()) + b * scaleBatchBytesB;
+                auto* dataPtr  = (mxDeviceB == DGen::MXInitDevice::Gpu)
+                                     ? reinterpret_cast<uint8_t*>(dB[i].buf()) + b * dataBatchBytesB
+                                     : reinterpret_cast<uint8_t*>(hB[i].buf()) + b * dataBatchBytesB;
+                auto* scalePtr = (mxDeviceB == DGen::MXInitDevice::Gpu)
+                                     ? reinterpret_cast<uint8_t*>(dScaleB[i].buf()) + b * scaleBatchBytesB
+                                     : reinterpret_cast<uint8_t*>(hScaleB[i].buf()) + b * scaleBatchBytesB;
                 auto batchRef = generateMXInput(toDataFormat(TiB),
                                                 toScaleType(scaleDataType(arg.scaleB)),
                                                 dataPtr,
@@ -2679,35 +2675,22 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                 1,
                                                 blockSize(arg.scaleB),
                                                 false,
+                                                mxDeviceB,
                                                 hipblaslt_initialization2string(arg.initialization));
                 refBAll.insert(refBAll.end(), batchRef.begin(), batchRef.end());
             }
             refB.emplace_back(std::move(refBAll));
-            // Copy data and scale to device buffers
-            CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
-            CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
+            if(mxDeviceB != DGen::MXInitDevice::Gpu)
+            {
+                CHECK_HIP_ERROR(synchronize(dB[i], hB[i], block_count));
+                CHECK_HIP_ERROR(synchronize(dScaleB[i], hScaleB[i], block_count));
+            }
 #else
-            hipblaslt_init_device(ABC_dims::B,
-                                  arg.initialization,
-                                  alpha_isnan_type(arg, Talpha),
-                                  dB[i].buf(),
-                                  B_row[i],
-                                  B_col[i],
-                                  ldb[i],
-                                  TiB,
-                                  stride_b[i],
-                                  num_batches[i]);
-
-            hipblaslt_init_device(ABC_dims::B,
-                                  arg.initialization,
-                                  alpha_isnan_type(arg, Talpha),
-                                  dScaleB[i].buf(),
-                                  B_row[i] / scaleB_row,
-                                  B_col[i] / scaleB_col,
-                                  ldb[i] / scaleB_row,
-                                  scaleDataType(arg.scaleB),
-                                  stride_b[i] / scaleB_row / scaleB_col,
-                                  num_batches[i]);
+            hipblaslt_cout
+                << "Block-scaled MX inputs require HIPBLASLT_ENABLE_MXDATAGENERATOR=ON; "
+                   "skipping."
+                << std::endl;
+            return;
 #endif
         }
         else

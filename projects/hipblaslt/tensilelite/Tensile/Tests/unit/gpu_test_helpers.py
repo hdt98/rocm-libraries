@@ -15,6 +15,7 @@
 import ctypes
 import os
 import re
+import shutil
 import sys
 import struct
 import subprocess
@@ -423,7 +424,9 @@ def assemble_kernel(asm_source, output_path):
             "-o", obj_path,
             asm_path
         ])
-        os.rename(obj_path, output_path)
+        # tempfile lives on /tmp (container) while output_path may live on a
+        # bind-mounted host path; os.rename only works within a single fs.
+        shutil.move(obj_path, output_path)
     finally:
         if os.path.exists(asm_path):
             os.unlink(asm_path)
