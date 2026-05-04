@@ -4,6 +4,7 @@
 #include "SelectionHeuristic.hpp"
 
 #include <string>
+#include <unordered_set>
 
 #include "HipdnnException.hpp"
 #include "plugin/HeuristicPlugin.hpp"
@@ -108,6 +109,7 @@ void SelectionHeuristic::setEngineIds(const std::vector<int64_t>& engineIds)
                        + std::to_string(_policyId));
 
     plugin->setEngineIds(_descriptor, engineIds.data(), engineIds.size());
+    _inputEngineIds = engineIds;
 }
 
 void SelectionHeuristic::setSerializedGraph(const hipdnnPluginConstData_t* serializedGraph)
@@ -157,7 +159,34 @@ std::vector<int64_t> SelectionHeuristic::getSortedEngineIds()
 
     // Call the plugin's getSortedEngineIds method
     // This is valid only after finalize() returned true
-    return plugin->getSortedEngineIds(_descriptor);
+    auto sortedIds = plugin->getSortedEngineIds(_descriptor);
+
+    // Validate that the plugin returned a permutation or subset of the IDs
+    // we handed it via setEngineIds: every output ID must be in the input
+    // and no output ID may appear twice. Plugins are untrusted code.
+    THROW_IF_FALSE(sortedIds.size() <= _inputEngineIds.size(),
+                   HIPDNN_STATUS_PLUGIN_ERROR,
+                   "Heuristic plugin for policy ID " + std::to_string(_policyId)
+                       + " returned more engine IDs (" + std::to_string(sortedIds.size())
+                       + ") than were provided (" + std::to_string(_inputEngineIds.size()) + ")");
+
+    const std::unordered_set<int64_t> inputSet(_inputEngineIds.begin(), _inputEngineIds.end());
+    std::unordered_set<int64_t> seen;
+    seen.reserve(sortedIds.size());
+    for(const int64_t id : sortedIds)
+    {
+        THROW_IF_FALSE(inputSet.count(id) != 0,
+                       HIPDNN_STATUS_PLUGIN_ERROR,
+                       "Heuristic plugin for policy ID " + std::to_string(_policyId)
+                           + " returned engine ID " + std::to_string(id)
+                           + " that was not in the provided candidate set");
+        THROW_IF_FALSE(seen.insert(id).second,
+                       HIPDNN_STATUS_PLUGIN_ERROR,
+                       "Heuristic plugin for policy ID " + std::to_string(_policyId)
+                           + " returned duplicate engine ID " + std::to_string(id));
+    }
+
+    return sortedIds;
 }
 
 const plugin::HeuristicPlugin* SelectionHeuristic::lookupPlugin() const

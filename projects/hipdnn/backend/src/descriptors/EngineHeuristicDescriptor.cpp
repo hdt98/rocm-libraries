@@ -601,6 +601,10 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
                   HIPDNN_STATUS_BAD_PARAM,
                   "EngineHeuristicDescriptor failed to set policy order: Negative element count.");
 
+    THROW_IF_TRUE(elementCount > 0 && arrayOfElements == nullptr,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "EngineHeuristicDescriptor failed to set policy order: Null pointer.");
+
     if(elementCount == 0)
     {
         _policyOrder.clear();
@@ -608,10 +612,6 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
         HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: 0 policies");
         return;
     }
-
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "EngineHeuristicDescriptor failed to set policy order: Null pointer.");
 
     const auto* data = static_cast<const int64_t*>(arrayOfElements);
     _policyOrder.assign(data, data + elementCount);
@@ -634,27 +634,28 @@ void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attr
                   "EngineHeuristicDescriptor failed to get policy order: Null pointer for "
                   "element count.");
 
-    if(!_policyOrderSet)
-    {
-        *elementCount = 0;
-        return;
-    }
+    THROW_IF_TRUE(requestedElementCount < 0,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "EngineHeuristicDescriptor failed to get policy order: Negative requested "
+                  "element count.");
 
-    // Return the count if they aren't requesting any
-    if(requestedElementCount == 0)
-    {
-        *elementCount = static_cast<int64_t>(_policyOrder.size());
-        return;
-    }
-
-    THROW_IF_NULL(arrayOfElements,
+    THROW_IF_TRUE(requestedElementCount > 0 && arrayOfElements == nullptr,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "EngineHeuristicDescriptor failed to get policy order: Null pointer.");
 
+    // The dispatcher requires isFinalized() before reaching here, so
+    // _orderedPolicyIds reflects the resolved order (descriptor > handle > env
+    // > default) actually used during finalize().
+    if(requestedElementCount == 0)
+    {
+        *elementCount = static_cast<int64_t>(_orderedPolicyIds.size());
+        return;
+    }
+
     auto* output = static_cast<int64_t*>(arrayOfElements);
     const auto count =
-        std::min(static_cast<size_t>(requestedElementCount), _policyOrder.size());
-    std::memcpy(output, _policyOrder.data(), count * sizeof(int64_t));
+        std::min(static_cast<size_t>(requestedElementCount), _orderedPolicyIds.size());
+    std::memcpy(output, _orderedPolicyIds.data(), count * sizeof(int64_t));
     *elementCount = static_cast<int64_t>(count);
 }
 

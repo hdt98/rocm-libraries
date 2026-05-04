@@ -151,6 +151,10 @@ private:
     std::shared_ptr<plugin::HeuristicPluginResourceManager> _resourceManager;
     int64_t _policyId = 0;
     hipdnnHeuristicPolicyDescriptor_t _descriptor = nullptr;
+    // Cached candidate engine IDs from the most recent setEngineIds call.
+    // Used in getSortedEngineIds to validate that the plugin returned a
+    // permutation or subset of the provided IDs (no duplicates, no fabrications).
+    std::vector<int64_t> _inputEngineIds;
 };
 
 } // namespace hipdnn_backend::heuristics

@@ -210,10 +210,20 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderWhenNotSet)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
+    // With no descriptor-level override and no env var, resolveHeuristicPolicyOrder
+    // falls through to the built-in default: Config + StaticOrdering.
     int64_t count = 999;
     ASSERT_NO_THROW(heur->getAttribute(
         HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
-    ASSERT_EQ(count, 0);
+    ASSERT_EQ(count, 2);
+
+    std::vector<int64_t> buffer(2);
+    ASSERT_NO_THROW(heur->getAttribute(
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 2, &count, buffer.data()));
+    ASSERT_EQ(count, 2);
+    EXPECT_EQ(buffer[0], hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"));
+    EXPECT_EQ(buffer[1],
+              hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"));
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderCountOnly)
@@ -283,6 +293,35 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNullPointer)
         heur->getAttribute(
             HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
+}
+
+TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNegativeRequestedCount)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<int64_t> buffer(4);
+    int64_t count = 0;
+    ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                                  HIPDNN_TYPE_INT64,
+                                                  -1,
+                                                  &count,
+                                                  buffer.data()),
+                               HIPDNN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderBufferTooSmall)

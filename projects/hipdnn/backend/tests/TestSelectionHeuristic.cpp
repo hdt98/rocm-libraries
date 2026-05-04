@@ -269,17 +269,111 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIds)
     EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
         .WillOnce(::testing::Return(mockDescriptor));
 
+    // The plugin output must be a permutation/subset of the IDs we hand in
+    // via setEngineIds — that's what SelectionHeuristic validates.
+    const std::vector<int64_t> inputIds = {1, 2, 3, 4, 5};
     const std::vector<int64_t> expectedIds = {5, 4, 3, 2, 1};
 
+    EXPECT_CALL(*_mockPlugin, setEngineIds(mockDescriptor, ::testing::_, inputIds.size())).Times(1);
     EXPECT_CALL(*_mockPlugin, getSortedEngineIds(mockDescriptor))
         .WillOnce(::testing::Return(expectedIds));
-
     EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
 
     SelectionHeuristic heuristic(_mockResourceManager, _policyId);
+    heuristic.setEngineIds(inputIds);
     auto result = heuristic.getSortedEngineIds();
 
     EXPECT_EQ(result, expectedIds);
+}
+
+TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsFabricatedId)
+{
+    wireResourceManager();
+
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
+
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+        .WillOnce(::testing::Return(mockDescriptor));
+
+    const std::vector<int64_t> inputIds = {1, 2, 3};
+    // Plugin returns an ID (99) that wasn't in the candidate set.
+    const std::vector<int64_t> badIds = {2, 99, 1};
+
+    EXPECT_CALL(*_mockPlugin, setEngineIds(mockDescriptor, ::testing::_, inputIds.size())).Times(1);
+    EXPECT_CALL(*_mockPlugin, getSortedEngineIds(mockDescriptor))
+        .WillOnce(::testing::Return(badIds));
+    EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
+
+    SelectionHeuristic heuristic(_mockResourceManager, _policyId);
+    heuristic.setEngineIds(inputIds);
+    EXPECT_THROW(heuristic.getSortedEngineIds(), hipdnn_backend::HipdnnException);
+}
+
+TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsDuplicates)
+{
+    wireResourceManager();
+
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
+
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+        .WillOnce(::testing::Return(mockDescriptor));
+
+    const std::vector<int64_t> inputIds = {1, 2, 3};
+    const std::vector<int64_t> badIds = {1, 2, 2};
+
+    EXPECT_CALL(*_mockPlugin, setEngineIds(mockDescriptor, ::testing::_, inputIds.size())).Times(1);
+    EXPECT_CALL(*_mockPlugin, getSortedEngineIds(mockDescriptor))
+        .WillOnce(::testing::Return(badIds));
+    EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
+
+    SelectionHeuristic heuristic(_mockResourceManager, _policyId);
+    heuristic.setEngineIds(inputIds);
+    EXPECT_THROW(heuristic.getSortedEngineIds(), hipdnn_backend::HipdnnException);
+}
+
+TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsOversizedOutput)
+{
+    wireResourceManager();
+
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
+
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+        .WillOnce(::testing::Return(mockDescriptor));
+
+    const std::vector<int64_t> inputIds = {1, 2};
+    const std::vector<int64_t> badIds = {1, 2, 3};
+
+    EXPECT_CALL(*_mockPlugin, setEngineIds(mockDescriptor, ::testing::_, inputIds.size())).Times(1);
+    EXPECT_CALL(*_mockPlugin, getSortedEngineIds(mockDescriptor))
+        .WillOnce(::testing::Return(badIds));
+    EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
+
+    SelectionHeuristic heuristic(_mockResourceManager, _policyId);
+    heuristic.setEngineIds(inputIds);
+    EXPECT_THROW(heuristic.getSortedEngineIds(), hipdnn_backend::HipdnnException);
+}
+
+TEST_F(TestSelectionHeuristic, GetSortedEngineIdsAcceptsProperSubset)
+{
+    wireResourceManager();
+
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
+
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+        .WillOnce(::testing::Return(mockDescriptor));
+
+    // Plugin may decline some candidates and return a strict subset.
+    const std::vector<int64_t> inputIds = {1, 2, 3, 4, 5};
+    const std::vector<int64_t> expectedIds = {3, 1};
+
+    EXPECT_CALL(*_mockPlugin, setEngineIds(mockDescriptor, ::testing::_, inputIds.size())).Times(1);
+    EXPECT_CALL(*_mockPlugin, getSortedEngineIds(mockDescriptor))
+        .WillOnce(::testing::Return(expectedIds));
+    EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
+
+    SelectionHeuristic heuristic(_mockResourceManager, _policyId);
+    heuristic.setEngineIds(inputIds);
+    EXPECT_EQ(heuristic.getSortedEngineIds(), expectedIds);
 }
 
 // ========== Lifetime Tests ==========
