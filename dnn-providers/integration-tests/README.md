@@ -7,11 +7,11 @@ the plugin and comparing results against a reference executor.
 ## Quick Start
 
 ```bash
-# Run smoke-tier tests against a built provider plugin
+# Standalone build — point to the plugin explicitly
 ./bin/hipdnn_integration_tests \
   --test-article /path/to/libmiopen_plugin.so
 
-# If running from a superbuild, plugin discovery is automatic
+# Superbuild — plugin discovery is automatic
 ./bin/hipdnn_integration_tests
 ```
 
@@ -24,16 +24,15 @@ the plugin and comparing results against a reference executor.
 | Comprehensive | `Comprehensive` | `getLargeEdge*()` | Nightly | 3600s (60 min) |
 | Full | `Full` | `getLargeStress*()` | Weekly | 7200s (120 min) |
 
-Timeouts are defaults and can be overridden per binary via
-`SMOKE_TIMEOUT`, `STANDARD_TIMEOUT`, `COMPREHENSIVE_TIMEOUT`, and
-`FULL_TIMEOUT` arguments to `add_tiered_test_target()`.
+Timeouts can be overridden per binary via `SMOKE_TIMEOUT`, `STANDARD_TIMEOUT`,
+`COMPREHENSIVE_TIMEOUT`, and `FULL_TIMEOUT` arguments to
+`add_tiered_test_target()`.
 
 ### Smoke is a catch-all
 
 The smoke ctest entry uses an exclusion filter
 (`-Standard*:Comprehensive*:Full*`). Every test that does **not** start with
-`Standard`, `Comprehensive`, or `Full` runs in smoke automatically. This
-includes standalone tests and any `Smoke`-prefixed parameterized suites:
+`Standard`, `Comprehensive`, or `Full` runs in smoke automatically:
 
 ```cpp
 // Runs in smoke — has Smoke prefix
@@ -44,9 +43,7 @@ TEST(MyFeature, BasicBehavior) { ... }
 TEST_F(MyFixture, EdgeCase) { ... }
 ```
 
-**The 600-second timeout on smoke is a safety net.** If smoke starts timing
-out, it means a large shape is missing its tier prefix and running where it
-shouldn't. Treat a smoke timeout as a signal to check tier categorization.
+If smoke starts timing out, a large shape is missing its tier prefix.
 
 ### How tiers cascade
 
@@ -64,80 +61,35 @@ ctest -L full            →  [smoke + standard + comprehensive + full]
 
 ## Running Tests
 
-**Which runner to use:**
-- **ctest** — CI and local full-tier runs
-- **ninja targets** — local shortcut
-- **Direct binary** — debugging a specific test with `--gtest_filter`
+| Method | Command | Use case |
+|--------|---------|----------|
+| ctest | `ctest -L quick` | CI and local tier runs |
+| ninja | `ninja unit-check` / `ninja check` | Local shortcut (smoke / all) |
+| Direct | `./bin/hipdnn_gpu_ref_tests --gtest_filter="Smoke*"` | Debugging a specific test |
 
-### Via ctest (recommended)
-
-| Command | What runs |
-|---------|-----------|
-| `ctest -L quick` | Smoke tier |
-| `ctest -L standard` | Smoke + standard |
-| `ctest -L comprehensive` | Smoke + standard + comprehensive |
-| `ctest -L full` | All tiers |
-
-### Via ninja targets
-
-| Command | What runs |
-|---------|-----------|
-| `ninja unit-check` | Smoke tier |
-| `ninja check` | All tiers |
-
-### Direct binary invocation
-
-```bash
-# Smoke tier (everything except standard/comprehensive/full)
-./bin/hipdnn_gpu_ref_tests --gtest_filter="-Standard*:Comprehensive*:Full*"
-
-# Specific tier only
-./bin/hipdnn_gpu_ref_tests --gtest_filter="Smoke*"
-./bin/hipdnn_gpu_ref_tests --gtest_filter="Standard*"
-
-# Run everything
-./bin/hipdnn_gpu_ref_tests
-```
-
-> **GTest filter syntax note:** The smoke exclusion filter uses
-> `-Standard*:Comprehensive*:Full*` (single leading dash). In GTest, only
-> the **first** `-` starts the negative section; all colon-separated patterns
-> after it are excluded. Using `:-` between patterns (e.g.,
-> `:-Comprehensive*`) does **not** negate — the dash becomes a literal
-> character in the pattern name.
-
-### Example output
-
-```
-[==========] 42 tests from 6 test suites ran. (12345 ms total)
-[  PASSED  ] 42 tests.
-```
+> **GTest filter syntax:** `-Standard*:Comprehensive*:Full*` uses a single
+> leading dash. In GTest, only the first `-` starts the negative section.
+> Using `:-` between patterns does **not** negate — the dash becomes literal.
 
 ## Adding a New Operation
 
 ### Directory layout
 
-Each operation has its own test file and shape catalog:
-
 ```
 tests/
   gpu_ref/
-    ConvShapeCase.hpp              # Shared shape struct + byTag()
+    ConvShapeCase.hpp              # Shape struct + byTag()
     ConvShapeCatalog.hpp           # getSmall/getMedium/getLargeEdge/getLargeStress
     TestGpuFpReferenceConvolution.cpp
-    TestGpuFpReferenceDgrad.cpp
-    TestGpuFpReferenceWgrad.cpp
   my_new_op/
-    MyNewOpShapeCase.hpp           # Shape struct for the new op
-    MyNewOpShapeCatalog.hpp        # Shape catalogs by tier
-    TestMyNewOp.cpp                # TEST_P suites + INSTANTIATE_TEST_SUITE_P
+    MyNewOpShapeCase.hpp
+    MyNewOpShapeCatalog.hpp
+    TestMyNewOp.cpp
 ```
 
 ### Step 1 — CMake registration
 
-Register the test binary with `add_tiered_test_target()` in
-`tests/CMakeLists.txt`. This creates the four ctest entries, install staging,
-and RPATH setup automatically:
+Register the test binary in `tests/CMakeLists.txt`:
 
 ```cmake
 add_tiered_test_target(hipdnn_my_new_op_tests ${CMAKE_CURRENT_BINARY_DIR})
@@ -145,53 +97,33 @@ add_tiered_test_target(hipdnn_my_new_op_tests ${CMAKE_CURRENT_BINARY_DIR})
 
 ### Step 2 — Shape catalog
 
-Create a shape catalog following the same tier pattern. See
-[`tests/gpu_ref/ConvShapeCatalog.hpp`](tests/gpu_ref/ConvShapeCatalog.hpp)
-for a complete example. The function-to-tier mapping is documented in its
-file header.
+Create a shape catalog following the tier pattern in
+[`tests/gpu_ref/ConvShapeCatalog.hpp`](tests/gpu_ref/ConvShapeCatalog.hpp).
 
 ### Step 3 — C++ test tiers
 
-New parameterized test suites **must** define all four tiers explicitly:
+New parameterized test suites **must** define all four tiers:
 
 ```cpp
-INSTANTIATE_TEST_SUITE_P(Smoke,
-                         MyNewOp2dTestFp32,
-                         ::testing::ValuesIn(getSmallMyNewOp2dCases()),
-                         byTag());
-
-INSTANTIATE_TEST_SUITE_P(Standard,
-                         MyNewOp2dTestFp32,
-                         ::testing::ValuesIn(getMediumMyNewOp2dCases()),
-                         byTag());
-
-INSTANTIATE_TEST_SUITE_P(Comprehensive,
-                         MyNewOp2dTestFp32,
-                         ::testing::ValuesIn(getLargeEdgeMyNewOp2dCases()),
-                         byTag());
-
-INSTANTIATE_TEST_SUITE_P(Full,
-                         MyNewOp2dTestFp32,
-                         ::testing::ValuesIn(getLargeStressMyNewOp2dCases()),
-                         byTag());
+INSTANTIATE_TEST_SUITE_P(Smoke,         MyNewOp2dTestFp32, ::testing::ValuesIn(getSmallCases()),     byTag());
+INSTANTIATE_TEST_SUITE_P(Standard,      MyNewOp2dTestFp32, ::testing::ValuesIn(getMediumCases()),    byTag());
+INSTANTIATE_TEST_SUITE_P(Comprehensive, MyNewOp2dTestFp32, ::testing::ValuesIn(getLargeEdgeCases()), byTag());
+INSTANTIATE_TEST_SUITE_P(Full,          MyNewOp2dTestFp32, ::testing::ValuesIn(getLargeStressCases()), byTag());
 ```
 
-`byTag()` is a name generator that uses the shape's `tag` field as the test
-name. Without it, a failing test shows as `Smoke/MyOp2dTestFp32.Runs/7` —
-with it, you get `Smoke/MyOp2dTestFp32.Runs/n8c64k32_f3x3_s1_p1` and
-immediately know which shape failed.
+`byTag()` uses the shape's `tag` field as the test name so failures show
+`Smoke/MyOp2dTestFp32.Runs/n8c64k32_f3x3_s1_p1` instead of `.../7`.
 
 ### Adding a new convolution shape
 
 Add to the appropriate function in
 [`tests/gpu_ref/ConvShapeCatalog.hpp`](tests/gpu_ref/ConvShapeCatalog.hpp).
-The existing `INSTANTIATE_TEST_SUITE_P` calls pick up new shapes
-automatically for forward, dgrad, and wgrad.
+Existing `INSTANTIATE_TEST_SUITE_P` calls pick up new shapes automatically.
 
 ## Troubleshooting
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `Engine 'X' is not loaded` | Plugin not found — standalone build has no auto-discovery | Pass `--test-article /path/to/plugin.so`, or run from a superbuild where plugins are in `build/lib/hipdnn_plugins/engines/` |
-| Smoke tier timing out | A large shape is running in smoke because it is missing its tier prefix | Check that all `INSTANTIATE_TEST_SUITE_P` calls use `Smoke`, `Standard`, `Comprehensive`, or `Full` as the prefix |
-| `No tests matched the filter` | Incorrect `--gtest_filter` syntax | Use a single `-` to start negative filters: `-Standard*:Comprehensive*:Full*`. Do **not** use `:-` between patterns |
+| Symptom | Fix |
+|---------|-----|
+| `Engine 'X' is not loaded` | Pass `--test-article /path/to/plugin.so`, or run from a superbuild |
+| Smoke tier timing out | A shape is missing its tier prefix — check `INSTANTIATE_TEST_SUITE_P` prefixes |
+| `No tests matched the filter` | Use a single `-` for negative filters: `-Standard*:Comprehensive*:Full*` |
