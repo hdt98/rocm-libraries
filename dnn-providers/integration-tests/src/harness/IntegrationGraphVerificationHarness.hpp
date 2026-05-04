@@ -16,6 +16,7 @@
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceMiopenRmsValidation.hpp>
 #include <hipdnn_test_sdk/utilities/CpuFpReferenceValidation.hpp>
 #include <hipdnn_test_sdk/utilities/SdkFrontendTypeConversions.hpp>
+#include <hipdnn_test_sdk/utilities/DynamicTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/TestTolerances.hpp>
 #include <hipdnn_test_sdk/utilities/VectorLoggingUtils.hpp>
 #include <hipdnn_test_sdk/utilities/cpu_graph_executor/CpuReferenceGraphExecutor.hpp>
@@ -266,13 +267,15 @@ protected:
         });
     }
 
+    static constexpr float FILL_RANGE = 1.0f;
+
     virtual void initializeBundle([[maybe_unused]] const hipdnn_frontend::graph::Graph& graph,
                                   hipdnn_test_sdk::utilities::GraphTensorBundle& bundle,
                                   unsigned int seed)
     {
         for(auto& tensorPair : bundle.tensors)
         {
-            bundle.randomizeTensor(tensorPair.first, -1.0f, 1.0f, seed);
+            bundle.randomizeTensor(tensorPair.first, -FILL_RANGE, FILL_RANGE, seed);
         }
     }
 
@@ -299,12 +302,24 @@ protected:
         namespace fe = hipdnn_frontend::graph;
         using namespace hipdnn_test_sdk::utilities;
 
-        if(dynamic_cast<const fe::ConvolutionFpropNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceFwd<T>());
-        if(dynamic_cast<const fe::ConvolutionDgradNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceBwd<T>());
-        if(dynamic_cast<const fe::ConvolutionWgradNode*>(&node) != nullptr)
-            return static_cast<float>(conv::getToleranceWrw<T>());
+        if(auto* fpropNode = dynamic_cast<const fe::ConvolutionFpropNode*>(&node))
+        {
+            auto wDims = fpropNode->attributes.get_w()->get_dim();
+            return conv::calculateConvFpropTolerance<T, T, float>(
+                -FILL_RANGE, FILL_RANGE, -FILL_RANGE, FILL_RANGE, wDims);
+        }
+        if(auto* dgradNode = dynamic_cast<const fe::ConvolutionDgradNode*>(&node))
+        {
+            auto wDims = dgradNode->attributes.get_w()->get_dim();
+            return conv::calculateConvDgradTolerance<T, T, float>(
+                -FILL_RANGE, FILL_RANGE, -FILL_RANGE, FILL_RANGE, wDims);
+        }
+        if(auto* wgradNode = dynamic_cast<const fe::ConvolutionWgradNode*>(&node))
+        {
+            auto dyDims = wgradNode->attributes.get_dy()->get_dim();
+            return conv::calculateConvWrwTolerance<T, T, float>(
+                -FILL_RANGE, FILL_RANGE, -FILL_RANGE, FILL_RANGE, dyDims);
+        }
         if(dynamic_cast<const fe::BatchnormInferenceNodeVarianceExt*>(&node) != nullptr)
             return static_cast<float>(batchnorm::getToleranceInferenceWithVariance<T>());
         if(dynamic_cast<const fe::BatchnormInferenceNode*>(&node) != nullptr)

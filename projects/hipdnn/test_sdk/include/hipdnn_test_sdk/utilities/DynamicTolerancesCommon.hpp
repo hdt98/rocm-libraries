@@ -219,4 +219,13 @@ double computeMatrixInfNorm(hipdnn_data_sdk::utilities::ITensor& tensor)
     return maxRowSum;
 }
 
+/// Maximum fill range r such that macs * r^2 < numeric_limits<T>::max().
+/// Prevents overflow when inputs are drawn from [-r, r].
+template <typename T>
+double maxSafeFillRange(uint64_t macs)
+{
+    auto typeMax = static_cast<double>(std::numeric_limits<T>::max());
+    return std::sqrt(typeMax / static_cast<double>(macs));
+}
+
 } // namespace hipdnn_test_sdk::utilities

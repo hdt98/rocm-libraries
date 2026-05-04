@@ -109,18 +109,27 @@ class ConvWgradShapeSuite : public ::testing::TestWithParam<ConvWgradShapeCase>
 protected:
     static float tolerance(const ConvWgradShapeCase& tc)
     {
-        constexpr double FILL_RANGE = 1.0;
+        auto fr = static_cast<double>(tc.fillRange);
         auto dyDims = tc.computeOutputDims();
         return hipdnn_test_sdk::utilities::conv::
             calculateConvWrwTolerance<DataType, DataType, double>(
-                -FILL_RANGE, FILL_RANGE, -FILL_RANGE, FILL_RANGE, dyDims);
+                -fr, fr, -fr, fr, dyDims);
     }
 
     void runConvWgradShapeTest()
     {
         SKIP_IF_NO_DEVICES();
         const auto& tc = GetParam();
+
         auto dyDims = tc.computeOutputDims();
+        auto macs = hipdnn_test_sdk::utilities::conv::computeConvWrwMacCount(dyDims);
+        auto safeFill = hipdnn_test_sdk::utilities::maxSafeFillRange<DataType>(macs);
+        if(static_cast<double>(tc.fillRange) > safeFill)
+        {
+            GTEST_SKIP() << "Fill range " << tc.fillRange << " exceeds max safe " << safeFill
+                         << " for type (MACs=" << macs << ")";
+        }
+
         runGpuVsCpuConvWrw<DataType>(tc.xDims,
                                      tc.wDims,
                                      dyDims,
@@ -129,7 +138,8 @@ protected:
                                      tc.padding,
                                      tc.padding,
                                      tolerance(tc),
-                                     tc.layout);
+                                     tc.layout,
+                                     tc.fillRange);
     }
 };
 

@@ -58,6 +58,16 @@ inline std::vector<ConvShapeCase> withChannelLastLayout(std::vector<ConvShapeCas
     return cases;
 }
 
+inline std::vector<ConvShapeCase> withFillRange(std::vector<ConvShapeCase> cases, float range)
+{
+    for(auto& tc : cases)
+    {
+        tc.fillRange = range;
+        tc.tag += "_fr" + std::to_string(static_cast<int>(range));
+    }
+    return cases;
+}
+
 // ============================================================================
 // Small shapes — fast binary (CI gate)
 // ============================================================================

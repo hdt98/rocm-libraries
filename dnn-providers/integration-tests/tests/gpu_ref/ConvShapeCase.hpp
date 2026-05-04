@@ -33,6 +33,8 @@ struct ConvShapeCase
     int64_t groups = 1;
     std::string tag;
 
+    float fillRange = 1.0f;
+
     // When non-null, input/output tensors use this channel-last layout (NHWC/NDHWC/NLC).
     // Weights always use default packed (KCRS) strides regardless.
     // When null, all tensors use default packed strides (NCHW/NCDHW/NCL).

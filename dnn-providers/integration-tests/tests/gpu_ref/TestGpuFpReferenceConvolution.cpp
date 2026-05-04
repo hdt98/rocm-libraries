@@ -1127,3 +1127,23 @@ INSTANTIATE_TEST_SUITE_P(Full,
                          TestGpuConvFwdRefNdhwc3dBfp16,
                          ::testing::ValuesIn(withChannelLastLayout(getLargeStress3dConvCases())),
                          byTag());
+
+// ============================================================================
+// LargeFill — stress-test with fillRange=10, overflow-guarded via GTEST_SKIP
+// ============================================================================
+
+// fp32
+INSTANTIATE_TEST_SUITE_P(LargeFill,
+                         TestGpuConvFwdRef2dFp32,
+                         ::testing::ValuesIn(withFillRange(getSmall2dConvCases(), 10.0f)),
+                         byTag());
+// fp16
+INSTANTIATE_TEST_SUITE_P(LargeFill,
+                         TestGpuConvFwdRef2dFp16,
+                         ::testing::ValuesIn(withFillRange(getSmall2dConvCases(), 10.0f)),
+                         byTag());
+// bfp16
+INSTANTIATE_TEST_SUITE_P(LargeFill,
+                         TestGpuConvFwdRef2dBfp16,
+                         ::testing::ValuesIn(withFillRange(getSmall2dConvCases(), 10.0f)),
+                         byTag());

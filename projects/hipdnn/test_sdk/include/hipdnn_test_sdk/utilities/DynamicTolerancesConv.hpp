@@ -15,6 +15,51 @@
 namespace hipdnn_test_sdk::utilities::conv
 {
 
+/// MACs per output element for fprop: C * product(spatial filter dims)
+inline uint64_t computeConvFpropMacCount(const std::vector<int64_t>& wDims)
+{
+    if(wDims.size() < 2)
+    {
+        throw std::invalid_argument("wDims must have at least 2 dimensions (K, C).");
+    }
+    auto macs = static_cast<uint64_t>(wDims[1]);
+    for(size_t i = 2; i < wDims.size(); ++i)
+    {
+        macs *= static_cast<uint64_t>(wDims[i]);
+    }
+    return macs;
+}
+
+/// MACs per output element for dgrad: K * product(spatial filter dims)
+inline uint64_t computeConvDgradMacCount(const std::vector<int64_t>& wDims)
+{
+    if(wDims.size() < 3)
+    {
+        throw std::invalid_argument("wDims must have at least 3 dimensions.");
+    }
+    auto macs = static_cast<uint64_t>(wDims[0]);
+    for(size_t i = 2; i < wDims.size(); ++i)
+    {
+        macs *= static_cast<uint64_t>(wDims[i]);
+    }
+    return macs;
+}
+
+/// MACs per output element for wgrad: N * product(spatial output dims)
+inline uint64_t computeConvWrwMacCount(const std::vector<int64_t>& dyDims)
+{
+    if(dyDims.size() < 2)
+    {
+        throw std::invalid_argument("dyDims must have at least 2 dimensions (N, K).");
+    }
+    auto macs = static_cast<uint64_t>(dyDims[0]);
+    for(size_t i = 2; i < dyDims.size(); ++i)
+    {
+        macs *= static_cast<uint64_t>(dyDims[i]);
+    }
+    return macs;
+}
+
 /**
  * @brief Calculates the expected tolerance for Convolution Backward Weights (WrW) operations.
  *
