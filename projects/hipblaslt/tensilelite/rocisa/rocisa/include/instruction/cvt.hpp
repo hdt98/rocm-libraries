@@ -556,6 +556,30 @@ namespace rocisa
         }
     };
 
+    struct VCvtScaleSRPkF32toFP8 : public VCvtInstruction
+    {
+        VCvtScaleSRPkF32toFP8(const std::shared_ptr<RegisterContainer>& dst,
+                              const InstructionInput&                   src0,
+                              const InstructionInput&                   src1,
+                              const InstructionInput&                   scale,
+                              const std::string&                        comment = "")
+            : VCvtInstruction(
+                CvtType::CVT_SCALEF32_SR_PK8_FP8_F32, dst, {src0, src1, scale}, std::nullopt, std::nullopt, std::vector<int>({}), comment)
+        {
+            setInst("v_cvt_scalef32_sr_pk8_fp8_f32");
+        }
+
+        VCvtScaleSRPkF32toFP8(const VCvtScaleSRPkF32toFP8& other)
+            : VCvtInstruction(other)
+        {
+        }
+
+        std::shared_ptr<Item> clone() const override
+        {
+            return std::make_shared<VCvtScaleSRPkF32toFP8>(*this);
+        }
+    };
+
     struct VCvtScalePkFP8toF16 : public VCvtInstruction
     {
         VCvtScalePkFP8toF16(const std::shared_ptr<RegisterContainer>& dst,
