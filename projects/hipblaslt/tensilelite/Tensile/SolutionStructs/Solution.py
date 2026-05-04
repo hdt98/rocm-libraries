@@ -640,6 +640,11 @@ class Solution(collections.abc.Mapping):
 
     state["MfmaInitCVgprs"] = False
 
+    if state["ISA"] == (12, 5, 0):
+      if ((state["LdsBlockSizePerPadMXSA"] != 0) or (state["LdsBlockSizePerPadMXSB"] != 0 )):
+        reject(state, "LdsBlockSizePerPadMXSA/LdsBlockSizePerPadMXSB only support 0 for gfx1250")
+        return
+
     # done
     state["AssignedProblemIndependentDerivedParameters"] = True
 
