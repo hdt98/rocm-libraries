@@ -105,6 +105,7 @@ class hardware_t {
    */
   struct architecture_constants {
     size_t num_xcds;  ///< Number of XCDs (XCD = XGMI Complex Die)
+    size_t rf_capacity_per_cu;  ///< Register file capacity per CU in bytes
     double mem1_perf_ratio;
     double mem2_perf_ratio;
     double mem3_perf_ratio;
@@ -114,6 +115,7 @@ class hardware_t {
     double mem_clock_ratio;          ///< Memory clock ratio relative to compute clock
 
     constexpr architecture_constants(size_t num_xcds,
+                                     size_t rf_capacity_per_cu,
                                      double mem1_perf_ratio,
                                      double mem2_perf_ratio,
                                      double mem3_perf_ratio,
@@ -121,6 +123,7 @@ class hardware_t {
                                      std::tuple<double, double, double> mem_bw_per_wg_coefficients,
                                      double mem_clock_ratio)  // Obtained through microbenchmarking
         : num_xcds(num_xcds)
+        , rf_capacity_per_cu(rf_capacity_per_cu)
         , mem1_perf_ratio(mem1_perf_ratio)
         , mem2_perf_ratio(mem2_perf_ratio)
         , mem3_perf_ratio(mem3_perf_ratio)
@@ -148,28 +151,28 @@ class hardware_t {
   static constexpr architecture_constants get_arch_constants(architecture_t arch) {
     switch (arch) {
       case architecture_t::gfx90a:
-        return {1, 5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
+        return {1, 256*1024, 5.5, 1.21875121875121875122 * 1.2, 1.2, 4, std::make_tuple(0, 0.03, 0), 1.5};
       case architecture_t::gfx942:
-        return {8, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
+        return {8, 512*1024, 17, 1.21875121875121875122 * 6, 4, 4, std::make_tuple(0, 0.015, 0), 1.5};
       case architecture_t::gfx950:
-        return {8, 17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
+        return {8, 512*1024, 17, 1.21875121875121875122 * 7, 6, 4, std::make_tuple(0, 0.008, 0), 1.5};
       case architecture_t::gfx1201:
-        return {1, 5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
+        return {1, 256*1024, 5.74, 1.21875121875121875122 * 2.41, 0.464, 2, std::make_tuple(0, 0.17, 0), 1.5};
       case architecture_t::gfx1100:
-        return {1, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5};
+        return {1, 256*1024, 7.12, 1.21875121875121875122 * 3.48, 0.732, 2, std::make_tuple(0, 0.11, 0), 1.5};
       case architecture_t::gfx1150:
         // AMD Strix Point iGPU
-        return {1, 1.497, NO_MALL_AVAILABLE, 0.077, 16, std::make_tuple(0, 0.18, 0), 1.5};
+        return {1, 256*1024, 1.497, NO_MALL_AVAILABLE, 0.077, 16, std::make_tuple(0, 0.18, 0), 1.5};
       case architecture_t::gfx1151:
         // AMD Strix Halo iGPU
-        return {1, 2.47, 1.21875121875121875122 * 0.93, 0.215, 2, std::make_tuple(0, 0.22, 0), 1.5};
+        return {1, 256*1024, 2.47, 1.21875121875121875122 * 0.93, 0.215, 2, std::make_tuple(0, 0.22, 0), 1.5};
       case architecture_t::gfx1152:
         // AMD Radeon 840M iGPU
-        return {1, 0.849, NO_MALL_AVAILABLE, 0.096, 4, std::make_tuple(0, 0.13, 0), 1.5};
+        return {1, 256*1024, 0.849, NO_MALL_AVAILABLE, 0.096, 4, std::make_tuple(0, 0.13, 0), 1.5};
       case architecture_t::gfx1153:
         // AMD Radeon 820M iGPU
-        return {1, 0.240, NO_MALL_AVAILABLE, 0.066, 2, std::make_tuple(0, 0.19, 0), 1.5};
-      default: return {0, 0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
+        return {1, 256*1024, 0.240, NO_MALL_AVAILABLE, 0.066, 2, std::make_tuple(0, 0.19, 0), 1.5};
+      default: return {0, 0, 0, 0, 0, 0, std::make_tuple(0, 0, 0), 0};
     }
   }
 
@@ -452,6 +455,7 @@ class hardware_t {
   architecture_t arch;  ///< GPU architecture type
   size_t N_CU;          ///< Number of Compute Units
   size_t lds_capacity;  ///< Capacity of Local Data Share (LDS) in bytes
+  size_t rf_capacity;   ///< Capacity of Register File (RF) in bytes
   double mem1_perf_ratio;
   double mem2_perf_ratio;
   double mem3_perf_ratio;
@@ -469,6 +473,7 @@ class hardware_t {
    * @param arch GPU architecture type
    * @param N_CU Number of compute units
    * @param lds_capacity LDS capacity in bytes
+   * @param rf_capacity RF capacity in bytes
    * @param NUM_XCD Number of XCDs
    * @param mem1_perf_ratio Memory level 1 performance ratio
    * @param mem2_perf_ratio Memory level 2 performance ratio
@@ -481,6 +486,7 @@ class hardware_t {
   hardware_t(architecture_t arch,
              size_t N_CU,
              size_t lds_capacity,
+             size_t rf_capacity,
              size_t NUM_XCD,
              double mem1_perf_ratio,
              double mem2_perf_ratio,
@@ -499,6 +505,7 @@ class hardware_t {
    * @param arch GPU architecture type
    * @param N_CU Number of compute units
    * @param lds_capacity LDS capacity in bytes
+   * @param rf_capacity LDS capacity in bytes
    * @param constants Architecture-specific constants
    * @param L2_capacity L2 cache capacity in bytes
    * @param compute_clock_ghz Compute clock frequency in GHz
@@ -507,6 +514,7 @@ class hardware_t {
   hardware_t(architecture_t arch,
              size_t N_CU,
              size_t lds_capacity,
+             size_t rf_capacity,
              const architecture_constants& constants,
              size_t L2_capacity,
              double compute_clock_ghz,
@@ -558,6 +566,7 @@ class hardware_t {
    * @param arch Architecture enum value
    * @param N_CU Number of compute units
    * @param lds_capacity LDS capacity in bytes
+   * @param rf_capacity LDS capacity in bytes
    * @param L2_capacity L2 cache capacity in bytes
    * @param compute_clock_khz Compute clock in KHz
    * @return hardware_t Configured hardware instance
@@ -566,6 +575,7 @@ class hardware_t {
   static hardware_t get_hardware_for_arch(architecture_t arch,
                                           size_t N_CU,
                                           size_t lds_capacity,
+                                          size_t rf_capacity,
                                           size_t L2_capacity,
                                           int compute_clock_khz);
 

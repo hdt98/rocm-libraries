@@ -135,18 +135,28 @@ size_t compute_mt_compute_latency(const problem_t& problem,
                                   const config_t& config);
 
 /**
+ * @brief Check if MT fits in RF
+ *
+ * @param hardware Hardware characteristics (@see origami::hardware_t)
+ * @param mt Macro tile dimensions
+ * @param a_dtype Data type of operand A
+ * @return bool True if MT fits in RF, false otherwise
+ */
+bool check_rf_capacity(const hardware_t& hardware,
+                        dim3_t mt,
+                        data_type_t a_dtype);
+
+/**
  * @brief Check if MT fits in LDS
  *
  * @param hardware Hardware characteristics (@see origami::hardware_t)
  * @param mt Macro tile dimensions
  * @param a_dtype Data type of operand A
- * @param b_dtype Data type of operand B
  * @return bool True if MT fits in LDS, false otherwise
  */
 bool check_lds_capacity(const hardware_t& hardware,
                         dim3_t mt,
-                        data_type_t a_dtype,
-                        data_type_t b_dtype);
+                        data_type_t a_dtype);
 /**
  * @brief A linear-estimation method for estimating L2-hitrate.
  *

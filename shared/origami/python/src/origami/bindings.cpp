@@ -199,6 +199,7 @@ NB_MODULE(origami, m) {
       .def(nanobind::init<hardware_t::architecture_t,
                           size_t,  // N_CU
                           size_t,  // lds_capacity
+                          size_t,  // rf_capacity
                           size_t,  // NUM_XCD
                           double,  // mem1_perf_ratio
                           double,  // mem2_perf_ratio
@@ -214,6 +215,7 @@ NB_MODULE(origami, m) {
            "Get recommended matrix instruction dimension (highest throughput) for a given datatype")
       .def_rw("N_CU", &hardware_t::N_CU)
       .def_rw("lds_capacity", &hardware_t::lds_capacity)
+      .def_rw("rf_capacity", &hardware_t::rf_capacity)
       .def_rw("mem1_perf_ratio", &hardware_t::mem1_perf_ratio)
       .def_rw("mem2_perf_ratio", &hardware_t::mem2_perf_ratio)
       .def_rw("mem3_perf_ratio", &hardware_t::mem3_perf_ratio)
@@ -234,6 +236,7 @@ NB_MODULE(origami, m) {
         nanobind::arg("arch"),
         nanobind::arg("N_CU"),
         nanobind::arg("lds_capacity"),
+        nanobind::arg("rf_capacity"),
         nanobind::arg("L2_capacity"),
         nanobind::arg("compute_clock_khz"),
         "Create hardware object for a specific architecture with specified parameters.");

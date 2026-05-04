@@ -508,7 +508,7 @@ TEST_CASE("Attention: check_lds_capacity", "[attention]") {
       origami::dim3_t mt{256, 256, 64};
 
       auto fits = origami::attention::check_lds_capacity(
-          hardware, mt, origami::data_type_t::BFloat16, origami::data_type_t::BFloat16);
+          hardware, mt, origami::data_type_t::BFloat16);
       REQUIRE(fits == true);
     }
 
@@ -517,7 +517,7 @@ TEST_CASE("Attention: check_lds_capacity", "[attention]") {
         auto hardware = make_hardware(gpu_arch);
 
         auto fits = origami::attention::check_lds_capacity(
-            hardware, {256, 256, 256}, origami::data_type_t::BFloat16, origami::data_type_t::BFloat16);
+            hardware, {256, 256, 256}, origami::data_type_t::BFloat16);
         REQUIRE(fits == false);
       }
 
@@ -525,7 +525,7 @@ TEST_CASE("Attention: check_lds_capacity", "[attention]") {
         auto hardware = make_hardware(gpu_arch);
 
         auto fits = origami::attention::check_lds_capacity(
-            hardware, {128, 128, 64}, origami::data_type_t::Int8, origami::data_type_t::Int8);
+            hardware, {128, 128, 64}, origami::data_type_t::Int8);
         REQUIRE(fits == true);
       }
     } else if (gpu_arch == 950) {
@@ -533,7 +533,7 @@ TEST_CASE("Attention: check_lds_capacity", "[attention]") {
         auto hardware = make_hardware(gpu_arch);
 
         auto fits = origami::attention::check_lds_capacity(
-            hardware, {512, 512, 256}, origami::data_type_t::BFloat16, origami::data_type_t::BFloat16);
+            hardware, {512, 512, 256}, origami::data_type_t::BFloat16);
         REQUIRE(fits == false);
       }
 
@@ -541,7 +541,7 @@ TEST_CASE("Attention: check_lds_capacity", "[attention]") {
         auto hardware = make_hardware(gpu_arch);
 
         auto fits = origami::attention::check_lds_capacity(
-            hardware, {256, 256, 64}, origami::data_type_t::Int8, origami::data_type_t::Int8);
+            hardware, {256, 256, 64}, origami::data_type_t::Int8);
         REQUIRE(fits == true);
       }
     }

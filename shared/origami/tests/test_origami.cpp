@@ -46,6 +46,7 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
         hardware_slow                  = origami::hardware_t(gpu_arch_enum,
                                             304,
                                             65536,
+                                            512 * 1024,  // rf_capacity
                                             8,
                                             1.0,
                                             1.0,
@@ -57,6 +58,7 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
         hardware_fast                  = origami::hardware_t(gpu_arch_enum,
                                             304,
                                             65536,
+                                            512 * 1024,  // rf_capacity
                                             8,
                                             1.0,
                                             1.0,
@@ -71,6 +73,7 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
         hardware_slow                  = origami::hardware_t(gpu_arch_enum,
                                             256,
                                             163840,
+                                            512 * 1024,  // rf_capacity
                                             8,
                                             1.0,
                                             1.0,
@@ -82,6 +85,7 @@ TEST_CASE("Origami: compute_perf_gflops", "[origami]") {
         hardware_fast                  = origami::hardware_t(gpu_arch_enum,
                                             256,
                                             163840,
+                                            512 * 1024,  // rf_capacity
                                             8,
                                             1.0,
                                             1.0,

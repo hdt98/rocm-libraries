@@ -144,14 +144,21 @@ size_t compute_mt_compute_latency(const problem_t& problem,
 /* Memory-related functions                                                                 */
 /* ======================================================================================== */
 
+bool check_rf_capacity(const hardware_t& hardware,
+                        dim3_t mt,
+                        data_type_t a_dtype) {
+  // RF size: Q[BLOCK_M, HEAD_DIM] in F16, K and V[BLOCK_N, HEAD_DIM] in F16, O[BLOCK_M, HEAD_DIM] in F32, and P[BLOCK_M, BLOCK_N] in F32 for 2 WGs
+  size_t rf_usage = 2 * (mt.mk() * data_type_to_bytes(a_dtype) +
+                    hardware.parallel_mi_cu * 2 * mt.nk() * data_type_to_bytes(a_dtype) +
+                    (mt.mk() + mt.mn()) * 4);
+  return rf_usage <= hardware.rf_capacity;
+}
+
 bool check_lds_capacity(const hardware_t& hardware,
                         dim3_t mt,
-                        data_type_t a_dtype,
-                        data_type_t b_dtype) {
-  auto a_loads_in_bytes = mt.mk() * data_type_to_bytes(a_dtype);
-  auto b_loads_in_bytes = mt.nk() * data_type_to_bytes(b_dtype);
-  auto LDS_usage = a_loads_in_bytes + b_loads_in_bytes;
-  return LDS_usage <= hardware.lds_capacity;
+                        data_type_t a_dtype) {
+  auto lds_usage = 2 * std::max(mt.mk(), mt.nk()) * data_type_to_bytes(a_dtype); // max(Q, K), V reuses the LDS space for K
+  return lds_usage <= hardware.lds_capacity;
 }
 
 double compute_mem_bw_from_occupancy(const hardware_t& hardware, size_t num_active_cus) {
@@ -418,6 +425,7 @@ static double wgmma0_compute_latency(const problem_t& problem,
   // S = Q * K^T : [MT_M x MT_K] * [MT_K x MT_N] -> [MT_M x MT_N]
   // This maps directly to the standard MT compute latency
   size_t N_MI = compute_number_matrix_instructions(config.mt, config.mi);
+  OLOG_DEBUG("  WGMMA0 MI: " << config.mi.m << ", " << config.mi.n << ", " << config.mi.k);
   size_t L_MI = hardware.get_mi_latency(config.mi.m, config.mi.n, config.mi.k, problem.mi_dtype);
   return static_cast<double>(L_MI) * static_cast<double>(N_MI);
 }
@@ -519,6 +527,8 @@ double compute_tile_latency(const problem_t& problem,
                             const config_t& config,
                             size_t num_active_cus,
                             size_t splitting_factor) {
+  bool debug = runtime_options::get().debug_enabled;
+
   // Compute individual stage latencies
   double L_ld_q    = q_tile_load_latency(problem, hardware, config, num_active_cus);
   double L_ld_kv   = kv_tile_load_latency(problem, hardware, config, num_active_cus, splitting_factor);
@@ -526,6 +536,33 @@ double compute_tile_latency(const problem_t& problem,
   double L_softmax = softmax_compute_latency(problem, hardware, config);
   double L_wgmma1  = wgmma1_compute_latency(problem, hardware, config);
   double L_st_o    = output_tile_write_latency(problem, hardware, config, num_active_cus);
+
+  if (debug) {
+    // Compute cache hit rates for logging (same logic as in kv_tile_load_latency)
+    double H_l2 = estimate_l2_hit(problem, hardware, config, splitting_factor);
+    double H_l2_global = compute_l2_hit_rate_global(problem, hardware, config, hardware.L2_capacity * 1024);
+    H_l2 = std::min(H_l2, H_l2_global);
+    if (H_l2 <= 0.0) H_l2 = 0.5;
+    double H_mall = hardware.has_MALL()
+        ? estimate_mall_hit(problem, hardware, config, num_active_cus, splitting_factor)
+        : 0.0;
+
+    OLOG_DEBUG("  --- Stage Latencies (loop cycle) ---");
+    OLOG_DEBUG("    KV tile load: MT_N=" << config.mt.n << " MT_K=" << config.mt.k
+               << " bytes=" << (config.mt.n * config.mt.k * 2)
+               << " l2_hit=" << H_l2 << " mall_hit=" << H_mall
+               << " latency=" << L_ld_kv << " cycles");
+    OLOG_DEBUG("    WGMMA0 (Q*K^T): MT_M=" << config.mt.m << " MT_N=" << config.mt.n << " MT_K=" << config.mt.k
+               << " MI=(" << config.mi.m << "," << config.mi.n << "," << config.mi.k << ")"
+               << " latency=" << L_wgmma0 << " cycles");
+    OLOG_DEBUG("    Softmax: elements=" << (config.mt.m * config.mt.n)
+               << " latency=" << L_softmax << " cycles");
+    OLOG_DEBUG("    WGMMA1 (P*V): remapped dims M=" << config.mt.m << " N=" << config.mt.k << " K=" << config.mt.n
+               << " MI=(" << config.mi.m << "," << config.mi.n << "," << config.mi.k << ")"
+               << " latency=" << L_wgmma1 << " cycles");
+    OLOG_DEBUG("    Output write: bytes=" << (config.mt.m * config.mt.k * 2)
+               << " latency=" << L_st_o << " cycles");
+  }
 
   // Composite latencies
   double L_compute_s = L_wgmma0 + L_softmax;  // S = QK^T + softmax
@@ -538,8 +575,21 @@ double compute_tile_latency(const problem_t& problem,
   double t3 = std::max(L_st_o, L_wgmma1);           // WG0: store O,  WG1: compute O
   double t4 = std::max(L_load_qk, L_st_o);          // WG0: load Q+K, WG1: store O
 
+  if (debug) {
+    OLOG_DEBUG("  --- Pipeline Stages ---");
+    OLOG_DEBUG("    t0 (max(compute_s, load_qk)): " << t0 << " cycles");
+    OLOG_DEBUG("    t1 (max(load_v, compute_s)): " << t1 << " cycles");
+    OLOG_DEBUG("    t2 (max(compute_o, load_v)): " << t2 << " cycles");
+    OLOG_DEBUG("    t3 (max(store_o, compute_o)): " << t3 << " cycles");
+    OLOG_DEBUG("    t4 (max(load_qk, store_o)): " << t4 << " cycles");
+  }
+
   // Pipeline cycle = max of all stage latencies (critical path)
   double loop_cycle = std::max({t0, t1, t2, t3, t4});
+
+  if (debug) {
+    OLOG_DEBUG("  Loop cycle (critical path): " << loop_cycle << " cycles");
+  }
 
   return loop_cycle;
 }
@@ -575,11 +625,11 @@ double compute_total_latency(const problem_t& problem,
   bool debug = runtime_options::get().debug_enabled;
 
   OLOG_DEBUG("=== Attention compute_total_latency START ===");
+  OLOG_DEBUG("Evaluating config: MT=(" << config.mt.m << "," << config.mt.n << "," << config.mt.k
+             << ") MI=(" << config.mi.m << "," << config.mi.n << "," << config.mi.k << ")");
   OLOG_DEBUG("Problem: M=" << problem.size.m << " N=" << problem.size.n
              << " K=" << problem.size.k << " batch=" << problem.batch
              << " q_heads=" << problem.q_heads);
-  OLOG_DEBUG("Config MT: M=" << config.mt.m << " N=" << config.mt.n
-             << " K=" << config.mt.k);
   OLOG_DEBUG("Hardware: N_CU=" << hardware.N_CU << " max_cus=" << max_cus);
 
   // Problem dimensions: M=Q_SEQ, N=K_SEQ, K=H_DIM
@@ -598,6 +648,11 @@ double compute_total_latency(const problem_t& problem,
   const size_t grid_n = math::safe_ceil_div(N, MT_N);
   const size_t grid_k = math::safe_ceil_div(K, MT_K);
 
+  OLOG_DEBUG("Grid: M=" << M << "/" << MT_M << "=" << grid_m
+             << " N=" << N << "/" << MT_N << "=" << grid_n
+             << " K=" << K << "/" << MT_K << "=" << grid_k
+             << " total_tiles=" << (grid_m * grid_n * grid_k));
+
   const size_t wgs_per_cu = 2;
 
   // CU occupancy (simplified for flash attention)
@@ -606,15 +661,26 @@ double compute_total_latency(const problem_t& problem,
 
   // --- Prologue: initial Q and K tile loads (sequential) ---
   double L_ld_q = q_tile_load_latency(problem, hardware, config, num_active_cus);
+  OLOG_DEBUG("  Q tile load: MT_M=" << config.mt.m << " MT_K=" << config.mt.k
+             << " bytes=" << (config.mt.m * config.mt.k * 2)
+             << " latency=" << L_ld_q << " cycles");
+
   double L_ld_k = kv_tile_load_latency(problem, hardware, config, num_active_cus, splitting_factor);
+  OLOG_DEBUG("  K tile load (prologue): MT_N=" << config.mt.n << " MT_K=" << config.mt.k
+             << " bytes=" << (config.mt.n * config.mt.k * 2)
+             << " latency=" << L_ld_k << " cycles");
+
   double L_prologue = L_ld_q + L_ld_k;
+  OLOG_DEBUG("  Prologue total: " << L_prologue << " cycles");
 
   // --- Loop: pipelined steady-state cycle ---
   double L_loop = compute_tile_latency(problem, hardware, config,
                                            num_active_cus, splitting_factor);
+  OLOG_DEBUG("  Loop cycle latency: " << L_loop << " cycles");
 
   // --- Epilogue: final output tile write ---
   double L_epilogue = output_tile_write_latency(problem, hardware, config, num_active_cus);
+  OLOG_DEBUG("  Epilogue (output write): " << L_epilogue << " cycles");
 
   // --- Number of pipeline iterations ---
   // Total work = batch * grid_M * grid_N * grid_K tiles distributed across N_CU CUs
@@ -631,13 +697,18 @@ double compute_total_latency(const problem_t& problem,
   // --- Total latency ---
   double total_latency = L_prologue + L_loop * num_iters + L_epilogue;
 
+  OLOG_DEBUG("Pipeline summary: prologue=" << L_prologue << " loop=" << L_loop
+             << " epilogue=" << L_epilogue << " num_iters=" << num_iters
+             << " total=" << total_latency << " cycles");
+
   if (debug) {
     OLOG_DEBUG("======== Flash Attention Debug Info ========");
     OLOG_DEBUG("Problem: Q_SEQ=" << M << " K_SEQ=" << N << " H_DIM=" << K);
-    OLOG_DEBUG("Batch: " << batch);
+    OLOG_DEBUG("Batch: " << batch << " q_heads=" << q_heads);
     OLOG_DEBUG("Macrotile: " << MT_M << "x" << MT_N << "x" << MT_K);
     OLOG_DEBUG("Grid: " << grid_m << "x" << grid_n << "x" << grid_k);
-    OLOG_DEBUG("Active CUs: " << num_active_cus);
+    OLOG_DEBUG("Total tiles: " << total_tiles << " (with adjustment_factor=" << adjustment_factor << ")");
+    OLOG_DEBUG("Active CUs: " << num_active_cus << " WGs per CU: " << wgs_per_cu);
     OLOG_DEBUG("L_prologue: " << L_prologue);
     OLOG_DEBUG("L_loop: " << L_loop);
     OLOG_DEBUG("L_epilogue: " << L_epilogue);
