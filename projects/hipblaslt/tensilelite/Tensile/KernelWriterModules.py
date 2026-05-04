@@ -212,7 +212,14 @@ def accToArchMapper(kernel):
 def hasSequentialValuC(kernel):
   """
   Returns True if valuC registers are already in sequential order after WMMA/MFMA.
+  Returns False for non-MFMA/WMMA kernels (EnableMatrixInstruction=False).
   """
+  # Non-MFMA/WMMA kernels don't have MatrixInstM/MatrixInstN parameters
+  # which are required by accToArchMapper to compute the register mapping.
+  # For these kernels, the concept of "sequential MFMA output" doesn't apply.
+  if not kernel["EnableMatrixInstruction"]:
+    return False
+
   acc2arch, _ = accToArchMapper(kernel)
 
   for i in range(len(acc2arch)):

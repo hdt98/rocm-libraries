@@ -196,14 +196,22 @@ class GlobalWriteBatchWriter:
   @property
   def skipRearrangement(self) -> bool:
     """
-    Check if we can skip v_mov_b32 rearrangement in alpha multiplication section:
+    Check if we can skip v_mov_b32 rearrangement and use WMMA output registers directly.
+
+    skipRearrangement changes store to read from (elementSumIdx - elementSumIdx[0]),
+    but other operations (bias, activation, alpha) work on (elementSumIdx - startVgprValu).
+    These positions are only the same when no operations modify the data.
+
+    Safe to skip rearrangement only when:
     1. hasSequentialValuC is True (WMMA output is already sequential)
     2. needsAccumToDestConversion is False (no pack module to do the rearrangement)
     3. Not a Beta path (Beta paths need separate alpha multiply + beta*C)
-
-    When all conditions are met, we can directly use WMMA output registers
-    without copying to elementSumIdx registers.
     """
+    if self.parentWriter.states.useBias == DataDirection.READ or \
+       self.kernel.get("ActivationFuncCall", False) or \
+       self.applyAlpha:
+      return False
+
     return hasSequentialValuC(self.kernel) and \
            not self.needsAccumToDestConversion and \
            not self.beta
@@ -456,11 +464,8 @@ class GlobalWriteBatchWriter:
     # rC *= alpha
     # Skip separate alpha multiplication if we can fuse it into FP8 SR PK conversion
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and self.parentWriter.alphaBeforeLoadC:
-      # skip rC *= alpha if:
-      # - alpha multiplication will be fused into pk8 conversion (canUsePk8FP8Conversion)
-      # - WMMA output is sequential and no conversion needed (skipRearrangement)
-
-      if not self.canUsePk8FP8Conversion and not self.skipRearrangement:
+      # skip rC *= alpha only if alpha multiplication will be fused into pk8 conversion
+      if not self.canUsePk8FP8Conversion:
         # Normal path: do rC *= alpha
         module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
         if self.codeMulAlpha is None:
@@ -811,11 +816,8 @@ class GlobalWriteBatchWriter:
     # rC *= alpha
     # Skip separate alpha multiplication if we can fuse it into FP8 SR conversion
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and not self.parentWriter.alphaBeforeLoadC:
-      # skip rC *= alpha if:
-      # - alpha multiplication will be fused into pk8 conversion (canUsePk8FP8Conversion)
-      # - WMMA output is sequential and no conversion needed (skipRearrangement)
-
-      if not self.canUsePk8FP8Conversion and not self.skipRearrangement:
+      # skip rC *= alpha only if alpha multiplication will be fused into pk8 conversion
+      if not self.canUsePk8FP8Conversion:
         # Normal path: do rC *= alpha
         module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
         if self.codeMulAlpha is None:
