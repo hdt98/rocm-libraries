@@ -14714,7 +14714,7 @@ class KernelWriterAssembly(KernelWriter):
         cvtVgpr = self.vgprPool.checkOut(4)
         cvtVgprStruct = self.BF8CVTVgprStruct(vgprBF8Temp=cvtVgpr, vgprBF8NanInf=(cvtVgpr+1), \
                                               vgprBF8Min=(cvtVgpr+2), vgprBF8Max=(cvtVgpr+3), \
-                                              autoTruncate=kernel["ISA"][0] >= 12)
+                                              autoTruncate=kernel["ISA"][0] == 12)
       elif kernel["ProblemType"]["DestDataType"].isInt8():
         cvtVgpr = self.vgprPool.checkOut(4)
         cvtVgprStruct = self.I8CVTVgprStruct(vgprI8Temp0=cvtVgpr, vgprI8Temp1=(cvtVgpr+1), \
