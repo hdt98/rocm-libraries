@@ -5,7 +5,7 @@
 
 #include "HipdnnException.hpp"
 #include "logging/Logging.hpp"
-#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
 namespace hipdnn_backend::plugin
 {
@@ -94,7 +94,7 @@ void HeuristicPlugin::resolveSymbols()
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                               "Cannot load heuristic plugin: policy name is empty");
     }
-    _policyId = hipdnn_data_sdk::utilities::engineNameToId(pluginName);
+    _policyId = hipdnn_data_sdk::utilities::policyNameToId(pluginName);
 }
 
 std::string_view HeuristicPlugin::apiVersion() const

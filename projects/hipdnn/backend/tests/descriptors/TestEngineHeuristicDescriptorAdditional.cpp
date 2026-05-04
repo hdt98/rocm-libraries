@@ -26,6 +26,7 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
 
 #include <cstdlib>
@@ -79,9 +80,9 @@ public:
     void setupMockHeuristicPlugin() const
     {
         const int64_t configPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::Config");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
         const int64_t staticOrderingPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::StaticOrdering");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
 
         auto mockHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0x1234);
         auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
@@ -169,28 +170,25 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, SetPolicyOrderValid)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    // Create null-separated string array: "Policy1\0Policy2\0Policy3\0"
-    const std::vector<std::string> policies = {"Policy1", "Policy2", "Policy3"};
-    std::vector<char> buffer;
-    for(const auto& policy : policies)
-    {
-        buffer.insert(buffer.end(), policy.begin(), policy.end());
-        buffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("Policy1"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy2"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy3"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(buffer.size()),
-                                       buffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, SetPolicyOrderInvalidType)
 {
     auto heur = getEngineHeuristicDescriptor();
-    const int64_t dummy = 0;
+    const char dummy = '\0';
 
     ASSERT_THROW_HIPDNN_STATUS(
-        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &dummy),
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 1, &dummy),
         HIPDNN_STATUS_BAD_PARAM);
 }
 
@@ -199,7 +197,7 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, SetPolicyOrderNullPointer)
     auto heur = getEngineHeuristicDescriptor();
 
     ASSERT_THROW_HIPDNN_STATUS(
-        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 10, nullptr),
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 }
 
@@ -214,7 +212,7 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderWhenNotSet)
 
     int64_t count = 999;
     ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 0, &count, nullptr));
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
     ASSERT_EQ(count, 0);
 }
 
@@ -222,18 +220,14 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderCountOnly)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<std::string> policies = {"SelectionHeuristic::StaticOrdering"};
-    std::vector<char> buffer;
-    for(const auto& policy : policies)
-    {
-        buffer.insert(buffer.end(), policy.begin(), policy.end());
-        buffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(buffer.size()),
-                                       buffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -243,8 +237,8 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderCountOnly)
 
     int64_t count = 0;
     ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 0, &count, nullptr));
-    ASSERT_GT(count, 0); // Should be length of "SelectionHeuristic::StaticOrdering\0\0"
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
+    ASSERT_EQ(count, static_cast<int64_t>(policyIds.size()));
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderInvalidType)
@@ -257,10 +251,11 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderInvalidType)
     ASSERT_NO_THROW(heur->finalize());
 
     std::vector<char> buffer(256);
+    int64_t count = 0;
     ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                                  HIPDNN_TYPE_INT64,
+                                                  HIPDNN_TYPE_CHAR,
                                                   256,
-                                                  nullptr,
+                                                  &count,
                                                   buffer.data()),
                                HIPDNN_STATUS_BAD_PARAM);
 }
@@ -269,19 +264,14 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNullPointer)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    // Set policy order first
-    const std::vector<std::string> policies = {"SelectionHeuristic::StaticOrdering"};
-    std::vector<char> buffer;
-    for(const auto& policy : policies)
-    {
-        buffer.insert(buffer.end(), policy.begin(), policy.end());
-        buffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(buffer.size()),
-                                       buffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -291,7 +281,7 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNullPointer)
 
     ASSERT_THROW_HIPDNN_STATUS(
         heur->getAttribute(
-            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 0, nullptr, nullptr),
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 }
 
@@ -299,19 +289,15 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderBufferTooSmall)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<std::string> policies
-        = {"SelectionHeuristic::StaticOrdering", "SelectionHeuristic::Config"};
-    std::vector<char> setBuffer;
-    for(const auto& policy : policies)
-    {
-        setBuffer.insert(setBuffer.end(), policy.begin(), policy.end());
-        setBuffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(setBuffer.size()),
-                                       setBuffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -319,32 +305,29 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderBufferTooSmall)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
-    // Request with tiny buffer
-    std::vector<char> buffer(5);
+    // Request fewer elements than the descriptor holds; should truncate.
+    std::vector<int64_t> buffer(1);
     int64_t count = 0;
     ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 5, &count, buffer.data()));
-    ASSERT_LE(count, 5); // Should truncate
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &count, buffer.data()));
+    ASSERT_EQ(count, 1);
+    ASSERT_EQ(buffer[0], policyIds[0]);
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderRoundTrip)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<std::string> policies = {"SelectionHeuristic::StaticOrdering",
-                                               "SelectionHeuristic::Config",
-                                               "SelectionHeuristic::StaticOrdering"};
-    std::vector<char> setBuffer;
-    for(const auto& policy : policies)
-    {
-        setBuffer.insert(setBuffer.end(), policy.begin(), policy.end());
-        setBuffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(setBuffer.size()),
-                                       setBuffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -352,29 +335,18 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderRoundTrip)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<char> getBuffer(256);
+    std::vector<int64_t> getBuffer(policyIds.size());
     int64_t count = 0;
-    ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 256, &count, getBuffer.data()));
+    ASSERT_NO_THROW(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(getBuffer.size()),
+                                       &count,
+                                       getBuffer.data()));
 
-    // Parse returned data
-    std::vector<std::string> returnedPolicies;
-    size_t offset = 0;
-    while(offset < static_cast<size_t>(count))
+    ASSERT_EQ(count, static_cast<int64_t>(policyIds.size()));
+    for(size_t i = 0; i < policyIds.size(); ++i)
     {
-        const std::string policy(getBuffer.data() + offset);
-        if(policy.empty())
-        {
-            break;
-        }
-        returnedPolicies.push_back(policy);
-        offset += policy.size() + 1;
-    }
-
-    ASSERT_EQ(returnedPolicies.size(), policies.size());
-    for(size_t i = 0; i < policies.size(); ++i)
-    {
-        ASSERT_EQ(returnedPolicies[i], policies[i]);
+        ASSERT_EQ(getBuffer[i], policyIds[i]);
     }
 }
 
@@ -450,23 +422,22 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, ToStringWithPolicyOrder)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<std::string> policies = {"Policy1", "Policy2"};
-    std::vector<char> buffer;
-    for(const auto& policy : policies)
-    {
-        buffer.insert(buffer.end(), policy.begin(), policy.end());
-        buffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("Policy1"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy2"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(buffer.size()),
-                                       buffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     const std::string str = heur->toString();
     ASSERT_NE(str.find("policyOrder"), std::string::npos);
-    ASSERT_NE(str.find("Policy1"), std::string::npos);
-    ASSERT_NE(str.find("Policy2"), std::string::npos);
+    ASSERT_NE(str.find(hipdnn_data_sdk::utilities::formatEngineIdHex(policyIds[0])),
+              std::string::npos);
+    ASSERT_NE(str.find(hipdnn_data_sdk::utilities::formatEngineIdHex(policyIds[1])),
+              std::string::npos);
 }
 
 // ========== Edge Case Tests ==========
@@ -475,29 +446,25 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, SetEmptyPolicyOrder)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    // Empty buffer with just null terminator
-    const std::vector<char> buffer = {'\0'};
-
+    // Setting an empty policy order is allowed at the attribute level; finalize()
+    // would later fail because no policy can be selected, but that is exercised by
+    // FinalizeWithAllPoliciesFailing. Here we only verify the attribute path.
     ASSERT_NO_THROW(heur->setAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 1, buffer.data()));
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
 }
 
 TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNullElementCount)
 {
     auto heur = getEngineHeuristicDescriptor();
 
-    const std::vector<std::string> policies = {"SelectionHeuristic::StaticOrdering"};
-    std::vector<char> buffer;
-    for(const auto& policy : policies)
-    {
-        buffer.insert(buffer.end(), policy.begin(), policy.end());
-        buffer.push_back('\0');
-    }
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
 
     ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                       HIPDNN_TYPE_CHAR,
-                                       static_cast<int64_t>(buffer.size()),
-                                       buffer.data()));
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -505,10 +472,10 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, GetPolicyOrderNullElementCount)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<char> getBuffer(256);
+    std::vector<int64_t> getBuffer(16);
     ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                                  HIPDNN_TYPE_CHAR,
-                                                  256,
+                                                  HIPDNN_TYPE_INT64,
+                                                  static_cast<int64_t>(getBuffer.size()),
                                                   nullptr,
                                                   getBuffer.data()),
                                HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
@@ -520,34 +487,24 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, MultipleSetPolicyOrderCalls)
 
     // First set
     {
-        const std::vector<std::string> policies = {"SelectionHeuristic::StaticOrdering"};
-        std::vector<char> buffer;
-        for(const auto& policy : policies)
-        {
-            buffer.insert(buffer.end(), policy.begin(), policy.end());
-            buffer.push_back('\0');
-        }
+        const std::vector<int64_t> policyIds = {
+            hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        };
         ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                           HIPDNN_TYPE_CHAR,
-                                           static_cast<int64_t>(buffer.size()),
-                                           buffer.data()));
+                                           HIPDNN_TYPE_INT64,
+                                           static_cast<int64_t>(policyIds.size()),
+                                           policyIds.data()));
     }
 
     // Second set should override
-    {
-        const std::vector<std::string> policies
-            = {"SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"};
-        std::vector<char> buffer;
-        for(const auto& policy : policies)
-        {
-            buffer.insert(buffer.end(), policy.begin(), policy.end());
-            buffer.push_back('\0');
-        }
-        ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                           HIPDNN_TYPE_CHAR,
-                                           static_cast<int64_t>(buffer.size()),
-                                           buffer.data()));
-    }
+    const std::vector<int64_t> secondPolicyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(secondPolicyIds.size()),
+                                       secondPolicyIds.data()));
 
     setGraph();
     setHeuristicMode();
@@ -555,11 +512,17 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, MultipleSetPolicyOrderCalls)
         .WillRepeatedly(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<char> getBuffer(256);
+    std::vector<int64_t> getBuffer(secondPolicyIds.size());
     int64_t count = 0;
-    ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 256, &count, getBuffer.data()));
+    ASSERT_NO_THROW(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(getBuffer.size()),
+                                       &count,
+                                       getBuffer.data()));
 
-    const std::string result(getBuffer.data());
-    ASSERT_EQ(result, "SelectionHeuristic::Config"); // Should see second set's first policy
+    ASSERT_EQ(count, static_cast<int64_t>(secondPolicyIds.size()));
+    for(size_t i = 0; i < secondPolicyIds.size(); ++i)
+    {
+        ASSERT_EQ(getBuffer[i], secondPolicyIds[i]);
+    }
 }

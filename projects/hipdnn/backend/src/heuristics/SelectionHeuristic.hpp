@@ -60,7 +60,7 @@ public:
      *                        of this object so the resolved plugin/handle
      *                        cannot dangle.
      * @param policyId Stable int64_t policy ID identifying the policy this
-     *                 slot represents (engineNameToId hash).
+     *                 slot represents (policyNameToId hash).
      */
     SelectionHeuristic(
         std::shared_ptr<plugin::HeuristicPluginResourceManager> resourceManager,

@@ -22,6 +22,7 @@
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <flatbuffers/flatbuffers.h>
@@ -503,7 +504,7 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {
     const auto policyId = plugin().policyId();
-    const auto expectedId = hipdnn_data_sdk::utilities::engineNameToId("TestGoodHeuristicPolicy");
+    const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
     EXPECT_EQ(policyId, expectedId);
 }
 TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyName)
@@ -789,7 +790,7 @@ TEST_F(TestHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
 {
     // First call - ID is computed from policy name
     const auto id1 = plugin().policyId();
-    const auto expectedId = hipdnn_data_sdk::utilities::engineNameToId("TestGoodHeuristicPolicy");
+    const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
     EXPECT_EQ(id1, expectedId);
 
     // Second call should return cached value

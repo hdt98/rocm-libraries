@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
 
 #include <memory>
@@ -95,9 +96,9 @@ public:
     {
         // Mock policy IDs for both well-known policies
         const int64_t configPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::Config");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
         const int64_t staticOrderingPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::StaticOrdering");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
 
         // Mock handles and descriptors
         auto mockHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0x1234);

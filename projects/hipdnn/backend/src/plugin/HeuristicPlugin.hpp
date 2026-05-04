@@ -43,7 +43,7 @@ public:
         type() const override; // Returns HIPDNN_PLUGIN_TYPE_HEURISTIC (via hipdnnPluginGetType)
 
     // Heuristic-specific metadata
-    virtual int64_t policyId() const; // Computed from name via engineNameToId
+    virtual int64_t policyId() const; // Computed from name via policyNameToId
 
     // Plugin type - heuristic plugins return HEURISTIC
     static hipdnnPluginType_t getPluginType()

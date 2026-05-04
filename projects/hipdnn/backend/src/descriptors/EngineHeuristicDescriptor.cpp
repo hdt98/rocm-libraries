@@ -23,8 +23,10 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
 #include <cstdlib>
+#include <cstring>
 #include <set>
 #include <sstream>
 #include <unordered_map>
@@ -36,24 +38,26 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
 {
     // RFC 0007 Section 5.3 & 15: Policy order resolution
     // Priority: descriptor attr > handle > env > default
-    std::vector<std::string> policyNames;
+    // Storage and ABI are policy IDs (FNV-1a of the policy name); names are
+    // hashed at the point they enter the system.
 
     // 1. Descriptor attribute (highest priority)
     if(_policyOrderSet)
     {
-        policyNames = _policyOrder;
         HIPDNN_BACKEND_LOG_DEBUG("Using descriptor-level policy order: {} policies",
-                                 policyNames.size());
+                                 _policyOrder.size());
+        return _policyOrder;
     }
     // 2. Handle-level override (TODO: implement handle API)
     // else if (handle has override)
     // {
-    //     policyNames = handle->getHeuristicPolicyOrder();
+    //     return handle->getHeuristicPolicyOrder();
     // }
     // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
-    else if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
+    if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
     {
-        // Parse comma-separated policy names
+        // Parse comma-separated policy names and hash to IDs
+        std::vector<int64_t> policyIds;
         const std::string envStr(envPolicyOrder);
         std::istringstream iss(envStr);
         std::string token;
@@ -64,27 +68,19 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
             token.erase(token.find_last_not_of(" \t\n\r") + 1);
             if(!token.empty())
             {
-                policyNames.push_back(token);
+                policyIds.push_back(hipdnn_data_sdk::utilities::policyNameToId(token));
             }
         }
         HIPDNN_BACKEND_LOG_DEBUG("Using environment variable policy order: {} policies",
-                                 policyNames.size());
+                                 policyIds.size());
+        return policyIds;
     }
     // 4. Default policy list per RFC 0007 Section 5.3
-    else
-    {
-        policyNames = {"SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"};
-        HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyNames.size());
-    }
-
-    // Convert policy names to IDs using engineNameToId (FNV-1a hash)
-    std::vector<int64_t> policyIds;
-    policyIds.reserve(policyNames.size());
-    for(const auto& name : policyNames)
-    {
-        policyIds.push_back(hipdnn_data_sdk::utilities::engineNameToId(name));
-    }
-
+    std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+    HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyIds.size());
     return policyIds;
 }
 
@@ -597,30 +593,28 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
                                                const void* arrayOfElements)
 {
     THROW_IF_NE(attributeType,
-                HIPDNN_TYPE_CHAR,
+                HIPDNN_TYPE_INT64,
                 HIPDNN_STATUS_BAD_PARAM,
                 "EngineHeuristicDescriptor failed to set policy order: Invalid attribute type.");
+
+    THROW_IF_TRUE(elementCount < 0,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "EngineHeuristicDescriptor failed to set policy order: Negative element count.");
+
+    if(elementCount == 0)
+    {
+        _policyOrder.clear();
+        _policyOrderSet = true;
+        HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: 0 policies");
+        return;
+    }
 
     THROW_IF_NULL(arrayOfElements,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "EngineHeuristicDescriptor failed to set policy order: Null pointer.");
 
-    // Parse null-separated string array
-    const char* data = static_cast<const char*>(arrayOfElements);
-    _policyOrder.clear();
-
-    size_t offset = 0;
-    while(offset < static_cast<size_t>(elementCount))
-    {
-        const std::string policyName(data + offset);
-        if(policyName.empty())
-        {
-            break; // End of list
-        }
-        _policyOrder.push_back(policyName);
-        offset += policyName.size() + 1; // Skip null terminator
-    }
-
+    const auto* data = static_cast<const int64_t*>(arrayOfElements);
+    _policyOrder.assign(data, data + elementCount);
     _policyOrderSet = true;
     HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: {} policies", _policyOrder.size());
 }
@@ -631,38 +625,25 @@ void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attr
                                                void* arrayOfElements) const
 {
     THROW_IF_NE(attributeType,
-                HIPDNN_TYPE_CHAR,
+                HIPDNN_TYPE_INT64,
                 HIPDNN_STATUS_BAD_PARAM,
                 "EngineHeuristicDescriptor failed to get policy order: Invalid attribute type.");
 
+    THROW_IF_NULL(elementCount,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "EngineHeuristicDescriptor failed to get policy order: Null pointer for "
+                  "element count.");
+
     if(!_policyOrderSet)
     {
-        // Return empty if not set
-        if(elementCount != nullptr)
-        {
-            *elementCount = 0;
-        }
+        *elementCount = 0;
         return;
     }
-
-    // Calculate total size needed for null-separated string array
-    // Format: "string1\0string2\0string3\0\0"
-    // Each string ends in \0, final extra \0 marks end of array
-    size_t totalSize = 0;
-    for(const auto& name : _policyOrder)
-    {
-        totalSize += name.size() + 1; // Include null terminator
-    }
-    totalSize += 1; // Final null terminator
 
     // Return the count if they aren't requesting any
     if(requestedElementCount == 0)
     {
-        THROW_IF_NULL(elementCount,
-                      HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                      "EngineHeuristicDescriptor failed to get policy order count: Null pointer "
-                      "for element count.");
-        *elementCount = static_cast<int64_t>(totalSize);
+        *elementCount = static_cast<int64_t>(_policyOrder.size());
         return;
     }
 
@@ -670,32 +651,11 @@ void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attr
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "EngineHeuristicDescriptor failed to get policy order: Null pointer.");
 
-    THROW_IF_NULL(elementCount,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "EngineHeuristicDescriptor failed to get policy order: Null pointer for "
-                  "element count.");
-
-    // Copy null-separated string array
-    char* output = static_cast<char*>(arrayOfElements);
-    size_t offset = 0;
-    for(const auto& name : _policyOrder)
-    {
-        if(offset + name.size() + 1 > static_cast<size_t>(requestedElementCount))
-        {
-            break; // Buffer too small
-        }
-        std::memcpy(output + offset, name.c_str(), name.size() + 1);
-        offset += name.size() + 1;
-    }
-
-    // Add final null terminator
-    if(offset < static_cast<size_t>(requestedElementCount))
-    {
-        output[offset] = '\0';
-        offset++;
-    }
-
-    *elementCount = static_cast<int64_t>(offset);
+    auto* output = static_cast<int64_t*>(arrayOfElements);
+    const auto count =
+        std::min(static_cast<size_t>(requestedElementCount), _policyOrder.size());
+    std::memcpy(output, _policyOrder.data(), count * sizeof(int64_t));
+    *elementCount = static_cast<int64_t>(count);
 }
 
 std::string EngineHeuristicDescriptor::toString() const
@@ -713,7 +673,7 @@ std::string EngineHeuristicDescriptor::toString() const
             {
                 str += ", ";
             }
-            str += "\"" + _policyOrder[i] + "\"";
+            str += hipdnn_data_sdk::utilities::formatEngineIdHex(_policyOrder[i]);
         }
         str += "]";
     }

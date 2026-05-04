@@ -30,7 +30,7 @@ private:
     // RFC 0007 Section 14 & 15: Heuristics framework integration
     std::vector<int64_t> _orderedPolicyIds;
     std::vector<std::unique_ptr<heuristics::SelectionHeuristic>> _policySlots;
-    std::vector<std::string> _policyOrder; // RFC 0007 Section 15: descriptor-level policy names
+    std::vector<int64_t> _policyOrder; // RFC 0007 Section 15: descriptor-level policy IDs
     bool _policyOrderSet = false;
 
     // Resolve policy order from descriptor/handle/env/default

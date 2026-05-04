@@ -15,6 +15,8 @@
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
+
 #include <filesystem>
 #include <gtest/gtest.h>
 
@@ -34,7 +36,7 @@ protected:
     // Helper to create a valid policy name/ID pair
     static std::pair<std::string, int64_t> makeValidPolicyPair(const std::string& baseName)
     {
-        const int64_t policyId = hipdnn_data_sdk::utilities::engineNameToId(baseName);
+        const int64_t policyId = hipdnn_data_sdk::utilities::policyNameToId(baseName);
         return {baseName, policyId};
     }
 };
@@ -281,8 +283,8 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithAdditiveModeAdds)
 TEST_F(TestHeuristicPluginManager, PolicyNameToIdIsConsistent)
 {
     const std::string name1 = "SelectionHeuristic::Config";
-    const int64_t id1a = hipdnn_data_sdk::utilities::engineNameToId(name1);
-    const int64_t id1b = hipdnn_data_sdk::utilities::engineNameToId(name1);
+    const int64_t id1a = hipdnn_data_sdk::utilities::policyNameToId(name1);
+    const int64_t id1b = hipdnn_data_sdk::utilities::policyNameToId(name1);
 
     EXPECT_EQ(id1a, id1b);
 }
@@ -292,8 +294,8 @@ TEST_F(TestHeuristicPluginManager, DifferentNamesProduceDifferentIds)
     const std::string name1 = "SelectionHeuristic::Config";
     const std::string name2 = "SelectionHeuristic::StaticOrdering";
 
-    const int64_t id1 = hipdnn_data_sdk::utilities::engineNameToId(name1);
-    const int64_t id2 = hipdnn_data_sdk::utilities::engineNameToId(name2);
+    const int64_t id1 = hipdnn_data_sdk::utilities::policyNameToId(name1);
+    const int64_t id2 = hipdnn_data_sdk::utilities::policyNameToId(name2);
 
     EXPECT_NE(id1, id2);
 }
@@ -301,7 +303,7 @@ TEST_F(TestHeuristicPluginManager, DifferentNamesProduceDifferentIds)
 TEST_F(TestHeuristicPluginManager, PolicyIdIsNonZero)
 {
     const std::string name = "SelectionHeuristic::Config";
-    const int64_t id = hipdnn_data_sdk::utilities::engineNameToId(name);
+    const int64_t id = hipdnn_data_sdk::utilities::policyNameToId(name);
 
     EXPECT_NE(id, 0);
 }
@@ -309,7 +311,7 @@ TEST_F(TestHeuristicPluginManager, PolicyIdIsNonZero)
 TEST_F(TestHeuristicPluginManager, EmptyPolicyNameProducesZeroId)
 {
     const std::string emptyName;
-    const int64_t id = hipdnn_data_sdk::utilities::engineNameToId(emptyName);
+    const int64_t id = hipdnn_data_sdk::utilities::policyNameToId(emptyName);
 
     // Empty string should produce a specific ID (FNV-1a hash of empty string)
     EXPECT_EQ(id, 0);

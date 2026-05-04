@@ -14,6 +14,7 @@
 #include "utilities/EngineOrdering.hpp"
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
 #include <gtest/gtest.h>
 
@@ -44,7 +45,7 @@ protected:
     // Helper to get StaticOrdering policy ID
     static int64_t getStaticOrderingPolicyId()
     {
-        return engineNameToId("SelectionHeuristic::StaticOrdering");
+        return policyNameToId("SelectionHeuristic::StaticOrdering");
     }
 
     hipdnnHandle_t _handle = nullptr;

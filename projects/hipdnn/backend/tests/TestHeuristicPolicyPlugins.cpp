@@ -24,6 +24,7 @@
 
 #include <flatbuffers/flatbuffers.h>
 #include <hip/hip_runtime.h>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
 
@@ -309,8 +310,8 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PolicyIdMatchesNameHash)
     {
         if(!info.policyName.empty())
         {
-            // Policy ID should match engineNameToId(policyName)
-            const int64_t expectedId = hipdnn_data_sdk::utilities::engineNameToId(info.policyName);
+            // Policy ID should match policyNameToId(policyName)
+            const int64_t expectedId = hipdnn_data_sdk::utilities::policyNameToId(info.policyName);
             EXPECT_EQ(info.policyId, expectedId) << "Policy ID mismatch for " << info.policyName;
         }
     }
