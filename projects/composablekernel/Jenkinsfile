@@ -1175,6 +1175,10 @@ def run_downstream_tests(Map conf=[:]){
             error "Unable to locate image: ${conf.image}"
         }
     }
+    catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
+                throw e
+    }
 
     withDockerContainer(image: conf.image, args: dockerOpts) {
         timeout(time: conf.get("timeoutHours", 2), unit: 'HOURS'){
@@ -1188,7 +1192,7 @@ def run_downstream_tests(Map conf=[:]){
             catch(e){
                 echo "Throwing error exception while running ${env.STAGE_NAME}"
                 echo 'Exception occurred: ' + e.toString()
-                setGithubStatus("${env.STAGE_NAME}", 'error', "Running ${env.STAGE_NAME} failed")
+                setGithubStatus("${env.STAGE_NAME}", 'error', "Stage ${env.STAGE_NAME} failed")
                 throw e
             }
             finally{
