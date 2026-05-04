@@ -226,13 +226,115 @@ void rocsolver_potrf_recursion_getMemorySize(const I n,
     size_t size_work3 = 0;
     size_t size_work4 = 0;
 
+    auto is_po2_NB = [](auto const n, auto const NB) -> bool {
+        // --------------------------
+        // check whether n = 2^k * NB
+        // --------------------------
+
+        auto is_power_of_2 = [](auto const n) -> bool {
+            // ---------
+            // check whether n is an exact power of 2,
+            // i.e. n = 2^k   k >= 0
+            // ---------
+            return (n > 0) && ((n & (n - 1)) == 0);
+        };
+
+        return ((n % NB) == 0) && is_power_of_2(n / NB);
+    };
+
     I const NB = POTF2_MAX_SMALL_SIZE(T);
+
     if(n <= NB)
     {
         // terminate recursion
     }
+    else if(is_po2_NB(n, NB))
+    {
+        // --------------------------
+        // special case  n = 2^k * NB
+        // --------------------------
+        I const n1 = n / 2;
+        I const n2 = n - n1;
+        if(uplo == rocblas_fill_upper)
+        {
+            // ----------------------------------
+            // U12 = U11' \ A12, note U12 has size n1 by n2
+            // ----------------------------------
+            size_t lsize_work1 = 0;
+            size_t lsize_work2 = 0;
+            size_t lsize_work3 = 0;
+            size_t lsize_work4 = 0;
+
+            if(use_rocblas_trsm)
+            {
+                // -------------------------------------------------------
+                // TODO: check whether setting ld1 = 1, ld2 = 1 is correct
+                // -------------------------------------------------------
+                I const ld1 = 1;
+                I const ld2 = 1;
+                (void)rocblasCall_trsm_mem<BATCHED, T, I>(
+                    rocblas_side_left, rocblas_operation_conjugate_transpose,
+
+                    n1, n2, ld1, ld2, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
+            }
+            else
+            {
+                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                    rocblas_side_left, rocblas_operation_conjugate_transpose, n1, n2, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+            }
+
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_work2 = std::max(size_work2, lsize_work2);
+            size_work3 = std::max(size_work3, lsize_work3);
+            size_work4 = std::max(size_work4, lsize_work4);
+        }
+        else
+        {
+            // ----------------------------------
+            // L21 = A21 / L11',  note L21 has size n2 by n1
+            // ----------------------------------
+
+            size_t lsize_work1 = 0;
+            size_t lsize_work2 = 0;
+            size_t lsize_work3 = 0;
+            size_t lsize_work4 = 0;
+
+            if(use_rocblas_trsm)
+            {
+                // -------------------------------------------------------
+                // TODO: check whether setting ld1 = 1, ld2 = 1 is correct
+                // -------------------------------------------------------
+                I const ld1 = 1;
+                I const ld2 = 1;
+                (void)rocblasCall_trsm_mem<BATCHED, T, I>(
+                    rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1, ld1, ld2,
+                    batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4);
+            }
+            else
+            {
+                (void)rocsolver_trsm_mem<BATCHED, STRIDED, T>(
+                    rocblas_side_right, rocblas_operation_conjugate_transpose, n2, n1, batch_count,
+
+                    &lsize_work1, &lsize_work2, &lsize_work3, &lsize_work4, optim_mem);
+            }
+
+            size_work1 = std::max(size_work1, lsize_work1);
+            size_work2 = std::max(size_work2, lsize_work2);
+            size_work3 = std::max(size_work3, lsize_work3);
+            size_work4 = std::max(size_work4, lsize_work4);
+        }
+    }
     else
     {
+        // ------------
+        // general case
+        // ------------
         I const n1 = split_n<T>(n);
         I const n2 = n - n1;
 
