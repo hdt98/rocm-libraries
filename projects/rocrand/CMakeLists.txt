@@ -182,11 +182,14 @@ endif()
 # injected by a super-project such as TheRock's host-ASAN preset), explicitly
 # cancel it for the device compilation pass. gfx942 and other targets without
 # xnack+ cannot support device-side ASAN, and clang silently drops the flag
-# rather than erroring — producing a malformed HIP fat binary. Using
-# -Xarch_device -fno-sanitize=address overrides the flag cleanly before any ASAN
-# metadata accounting occurs, keeping host ASAN fully intact.
+# rather than erroring — producing a malformed HIP fat binary.
+# Note: rocRAND compiles HIP device code through the CXX language path (clang++
+# with --offload-arch flags), so COMPILE_LANGUAGE:HIP does not apply here.
+# Appending to CMAKE_CXX_FLAGS ensures -Xarch_device -fno-sanitize=address trails
+# the -fsanitize=address on every compile command, cleanly overriding it for the
+# device pass while leaving host ASAN fully intact.
 if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
-  add_compile_options("$<$<COMPILE_LANGUAGE:HIP>:-Xarch_device;-fno-sanitize=address>")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xarch_device -fno-sanitize=address")
 endif()
 
 # Set version variables
