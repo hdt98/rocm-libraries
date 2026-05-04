@@ -29,8 +29,10 @@ from rocisa.instruction import VAdd3U32, VCvtF32toF16, VLShiftRightB32, \
                             VCmpClassF32, VOrB32, VPackF16toB32, \
                             VAndOrB32, VBfeU32, VLShiftLeftB16, SNop, VMed3F32, \
                             VCvtPkF32toBF16, VCvtPkF32toF16, VAndB32, \
-                            VMovB32, VLShiftLeftB32, VCvtScalePk8F32toFP8, VCvtScalePk8F32toBF8
+                            VMovB32, VLShiftLeftB32, VCvtScalePk8F32toFP8, VCvtScalePk8F32toBF8, \
+                            VCvtSRF32toFP8, VCvtScaleSRPkF32toFP8, VPrngB32, MacroInstruction
 from rocisa.functions import VSaturateCastInt
+from rocisa.macro import PseudoRandomGeneratorModule
 
 from ..Common.DataType import DataType
 from ..Component import PackData
@@ -136,7 +138,7 @@ class PackData_BF16(PackData):
         return module
 
 class PackData_FLOAT8(PackData):
-    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8)}}
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8), "StochasticRounding": False}}
     def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, inputPrefix="", prefixOffset=0):
         vgprFp8NanInf = fp8CVTVgprStruct.vgprFp8NanInf
         vgprFp8Temp   = fp8CVTVgprStruct.vgprFp8Temp
@@ -372,6 +374,54 @@ class PackData_INT8(PackData):
                     module.add(SNop(waitState=0, comment="1 wait states"))
             elif vi + 1 >= gwvw:
                 module.add(VSaturateCastInt(vgpr(formatVgpr), vgprI8Temp0, tmpS01, -128, 127, type=SaturateTypeInt8, initGpr=True))
+        return module
+
+class PackData_FLOAT8_SR(PackData):
+    kernel = {"ProblemType": {"ComputeDataType": DataType(DataTypeEnum.Float), "DestDataType": DataType(DataTypeEnum.Float8), "StochasticRounding": True}}
+    def __call__(self, gwvw, destIdx, elementSumIdx, fp8CVTVgprStruct, tmpS01, laneSGPRC, vgprTmp, inputPrefix="", prefixOffset=0):
+        ti = rocIsa.getInstance()
+        vgprFp8NanInf = fp8CVTVgprStruct.vgprFp8NanInf
+        vgprFp8Temp   = fp8CVTVgprStruct.vgprFp8Temp
+        vgprFp8Min    = fp8CVTVgprStruct.vgprFp8Min
+        vgprFp8Max    = fp8CVTVgprStruct.vgprFp8Max
+        vRand = vgprTmp #seed
+        if not ti.getAsmCaps()["v_prng_b32"]:
+            vTemp0 = vgprTmp+1
+            vTemp1 = vgprTmp+2
+
+        module = Module("PackData float8 with stochastic rounding")
+
+        # Helper: generate truncation and PRNG instructions
+        def addTruncateAndPRNG(formatVgpr):
+            if not fp8CVTVgprStruct.autoTruncate:
+                module.add(VCmpClassF32(dst=sgpr(tmpS01,laneSGPRC), src0=vgpr(formatVgpr), src1=vgpr(vgprFp8NanInf), comment="Nan and +/- inf"))
+                module.add(VMed3F32(dst=vgpr(vgprFp8Temp), src0=vgpr(formatVgpr), src1=vgpr(vgprFp8Min), src2=vgpr(vgprFp8Max)))
+                module.add(VCndMaskB32(dst=vgpr(formatVgpr), src0=vgpr(vgprFp8Temp), src1=vgpr(formatVgpr), src2=sgpr(tmpS01,laneSGPRC)))
+            if ti.getAsmCaps()["v_prng_b32"]:
+                # NOTE: Current PRNG seed implementation simply uses the value to be converted directly as seed.
+                # For thread ID-based seed design, see the legacy PRND_GENERATOR approach in tensilelite/rocisa/rocisa/include/macro.hpp
+                module.add(VPrngB32(dst=vgpr(vRand), src=vgpr(formatVgpr), comment="Pseudo Random Number Generator"))
+            else:
+                if ti.getAsmCaps()["HasVgprMSB"]:
+                    module.add(PseudoRandomGeneratorModule(vRand, vgprFp8Temp, vTemp0, vTemp1))
+                else:
+                    module.add(MacroInstruction(name="PRND_GENERATOR", args=[vRand, vgprFp8Temp, vTemp0, vTemp1]))
+
+        if gwvw % 8 == 0:
+            # Packed path: convert 8 F32 elements to FP8 at once
+            for groupIdx in range(gwvw // 8):
+                srcStartVgpr = formatting(elementSumIdx + groupIdx * 8, inputPrefix, prefixOffset)
+                addTruncateAndPRNG(srcStartVgpr)
+                d = destIdx + groupIdx * 2  # Each group outputs 2 VGPRs (64-bit aligned)
+                module.add(VCvtScaleSRPkF32toFP8(dst=vgpr(d, 2), src0=vgpr(srcStartVgpr, 8), src1=vgpr(vRand), scale=1.0))
+        else:
+            # Scalar path: convert one element at a time
+            for vi in range(gwvw):
+                formatVgpr = formatting(elementSumIdx + vi, inputPrefix, prefixOffset)
+                addTruncateAndPRNG(formatVgpr)
+                d = destIdx + vi // 4
+                module.add(VCvtSRF32toFP8(dst=vgpr(d), src0=vgpr(formatVgpr), src1=vgpr(vRand), sels=[vi % 4]))
+
         return module
 
 # Cvt is outside of this component, this is just a wrapper for ComputeDataType == float
