@@ -6007,6 +6007,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
       self.defineSgpr("StreamKTileIdx", 1)
       self.defineSgpr("StreamKLocalStart", 1)
       self.defineSgpr("StreamKLocalEnd", 1)
+      if kernel["StreamKDynamicQueueWorkStealing"]:
+        self.defineSgpr("StreamKStealState", 1)
       if kernel["StreamKAtomic"] == 0:
         self.defineSgpr("SrdWS", 4, 4)
     elif kernel["StreamK"]:
