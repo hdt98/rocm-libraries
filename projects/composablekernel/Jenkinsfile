@@ -60,7 +60,7 @@ def setGithubStatus(String context, String state, String description) {
     def sha = env.GIT_COMMIT
     def targetUrl = env.RUN_DISPLAY_URL ?: env.BUILD_URL
     def statusUrl = "https://api.github.com/repos/ROCm/rocm-libraries/statuses/${sha}"
-    withCredentials([usernamePassword(credentialsId: 'github-app-composable-kernel', usernameVariable: 'GITHUB_APP', passwordVariable: 'GITHUB_TOKEN')]) {
+    withCredentials([usernamePassword(credentialsId: 'github-app-miopen', usernameVariable: 'GITHUB_APP', passwordVariable: 'GITHUB_TOKEN')]) {
         def code = '0'
         try {
             retry(3) {
