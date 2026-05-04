@@ -928,7 +928,7 @@ def Build_CK(Map conf=[:]){
             }
             catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
                 echo "The job was cancelled or aborted"
-                setGithubStatus("${env.STAGE_NAME}", 'failure', 'Build stage failed')
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
                 throw e
             }
             withDockerContainer(image: image, args: dockerOpts) {
@@ -989,11 +989,10 @@ def Build_CK(Map conf=[:]){
                     }
                 }
             }
-            setGithubStatus("${env.STAGE_NAME}", 'success', 'Completed successfully')
+            setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
         }
         catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
-                echo "The job was cancelled or aborted"
-                setGithubStatus("${env.STAGE_NAME}", 'error', 'Build stage failed')
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
                 throw e
         }
         return retimage
@@ -1030,6 +1029,10 @@ def process_results(Map conf=[:]){
         {
             error "Unable to locate image: ${image}"
         }
+    }
+    catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
+                throw e
     }
 
     withDockerContainer(image: image, args: '--cap-add=SYS_PTRACE --security-opt seccomp=unconfined -v=/var/jenkins/:/var/jenkins') {
@@ -1140,10 +1143,8 @@ def process_results(Map conf=[:]){
                 }
                 setGithubStatus("${env.STAGE_NAME}", 'success', 'Completed successfully')
             }
-            catch(e){
-                echo "Throwing error exception while processing performance test results"
-                echo 'Exception occurred: ' + e.toString()
-                setGithubStatus("${env.STAGE_NAME}", 'error', 'Processing results failed')
+            catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
+                setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
                 throw e
             }
             finally{
