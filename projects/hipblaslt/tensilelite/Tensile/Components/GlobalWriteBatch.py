@@ -20,6 +20,7 @@
 # CTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ################################################################################
 
+from rocisa import rocIsa
 from rocisa.code import Label, Module, RegSet, TextBlock
 from rocisa.container import SMEMModifiers, VOP3PModifiers, MUBUFModifiers, \
   SDWAModifiers, replaceHolder, EXEC, EXECLO, EXECHI, VCC, vgpr, sgpr, ContinuousRegister
@@ -51,6 +52,7 @@ from ..AsmStoreState import StoreState
 from ..AsmAddressCalculation import AddrCalculation
 from ..Components.PackData import formatting, PackData_F16, PackData_BF16, PackData_FLOAT8, PackData_FLOAT8_fnuz
 from rocisa.instruction import ECvtF16toF32, ECvtPkFP8toF32, ECvtPkBF8toF32
+from ..KernelWriterModules import hasSequentialValuC
 
 from math import ceil, log2
 
@@ -131,7 +133,80 @@ class GlobalWriteBatchWriter:
       self.kernel["ProblemType"]["BiasSrc"] == "D":
       self.storeBiasD = 1
 
+  @property
+  def _canFuseAlphaIntoPk8Common(self) -> bool:
+    """
+    Common conditions for fusing alpha into pk8 FP8 SR conversion, used by canUsePk8FP8Conversion.
 
+    Conditions:
+    1. Architecture supports pk8 SR conversion with scale (HasScaleSRPk8Cvt)
+    2. Alpha needs to be applied
+    3. Not a Beta path (Beta paths need separate alpha multiply + beta*C)
+    4. Destination is FP8 with stochastic rounding (ToDo: add support for FP8 w/o SR)
+    5. Batch has 8+ elements (for pk8 conversion)
+    """
+    if not self.parentWriter.states.asmCaps.get("HasScaleSRPk8Cvt", False):
+      return False
+    if not self.applyAlpha:
+      return False
+    if self.beta:
+      return False
+    if not self.kernel["ProblemType"]["DestDataType"].isAnyFloat8():
+      return False
+    if not self.kernel["ProblemType"]["StochasticRounding"]:
+      return False
+    if len(self.batchElements) < 8:
+      return False
+    return True
+
+  @property
+  def canUsePk8FP8Conversion(self) -> bool:
+    """
+    Pk8 FP8 SR conversion with fused alpha.
+    Requires gwvw >= 8 and sequential valuC (no rearrangement needed).
+
+    Additional conditions beyond _canFuseAlphaIntoPk8Common:
+    - gwvw >= 8 (packdata will use the pk8 path)
+    - hasSequentialValuC is True (WMMA output is already sequential)
+    """
+    if not self._canFuseAlphaIntoPk8Common:
+      return False
+    if self.gwvw < 8:
+      return False
+    if not hasSequentialValuC(self.kernel):
+      return False
+    return True
+
+  @property
+  def needsAccumToDestConversion(self) -> bool:
+    """
+    Check if accumulation values need to be converted to destination type:
+    1. HighPrecisionAccumulate is enabled (accumulator precision > output precision)
+       e.g., F32 accumulator -> FP16/BF16/FP8/BF8/I32/I8 output
+    2. _GlobalAccumulation is not 'MultipleBuffer'
+
+    When True, the pack/convert module will be generated to perform:
+    - F32 -> FP16/BF16 packing
+    - F32 -> FP8/BF8 conversion (with optional stochastic rounding)
+    - F32 -> I32/I8 conversion and packing
+    """
+    return self.kernel["ProblemType"]["HighPrecisionAccumulate"] and \
+           (self.kernel["_GlobalAccumulation"] != 'MultipleBuffer')
+
+  @property
+  def skipRearrangement(self) -> bool:
+    """
+    Check if we can skip v_mov_b32 rearrangement in alpha multiplication section:
+    1. hasSequentialValuC is True (WMMA output is already sequential)
+    2. needsAccumToDestConversion is False (no pack module to do the rearrangement)
+    3. Not a Beta path (Beta paths need separate alpha multiply + beta*C)
+
+    When all conditions are met, we can directly use WMMA output registers
+    without copying to elementSumIdx registers.
+    """
+    return hasSequentialValuC(self.kernel) and \
+           not self.needsAccumToDestConversion and \
+           not self.beta
 
   @property
   def wavelen(self) -> int:
@@ -379,27 +454,34 @@ class GlobalWriteBatchWriter:
 
     ########################################
     # rC *= alpha
+    # Skip separate alpha multiplication if we can fuse it into FP8 SR PK conversion
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and self.parentWriter.alphaBeforeLoadC:
-      module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
-      if self.codeMulAlpha is None:
-        elementIdx = 0
-        while elementIdx < len(self.batchElements):
-          isEnd = (elementIdx == len(self.batchElements) - 1)
-          if not isEnd and (self.ss.elementSumIdx[elementIdx] + 1 == self.ss.elementSumIdx[elementIdx + 1]) and (self.ss.elementSumIdx[elementIdx] % 2 == 0):
-            module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01, usePK=True))
-            elementIdx += 2
-          else:
-            module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01))
-            elementIdx += 1
-      else:
-          regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
-          for elementIdx in range(len(self.batchElements)):
-            for vi in range(self.gwvw):
-              rh = replaceHolder(self.codeMulAlpha.popFirstItem(), self.ss.elementSumIdx[elementIdx]*regsPerScalar + regsPerScalar*vi)
-              if (self.kernel["GlobalSplitU"] == 1) and (self.kernel["ProblemType"]["ComputeDataType"].isSingle() and self.kernel["ProblemType"]["DataType"].isInt8()):
-                srcRegName = rh.getParams()[2].getCompleteRegName()
-                module.add(VCvtI32toF32(dst=vgpr(srcRegName), src=vgpr(srcRegName), comment="Convert MI out reg to fp32"))
-              module.add(rh)
+      # skip rC *= alpha if:
+      # - alpha multiplication will be fused into pk8 conversion (canUsePk8FP8Conversion)
+      # - WMMA output is sequential and no conversion needed (skipRearrangement)
+
+      if not self.canUsePk8FP8Conversion and not self.skipRearrangement:
+        # Normal path: do rC *= alpha
+        module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
+        if self.codeMulAlpha is None:
+          elementIdx = 0
+          while elementIdx < len(self.batchElements):
+            isEnd = (elementIdx == len(self.batchElements) - 1)
+            if not isEnd and (self.ss.elementSumIdx[elementIdx] + 1 == self.ss.elementSumIdx[elementIdx + 1]) and (self.ss.elementSumIdx[elementIdx] % 2 == 0):
+              module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01, usePK=True))
+              elementIdx += 2
+            else:
+              module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01))
+              elementIdx += 1
+        else:
+            regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
+            for elementIdx in range(len(self.batchElements)):
+              for vi in range(self.gwvw):
+                rh = replaceHolder(self.codeMulAlpha.popFirstItem(), self.ss.elementSumIdx[elementIdx]*regsPerScalar + regsPerScalar*vi)
+                if (self.kernel["GlobalSplitU"] == 1) and (self.kernel["ProblemType"]["ComputeDataType"].isSingle() and self.kernel["ProblemType"]["DataType"].isInt8()):
+                  srcRegName = rh.getParams()[2].getCompleteRegName()
+                  module.add(VCvtI32toF32(dst=vgpr(srcRegName), src=vgpr(srcRegName), comment="Convert MI out reg to fp32"))
+                module.add(rh)
 
 
     loadInputCode    = Module("loadInputCode")
@@ -727,27 +809,34 @@ class GlobalWriteBatchWriter:
                                                    self.beta, self.edge, sumIdxGSUSYNC, addrCalc))
 
     # rC *= alpha
+    # Skip separate alpha multiplication if we can fuse it into FP8 SR conversion
     if not self.kernel["InterleaveAlpha"] and self.applyAlpha and not self.parentWriter.alphaBeforeLoadC:
-      module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
-      if self.codeMulAlpha is None:
-        elementIdx = 0
-        while elementIdx < len(self.batchElements):
-          isEnd = (elementIdx == len(self.batchElements) - 1)
-          if not isEnd and (self.ss.elementSumIdx[elementIdx] + 1 == self.ss.elementSumIdx[elementIdx + 1]) and (self.ss.elementSumIdx[elementIdx] % 2 == 0):
-            module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01, usePK=True))
-            elementIdx += 2
-          else:
-            module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01))
-            elementIdx += 1
-      else:
-          regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
-          for elementIdx in range(len(self.batchElements)):
-            for vi in range(self.gwvw):
-              rh = replaceHolder(self.codeMulAlpha.popFirstItem(), self.ss.elementSumIdx[elementIdx]*regsPerScalar + regsPerScalar*vi - self.parentWriter.states.c.startVgprValu)
-              if (self.kernel["GlobalSplitU"] == 1) and (self.kernel["ProblemType"]["ComputeDataType"].isSingle() and self.kernel["ProblemType"]["DataType"].isInt8()):
-                srcRegName = rh.getParams()[2].getCompleteRegName()
-                module.add(VCvtI32toF32(dst=vgpr(srcRegName), src=vgpr(srcRegName), comment="Convert MI out reg to fp32"))
-              module.add(rh)
+      # skip rC *= alpha if:
+      # - alpha multiplication will be fused into pk8 conversion (canUsePk8FP8Conversion)
+      # - WMMA output is sequential and no conversion needed (skipRearrangement)
+
+      if not self.canUsePk8FP8Conversion and not self.skipRearrangement:
+        # Normal path: do rC *= alpha
+        module.addComment1("rC *= alpha batchElements=%s"%self.batchElements)
+        if self.codeMulAlpha is None:
+          elementIdx = 0
+          while elementIdx < len(self.batchElements):
+            isEnd = (elementIdx == len(self.batchElements) - 1)
+            if not isEnd and (self.ss.elementSumIdx[elementIdx] + 1 == self.ss.elementSumIdx[elementIdx + 1]) and (self.ss.elementSumIdx[elementIdx] % 2 == 0):
+              module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01, usePK=True))
+              elementIdx += 2
+            else:
+              module.add(self._applyAlpha(self.kernel, self.gwvw, self.ss.elementSumIdx, elementIdx, self.tmpS01))
+              elementIdx += 1
+        else:
+            regsPerScalar = self.parentWriter.states.bpeCinternal // self.parentWriter.states.bpr # register per scalar
+            for elementIdx in range(len(self.batchElements)):
+              for vi in range(self.gwvw):
+                rh = replaceHolder(self.codeMulAlpha.popFirstItem(), self.ss.elementSumIdx[elementIdx]*regsPerScalar + regsPerScalar*vi - self.parentWriter.states.c.startVgprValu)
+                if (self.kernel["GlobalSplitU"] == 1) and (self.kernel["ProblemType"]["ComputeDataType"].isSingle() and self.kernel["ProblemType"]["DataType"].isInt8()):
+                  srcRegName = rh.getParams()[2].getCompleteRegName()
+                  module.add(VCvtI32toF32(dst=vgpr(srcRegName), src=vgpr(srcRegName), comment="Convert MI out reg to fp32"))
+                module.add(rh)
 
   def _epilog(self, module: Module):
     # return registers to pool:
@@ -969,7 +1058,16 @@ class GlobalWriteBatchWriter:
       dataScaleAlphaVec = self.ss.elementDataScaleAlphaVec[elementIdx]
       mask = self.ss.elementMask[elementIdx]
       vc0 = element[3]
-      sumIdx = self.ss.elementSumIdx[elementIdx]
+
+      # When skipRearrangement is True:
+      # - Data is at WMMA output (v[0:N]), not at elementSumIdx (v[144:N])
+      # - Store should read from WMMA output directly
+      # Note: Beta paths need the rearrangement because they load C and compute rC = alpha*rC + beta*C
+      if self.skipRearrangement:
+        # WMMA output index = elementSumIdx - elementSumIdx[0] (relative offset from first element)
+        sumIdx = self.ss.elementSumIdx[elementIdx] - self.ss.elementSumIdx[0]
+      else:
+        sumIdx = self.ss.elementSumIdx[elementIdx]
 
       # print(str(element)+" rowInc="+str(addrCalc.rowInc))
       # Already write wave column block into LDS
@@ -1266,7 +1364,7 @@ class GlobalWriteBatchWriter:
       # pack stores, beta and non-beta reach here:
       packModule = Module("Empty pack module")
       convertModule = Module("Empty convert module")
-      if self.kernel["ProblemType"]["HighPrecisionAccumulate"] and (self.kernel["_GlobalAccumulation"] != 'MultipleBuffer'):
+      if self.needsAccumToDestConversion:
         if self.kernel["ActivationFuncCall"] and activationCDataType == self.kernel["ProblemType"]["DestDataType"]:
           destIdx = self.activationSetPCStruct.vgprActCopy
         else:
@@ -1282,8 +1380,15 @@ class GlobalWriteBatchWriter:
                                        tmpS01=self.tmpS01, laneSGPRC=self.laneSGPRC, inputPrefix="ValuC+", prefixOffset=self.parentWriter.states.c.startVgprValu)
         elif self.kernel["ProblemType"]["DestDataType"].isAnyFloat8():
           if self.kernel["ProblemType"]["StochasticRounding"]:
-            packModule = self.packdata(self.gwvw, destIdx, self.ss.elementSumIdx[elementIdx], fp8CVTVgprStruct=self.cvtVgprStruct, \
-                                       tmpS01=self.tmpS01, laneSGPRC=self.laneSGPRC, vgprTmp=vgprRND, inputPrefix="ValuC+", prefixOffset=self.parentWriter.states.c.startVgprValu)
+            if self.canUsePk8FP8Conversion:
+              # Fuse alpha into pk8: read from WMMA output (v[0:N]) with alpha as scale
+              srcPrefixOffset = self.ss.elementSumIdx[0]
+              packModule = self.packdata(self.gwvw, destIdx, self.ss.elementSumIdx[elementIdx], fp8CVTVgprStruct=self.cvtVgprStruct, \
+                                         tmpS01=self.tmpS01, laneSGPRC=self.laneSGPRC, vgprTmp=vgprRND, inputPrefix="ValuC+", prefixOffset=srcPrefixOffset, alphaScale=sgpr("Alpha"))
+            else:
+              # Normal path: no alpha fusion
+              packModule = self.packdata(self.gwvw, destIdx, self.ss.elementSumIdx[elementIdx], fp8CVTVgprStruct=self.cvtVgprStruct, \
+                                         tmpS01=self.tmpS01, laneSGPRC=self.laneSGPRC, vgprTmp=vgprRND, inputPrefix="ValuC+", prefixOffset=self.parentWriter.states.c.startVgprValu, alphaScale=1.0)
           else:
             packModule = self.packdata(self.gwvw, destIdx, self.ss.elementSumIdx[elementIdx], fp8CVTVgprStruct=self.cvtVgprStruct, \
                                        tmpS01=self.tmpS01, laneSGPRC=self.laneSGPRC, inputPrefix="ValuC+", prefixOffset=self.parentWriter.states.c.startVgprValu)
