@@ -280,7 +280,7 @@ class TensorDataMoverLoad(TensorDataMover):
         mod.add(SAndB32(sgpr(group1), sgpr(group1), hex(mask)))
         return mod
 
-    def resetTensorDimForTail(self, group1: int | str, sgprTail: int, tdmDescIdx: int, writer: "KernelWriterAssembly", constShifter: int=0, isMXS: bool=False) -> Module:
+    def resetTensorDimForTail(self, group1: int | str, sgprTail: int, tdmDescIdx: int, writer: "KernelWriterAssembly", constShifter: int=0, isMXS: bool=False, isSparseTrack: bool=False) -> Module:
         mod = Module()
         mod.addComment("TDM reset tensor dim for tail")
 
@@ -300,6 +300,16 @@ class TensorDataMoverLoad(TensorDataMover):
                 mod.add(SLShiftLeftB32(sgpr(tmpSgpr.idx), hex(16), sgpr(tmpSgpr.idx)))
                 mod.add(SOrB32(sgpr(descSgprName(tdmDescIdx)), sgpr(descSgprName(tdmDescIdx)), sgpr(tmpSgpr.idx)))
                 mod.add(SLShiftRightB32(sgpr(tmpSgpr.idx), hex(constShifter), sgpr(sgprTail)))
+                mod.add(SLShiftRightB32(sgpr(tmpSgpr.idx), hex(16), sgpr(tmpSgpr.idx)))
+                mod.add(SOrB32(sgpr(descSgprName(tdmDescIdx+1)), sgpr(descSgprName(tdmDescIdx+1)), sgpr(tmpSgpr.idx)))
+            elif isSparseTrack:
+                # sparse A/B: tensor_dim0 must be K/2 (compressed), divide SizeL by 2
+                mod.add(SMovB32(sgpr(tmpSgpr.idx), sgpr(sgprTail)))
+                mod.add(SLShiftRightB32(sgpr(tmpSgpr.idx), hex(1), sgpr(tmpSgpr.idx), "sizeL /= 2 for sparse matrix"))
+                mod.add(SLShiftLeftB32(sgpr(tmpSgpr.idx), hex(16), sgpr(tmpSgpr.idx)))
+                mod.add(SOrB32(sgpr(descSgprName(tdmDescIdx)), sgpr(descSgprName(tdmDescIdx)), sgpr(tmpSgpr.idx)))
+                mod.add(SMovB32(sgpr(tmpSgpr.idx), sgpr(sgprTail)))
+                mod.add(SLShiftRightB32(sgpr(tmpSgpr.idx), hex(1), sgpr(tmpSgpr.idx), "sizeL /= 2 for sparse matrix"))
                 mod.add(SLShiftRightB32(sgpr(tmpSgpr.idx), hex(16), sgpr(tmpSgpr.idx)))
                 mod.add(SOrB32(sgpr(descSgprName(tdmDescIdx+1)), sgpr(descSgprName(tdmDescIdx+1)), sgpr(tmpSgpr.idx)))
             else:
