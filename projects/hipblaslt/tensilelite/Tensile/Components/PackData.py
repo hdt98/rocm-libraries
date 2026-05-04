@@ -29,7 +29,7 @@ from rocisa.instruction import VAdd3U32, VCvtF32toF16, VLShiftRightB32, \
                             VCmpClassF32, VOrB32, VPackF16toB32, \
                             VAndOrB32, VBfeU32, VLShiftLeftB16, SNop, VMed3F32, \
                             VCvtPkF32toBF16, VCvtPkF32toF16, VAndB32, \
-                            VMovB32, VLShiftLeftB32
+                            VMovB32, VLShiftLeftB32, VCvtScalePk8F32toFP8, VCvtScalePk8F32toBF8
 from rocisa.functions import VSaturateCastInt
 
 from ..Common.DataType import DataType
@@ -144,6 +144,17 @@ class PackData_FLOAT8(PackData):
         vgprFp8Max    = fp8CVTVgprStruct.vgprFp8Max
 
         module = Module("PackData float8")
+
+        # Use v_cvt_scalef32_pk8_fp8_f32 when gwvw == 8 and hardware supports it
+        if gwvw == 8:
+            ti = rocIsa.getInstance()
+            if ti.getAsmCaps().get("HasCvtScalePk8Fp8F32", False):
+                # Pack 8 F32 values into 8 FP8 values using single instruction
+                srcVgpr = formatting(elementSumIdx, inputPrefix, prefixOffset)
+                module.add(VCvtScalePk8F32toFP8(dst=vgpr(destIdx, 2), src=vgpr(srcVgpr, 8),
+                                                scale=0x3f800000, comment="convert 8xF32 to 8xFP8"))
+                return module
+
         pos = 0
         for vi in range(0, gwvw):
             sumIdxV = elementSumIdx + vi
@@ -206,6 +217,17 @@ class PackData_BF8(PackData):
         vgprBF8Max    = bf8CVTVgprStruct.vgprBF8Max
 
         module = Module("PackData bfloat8")
+
+        # Use v_cvt_scalef32_pk8_bf8_f32 when gwvw == 8 and hardware supports it
+        if gwvw == 8:
+            ti = rocIsa.getInstance()
+            if ti.getAsmCaps().get("HasCvtScalePk8Bf8F32", False):
+                # Pack 8 F32 values into 8 BF8 values using single instruction
+                srcVgpr = formatting(elementSumIdx, inputPrefix, prefixOffset)
+                module.add(VCvtScalePk8F32toBF8(dst=vgpr(destIdx, 2), src=vgpr(srcVgpr, 8),
+                                                scale=0x3f800000, comment="convert 8xF32 to 8xBF8"))
+                return module
+
         pos = 0
         for vi in range(0, gwvw):
             sumIdxV = elementSumIdx + vi
