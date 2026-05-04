@@ -6,16 +6,11 @@
 
 project(hipdnn_heuristic_config VERSION 1.0.0 LANGUAGES CXX)
 
-# Create the plugin as a shared library
+# Create the plugin as a shared library. Do not set OUTPUT_NAME or PREFIX;
+# the target name already matches the desired output name, and relying on the
+# platform default avoids the `lib` prefix appearing on Windows DLLs.
 add_library(hipdnn_heuristic_config SHARED
     ConfigPlugin.cpp
-)
-
-# Set output name to match expected plugin naming convention
-set_target_properties(hipdnn_heuristic_config PROPERTIES
-    OUTPUT_NAME "hipdnn_heuristic_config"
-    PREFIX "lib"
-    CXX_VISIBILITY_PRESET hidden
 )
 
 # Include directories
@@ -36,27 +31,37 @@ target_compile_options(hipdnn_heuristic_config PRIVATE
     ${HIPDNN_WARNING_COMPILE_OPTIONS}
 )
 
-# Export symbols for the C ABI
+# Export only the C ABI symbols on Linux. --exclude-libs=ALL prevents symbols
+# from statically-linked dependencies from being re-exported, matching the
+# engine plugin pattern used for TheRock / multi-arch / wheel builds.
 if(NOT WIN32)
-    # On Linux, export only the C ABI symbols
+    target_link_libraries(hipdnn_heuristic_config PRIVATE
+        "-Xlinker --exclude-libs=ALL"
+    )
     target_link_options(hipdnn_heuristic_config PRIVATE
         "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map"
     )
 endif()
 
-# Installation
-install(TARGETS hipdnn_heuristic_config
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/hipdnn_plugins/heuristics
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/hipdnn_plugins/heuristics
-    COMPONENT Runtime
+# Build the plugin directly into the standard build-tree heuristic plugin
+# directory so the loader (and tests) can discover it relative to the backend
+# library location, and set THEROCK_INSTALL_RPATH_ORIGIN so the installed
+# plugin can locate its sibling libraries when packaged for TheRock / wheels.
+set_target_properties(hipdnn_heuristic_config PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    LIBRARY_OUTPUT_DIRECTORY "${HIPDNN_BUILD_PLUGIN_HEURISTIC_DIR}"
+    RUNTIME_OUTPUT_DIRECTORY "${HIPDNN_BUILD_PLUGIN_HEURISTIC_DIR}"
+    ARCHIVE_OUTPUT_DIRECTORY "${HIPDNN_BUILD_PLUGIN_HEURISTIC_DIR}"
+    THEROCK_INSTALL_RPATH_ORIGIN "${HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR}"
 )
 
-# Copy to build directory for testing (relative to backend library location)
-add_custom_command(TARGET hipdnn_heuristic_config POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-        $<TARGET_FILE_DIR:hipdnn_backend>/hipdnn_plugins/heuristics
-    COMMAND ${CMAKE_COMMAND} -E copy
-        $<TARGET_FILE:hipdnn_heuristic_config>
-        $<TARGET_FILE_DIR:hipdnn_backend>/hipdnn_plugins/heuristics/
-    COMMENT "Copying Config plugin to build directory for testing"
+clang_tidy_check(hipdnn_heuristic_config)
+
+# Installation. HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR is the standard
+# install subfolder where hipDNN heuristic plugins are located (e.g.
+# lib/hipdnn_plugins/heuristics on Linux, bin/hipdnn_plugins/heuristics on Windows).
+install(TARGETS hipdnn_heuristic_config
+    LIBRARY DESTINATION ${HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR}
+    RUNTIME DESTINATION ${HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR}
+    COMPONENT Runtime
 )
