@@ -271,7 +271,7 @@ TEST_CASE("CsvLogger: escape_csv handles special characters", "[logger][csv]") {
   std::remove(csv_path.c_str());
 }
 
-TEST_CASE("CsvLogger: debug logging produces consistent latency values", "[logger][csv]") {
+TEST_CASE("Logger: debug-enabled GEMM evaluation produces consistent latency values", "[logger][csv]") {
   portable_setenv("ANALYTICAL_GEMM_DEBUG", "1", 1);
   origami::runtime_options::get().update_from_env();
 
