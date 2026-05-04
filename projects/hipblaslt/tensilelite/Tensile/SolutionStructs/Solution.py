@@ -2587,7 +2587,8 @@ class Solution(collections.abc.Mapping):
           pads = {"A": ldsPadA * state["ProblemType"]["MacDataTypeA"].numBytes(), "B": ldsPadB * state["ProblemType"]["MacDataTypeB"].numBytes(), "MXSA": ldsPadMXSA, "MXSB": ldsPadMXSB}
           for tc, val in pads.items():
             if val == 0: continue
-            if TensorDataMoverLoad.calPadAmount(val) > 127:
+            pad_amount = TensorDataMoverLoad.calPadAmount(val)
+            if pad_amount > 127:
               reject(state, printRejectionReason, f"pad_amount=(ldsPad//4-1)={pad_amount} should be smaller than or equal to 127 for ldsPad{tc}={val}")
 
         return ldsPadA, ldsPadB, ldsPadM, ldsPadMXSA, ldsPadMXSB
