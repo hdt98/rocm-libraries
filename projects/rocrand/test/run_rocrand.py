@@ -12,6 +12,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_DIR_NAME = "rocRAND"
 
 # If quick tests are enabled, run quick tests only. Otherwise, run the full suite.
@@ -126,7 +130,7 @@ def main() -> None:
     if os.getenv("TEST_TYPE", "full") == "quick":
         env["GTEST_FILTER"] = ":".join(QUICK_TESTS)
 
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 
