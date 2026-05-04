@@ -12,6 +12,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_DIR_NAME = "rocwmma"
 
 # TODO(#2823): Re-enable test once flaky issue is resolved.
@@ -71,7 +75,7 @@ def main() -> None:
         "--exclude-regex",
         "|".join(TESTS_TO_IGNORE),
     ]
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 
