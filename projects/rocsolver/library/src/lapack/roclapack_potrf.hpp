@@ -1213,6 +1213,123 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         return istat;
     }
 
+    // ----------------------------------------
+    // computations for  special case n == 4*NB
+    // ----------------------------------------
+    auto potrf_4NB = [=](rocblas_stride const shiftA, I const row_offset) -> rocblas_status {
+        I const n1 = 2 * NB;
+        I const n2 = 2 * NB;
+
+        rocblas_status istat = rocblas_status_success;
+
+        // --------------------
+        // factorization of A11
+        // --------------------
+        istat = potrf_2NB(shiftA, row_offset);
+
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // -------------------------------------
+        // update A12  n1 by n2  if use_upper_part
+        // update A21  n2 by n1  otherwise
+        //
+        // step 2:   A12 = U11' * U12, or   U12 = U11' \ A12,  trsm
+        // step 2:   A21 = L21 * L11', or   L21 = A21 / L11',  trsm
+        // -------------------------------------
+
+        rocblas_stride const loffset_A12 = idx2D(0, n1, lda);
+        rocblas_stride const loffset_A21 = idx2D(n1, 0, lda);
+
+        {
+            I const mm = (use_upper_part) ? n1 : n2;
+            I const nn = (use_upper_part) ? n2 : n1;
+
+            rocblas_side const side = (use_upper_part) ? rocblas_side_left : rocblas_side_right;
+
+            rocblas_operation const trans = rocblas_operation_conjugate_transpose;
+            rocblas_diagonal const diag = rocblas_diagonal_non_unit;
+
+            // ---------------------
+            // offset for A12 or A21
+            // ---------------------
+            rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
+
+            istat = potrf_trsm(side, uplo, trans, diag,
+
+                               mm, nn,
+
+                               A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
+
+                               A, shiftA + loffset, lda, strideA); // submatrix for A12 or A21
+        }
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // ------------------
+        // SYRK to update A22
+        //
+        // step 3a:  A22 = A22 - U12' * U12,   syrk
+        // step 3a:  A22 = A22 - L21 * L21',   syrk
+        // ------------------
+        {
+            I const nn = n2;
+            I const kk = n1;
+            S alpha = -1;
+            S beta = 1;
+
+            // --------------------
+            // submatrix U12 or L21
+            // --------------------
+            rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
+
+            rocblas_operation const trans
+                = (use_upper_part) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
+
+            istat = potrf_syrk(
+
+                uplo, trans,
+
+                nn, kk,
+
+                &alpha,
+
+                A, shiftA + loffset, lda, strideA, // submatrix U12 or L21
+
+                &beta,
+
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
+
+            );
+        }
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // --------------------
+        // factorization of A22
+        // --------------------
+
+        istat = potrf_2NB(shiftA + idx2D(n1, n1, lda), row_offset + n1); // submatrix A22
+
+        return istat;
+    }; // end potrf_4NB
+
+    if(n == 4 * NB)
+    {
+        rocblas_status const istat = potrf_4NB(shiftA, row_offset_in);
+        return istat;
+    }
+
+    // --------------------------
+    // general case for recursion
+    // --------------------------
+
     I const n1 = split_n<T>(n);
     I const n2 = n - n1;
 
