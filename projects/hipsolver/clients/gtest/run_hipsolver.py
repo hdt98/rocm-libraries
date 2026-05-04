@@ -13,6 +13,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_EXE = "hipsolver-test"
 
 TESTS_TO_EXCLUDE = [
@@ -73,7 +77,7 @@ def main() -> None:
         f"--gtest_filter=-{exclusion_list}",
     ]
 
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 
