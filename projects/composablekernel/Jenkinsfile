@@ -873,7 +873,6 @@ def buildHipClangJob(Map conf=[:]){
         def retimage
         (retimage, image) = getDockerImage(conf)
 
-        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
         setGithubStatus("${env.STAGE_NAME}", 'pending', "Starting ${env.STAGE_NAME}")
         try {
             withDockerContainer(image: image, args: dockerOpts) {
@@ -882,6 +881,7 @@ def buildHipClangJob(Map conf=[:]){
                     cmake_build(conf)
                 }
             }
+            setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
         }
         catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
                 setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
@@ -909,8 +909,7 @@ def Build_CK(Map conf=[:]){
         def image
         def retimage
 
-        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-        setGithubStatus("${env.STAGE_NAME}", 'pending', 'Building CK...')
+        setGithubStatus("${env.STAGE_NAME}", 'pending', "Starting ${env.STAGE_NAME}")
         try {
             try {
                 (retimage, image) = getDockerImage(conf)
@@ -1014,7 +1013,6 @@ def process_results(Map conf=[:]){
     //use older image that has user jenkins
     def image = "${env.CK_DOCKERHUB}:ck_ub22.04_rocm6.3"
 
-    //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
     setGithubStatus("${env.STAGE_NAME}", 'pending', 'Processing results...')
     try {
         try
@@ -1141,7 +1139,7 @@ def process_results(Map conf=[:]){
                     // process the logs
                     sh "./process_perf_data.sh"
                 }
-                setGithubStatus("${env.STAGE_NAME}", 'success', 'Completed successfully')
+                setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
             }
             catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e){
                 setGithubStatus("${env.STAGE_NAME}", 'failure', "Stage ${env.STAGE_NAME} failed")
@@ -1159,7 +1157,6 @@ def run_downstream_tests(Map conf=[:]){
     checkoutComposableKernel()
     def dockerOpts = get_docker_options() + ' --group-add irc '
 
-    //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
     setGithubStatus("${env.STAGE_NAME}", 'pending', "Starting ${env.STAGE_NAME}")
     try {
         try
@@ -1188,6 +1185,7 @@ def run_downstream_tests(Map conf=[:]){
                 for (cmd in conf.execute_cmds) {
                     sh "${cmd}"
                 }
+                setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
             }
             catch(e){
                 echo "Throwing error exception while running ${env.STAGE_NAME}"
@@ -1447,8 +1445,6 @@ pipeline {
         dbsshport = "${dbsshport}"
         dbsshuser = "${dbsshuser}"
         dbsshpassword = "${dbsshpassword}"
-        ck_git_creds = "${ck_git_creds}"
-        ck_git_credentials = "${ck_git_credentials}"
         gerrit_cred="${gerrit_cred}"
         DOCKER_BUILDKIT = "1"
     }
@@ -2083,9 +2079,8 @@ pipeline {
                 }
                 success {
                     script {
-                        // Report the parent stage build ck and run tests status
-                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "${env.STAGE_NAME}", account: 'ROCm', repo: 'rocm-libraries') {
-                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+                            // Report the parent stage build ck and run tests status
+                            setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
                             echo "Reporting success status for build ck and run tests"
                         }
                     }
@@ -2112,14 +2107,9 @@ pipeline {
                 success {
                     script {
                         // Report the skipped parent's stage status
-                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process Performance Test Results", account: 'ROCm', repo: 'rocm-libraries') {
-                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
+                        setGithubStatus("${env.STAGE_NAME}", 'success', "Stage ${env.STAGE_NAME} passed")
                             echo "Process Performance Test Results stage skipped."
-                        }
-                        // Report the skipped stage's status
-                        //gitStatusWrapper(credentialsId: "${env.ck_git_creds}", gitHubContext: "Process results", account: 'ROCm', repo: 'rocm-libraries') {
-                        withCredentials([usernamePassword(credentialsId: "${env.ck_git_credentials}", usernameVariable: 'BEARER_ID', passwordVariable: 'BEARER_TOKEN')]) {
-                            echo "Process Performance Test Results stage skipped."
+
                         }
                     }
                 }
