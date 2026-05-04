@@ -83,10 +83,13 @@ def _build_and_validate_solution(solution, assembler, debugConfig, isaInfoMap, s
     """
     try:
         mi = solution["MatrixInstruction"]
-        wavefrontSize = solution["WavefrontSize"]
         workgroup = solution["WorkGroup"]
         ptype = solution["ProblemType"]
         isa = solution["ISA"]
+
+        if solution["WavefrontSize"] == -1:
+            solution["WavefrontSize"] = 32 if isaInfoMap[isa].archCaps["HasWave32"] else 64
+        wavefrontSize = solution["WavefrontSize"]
 
         if len(mi) == 9:
             miParams = matrixInstructionToMIParameters(mi, isa, wavefrontSize, ptype, workgroup, isaInfoMap)
