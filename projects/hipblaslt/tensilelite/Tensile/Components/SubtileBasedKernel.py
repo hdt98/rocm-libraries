@@ -552,7 +552,7 @@ def _applyWavePartitionLROffset(module, writer, kernel, tileInfo):
   waveId = writer.vgprPool.checkOut(1)
   module.add(VLShiftRightB32(dst=vgpr(waveId), shiftHex=hex(wavesize.bit_length()-1), src=vgpr("Serial"), comment="waveId"))
 
-  if tileInfo.loadRatioGR == 1.0 or kernel["ProblemType"]["DataTypeA"] == "F8":
+  if tileInfo.loadRatioGR == 1.0 or kernel["ProblemType"]["DataTypeA"].is8bitFloat():
     # W0 W2
     # W1 W3
     # W1-3 : A / W2-3 : B
