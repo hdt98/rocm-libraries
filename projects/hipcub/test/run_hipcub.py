@@ -13,6 +13,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_DIR_NAME = "hipcub"
 
 QUICK_TESTS = [
@@ -131,7 +135,7 @@ def main() -> None:
         str(resource_spec_generator),
         str(resource_spec_file),
     ]
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(res_gen_cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(res_gen_cmd)}")
     subprocess.run(res_gen_cmd, cwd=rocm_path, check=True, env=env)
 
     cmd = [
@@ -150,7 +154,7 @@ def main() -> None:
     if os.getenv("TEST_TYPE", "full") == "quick":
         env["GTEST_FILTER"] = ":".join(QUICK_TESTS)
 
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 
