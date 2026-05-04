@@ -43,6 +43,23 @@ namespace TensileLite
 {
     namespace Client
     {
+        inline bool isMXScaledTensor(const TensorDescriptor& tensor, size_t mxBlock)
+        {
+            if (mxBlock == 0) return false;
+            auto dt = tensor.dataType();
+            return dt == rocisa::DataType::Float4
+                || dt == rocisa::DataType::Float8
+                || dt == rocisa::DataType::BFloat8
+                || dt == rocisa::DataType::Float8BFloat8
+                || dt == rocisa::DataType::BFloat8Float8;
+        }
+
+        inline bool isMXScaledProblem(const ContractionProblemGemm& problem)
+        {
+            return isMXScaledTensor(problem.a(), problem.mxBlockA())
+                || isMXScaledTensor(problem.b(), problem.mxBlockB());
+        }
+
         inline bool isMXFP4Tensor(const TensorDescriptor& tensor, size_t mxBlock)
         {
             return tensor.dataType() == rocisa::DataType::Float4 && mxBlock > 0;
@@ -874,7 +891,8 @@ namespace TensileLite
                    && m_currentGemmProblem != nullptr
                    && !m_gpuPtrs.empty())
                 {
-                    bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
+                    //bool isMXFP4 = isMXFP4Problem(*m_currentGemmProblem);
+                    bool isMXFP4 = isMXScaledProblem(*m_currentGemmProblem);
                     if(isMXFP4)
                     {
                         initializeMXDataForFP4(*m_currentGemmProblem);

@@ -35,6 +35,7 @@
 #include <Tensile/hip/HipUtils.hpp>
 
 #include <cstddef>
+#include <fstream>
 
 namespace TensileLite
 {
@@ -772,6 +773,8 @@ namespace TensileLite
                     const size_t innerDimSize  = tensor.sizes()[0];
                     const size_t initialStride = tensor.strides()[0];
 
+		    std::ofstream cpu_result("cpu_result");
+		    std::ofstream gpu_result("gpu_result");
                     for(size_t i = 0; i < outerCount; i++)
                     {
                         CoordNumbered(i,
@@ -801,6 +804,14 @@ namespace TensileLite
 
                             ValidType referenceValue = reference[elemIndex];
                             ValidType resultValue    = resultData[elemIndex];
+
+			    if constexpr (std::is_same_v<ValidType, BFloat16>)
+			    {
+				//cpu_result << "(" << i << "," << j << "): "  << static_cast<float>(referenceValue) << "\n";
+				//gpu_result << "(" << i << "," << j << "): "  << static_cast<float>(resultValue) << "\n";
+				cpu_result << "(" << i << "," << j << "): "  << referenceValue << "\n";
+				gpu_result << "(" << i << "," << j << "): "  << resultValue << "\n";
+			    }
 
                             compareValid(
                                 referenceValue, resultValue, elemIndex, (i * tensor.sizes()[0]) + j);

@@ -216,7 +216,7 @@ def ParallelMap2(
     threadCount = procs if procs else CPUThreadCount(enable)
 
     threadCount = CPUThreadCount(enable)
-
+    threadCount = 1
     if threadCount <= 1 and globalParameters["ShowProgressBar"]:
         # Provide a progress bar for single-threaded operation.
         return [function(*args) if multiArg else function(args) for args in tqdm(objects, message)]

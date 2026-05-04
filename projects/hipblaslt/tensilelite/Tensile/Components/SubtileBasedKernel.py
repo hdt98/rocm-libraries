@@ -552,7 +552,7 @@ def _applyWavePartitionLROffset(module, writer, kernel, tileInfo):
   waveId = writer.vgprPool.checkOut(1)
   module.add(VLShiftRightB32(dst=vgpr(waveId), shiftHex=hex(wavesize.bit_length()-1), src=vgpr("Serial"), comment="waveId"))
 
-  if tileInfo.loadRatioGR == 1.0:
+  if tileInfo.loadRatioGR == 1.0 or kernel["ProblemType"]["DataTypeA"] == "F8":
     # W0 W2
     # W1 W3
     # W1-3 : A / W2-3 : B
@@ -621,7 +621,9 @@ def lraTileAssignment(writer, kernel):
   module.add(VLShiftRightB32(dst=vgpr(lane16Group), shiftHex=hex(mi_m.bit_length()-1), src=vgpr(lane16Group), comment="lane16Group"))
   module.add(VAndB32(dst=vgpr(lane16), src0=vgpr("Serial"), src1=mi_m-1, comment="laneId % 16"))
 
-  swizzling = True
+  #swizzling = True
+  CHUNK_SIZE_BYTES = 16
+  swizzling = (tileInfoA.loadWidthLR <= CHUNK_SIZE_BYTES)  # only single-chunk LR can use the pair/16-lane swizzle
   if swizzling:
     # Get lds row id
     module.add(VLShiftRightB32(dst=vgpr(rotation), shiftHex=hex(numRowsPerLDSBanks.bit_length()-1), src=vgpr(lane16), comment="lds_row_id"))
@@ -636,6 +638,8 @@ def lraTileAssignment(writer, kernel):
     module.add(VPermlane16SwapB32(dst=vgpr(colOffset), src=vgpr(colOffset), comment="apply swizzling"))
     setExecMask(module, writer, -1, -1)
   else:
+    # F8/BF8 multi-chunk path: no swap, no rotation. The chunks at +0 and +16
+    # MUST land on contiguous LDS bytes, so colOffset is just lane16Group.
     module.add(VMovB32(dst=vgpr(colOffset), src=vgpr(lane16Group), comment="colOffset = lane16Group"))
 
   # Row
@@ -797,8 +801,16 @@ def _grComputeRowPartition(module, kernel, writer, tileInfo, waveId, rowOffset):
     module.add(VAndB32(dst=vgpr(localRow), src0=hex(1), src1=vgpr(waveId), comment="%s: waveId %% 2"%tc))
     module.add(VLShiftRightB32(dst=vgpr(partitionRow), shiftHex=hex(1), src=vgpr(waveId), comment="%s: waveId / 2"%tc))
   elif tileInfo.loadRatioGR == 0.5:
-    module.add(VMovB32(dst=vgpr(localRow), src=0, comment="%s"%tc))
-    module.add(VMovB32(dst=vgpr(partitionRow), src=vgpr(waveId), comment="%s"%tc))
+    #module.add(VMovB32(dst=vgpr(localRow), src=0, comment="%s"%tc))
+    #module.add(VMovB32(dst=vgpr(partitionRow), src=vgpr(waveId), comment="%s"%tc))
+
+    # 2 waves cooperate per M-tile (miWaveGroupSize0 == 2):
+    # localRow distinguishes the cooperating waves within a partition,
+    # partitionRow selects the M-tile (waveM). Mirrors loadRatio==1.0.
+    module.add(VAndB32(dst=vgpr(localRow), src0=hex(1), src1=vgpr(waveId),
+                       comment="%s: waveId %% 2 (within-partition row)"%tc))
+    module.add(VLShiftRightB32(dst=vgpr(partitionRow), shiftHex=hex(1), src=vgpr(waveId),
+                               comment="%s: waveId / 2 (M-tile partition)"%tc))
   elif tileInfo.loadRatioGR == 2.0:
     module.add(VMovB32(dst=vgpr(localRow), src=vgpr(waveId), comment="%s"%tc))
     module.add(VMovB32(dst=vgpr(partitionRow), src=0, comment="%s"%tc))
@@ -827,7 +839,12 @@ def _grComputeAllOffsets(module, writer, tileInfo, colId, rowId, rowOffset):
     # Apply Rotation on entire wave. Only applies to 4x case as a subtile is loaded by a single wave in 2 steps. (waveId rotation not applied)
     rotatedcolId = writer.vgprPool.checkOut(1)
     loadWidth = tileInfo.loadWidthGR
-    if tileInfo.loadRatioGR == 0.5:
+    CHUNK_SIZE_BYTES = 16
+    # Multi-chunk LR (F8/BF8) requires K-contiguous LDS rows. The col+4
+    # rotation was a single-chunk bank-conflict optimization that scrambles
+    # the K layout for the v2 buffer-load (rows 8..11 / 24..27 / ...).
+    # Skip it whenever LR loadWidth > one b128 chunk.
+    if tileInfo.loadRatioGR == 0.5 and tileInfo.loadWidthLR <= CHUNK_SIZE_BYTES:
       blockSize = tileInfo.subIterKBytes // loadWidth
       module.add(VAddU32(dst=vgpr(rotatedcolId), src0=4, src1=vgpr(colId), comment="%s: advance row for GR offset %u"%(tileInfo.tc, i)))
       module.add(VAndB32(dst=vgpr(rotatedcolId), src0=vgpr(rotatedcolId), src1=hex(blockSize-1), comment="(col + offset) % block_size"))
@@ -852,6 +869,16 @@ def _grComputeAllOffsets(module, writer, tileInfo, colId, rowId, rowOffset):
 #
 def _grSwizzleColIds(module, writer, tileInfoA, tileInfoB, blockSize, numRowsPerLDSBanks,
                      laneId, colIdA, colIdB, waveId):
+  CHUNK_SIZE_BYTES = 16
+  # Multi-chunk LR path (F8/BF8) cannot tolerate the pair-swap / inter-wave-rotation
+  # swizzle: each lane reads >16B per MFMA, so chunks at +0 and +16 must land on
+  # contiguous LDS bytes. Skip the swap entirely and just make colIdB = colIdA.
+  multiChunkLR = (tileInfoA.loadWidthLR > CHUNK_SIZE_BYTES) or (tileInfoB.loadWidthLR > CHUNK_SIZE_BYTES)
+  if multiChunkLR:
+      module.addComment0("Swizzling skipped (multi-chunk LR; F8/BF8)")
+      module.add(VMovB32(dst=vgpr(colIdB), src=vgpr(colIdA), comment="colIdB = colIdA (no GR swap)"))
+      return
+
   tmpVgpr = writer.vgprPool.checkOut(3)
   ldsRowId = tmpVgpr
   tmp = tmpVgpr + 1
@@ -1336,6 +1363,19 @@ def emitSingleDsRead(tileInfo, sId0, sId1, subIterK, dstTile):
       sId0:      Subtile row index (used for offset computation)
       subIterK:  subIterK index within the subtile (maps to mfmaC; subtileShape[0]=1 so mfmaR=0)
       dstTile:   RegisterTileInfo — destination vgpr tile for the load
+
+  Returns:
+    - A single `DSLoadB128` leaf when the MMA tile fits in one b128 chunk
+      (FP4, BF16: numRegs == 4). This is the FP4 hot path; wrapping it in
+      a Module would leave the leaf with a dangling raw `parent` pointer
+      after `emit_lr`'s outer Module is collected, breaking downstream
+      pipeline stages that walk the in-memory module tree (cycle/bank pass,
+      vmcnt post-adjustment, prettyPrint), and it is what was hanging FP4
+      with PGR=2 + StreamK.
+    - A `Module` containing `numChunks` `DSLoadB128`s when the MMA tile
+      requires multiple b128 chunks (F8/BF8: numRegs == 8). The chunks are
+      spread over the K dimension by `chunkGapBytes` so each lane assembles
+      a strided MFMA input from contiguous LDS slabs.
   """
 
   # du maps to mfmaC, mfmaR is always 0 (subtileShape[0]=1)
@@ -1349,12 +1389,44 @@ def emitSingleDsRead(tileInfo, sId0, sId1, subIterK, dstTile):
 
   dstVgpr = dstTile.regList.regValues[0]
   numRegs = len(dstTile.regList.regValues)
-  return DSLoadB128(
-      dst=vgpr(dstVgpr, numRegs),
-      src=vgpr(addrVgpr),
-      ds=DSModifiers(offset=offset),
-      comment="Subtile%s[%u, %u] subIterK=%u" % (tileInfo.tc, sId0, sId1, subIterK))
 
+  DWORDS_PER_B128 = 4
+  # Single-chunk fast path (FP4 / BF16). MUST return the leaf directly:
+  # wrapping it in Module() makes `flatitems()` produce the same flat list
+  # but leaves an extra Module in the tree whose parent/child pointers
+  # de-sync with the post-schedule traversal — which hangs PGR=2 FP4.
+  if numRegs <= DWORDS_PER_B128:
+    return DSLoadB128(
+        dst=vgpr(dstTile.regList.regValues[0], numRegs),
+        src=vgpr(addrVgpr),
+        ds=DSModifiers(offset=offset),
+        comment="Subtile%s[%u, %u] subIterK=%u"
+                % (tileInfo.tc, sId0, sId1, subIterK))
+  # Multi-chunk path (F8 / BF8). Each lane's full K-block for ONE MFMA spans
+  # `numChunks * CHUNK_SIZE_BYTES` contiguous LDS bytes. ds_read_b128 reads only
+  # 16 B/lane, so we issue `numChunks` adjacent reads, NOT reads spread across
+  # subIterKBytes (which would land in another MFMA's K range / past the M-row).
+  assert numRegs % DWORDS_PER_B128 == 0, \
+      "SubtileImpl LDS read expects a multiple of 4 dwords, got %u" % numRegs
+  numChunks     = numRegs // DWORDS_PER_B128
+  chunkGapBytes = DWORDS_PER_B128 * 4    # == CHUNK_SIZE_BYTES == 16
+  module = Module()
+  for c in range(numChunks):
+    # IMPORTANT: index regValues[c*4] — do NOT use `dstVgpr + c*4`.
+    # _alloc_tiles() in SubtileBasedLogicalScheduler allocates each
+    # 4-dword block via a SEPARATE `checkOutAligned(4, 4)` call, so the
+    # blocks are not guaranteed to be VGPR-contiguous. Arithmetic on
+    # the first vgpr index silently aliases unrelated registers when
+    # the pool fragments.
+    chunkVgpr = dstTile.regList.regValues[c * DWORDS_PER_B128]
+    module.add(DSLoadB128(
+        dst=vgpr(chunkVgpr, DWORDS_PER_B128),
+        src=vgpr(addrVgpr),
+        ds=DSModifiers(offset=offset + c * chunkGapBytes),
+        comment="Subtile%s[%u, %u] subIterK=%u chunk=%u/%u stride=%u"
+                % (tileInfo.tc, sId0, sId1, subIterK,
+                   c + 1, numChunks, chunkGapBytes)))
+  return module
 
 def emitSubtileDsRead(writer, kernel, tileInfo, subtileId):
 
@@ -1566,10 +1638,22 @@ def emitMfmaInstruction(writer, kernel, vgprTileA, vgprTileB, vgprTileC, vgprTil
   miK = kernel["MatrixInstK"]
 
   if miK == 128:
+    abbrevA = kernel["ProblemType"]["DataTypeA"].toNameAbbrev()
+    abbrevB = kernel["ProblemType"]["DataTypeB"].toNameAbbrev()
+    sourceSwap = kernel["SourceSwap"]
+    pair = (abbrevA, abbrevB)
+
+    if pair == ('fp8', 'fp8'):
+      miInInstType = InstType.INST_F8         # cbsz:0 blgp:0
+    elif pair == ('fp4', 'fp4'):
+      miInInstType = InstType.INST_F4         # cbsz:4 blgp:4
+    else:
+        raise RuntimeError("SubtileBasedKernel: unsupported MX MFMA input pair (%s, %s)" % pair)
+
     # MX FP4: 16x16x128
     if scaleAVgpr >= 0 and scaleBVgpr >= 0:
       # Use actual loaded scale VGPRs
-      module.add(MXMFMAInstruction(instType=InstType.INST_F4, accType=InstType.INST_F32, variant=[16,16,miK,1], \
+      module.add(MXMFMAInstruction(instType=miInInstType, accType=InstType.INST_F32, variant=[16,16,miK,1], \
                                    acc=dAccAlias(vgprDStart,opDSize), \
                                    a=aOperand, \
                                    b=bOperand, \
@@ -1797,8 +1881,20 @@ def mainLoop(writer, kernel):
     # Based on current subtile shape. loadRatioGR == 2.0 has 2x2 granularity.
     grAGran = ReadGranularity(mn=1, k=2) if tiA.loadRatioGR <= 1.0 else ReadGranularity(mn=2, k=2)
     grBGran = ReadGranularity(mn=1, k=2) if tiB.loadRatioGR <= 1.0 else ReadGranularity(mn=2, k=2)
-    lrSAGran = ReadGranularity(mn=2, k=2) if scaleTiA else None
-    lrSBGran = ReadGranularity(mn=2, k=2) if scaleTiB else None
+
+    # The effective K granularity for an LR cannot exceed numSubIterK
+    # (numSubIterK == localMMATileGrid[1]). With subtileShape[1]==1 and
+    # DepthU == MatrixInstK we get numSubIterK == 1, and the previous
+    # hard-coded k=2 made num_chunks = numSubIterK // 2 = 0 in
+    # _place_LRs_for_partition, skipping all SA/SB LR placements and
+    # later tripping "GR SA mt=n+2 at slot 0 has no overlapping LR(n)
+    # dependency" in _annotate_deps_partition.
+    numSubIterK = tiA.localMMATileGrid[1]
+    lrSAGran = ReadGranularity(mn=2, k=min(2, numSubIterK)) if scaleTiA else None
+    lrSBGran = ReadGranularity(mn=2, k=min(2, numSubIterK)) if scaleTiB else None
+    #lrSAGran = ReadGranularity(mn=2, k=2) if scaleTiA else None
+    #lrSBGran = ReadGranularity(mn=2, k=2) if scaleTiB else None
+
     grSAGran = ReadGranularity(mn=scaleTiA.localMMATileGrid[0], k=scaleTiA.localMMATileGrid[1]) if scaleTiA else None
     grSBGran = ReadGranularity(mn=scaleTiB.localMMATileGrid[0], k=scaleTiB.localMMATileGrid[1]) if scaleTiB else None
 
