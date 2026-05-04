@@ -2698,41 +2698,42 @@ class KernelWriter(metaclass=abc.ABCMeta):
               module.addComment1("global read addresses: shift mxsb")
               module.add(self.graShiftMX(kernel, tensorParametersB["MX"], tensorParametersB))
 
-        # addresses
-        def releaseTensorTmpGprs(tP):
-          self.vgprPool.checkIn(tP["gpr"]["lwoT"])
-          tP["gpr"]["lwoT"] = None
-          self.vgprPool.checkIn(tP["gpr"]["uReg2"])
-          tP["gpr"]["uReg2"] = None
+      # addresses
+      def releaseTensorTmpGprs(tP):
+        self.vgprPool.checkIn(tP["gpr"]["lwoT"])
+        tP["gpr"]["lwoT"] = None
+        self.vgprPool.checkIn(tP["gpr"]["uReg2"])
+        tP["gpr"]["uReg2"] = None
 
-          self.vgprPool.checkIn(tP["gpr"]["uReg"])
-          tP["gpr"]["uReg"] = None
-          if "subIterReg" in tP["gpr"]:
-            if tP["gpr"]["subIterReg"] is not None:
-              self.vgprPool.checkIn(tP["gpr"]["subIterReg"])
-            tP["gpr"]["subIterReg"] = None
+        self.vgprPool.checkIn(tP["gpr"]["uReg"])
+        tP["gpr"]["uReg"] = None
+        if "subIterReg" in tP["gpr"]:
+          if tP["gpr"]["subIterReg"] is not None:
+            self.vgprPool.checkIn(tP["gpr"]["subIterReg"])
+          tP["gpr"]["subIterReg"] = None
 
-        # addresses
-        if not forceNoTileCode:
-          # Addresses A(MXSA)
-          if not tdmA:
-            module.addComment1("global read addresses: addresses a")
-            module.add(self.graAddresses(kernel, tensorParametersA))
-          if not tdmA and kernel["ProblemType"]["MXBlockA"]:
-            module.addComment1("global read addresses: addresses mxsa")
-            module.add(self.graAddresses(kernel, tensorParametersA["MX"]))
-          # Addresses Metadata
-          if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
-            module.addComment1("global read addresses: addresses metadata")
-            module.add(self.graAddresses(kernel, tPM))
-          # Addresses B(MXSB)
-          if not tdmB and kernel["ProblemType"]["MXBlockB"]:
-            module.addComment1("global read addresses: addresses mxsb")
-            module.add(self.graAddresses(kernel, tensorParametersB["MX"]))
-          if not tdmB:
-            module.addComment1("global read addresses: addresses b")
-            module.add(self.graAddresses(kernel, tensorParametersB))
+      # SRD setup via graAddresses: non-subtile PAP still needs new-tile A/B SRDs.
+      if not kernel["UseSubtileImpl"] and not forceNoTileCode:
+        # Addresses A(MXSA)
+        if not tdmA:
+          module.addComment1("global read addresses: addresses a")
+          module.add(self.graAddresses(kernel, tensorParametersA))
+        if not tdmA and kernel["ProblemType"]["MXBlockA"]:
+          module.addComment1("global read addresses: addresses mxsa")
+          module.add(self.graAddresses(kernel, tensorParametersA["MX"]))
+        # Addresses Metadata
+        if kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]:
+          module.addComment1("global read addresses: addresses metadata")
+          module.add(self.graAddresses(kernel, tPM))
+        # Addresses B(MXSB)
+        if not tdmB and kernel["ProblemType"]["MXBlockB"]:
+          module.addComment1("global read addresses: addresses mxsb")
+          module.add(self.graAddresses(kernel, tensorParametersB["MX"]))
+        if not tdmB:
+          module.addComment1("global read addresses: addresses b")
+          module.add(self.graAddresses(kernel, tensorParametersB))
 
+      if not kernel["UseSubtileImpl"] and not forPrefetchAcrossPersistent:
         # workgroup SGPRs no longer needed
         if not tdmA:
           module.add(self.removeGROffsetsVariableSgprsFromPool(kernel))
@@ -2760,9 +2761,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
           module.add(self.graFinalOffsets(kernel, tensorParametersB))
           # releaseTensorTmpGprs(tensorParametersB)
 
-        self.dontAppendCode = False
-        self.dontAppendCode = self.dontAppendCode or forceNoTileCode
+      self.dontAppendCode = False
+      self.dontAppendCode = self.dontAppendCode or forceNoTileCode
 
+      if not kernel["UseSubtileImpl"] and not forPrefetchAcrossPersistent:
         # Add increment code
         gsuComponent = Component.GSU.find(self)
         module.add(gsuComponent.setupNewTile(self, kernel, tensorParametersA, tensorParametersB, tPM))
