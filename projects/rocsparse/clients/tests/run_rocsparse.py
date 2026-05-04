@@ -13,6 +13,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_EXE = "rocsparse-test"
 
 
@@ -65,7 +69,7 @@ def main() -> None:
     # The current quick and full paths both use the smoke suite.
     cmd.extend(["--yaml", str(smoke_yaml)])
 
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 

@@ -13,6 +13,10 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 
 
+def format_command(cmd) -> str:
+    return " ".join(shlex.quote(str(arg)) for arg in cmd)
+
+
 TEST_EXE = "hipsparse-test"
 
 TEST_TO_IGNORE = {
@@ -75,7 +79,7 @@ def main() -> None:
 
     gtest_filter = f"--gtest_filter={':'.join(tests_to_run)}-{':'.join(tests_to_skip)}"
     cmd = [str(test_exe_path), gtest_filter]
-    logging.info(f"++ Exec [{rocm_path}]$ {shlex.join(cmd)}")
+    logging.info(f"++ Exec [{rocm_path}]$ {format_command(cmd)}")
     subprocess.run(cmd, cwd=rocm_path, check=True, env=env)
 
 
