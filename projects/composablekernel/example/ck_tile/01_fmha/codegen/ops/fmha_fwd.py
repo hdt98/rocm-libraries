@@ -988,8 +988,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                               FmhaFwdTileSize( 64, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  16, 16, 32,  16, 16, 16,  -1, CppConstraint('get_num_blocks(64) <= num_cus')),
                               FmhaFwdTileSize(128,  64,  32, 128,  16, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
                               FmhaFwdTileSize(128, 128,  32, 128,  32, 128,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1),
-                              # FmhaFwdTileSize(256,  32, 128, 128,  32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1),  # v3 pipeline for hdim=128
-                              ],
+                              FmhaFwdTileSize(256,  32, 128, 128,  32, 128,  8, 1, 1,  8, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
               # (160, 160) : [FmhaFwdTileSize(128, 128 , 32, 160,  32, 160,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
                 (192, 128) : [FmhaFwdTileSize(128, 128,  32, 128,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,  -1)],
                 (192, 192) : [FmhaFwdTileSize(128, 128,  32, 192,  32, 192,  4, 1, 1,  4, 1, 1,  32, 32, 16,  32, 32, 16,   1)],
@@ -1058,7 +1057,7 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                         pipelines.append(FmhaFwdPipeline("qr_async", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip
                     if receipt == 1 and bias != "bias":
                         pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip # TODO: cover arbitraty hdim# fmt: skip
-            if (hdim, hdim_v) in [(64, 64)]:
+            if (hdim, hdim_v) in [(64, 64), (128, 128)]:
                 for logits, mask, lse in itertools.product(["t", "f"], ["no", "causal"], ["t", "f"]):
                     pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
                         F_logits=logits, F_bias="no", F_lse=lse, F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
