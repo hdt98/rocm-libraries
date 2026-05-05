@@ -348,11 +348,9 @@ TEST(TestEngineOverrideConfig, LoadFromMissingFileReturnsNullopt)
     EXPECT_FALSE(config.has_value());
 }
 
-TEST(TestEngineOverrideConfig, EnvVarUnsetReturnsNullptr)
+TEST(TestEngineOverrideConfig, EnvVarUnsetReturnsNullopt)
 {
-    const auto* config = EngineOverrideConfig::loadFromEnv();
-    EXPECT_EQ(config, nullptr);
-    EXPECT_EQ(EngineOverrideConfig::loadFromEnv(), config);
+    EXPECT_FALSE(EngineOverrideConfig::loadFromEnv().has_value());
 }
 
 TEST(TestEngineOverrideConfig, JsonWithStrideConstraint)

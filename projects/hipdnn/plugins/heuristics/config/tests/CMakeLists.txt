@@ -12,12 +12,23 @@ find_package(Threads REQUIRED)
 
 add_executable(hipdnn_heuristic_config_tests
     TestEngineOverrideConfig.cpp
+    TestConfigPlugin.cpp
 )
 
 # The matcher header is internal to the plugin; expose its parent directory so
 # the test can include it the same way ConfigPlugin.cpp does.
 target_include_directories(hipdnn_heuristic_config_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
+)
+
+# TestConfigPlugin.cpp links the plugin's STATIC archive directly so the C ABI
+# entry points can be exercised without dlopen. Define the *_STATIC_DEFINE
+# macros so the export-annotated declarations in the public headers expand to
+# nothing on this consumer side (matches the producer OBJECT lib behavior when
+# linked statically into an executable).
+target_compile_definitions(hipdnn_heuristic_config_tests PRIVATE
+    HIPDNN_PLUGIN_STATIC_DEFINE
+    HIPDNN_HEURISTIC_PLUGIN_STATIC_DEFINE
 )
 
 target_compile_options(hipdnn_heuristic_config_tests PRIVATE
@@ -29,6 +40,10 @@ target_link_libraries(hipdnn_heuristic_config_tests PRIVATE
     GTest::gtest_main
     Threads::Threads
     hipdnn_data_sdk
+    hipdnn_plugin_sdk
+    hipdnn_flatbuffers_sdk
+    hipdnn_test_sdk
+    hipdnn_heuristic_config_private
 )
 
 # nlohmann_json is consumed via the matcher header for JSON loading paths.

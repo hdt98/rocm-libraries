@@ -133,7 +133,8 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
 // Policy order resolution (descriptor / env / default), policy decline behavior,
 // and "no policy succeeds" failure paths are covered with mocked plugin managers
 // in TestEngineHeuristicDescriptorAdditional.cpp. The StaticOrdering "never
-// declines" contract is covered directly in TestStaticOrderingPolicy.cpp.
+// declines" contract is enforced by the plugin's Finalize implementation and
+// exercised in plugins/heuristics/static_ordering/tests/TestStaticOrderingPlugin.cpp.
 
 // ========== Integration Tests ==========
 

@@ -79,3 +79,5 @@ install(TARGETS hipdnn_heuristic_static_ordering
     RUNTIME DESTINATION ${HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR}
     COMPONENT Runtime
 )
+
+add_subdirectory(tests)

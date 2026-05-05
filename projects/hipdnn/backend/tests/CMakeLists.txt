@@ -106,7 +106,6 @@ add_executable(
     TestPlatformUtils.cpp
     TestPlugin.cpp
     TestSharedLibrary.cpp
-    TestStaticOrderingPolicy.cpp
     TestVersion.cpp
     utilities/TestEngineOrdering.cpp
 )
