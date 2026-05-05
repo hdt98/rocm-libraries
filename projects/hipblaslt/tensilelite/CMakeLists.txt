@@ -15,8 +15,10 @@ if(TENSILELITE_ENABLE_HOST)
     set_target_properties(tensilelite-host
         PROPERTIES
             POSITION_INDEPENDENT_CODE ON
+            CXX_VISIBILITY_PRESET hidden
+            VISIBILITY_INLINES_HIDDEN ON
     )
-    target_compile_options(tensilelite-host PUBLIC -fvisibility=hidden)
+
     target_compile_features(tensilelite-host PUBLIC cxx_std_17)
     target_compile_definitions(tensilelite-host
         PUBLIC
@@ -54,6 +56,9 @@ if(TENSILELITE_ENABLE_HOST)
     add_subdirectory(include)
 
     if(TENSILELITE_ENABLE_CLIENT)
+        # mxDataGenerator bootstrap and `hipblaslt::mxdatagen` helper target
+        # live in projects/hipblaslt/CMakeLists.txt and are guaranteed to be
+        # available before this subdirectory is processed.
         add_subdirectory(client)
     endif()
 

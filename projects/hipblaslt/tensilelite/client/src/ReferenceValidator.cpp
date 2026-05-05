@@ -128,6 +128,23 @@ namespace TensileLite
             m_validatedSolution = false;
             m_errorInSolution   = false;
             m_executedSolution  = false;
+
+            // MXFP4 data can depend on the selected solution (e.g. MI-based preSwizzle when
+            // enabled). prepareCPUInputs runs in preProblem before preSolution, so the initial
+            // SolveCPU may not match GPU inputs refreshed in DataInitialization::preSolution.
+            // Re-run the CPU reference after that refresh (CPU "current" buffers are synced there
+            // when the MX path runs).
+            if(!m_enabled || m_problem == nullptr || m_referenceInputs == nullptr
+               || solution == nullptr)
+                return;
+
+            if(auto* gemm = dynamic_cast<ContractionProblemGemm*>(m_problem))
+            {
+                if(!isMXFP4Problem(*gemm))
+                    return;
+                ScopedTimer timer("cpu_reference_gemm_per_solution");
+                SolveCPU(m_problem, m_referenceInputs.get(), m_elementsToValidate);
+            }
         }
 
         bool ReferenceValidator::needMoreRunsInSolution() const
@@ -375,8 +392,11 @@ namespace TensileLite
 
             auto k = problem.transA() ? problem.a().sizes().at(0) : problem.a().sizes().at(1);
             bool isTF32 = (problem.f32XdlMathOp() == rocisa::DataType::XFloat32);
-            bool isTF32x1 = (problem.computeInputType() == rocisa::DataType::BFloat16
-                && problem.computeType() == rocisa::DataType::Float);
+            bool isTF32x1 = (problem.computeInputTypeA() == rocisa::DataType::BFloat16
+                && problem.computeInputTypeB() == rocisa::DataType::BFloat16
+                && problem.computeType() == rocisa::DataType::Float
+                && problem.a().dataType() == rocisa::DataType::Float
+                && problem.b().dataType() == rocisa::DataType::Float);
             double threshold = -1.0;
             if (isTF32) {
                 threshold = 0.01 * sqrt(double(k));
@@ -464,11 +484,13 @@ namespace TensileLite
                     refPtr = reference.scaleAlphaVec;
                     resPtr = result.scaleAlphaVec;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::Synchronizer:
                 {
                     refPtr = reference.Synchronizer;
                     resPtr = result.Synchronizer;
                 }
+                break;
                 case ContractionProblemGemm::TENSOR::AMAXD:
                 {
                     refPtr = reference.amaxD;
@@ -544,9 +566,17 @@ namespace TensileLite
 
             if(m_printTensorA)
             {
-                auto a = problem.a();
                 m_reporter->logTensor(
                     LogLevel::Verbose, "A", reference.a, problem.a(), reference.a);
+                if(problem.a().dataType() == rocisa::DataType::Float4
+                   && problem.mxBlockA() > 0)
+                {
+                    m_reporter->logTensor(LogLevel::Verbose,
+                                          "MXSA",
+                                          reference.mxsa,
+                                          problem.mxsa(),
+                                          reference.mxsa);
+                }
                 if(problem.sparse() && problem.sparse() != 2)
                 {
                     m_reporter->logTensor(LogLevel::Verbose,
@@ -559,9 +589,17 @@ namespace TensileLite
 
             if(m_printTensorB)
             {
-                auto b = problem.b();
                 m_reporter->logTensor(
                     LogLevel::Verbose, "B", reference.b, problem.b(), reference.b);
+                if(problem.b().dataType() == rocisa::DataType::Float4
+                   && problem.mxBlockB() > 0)
+                {
+                    m_reporter->logTensor(LogLevel::Verbose,
+                                          "MXSB",
+                                          reference.mxsb,
+                                          problem.mxsb(),
+                                          reference.mxsb);
+                }
                 if(problem.sparse() && problem.sparse() == 2)
                 {
                     m_reporter->logTensor(LogLevel::Verbose,
@@ -676,9 +714,6 @@ namespace TensileLite
                                                    size_t                  validationStride,
                                                    double                  threshold)
         {
-            PointwiseComparison<ValidType> compareValid(m_printValids, m_printMax, m_printMax > 0, threshold);
-            InvalidComparison<ValidType>   compareInvalid(m_printMax, m_printMax > 0);
-
             size_t elementsToCopy       = tensor.totalAllocatedElements();
             size_t elementsOffsetToCopy = 0;
             size_t elementsBeforeData   = 0;
@@ -694,7 +729,10 @@ namespace TensileLite
 
             auto copykind = isgpu ? hipMemcpyDeviceToHost : hipMemcpyHostToHost;
 
-            HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
+            {
+                ScopedTimer timer("validate_gpu_readback");
+                HIP_CHECK_EXC(hipMemcpy(m_cpuResultBuffer.get(), result, bytesToCopy, copykind));
+            }
 
             if(boundsCheck == BoundsCheckMode::NaN)
             {
@@ -711,81 +749,88 @@ namespace TensileLite
             ValidType const* resultData      = resultBuffer + elementsBeforeData;
             ValidType const* resultAfterData = resultData + tensor.totalAllocatedElements();
 
+            PointwiseComparison<ValidType> compareValid(m_printValids, m_printMax, m_printMax > 0, threshold);
+            InvalidComparison<ValidType>   compareInvalid(m_printMax, m_printMax > 0);
+
             size_t boundsCheckElements = 0;
 
-            for(ptrdiff_t i = 0; i < elementsBeforeData; i++)
             {
-                boundsCheckElements++;
-                compareInvalid.before(resultBuffer[i], i, elementsBeforeData);
-            }
+                ScopedTimer timer("validate_element_comparison");
 
-            if(validationStride == 1)
-            {
-                std::vector<size_t> coord(tensor.dimensions());
-                size_t outerCount = CoordCount(tensor.sizes().begin() + 1, tensor.sizes().end());
-
-                size_t       prevBaseIndex = 0;
-                const size_t innerDimSize  = tensor.sizes()[0];
-                const size_t initialStride = tensor.strides()[0];
-
-                for(size_t i = 0; i < outerCount; i++)
+                for(ptrdiff_t i = 0; i < elementsBeforeData; i++)
                 {
-                    CoordNumbered(i,
-                                  coord.begin() + 1,
-                                  coord.end(),
-                                  tensor.sizes().begin() + 1,
-                                  tensor.sizes().end());
-                    size_t baseElemIndex = tensor.index(coord);
+                    boundsCheckElements++;
+                    compareInvalid.before(resultBuffer[i], i, elementsBeforeData);
+                }
 
-                    if(boundsCheck == BoundsCheckMode::NaN && baseElemIndex != 0
-                       && baseElemIndex != prevBaseIndex + innerDimSize)
+                if(validationStride == 1)
+                {
+                    std::vector<size_t> coord(tensor.dimensions());
+                    size_t outerCount = CoordCount(tensor.sizes().begin() + 1, tensor.sizes().end());
+
+                    size_t       prevBaseIndex = 0;
+                    const size_t innerDimSize  = tensor.sizes()[0];
+                    const size_t initialStride = tensor.strides()[0];
+
+                    for(size_t i = 0; i < outerCount; i++)
                     {
-                        for(auto innerIndex = prevBaseIndex + innerDimSize;
-                            innerIndex < baseElemIndex;
-                            innerIndex++)
+                        CoordNumbered(i,
+                                    coord.begin() + 1,
+                                    coord.end(),
+                                    tensor.sizes().begin() + 1,
+                                    tensor.sizes().end());
+                        size_t baseElemIndex = tensor.index(coord);
+
+                        if(boundsCheck == BoundsCheckMode::NaN && baseElemIndex != 0
+                        && baseElemIndex != prevBaseIndex + innerDimSize)
                         {
-                            compareInvalid.inside(
-                                resultData[innerIndex], innerIndex, baseElemIndex);
+                            for(auto innerIndex = prevBaseIndex + innerDimSize;
+                                innerIndex < baseElemIndex;
+                                innerIndex++)
+                            {
+                                compareInvalid.inside(
+                                    resultData[innerIndex], innerIndex, baseElemIndex);
+                            }
+                        }
+
+                        prevBaseIndex = baseElemIndex;
+
+                        for(size_t j = 0; j < innerDimSize; j++)
+                        {
+                            size_t elemIndex = baseElemIndex + (j * initialStride);
+
+                            ValidType referenceValue = reference[elemIndex];
+                            ValidType resultValue    = resultData[elemIndex];
+
+                            compareValid(
+                                referenceValue, resultValue, elemIndex, (i * tensor.sizes()[0]) + j);
                         }
                     }
-
-                    prevBaseIndex = baseElemIndex;
-
-                    for(size_t j = 0; j < innerDimSize; j++)
+                }
+                else
+                {
+                    std::vector<size_t> coord(tensor.dimensions());
+                    for(size_t elemNumber = 0; elemNumber < tensor.totalLogicalElements();
+                        elemNumber += validationStride)
                     {
-                        size_t elemIndex = baseElemIndex + (j * initialStride);
+                        CoordNumbered(elemNumber,
+                                    coord.begin(),
+                                    coord.end(),
+                                    tensor.sizes().begin(),
+                                    tensor.sizes().end());
+                        size_t elemIndex = tensor.index(coord);
 
                         ValidType referenceValue = reference[elemIndex];
                         ValidType resultValue    = resultData[elemIndex];
 
-                        compareValid(
-                            referenceValue, resultValue, elemIndex, (i * tensor.sizes()[0]) + j);
+                        compareValid(referenceValue, resultValue, elemIndex, elemNumber);
                     }
                 }
-            }
-            else
-            {
-                std::vector<size_t> coord(tensor.dimensions());
-                for(size_t elemNumber = 0; elemNumber < tensor.totalLogicalElements();
-                    elemNumber += validationStride)
+
+                for(ptrdiff_t i = 0; i < elementsAfterData; i++)
                 {
-                    CoordNumbered(elemNumber,
-                                  coord.begin(),
-                                  coord.end(),
-                                  tensor.sizes().begin(),
-                                  tensor.sizes().end());
-                    size_t elemIndex = tensor.index(coord);
-
-                    ValidType referenceValue = reference[elemIndex];
-                    ValidType resultValue    = resultData[elemIndex];
-
-                    compareValid(referenceValue, resultValue, elemIndex, elemNumber);
+                    compareInvalid.after(resultAfterData[i], i, elementsAfterData);
                 }
-            }
-
-            for(ptrdiff_t i = 0; i < elementsAfterData; i++)
-            {
-                compareInvalid.after(resultAfterData[i], i, elementsAfterData);
             }
 
             if(boundsCheckElements > 0)
@@ -808,6 +853,7 @@ namespace TensileLite
 
         void ReferenceValidator::postSolution()
         {
+            ScopedTimer timer("post_solution_validation");
             if(!m_executedSolution)
                 return;
 

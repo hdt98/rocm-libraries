@@ -24,6 +24,7 @@
 
 import rocisa
 
+import copy
 import functools
 import glob
 import itertools
@@ -33,7 +34,7 @@ import pickle
 import zlib
 from pathlib import Path
 from timeit import default_timer as timer
-from typing import List, NamedTuple, Optional, Union
+from typing import Collection, List, NamedTuple, Optional, Union
 
 from Tensile import SOURCE_PATH, LibraryIO
 from Tensile.Common import (
@@ -56,6 +57,7 @@ from Tensile.Common import (
 from Tensile.Common.Architectures import gfxToIsa, isaToGfx, SUPPORTED_GFX, splitArchsFromPredicates, filterLogicFilesByPredicates
 from Tensile.Common.Capabilities import makeIsaInfoMap
 from Tensile.Common.GlobalParameters import assignGlobalParameters, globalParameters
+from Tensile.Common.TimingInstrumentation import timing_context
 from Tensile.SolutionStructs.Naming import getKernelFileBase, getKeyNoInternalArgs, getKernelNameMin
 
 from Tensile.CustomYamlLoader import load_logic_gfx_arch
@@ -65,8 +67,9 @@ from Tensile.KernelWriterBase import (
     KERNEL_HELPER_FILENAME_CPP,
     KERNEL_HELPER_FILENAME_H,
 )
-from Tensile.SolutionLibrary import MasterSolutionLibrary
+from Tensile.SolutionLibrary import MasterSolutionLibrary, PlaceholderLibrary
 from Tensile.SolutionStructs import Solution
+from Tensile.SolutionStructs.Solution import mergeTypeMismatchCollector, printTypeMismatchSummary
 from Tensile.Toolchain.Assembly import makeAssemblyToolchain, buildAssemblyCodeObjectFiles
 from Tensile.Toolchain.Source import makeSourceToolchain, buildSourceCodeObjectFiles
 from Tensile.Toolchain.Validators import (
@@ -78,6 +81,20 @@ from Tensile.Utilities.Decorators.Profile import profile
 from Tensile.Utilities.Decorators.Timing import timing
 
 from .ParseArguments import parseArguments
+
+
+def libraryDir(outputPath: Union[str, Path], archs: Collection[str]) -> Path:
+    """Return the library output/input directory for the given target archs.
+
+    Single arch  → <outputPath>/library/<arch>/   (TheRock shard overlay safe)
+    Zero or multiple archs → <outputPath>/library/ (flat)
+    """
+    path = Path(outputPath)
+    archs = list(archs)
+    if len(archs) == 1:
+        return path / "library" / archs[0]
+    return path / "library"
+
 
 class KernelCodeGenResult(NamedTuple):
     err: int
@@ -320,53 +337,56 @@ def writeSolutionsAndKernels(
 
     codeObjectFiles = []
 
-    outputPath = Path(outputPath)
-    destLibPath = ensurePath(
-        outputPath / "library"
-    )  # Destination for code object library files (.co)
-    buildTmpPath = ensurePath(outputPath / "build_tmp" / outputPath.stem.upper())  #
-    assemblyTmpPath = ensurePath(
-        buildTmpPath / "assembly"
-    )  # Temp path for generated assembly files (.s)
-    objectTmpPath = ensurePath(
-        buildTmpPath / "code_object_tmp"
-    )  # Temp path for HSA code object files (.hsaco)
+    with timing_context("python_kernel_setup"):
+        outputPath = Path(outputPath)
+        destLibPath = ensurePath(
+            libraryDir(outputPath, cmdlineArchs)
+        )  # Destination for code object library files (.co)
+        buildTmpPath = ensurePath(outputPath / "build_tmp" / outputPath.stem.upper())  #
+        assemblyTmpPath = ensurePath(
+            buildTmpPath / "assembly"
+        )  # Temp path for generated assembly files (.s)
+        objectTmpPath = ensurePath(
+            buildTmpPath / "code_object_tmp"
+        )  # Temp path for HSA code object files (.hsaco)
 
-    asmKernels = [k for k in kernels if k["KernelLanguage"] == "Assembly"]
+        asmKernels = [k for k in kernels if k["KernelLanguage"] == "Assembly"]
 
-    visited = set()
-    duplicates = 0
-    for k in asmKernels:
-        base = getKernelFileBase(splitGSU, k)
-        k.duplicate = True if base in visited else False
-        if not k.duplicate:
-            k["BaseName"] = base
-        duplicates += k.duplicate
-        print2(f"Duplicate: {base}")
-        visited.add(base)
-    print1(f"Number of duplicate kernels: {duplicates}")
+        visited = set()
+        duplicates = 0
+        for k in asmKernels:
+            base = getKernelFileBase(splitGSU, k)
+            k.duplicate = True if base in visited else False
+            if not k.duplicate:
+                k["BaseName"] = base
+            duplicates += k.duplicate
+            print2(f"Duplicate: {base}")
+            visited.add(base)
+        print1(f"Number of duplicate kernels: {duplicates}")
 
-    outOptions = rocisa.rocIsa.getInstance().getOutputOptions()
-    outOptions.outputNoComment = disableAsmComments
+        outOptions = rocisa.rocIsa.getInstance().getOutputOptions()
+        outOptions.outputNoComment = disableAsmComments
 
-    numAsmKernels = len(asmKernels)
-    numKernels = len(asmKernels)
-    assert numKernels == numAsmKernels, "Only assembly kernels are supported in TensileLite"
-    asmIter = zip(
-        itertools.repeat(kernelWriterAssembly),
-        itertools.repeat(rocisa.rocIsa.getInstance().getData()),
-        itertools.repeat(outOptions),
-        itertools.repeat(splitGSU),
-        asmKernels
-    )
-    memcompress = numAsmKernels > 10000
-    asmResults = ParallelMap2(functools.partial(processKernelSource, compress=memcompress), asmIter, "Generating assembly kernels", return_as="list")
-    removeInvalidSolutionsAndKernels(
-        asmResults, asmKernels, solutions, errorTolerant, getVerbosity(), splitGSU
-    )
-    passPostKernelInfoToSolution(
-        asmResults, asmKernels, solutions, splitGSU
-    )
+        numAsmKernels = len(asmKernels)
+        numKernels = len(asmKernels)
+        assert numKernels == numAsmKernels, "Only assembly kernels are supported in TensileLite"
+        asmIter = zip(
+            itertools.repeat(kernelWriterAssembly),
+            itertools.repeat(rocisa.rocIsa.getInstance().getData()),
+            itertools.repeat(outOptions),
+            itertools.repeat(splitGSU),
+            asmKernels
+        )
+        memcompress = numAsmKernels > 10000
+    with timing_context("python_kernel_codegen"):
+        asmResults = ParallelMap2(functools.partial(processKernelSource, compress=memcompress), asmIter, "Generating assembly kernels", return_as="list")
+    with timing_context("python_kernel_validate"):
+        removeInvalidSolutionsAndKernels(
+            asmResults, asmKernels, solutions, errorTolerant, getVerbosity(), splitGSU
+        )
+        passPostKernelInfoToSolution(
+            asmResults, asmKernels, solutions, splitGSU
+        )
 
     def assemble(ret):
         p, isa, wavefrontsize, _ = ret
@@ -374,15 +394,17 @@ def writeSolutionsAndKernels(
 
     unaryWriteAssembly = functools.partial(writeAssembly, assemblyTmpPath)
     compose = lambda *F: functools.reduce(lambda f, g: lambda x: f(g(x)), F)
-    ret = ParallelMap2(
-        compose(assemble, unaryWriteAssembly),
-        asmResults,
-        "Writing assembly kernels",
-        return_as="list",
-        multiArg=False,
-    )
+    with timing_context("python_kernel_write_assemble"):
+        ret = ParallelMap2(
+            compose(assemble, unaryWriteAssembly),
+            asmResults,
+            "Writing assembly kernels",
+            return_as="list",
+            multiArg=False,
+        )
 
-    writeHelpers(outputPath, kernelHelperObjs, KERNEL_HELPER_FILENAME_CPP, KERNEL_HELPER_FILENAME_H)
+    with timing_context("python_kernel_write_helpers"):
+        writeHelpers(outputPath, kernelHelperObjs, KERNEL_HELPER_FILENAME_CPP, KERNEL_HELPER_FILENAME_H)
     srcKernelFile = Path(outputPath) / "Kernels.cpp"
 
     if globalParameters["PythonProfile"]:
@@ -395,24 +417,26 @@ def writeSolutionsAndKernels(
                 yappi.get_thread_stats().print_all(out=f)
 
     if not generateSourcesAndExit:
-        codeObjectFiles += buildAssemblyCodeObjectFiles(
-            asmToolchain.linker,
-            asmToolchain.bundler,
-            asmKernels,
-            destLibPath,
-            assemblyTmpPath,
-            compress,
-        )
-        
-        buildSourceCodeObjectFiles(
-            srcToolchain.compiler,
-            srcToolchain.bundler,
-            destLibPath,
-            objectTmpPath,
-            outputPath,
-            srcKernelFile,
-            cmdlineArchs,
-        )
+        with timing_context("python_kernel_build_co"):
+            codeObjectFiles += buildAssemblyCodeObjectFiles(
+                asmToolchain.linker,
+                asmToolchain.bundler,
+                asmKernels,
+                destLibPath,
+                assemblyTmpPath,
+                compress,
+            )
+
+        with timing_context("python_kernel_build_src_co"):
+            buildSourceCodeObjectFiles(
+                srcToolchain.compiler,
+                srcToolchain.bundler,
+                destLibPath,
+                objectTmpPath,
+                outputPath,
+                srcKernelFile,
+                cmdlineArchs,
+            )
 
     return codeObjectFiles, numKernels
 
@@ -431,9 +455,7 @@ def writeSolutionsAndKernelsTCL(
     removeTemporaries: bool=True
 ):
     outputPath = Path(outputPath)
-    destLibPath = ensurePath(
-        outputPath / "library"
-    )  # Destination for code object library files (.co)
+    destLibPath = ensurePath(libraryDir(outputPath, cmdlineArchs))
     buildTmpPath = ensurePath(outputPath / "build_tmp" / outputPath.stem.upper())
     assemblyTmpPath = ensurePath(
         buildTmpPath / "assembly"
@@ -596,6 +618,61 @@ def generateKernelHelperObjects(solutions: List[Solution], cxxCompiler: str, isa
     return sorted(khos, key=sortByEnum, reverse=True) # Ensure that we write Enum kernel helpers are first in list
 
 
+def _renameFallbackPlaceholders(node, arch: str) -> None:
+    """Walk a library tree, appending "_<arch>" to fallback PlaceholderLibrary names.
+
+    Mutates `filenamePrefix` on every PlaceholderLibrary leaf whose existing
+    prefix already encodes a fallback (i.e. came from the merged-in fallback
+    master library and therefore ends with "_fallback") and which has not yet
+    been arch-suffixed. Idempotent: a prefix already ending in "_<arch>"
+    is left alone so a second pass cannot double-suffix.
+    """
+    if node is None:
+        return
+    if isinstance(node, PlaceholderLibrary):
+        if "_fallback" in node.filenamePrefix and not node.filenamePrefix.endswith("_" + arch):
+            node.filenamePrefix = node.filenamePrefix + "_" + arch
+        return
+    rows = getattr(node, "rows", None)
+    if rows:
+        for row in rows:
+            _renameFallbackPlaceholders(row.get("library"), arch)
+    mapping = getattr(node, "mapping", None)
+    if mapping:
+        for child in mapping.values():
+            _renameFallbackPlaceholders(child, arch)
+
+
+def renameFallbacksPerArch(masterLibraries) -> None:
+    """Make merged-in fallback lazy-library filenames arch-specific.
+
+    `MasterSolutionLibrary.merge` aliases the same fallback lazy library across
+    every per-arch master that absorbs it (keys collide on the un-suffixed
+    "_fallback" name). That alias means the per-arch *_fallback.dat files are
+    written with overlapping filenames carrying different solution-index spaces,
+    and the per-arch Mapping write loop's `name.endswith("_<arch>")` filter drops
+    every fallback entry — runtime then can't resolve fallback-served dtypes.
+
+    Per-arch deep-copy here splits the alias and arch-suffixes both the
+    `lazyLibraries` dict keys and the matching PlaceholderLibrary nodes inside
+    the master library tree, so:
+      - on-disk filenames diverge (no overlay collision),
+      - the per-arch Mapping filter matches "_fallback_<arch>" naturally, and
+      - each arch keeps its own re-indexed copy of the fallback solutions.
+    """
+    for arch in list(masterLibraries.keys()):
+        master = copy.deepcopy(masterLibraries[arch])
+        masterLibraries[arch] = master
+        renamed = {}
+        for name, lib in master.lazyLibraries.items():
+            if "_fallback" in name and not name.endswith("_" + arch):
+                renamed[name + "_" + arch] = lib
+            else:
+                renamed[name] = lib
+        master.lazyLibraries = renamed
+        _renameFallbackPlaceholders(master.library, arch)
+
+
 @timing
 def generateLogicDataAndSolutions(logicFiles, args, assembler: Assembler, isaInfoMap):
 
@@ -632,7 +709,8 @@ def generateLogicDataAndSolutions(logicFiles, args, assembler: Assembler, isaInf
     for library in ParallelMap2(
         LibraryIO.parseLibraryLogicFile, fIter, "Loading Logics...", return_as="generator_unordered"
     ):
-        _, architectureName, _, _, _, newLibrary = library
+        _, architectureName, _, _, _, newLibrary, typeMismatches = library
+        mergeTypeMismatchCollector(typeMismatches)
 
         if architectureName == "":
             continue
@@ -642,6 +720,10 @@ def generateLogicDataAndSolutions(logicFiles, args, assembler: Assembler, isaInf
         else:
             masterLibraries[architectureName] = newLibrary
             masterLibraries[architectureName].version = args["CodeObjectVersion"]
+
+    # After all YAML files have been parsed and Solution objects created,
+    # print a summary of any type mismatches that were collected.
+    printTypeMismatchSummary(len(logicFiles))
 
     # Sort masterLibraries to make global soln index values deterministic
     solnReIndex = 0
@@ -670,11 +752,17 @@ def generateLogicDataAndSolutions(logicFiles, args, assembler: Assembler, isaInf
                 matchTable[s.index] = [s.srcName, s.libraryLogicIndex]
         LibraryIO.write("MatchTable", matchTable)
 
-    if "fallback" in masterLibraries.keys():
+    fallbackAdded = "fallback" in masterLibraries.keys()
+    if fallbackAdded:
         for key, value in masterLibraries.items():
             if key != "fallback":
                 value.merge(masterLibraries["fallback"])
         masterLibraries.pop("fallback")
+    if fallbackAdded:
+        # Must run AFTER merge (so per-arch masters carry their own fallback
+        # entries) and BEFORE the codeObjectFile-assignment loop below (which
+        # snapshots the dict key as the on-disk filename for each solution).
+        renameFallbacksPerArch(masterLibraries)
     solIndex = []
     for _, masterLibrary in masterLibraries.items():
         for _, sol in masterLibrary.solutions.items():
@@ -845,7 +933,7 @@ def run():
         for arch in targetIsas
         if isaInfoMap[arch].asmCaps["SupportedISA"]
     ]
-    newLibraryDir = ensurePath(os.path.join(outputPath, "library"))
+    newLibraryDir = ensurePath(libraryDir(outputPath, archs))
     splitGSU = False
 
     start_pki = timer()
@@ -866,8 +954,23 @@ def run():
         lib.applyNaming(splitGSU)
         LibraryIO.write(filename, state(lib), arguments["LibraryFormat"])
 
-    filename = os.path.join(newLibraryDir, "TensileLiteLibrary_lazy_Mapping")
-    LibraryIO.write(filename, libraryMapping, "msgpack")
+    # Split libraryMapping per arch and write one mapping file per arch.
+    # Every value ends in "_<arch>" because tuned entries carry the arch
+    # natively and renameFallbacksPerArch arch-suffixed every fallback entry
+    # before this point. Filtering on that suffix keeps each arch's Mapping
+    # complete while letting single-arch builds produce non-colliding mapping
+    # artifacts that survive overlay-style installs (kpack shards).
+    for archName in archs:
+        archMapping = {
+            idx: name
+            for idx, name in libraryMapping.items()
+            if name.endswith("_" + archName)
+        }
+        if archMapping:
+            archMappingFile = os.path.join(
+                newLibraryDir, "TensileLiteLibrary_lazy_" + archName + "_Mapping"
+            )
+            LibraryIO.write(archMappingFile, archMapping, "msgpack")
 
     start_msl = timer()
     for archName, newMasterLibrary in masterLibraries.items():
