@@ -1873,6 +1873,57 @@ namespace TensileLite
             }
         }
 
+	// Set all scale bytes to scaleByte (default 0x7F) and randomize the FP4 data
+	// bytes so each FP4 element (2 packed per byte) has |value| <= 1.
+	// Allowed FP4 (E2M1) nibbles for |value| <= 1: 0x0, 0x1, 0x2, 0x8, 0x9, 0xA.
+	void randomFP4DataAndFixScales(void*   data,
+		size_t  numDataBytes,
+		void*   scale,
+		size_t  numScaleBytes,
+		uint8_t scaleByte = 0x7F)
+	{
+	    std::memset(scale, scaleByte, numScaleBytes);
+	    static constexpr uint8_t kFP4Nibbles[6] = {0x0, 0x1, 0x2, 0x8, 0x9, 0xA};
+	    auto* bytes = static_cast<uint8_t*>(data);
+	    for(size_t i = 0; i < numDataBytes; ++i)
+	    {
+		uint8_t hi = kFP4Nibbles[getThreadLocalRandInt() % 6];
+		uint8_t lo = kFP4Nibbles[getThreadLocalRandInt() % 6];
+		bytes[i]   = static_cast<uint8_t>((hi << 4) | lo);
+	    }
+	}
+
+        // Set all scale bytes to scaleByte (default 0x7F) and randomize the FP8 data
+        // bytes so each FP8 element (1 byte each) has |value| <= 1.
+        // E4M3 (rocisa::DataType::Float8):  valid bytes have (byte & 0x7F) <= 0x38
+        //   (covers +/-0 ... +/-1.0; NaN encodings 0x7F/0xFF are excluded).
+        // E5M2 (rocisa::DataType::BFloat8): valid bytes have (byte & 0x7F) <= 0x3C
+        //   (covers +/-0 ... +/-1.0; Inf and NaN encodings are excluded).
+        void randomFP8DataAndFixScales(rocisa::DataType dataType,
+                                       void*            data,
+                                       size_t           numDataBytes,
+                                       void*            scale,
+                                       size_t           numScaleBytes,
+                                       uint8_t          scaleByte = 0x7F)
+        {
+            std::memset(scale, scaleByte, numScaleBytes);
+            uint8_t maxMagByte;
+            if(dataType == rocisa::DataType::Float8)        // OCP E4M3
+                maxMagByte = 0x38;                           // exp=7,  m=0 -> +1.0
+            else if(dataType == rocisa::DataType::BFloat8)  // OCP E5M2
+                maxMagByte = 0x3C;                           // exp=15, m=0 -> +1.0
+            else
+                throw std::runtime_error(
+                    "randomFP8DataAndFixScales: unsupported FP8 data type");
+            int const numMagValues = static_cast<int>(maxMagByte) + 1;
+            auto* bytes = static_cast<uint8_t*>(data);
+            for(size_t i = 0; i < numDataBytes; ++i)
+            {
+                uint8_t mag  = static_cast<uint8_t>(getThreadLocalRandInt() % numMagValues);
+                uint8_t sign = static_cast<uint8_t>((getThreadLocalRandInt() & 1) << 7);
+                bytes[i]     = static_cast<uint8_t>(sign | mag);
+            }
+        }
 
 	void fixBytes(void* data, size_t numBytes, uint8_t fillByte = 0x30)
 	{
@@ -2043,9 +2094,34 @@ namespace TensileLite
                                     initModeToMXMethod(initA),
                                     -1.0f,
                                     1.0f);
+
                 }
 
-		// (1) Force scales to be fixed
+		//// (3) Override generated A data/scale: scales -> 0x7F, FP4 data |v| <= 1
+		//if(tensorA.dataType() == rocisa::DataType::Float4)
+		//{
+		//    assert(false); // Currently not testing FP4
+		//    randomFP4DataAndFixScales(pristineA.cpuInput.valid.get(),
+		//	    problem.a().totalAllocatedBytes(),
+		//	    pristineE8A.cpuInput.valid.get(),
+		//	    problem.mxsa().totalAllocatedBytes());
+		//}
+		//else if(tensorA.dataType() == rocisa::DataType::Float8
+		//	|| tensorA.dataType() == rocisa::DataType::BFloat8)
+		//{
+		//    randomFP8DataAndFixScales(tensorA.dataType(),
+		//	    pristineA.cpuInput.valid.get(),
+		//	    problem.a().totalAllocatedBytes(),
+		//	    pristineE8A.cpuInput.valid.get(),
+		//	    problem.mxsa().totalAllocatedBytes());
+		//}
+
+		// (0) Force scale to be fixed
+		//void* cpuMxsa = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()].cpuInput.valid.get();
+		//size_t aBytes = problem.mxsa().totalAllocatedBytes();
+		//fixBytes(cpuMxsa, aBytes, 0x7F);
+
+		// (1) Force data to be fixed
 		//void* cpuA       = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[problem.a().dataType()]
 		//    .cpuInput.valid.get();
 		//size_t aBytes = problem.a().totalAllocatedBytes();
@@ -2131,13 +2207,40 @@ namespace TensileLite
                                     initModeToMXMethod(initB),
                                     -1.0f,
                                     1.0f);
+
                 }
 
-		// (1) Force scales to be fixed
+		//// (3) Override generated B data/scale: scales -> 0x7F, FP4 data |v| <= 1
+		//if(tensorB.dataType() == rocisa::DataType::Float4)
+		//{
+		//    assert(false); // Currently not testing FP4
+		//    randomFP4DataAndFixScales(pristineB.cpuInput.valid.get(),
+		//	    problem.b().totalAllocatedBytes(),
+		//	    pristineE8B.cpuInput.valid.get(),
+		//	    problem.mxsb().totalAllocatedBytes());
+		//}
+		//else if(tensorB.dataType() == rocisa::DataType::Float8
+		//	|| tensorB.dataType() == rocisa::DataType::BFloat8)
+		//{
+		//    randomFP8DataAndFixScales(tensorB.dataType(),
+		//	    pristineB.cpuInput.valid.get(),
+		//	    problem.b().totalAllocatedBytes(),
+		//	    pristineE8B.cpuInput.valid.get(),
+		//	    problem.mxsb().totalAllocatedBytes());
+		//}
+
+
+		// (0) Force scale to be fixed
+		//void* cpuMxsb = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()].cpuInput.valid.get();
+		//size_t bBytes = problem.mxsb().totalAllocatedBytes();
+		//fixBytes(cpuMxsb, bBytes, 0x7F);
+
+
+		// (1) Force data to be fixed
 		//void* cpuB       = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[problem.b().dataType()]
 		//    .cpuInput.valid.get();
 		//size_t bBytes = problem.b().totalAllocatedBytes();
-		//fixBytes(cpuB, bBytes); // FP8 = 1 byte/elem
+		//fixBytes(cpuB, bBytes, 0x38); // FP8 = 1 byte/elem
 
 
 		// (2) Force scales and data to be fixed
@@ -2147,7 +2250,8 @@ namespace TensileLite
 		//	cpuBData,
 		//	problem.b().totalAllocatedBytes(),
 		//	cpuMxsb,
-		//	problem.mxsb().totalAllocatedBytes());
+		//	problem.mxsb().totalAllocatedBytes(), 0x7F, 0x38);
+
 
             }
             else
