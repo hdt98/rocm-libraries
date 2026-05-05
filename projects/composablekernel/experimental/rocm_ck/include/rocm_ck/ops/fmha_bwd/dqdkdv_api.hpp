@@ -7,9 +7,9 @@
 // Device code should include <rocm_ck/ops/fmha_bwd/dqdkdv_dev.hpp>.
 //
 // Compilation boundary:
-//   _spec.hpp — consteval factory + slot constants (both passes)
-//   _api.hpp (this) — host-only helpers: grid_size (host pass only, #error on device)
-//   _dev.hpp — CK Tile bridge + __device__ code (device pass only, #error on host)
+//   _spec.hpp -- consteval factory + slot constants (both passes)
+//   _api.hpp (this) -- host-only helpers: grid_size (host pass only, #error on device)
+//   _dev.hpp -- CK Tile bridge + __device__ code (device pass only, #error on host)
 
 #pragma once
 
@@ -39,8 +39,22 @@ namespace rocm_ck {
 ///   GridDim(ceil(seqlen_k / kN0), nhead, batch).
 /// block_n0 comes from FmhaBwdDQDKDVSpec::block_n0 (kN0).
 /// Precondition: block_n0 > 0, seqlen_k >= 0, batch > 0, nhead > 0.
-constexpr GridDim dqdkdv_grid_size(int batch, int nhead, int seqlen_k, int block_n0)
+inline GridDim dqdkdv_grid_size(int batch, int nhead, int seqlen_k, int block_n0)
 {
+#ifndef NDEBUG
+    if(block_n0 <= 0)
+    {
+        std::fprintf(
+            stderr, "rocm_ck::dqdkdv_grid_size: block_n0 must be positive, got %d\n", block_n0);
+        std::abort();
+    }
+    if(seqlen_k < 0)
+    {
+        std::fprintf(
+            stderr, "rocm_ck::dqdkdv_grid_size: seqlen_k must be non-negative, got %d\n", seqlen_k);
+        std::abort();
+    }
+#endif
     return {static_cast<unsigned>((seqlen_k + block_n0 - 1) / block_n0),
             static_cast<unsigned>(nhead),
             static_cast<unsigned>(batch)};
@@ -60,13 +74,31 @@ inline void validateArgs([[maybe_unused]] const Args& args, [[maybe_unused]] Fmh
     // clang-format off
     static constexpr const char* tensor_names[] = {
         "Q", "K", "V", "LSE", "DO", "D", "DQ_ACC", "DK", "DV",
-        "BIAS", "DBIAS", "RANDVAL"
+        "BIAS", "DBIAS", "RANDVAL",
+        "SEQSTART_Q", "SEQSTART_K", "SEQLEN_Q", "SEQLEN_K"
     };
     // clang-format on
 
     int n = S::requiredTensors(k);
     for(int i = 0; i < n; ++i)
     {
+        // Skip optional feature slots that are not enabled for this config.
+        // Slots 9-11 (BIAS, DBIAS, RANDVAL) are intentionally unpopulated
+        // when their respective features are disabled.
+        if(i == S::BIAS && k.bias_type == FmhaBiasType::NONE)
+            continue;
+        if(i == S::DBIAS && !k.has_bias_grad)
+            continue;
+        // RANDVAL is never populated by the host: the device bridge always
+        // assigns rand_val_ptr=nullptr (backward pass never stores randval).
+        // Skip unconditionally.
+        if(i == S::RANDVAL)
+            continue;
+        // SEQLEN_Q/SEQLEN_K may be left null in group mode -- CK Tile derives
+        // per-batch lengths from SEQSTART_Q/SEQSTART_K when these are absent.
+        if(i == S::SEQLEN_Q || i == S::SEQLEN_K)
+            continue;
+
         if(args.tensors[i].ptr == nullptr)
         {
             std::fprintf(stderr,
@@ -95,6 +127,24 @@ inline void validateArgs([[maybe_unused]] const Args& args, [[maybe_unused]] Fmh
                      S::NHEAD_RATIO_QK,
                      nhead_ratio);
         std::abort();
+    }
+
+    // BATCH_SIZE is required only by the deterministic+BATCH persistent kernel
+    // path (CK Tile reads kargs.batch for total_jobs); other configs ignore it.
+    // Predicate is centralized in usesBatchSizeSlot() so the spec, validator,
+    // and device bridge cannot drift apart.
+    if(usesBatchSizeSlot(k))
+    {
+        const int32_t batch_size = args.scalars[S::BATCH_SIZE].i32;
+        if(batch_size <= 0)
+        {
+            std::fprintf(stderr,
+                         "rocm_ck::validateArgs(DqDkDv): BATCH_SIZE (slot %d)"
+                         " must be positive for deterministic batch mode, got %d\n",
+                         S::BATCH_SIZE,
+                         batch_size);
+            std::abort();
+        }
     }
 #endif
 }

@@ -5,13 +5,14 @@
 
 #include "rocm_fmha_bwd_registry.hpp"
 
-// BF16, hdim_q/v=128, batch, no features. dtype axis variant.
+// FP16, hdim_q/v=128, batch, ALiBi bias.
+// Compilation proof only -- numerical verification deferred (NV-3).
 static constexpr rocm_ck::FmhaBwdDQDKDVSpec spec =
-    rocm_ck::fmha_bwd_dqdkdv_variant_spec("fmha_bwd_dqdkdv_bf16_d128_batch");
+    rocm_ck::fmha_bwd_dqdkdv_variant_spec("fmha_bwd_dqdkdv_fp16_d128_batch_alibi");
 
 extern "C" __global__
 __launch_bounds__(spec.block_size,
-                  spec.block_per_cu) void fmha_bwd_dqdkdv_bf16_d128_batch(rocm_ck::Args args)
+                  spec.block_per_cu) void fmha_bwd_dqdkdv_fp16_d128_batch_alibi(rocm_ck::Args args)
 {
     rocm_ck::runFmhaBwdDQDKDV<spec>(args);
 }

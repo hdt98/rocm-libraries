@@ -75,7 +75,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecBF16)
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 {
     // Test all supported hdim_q values. Each must be a separate constexpr
-    // variable because makeSpec is consteval — cannot use a runtime loop.
+    // variable because makeSpec is consteval -- cannot use a runtime loop.
     constexpr auto k32 =
         makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
                                                    .hdim_q = 32,
@@ -117,7 +117,7 @@ TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsQ)
 TEST(FmhaBwdDqDkDv, MakeSpecAllHdimsV)
 {
     // Test all supported hdim_v values. Each must be a separate constexpr
-    // variable because makeSpec is consteval — cannot use a runtime loop.
+    // variable because makeSpec is consteval -- cannot use a runtime loop.
     constexpr auto k32 =
         makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
                                                    .hdim_q = 128,
@@ -328,6 +328,29 @@ TEST(FmhaBwdDqDkDv, ScalarSlotIndicesFixed)
     EXPECT_EQ(S::RP_UNDROP, 5);
     EXPECT_EQ(S::DROP_SEED, 6);
     EXPECT_EQ(S::DROP_OFFSET, 7);
+    EXPECT_EQ(S::WINDOW_SIZE_LEFT, 8);
+    EXPECT_EQ(S::WINDOW_SIZE_RIGHT, 9);
+    EXPECT_EQ(S::MASK_TYPE, 10);
+}
+
+TEST(FmhaBwdDqDkDv, RequiredScalarsWithMask)
+{
+    // has_mask alone: needs WINDOW_SIZE_LEFT/RIGHT + MASK_TYPE (slots 8..10) -> 11
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
+        .algorithm = {.has_mask = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    EXPECT_EQ(S::requiredScalars(k), 11);
+}
+
+TEST(FmhaBwdDqDkDv, RequiredScalarsWithMaskAndDropout)
+{
+    // has_mask + has_dropout: mask slots (8..10) are highest -> 11
+    constexpr auto k = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::BATCH},
+        .algorithm = {.has_mask = true, .has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    EXPECT_EQ(S::requiredScalars(k), 11);
 }
 
 TEST(FmhaBwdDqDkDv, RequiredTensorsPlain)
@@ -398,7 +421,7 @@ TEST(FmhaBwdDqDkDv, RequiredScalarsWithDropout)
     EXPECT_EQ(S::requiredScalars(k), 8);
 }
 
-TEST(FmhaBwdDqDkDv, RequiredTensorsGroupSameAsBatch)
+TEST(FmhaBwdDqDkDv, RequiredTensorsGroupIncludesSeqSlots)
 {
     constexpr auto k_batch =
         makeSpec(FmhaBwdDQDKDVConfig{.signature = {.dtype  = DataType::FP16,
@@ -412,7 +435,21 @@ TEST(FmhaBwdDqDkDv, RequiredTensorsGroupSameAsBatch)
                                                    .hdim_v = 128,
                                                    .mode   = FmhaMode::GROUP},
                                      .algorithm = {.pad_hdim_q = 8, .pad_hdim_v = 8}});
-    EXPECT_EQ(S::requiredTensors(k_batch), S::requiredTensors(k_group));
+    EXPECT_EQ(S::requiredTensors(k_batch), 9);
+    EXPECT_EQ(S::requiredTensors(k_group), 16);
+
+    // Group mode slot constants
+    EXPECT_EQ(S::SEQSTART_Q, 12);
+    EXPECT_EQ(S::SEQSTART_K, 13);
+    EXPECT_EQ(S::SEQLEN_Q, 14);
+    EXPECT_EQ(S::SEQLEN_K, 15);
+
+    // Group mode always returns 16 regardless of features
+    constexpr auto k_group_dropout = makeSpec(FmhaBwdDQDKDVConfig{
+        .signature =
+            {.dtype = DataType::FP16, .hdim_q = 128, .hdim_v = 128, .mode = FmhaMode::GROUP},
+        .algorithm = {.has_dropout = true, .pad_hdim_q = 8, .pad_hdim_v = 8}});
+    EXPECT_EQ(S::requiredTensors(k_group_dropout), 16);
 }
 
 // ============================================================================
@@ -421,8 +458,7 @@ TEST(FmhaBwdDqDkDv, RequiredTensorsGroupSameAsBatch)
 
 TEST(FmhaBwdDqDkDv, GridSizeBasic)
 {
-    constexpr auto g =
-        dqdkdv_grid_size(/*batch=*/2, /*nhead=*/8, /*seqlen_q=*/256, /*block_n0=*/128);
+    const auto g = dqdkdv_grid_size(/*batch=*/2, /*nhead=*/8, /*seqlen_q=*/256, /*block_n0=*/128);
     EXPECT_EQ(g.x, 2u);
     EXPECT_EQ(g.y, 8u);
     EXPECT_EQ(g.z, 2u);
@@ -430,8 +466,7 @@ TEST(FmhaBwdDqDkDv, GridSizeBasic)
 
 TEST(FmhaBwdDqDkDv, GridSizeCeil)
 {
-    constexpr auto g =
-        dqdkdv_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/129, /*block_n0=*/128);
+    const auto g = dqdkdv_grid_size(/*batch=*/1, /*nhead=*/1, /*seqlen_q=*/129, /*block_n0=*/128);
     EXPECT_EQ(g.x, 2u);
     EXPECT_EQ(g.y, 1u);
     EXPECT_EQ(g.z, 1u);
