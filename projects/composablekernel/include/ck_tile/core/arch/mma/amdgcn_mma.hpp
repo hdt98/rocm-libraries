@@ -9,7 +9,6 @@
 #include "ck_tile/core/arch/mma/mma_op_family.hpp"
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
-#include "ck_tile/core/numeric/numeric.hpp"
 #include "ck_tile/core/utility/ignore.hpp"
 
 #pragma clang diagnostic push

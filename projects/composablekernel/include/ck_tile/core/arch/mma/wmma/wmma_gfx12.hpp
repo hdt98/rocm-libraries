@@ -8,7 +8,6 @@
 #include "ck_tile/core/config.hpp"
 #include "ck_tile/core/arch/arch.hpp"
 #include "ck_tile/core/arch/mma/amdgcn_mma.hpp"
-#include "ck_tile/core/arch/mma/mma_traits.hpp"
 #include "ck_tile/core/numeric/vector_type.hpp"
 #include "ck_tile/core/utility/bit_cast.hpp"
 
@@ -256,13 +255,12 @@ struct amdgcn_mma<pk_int4_t, pk_int4_t, int32_t, 16u, 16u, 16u, CtrlFlags, Compi
     CK_TILE_DEVICE static CVecType
     exec(AVecType const& aVec, BVecType const& bVec, CVecType const& cVec)
     {
-        return {__builtin_amdgcn_wmma_i32_16x16x16_iu4_w32_gfx12(
-            true, // A signedness
-            bit_cast<int32_t>(aVec),
-            true, // B signedness
-            bit_cast<int32_t>(bVec),
-            cVec,
-            false)}; // TODO: use CtrlFlags for clamp val.
+        return {__builtin_amdgcn_wmma_i32_16x16x16_iu4_w32_gfx12(true, // A signedness
+                                                                 bit_cast<int32_t>(aVec),
+                                                                 true, // B signedness
+                                                                 bit_cast<int32_t>(bVec),
+                                                                 cVec,
+                                                                 CtrlFlags::Clamp)};
     }
 };
 
@@ -285,13 +283,12 @@ struct amdgcn_mma<pk_int4_t, pk_int4_t, int32_t, 16u, 16u, 32u, CtrlFlags, Compi
     CK_TILE_DEVICE static auto
     exec(AVecType const& aVec, BVecType const& bVec, CVecType const& cVec) -> CVecType
     {
-        return {__builtin_amdgcn_wmma_i32_16x16x32_iu4_w32_gfx12(
-            true, // A signedness
-            bit_cast<int32x2_t>(aVec),
-            true, // B signedness
-            bit_cast<int32x2_t>(bVec),
-            cVec,
-            false)}; // TODO: use CtrlFlags for clamp val.
+        return {__builtin_amdgcn_wmma_i32_16x16x32_iu4_w32_gfx12(true, // A signedness
+                                                                 bit_cast<int32x2_t>(aVec),
+                                                                 true, // B signedness
+                                                                 bit_cast<int32x2_t>(bVec),
+                                                                 cVec,
+                                                                 CtrlFlags::Clamp)};
     }
 };
 
