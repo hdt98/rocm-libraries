@@ -72,3 +72,10 @@ function(add_hiprand_link_test TEST_SOURCES)
 endfunction()
 
 add_hiprand_link_test("test_hiprand_linkage.cpp;get_hiprand_version.cpp")
+
+# Apply CTest category labels to the linkage test. Must be called in
+# this directory scope because set_property(TEST ...) and the TESTS
+# directory property are scoped per-directory.
+if(COMMAND apply_ctest_category_labels)
+    apply_ctest_category_labels("${_HIPRAND_TEST_CATEGORIES_YAML}")
+endif()

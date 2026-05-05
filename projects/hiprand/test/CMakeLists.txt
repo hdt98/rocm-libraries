@@ -22,6 +22,27 @@
 
 # Tests
 
+# CTest test categorization (YAML-driven). Include the helper module up
+# front so the function apply_ctest_category_labels() is available not
+# only here but also in nested test subdirectories (linkage/, fortran/),
+# which are processed by add_subdirectory() further down. Each scope
+# that registers tests must call apply_ctest_category_labels() itself,
+# because CMake's TESTS directory property and set_property(TEST ...)
+# are scoped to the directory in which add_test() ran.
+set(_HIPRAND_TEST_CATEGORIES_YAML "${CMAKE_SOURCE_DIR}/test_categories.yaml")
+set(_HIPRAND_SHARED_CTEST          "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+if(EXISTS "${_HIPRAND_SHARED_CTEST}" AND EXISTS "${_HIPRAND_TEST_CATEGORIES_YAML}")
+    include("${_HIPRAND_SHARED_CTEST}")
+    message(STATUS "hipRAND: YAML-based CTest categorization enabled")
+else()
+    if(NOT EXISTS "${_HIPRAND_SHARED_CTEST}")
+        message(STATUS "hipRAND: shared/ctest not found at ${_HIPRAND_SHARED_CTEST}; skipping CTest categories")
+    endif()
+    if(NOT EXISTS "${_HIPRAND_TEST_CATEGORIES_YAML}")
+        message(STATUS "hipRAND: ${_HIPRAND_TEST_CATEGORIES_YAML} not found; skipping CTest categories")
+    endif()
+endif()
+
 set(PROFILE_DIR "${CMAKE_BINARY_DIR}/coverage-report")
 set(INSTALL_TEST_FILE "${CMAKE_CURRENT_BINARY_DIR}/install_CTestTestfile.cmake")
 file(WRITE "${INSTALL_TEST_FILE}"
@@ -182,3 +203,10 @@ rocm_install(
     COMPONENT tests
     RENAME "CTestTestfile.cmake"
 )
+
+# Apply CTest category labels to tests registered in this directory
+# scope (the test_hiprand_* executables added by the foreach above).
+# Nested subdirectories (linkage/, fortran/) make their own call.
+if(COMMAND apply_ctest_category_labels)
+    apply_ctest_category_labels("${_HIPRAND_TEST_CATEGORIES_YAML}")
+endif()

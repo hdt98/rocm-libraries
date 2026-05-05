@@ -32,3 +32,10 @@ set_target_properties(${test_hiprand}
 rocm_install(TARGETS ${test_hiprand} COMPONENT tests)
 
 add_relative_test(${test_hiprand} ${test_hiprand})
+
+# Apply CTest category labels to the Fortran wrapper test. Must be
+# called in this directory scope because set_property(TEST ...) and
+# the TESTS directory property are scoped per-directory.
+if(COMMAND apply_ctest_category_labels)
+    apply_ctest_category_labels("${_HIPRAND_TEST_CATEGORIES_YAML}")
+endif()
