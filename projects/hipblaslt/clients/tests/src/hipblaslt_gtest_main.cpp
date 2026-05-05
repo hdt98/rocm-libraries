@@ -106,7 +106,7 @@ public:
         }
         // GTEST_SKIP() messages may include trailing detail (e.g. matched
         // platforms), so use substring match instead of strcmp.
-        else if(strstr(result.message(), KNOWN_BUG_STRING))
+        else if(strstr(result.message(), KNOWN_BUG_STRING_GTEST))
         {
             if(showInlineSkips)
                 hipblaslt_cout << "Skipped known bug for current platform." << std::endl;

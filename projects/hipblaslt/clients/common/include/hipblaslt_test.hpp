@@ -194,7 +194,6 @@ bool match_test_category(const Arguments& arg, const char* category);
         {                                                                           \
             GTEST_SKIP() << KNOWN_BUG_STRING                                        \
                          << " (platforms=" << _kb_arg.known_bug_platforms << ")";   \
-            return;                                                                 \
         }                                                                           \
     } while(0)
 
