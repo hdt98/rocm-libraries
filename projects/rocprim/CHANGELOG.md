@@ -2,25 +2,26 @@
 
 Full documentation for rocPRIM is available at [https://rocm.docs.amd.com/projects/rocPRIM/en/latest/](https://rocm.docs.amd.com/projects/rocPRIM/en/latest/).
 
+## Since last release ROCm 7.13
+
+### Added
+
+* Added `generate_resource_spec.cpp` to the test directory and built as a new target by CMake. It generates the resource spec file required by CTest when running tests in parallel.
+
+### Changed
+
+* Updated the documentation on how to run rocPrim tests on multiple GPUs in parallel.
+
+### Removed
+
+* Removed the `GenerateResourceSpec.cmake` script - it is replaced by the added `generate_resource_spec.cpp` code above.
+
 ## Since last release ROCm 7.12
 
 ### Added
 
 * Added type trait definitions for `__hip_bfloat16`. This should resolve issues where this type did not work with radix-based algorithms.
 * Unit tests for config_types
-
-TODO: move this to 7.13 changes
-* Added `generate_resource_spec.cpp` to the test directory and built as a new target by CMake. It generates the resource spec file required by CTest when running tests in parallel.
-
-### Changed
-
-TODO: move this to 7.13 changes
-* Updated the documentation on how to run rocPrim tests on multiple GPUs in parallel.
-
-### Removed
-
-TODO: move this to 7.13 changes
-* Removed the `GenerateResourceSpec.cmake` script - it is replaced by the added `generate_resource_spec.cpp` code above.
 
 ### Optimized
 
