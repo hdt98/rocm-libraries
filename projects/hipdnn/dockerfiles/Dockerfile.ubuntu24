@@ -168,14 +168,14 @@ ARG ROCM_SYSTEMS_REF=default
 RUN git config --global user.email "docker@build.local" && \
     git config --global user.name "Docker Build"
 
-RUN git clone https://github.com/ROCm/TheRock.git
+RUN git clone --depth 1 https://github.com/ROCm/TheRock.git
 
 WORKDIR /TheRock
 
 RUN if [ "$THEROCK_GIT_HASH" != "default" ]; then \
-        echo "Checking out specific hash: $THEROCK_GIT_HASH"; \
-        git fetch; \
-        git checkout $THEROCK_GIT_HASH; \
+        echo "Checking out specific ref: $THEROCK_GIT_HASH"; \
+        git fetch --depth 1 origin "$THEROCK_GIT_HASH" && \
+        git checkout FETCH_HEAD; \
     else \
         echo "Using default branch"; \
     fi
@@ -184,10 +184,10 @@ RUN if [ "$THEROCK_GIT_HASH" != "default" ]; then \
 # we need to commit the change so that fetch_sources.py does not overwrite the change
 RUN if [ "$ROCM_LIBRARIES_REF" != "default" ]; then \
         echo "Updating rocm-libraries submodule to: $ROCM_LIBRARIES_REF"; \
-        git submodule update --init rocm-libraries && \
+        git submodule update --init --depth 1 rocm-libraries && \
         cd rocm-libraries && \
-        git fetch origin && \
-        git checkout $ROCM_LIBRARIES_REF && \
+        git fetch --depth 1 origin "$ROCM_LIBRARIES_REF" && \
+        git checkout FETCH_HEAD && \
         cd .. && \
         git add rocm-libraries && \
         git commit -m "Update rocm-libraries submodule to $ROCM_LIBRARIES_REF"; \
@@ -197,10 +197,10 @@ RUN if [ "$ROCM_LIBRARIES_REF" != "default" ]; then \
 # we need to commit the change so that fetch_sources.py does not overwrite the change
 RUN if [ "$ROCM_SYSTEMS_REF" != "default" ]; then \
         echo "Updating rocm-systems submodule to: $ROCM_SYSTEMS_REF"; \
-        git submodule update --init rocm-systems && \
+        git submodule update --init --depth 1 rocm-systems && \
         cd rocm-systems && \
-        git fetch origin && \
-        git checkout $ROCM_SYSTEMS_REF && \
+        git fetch --depth 1 origin "$ROCM_SYSTEMS_REF" && \
+        git checkout FETCH_HEAD && \
         cd .. && \
         git add rocm-systems && \
         git commit -m "Update rocm-systems submodule to $ROCM_SYSTEMS_REF"; \
@@ -216,7 +216,7 @@ RUN pip install -r requirements.txt
 
 RUN git config --global url."https://github.com/".insteadOf git@github.com: && \
     git config --global credential.helper "!f() { echo username=anonymous; echo password=; }; f" && \
-    python ./build_tools/fetch_sources.py
+    python ./build_tools/fetch_sources.py --depth 1
 
 RUN mkdir build
 WORKDIR /TheRock/build
