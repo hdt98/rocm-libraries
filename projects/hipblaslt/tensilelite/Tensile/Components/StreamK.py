@@ -2526,6 +2526,19 @@ class StreamKDynamic(StreamK):
 
         skSharedQueue = Label("SK_SharedQueue", "")
         skBroadcastDone = Label("SK_BroadcastDone", "")
+        skHasSharedTiles = Label("SK_HasSharedTiles", "")
+
+        sSharedTileCheckPerQueue = writer.sgprPool.checkOut(1, "SharedTileCheckPerQueue")
+        sSharedTileCheckTotal = writer.sgprPool.checkOut(1, "SharedTileCheckTotal")
+        module.add(SLShiftRightB32(dst=sgpr(sSharedTileCheckPerQueue), src=sgpr("TotalTiles"), shiftHex=log2(numXCDs), comment="Check TotalTiles / numXCDs"))
+        module.add(SLShiftLeftB32(dst=sgpr(sSharedTileCheckTotal), src=sgpr(sSharedTileCheckPerQueue), shiftHex=log2(numXCDs), comment="Check private total tiles"))
+        module.add(SCmpEQU32(src0=sgpr(sSharedTileCheckTotal), src1=sgpr("TotalTiles"), comment="Check if shared queue has no tiles"))
+        writer.sgprPool.checkIn(sSharedTileCheckPerQueue)
+        writer.sgprPool.checkIn(sSharedTileCheckTotal)
+        module.add(SCBranchSCC0(labelName=skHasSharedTiles.getLabelName(), comment="Use ESQ when shared tiles exist"))
+        module.add(self._graWorkGroup_perXCDOnly(writer, kernel, sQueueIdx, sWorkItemIdx))
+        module.add(SBranch(labelName=skBroadcastDone.getLabelName(), comment="No shared tiles; use per-XCD auto-reset"))
+        module.add(skHasSharedTiles)
 
         sPerXCDPerQueue = writer.sgprPool.checkOut(1, "PerXCDPerQueue")
         sPerXCDTotal = writer.sgprPool.checkOut(1, "PerXCDTotal")
@@ -2553,16 +2566,23 @@ class StreamKDynamic(StreamK):
 
         # --- Shared overflow queue (queue numXCDs) ---
         module.add(skSharedQueue)
-        sSharedAddr = writer.sgprPool.checkOutAligned(2, 2, "SharedAddress")
-        module.add(SMovB32(dst=sgpr(sSharedAddr+0), src=sgpr("AddressFlags+0")))
-        module.add(SMovB32(dst=sgpr(sSharedAddr+1), src=sgpr("AddressFlags+1")))
-        module.add(SAddU32(dst=sgpr(sSharedAddr+0), src0=sgpr(sSharedAddr+0), src1=numXCDs * 256))
-        module.add(SAddCU32(dst=sgpr(sSharedAddr+1), src0=sgpr(sSharedAddr+1), src1=0, comment="Shared queue at offset %d" % (numXCDs * 256)))
+        sharedQueueOffset = numXCDs * 256
+        module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=sgpr("TotalTiles"), comment="Default to invalid work item"))
+        module.add(SCmpEQU32(src0=sgpr(sPerXCDTotal), src1=sgpr("TotalTiles"), comment="Check if shared queue has no tiles"))
+        module.add(SCBranchSCC1(labelName=skBroadcastDone.getLabelName(), comment="No shared tiles to fetch"))
+
+        module.add(SLoadB32(dst=sgpr(sWorkItemIdx), base=sgpr("AddressFlags", 2), soffset=sharedQueueOffset,
+                            smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV),
+                            comment="Probe shared queue counter"))
+        module.add(SWaitCnt(kmcnt=0, comment="Wait for shared queue probe"))
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sPerXCDTotal), src1=sgpr(sWorkItemIdx), comment="globalIdx = perXCDTotal + sharedLocalIdx"))
+        module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr("TotalTiles"), comment="Check if shared queue has work"))
+        module.add(SCBranchSCC0(labelName=skBroadcastDone.getLabelName(), comment="Shared queue already empty"))
 
         module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0x7FFFFFFF), comment="Large wrap value (no wrap)"))
-        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sSharedAddr, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item from shared queue"))
+        module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr("AddressFlags", 2), soffset=sharedQueueOffset,
+                              smem=SMEMModifiers(glc=True), comment="Fetch next work item from shared queue"))
         module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-        writer.sgprPool.checkIn(sSharedAddr)
 
         module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sPerXCDTotal), src1=sgpr(sWorkItemIdx), comment="globalIdx = perXCDTotal + sharedLocalIdx"))
 
@@ -2863,13 +2883,23 @@ class StreamKDynamic(StreamK):
         # The last WG to exit must zero all queue counters + the completion
         # counter so the next kernel invocation starts from fresh counters.
         #
-        # Completion counter at AddressFlags + numXCDs*256.
+        # Completion counter at AddressFlags + (numXCDs+1)*256.
         # Queue counters at offsets 0, 256, ..., (numXCDs-1)*256 (per-XCD)
         # plus numXCDs*256 (shared queue), so numXCDs+2 counters total.
         numCounters = numXCDs + 2
 
         skExitLabel = Label("SK_ExitESQ", "")
 
+        sSharedTileCheckPerQueue = writer.sgprPool.checkOut(1, "SharedTileCheckPerQueue")
+        sSharedTileCheckTotal = writer.sgprPool.checkOut(1, "SharedTileCheckTotal")
+        module.add(SLShiftRightB32(dst=sgpr(sSharedTileCheckPerQueue), src=sgpr("TotalTiles"), shiftHex=log2(numXCDs), comment="Check TotalTiles / numXCDs"))
+        module.add(SLShiftLeftB32(dst=sgpr(sSharedTileCheckTotal), src=sgpr(sSharedTileCheckPerQueue), shiftHex=log2(numXCDs), comment="Check private total tiles"))
+        module.add(SCmpEQU32(src0=sgpr(sSharedTileCheckTotal), src1=sgpr("TotalTiles"), comment="Check if shared queue has no tiles"))
+        writer.sgprPool.checkIn(sSharedTileCheckPerQueue)
+        writer.sgprPool.checkIn(sSharedTileCheckTotal)
+        module.add(SCBranchSCC1(labelName=skExitLabel.getLabelName(), comment="No ESQ cleanup needed without shared tiles"))
+
+        module.add(SBarrier(comment="Wait for all waves before completion count"))
         sWave = writer.sgprPool.checkOut(1, "Wave")
         module.add(VReadfirstlaneB32(dst=sgpr(sWave), src=vgpr("Serial"), comment="Wave 0 does sync"))
         module.add(SCmpEQU32(src0=sgpr(sWave), src1=0, comment="Check for wave 0"))
