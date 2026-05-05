@@ -2151,11 +2151,13 @@ pipeline {
     }
     post {
         success {
+            setGithubStatus('Math CI Summary', 'success', "Math CI passed")
             githubNotify context: 'Math CI Summary',
                          status: 'SUCCESS',
                          description: 'All checks have passed'
         }
         failure {
+            setGithubStatus('Math CI Summary', 'failure', "Math CI failed")
             githubNotify context: 'Math CI Summary',
                          status: 'FAILURE',
                          description: 'Some checks have failed'
