@@ -34,7 +34,6 @@ using namespace ck_tile::core::arch;
 using namespace mma;
 
 // using F4        = pk_fp4_t;
-using F8        = fp8_t;
 using BF8       = bf8_t;
 using F16       = fp16_t;
 using BF16      = bf16_t;
@@ -42,7 +41,6 @@ using F32       = fp32_t;
 using F64       = fp64_t;
 using I8        = int8_t;
 using FP8       = fp8_t;
-using BF8       = bf8_t;
 using I32       = int32_t;
 using Target908 = decltype(make_amdgcn_gfx9_target<amdgcn_target_id::GFX908>());
 using Target90a = decltype(make_amdgcn_gfx9_target<amdgcn_target_id::GFX90A>());
@@ -273,7 +271,7 @@ using Gfx9CommonIntrinsics = ::testing::Types<
     amdgcn_mma<I8,   I8,   I32,  64u, 16u, 4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_i32_16x16x4i8
     amdgcn_mma<I8,   I8,   I32,  4u,  64u, 4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_i32_4x4x4i8
     amdgcn_mma<I8,   I8,   I32,  64u, 4u,  4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>  // mfma_i32_4x4x4i8
-    >;
+>;
 using Gfx908andGfx90aIntrinsics = ::testing::Types<
     amdgcn_mma<BF16, BF16, F32,  32u, 64u, 2u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x2bf16
     amdgcn_mma<BF16, BF16, F32,  64u, 32u, 2u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x2bf16
@@ -285,7 +283,7 @@ using Gfx908andGfx90aIntrinsics = ::testing::Types<
     amdgcn_mma<BF16, BF16, F32,  16u, 16u, 8u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_16x16x8bf16
     amdgcn_mma<I8,   I8,   I32,  32u, 32u, 8u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_i32_32x32x8i8
     amdgcn_mma<I8,   I8,   I32,  16u, 16u, 16u, DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>  // mfma_i32_16x16x16i8
-    >;
+>;
 using Gfx90aAndHigherIntrinsics = ::testing::Types<
     amdgcn_mma<BF16, BF16, F32,  32u, 64u, 4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x4bf16_1k
     amdgcn_mma<BF16, BF16, F32,  64u, 32u, 4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x4bf16_1k
@@ -296,7 +294,7 @@ using Gfx90aAndHigherIntrinsics = ::testing::Types<
     amdgcn_mma<BF16, BF16, F32,  32u, 32u, 8u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_32x32x8bf16_1k
     amdgcn_mma<BF16, BF16, F32,  16u, 16u, 16u, DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_f32_16x16x16bf16_1k
     amdgcn_mma<F64,  F64,  F64,  16u, 16u, 4u,  DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>  // mfma_f64_16x16x4f64
-    >;
+>;
 using Gfx942AndHigherIntrinsics = ::testing::Types<
     amdgcn_mma<I8,   I8,   I32,  16u, 16u, 32u, DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_i32_16x16x32_i8
     amdgcn_mma<I8,   I8,   I32,  32u, 32u, 16u, DefaultMfmaCtrlFlags,                TestTarget, MmaOpFamily::DENSE>, // mfma_i32_32x32x16_i8
