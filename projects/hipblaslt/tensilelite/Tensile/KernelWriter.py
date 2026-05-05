@@ -2385,18 +2385,22 @@ class KernelWriter(metaclass=abc.ABCMeta):
         dataAtIterB = iteration//self.states.numIterPerCoalescedReadB - self.states.numItersPLR
         dataAtIterMXSA = iteration//self.states.numIterPerCoalescedReadMXSA - self.states.numItersPLR if kernel["ProblemType"]["MXBlockA"] else (-self.states.numItersPLR)
         dataAtIterMXSB = iteration//self.states.numIterPerCoalescedReadMXSB - self.states.numItersPLR if kernel["ProblemType"]["MXBlockB"] else (-self.states.numItersPLR)
-        maxDataAtIter = max(dataAtIterA, dataAtIterB, dataAtIterMXSA, dataAtIterMXSB)
+        hasMetadata = kernel["ProblemType"]["Sparse"] and not kernel["DirectToVgprSparseMetadata"]
+        dataAtIterMetadata = iteration//self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR if hasMetadata else (-self.states.numItersPLR)
+        maxDataAtIter = max(dataAtIterA, dataAtIterB, dataAtIterMXSA, dataAtIterMXSB, dataAtIterMetadata)
 
         numReadsIterA = min(iteration+1, kernel["LoopIters"]//self.states.numIterPerCoalescedReadA - self.states.numItersPLR)
         numReadsIterB = min(iteration+1, kernel["LoopIters"]//self.states.numIterPerCoalescedReadB - self.states.numItersPLR)
         numReadsIterMXSA = min(iteration+1, kernel["LoopIters"]//self.states.numIterPerCoalescedReadMXSA - self.states.numItersPLR) if kernel["ProblemType"]["MXBlockA"] else 0
         numReadsIterMXSB = min(iteration+1, kernel["LoopIters"]//self.states.numIterPerCoalescedReadMXSB - self.states.numItersPLR) if kernel["ProblemType"]["MXBlockB"] else 0
-        maxNumberReadIter = max(numReadsIterA, numReadsIterMXSA, numReadsIterB, numReadsIterMXSB)
+        numReadsIterMetadata = min(iteration+1, kernel["LoopIters"]//self.states.numIterPerCoalescedReadMetadata - self.states.numItersPLR) if hasMetadata else 0
+        maxNumberReadIter = max(numReadsIterA, numReadsIterMXSA, numReadsIterB, numReadsIterMXSB, numReadsIterMetadata)
 
         skipReadsIterA = numReadsIterA - dataAtIterA - 1 if not dataAtIterA < maxDataAtIter else 0
         skipReadsIterMXSA = numReadsIterMXSA - dataAtIterMXSA - 1 if not dataAtIterMXSA < maxDataAtIter else 0
         skipReadsIterB = numReadsIterB - dataAtIterB - 1 if not dataAtIterB < maxDataAtIter else 0
         skipReadsIterMXSB = numReadsIterMXSB - dataAtIterMXSB - 1 if not dataAtIterMXSB < maxDataAtIter else 0
+        skipReadsIterMetadata = numReadsIterMetadata - dataAtIterMetadata - 1 if (hasMetadata and not dataAtIterMetadata < maxDataAtIter) else 0
 
         # numPrefetchIter : in this loop, number of prefetch iteration we have read (data used in next loop)
         # currently we have localReadA and localReadB if iteration >= isBarrier
@@ -2408,6 +2412,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
         skipReadsIterB += numPrefetchIter
         skipReadsIterMXSA += numPrefetchIter
         skipReadsIterMXSB += numPrefetchIter
+        if hasMetadata:
+          skipReadsIterMetadata += numPrefetchIter
 
         # here the reads are prefetches so can skip them in the waitcnt
         # how many localreads can skip is based on how many iterations we prefetch.
@@ -2417,7 +2423,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         localReadsB = 0 if kernel["DirectToVgprB"] else self.states.numReadsPerIterB * skipReadsIterB * readFactorB
         localReadsMXSA = 0 if ((not kernel["ProblemType"]["MXBlockA"]) or kernel["DirectToVgprMXSA"]) else self.states.numReadsPerIterMXSA * skipReadsIterMXSA
         localReadsMXSB = 0 if ((not kernel["ProblemType"]["MXBlockB"]) or kernel["DirectToVgprMXSB"]) else self.states.numReadsPerIterMXSB * skipReadsIterMXSB
-        localReads += (localReadsA + localReadsB + localReadsMXSA + localReadsMXSB)
+        # sparse metadata local-reads must be accounted for in dscnt; otherwise s_wait_dscnt is overly strict.
+        localReadsMetadata = self.states.numReadsPerIterMetadata * skipReadsIterMetadata if hasMetadata else 0
+        localReads += (localReadsA + localReadsB + localReadsMXSA + localReadsMXSB + localReadsMetadata)
         # some of localReads is interleaved after waitcnt in SIA3
         if scheduleIterAlg == 3 and self.states.numItersPLR and (iteration < maxNumberReadIter or numPrefetchIter) and\
           not kernel["UseF32XEmulation"]:
@@ -2431,6 +2439,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
           if kernel["ProblemType"]["MXBlockB"]:
             if ((iteration < numReadsIterMXSB and not dataAtIterMXSB < maxDataAtIter) or numPrefetchIter) and (not kernel["DirectToVgprB"]):
               localReads -= self.states.numReadsPerIterMXSB
+          if hasMetadata:
+            if ((iteration < numReadsIterMetadata and not dataAtIterMetadata < maxDataAtIter) or numPrefetchIter):
+              localReads -= self.states.numReadsPerIterMetadata
 
           localReads += localReadsWaitcnt
           if iteration == 0 and kernel["UnrollMajorLDSB"] and not (kernel["ProblemType"]["DataTypeB"].isAnyFloat8() and kernel["ConvertAfterDS"]):
@@ -2452,6 +2463,8 @@ class KernelWriter(metaclass=abc.ABCMeta):
           iterCode.addComment0("dataAtIterMXSA=%u numReadsIterMXSA=%u skipReadsIterMXSA=%u readsPerIterMXSA=%u" % (dataAtIterMXSA, numReadsIterMXSA, skipReadsIterMXSA, self.states.numReadsPerIterMXSA))
         if kernel["ProblemType"]["MXBlockB"]:
           iterCode.addComment0("dataAtIterMXSB=%u numReadsIterMXSB=%u skipReadsIterMXSB=%u readsPerIterMXSB=%u" % (dataAtIterMXSB, numReadsIterMXSB, skipReadsIterMXSB, self.states.numReadsPerIterMXSB))
+        if hasMetadata:
+          iterCode.addComment0("dataAtIterMetadata=%u numReadsIterMetadata=%u skipReadsIterMetadata=%u readsPerIterMetadata=%u" % (dataAtIterMetadata, numReadsIterMetadata, skipReadsIterMetadata, self.states.numReadsPerIterMetadata))
         if scheduleIterAlg == 0 or scheduleIterAlg == 1:
           for i in range (max(dataAtIterA,dataAtIterB),iteration+1):
             localWrites += countWeightedLocalWrite(self.codes.perIterLocalWrite[i][1])
@@ -4810,6 +4823,10 @@ class KernelWriter(metaclass=abc.ABCMeta):
               g2lBufIdx2nd = 1
             module.add(self.directToLdsM0Update(kernel, 1, tensorParameters2nd, skip2ndWaitForDtl))
             module.add(self.globalReadDo(kernel, 0, tensorParameters2nd, g2lBufIdx=g2lBufIdx2nd))
+          # Sparse: prefetch metadata global read for PGR>=2 (mirrors setupNewTile PGR=1 prefetch).
+          if kernel["enableTDMMetadata"] and not kernel["DirectToVgprSparseMetadata"]:
+            module.add(self.directToLdsM0Update(kernel, 1, tPM))
+            module.add(self.globalReadDo(kernel, 0, tPM, g2lBufIdx=0))
           if idxPgr < kernel["PrefetchGlobalRead"] - 1:
             # generate GR inc code except for the last prefetch
             prefetchIdx = kernel["PrefetchGlobalRead"] - 1 - idxPgr
