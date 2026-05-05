@@ -137,7 +137,8 @@ struct StreamKKernelArgs : ck_tile::UniversalGemmKernelArgs<NumATensor, NumBTens
                                                                       host_args.stride_Bs,
                                                                       host_args.stride_Ds,
                                                                       host_args.stride_E,
-                                                                      host_args.k_batch},
+                                                                      host_args.k_batch,
+								      host_args.async_input_scheduler},
           // The workspace pointer is set to nullptr because we must first
           // instantiate the TilePartitioner to get the necessary size
           workspace_ptr{nullptr},
@@ -1354,6 +1355,42 @@ struct UniversalGemmKernel
         }
     }
 
+    CK_TILE_DEVICE void WaitAsync(const KernelArgs& kargs,
+                                               index_t i_m_tile) const
+    {
+	if constexpr(!PersistentKernel)
+        {
+		return;
+	}
+	else{
+        if(kargs.async_input_scheduler.chunk_signals != nullptr)
+        {
+            auto iM_eff = amd_wave_read_first_lane(i_m_tile);
+
+            const auto tile_idx_pivot =
+                amd_wave_read_first_lane(kargs.async_input_scheduler.tile_idx_pivot_m);
+            const auto tiles_m = amd_wave_read_first_lane(
+                integer_divide_ceil(kargs.M, TilePartitioner::MPerBlock));
+            if(tiles_m > 0)
+            {
+                iM_eff = amd_wave_read_first_lane((iM_eff + tile_idx_pivot) % tiles_m);
+            }
+
+            const auto tiles_per_chunk =
+                amd_wave_read_first_lane(kargs.async_input_scheduler.tiles_per_chunk_m);
+            const auto num_chunks =
+                amd_wave_read_first_lane(kargs.async_input_scheduler.num_chunks);
+            if(tiles_per_chunk > 0 && num_chunks > 0)
+            {
+                const auto chunk_idx =
+                    amd_wave_read_first_lane((iM_eff / tiles_per_chunk) % num_chunks);
+                workgroup_barrier chunk_barrier(kargs.async_input_scheduler.chunk_signals);
+                chunk_barrier.wait_eq_wave(1, chunk_idx);
+            }
+        }
+	}
+    }
+
     /**
      * @brief Runs the main Stream - K algorithm.
      * @param kargs Stream - K kernel arguments.
@@ -1403,6 +1440,8 @@ struct UniversalGemmKernel
             const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
             const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
             const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+
+	    WaitAsync(kargs, c_macro_tile_idx[I0]);
 
             std::array<const ADataType*, NumATensor> as_ptr;
             static_for<0, NumATensor, 1>{}([&](auto i) {
@@ -1781,6 +1820,7 @@ struct UniversalGemmKernel
             const auto c_macro_tile_idx = kargs.tile_partitioner.get_output_tile_index(tile_idx);
             const index_t i_m           = c_macro_tile_idx[I0] * TilePartitioner::MPerBlock;
             const index_t i_n           = c_macro_tile_idx[I1] * TilePartitioner::NPerBlock;
+	    WaitAsync(kargs, c_macro_tile_idx[I0]);
 
             std::array<const ADataType*, NumATensor> as_ptr;
             static_for<0, NumATensor, 1>{}(

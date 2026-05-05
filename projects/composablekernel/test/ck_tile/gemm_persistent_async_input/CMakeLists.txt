@@ -13,7 +13,9 @@ list(APPEND PERSISTENT_ASYNC_INPUT_COMPILE_OPTIONS
 
 if(GPU_TARGETS MATCHES "gfx95")
     add_gtest_executable(test_ck_tile_gemm_persistent_async_input test_gemm_persistent_async_input.cpp)
+    add_gtest_executable(test_ck_tile_gemm_streamk_persistent_async_input test_gemm_streamk_persistent_async_input.cpp)
     target_compile_options(test_ck_tile_gemm_persistent_async_input PRIVATE ${PERSISTENT_ASYNC_INPUT_COMPILE_OPTIONS})
+    target_compile_options(test_ck_tile_gemm_streamk_persistent_async_input PRIVATE ${PERSISTENT_ASYNC_INPUT_COMPILE_OPTIONS})
 else()
     message(DEBUG "Skipping test_ck_tile_gemm_persistent_async_input for current target - requires gfx95")
 endif()
