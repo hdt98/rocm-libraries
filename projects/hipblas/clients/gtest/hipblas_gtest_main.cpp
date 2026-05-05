@@ -351,8 +351,11 @@ int main(int argc, char** argv)
     (void)hipDeviceReset();
 
 #ifdef WIN32
-    // Use quick_exit() to bypass C++ static destructors and atexit() handlers.
-    // Post-main cleanup in linked DLLs (HIP runtime) crash in comgr
+    // RUN_ALL_TESTS can report a non-zero process status on Windows even when
+    // GTest reports all tests passed. Keep quick_exit to bypass static
+    // destructors in linked DLLs after normalizing the success case.
+    if(::testing::UnitTest::GetInstance()->successful())
+        status = 0;
     std::quick_exit(status);
 #else
     return status;
