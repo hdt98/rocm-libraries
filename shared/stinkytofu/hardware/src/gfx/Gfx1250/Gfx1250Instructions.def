@@ -1130,6 +1130,31 @@ DEF_T(VCvtScalef32Pk8Fp8F16Inst, "v_cvt_scalef32_pk8_fp8_f16",
         {S1, src1, src, 32},
     },
 )
+DEF_T(VCvtScalef32Pk8Fp8F32Inst, "v_cvt_scalef32_pk8_fp8_f32", .logical = "VCvtScalePk8F32toFP8",
+    .format = VOP3,
+    .operand_fields = {
+        {D0, vdst, vgpr, 64},
+        {S0, src0, src_vgpr, 256},
+        {S1, src1, src, 32},
+    },
+)
+DEF_T(VCvtScalef32Pk8Bf8F32Inst, "v_cvt_scalef32_pk8_bf8_f32", .logical = "VCvtScalePk8F32toBF8",
+    .format = VOP3,
+    .operand_fields = {
+        {D0, vdst, vgpr, 64},
+        {S0, src0, src_vgpr, 256},
+        {S1, src1, src, 32},
+    },
+)
+DEF_T(VCvtScalef32SrPk8Fp8F32Inst, "v_cvt_scalef32_sr_pk8_fp8_f32", .logical = "VCvtScaleSRPkF32toFP8",
+    .format = VOP3,
+    .operand_fields = {
+        {D0, vdst, vgpr, 64},
+        {S0, src0, src_vgpr, 256},
+        {S1, src1, src, 32},
+        {S2, src2, src, 32},
+    },
+)
 DEF_T(VCvtScalePk8F16Bf8Inst, "v_cvt_scale_pk8_f16_bf8",
     .format = VOP3,
     .operand_fields = {
