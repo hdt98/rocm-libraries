@@ -2151,22 +2151,22 @@ pipeline {
     }
     post {
         success {
-            setGithubStatus('Math CI Summary', 'success', "Math CI passed")
-            githubNotify context: 'Math CI Summary',
-                         status: 'SUCCESS',
-                         description: 'All checks have passed'
+            script {
+                node(rocmnode("nogpu")) {
+                    setGithubStatus('Math CI Summary', 'success', "Math CI passed")
+                }
+            }
         }
         failure {
-            setGithubStatus('Math CI Summary', 'failure', "Math CI failed")
-            githubNotify context: 'Math CI Summary',
-                         status: 'FAILURE',
-                         description: 'Some checks have failed'
-            node(rocmnode("nogpu")) {
-                script {
-                    checkoutComposableKernel()
-                }
-                withCredentials([string(credentialsId: 'ck_ci_errors_webhook_url', variable: 'WEBHOOK_URL')]) {
-                    sh 'bash projects/composablekernel/script/infra_helper/send_failure_notifications.sh'
+            script {
+                node(rocmnode("nogpu")) {
+                    setGithubStatus('Math CI Summary', 'failure', "Math CI failed")
+                    script {
+                        checkoutComposableKernel()
+                    }
+                    withCredentials([string(credentialsId: 'ck_ci_errors_webhook_url', variable: 'WEBHOOK_URL')]) {
+                        sh 'bash projects/composablekernel/script/infra_helper/send_failure_notifications.sh'
+                    }
                 }
             }
         }
