@@ -95,20 +95,35 @@ include(cmake/HaveASMIncbin.cmake)
 rocrand_check_have_asm_incbin(ROCRAND_HAVE_ASM_INCBIN)
 
 # When -fsanitize=address is present (either injected by a super-project such as
-# TheRock's host-ASAN preset, or set via BUILD_ADDRESS_SANITIZER below), explicitly
-# cancel it for the device compilation pass. gfx942 and other targets without xnack+
-# cannot support device-side ASAN, and clang silently drops the flag rather than
-# erroring — producing a malformed HIP fat binary.
+# TheRock's host-ASAN preset, or set via BUILD_ADDRESS_SANITIZER below), rewrite
+# it so ASAN applies only to the host compilation pass. gfx942 and other targets
+# without xnack+ cannot support device-side ASAN: clang silently drops the flag
+# rather than erroring, but only after ASAN metadata accounting has already begun,
+# producing a malformed HIP fat binary whose .hipFatBinSegment size fields are
+# inconsistent with the actual embedded code object.
+#
+# The correct fix is -Xarch_host -fsanitize=address: this passes -fsanitize=address
+# only to the host compilation pass and never reaches the device pass. Approaches
+# that keep a bare -fsanitize=address and attempt to negate it for device
+# (e.g. -Xarch_device -fno-sanitize=address or -fno-sanitize=address appended after)
+# do NOT work: clang's unified driver processes -fsanitize=address before per-arch
+# splitting, so ASAN metadata is baked in before the flag would be negated.
+#
 # Note: rocRAND compiles HIP device code through the CXX language path (clang++ with
-# --offload-arch flags), so COMPILE_LANGUAGE:HIP does not apply here.
+# --offload-arch flags), so COMPILE_LANGUAGE:HIP generator expressions do not apply.
+#
 # IMPORTANT: This must run before include(cmake/Dependencies.cmake) and before
 # include(cmake/VerifyCompiler.cmake) because find_package(HIP) inside
 # VerifyCompiler.cmake locks in the device-compiler flags from CMAKE_CXX_FLAGS at
 # that moment. Changes to CMAKE_CXX_FLAGS after find_package(HIP) do not reach the
 # device compilation pass.
 if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xarch_device -fno-sanitize=address")
-  message(STATUS "HOST_ASAN detected: appending -Xarch_device -fno-sanitize=address to CMAKE_CXX_FLAGS to suppress device-side ASAN for targets without xnack+")
+  # Replace bare -fsanitize=address with -Xarch_host -fsanitize=address so the flag
+  # only reaches the host compilation pass, leaving the device pass ASAN-free.
+  string(REPLACE "-fsanitize=address" "-Xarch_host -fsanitize=address" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  message(STATUS "HOST_ASAN detected: replaced -fsanitize=address with -Xarch_host -fsanitize=address in CMAKE_CXX_FLAGS")
+  message(STATUS "HOST_ASAN CMAKE_CXX_FLAGS after fix: ${CMAKE_CXX_FLAGS}")
+  message(STATUS "HOST_ASAN hip::device INTERFACE_COMPILE_OPTIONS (pre-find_package): will be printed after VerifyCompiler.cmake")
 endif()
 
 # Get dependencies
@@ -154,6 +169,21 @@ endif()
 
 # Verify the compiler settings and include the HIP CMake package
 include(cmake/VerifyCompiler.cmake)
+
+# Diagnostics: dump hip::device INTERFACE properties after find_package(HIP) has run.
+# This is always printed (not gated on HOST_ASAN) so future builds capture a full
+# picture regardless of sanitizer mode. Critical for diagnosing fat-binary corruption.
+if(TARGET hip::device)
+  get_target_property(_dbg_hip_device_compile_opts hip::device INTERFACE_COMPILE_OPTIONS)
+  get_target_property(_dbg_hip_device_link_opts    hip::device INTERFACE_LINK_OPTIONS)
+  get_target_property(_dbg_hip_device_link_libs    hip::device INTERFACE_LINK_LIBRARIES)
+  message(STATUS "DIAG hip::device INTERFACE_COMPILE_OPTIONS : ${_dbg_hip_device_compile_opts}")
+  message(STATUS "DIAG hip::device INTERFACE_LINK_OPTIONS    : ${_dbg_hip_device_link_opts}")
+  message(STATUS "DIAG hip::device INTERFACE_LINK_LIBRARIES  : ${_dbg_hip_device_link_libs}")
+  message(STATUS "DIAG CMAKE_CXX_FLAGS after VerifyCompiler  : ${CMAKE_CXX_FLAGS}")
+else()
+  message(STATUS "DIAG hip::device target NOT found after VerifyCompiler.cmake")
+endif()
 
 # Build option to disable -Werror
 option(DISABLE_WERROR "Disable building with Werror" ON)
