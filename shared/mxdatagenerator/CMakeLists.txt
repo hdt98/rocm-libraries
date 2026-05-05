@@ -19,22 +19,22 @@ target_include_directories(mxDataGenerator
 )
 
 # Optional HIP/GPU backend (`DGen::DataGeneratorGPU`). The implementation is
-# header-only; consumers must compile their TU with hipcc/clang in HIP mode.
-# When ON, we add `hip::device` to the INTERFACE link if available, so plain
-# `target_link_libraries(<tgt> PUBLIC roc::mxDataGenerator)` brings the HIP
-# runtime headers along.
+# header-only and gated behind `__HIPCC__`; host-only consumers see nothing.
+# We deliberately do *not* link `hip::device` into the INTERFACE here, since
+# that would propagate `--offload-arch` flags to every consumer (including
+# pure-host TUs that compile with g++) and break their builds. Consumers that
+# actually want the GPU backend must:
+#   * compile their TU with hipcc / amdclang++ in HIP mode (so `__HIPCC__`
+#     is defined and `<hip/hip_runtime.h>` is in the include path), and
+#   * `target_link_libraries(<their_tgt> PRIVATE hip::device)` themselves.
 option(MXDATAGENERATOR_ENABLE_GPU
        "Enable header-only HIP/GPU backend in mxDataGenerator" ON)
-if(MXDATAGENERATOR_ENABLE_GPU)
+if(MXDATAGENERATOR_ENABLE_GPU AND MXDATAGENERATOR_BUILD_TESTING)
     find_package(hip QUIET CONFIG)
     if(hip_FOUND)
-        target_link_libraries(mxDataGenerator INTERFACE hip::device)
-        # Enable HIP language only if we'll actually build GPU tests; this keeps
-        # host-only consumers (e.g. the existing `mxDataGeneratorTests`) decoupled
-        # from the HIP toolchain.
-        if(MXDATAGENERATOR_BUILD_TESTING)
-            enable_language(HIP)
-        endif()
+        # We only need the HIP language when *we* build the GPU test
+        # executable below; otherwise leave host consumers alone.
+        enable_language(HIP)
     endif()
 endif()
 

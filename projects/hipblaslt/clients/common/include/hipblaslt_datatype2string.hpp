@@ -174,7 +174,10 @@ inline std::vector<size_t> preTileSizeForScaleB(hipblaslt_scaling_format s)
 //   scaleRows = ceil(dataRow / blockSize) rounded up to multiple of 8
 //   scaleCols = dataCol rounded up to multiple of 32
 // When pre-swizzle is active, additional layout requirements may apply but are
-// already satisfied by the rounding above.
+// already satisfied by the rounding above. In particular, the gfx1250 (non-
+// rocroller WMMA) dimk swizzle pads the natural-layout fast scale dim to a
+// multiple of `dimk = 128 / blockSize` (= 4 for blockSize=32, = 8 for
+// blockSize=16); the round-to-8 above covers both cases.
 inline size_t scaleBufferSize(int64_t dataRow, int64_t dataCol, hipblaslt_scaling_format s)
 {
     auto   bs        = blockSize(s);

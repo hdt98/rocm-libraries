@@ -300,7 +300,22 @@ namespace DGen
             case DeviceInitMode::ScaledDiagonal:
                 return (row == col) ? static_cast<float>(row + 1) : 0.0f;
             case DeviceInitMode::TrigonometricFromFloat:
-                return sinf(static_cast<float>(dataIdx));
+            {
+                // Match the CPU path's `generate_data_trigonometric_from_float`:
+                // draw a uniform random angle in [0, 2pi) and return its
+                // cosine (so the values are uniformly distributed on [-1, 1]).
+                // The deterministic `sinf(dataIdx)` we used here previously
+                // produced a smooth oscillating pattern with no PRNG mixing,
+                // which exposed pathological cancellations in tests that
+                // multiply A*B by per-row vectors (e.g. scaleAlphaVec) and
+                // then norm-check the activated/biased result -- the
+                // resulting reference values were small enough that the
+                // relative error denominator blew up.
+                uint32_t       s     = seedMix(seed, dataIdx);
+                float          u     = prngFloat01(s);
+                constexpr float kTwoPi = 6.283185307179586f;
+                return cosf(kTwoPi * u);
+            }
             case DeviceInitMode::Bounded:
             {
                 uint32_t s = seedMix(seed, dataIdx);

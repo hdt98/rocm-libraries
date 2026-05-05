@@ -1993,6 +1993,29 @@ void testing_matmul_with_bias(const Arguments& arg,
     // Calculating block count end
     matmul.resize(block_count, std::vector<hipblasLtMatmulDesc_t>(gemm_count));
 
+    // Detect the device arch once. The MX block-scaled init below uses this to
+    // pick a per-arch scale swizzle. In particular, on gfx1250 (and other gfx12xx
+    // WMMA targets) the non-rocroller kernel expects the dimk-permuted scale
+    // layout from `preSwizzleScalesGFX1250`, while gfx950 keeps the existing
+    // AITER swizzle from `preSwizzleScalesGFX950`. Rocroller builds use the
+    // natural scale layout regardless of arch, so the gfx1250 swizzle is gated
+    // on `#ifndef HIPBLASLT_USE_ROCROLLER`.
+    bool isGfx1250Arch = false;
+#ifndef HIPBLASLT_USE_ROCROLLER
+    {
+        hipDeviceProp_t archProps;
+        if(hipGetDeviceProperties(&archProps, 0) == hipSuccess)
+        {
+            std::string arch(archProps.gcnArchName);
+            // gcnArchName looks like "gfx1250" or "gfx1250:sramecc+:xnack-".
+            // Match the gfx12xx WMMA family (gfx1200/gfx1201/gfx1250) since
+            // mengzcai's reference uses the same dimk = 128/MXBlock permutation
+            // for all of them.
+            isGfx1250Arch = arch.compare(0, 5, "gfx12") == 0;
+        }
+    }
+#endif
+
     for(int i = 0; i < gemm_count; i++)
     {
         CHECK_HIPBLASLT_ERROR(
@@ -2553,6 +2576,17 @@ void testing_matmul_with_bias(const Arguments& arg,
             DGen::MXInitDevice mxDeviceA = (arg.mx_init_device == 1)
                                                ? DGen::MXInitDevice::Gpu
                                                : DGen::MXInitDevice::Cpu;
+            // Edge cases (M or N not a multiple of the swizzle tile) cause the
+            // device buffer to be allocated with tail padding past the natural
+            // packed size. The CPU path inherits zero padding from the host
+            // pristine buffer; the GPU path writes only the natural-packed
+            // bytes, so we must zero the device buffers up front to keep the
+            // padding well-defined.
+            if(mxDeviceA == DGen::MXInitDevice::Gpu)
+            {
+                CHECK_HIP_ERROR(hipMemset(dA[i].buf(), 0, dA[i].getNumBytes()));
+                CHECK_HIP_ERROR(hipMemset(dScaleA[i].buf(), 0, dScaleA[i].getNumBytes()));
+            }
             for(int64_t b = 0; b < num_batches[i]; b++)
             {
                 auto* dataPtr  = (mxDeviceA == DGen::MXInitDevice::Gpu)
@@ -2561,6 +2595,11 @@ void testing_matmul_with_bias(const Arguments& arg,
                 auto* scalePtr = (mxDeviceA == DGen::MXInitDevice::Gpu)
                                      ? reinterpret_cast<uint8_t*>(dScaleA[i].buf()) + b * scaleBatchBytesA
                                      : reinterpret_cast<uint8_t*>(hScaleA[i].buf()) + b * scaleBatchBytesA;
+                // gfx1250 swizzle replaces the gfx950 AITER swizzle on gfx12xx.
+                // generateMXInput throws if both are enabled, so we have to
+                // suppress the gfx950 preSwizzleTile here.
+                auto preSwizzleA = isGfx1250Arch ? std::vector<size_t>{}
+                                                 : preSwizzleSizeForScale(arg.scaleA);
                 auto batchRef = generateMXInput(toDataFormat(TiA),
                                                 toScaleType(scaleDataType(arg.scaleA)),
                                                 dataPtr,
@@ -2569,13 +2608,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                 A_col[i],
                                                 lda[i],
                                                 transA == HIPBLAS_OP_T,
-                                                preSwizzleSizeForScale(arg.scaleA),
+                                                preSwizzleA,
                                                 preTileA,
                                                 blockSize(arg.scaleA),
                                                 1,
                                                 true,
                                                 mxDeviceA,
-                                                hipblaslt_initialization2string(arg.initialization));
+                                                hipblaslt_initialization2string(arg.initialization),
+                                                /*min_val=*/-1.0f,
+                                                /*max_val=*/1.0f,
+                                                /*gfx1250Swizzle=*/isGfx1250Arch);
                 refAAll.insert(refAAll.end(), batchRef.begin(), batchRef.end());
             }
             refA.emplace_back(std::move(refAAll));
@@ -2657,6 +2699,12 @@ void testing_matmul_with_bias(const Arguments& arg,
             DGen::MXInitDevice mxDeviceB = (arg.mx_init_device == 1)
                                                ? DGen::MXInitDevice::Gpu
                                                : DGen::MXInitDevice::Cpu;
+            // See the matching A-side comment above re: padding.
+            if(mxDeviceB == DGen::MXInitDevice::Gpu)
+            {
+                CHECK_HIP_ERROR(hipMemset(dB[i].buf(), 0, dB[i].getNumBytes()));
+                CHECK_HIP_ERROR(hipMemset(dScaleB[i].buf(), 0, dScaleB[i].getNumBytes()));
+            }
             for(int64_t b = 0; b < num_batches[i]; b++)
             {
                 auto* dataPtr  = (mxDeviceB == DGen::MXInitDevice::Gpu)
@@ -2665,6 +2713,8 @@ void testing_matmul_with_bias(const Arguments& arg,
                 auto* scalePtr = (mxDeviceB == DGen::MXInitDevice::Gpu)
                                      ? reinterpret_cast<uint8_t*>(dScaleB[i].buf()) + b * scaleBatchBytesB
                                      : reinterpret_cast<uint8_t*>(hScaleB[i].buf()) + b * scaleBatchBytesB;
+                auto preSwizzleB = isGfx1250Arch ? std::vector<size_t>{}
+                                                 : preSwizzleSizeForScale(arg.scaleB);
                 auto batchRef = generateMXInput(toDataFormat(TiB),
                                                 toScaleType(scaleDataType(arg.scaleB)),
                                                 dataPtr,
@@ -2673,13 +2723,16 @@ void testing_matmul_with_bias(const Arguments& arg,
                                                 B_col[i],
                                                 ldb[i],
                                                 transB == HIPBLAS_OP_T,
-                                                preSwizzleSizeForScale(arg.scaleB),
+                                                preSwizzleB,
                                                 preTileB,
                                                 1,
                                                 blockSize(arg.scaleB),
                                                 false,
                                                 mxDeviceB,
-                                                hipblaslt_initialization2string(arg.initialization));
+                                                hipblaslt_initialization2string(arg.initialization),
+                                                /*min_val=*/-1.0f,
+                                                /*max_val=*/1.0f,
+                                                /*gfx1250Swizzle=*/isGfx1250Arch);
                 refBAll.insert(refBAll.end(), batchRef.begin(), batchRef.end());
             }
             refB.emplace_back(std::move(refBAll));

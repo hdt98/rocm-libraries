@@ -42,6 +42,14 @@ target_link_libraries(hipblaslt-mxdatagen
     INTERFACE
         roc::mxDataGenerator
 )
+# The GPU init overload in <mxDataGenerator/mxDataGen.hpp> is gated behind
+# `__HIPCC__` and uses `<hip/hip_runtime.h>`. All hipblaslt consumers of this
+# shim already compile as HIP (amdclang++ -x hip), so we propagate hip::device
+# here to make the include path / runtime symbols available without forcing
+# every consumer to wire it up themselves.
+if(TARGET hip::device)
+    target_link_libraries(hipblaslt-mxdatagen INTERFACE hip::device)
+endif()
 target_compile_features(hipblaslt-mxdatagen
     INTERFACE
         cxx_std_20
