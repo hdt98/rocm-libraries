@@ -163,23 +163,22 @@ public:
         }
     }
 
-    /// Process-lifetime config loaded from HIPDNN_ENGINE_OVERRIDE_FILE
-    /// (cached on first call, thread-safe per C++11). Returns nullptr when
-    /// the variable is unset / empty / the file cannot be opened or parsed.
-    static const EngineOverrideConfig* loadFromEnv()
+    /// Read HIPDNN_ENGINE_OVERRIDE_FILE and load the referenced config.
+    /// Returns nullopt when the variable is unset / empty / the file cannot
+    /// be opened or parsed. Called once per PolicyFinalize (graph-build
+    /// time), so re-parsing is acceptable; this lets env changes take effect
+    /// without process restart and keeps the path testable.
+    static std::optional<EngineOverrideConfig> loadFromEnv()
     {
         static constexpr const char* ENV_VAR = "HIPDNN_ENGINE_OVERRIDE_FILE";
-        static const std::optional<EngineOverrideConfig> s_cached = []() {
-            std::string path = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
-            const auto first = path.find_first_not_of(" \t\r\n");
-            if(first == std::string::npos)
-            {
-                return std::optional<EngineOverrideConfig>{};
-            }
-            path = path.substr(first, path.find_last_not_of(" \t\r\n") - first + 1);
-            return load(path);
-        }();
-        return s_cached ? &*s_cached : nullptr;
+        std::string path = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
+        const auto first = path.find_first_not_of(" \t\r\n");
+        if(first == std::string::npos)
+        {
+            return std::nullopt;
+        }
+        path = path.substr(first, path.find_last_not_of(" \t\r\n") - first + 1);
+        return load(path);
     }
 
     /// Scan rules in declaration order; return the first matching engine ID or nullopt.

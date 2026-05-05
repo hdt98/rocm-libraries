@@ -14,6 +14,7 @@
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/utilities/EngineOrdering.hpp>
+#include <hipdnn_plugin_sdk/HeuristicValidation.hpp>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 
 #include <algorithm>
@@ -173,11 +174,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT void hipdnnPluginGetLastErrorString(const char** 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleCreate(hipdnnHeuristicHandle_t* outHandle)
 {
-    if(outHandle == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "HandleCreate: null output pointer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        outHandle, STATIC_ORDERING_LOG, "HandleCreate: null output pointer");
 
     try
     {
@@ -195,11 +193,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle)
 {
-    if(handle == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "HandleDestroy: null handle");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(handle, STATIC_ORDERING_LOG, "HandleDestroy: null handle");
 
     try
     {
@@ -217,18 +211,12 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDeviceProperties(
     hipdnnHeuristicHandle_t handle, const hipdnnPluginConstData_t* devicePropsSerialized)
 {
-    if(handle == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetDeviceProperties: null handle");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
-    if(devicePropsSerialized == nullptr || devicePropsSerialized->ptr == nullptr
-       || devicePropsSerialized->size == 0)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetDeviceProperties: invalid buffer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        handle, STATIC_ORDERING_LOG, "SetDeviceProperties: null handle");
+    HIPDNN_PLUGIN_REQUIRE_CONST_DATA(devicePropsSerialized,
+                                     true,
+                                     STATIC_ORDERING_LOG,
+                                     "SetDeviceProperties: invalid buffer");
 
     try
     {
@@ -257,17 +245,10 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyDescriptorCreate(
     hipdnnHeuristicHandle_t pluginHandle, hipdnnHeuristicPolicyDescriptor_t* outDesc)
 {
-    if(pluginHandle == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorCreate: null handle");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
-    if(outDesc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorCreate: null output pointer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        pluginHandle, STATIC_ORDERING_LOG, "PolicyDescriptorCreate: null handle");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        outDesc, STATIC_ORDERING_LOG, "PolicyDescriptorCreate: null output pointer");
 
     try
     {
@@ -286,11 +267,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyDescrip
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyDescriptorDestroy(hipdnnHeuristicPolicyDescriptor_t desc)
 {
-    if(desc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorDestroy: null descriptor");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        desc, STATIC_ORDERING_LOG, "PolicyDescriptorDestroy: null descriptor");
 
     try
     {
@@ -312,17 +290,11 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(
     hipdnnHeuristicPolicyDescriptor_t desc, const int64_t* engineIds, size_t engineIdCount)
 {
-    if(desc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetEngineIds: null descriptor");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
-    if(engineIds == nullptr && engineIdCount > 0)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetEngineIds: null engine_ids with count > 0");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(desc, STATIC_ORDERING_LOG, "SetEngineIds: null descriptor");
+    HIPDNN_PLUGIN_REQUIRE_ARRAY(engineIds,
+                                engineIdCount,
+                                STATIC_ORDERING_LOG,
+                                "SetEngineIds: null engine_ids with count > 0");
 
     try
     {
@@ -343,18 +315,11 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngi
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSerializedGraph(
     hipdnnHeuristicPolicyDescriptor_t desc, const hipdnnPluginConstData_t* serializedGraph)
 {
-    if(desc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetSerializedGraph: null descriptor");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        desc, STATIC_ORDERING_LOG, "SetSerializedGraph: null descriptor");
     // StaticOrdering doesn't use the graph, but validate the parameter
-    if(serializedGraph == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "SetSerializedGraph: null graph pointer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        serializedGraph, STATIC_ORDERING_LOG, "SetSerializedGraph: null graph pointer");
 
     STATIC_ORDERING_LOG(HIPDNN_SEV_INFO,
                         "SetSerializedGraph: graph received (%zu bytes) - not used by "
@@ -370,17 +335,9 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* outApplied)
 {
-    if(desc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: null descriptor");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
-    if(outApplied == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "PolicyFinalize: null output pointer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(desc, STATIC_ORDERING_LOG, "PolicyFinalize: null descriptor");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        outApplied, STATIC_ORDERING_LOG, "PolicyFinalize: null output pointer");
 
     try
     {
@@ -416,17 +373,10 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicyGetSortedEngineIds(
     hipdnnHeuristicPolicyDescriptor_t desc, int64_t* engineIds, size_t* numEngines)
 {
-    if(desc == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "GetSortedEngineIds: null descriptor");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
-
-    if(numEngines == nullptr)
-    {
-        STATIC_ORDERING_LOG(HIPDNN_SEV_ERROR, "GetSortedEngineIds: null num_engines pointer");
-        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
-    }
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        desc, STATIC_ORDERING_LOG, "GetSortedEngineIds: null descriptor");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
+        numEngines, STATIC_ORDERING_LOG, "GetSortedEngineIds: null num_engines pointer");
 
     try
     {

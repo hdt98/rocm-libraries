@@ -59,8 +59,7 @@ void finalize() {
     // 2. Otherwise consult HIPDNN_ENGINE_OVERRIDE_FILE for a rule whose
     //    op + tensor pattern matches the first conv-like node in the graph.
     if (!preferredEngineId) {
-        auto* config = EngineOverrideConfig::loadFromEnv();
-        if (config) {
+        if (auto config = EngineOverrideConfig::loadFromEnv()) {
             preferredEngineId = matchOverrideConfig(graph, *config);
         }
     }
