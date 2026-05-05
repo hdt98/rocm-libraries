@@ -126,11 +126,40 @@ struct CoreLoopSchedulerImpl<PipelineProblem, ck_tile::bf16_t, ck_tile::bf16_t, 
 {
 };
 
-// fp16 — uses default base
+// fp16 — higher VALU budget in GEMM0 phase to interleave P conversion with MFMAs.
+// On gfx942, the compiler eagerly places fp16 v_cvt_f16_f32 P conversion on the critical
+// path before s_barrier. Increasing VALU slots per MFMA from 2 to 5 lets the scheduler
+// pull P conversion VALU into MFMA latency slots, reducing the serial tail.
 template <typename PipelineProblem>
 struct CoreLoopSchedulerImpl<PipelineProblem, ck_tile::half_t, ck_tile::half_t, ck_tile::half_t>
     : CoreLoopSchedulerDefaultBase<PipelineProblem>
 {
+    using Base = CoreLoopSchedulerDefaultBase<PipelineProblem>;
+    using Params = CoreLoopSchedulingParams<PipelineProblem>;
+
+    CK_TILE_DEVICE static constexpr void schedule_gemm0_compute()
+    {
+        static_for<0, Params::kMfmaPerWarpGemm0, 1>{}([&](auto) {
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::MFMA, 1, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::TRANS, 2, 0);
+            __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 5, 0);
+        });
+    }
+
+    // Must override schedule() — static methods have no virtual dispatch
+    template <ck_tile::index_t WaveGroup, ck_tile::index_t Phase>
+    CK_TILE_DEVICE static constexpr void schedule(ck_tile::number<WaveGroup>,
+                                                  ck_tile::number<Phase>)
+    {
+        constexpr ck_tile::index_t effective = (WaveGroup == 0) ? Phase : (Phase + 3) % 4;
+
+        if constexpr(effective == 0)
+            schedule_gemm0_compute();
+        else if constexpr(effective == 2)
+            Base::schedule_gemm1_compute();
+        else
+            Base::schedule_load_phase();
+    }
 };
 
 // fp8 — asymmetric GEMM0 scheduling for 2× K iterations
