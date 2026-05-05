@@ -3,6 +3,7 @@
 
 # Config Heuristic Plugin
 # RFC 0007: Well-known policy that honors graph-level preferences
+# (Graph.preferred_engine_id) and the HIPDNN_ENGINE_OVERRIDE_FILE JSON config.
 
 project(hipdnn_heuristic_config VERSION 1.0.0 LANGUAGES CXX)
 
@@ -25,6 +26,14 @@ target_link_libraries(hipdnn_heuristic_config PRIVATE
     hipdnn_data_sdk
     hipdnn_flatbuffers_sdk
 )
+
+# nlohmann_json is used directly by EngineOverrideConfig.hpp for parsing the
+# HIPDNN_ENGINE_OVERRIDE_FILE. Declare it explicitly so the plugin builds
+# even when downstream consumers gate flatbuffers_sdk's JSON headers off.
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    hipdnn_add_dependency(nlohmann_json VERSION ${HIPDNN_NLOHMANN_JSON_VERSION})
+endif()
+hipdnn_add_dependency_includes(hipdnn_heuristic_config nlohmann_json::nlohmann_json)
 
 # Compiler options
 target_compile_options(hipdnn_heuristic_config PRIVATE
@@ -65,3 +74,5 @@ install(TARGETS hipdnn_heuristic_config
     RUNTIME DESTINATION ${HIPDNN_RELATIVE_INSTALL_PLUGIN_HEURISTIC_DIR}
     COMPONENT Runtime
 )
+
+add_subdirectory(tests)

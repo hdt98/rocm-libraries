@@ -92,7 +92,6 @@
 #include <hipdnn_frontend/detail/BackendWrapper.hpp>
 #include <hipdnn_frontend/detail/ConvolutionFpropUnpacker.hpp>
 #include <hipdnn_frontend/detail/CreateBackendDescriptor.hpp>
-#include <hipdnn_frontend/detail/EngineOverrideUtils.hpp>
 #include <hipdnn_frontend/detail/GraphDetail.hpp>
 #include <hipdnn_frontend/detail/GraphPacker.hpp>
 #include <hipdnn_frontend/detail/GraphUnpacker.hpp>
@@ -342,12 +341,6 @@ private:
         }
         resetGraphDesc();
 
-        if(!_preferredEngineId.has_value())
-        {
-            _preferredEngineId
-                = hipdnn_frontend::engine_override::getPreferredIdFromOverrideConfig(*this);
-        }
-
         std::unordered_map<int64_t, detail::ScopedHipdnnBackendDescriptor> tensorDescs;
         std::vector<detail::ScopedHipdnnBackendDescriptor> operations;
 
@@ -408,12 +401,13 @@ private:
         std::vector<int64_t> engineIds;
         auto defaultEngineId = getDefaultEngineId();
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(
-            engineConfigs,
-            engineIds,
-            engineHeuristicDesc,
-            _preferredEngineId.has_value() || defaultEngineId.has_value()));
+            engineConfigs, engineIds, engineHeuristicDesc, defaultEngineId.has_value()));
 
-        // Select engine config based on preferred ID or use first available
+        // The heuristic chain (RFC 0007) is responsible for honoring graph-level
+        // preferences such as preferred_engine_id via the SelectionHeuristic::Config
+        // policy, which moves the preferred engine to the front of the result list.
+        // The frontend trusts that ordering and selects index 0 unless
+        // HIPDNN_DEFAULT_ENGINE pins a specific engine ID.
         size_t selectedIndex = 0;
         if(defaultEngineId)
         {
@@ -429,29 +423,6 @@ private:
             {
                 HIPDNN_FE_LOG_INFO("Default engine id "
                                    << defaultId << " not found, using top engine config instead.");
-            }
-        }
-
-        if(_preferredEngineId.has_value())
-        {
-            bool found = false;
-
-            for(size_t i = 0; i < engineIds.size(); ++i)
-            {
-
-                if(engineIds[i] == _preferredEngineId.value())
-                {
-                    selectedIndex = i;
-                    found = true;
-                    break;
-                }
-            }
-
-            if(!found)
-            {
-                HIPDNN_FE_LOG_WARN("Preferred engine id "
-                                   << _preferredEngineId.value()
-                                   << " not found, using top engine config instead.");
             }
         }
 

@@ -3,11 +3,22 @@
 
 /**
  * @file ConfigPlugin.cpp
- * @brief Config heuristic plugin - honors graph-level preferences
+ * @brief Config heuristic plugin - honors graph-level and config-file preferences
  *
- * This plugin implements configuration-based engine selection by interpreting
- * graph-level preferences such as preferred_engine_id. It allows users to
- * directly specify engine ordering preferences in their operation graphs.
+ * This plugin implements configuration-based engine selection. During Finalize
+ * it resolves a preferred engine ID from two sources, in priority order:
+ *   1. Graph.preferred_engine_id, set via the frontend
+ *      Graph::set_preferred_engine_id_ext() setter and packed into the
+ *      serialized FlatBuffer graph.
+ *   2. A rule from the JSON file pointed to by HIPDNN_ENGINE_OVERRIDE_FILE that
+ *      matches the first conv-like node in the graph (parsed and cached for the
+ *      process by EngineOverrideConfig::loadFromEnv).
+ *
+ * If a preferred ID is resolved and it appears in the candidate list, the
+ * plugin reorders the candidates so the preferred ID comes first while
+ * preserving the relative order of the remaining IDs. Otherwise it returns
+ * NOT_APPLICABLE so the next policy in the chain (StaticOrdering by default)
+ * runs.
  *
  * RFC 0007 Section 13.3: Graph-level preferences are interpreted by this policy,
  * not by hard-coded backend logic.
@@ -24,7 +35,10 @@
 #include <array>
 #include <cstring>
 #include <memory>
+#include <unordered_map>
 #include <vector>
+
+#include "EngineOverrideConfig.hpp"
 
 // Plugin version and identification
 static constexpr const char* PLUGIN_VERSION = "1.0.0";
@@ -379,9 +393,129 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
     }
 }
 
+} // extern "C"
+
 //=============================================================================
 // C ABI Implementation - Selection
 //=============================================================================
+
+namespace
+{
+
+using hipdnn_flatbuffers_sdk::data_objects::Graph;
+
+std::vector<int64_t> toVector(const flatbuffers::Vector<int64_t>* fb)
+{
+    if(fb == nullptr)
+    {
+        return {};
+    }
+    return {fb->begin(), fb->end()};
+}
+
+struct TensorDimsStrides
+{
+    std::vector<int64_t> dims;
+    std::vector<int64_t> strides;
+};
+
+/// Extract every (uid, dims, strides) triple from the FlatBuffer graph so that
+/// node-level UID lookups during the conv scan are O(1). Owns the dim/stride
+/// vectors so callers can hand TensorView pointers into them safely.
+std::unordered_map<int64_t, TensorDimsStrides> indexTensorsByUid(const Graph* graph)
+{
+    std::unordered_map<int64_t, TensorDimsStrides> out;
+    const auto* tensors = graph->tensors();
+    if(tensors == nullptr)
+    {
+        return out;
+    }
+    out.reserve(tensors->size());
+    for(const auto* t : *tensors)
+    {
+        if(t == nullptr)
+        {
+            continue;
+        }
+        out.emplace(t->uid(), TensorDimsStrides{toVector(t->dims()), toVector(t->strides())});
+    }
+    return out;
+}
+
+/// Walk conv-like nodes; for each, look the override config up and return the
+/// first match (first conv node, first matching rule).
+std::optional<int64_t>
+    matchOverrideConfig(const Graph* graph,
+                        const std::unordered_map<int64_t, TensorDimsStrides>& tensorIndex)
+{
+    const auto* config = hipdnn_heuristic_config::EngineOverrideConfig::loadFromEnv();
+    if(config == nullptr)
+    {
+        return std::nullopt;
+    }
+    const auto* nodes = graph->nodes();
+    if(nodes == nullptr)
+    {
+        return std::nullopt;
+    }
+
+    auto viewFor = [&](int64_t uid) -> const TensorDimsStrides* {
+        auto it = tensorIndex.find(uid);
+        return it == tensorIndex.end() ? nullptr : &it->second;
+    };
+
+    auto buildView = [&](const TensorDimsStrides* t) {
+        return hipdnn_heuristic_config::TensorView{&t->dims, &t->strides};
+    };
+
+    for(const auto* node : *nodes)
+    {
+        if(node == nullptr)
+        {
+            continue;
+        }
+
+        const char* op = nullptr;
+        const TensorDimsStrides* a = nullptr;
+        const TensorDimsStrides* b = nullptr;
+
+        if(const auto* fwd = node->attributes_as_ConvolutionFwdAttributes())
+        {
+            op = "conv_fprop";
+            a = viewFor(fwd->x_tensor_uid());
+            b = viewFor(fwd->w_tensor_uid());
+        }
+        else if(const auto* bwd = node->attributes_as_ConvolutionBwdAttributes())
+        {
+            op = "conv_dgrad";
+            a = viewFor(bwd->dy_tensor_uid());
+            b = viewFor(bwd->w_tensor_uid());
+        }
+        else if(const auto* wrw = node->attributes_as_ConvolutionWrwAttributes())
+        {
+            op = "conv_wgrad";
+            a = viewFor(wrw->x_tensor_uid());
+            b = viewFor(wrw->dy_tensor_uid());
+        }
+
+        if(op == nullptr || a == nullptr || b == nullptr)
+        {
+            continue;
+        }
+
+        const std::vector<hipdnn_heuristic_config::TensorView> views{buildView(a), buildView(b)};
+        auto match = config->matchOperation(op, views);
+        if(match.has_value())
+        {
+            return match;
+        }
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+extern "C" {
 
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* outApplied)
@@ -425,7 +559,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
             return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
 
-        auto graph
+        const auto* graph
             = hipdnn_flatbuffers_sdk::data_objects::GetGraph(d->serializedGraphBuffer.data());
         if(graph == nullptr)
         {
@@ -433,60 +567,71 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
             return HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR;
         }
 
-        // Check if graph has a preferred_engine_id
-        // In FlatBuffers, optional int64 fields use flatbuffers::Optional
-        // If null, the field was not set
-        auto preferredEngineIdOpt = graph->preferred_engine_id();
+        // Resolve a preferred engine ID, in priority order:
+        //   1. Explicit graph.preferred_engine_id (set via the frontend setter).
+        //   2. HIPDNN_ENGINE_OVERRIDE_FILE rule that matches a conv node.
+        // Earlier signals win; nothing matched -> policy not applicable.
+        std::optional<int64_t> preferredEngineId;
+        const char* preferredSource = nullptr;
 
-        if(!preferredEngineIdOpt.has_value())
+        if(auto preferredEngineIdOpt = graph->preferred_engine_id();
+           preferredEngineIdOpt.has_value())
         {
-            // No preference set - policy not applicable
+            preferredEngineId = preferredEngineIdOpt;
+            preferredSource = "graph.preferred_engine_id";
+        }
+        else
+        {
+            const auto tensorIndex = indexTensorsByUid(graph);
+            preferredEngineId = matchOverrideConfig(graph, tensorIndex);
+            if(preferredEngineId.has_value())
+            {
+                preferredSource = "HIPDNN_ENGINE_OVERRIDE_FILE";
+            }
+        }
+
+        if(!preferredEngineId.has_value())
+        {
             CONFIG_LOG(HIPDNN_SEV_INFO,
-                       "PolicyFinalize: no preferred_engine_id set - not applicable");
+                       "PolicyFinalize: no preferred engine resolved - not applicable");
             *outApplied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
-
-        const int64_t preferredEngineId = preferredEngineIdOpt.value();
 
         // Check if the preferred engine ID is in the candidates
         auto it = std::find(
-            d->candidateEngineIds.begin(), d->candidateEngineIds.end(), preferredEngineId);
-
+            d->candidateEngineIds.begin(), d->candidateEngineIds.end(), *preferredEngineId);
         if(it == d->candidateEngineIds.end())
         {
-            // Preferred engine not in candidates - policy not applicable
-            CONFIG_LOG(
-                HIPDNN_SEV_INFO,
-                "PolicyFinalize: preferred_engine_id 0x%llx not in candidates - not applicable",
-                static_cast<long long>(preferredEngineId));
+            CONFIG_LOG(HIPDNN_SEV_INFO,
+                       "PolicyFinalize: preferred engine 0x%llx (from %s) not in candidates - "
+                       "not applicable",
+                       static_cast<long long>(*preferredEngineId),
+                       preferredSource);
             *outApplied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
 
-        // Reorder candidates: preferred engine first, others maintain relative order
         d->sortedEngineIds.clear();
         d->sortedEngineIds.reserve(d->candidateEngineIds.size());
-
-        // Add preferred engine first
-        d->sortedEngineIds.push_back(preferredEngineId);
-
-        // Add remaining engines in original order
+        d->sortedEngineIds.push_back(*preferredEngineId);
         for(const int64_t engineId : d->candidateEngineIds)
         {
-            if(engineId != preferredEngineId)
+            if(engineId != *preferredEngineId)
             {
                 d->sortedEngineIds.push_back(engineId);
             }
         }
 
         d->finalized = true;
-        *outApplied = 1; // Policy succeeded
+        *outApplied = 1;
 
         CONFIG_LOG(HIPDNN_SEV_INFO,
-                   "PolicyFinalize: reordered %zu engines with preferred engine 0x%llx first",
+                   "PolicyFinalize: reordered %zu engines with preferred engine 0x%llx (from %s) "
+                   "first",
                    d->sortedEngineIds.size(),
-                   static_cast<long long>(preferredEngineId));
+                   static_cast<long long>(*preferredEngineId),
+                   preferredSource);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
