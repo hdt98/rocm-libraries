@@ -1057,9 +1057,9 @@ class KernelComponentFactoryGfx9(CompatibilityRuleFactoryGfx9):
                     if receipt == 1 and bias != "bias":
                         pipelines.append(FmhaFwdPipeline("qr", "row", "t", "t", "t", "t", logits, bias, lse, dropout, qscale, mask, skip, "f", sink))  # fmt: skip # TODO: cover arbitraty hdim# fmt: skip
             if (hdim, hdim_v) in [(64, 64)]:
-                for logits, mask in itertools.product(["t", "f"], ["no", "causal"]):
+                for logits, mask, lse in itertools.product(["t", "f"], ["no", "causal"], ["t", "f"]):
                     pipelines.append(FmhaFwdPipeline("qr_async_trload_v3", "row", "t", "t", "f", "f",
-                        F_logits=logits, F_bias="no", F_lse="f", F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
+                        F_logits=logits, F_bias="no", F_lse=lse, F_dropout="f", F_qscale=qscale, F_mask=mask, F_skip="f", F_trload="t", F_sink="f"))  # fmt: skip
         elif dtype in cls._DT_FP8BF16 or dtype in cls._DT_FP8FP32:
             # no need lse/dropout kernels
             for logits, qscale, mask, bias, sink in itertools.product(

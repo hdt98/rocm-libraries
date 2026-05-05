@@ -1197,7 +1197,7 @@ struct BlockFmhaFwdV3Pipeline
             constexpr auto lse_spans = decltype(lse)::get_distributed_spans();
             sweep_tile_span(lse_spans[number<0>{}], [&](auto idx0) {
                 constexpr auto i_idx = make_tuple(idx0);
-                lse(i_idx)           = m[i_idx] / C_LOG2E + log(l[i_idx]);
+                lse(i_idx)           = m[i_idx] * scale_s / C_LOG2E + log(l[i_idx]);
             });
 
             store_tile(lse_dram_window_tmp, tile_elementwise_in(lse_element_func, lse));
