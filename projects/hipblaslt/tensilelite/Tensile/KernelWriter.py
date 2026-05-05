@@ -2528,17 +2528,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
     tdmA: bool = kernel["enableTDMA"]
     tdmB: bool = kernel["enableTDMB"]
     tdmInited: bool = False
-
-    # Free sgpr that will not be used
-    if kernel["Multicast"] and kernel["TDMInst"] != 0:
-      tdmA: bool = kernel["enableTDMA"]
-      tdmB: bool = kernel["enableTDMB"]
-      if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
-        module.add(self.undefineSgpr("MulticastMask"))
-      else:
-        module.add(self.undefineSgpr("MulticastMaskA"))
-        module.add(self.undefineSgpr("MulticastMaskB"))
-
+#
+#    # Free sgpr that will not be used
+#    if kernel["Multicast"] and kernel["TDMInst"] != 0:
+#      tdmA: bool = kernel["enableTDMA"]
+#      tdmB: bool = kernel["enableTDMB"]
+#      if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
+#        module.add(self.undefineSgpr("MulticastMask"))
+#      else:
+#        module.add(self.undefineSgpr("MulticastMaskA"))
+#        module.add(self.undefineSgpr("MulticastMaskB"))
+#
     # TODO: This can probably be moved later, after setupnewtile
     if not tdmA:
       module.add(self.removeGRSrdVariableSgprsFromPool(kernel))
@@ -2664,6 +2664,17 @@ class KernelWriter(metaclass=abc.ABCMeta):
       if not tdmB:
         module.addComment1("global read addresses: unroll offsets b")
         module.add(self.graUnrollOffsets(kernel, tensorParametersB))
+
+            # Free sgpr that will not be used
+      if kernel["Multicast"] and kernel["TDMInst"] != 0:
+        tdmA: bool = kernel["enableTDMA"]
+        tdmB: bool = kernel["enableTDMB"]
+        if tdmA and tdmB and prod(kernel["MIWaveGroup"]) > 1:
+          module.add(self.undefineSgpr("MulticastMask"))
+        else:
+          module.add(self.undefineSgpr("MulticastMaskA"))
+          module.add(self.undefineSgpr("MulticastMaskB"))
+
 
       # tile edges
       if kernel["EdgeType"] == "ShiftPtr" and not tdmA and not tdmB:
