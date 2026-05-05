@@ -2318,6 +2318,12 @@ class StreamKTwoTileDPFirst(StreamK):
 class StreamKDynamic(StreamK):
     kernel = {"StreamK": 4}
 
+    def dynamicQueueGeometry(self, kernel):
+        numXCDs = kernel["NumXCDs"]
+        if numXCDs < 1 or (numXCDs & (numXCDs - 1)) != 0:
+            raise RuntimeError("StreamK dynamic queue work-stealing requires power-of-two NumXCDs for bitwise queue math.")
+        return numXCDs, log2(numXCDs), numXCDs - 1
+
     def preLoop(self, writer, kernel):
         module = Module("StreamK Dynamic openLoop")
 
@@ -2493,11 +2499,11 @@ class StreamKDynamic(StreamK):
         module.add(SCBranchSCC0(labelName=skSkipWorkItem.getLabelName(), comment="Skip work item"))
         writer.sgprPool.checkIn(sWave)
         
+        numXCDs, log2NumXCDs, xcdMask = self.dynamicQueueGeometry(kernel)
+
         # Default queue index
         sQueueIdx = writer.sgprPool.checkOut(1, "QueueIdx")
-        module.add(SLShiftRightB32(dst=sgpr(sQueueIdx), src=sgpr("StreamKIdx"), shiftHex=log2(8)))
-        module.add(SLShiftLeftB32(dst=sgpr(sQueueIdx), src=sgpr(sQueueIdx), shiftHex=log2(8)))
-        module.add(SSubU32(dst=sgpr(sQueueIdx), src0=sgpr("StreamKIdx"), src1=sgpr(sQueueIdx), comment="Default queue index"))
+        module.add(SAndB32(dst=sgpr(sQueueIdx), src0=sgpr("StreamKIdx"), src1=xcdMask, comment="Default queue index"))
 
         # Queue address
         sAddress = writer.sgprPool.checkOutAligned(2, 2, "Address")
@@ -2507,35 +2513,48 @@ class StreamKDynamic(StreamK):
 
         # Fetch next work item index
         sWorkItemIdx = writer.sgprPool.checkOut(1, "nextWorkItemIdx")
+        skUseWorkStealing = None
+        skFetchHomeQueue = None
         if kernel["StreamKDynamicQueueWorkStealing"]:
-            module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0xFFFFFFFF), comment="Last WG resets queue counters"))
-        else:
-            # Tiles in queue
-            sTilesInQueue = writer.sgprPool.checkOut(1, "tilesInQueue")
-            module.add(SLShiftRightB32(dst=sgpr(sTilesInQueue), src=sgpr("TotalTiles"), shiftHex=log2(8)))
+            skUseWorkStealing = Label("SK_UseWorkStealing", "")
+            skFetchHomeQueue = Label("SK_FetchHomeQueue", "")
             sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
-            module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sTilesInQueue), shiftHex=log2(8)))
-            module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=sgpr(sRemainder), comment="Remainder tiles"))
-            module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
-            module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
-            module.add(SAddU32(dst=sgpr(sTilesInQueue), src0=sgpr(sTilesInQueue), src1=sgpr(sRemainder)))
+            module.add(SAndB32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=xcdMask, comment="Remainder tiles"))
+            module.add(SCmpEQU32(src0=sgpr(sRemainder), src1=0, comment="Check if stealing can help"))
+            module.add(SCBranchSCC0(labelName=skUseWorkStealing.getLabelName(), comment="Remainder tiles may benefit from stealing"))
             writer.sgprPool.checkIn(sRemainder)
 
-            # Workgroups in queue
-            sWorkgroupsInQueue = writer.sgprPool.checkOut(1, "workgroupsInQueue")
-            module.add(SLShiftRightB32(dst=sgpr(sWorkgroupsInQueue), src=sgpr("skGrid"), shiftHex=log2(8)))
-            sRemainder = writer.sgprPool.checkOut(1, "remainder workgroups")
-            module.add(SLShiftLeftB32(dst=sgpr(sRemainder), src=sgpr(sWorkgroupsInQueue), shiftHex=log2(8)))
-            module.add(SSubU32(dst=sgpr(sRemainder), src0=sgpr("skGrid"), src1=sgpr(sRemainder), comment="Remainder workgroups"))
-            module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
-            module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
-            module.add(SAddU32(dst=sgpr(sWorkgroupsInQueue), src0=sgpr(sWorkgroupsInQueue), src1=sgpr(sRemainder)))
-            writer.sgprPool.checkIn(sRemainder)
+        # The no-remainder work-stealing fast path uses the baseline auto-reset
+        # counter bounds and skips explicit cleanup at kernel end.
+        sTilesInQueue = writer.sgprPool.checkOut(1, "tilesInQueue")
+        module.add(SLShiftRightB32(dst=sgpr(sTilesInQueue), src=sgpr("TotalTiles"), shiftHex=log2NumXCDs))
+        sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
+        module.add(SAndB32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=xcdMask, comment="Remainder tiles"))
+        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
+        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
+        module.add(SAddU32(dst=sgpr(sTilesInQueue), src0=sgpr(sTilesInQueue), src1=sgpr(sRemainder)))
+        writer.sgprPool.checkIn(sRemainder)
 
-            module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sTilesInQueue), src1=sgpr(sWorkgroupsInQueue), comment="Queue reset"))
-            module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=1))
-            writer.sgprPool.checkIn(sTilesInQueue)
-            writer.sgprPool.checkIn(sWorkgroupsInQueue)
+        # Workgroups in queue
+        sWorkgroupsInQueue = writer.sgprPool.checkOut(1, "workgroupsInQueue")
+        module.add(SLShiftRightB32(dst=sgpr(sWorkgroupsInQueue), src=sgpr("skGrid"), shiftHex=log2NumXCDs))
+        sRemainder = writer.sgprPool.checkOut(1, "remainder workgroups")
+        module.add(SAndB32(dst=sgpr(sRemainder), src0=sgpr("skGrid"), src1=xcdMask, comment="Remainder workgroups"))
+        module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if queue gets an extra tile"))
+        module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
+        module.add(SAddU32(dst=sgpr(sWorkgroupsInQueue), src0=sgpr(sWorkgroupsInQueue), src1=sgpr(sRemainder)))
+        writer.sgprPool.checkIn(sRemainder)
+
+        module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sTilesInQueue), src1=sgpr(sWorkgroupsInQueue), comment="Queue reset"))
+        module.add(SSubU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=1))
+        writer.sgprPool.checkIn(sTilesInQueue)
+        writer.sgprPool.checkIn(sWorkgroupsInQueue)
+
+        if kernel["StreamKDynamicQueueWorkStealing"]:
+            module.add(SBranch(labelName=skFetchHomeQueue.getLabelName(), comment="No tile remainder; use auto-reset home queue"))
+            module.add(skUseWorkStealing)
+            module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0xFFFFFFFF), comment="Last WG resets queue counters"))
+            module.add(skFetchHomeQueue)
 
         # Fetch next work item
         module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch next work item index"))
@@ -2544,7 +2563,7 @@ class StreamKDynamic(StreamK):
 
         # Convert to global work item index
         # TODO test the other work distribution order
-        module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
+        module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2NumXCDs))
         # module.add(SMulI32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=38))
         # module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr(sTilesInQueue), comment="Check if work item index is valid"))
         # module.add(SCSelectB32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr("TotalTiles")))
@@ -2554,22 +2573,33 @@ class StreamKDynamic(StreamK):
             skFetchDone = Label("SK_FetchDone", "")
             module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr("TotalTiles"), comment="Check active queue work item"))
             module.add(SCBranchSCC1(labelName=skFetchDone.getLabelName(), comment="Fetched valid work"))
+            sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
+            module.add(SAndB32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=xcdMask, comment="Remainder tiles"))
+            module.add(SCmpEQU32(src0=sgpr(sRemainder), src1=0, comment="Check if stealing can help"))
+            module.add(SCBranchSCC1(labelName=skFetchDone.getLabelName(), comment="No tile remainder; no stealing"))
             module.add(SCmpEQU32(src0=sgpr("StreamKStealState"), src1=0, comment="Can hop to neighbor queue?"))
             module.add(SCBranchSCC0(labelName=skFetchDone.getLabelName(), comment="Already stealing"))
-            module.add(SMovB32(dst=sgpr("StreamKStealState"), src=1, comment="Switch to neighbor queue"))
+            sHomeHasExtra = writer.sgprPool.checkOut(1, "homeHasExtra")
+            module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if home queue has remainder work"))
+            module.add(SCSelectB32(dst=sgpr(sHomeHasExtra), src0=1, src1=0))
             if kernel["StreamKDynamicQueueWorkStealing"] == 2:
-                module.add(SAddU32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=7, comment="Previous queue"))
+                module.add(SAddU32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=xcdMask, comment="Previous queue"))
             else:
                 module.add(SAddU32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=1, comment="Next queue"))
-            module.add(SAndB32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=7, comment="Wrap queue index"))
-            module.add(SMovB32(dst=sgpr("StreamKIdx"), src=sgpr(sQueueIdx), comment="Persist stolen queue"))
+            module.add(SAndB32(dst=sgpr(sQueueIdx), src0=sgpr(sQueueIdx), src1=xcdMask, comment="Wrap queue index"))
+            module.add(SCmpLtU32(src0=sgpr(sQueueIdx), src1=sgpr(sRemainder), comment="Check if neighbor has remainder work"))
+            module.add(SCSelectB32(dst=sgpr(sRemainder), src0=1, src1=0))
+            module.add(SCmpLtU32(src0=sgpr(sHomeHasExtra), src1=sgpr(sRemainder), comment="Check if neighbor has deterministic extra work"))
+            module.add(SCBranchSCC0(labelName=skFetchDone.getLabelName(), comment="Neighbor has no deterministic extra work"))
+            writer.sgprPool.checkIn(sHomeHasExtra)
+            writer.sgprPool.checkIn(sRemainder)
             module.add(SLShiftLeftB32(dst=sgpr(sAddress), src=sgpr(sQueueIdx), shiftHex=log2(256), comment="Stride queues to different cache lines"))
             module.add(SAddU32(dst=sgpr(sAddress+0), src0=sgpr(sAddress+0), src1=sgpr("AddressFlags+0")))
             module.add(SAddCU32(dst=sgpr(sAddress+1), src0=0, src1=sgpr("AddressFlags+1")))
             sStolenQueueProbe = writer.sgprPool.checkOut(1, "stolenQueueProbe")
             module.add(SLoadB32(dst=sgpr(sStolenQueueProbe), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True, dlc=True, scope=CacheScope.SCOPE_DEV), comment="Probe stolen queue counter"))
             module.add(SWaitCnt(kmcnt=0, comment="Wait for stolen queue probe"))
-            module.add(SLShiftLeftB32(dst=sgpr(sStolenQueueProbe), src=sgpr(sStolenQueueProbe), shiftHex=log2(8), comment="Probe local index to global work item"))
+            module.add(SLShiftLeftB32(dst=sgpr(sStolenQueueProbe), src=sgpr(sStolenQueueProbe), shiftHex=log2NumXCDs, comment="Probe local index to global work item"))
             module.add(SAddU32(dst=sgpr(sStolenQueueProbe), src0=sgpr(sStolenQueueProbe), src1=sgpr(sQueueIdx)))
             module.add(SCmpLtU32(src0=sgpr(sStolenQueueProbe), src1=sgpr("TotalTiles"), comment="Check if stolen queue has work"))
             module.add(SCBranchSCC0(labelName=skFetchDone.getLabelName(), comment="Stolen queue already empty"))
@@ -2577,8 +2607,12 @@ class StreamKDynamic(StreamK):
             module.add(SMovB32(dst=sgpr(sWorkItemIdx), src=hex(0xFFFFFFFF), comment="Last WG resets queue counters"))
             module.add(SAtomicInc(dst=sgpr(sWorkItemIdx), base=sgpr(sAddress, 2), soffset=0, smem=SMEMModifiers(glc=True), comment="Fetch stolen work item index"))
             module.add(SWaitCnt(dscnt=0, comment="Wait for scalar memory op"))
-            module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2(8)))
+            module.add(SLShiftLeftB32(dst=sgpr(sWorkItemIdx), src=sgpr(sWorkItemIdx), shiftHex=log2NumXCDs))
             module.add(SAddU32(dst=sgpr(sWorkItemIdx), src0=sgpr(sWorkItemIdx), src1=sgpr(sQueueIdx)))
+            module.add(SCmpLtU32(src0=sgpr(sWorkItemIdx), src1=sgpr("TotalTiles"), comment="Check stolen work item"))
+            module.add(SCBranchSCC0(labelName=skFetchDone.getLabelName(), comment="Stolen atomic lost race"))
+            module.add(SMovB32(dst=sgpr("StreamKStealState"), src=1, comment="Switch to neighbor queue"))
+            module.add(SMovB32(dst=sgpr("StreamKIdx"), src=sgpr(sQueueIdx), comment="Persist stolen queue"))
             module.add(skFetchDone)
 
         writer.sgprPool.checkIn(sAddress)
@@ -2817,8 +2851,14 @@ class StreamKDynamic(StreamK):
         module = Module("StreamK Dynamic kernelEnd")
 
         if kernel["StreamKDynamicQueueWorkStealing"]:
-            completionCounterOffset = 8 * 256
+            numXCDs, _, xcdMask = self.dynamicQueueGeometry(kernel)
+            completionCounterOffset = numXCDs * 256
             skExitLabel = Label("SK_Exit", "")
+            sRemainder = writer.sgprPool.checkOut(1, "remainder tiles")
+            module.add(SAndB32(dst=sgpr(sRemainder), src0=sgpr("TotalTiles"), src1=xcdMask, comment="Remainder tiles"))
+            module.add(SCmpEQU32(src0=sgpr(sRemainder), src1=0, comment="Check if stealing was disabled"))
+            module.add(SCBranchSCC1(labelName=skExitLabel.getLabelName(), comment="Auto-reset preserved queue counters"))
+            writer.sgprPool.checkIn(sRemainder)
             module.add(SBarrier(comment="Wait for all waves before completion count"))
             sWave = writer.sgprPool.checkOut(1, "Wave")
             module.add(VReadfirstlaneB32(dst=sgpr(sWave), src=vgpr("Serial"), comment="Wave 0 handles completion"))
@@ -2835,7 +2875,7 @@ class StreamKDynamic(StreamK):
             module.add(SCBranchSCC0(labelName=skExitLabel.getLabelName(), comment="Exit kernel"))
 
             module.add(SMovB32(dst=sgpr(sCompletedWGs), src=0, comment="Clear synchronizer"))
-            for queueIdx in range(8):
+            for queueIdx in range(numXCDs):
                 module.add(SStoreB32(src=sgpr(sCompletedWGs), base=sgpr("AddressFlags", 2), soffset=queueIdx * 256, smem=SMEMModifiers(glc=True), comment="Reset queue counter"))
             module.add(SStoreB32(src=sgpr(sCompletedWGs), base=sgpr("AddressFlags", 2), soffset=completionCounterOffset, smem=SMEMModifiers(glc=True), comment="Reset completion counter"))
             module.add(SWaitCnt(dscnt=0, comment="Wait for synchronizer reset"))
