@@ -163,11 +163,30 @@ endif()
 # IMPORTANT: This must run before include(VerifyCompiler) because find_package(HIP)
 # inside VerifyCompiler locks in the device-compiler flags from CMAKE_CXX_FLAGS at
 # that moment.
-if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
-  string(REPLACE "-fsanitize=address" "-Xarch_host -fsanitize=address" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-  message(STATUS "HOST_ASAN detected: replaced -fsanitize=address with -Xarch_host -fsanitize=address in CMAKE_CXX_FLAGS")
-  message(STATUS "HOST_ASAN CMAKE_CXX_FLAGS after fix: ${CMAKE_CXX_FLAGS}")
+# Diagnostics: log CMAKE_CXX_FLAGS as injected by the parent (TheRock) before
+# any per-project modification. Verifies whether the TheRock HOST_ASAN fix in
+# cmake/therock_sanitizers.cmake is injecting -Xarch_host -fsanitize=address
+# (correct) or bare -fsanitize=address (TheRock fix not active).
+message(STATUS "HOST_ASAN_DIAG CMAKE_CXX_FLAGS on entry (from TheRock): ${CMAKE_CXX_FLAGS}")
+
+if(CMAKE_CXX_FLAGS MATCHES "-Xarch_host -fsanitize=address")
+  message(STATUS "HOST_ASAN_DIAG TheRock fix ACTIVE: -Xarch_host -fsanitize=address confirmed in CMAKE_CXX_FLAGS")
+elseif(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
+  # Bare -fsanitize=address detected without -Xarch_host: TheRock fix is not
+  # active. The per-project replacement is currently disabled (see below).
+  # If this warning fires during a HOST_ASAN build, re-enable the commented
+  # string(REPLACE ...) block below.
+  message(WARNING "HOST_ASAN_DIAG bare -fsanitize=address detected without -Xarch_host: TheRock fix is NOT active. Re-enable the string(REPLACE) below.")
+  # Per-project fix (disabled: TheRock now owns this via therock_sanitizers.cmake).
+  # Re-enable if the TheRock fix is reverted or this project is built outside TheRock.
+  # The AND NOT guard prevents double-replacement if both fixes are simultaneously active.
+  # if((CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
+  #     AND NOT CMAKE_CXX_FLAGS MATCHES "-Xarch_host -fsanitize=address")
+  #   string(REPLACE "-fsanitize=address" "-Xarch_host -fsanitize=address" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  #   message(STATUS "HOST_ASAN: replaced -fsanitize=address with -Xarch_host -fsanitize=address in CMAKE_CXX_FLAGS")
+  # endif()
 endif()
+message(STATUS "HOST_ASAN CMAKE_CXX_FLAGS after fix: ${CMAKE_CXX_FLAGS}")
 
 # Verify that hipcc or HIP-aware clang is used on ROCM software
 # TODO: Fix VerifyCompiler for Windows
