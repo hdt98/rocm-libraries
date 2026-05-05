@@ -57,28 +57,30 @@ program example_fortran_scal
     ! TODO: hip workaround until plugin is ready.
     interface
         function hipMalloc(ptr, size) &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipMalloc')
             use iso_c_binding
             implicit none
             type(c_ptr), value :: ptr
             integer(c_size_t), value :: size
+            integer(c_int) :: hip_status
         end function hipMalloc
     end interface
 
     interface
         function hipFree(ptr) &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipFree')
             use iso_c_binding
             implicit none
             type(c_ptr), value :: ptr
+            integer(c_int) :: hip_status
         end function hipFree
     end interface
 
     interface
         function hipMemcpy(dst, src, size, kind) &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipMemcpy')
             use iso_c_binding
             implicit none
@@ -86,36 +88,40 @@ program example_fortran_scal
             type(c_ptr), intent(in), value :: src
             integer(c_size_t), value :: size
             integer(c_int), value :: kind
+            integer(c_int) :: hip_status
         end function hipMemcpy
     end interface
 
     interface
         function hipMemset(dst, val, size) &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipMemset')
             use iso_c_binding
             implicit none
             type(c_ptr), value :: dst
             integer(c_int), value :: val
             integer(c_size_t), value :: size
+            integer(c_int) :: hip_status
         end function hipMemset
     end interface
 
     interface
         function hipDeviceSynchronize() &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipDeviceSynchronize')
             use iso_c_binding
             implicit none
+            integer(c_int) :: hip_status
         end function hipDeviceSynchronize
     end interface
 
     interface
         function hipDeviceReset() &
-                result(c_int) &
+                result(hip_status) &
                 bind(c, name = 'hipDeviceReset')
             use iso_c_binding
             implicit none
+            integer(c_int) :: hip_status
         end function hipDeviceReset
     end interface
     ! TODO end
