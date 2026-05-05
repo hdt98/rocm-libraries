@@ -1941,6 +1941,51 @@ namespace TensileLite
 	    fixBytes(data, numDataBytes, dataFillByte);
 	}
 
+	// Set all scale bytes to scaleByte (default 0x7F) and write an identity-matrix
+	// pattern into the FP8 data buffer. Every byte is zeroed first, then the
+	// leading-diagonal elements [i, i] for i in [0, min(rows, cols)) are set to FP8
+	// +1.0. Per-batch independent identity is written when the data tensor is 3D.
+	//   E4M3 (rocisa::DataType::Float8):  byte 0x38 == +1.0
+	//   E5M2 (rocisa::DataType::BFloat8): byte 0x3C == +1.0
+	// FP8 packing == 1, so TensorDescriptor strides (in elements) coincide with
+	// byte offsets and totalAllocatedBytes() equals totalAllocatedElements().
+	// The MX UE8M0 scale byte 0x7F (bias 127 -> 2^0 = 1.0) preserves the value
+	// end-to-end, so the kernel sees a true logical identity.
+	void identityFP8DataAndFixScales(rocisa::DataType         dataType,
+		void*                    data,
+		TensorDescriptor const&  dataTensor,
+		void*                    scale,
+		size_t                   numScaleBytes,
+		uint8_t                  scaleByte = 0x7F)
+	{
+	    std::memset(scale, scaleByte, numScaleBytes);
+	    std::memset(data,  0x00,      dataTensor.totalAllocatedBytes());
+	    uint8_t oneByte;
+	    if(dataType == rocisa::DataType::Float8)        // OCP E4M3
+		oneByte = 0x38;                              // exp=7,  m=0 -> +1.0
+	    else if(dataType == rocisa::DataType::BFloat8)  // OCP E5M2
+		oneByte = 0x3C;                              // exp=15, m=0 -> +1.0
+	    else
+		throw std::runtime_error(
+			"identityFP8DataAndFixScales: unsupported FP8 data type");
+	    auto const& sizes   = dataTensor.sizes();
+	    auto const& strides = dataTensor.strides();
+	    size_t      rows        = sizes[0];
+	    size_t      cols        = sizes[1];
+	    size_t      strideRow   = strides[0];
+	    size_t      strideCol   = strides[1];
+	    size_t      batchCount  = sizes.size()   > 2 ? sizes[2]   : 1;
+	    size_t      batchStride = strides.size() > 2 ? strides[2] : 0;
+	    size_t      diag        = std::min(rows, cols);
+	    auto* bytes = static_cast<uint8_t*>(data);
+	    for(size_t b = 0; b < batchCount; ++b)
+	    {
+		uint8_t* batchPtr = bytes + b * batchStride;
+		for(size_t i = 0; i < diag; ++i)
+		    batchPtr[i * strideRow + i * strideCol] = oneByte;
+	    }
+	}
+
 	bool isMXFP4OrFP8Tensor(const TensorDescriptor& tensor, size_t mxBlock)
 	{
 	    if(mxBlock == 0)
@@ -2097,7 +2142,7 @@ namespace TensileLite
 
                 }
 
-		//// (3) Override generated A data/scale: scales -> 0x7F, FP4 data |v| <= 1
+		// (3) Override generated A data/scale: scales -> 0x7F, FP4 data |v| <= 1
 		//if(tensorA.dataType() == rocisa::DataType::Float4)
 		//{
 		//    assert(false); // Currently not testing FP4
@@ -2116,12 +2161,23 @@ namespace TensileLite
 		//	    problem.mxsa().totalAllocatedBytes());
 		//}
 
-		// (0) Force scale to be fixed
+		// Make the function to be an identity matrix
+		if(tensorA.dataType() == rocisa::DataType::Float8
+			|| tensorA.dataType() == rocisa::DataType::BFloat8)
+		{
+		    identityFP8DataAndFixScales(tensorA.dataType(),
+			    pristineA.cpuInput.valid.get(),
+			    problem.a(),
+			    pristineE8A.cpuInput.valid.get(),
+			    problem.mxsa().totalAllocatedBytes());
+		}
+
+		/// (0) Force scale to be fixed
 		//void* cpuMxsa = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()].cpuInput.valid.get();
 		//size_t aBytes = problem.mxsa().totalAllocatedBytes();
 		//fixBytes(cpuMxsa, aBytes, 0x7F);
 
-		// (1) Force data to be fixed
+		//// (1) Force data to be fixed
 		//void* cpuA       = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[problem.a().dataType()]
 		//    .cpuInput.valid.get();
 		//size_t aBytes = problem.a().totalAllocatedBytes();
@@ -2230,13 +2286,24 @@ namespace TensileLite
 		//}
 
 
-		// (0) Force scale to be fixed
+		// Make the function to be an identity matrix
+		//if(tensorB.dataType() == rocisa::DataType::Float8
+		//	|| tensorB.dataType() == rocisa::DataType::BFloat8)
+		//{
+		//    identityFP8DataAndFixScales(tensorB.dataType(),
+		//	    pristineB.cpuInput.valid.get(),
+		//	    problem.b(),
+		//	    pristineE8B.cpuInput.valid.get(),
+		//	    problem.mxsb().totalAllocatedBytes());
+		//}
+
+		//// (0) Force scale to be fixed
 		//void* cpuMxsb = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()].cpuInput.valid.get();
 		//size_t bBytes = problem.mxsb().totalAllocatedBytes();
 		//fixBytes(cpuMxsb, bBytes, 0x7F);
 
 
-		// (1) Force data to be fixed
+		//// (1) Force data to be fixed
 		//void* cpuB       = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[problem.b().dataType()]
 		//    .cpuInput.valid.get();
 		//size_t bBytes = problem.b().totalAllocatedBytes();
