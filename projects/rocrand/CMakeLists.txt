@@ -94,6 +94,23 @@ include(cmake/HaveASMIncbin.cmake)
 
 rocrand_check_have_asm_incbin(ROCRAND_HAVE_ASM_INCBIN)
 
+# When -fsanitize=address is present (either injected by a super-project such as
+# TheRock's host-ASAN preset, or set via BUILD_ADDRESS_SANITIZER below), explicitly
+# cancel it for the device compilation pass. gfx942 and other targets without xnack+
+# cannot support device-side ASAN, and clang silently drops the flag rather than
+# erroring — producing a malformed HIP fat binary.
+# Note: rocRAND compiles HIP device code through the CXX language path (clang++ with
+# --offload-arch flags), so COMPILE_LANGUAGE:HIP does not apply here.
+# IMPORTANT: This must run before include(cmake/Dependencies.cmake) and before
+# include(cmake/VerifyCompiler.cmake) because find_package(HIP) inside
+# VerifyCompiler.cmake locks in the device-compiler flags from CMAKE_CXX_FLAGS at
+# that moment. Changes to CMAKE_CXX_FLAGS after find_package(HIP) do not reach the
+# device compilation pass.
+if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xarch_device -fno-sanitize=address")
+  message(STATUS "HOST_ASAN detected: appending -Xarch_device -fno-sanitize=address to CMAKE_CXX_FLAGS to suppress device-side ASAN for targets without xnack+")
+endif()
+
 # Get dependencies
 include(cmake/Dependencies.cmake)
 
@@ -176,20 +193,6 @@ if(BUILD_ADDRESS_SANITIZER AND BUILD_SHARED_LIBS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -shared-libasan")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -shared-libasan")
   add_link_options(-fuse-ld=lld)
-endif()
-
-# When -fsanitize=address is present (either via BUILD_ADDRESS_SANITIZER above or
-# injected by a super-project such as TheRock's host-ASAN preset), explicitly
-# cancel it for the device compilation pass. gfx942 and other targets without
-# xnack+ cannot support device-side ASAN, and clang silently drops the flag
-# rather than erroring — producing a malformed HIP fat binary.
-# Note: rocRAND compiles HIP device code through the CXX language path (clang++
-# with --offload-arch flags), so COMPILE_LANGUAGE:HIP does not apply here.
-# Appending to CMAKE_CXX_FLAGS ensures -Xarch_device -fno-sanitize=address trails
-# the -fsanitize=address on every compile command, cleanly overriding it for the
-# device pass while leaving host ASAN fully intact.
-if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Xarch_device -fno-sanitize=address")
 endif()
 
 # Set version variables
