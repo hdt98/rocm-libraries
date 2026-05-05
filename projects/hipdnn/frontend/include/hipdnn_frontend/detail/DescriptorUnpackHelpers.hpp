@@ -332,7 +332,7 @@ template <typename T>
     // Restore pass-by-value scalar if present.
     bool isByValue = false;
     HIPDNN_CHECK_ERROR(getDescriptorAttrScalar(tensorDesc,
-                                               HIPDNN_ATTR_TENSOR_IS_BY_VALUE_EXT,
+                                               HIPDNN_ATTR_TENSOR_IS_BY_VALUE,
                                                HIPDNN_TYPE_BOOLEAN,
                                                isByValue,
                                                "tensor is_by_value"));
@@ -402,6 +402,13 @@ template <typename T>
         case DataType::FP8_E5M2:
         {
             const uint8_t val = valueBytes[0];
+            tensor->set_value(val);
+            break;
+        }
+        case DataType::BOOLEAN:
+        {
+            bool val = false;
+            std::memcpy(&val, valueBytes.data(), sizeof(bool));
             tensor->set_value(val);
             break;
         }

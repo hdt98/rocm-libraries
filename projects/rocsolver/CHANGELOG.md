@@ -8,6 +8,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 * 64-bit APIs for existing functions:
     - LARFT_64
+* Computation of solution for LU factorization without pivoting
+    * GETRS_NPVT (with batched and strided\_batched versions)
+    * GETRS_NPVT_64 (with batched and strided\_batched versions)
 * Support added for the gfx1150, gfx1152, and gfx1153 architectures
 * Computation of different matrix norms
     * LANGE
@@ -15,6 +18,9 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 * Computation of different matrix condition numbers
     * GECON
     * GECON_64
+* Linear solver routines for symmetric matrices
+    * SYTRS (with batched and strided\_batched versions)
+    * SYTRS_64 (with batched and strided\_batched versions)
 
 ### Changed
 ### Removed
@@ -24,6 +30,7 @@ Full documentation for rocSOLVER is available at the [rocSOLVER documentation](h
 
 ### Resolved issues
 
+* Fixed a memory access error in SYTRF and synchronization issues in LASYF and SYTF2.
 * Fixed a synchronization issue in STEBZ and downstream functions, such as SYEVX and SYEVDX.
 * Fixed a synchronization issue in GETF2.
 
