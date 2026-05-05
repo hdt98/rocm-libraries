@@ -1370,8 +1370,8 @@ class Solution(collections.abc.Mapping):
         if not isaInfoMap[isa].archCaps["HasF32XEmulation"]:
           reject(state, printRejectionReason, "Missing emulation for F32X")
           return
-        if state["ScheduleIterAlg"] not in (1, 3):
-          reject(state, printRejectionReason, "F32X Emulation only supported with Schedule Iter Alg == (1 or 3)")
+        if state["ScheduleIterAlg"] not in (0, 1, 3):
+          reject(state, printRejectionReason, "F32X Emulation only supported with Schedule Iter Alg == (0, 1 or 3)")
           return
         if tuple(state["MatrixInstruction"])[:3] in ((16, 16, 8), (16, 16, 16), (32, 32, 4)):
           reject(state, printRejectionReason, "tf32 emulation currently only supports mfma MI 16x16x32 and 32x32x16")
@@ -1903,6 +1903,10 @@ class Solution(collections.abc.Mapping):
 
     if tdmInst not in (0, 3):
       reject(state, printRejectionReason, "Currently TDMA and TDMB must be enabled simultaneously")
+      return
+
+    if tdmInst != 0 and state["ScheduleIterAlg"] != 0:
+      reject(state, printRejectionReason, "Currently only SIA0 is supported when TDMInst is enabled")
       return
 
     if tdmInst > 0:
