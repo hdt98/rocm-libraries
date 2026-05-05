@@ -148,6 +148,27 @@ else()
   set(GPU_TARGETS "all" CACHE INTERNAL "")
 endif()
 
+# When -fsanitize=address is present (injected by a super-project such as TheRock's
+# host-ASAN preset), rewrite it so ASAN applies only to the host compilation pass.
+# gfx942 and other targets without xnack+ cannot support device-side ASAN: clang
+# silently drops the flag after ASAN metadata accounting has already begun, producing
+# a malformed HIP fat binary whose .hipFatBinSegment size fields are inconsistent
+# with the actual embedded code object.
+#
+# The correct fix is -Xarch_host -fsanitize=address: this confines ASAN to the host
+# pass only. Negation approaches (-Xarch_device -fno-sanitize=address, or appending
+# -fno-sanitize=address) do NOT work — clang's unified driver bakes in ASAN metadata
+# before per-arch splitting occurs.
+#
+# IMPORTANT: This must run before include(VerifyCompiler) because find_package(HIP)
+# inside VerifyCompiler locks in the device-compiler flags from CMAKE_CXX_FLAGS at
+# that moment.
+if(CMAKE_CXX_FLAGS MATCHES "-fsanitize=address" OR BUILD_ADDRESS_SANITIZER)
+  string(REPLACE "-fsanitize=address" "-Xarch_host -fsanitize=address" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  message(STATUS "HOST_ASAN detected: replaced -fsanitize=address with -Xarch_host -fsanitize=address in CMAKE_CXX_FLAGS")
+  message(STATUS "HOST_ASAN CMAKE_CXX_FLAGS after fix: ${CMAKE_CXX_FLAGS}")
+endif()
+
 # Verify that hipcc or HIP-aware clang is used on ROCM software
 # TODO: Fix VerifyCompiler for Windows
 if (NOT WIN32)
@@ -155,6 +176,15 @@ if (NOT WIN32)
 else()
   list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH} ${ROCM_PATH}/hip ${ROCM_PATH}/llvm)
   find_package(hip REQUIRED CONFIG PATHS ${HIP_DIR} ${ROCM_PATH})
+endif()
+
+# Diagnostics: dump hip::device INTERFACE properties after find_package(HIP) has run.
+if(TARGET hip::device)
+  get_target_property(_dbg_hip_device_compile_opts hip::device INTERFACE_COMPILE_OPTIONS)
+  message(STATUS "DIAG hip::device INTERFACE_COMPILE_OPTIONS : ${_dbg_hip_device_compile_opts}")
+  message(STATUS "DIAG CMAKE_CXX_FLAGS after VerifyCompiler  : ${CMAKE_CXX_FLAGS}")
+else()
+  message(STATUS "DIAG hip::device target NOT found after VerifyCompiler")
 endif()
 
 # Include cmake scripts
