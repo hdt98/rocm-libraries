@@ -237,9 +237,20 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ConstructorSetsUpValidationInf
 
     // Should start with no plugins
     EXPECT_TRUE(_manager->getPlugins().empty());
+}
 
-    // Validation infrastructure should be ready (verified by successful construction)
-    SUCCEED();
+// ========== Destructor Path Coverage ==========
+
+TEST_F(TestHeuristicPluginManagerValidationPaths, DestructorUnloadsLoadedPluginLibraries)
+{
+    _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    ASSERT_FALSE(_manager->getPlugins().empty())
+        << "Test precondition: at least one plugin must load to exercise the unload path";
+
+    // Destruction triggers SharedLibrary teardown for each loaded plugin
+    // (dlclose / FreeLibrary). ASAN catches any leak in plugin-side static teardown.
+    EXPECT_NO_THROW(_manager.reset());
+    EXPECT_EQ(_manager, nullptr);
 }
 
 // ========== Integration with PluginManagerBase ==========
@@ -273,23 +284,21 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, NoOptionalHeuristicPluginPasse
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
 
+    bool foundNoOptional = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
         if(name.find("NoOptional") != std::string::npos)
         {
+            foundNoOptional = true;
             // Should pass all validation checks
             EXPECT_NE(plugin->policyId(), 0);
             EXPECT_FALSE(name.empty());
         }
     }
-
-    // Plugin should have been loaded if it exists
-    if(!plugins.empty())
-    {
-        SUCCEED();
-    }
+    EXPECT_TRUE(foundNoOptional) << "test_no_optional_heuristic_plugin should be loaded";
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValidation)
@@ -297,12 +306,15 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
 
+    bool foundGoodOrTest = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
         if(name.find("Good") != std::string::npos || name.find("Test") != std::string::npos)
         {
+            foundGoodOrTest = true;
             // Verify it passed all validation:
             // 1. API version (lines 55-66)
             const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
@@ -315,11 +327,7 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
             EXPECT_FALSE(name.empty());
         }
     }
-
-    if(!plugins.empty())
-    {
-        SUCCEED();
-    }
+    EXPECT_TRUE(foundGoodOrTest) << "test_good_heuristic_plugin should be loaded";
 }
 
 // ========== Validation Failure Tests ==========

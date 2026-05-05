@@ -92,9 +92,9 @@ add_executable(
     TestFlatbufferUtilities.cpp
     TestHandle.cpp
     TestHelpers.cpp
-    TestHeuristicPluginIntegration.cpp
+    IntegrationHeuristicPlugin.cpp
     TestHeuristicPolicyFramework.cpp
-    TestHeuristicPolicyPlugins.cpp
+    IntegrationHeuristicPolicyPlugins.cpp
     TestBackendLogger.cpp
     TestGraphLogger.cpp
     TestHeuristicPlugin.cpp

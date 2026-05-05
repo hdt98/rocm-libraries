@@ -2,7 +2,7 @@
 // SPDX-License-Identifier:  MIT
 
 /**
- * @file TestHeuristicPolicyPlugins.cpp
+ * @file IntegrationHeuristicPolicyPlugins.cpp
  * @brief Integration tests for real heuristic policy plugins (RFC 0007)
  *
  * These tests verify the actual heuristic policy plugins (Config, StaticOrdering):
@@ -223,9 +223,6 @@ TEST_F(IntegrationHeuristicPolicyPlugins, HandleDestructionCleansUpResources)
 
     // Destroy handle (should clean up plugin handles)
     EXPECT_EQ(hipdnnDestroy(tempHandle), HIPDNN_STATUS_SUCCESS);
-
-    // If we got here without crashes, cleanup succeeded
-    SUCCEED();
 }
 
 // ========== Policy Descriptor Tests ==========
@@ -259,16 +256,11 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PolicyDescriptorCreationSucceeds)
 
 TEST_F(IntegrationHeuristicPolicyPlugins, PluginsReceiveLoggingCallback)
 {
-    // Verify that setLoggingCallback was called during plugin initialization
-    // This is verified by checking that the resource manager successfully
-    // created without errors
-
+    // Verify that setLoggingCallback was wired up during plugin initialization.
+    // If the callback registration failed, resource manager construction would have
+    // logged warnings; here we at least confirm the manager came up.
     auto heurRm = _handle->getHeuristicPluginResourceManager();
     ASSERT_NE(heurRm, nullptr);
-
-    // If logging callback failed, resource manager creation would have logged warnings
-    // For now, just verify it exists
-    SUCCEED();
 }
 
 // ========== Device Properties Tests ==========

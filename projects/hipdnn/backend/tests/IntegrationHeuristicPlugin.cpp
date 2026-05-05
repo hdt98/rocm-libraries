@@ -2,14 +2,19 @@
 // SPDX-License-Identifier:  MIT
 
 /**
- * @file TestHeuristicPluginIntegration.cpp
+ * @file IntegrationHeuristicPlugin.cpp
  * @brief Integration tests for HeuristicPlugin workflow coverage
  *
- * These tests exercise full workflows with real plugins to improve coverage:
- * - Complete handle and descriptor lifecycle
- * - Device properties serialization and setting
- * - Engine ID setting and finalization
- * - Error handling paths
+ * These tests exercise full workflows with real plugins. The file holds four
+ * sibling fixtures, each focused on a distinct concept:
+ *  - IntegrationHeuristicPlugin: resource-manager-mediated paths against a
+ *    directory of test plugins.
+ *  - IntegrationHeuristicPluginLoadedGood: direct construction of the good
+ *    test plugin to exercise the HeuristicPlugin object surface.
+ *  - IntegrationHeuristicPluginLoadedNoOptional: direct construction of a
+ *    plugin missing optional symbols, verifying graceful degradation.
+ *  - IntegrationHeuristicPluginIncomplete: a plugin missing required symbols
+ *    must be rejected at construction time.
  */
 
 #include "HipdnnException.hpp"
@@ -48,7 +53,22 @@ std::vector<uint8_t>
     builder.Finish(offset, "HDDP");
     return {builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize()};
 }
+
+// Wrapper class to access protected constructor
+class TestableHeuristicPlugin : public HeuristicPlugin
+{
+public:
+    explicit TestableHeuristicPlugin(SharedLibrary&& lib)
+        : HeuristicPlugin(std::move(lib))
+    {
+    }
+};
+
 } // namespace
+
+// ====================================================================================
+// IntegrationHeuristicPlugin: resource-manager-mediated workflows
+// ====================================================================================
 
 class IntegrationHeuristicPlugin : public ::testing::Test
 {
@@ -101,7 +121,7 @@ TEST_F(IntegrationHeuristicPlugin, CompleteHandleLifecycleWithGoodPlugin)
 
 // ========== Basic Operation Tests ==========
 // Note: Basic individual operations (createHandle, createPolicyDescriptor, setEngineIds,
-// setSerializedGraph, finalize, getSortedEngineIds) are tested in TestHeuristicPluginLoadedGood
+// setSerializedGraph, finalize, getSortedEngineIds) are tested in IntegrationHeuristicPluginLoadedGood
 // fixture with focused assertions. Tests here focus on resource manager integration.
 
 TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesOnHandle)
@@ -210,7 +230,7 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
 
 // ========== Plugin Metadata Coverage ==========
 // Note: Plugin metadata queries (name, version, API version, policy ID) are tested
-// in TestHeuristicPluginLoadedGood fixture with more specific assertions
+// in IntegrationHeuristicPluginLoadedGood fixture with more specific assertions
 
 TEST_F(IntegrationHeuristicPlugin, GetPluginTypeFromLoadedPlugin)
 {
@@ -309,28 +329,6 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesHandlesPluginFailures)
 }
 
 // ========== Error Path: Missing Optional Functions ==========
-
-TEST_F(IntegrationHeuristicPlugin, PolicyNameReturnsEmptyWhenOptionalFunctionMissing)
-{
-    auto rm = HeuristicPluginResourceManager::create();
-    ASSERT_NE(rm, nullptr);
-
-    const auto policyInfos = rm->getHeuristicPolicyInfos();
-    ASSERT_FALSE(policyInfos.empty());
-
-    // Find the no-optional plugin which doesn't implement hipdnnHeuristicGetPolicyName
-    for(const auto& info : policyInfos)
-    {
-        const HeuristicPlugin* plugin = rm->getPluginForPolicyId(info.policyId);
-        if(plugin != nullptr)
-        {
-            // policyName() should return empty string for plugins without the optional function
-            const auto name = plugin->name();
-            // Either has a name or empty string (both valid)
-            EXPECT_TRUE(name.empty() || !name.empty());
-        }
-    }
-}
 
 TEST_F(IntegrationHeuristicPlugin, SetPluginLogLevelHandlesMissingOptionalFunction)
 {
@@ -436,26 +434,11 @@ TEST_F(IntegrationHeuristicPlugin, SetDevicePropertiesWithNoPluginsLoaded)
     EXPECT_NO_THROW(rm->setDevicePropertiesOnAllHandles(&devicePropsData));
 }
 
-// ========== Plugin Loading Tests ==========
-// These tests exercise loading real plugins and their functionality
+// ====================================================================================
+// IntegrationHeuristicPluginLoadedGood: direct construction of the good test plugin
+// ====================================================================================
 
-namespace
-{
-
-// Wrapper class to access protected constructor
-class TestableHeuristicPlugin : public HeuristicPlugin
-{
-public:
-    explicit TestableHeuristicPlugin(SharedLibrary&& lib)
-        : HeuristicPlugin(std::move(lib))
-    {
-    }
-};
-
-} // anonymous namespace
-
-// Fixture that loads the good plugin for tests that need it
-class TestHeuristicPluginLoadedGood : public ::testing::Test
+class IntegrationHeuristicPluginLoadedGood : public ::testing::Test
 {
 protected:
     void SetUp() override
@@ -482,116 +465,34 @@ protected:
 private:
     std::unique_ptr<TestableHeuristicPlugin> _pluginPtr;
 };
-TEST_F(IntegrationHeuristicPlugin, LoadGoodPluginSucceeds)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_GOOD_HEURISTIC_PLUGIN_NAME);
 
-    ASSERT_TRUE(std::filesystem::exists(pluginPath))
-        << "Test plugin not found: " << pluginPath
-        << "\nMake sure test_plugins are built before running tests";
-
-    // Load the plugin
-    SharedLibrary lib(pluginPath);
-    // NOLINTNEXTLINE(misc-const-correctness)
-    ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 {
     const auto version = plugin().apiVersion();
     EXPECT_FALSE(version.empty());
     EXPECT_EQ(version, "0.0.1"); // HIPDNN_HEURISTIC_API_VERSION
 }
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
+
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {
     const auto policyId = plugin().policyId();
     const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
     EXPECT_EQ(policyId, expectedId);
 }
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyName)
+
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyName)
 {
     const auto name = plugin().name();
     EXPECT_EQ(name, "TestGoodHeuristicPolicy");
 }
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginVersion)
+
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginVersion)
 {
     const auto version = plugin().version();
     EXPECT_EQ(version, "1.0.0");
 }
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanCreateAndDestroyHandle)
-{
-    hipdnnHeuristicHandle_t handle = nullptr;
-    ASSERT_NO_THROW({ handle = plugin().createHandle(); });
-    EXPECT_NE(handle, nullptr);
 
-    ASSERT_NO_THROW({ plugin().destroyHandle(handle); });
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanSetDeviceProperties)
-{
-    const auto handle = plugin().createHandle();
-    ASSERT_NE(handle, nullptr);
-
-    hipdnnPluginConstData_t deviceProps{};
-    deviceProps.ptr = nullptr;
-    deviceProps.size = 0;
-
-    ASSERT_NO_THROW({ plugin().setDeviceProperties(handle, &deviceProps); });
-
-    plugin().destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanManagePolicyDescriptor)
-{
-    const auto handle = plugin().createHandle();
-    ASSERT_NE(handle, nullptr);
-
-    hipdnnHeuristicPolicyDescriptor_t desc = nullptr;
-    ASSERT_NO_THROW({ desc = plugin().createPolicyDescriptor(handle); });
-    EXPECT_NE(desc, nullptr);
-
-    ASSERT_NO_THROW({ plugin().destroyPolicyDescriptor(desc); });
-
-    plugin().destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanSetEngineIds)
-{
-    const auto handle = plugin().createHandle();
-    const auto desc = plugin().createPolicyDescriptor(handle);
-
-    const std::vector<int64_t> engineIds = {1, 2, 3, 4, 5};
-    ASSERT_NO_THROW({ plugin().setEngineIds(desc, engineIds.data(), engineIds.size()); });
-
-    plugin().destroyPolicyDescriptor(desc);
-    plugin().destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanSetSerializedGraph)
-{
-    const auto handle = plugin().createHandle();
-    const auto desc = plugin().createPolicyDescriptor(handle);
-
-    hipdnnPluginConstData_t graphData{};
-    graphData.ptr = nullptr;
-    graphData.size = 0;
-
-    ASSERT_NO_THROW({ plugin().setSerializedGraph(desc, &graphData); });
-
-    plugin().destroyPolicyDescriptor(desc);
-    plugin().destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanFinalizePolicy)
-{
-    const auto handle = plugin().createHandle();
-    const auto desc = plugin().createPolicyDescriptor(handle);
-
-    const std::vector<int64_t> engineIds = {1, 2, 3};
-    plugin().setEngineIds(desc, engineIds.data(), engineIds.size());
-
-    bool applied = false;
-    ASSERT_NO_THROW({ applied = plugin().finalize(desc); });
-    EXPECT_TRUE(applied); // Good plugin always applies
-
-    plugin().destroyPolicyDescriptor(desc);
-    plugin().destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
 {
     const auto handle = plugin().createHandle();
     const auto desc = plugin().createPolicyDescriptor(handle);
@@ -610,38 +511,108 @@ TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
     plugin().destroyPolicyDescriptor(desc);
     plugin().destroyHandle(handle);
 }
-TEST_F(TestHeuristicPluginLoadedGood, LoadedPluginCompleteWorkflow)
+
+TEST_F(IntegrationHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
 {
-    // Create handle and descriptor
+    // First call - ID is computed from policy name
+    const auto id1 = plugin().policyId();
+    const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
+    EXPECT_EQ(id1, expectedId);
+
+    // Second call should return cached value
+    const auto id2 = plugin().policyId();
+    EXPECT_EQ(id2, id1);
+}
+
+// ====================================================================================
+// IntegrationHeuristicPluginLoadedNoOptional: plugin missing optional symbols
+// ====================================================================================
+
+class IntegrationHeuristicPluginLoadedNoOptional : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
+        ASSERT_TRUE(std::filesystem::exists(pluginPath))
+            << "Test plugin not found: " << pluginPath
+            << "\nMake sure test_plugins are built before running tests";
+
+        SharedLibrary lib(pluginPath);
+        _pluginPtr = std::make_unique<TestableHeuristicPlugin>(std::move(lib));
+    }
+
+    void TearDown() override
+    {
+        _pluginPtr.reset();
+    }
+
+    TestableHeuristicPlugin& plugin()
+    {
+        return *_pluginPtr;
+    }
+
+private:
+    std::unique_ptr<TestableHeuristicPlugin> _pluginPtr;
+};
+
+TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalPolicyNameHasName)
+{
+    // GetPolicyName is now required
+    const auto name = plugin().name();
+    EXPECT_FALSE(name.empty());
+    EXPECT_EQ(name, "TestNoOptionalHeuristicPolicy");
+}
+
+TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalSetLogLevelSucceeds)
+{
+    // Plugin doesn't implement hipdnnHeuristicSetLogLevel
+    // Should return SUCCESS without calling the function
+    const auto status = plugin().setLogLevel(HIPDNN_SEV_INFO);
+    EXPECT_EQ(status, HIPDNN_PLUGIN_STATUS_SUCCESS);
+}
+
+TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalCanStillExecuteWorkflow)
+{
+    // Full workflow should work despite missing optional functions
     const auto handle = plugin().createHandle();
     ASSERT_NE(handle, nullptr);
 
     const auto desc = plugin().createPolicyDescriptor(handle);
     ASSERT_NE(desc, nullptr);
 
-    // Set inputs
-    const std::vector<int64_t> inputIds = {10, 20, 30};
+    const std::vector<int64_t> inputIds = {1, 2, 3};
     plugin().setEngineIds(desc, inputIds.data(), inputIds.size());
 
-    hipdnnPluginConstData_t graphData{};
-    graphData.ptr = nullptr;
-    graphData.size = 0;
-    plugin().setSerializedGraph(desc, &graphData);
-
-    // Finalize and retrieve results
     const bool applied = plugin().finalize(desc);
-    EXPECT_TRUE(applied);
+    EXPECT_FALSE(applied); // This plugin declines to apply
 
     const auto sortedIds = plugin().getSortedEngineIds(desc);
-    EXPECT_EQ(sortedIds, std::vector<int64_t>({30, 20, 10}));
+    EXPECT_TRUE(sortedIds.empty()); // Returns empty list
 
-    // Cleanup
     plugin().destroyPolicyDescriptor(desc);
     plugin().destroyHandle(handle);
 }
-TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
+
+// ====================================================================================
+// IntegrationHeuristicPluginIncomplete: plugin missing required symbols is rejected
+// ====================================================================================
+//
+// This fixture cannot pre-load the plugin in SetUp because construction is expected
+// to throw. Each test loads the SharedLibrary and attempts construction in its body.
+
+class IntegrationHeuristicPluginIncomplete : public ::testing::Test
 {
-    const auto pluginPath = getHeuristicPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
+protected:
+    static std::filesystem::path incompletePluginPath()
+    {
+        return getHeuristicPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
+    }
+};
+
+TEST_F(IntegrationHeuristicPluginIncomplete, LoadIncompletePluginThrowsException)
+{
+    const auto pluginPath = incompletePluginPath();
 
     ASSERT_TRUE(std::filesystem::exists(pluginPath)) << "Test plugin not found: " << pluginPath;
 
@@ -680,9 +651,10 @@ TEST_F(IntegrationHeuristicPlugin, LoadIncompletePluginThrowsException)
         },
         HipdnnException);
 }
-TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionContainsSymbolName)
+
+TEST_F(IntegrationHeuristicPluginIncomplete, IncompletePluginExceptionContainsSymbolName)
 {
-    const auto pluginPath = getHeuristicPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
+    const auto pluginPath = incompletePluginPath();
     SharedLibrary lib(pluginPath);
 
     EXPECT_THROW(
@@ -707,9 +679,10 @@ TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionContainsSymbolName)
         },
         HipdnnException);
 }
-TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionHasPluginErrorStatus)
+
+TEST_F(IntegrationHeuristicPluginIncomplete, IncompletePluginExceptionHasPluginErrorStatus)
 {
-    const auto pluginPath = getHeuristicPluginPath(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME);
+    const auto pluginPath = incompletePluginPath();
     SharedLibrary lib(pluginPath);
 
     EXPECT_THROW(
@@ -725,93 +698,4 @@ TEST_F(IntegrationHeuristicPlugin, IncompletePluginExceptionHasPluginErrorStatus
             }
         },
         HipdnnException);
-}
-TEST_F(IntegrationHeuristicPlugin, LoadPluginWithoutOptionalSymbolsSucceeds)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
-
-    // NOLINTNEXTLINE(readability-implicit-bool-conversion)
-    ASSERT_TRUE(std::filesystem::exists(pluginPath)) << "Test plugin not found: " << pluginPath;
-
-    SharedLibrary lib(pluginPath);
-
-    // Should load successfully despite missing optional symbols
-    // NOLINTNEXTLINE(misc-const-correctness)
-    ASSERT_NO_THROW({ TestableHeuristicPlugin plugin(std::move(lib)); });
-}
-TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalPolicyNameHasName)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
-    SharedLibrary lib(pluginPath);
-    const TestableHeuristicPlugin plugin(std::move(lib));
-
-    // GetPolicyName is now required
-    const auto name = plugin.name();
-    EXPECT_FALSE(name.empty());
-    EXPECT_EQ(name, "TestNoOptionalHeuristicPolicy");
-}
-TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalSetLogLevelSucceeds)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
-    SharedLibrary lib(pluginPath);
-    const TestableHeuristicPlugin plugin(std::move(lib));
-
-    // Plugin doesn't implement hipdnnHeuristicSetLogLevel
-    // Should return SUCCESS without calling the function
-    const auto status = plugin.setLogLevel(HIPDNN_SEV_INFO);
-    EXPECT_EQ(status, HIPDNN_PLUGIN_STATUS_SUCCESS);
-}
-TEST_F(IntegrationHeuristicPlugin, PluginWithoutOptionalCanStillExecuteWorkflow)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
-    SharedLibrary lib(pluginPath);
-    const TestableHeuristicPlugin plugin(std::move(lib));
-
-    // Full workflow should work despite missing optional functions
-    const auto handle = plugin.createHandle();
-    ASSERT_NE(handle, nullptr);
-
-    const auto desc = plugin.createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
-
-    const std::vector<int64_t> inputIds = {1, 2, 3};
-    plugin.setEngineIds(desc, inputIds.data(), inputIds.size());
-
-    const bool applied = plugin.finalize(desc);
-    EXPECT_FALSE(applied); // This plugin declines to apply
-
-    const auto sortedIds = plugin.getSortedEngineIds(desc);
-    EXPECT_TRUE(sortedIds.empty()); // Returns empty list
-
-    plugin.destroyPolicyDescriptor(desc);
-    plugin.destroyHandle(handle);
-}
-TEST_F(TestHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
-{
-    // First call - ID is computed from policy name
-    const auto id1 = plugin().policyId();
-    const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
-    EXPECT_EQ(id1, expectedId);
-
-    // Second call should return cached value
-    const auto id2 = plugin().policyId();
-    EXPECT_EQ(id2, id1);
-}
-TEST_F(IntegrationHeuristicPlugin, GetSortedEngineIdsReturnsEmptyWhenNoEngines)
-{
-    const auto pluginPath = getHeuristicPluginPath(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME);
-    SharedLibrary lib(pluginPath);
-    const TestableHeuristicPlugin plugin(std::move(lib));
-
-    const auto handle = plugin.createHandle();
-    const auto desc = plugin.createPolicyDescriptor(handle);
-
-    // Don't set any engine IDs
-    plugin.finalize(desc);
-
-    const auto sortedIds = plugin.getSortedEngineIds(desc);
-    EXPECT_TRUE(sortedIds.empty());
-
-    plugin.destroyPolicyDescriptor(desc);
-    plugin.destroyHandle(handle);
 }

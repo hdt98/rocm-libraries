@@ -288,9 +288,6 @@ TEST_F(TestHeuristicPluginResourceManager, DestructorCleansUpResources)
         // Use rm
         rm->getHeuristicPolicyInfos();
     } // rm destroyed here
-
-    // If we get here without crashes, cleanup succeeded
-    SUCCEED();
 }
 
 TEST_F(TestHeuristicPluginResourceManager, MultipleDestructionsSucceed)
@@ -303,8 +300,6 @@ TEST_F(TestHeuristicPluginResourceManager, MultipleDestructionsSucceed)
         rm->getHeuristicPolicyInfos();
         // Destroyed at end of loop
     }
-
-    SUCCEED();
 }
 
 // ========== Constructor Null Pointer Tests ==========
