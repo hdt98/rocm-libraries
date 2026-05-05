@@ -42,11 +42,10 @@ template <typename ComputeDataType, typename ADataType, typename BDataType>
 using mixed_prec_compute_type_t =
     typename detail::mixed_prec_compute_type<ComputeDataType, ADataType, BDataType>::type;
 
-// Helper method to determine compute type, defaulting to input data type
-// If "ThisDataType" is packed (4-bit), will default to "OtherDataType" or "ComputeDataType". If
-// both are packed, Else
-//    If "ThisDataType" is smaller than OtherDataType (and OtherDataType is not packed): use
-//    ComputeDataType. Else ThisDataType is used.
+// Determines the compute type for a given input, preferring ThisDataType when possible.
+//  - If ThisDataType is packed: use OtherDataType, or ComputeDataType if both are packed.
+//  - If ThisDataType is smaller than a non-packed OtherDataType: use ComputeDataType.
+//  - Otherwise: use ThisDataType.
 template <typename ThisDataType, typename OtherDataType, typename ComputeDataType>
 using mixed_prec_compute_type_from_input_t = std::conditional_t<
     is_packed_type_v<ThisDataType>,
