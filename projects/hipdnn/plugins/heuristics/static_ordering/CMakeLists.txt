@@ -6,38 +6,54 @@
 
 project(hipdnn_heuristic_static_ordering VERSION 1.0.0 LANGUAGES CXX)
 
-# Create the plugin as a shared library. Do not set OUTPUT_NAME or PREFIX;
-# the target name already matches the desired output name, and relying on the
-# platform default avoids the `lib` prefix appearing on Windows DLLs.
-add_library(hipdnn_heuristic_static_ordering SHARED
+# OBJECT library: contains the plugin implementation. Built once and shared
+# between the SHARED plugin and the STATIC library used by unit tests.
+add_library(hipdnn_heuristic_static_ordering_impl OBJECT
     StaticOrderingPlugin.cpp
 )
-
-# Include directories
-target_include_directories(hipdnn_heuristic_static_ordering PRIVATE
+target_include_directories(hipdnn_heuristic_static_ordering_impl PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+target_link_libraries(hipdnn_heuristic_static_ordering_impl PUBLIC
+    hipdnn_plugin_sdk
+    hipdnn_data_sdk
+)
+target_compile_options(hipdnn_heuristic_static_ordering_impl PRIVATE
+    ${HIPDNN_WARNING_COMPILE_OPTIONS}
+)
+set_target_properties(hipdnn_heuristic_static_ordering_impl PROPERTIES
+    CXX_VISIBILITY_PRESET hidden
+    POSITION_INDEPENDENT_CODE ON
+)
 
-# Link against hipdnn_plugin_sdk (for C ABI types) and hipdnn_data_sdk (for utilities)
-target_link_libraries(hipdnn_heuristic_static_ordering PRIVATE
+# STATIC library: exposes plugin internals for unit tests that link directly
+# against the implementation rather than dlopen'ing the shared plugin.
+add_library(hipdnn_heuristic_static_ordering_private STATIC
+    $<TARGET_OBJECTS:hipdnn_heuristic_static_ordering_impl>
+)
+target_include_directories(hipdnn_heuristic_static_ordering_private PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+target_link_libraries(hipdnn_heuristic_static_ordering_private PUBLIC
     hipdnn_plugin_sdk
     hipdnn_data_sdk
 )
 
-# Compiler options
-target_compile_options(hipdnn_heuristic_static_ordering PRIVATE
-    ${HIPDNN_WARNING_COMPILE_OPTIONS}
+# SHARED library: the actual plugin loaded at runtime. Re-uses the OBJECTs
+# from the impl target. CXX_VISIBILITY_PRESET hidden + HIPDNN_HEURISTIC_PLUGIN_EXPORT
+# annotations on the C ABI entry points keep all other symbols hidden, and
+# --exclude-libs=ALL prevents statically-linked dependencies from re-exporting
+# their symbols. This matches the example engine plugin pattern.
+add_library(hipdnn_heuristic_static_ordering SHARED
+    $<TARGET_OBJECTS:hipdnn_heuristic_static_ordering_impl>
 )
-
-# Export only the C ABI symbols on Linux. --exclude-libs=ALL prevents symbols
-# from statically-linked dependencies from being re-exported, matching the
-# engine plugin pattern used for TheRock / multi-arch / wheel builds.
+target_link_libraries(hipdnn_heuristic_static_ordering PRIVATE
+    hipdnn_plugin_sdk
+    hipdnn_data_sdk
+)
 if(NOT WIN32)
     target_link_libraries(hipdnn_heuristic_static_ordering PRIVATE
         "-Xlinker --exclude-libs=ALL"
-    )
-    target_link_options(hipdnn_heuristic_static_ordering PRIVATE
-        "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports.map"
     )
 endif()
 
