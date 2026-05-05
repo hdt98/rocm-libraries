@@ -196,11 +196,7 @@ public:
     inline bool alloc_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-#ifdef MEMCHECK_LOGGING
-        std::cout << "alloc host: " << toMB(bytes) << " MiB" << std::endl;
-#endif
-        this->host_usage += bytes;
-        return this->mem_check_host();
+        return alloc_host_bytes(bytes);
     }
 
     inline bool alloc_host_bytes(const size_t bytes)
@@ -208,8 +204,8 @@ public:
 #ifdef MEMCHECK_LOGGING
         std::cout << "alloc host: " << toMB(bytes) << " MiB" << std::endl;
 #endif
-        this->host_usage += bytes;
-        return this->mem_check_host();
+        host_usage += bytes;
+        return mem_check_host();
     }
 
     // Call this before host frees
@@ -217,10 +213,7 @@ public:
     inline void free_host(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-#ifdef MEMCHECK_LOGGING
-        std::cout << "free host: " << toMB(bytes) << " MiB" << std::endl;
-#endif
-        this->host_usage -= bytes;
+        return free_host_bytes(bytes);
     }
 
     inline void free_host_bytes(const size_t bytes)
@@ -228,7 +221,7 @@ public:
 #ifdef MEMCHECK_LOGGING
         std::cout << "free host: " << toMB(bytes) << " MiB" << std::endl;
 #endif
-        this->host_usage -= bytes;
+        host_usage -= bytes;
     }
 
 	// Call this before dev allocs
@@ -236,11 +229,7 @@ public:
     inline bool alloc_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-#ifdef MEMCHECK_LOGGING
-        std::cout << "alloc device: " << toMB(bytes) << " MiB" << std::endl;
-#endif
-        this->dev_usage += bytes;
-        return this->mem_check_device();
+        return alloc_device_bytes(bytes);
     }
 
     inline bool alloc_device_bytes(const size_t bytes)
@@ -248,8 +237,8 @@ public:
 #ifdef MEMCHECK_LOGGING
         std::cout << "alloc device: " << toMB(bytes) << " MiB" << std::endl;
 #endif
-        this->dev_usage += bytes;
-        return this->mem_check_device();
+        dev_usage += bytes;
+        return mem_check_device();
     }
 
     // Call this before dev frees
@@ -257,10 +246,7 @@ public:
     inline void free_device(const size_t size)
     {
         size_t bytes = sizeof(T) * size;
-#ifdef MEMCHECK_LOGGING
-        std::cout << "free device: " << toMB(bytes) << " MiB" << std::endl;
-#endif
-        this->dev_usage -= bytes;
+        free_device_bytes(bytes);
     }
 
     inline void free_device_bytes(const size_t bytes)
@@ -268,7 +254,7 @@ public:
 #ifdef MEMCHECK_LOGGING
         std::cout << "free device: " << toMB(bytes) << " MiB" << std::endl;
 #endif
-        this->dev_usage -= bytes;
+        dev_usage -= bytes;
     }
 
 private:
