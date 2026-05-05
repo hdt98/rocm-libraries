@@ -119,11 +119,37 @@ struct CoreLoopSchedulerDefaultBase
 template <typename PipelineProblem, typename QDataType, typename KDataType, typename VDataType>
 struct CoreLoopSchedulerImpl;
 
-// bf16 — uses default base
+// bf16 — tuned load phase VALU budget for better P conversion interleaving.
+// bf16 P conversion (~40 VALU) is naturally placed in the load phase by the compiler.
+// Default VALU:2 leaves most of those VALU unguided; increasing the budget lets the
+// scheduler interleave P conversion with LDS reads more effectively.
 template <typename PipelineProblem>
 struct CoreLoopSchedulerImpl<PipelineProblem, ck_tile::bf16_t, ck_tile::bf16_t, ck_tile::bf16_t>
     : CoreLoopSchedulerDefaultBase<PipelineProblem>
 {
+    using Base = CoreLoopSchedulerDefaultBase<PipelineProblem>;
+    using Params = CoreLoopSchedulingParams<PipelineProblem>;
+
+    CK_TILE_DEVICE static constexpr void schedule_load_phase()
+    {
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::VALU, 16, 0);
+        __builtin_amdgcn_sched_group_barrier(LLVMSchedGroupMask::SALU, 4, 0);
+    }
+
+    // Must override schedule() — static methods have no virtual dispatch
+    template <ck_tile::index_t WaveGroup, ck_tile::index_t Phase>
+    CK_TILE_DEVICE static constexpr void schedule(ck_tile::number<WaveGroup>,
+                                                  ck_tile::number<Phase>)
+    {
+        constexpr ck_tile::index_t effective = (WaveGroup == 0) ? Phase : (Phase + 3) % 4;
+
+        if constexpr(effective == 0)
+            Base::schedule_gemm0_compute();
+        else if constexpr(effective == 2)
+            Base::schedule_gemm1_compute();
+        else
+            schedule_load_phase();
+    }
 };
 
 // fp16 — higher VALU budget in GEMM0 phase to interleave P conversion with MFMAs.
