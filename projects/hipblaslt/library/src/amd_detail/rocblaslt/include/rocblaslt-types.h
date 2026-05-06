@@ -671,8 +671,10 @@ namespace rocblaslt
     class RocTuningV2
     {
     public:
-        uint16_t gsu = 0;
-        int16_t  wgm = 0;
+        uint16_t gsu         = 0;
+        int16_t  wgm         = 0;
+        int16_t  wgmxcc      = 0;
+        int16_t  wgmxccchunk = 0;
     };
 
     struct RocGemmInputsV2

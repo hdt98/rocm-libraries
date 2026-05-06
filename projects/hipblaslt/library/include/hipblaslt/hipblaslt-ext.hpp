@@ -233,9 +233,17 @@ namespace hipblaslt_ext
         HIPBLASLT_EXPORT void setWgm(
             int16_t
                 wgm); //!< Set the value of workgroup mapping, 0 is off (use the workgroup mapping inside the solution).
+        HIPBLASLT_EXPORT void setWgmXcc(
+            int16_t
+                wgmxcc); //!< Set WGMXCC (number of XCDs the WG groups span).  0 = use solution's auto-WGMXCC.
+        HIPBLASLT_EXPORT void setWgmXccChunk(
+            int16_t
+                wgmxccchunk); //!< Set WGMXCCCHUNK (per-XCD chunk size in WGs).  0 = use solution's auto-WGMXCCCHUNK.
 
         HIPBLASLT_EXPORT uint16_t getSplitK() const; //!< Value of splitK.
         HIPBLASLT_EXPORT int16_t  getWgm() const; //!< Value of workgroup mapping.
+        HIPBLASLT_EXPORT int16_t  getWgmXcc() const; //!< Value of WGMXCC.
+        HIPBLASLT_EXPORT int16_t  getWgmXccChunk() const; //!< Value of WGMXCCCHUNK.
     private:
         friend GemmInstance;
         class GemmTuningImpl;

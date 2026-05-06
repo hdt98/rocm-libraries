@@ -644,6 +644,13 @@ try
         "Switches the multi-MacroTile timing path from the C API to the extension API "
         "(hipblaslt_ext::Gemm + GemmTuning) so the per-sub WGM can be applied at runtime.")
 
+        ("multi_mt_aware_wgm",
+        value<bool>(&arg.multi_mt_aware_wgm)->default_value(false),
+        "Multi-MT-aware WGM: sub-problem 0 uses Origami's WGM, sub-problems 1.. inherit "
+        "and align it so workgroups that share the same B-column (M-split) or A-row (N-split) "
+        "are scheduled on the same XCD as the previous sub-problem dispatched them to. "
+        "Implies --origami_wgm.")
+
         ("help,h", "produces this help message")
 
         ("version", "Prints the version number");

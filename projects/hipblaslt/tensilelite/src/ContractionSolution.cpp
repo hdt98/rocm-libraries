@@ -1276,7 +1276,11 @@ namespace TensileLite
         bool           gsuwgmrr            = false; // initialized false
         int32_t        wgm                 = param.wgm() != 0 ? param.wgm() : autoWGM;
         size_t         wgmxcc              = param.wgmxcc() != 0 ? param.wgmxcc() : autoWGMXCC;
-        size_t         wgmxccchunk         = autoWGMXCCCHUNK;
+        // Per-problem runtime override of WGMXCCCHUNK (used by the
+        // multi-MT-aware WGM feature to align XCD chunking across sub-problems).
+        size_t         wgmxccchunk         = param.wgmxccchunk() != 0
+                                                 ? (size_t)param.wgmxccchunk()
+                                                 : autoWGMXCCCHUNK;
         int32_t        wgmxccg             = -1; // initialized -1
         size_t         staggerUMapping     = autoStaggerUMapping;
         size_t         staggerU            = autoStaggerU;
@@ -2676,8 +2680,22 @@ namespace TensileLite
     {
         calculateAutoGSU(problem, &hardware);
         if(Debug::Instance().printWinningKernelName())
+        {
+            // For Stream-K kernels, also report tiles and the actual sk.grid that
+            // will be dispatched (helps disambiguate DP-vs-SK runtime behaviour).
+            std::ostringstream skExtra;
+            if(sizeMapping.streamK > 0)
+            {
+                auto reduc      = getSKReduction(problem, hardware);
+                auto tilesLocal = problem.getNumTiles(sizeMapping, 1);
+                auto skGridLocal
+                    = (tilesLocal > 0) ? getSKGrid(problem, hardware, tilesLocal, reduc) : 0;
+                skExtra << " [tiles=" << tilesLocal << ", skGrid=" << skGridLocal << "]";
+            }
             std::cout << "Running kernel: " << this->KernelName()
-                      << " [MatchingTag: " << this->matchingTag() << "]" << std::endl;
+                      << " [MatchingTag: " << this->matchingTag() << "]"
+                      << skExtra.str() << std::endl;
+        }
 
         // retreive alpha/beta type set via setAlpha/BetaType()
         auto alphaType = problem.alphaType();

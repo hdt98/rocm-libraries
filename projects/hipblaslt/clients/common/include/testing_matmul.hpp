@@ -4671,6 +4671,10 @@ void testing_matmul_with_bias(const Arguments& arg,
 
             // === OPT 1: Pre-create all layouts and cache heuristics ONCE ===
             std::vector<SubProblemContext> spCtxs(subProblems.size());
+            // Carry-over of the FULL WGM triple (wgm, wgmxcc, wgmxccchunk) applied
+            // to the previous sub-problem so that sub[i>0] can align its
+            // column/row → XCD mapping with sub[0] for layouts that benefit.
+            OrigamiWgmTriple mmt_prev_triple;
             for(size_t sp = 0; sp < subProblems.size(); sp++)
             {
                 const auto& sub = subProblems[sp];
@@ -4726,12 +4730,21 @@ void testing_matmul_with_bias(const Arguments& arg,
                 ctx.C_ptr = static_cast<char*>(dC[0].buf()) + sub.offset_C_bytes;
                 ctx.D_ptr = static_cast<char*>((*dDp)[0].buf()) + sub.offset_D_bytes;
 
-                // === --origami_wgm: build ext-API Gemm + GemmTuning ============
+                // === --origami_wgm / --multi_mt_aware_wgm =====================
                 // Switches the hot-loop dispatch from hipblasLtMatmul (C API) to
                 // hipblaslt_ext::Gemm::run() (extension API), which is the only
                 // path that lets us override the workgroup-mapping per kernel
-                // via GemmTuning::setWgm.
-                if(arg.origami_wgm && ctx.valid)
+                // via GemmTuning::setWgm/setWgmXcc/setWgmXccChunk.
+                //
+                // --origami_wgm:        each sub picks its own Origami triple independently.
+                // --multi_mt_aware_wgm: sub[0] uses Origami's triple, sub[i>0]
+                //                       inherits the entire triple so the
+                //                       column/row → XCD mapping repeats across
+                //                       sub-problems (L2 reuse on the shared matrix).
+                //                       Layout-gated to NN-style layouts where
+                //                       it actually maps to the same XCD pattern.
+                bool wgm_path_active = arg.origami_wgm || arg.multi_mt_aware_wgm;
+                if(wgm_path_active && ctx.valid)
                 {
                     // 1. Get baseline kernel's MT/MI from the heuristic algo we just picked
                     size_t bl_mt_m = 256, bl_mt_n = 256, bl_mt_k = 64;
@@ -4742,21 +4755,54 @@ void testing_matmul_with_bias(const Arguments& arg,
                         parseMatrixInstructionFromName(sol_name, bl_mi_m, bl_mi_n, bl_mi_k);
                     } catch(...) {}
 
-                    // 2. Ask Origami for its recommended WGM for this sub-problem
                     int dev_id = 0; hipGetDevice(&dev_id);
-                    int16_t wgm = selectOrigamiWgm(
+
+                    // Origami's per-sub recommendation (full triple).
+                    OrigamiWgmTriple origami_t = selectOrigamiWgmTriple(
                         sub.m_size, sub.n_size, sub.k_size,
                         bl_mt_m, bl_mt_n, bl_mt_k,
                         bl_mi_m, bl_mi_n, bl_mi_k,
                         transA, transB,
                         arg.a_type, arg.b_type, arg.c_type, arg.d_type,
                         dev_id);
-                    ctx.origami_wgm = wgm;
+
+                    OrigamiWgmTriple chosen = origami_t;
+                    bool mmt_aware_overrode = false;
+                    if(arg.multi_mt_aware_wgm)
+                    {
+                        bool is_m_split = (arg.split_strategy == 17 || arg.split_strategy == 19
+                                           || arg.split_strategy == 21 || arg.split_strategy == 23);
+                        auto r = selectMultiMTAwareWgmTriple(
+                            (int)sp,
+                            sub.m_size, sub.n_size, sub.k_size,
+                            bl_mt_m, bl_mt_n, bl_mt_k,
+                            bl_mi_m, bl_mi_n, bl_mi_k,
+                            transA, transB,
+                            arg.a_type, arg.b_type, arg.c_type, arg.d_type,
+                            dev_id,
+                            is_m_split,
+                            mmt_prev_triple);
+                        chosen = r.triple;
+                        mmt_aware_overrode = r.overrode;
+                    }
+                    ctx.origami_wgm         = chosen.wgm;
+                    ctx.origami_wgmxcc      = chosen.wgmxcc;
+                    ctx.origami_wgmxccchunk = chosen.wgmxccchunk;
+                    mmt_prev_triple = chosen;
 
                     hipblaslt_cout << "  WGM[" << sp << "] sub=" << sub.m_size << "x"
                                   << sub.n_size << " baseline=MT" << bl_mt_m << "x"
                                   << bl_mt_n << " MI=" << bl_mi_m << "x" << bl_mi_n
-                                  << " → Origami WGM=" << wgm;
+                                  << " → Origami (wgm=" << origami_t.wgm
+                                  << ",wgmxcc=" << origami_t.wgmxcc
+                                  << ",wgmxccchunk=" << origami_t.wgmxccchunk << ")";
+                    if(mmt_aware_overrode)
+                        hipblaslt_cout << " [mmt-aware override → (wgm="
+                                       << chosen.wgm << ",wgmxcc=" << chosen.wgmxcc
+                                       << ",wgmxccchunk=" << chosen.wgmxccchunk << ")]";
+
+                    // Aliases for the rest of the block (downstream code uses `wgm`)
+                    int16_t wgm = chosen.wgm;
 
                     // 3. Build a hipblaslt_ext::Gemm with the same problem geometry
                     auto gemm = std::make_shared<hipblaslt_ext::Gemm>(
@@ -4782,7 +4828,9 @@ void testing_matmul_with_bias(const Arguments& arg,
                     if(ext_ok)
                     {
                         auto tuning = std::make_shared<hipblaslt_ext::GemmTuning>();
-                        if(wgm != 0) tuning->setWgm(wgm);
+                        if(wgm != 0)               tuning->setWgm(wgm);
+                        if(chosen.wgmxcc      != 0) tuning->setWgmXcc(chosen.wgmxcc);
+                        if(chosen.wgmxccchunk != 0) tuning->setWgmXccChunk(chosen.wgmxccchunk);
 
                         // 4. Find an algo that supports our tuning override.
                         //    Prefer the heuristic-picked algo if it accepts the

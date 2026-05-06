@@ -64,11 +64,13 @@ struct SubProblemContext
     bool valid;
     bool owns_matmul_desc; // true if we created matmul_desc and need to destroy it
 
-    // Ext-API state (populated only when --origami_wgm is set)
-    bool use_ext_gemm = false;
-    int16_t origami_wgm = 0;          // Origami-recommended WGM (0 = kernel default)
+    // Ext-API state (populated only when --origami_wgm or --multi_mt_aware_wgm is set)
+    bool    use_ext_gemm    = false;
+    int16_t origami_wgm     = 0;  // Origami-recommended WGM (0 = kernel default)
+    int16_t origami_wgmxcc  = 0;  // Origami-recommended WGMXCC
+    int16_t origami_wgmxccchunk = 0; // Origami-recommended WGMXCCCHUNK
     std::shared_ptr<hipblaslt_ext::Gemm> ext_gemm;          // initialized once
-    std::shared_ptr<hipblaslt_ext::GemmTuning> ext_tuning;  // setWgm(origami_wgm)
+    std::shared_ptr<hipblaslt_ext::GemmTuning> ext_tuning;  // configured per-sub
 };
 
 // Dispatch a single sub-problem on the given stream.  Picks ext_gemm.run()

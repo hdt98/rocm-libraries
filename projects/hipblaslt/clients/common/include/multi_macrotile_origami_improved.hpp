@@ -167,15 +167,18 @@ inline double querySubProblemLatency(
     return latency;
 }
 
-// Query Origami's select_workgroup_mapping for the optimal WGM of a sub-problem.
-// Returns Origami's recommended `wgm` (signed; 0 keeps the kernel's built-in WGM,
-// negative is a Tensile sign convention for "use numMT_M tiles per group").
-// On any internal failure, returns 0 (i.e., let the kernel default apply).
-//
-// MI dimensions need to be supplied — these come from parsing the heuristic-
-// selected algo's solution name (parseMacroTileFromName already gives MT_M/N/K;
-// the MI is encoded as "MI<m>x<n>x<k>" in the same name).
-inline int16_t selectOrigamiWgm(
+// Full Origami WGM triple: wgm + wgmxcc + wgmxccchunk.
+struct OrigamiWgmTriple
+{
+    int16_t wgm         = 0;
+    int16_t wgmxcc      = 0;
+    int16_t wgmxccchunk = 0;
+    bool    valid       = false;
+};
+
+// Query Origami's select_workgroup_mapping for the optimal (wgm, wgmxcc, wgmxccchunk)
+// triple of a sub-problem. On any internal failure, returns {0,0,0,false}.
+inline OrigamiWgmTriple selectOrigamiWgmTriple(
     int64_t M, int64_t N, int64_t K,
     size_t mt_m, size_t mt_n, size_t mt_k,
     size_t mi_m, size_t mi_n, size_t mi_k,
@@ -184,7 +187,8 @@ inline int16_t selectOrigamiWgm(
     hipDataType c_type, hipDataType d_type,
     int device_id)
 {
-    if (mt_m == 0 || mt_n == 0) return 0;
+    OrigamiWgmTriple out;
+    if (mt_m == 0 || mt_n == 0) return out;
     if (mi_m == 0 || mi_n == 0) { mi_m = 16; mi_n = 16; mi_k = 16; }
     try
     {
@@ -208,23 +212,154 @@ inline int16_t selectOrigamiWgm(
 
         auto hardware = origami::hardware_t::get_hardware_for_device(device_id);
 
-        // skGrid = number of output tiles for the data-parallel grid
         size_t n_tiles_m = (M + mt_m - 1) / mt_m;
         size_t n_tiles_n = (N + mt_n - 1) / mt_n;
         size_t skGrid    = n_tiles_m * n_tiles_n;
 
         auto mapping = origami::select_workgroup_mapping(problem, hardware, config, skGrid);
-        // Clamp to int16_t range expected by hipblaslt GemmTuning::setWgm
-        long w = (long)mapping.wgm;
-        if (w >  32767) w =  32767;
-        if (w < -32768) w = -32768;
-        return (int16_t)w;
+
+        auto clamp16 = [](long v) -> int16_t {
+            if (v >  32767) return  32767;
+            if (v < -32768) return -32768;
+            return (int16_t)v;
+        };
+        out.wgm         = clamp16((long)mapping.wgm);
+        out.wgmxcc      = clamp16((long)mapping.wgmxcc);
+        out.wgmxccchunk = clamp16((long)mapping.wgmxccchunk);
+        out.valid = true;
+        return out;
     }
     catch (...)
     {
-        return 0;
+        return out;
     }
 }
+
+// Backwards-compatible wrapper: returns just the wgm scalar.
+inline int16_t selectOrigamiWgm(
+    int64_t M, int64_t N, int64_t K,
+    size_t mt_m, size_t mt_n, size_t mt_k,
+    size_t mi_m, size_t mi_n, size_t mi_k,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    int device_id)
+{
+    auto t = selectOrigamiWgmTriple(M, N, K, mt_m, mt_n, mt_k,
+                                    mi_m, mi_n, mi_k,
+                                    transA, transB, a_type, b_type,
+                                    c_type, d_type, device_id);
+    return t.valid ? t.wgm : (int16_t)0;
+}
+
+// ── Multi-MT-aware WGM selection ────────────────────────────────────────────
+//
+// Goal: when a GEMM is split into N sub-problems sharing one of A or B, schedule
+// sub-problem i's workgroups on the same XCD that processed the matching tile
+// (n-tile column for M-split, m-tile row for N-split) in sub-problem i-1.
+// The shared matrix data already in that XCD's L2 cache is then re-used.
+//
+// Mechanism (MI350X, NUM_XCD=8, numCUsPerXCD=32):
+//   * Tensile maps physical WG-id → XCD via a round-robin (wg_id % NUM_XCD),
+//     with the (wgm, wgmxcc, wgmxccchunk) triple controlling how the logical
+//     (m_tile, n_tile) → wg_id permutation is built.
+//   * `GemmTuning` now exposes setWgm + setWgmXcc + setWgmXccChunk so we can
+//     propagate ALL THREE values from sub[0] to sub[1+].
+//
+// Layout-gating: propagating sub[0]'s WGM triple is only physically meaningful
+// when both sub-problems share the matrix that determines XCD-locality.
+//
+//   M-split (split along M, B is shared):
+//     transB = N → B is K×N column-major.  WGs at the same n_tile column read
+//                  the same B columns.  Same WGM triple → same column→XCD
+//                  pattern.  HELPS.
+//     transB = T → B is N×K, row-major.  Different access pattern; propagation
+//                  was empirically harmful.  Skip.
+//
+//   N-split (split along N, A is shared):
+//     transA = N → A is M×K column-major.  WGs at the same m_tile row read
+//                  the same A rows.  Propagation HELPS.
+//     transA = T → A is K×M.  Skip.
+//
+// `prev` carries sub-problem (i-1)'s applied triple; if invalid, falls back to
+// plain Origami picks.
+struct MultiMTAwareWgm
+{
+    OrigamiWgmTriple triple;     // chosen (wgm, wgmxcc, wgmxccchunk)
+    bool overrode = false;       // did we override Origami's pick?
+};
+
+inline MultiMTAwareWgm selectMultiMTAwareWgmTriple(
+    int sub_idx,
+    int64_t M, int64_t N, int64_t K,
+    size_t mt_m, size_t mt_n, size_t mt_k,
+    size_t mi_m, size_t mi_n, size_t mi_k,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    int device_id,
+    bool is_m_split,
+    const OrigamiWgmTriple& prev)
+{
+    MultiMTAwareWgm out;
+
+    // First sub-problem: use Origami's triple unconditionally.
+    auto origami_t = selectOrigamiWgmTriple(M, N, K, mt_m, mt_n, mt_k,
+                                            mi_m, mi_n, mi_k,
+                                            transA, transB, a_type, b_type,
+                                            c_type, d_type, device_id);
+    if (sub_idx == 0 || !prev.valid)
+    {
+        out.triple = origami_t;
+        return out;
+    }
+
+    // Layout gate: empirically (see MMT_AWARE_WGM_RESULTS.md), propagation
+    // helps only when BOTH transposes are 'N' (NN layout) — i.e., A column-major
+    // and B column-major.  TN (transA=T) was found to consistently regress and
+    // NT (transB=T) was mostly neutral.  We require both `N`s here.
+    bool layout_eligible = (transA == HIPBLAS_OP_N) && (transB == HIPBLAS_OP_N);
+
+    if (!layout_eligible)
+    {
+        // Other layouts: keep per-sub Origami pick (preserve baseline behavior).
+        out.triple = origami_t;
+        return out;
+    }
+    (void)is_m_split;
+
+    // Eligible: inherit sub[0]'s entire (wgm, wgmxcc, wgmxccchunk) triple.
+    out.triple    = prev;
+    out.overrode  = (origami_t.valid &&
+                     (origami_t.wgm         != prev.wgm
+                   || origami_t.wgmxcc      != prev.wgmxcc
+                   || origami_t.wgmxccchunk != prev.wgmxccchunk));
+    return out;
+}
+
+// Backwards-compatible wrapper: returns just the wgm scalar (older callers).
+inline int16_t selectMultiMTAwareWgm(
+    int sub_idx,
+    int64_t M, int64_t N, int64_t K,
+    size_t mt_m, size_t mt_n, size_t mt_k,
+    size_t mi_m, size_t mi_n, size_t mi_k,
+    hipblasOperation_t transA, hipblasOperation_t transB,
+    hipDataType a_type, hipDataType b_type,
+    hipDataType c_type, hipDataType d_type,
+    int device_id,
+    bool is_m_split,
+    int16_t prev_wgm)
+{
+    OrigamiWgmTriple prev;
+    if (prev_wgm != 0) { prev.wgm = prev_wgm; prev.valid = true; }
+    auto r = selectMultiMTAwareWgmTriple(sub_idx, M, N, K,
+                                         mt_m, mt_n, mt_k, mi_m, mi_n, mi_k,
+                                         transA, transB, a_type, b_type,
+                                         c_type, d_type, device_id,
+                                         is_m_split, prev);
+    return r.triple.valid ? r.triple.wgm : (int16_t)0;
+}
+
 
 // Parse "MI<m>x<n>x<k>" out of a Tensile solution name.
 // Returns false if the substring is absent.

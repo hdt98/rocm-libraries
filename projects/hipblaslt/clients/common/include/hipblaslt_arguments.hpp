@@ -192,6 +192,10 @@ struct Arguments
     bool l2_cache_hints;          // Enable L2 cache persistence hints for shared matrices
     bool origami_wgm;             // Use Origami's select_workgroup_mapping per sub-problem
                                   // (switches multi-MT timing path from C-API to ext-API + GemmTuning)
+    bool multi_mt_aware_wgm;      // Cross-sub-problem WGM alignment: sub[0] uses Origami's WGM,
+                                  // sub[1+] inherit/align it so the n-tile→XCD (M-split) or
+                                  // m-tile→XCD (N-split) mapping repeats across sub-problems.
+                                  // Implies (and replaces) --origami_wgm when set.
 
     /*************************************************************************
      *                     End Of Arguments                                  *

@@ -3163,6 +3163,8 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             {
                 data->problem.setParams().setGSU(tuning->gsu);
                 data->problem.setParams().setWgm(tuning->wgm);
+                data->problem.setParams().setWGMXCC(tuning->wgmxcc);
+                data->problem.setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
                 std::stringstream ss;
                 if(!solution->checkInternalArgumentsSupport(data->problem, ss, true))
                 {
@@ -3212,6 +3214,8 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
             {
                 data->problem.gemms[0].setParams().setGSU(tuning->gsu);
                 data->problem.gemms[0].setParams().setWgm(tuning->wgm);
+                data->problem.gemms[0].setParams().setWGMXCC(tuning->wgmxcc);
+                data->problem.gemms[0].setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
                 std::stringstream ss;
                 if(!solution->checkInternalArgumentsSupport(data->problem.gemms[0], ss, true))
                 {
@@ -3223,6 +3227,8 @@ rocblaslt_status makeArgument(rocblaslt_handle             handle,
                 {
                     data->problem.gemms[i].setParams().setGSU(tuning->gsu);
                     data->problem.gemms[i].setParams().setWgm(tuning->wgm);
+                    data->problem.gemms[i].setParams().setWGMXCC(tuning->wgmxcc);
+                    data->problem.gemms[i].setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
                 }
             }
             else
@@ -4099,6 +4105,8 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
         {
             tensile_prob.setParams().setGSU(tuning->gsu);
             tensile_prob.setParams().setWgm(tuning->wgm);
+            tensile_prob.setParams().setWGMXCC(tuning->wgmxcc);
+            tensile_prob.setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
             std::stringstream ss;
             if(!solution->checkInternalArgumentsSupport(tensile_prob, ss, true))
             {
@@ -4184,6 +4192,8 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
         {
             tensile_prob.gemms[0].setParams().setGSU(tuning->gsu);
             tensile_prob.gemms[0].setParams().setWgm(tuning->wgm);
+            tensile_prob.gemms[0].setParams().setWGMXCC(tuning->wgmxcc);
+            tensile_prob.gemms[0].setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
             std::stringstream ss;
             if(!solution->checkInternalArgumentsSupport(tensile_prob.gemms[0], ss, true))
             {
@@ -4195,6 +4205,8 @@ rocblaslt_status isSolutionSupported(rocblaslt_handle       handle,
             {
                 tensile_prob.gemms[i].setParams().setGSU(tuning->gsu);
                 tensile_prob.gemms[i].setParams().setWgm(tuning->wgm);
+                tensile_prob.gemms[i].setParams().setWGMXCC(tuning->wgmxcc);
+                tensile_prob.gemms[i].setParams().setWGMXCCCHUNK(tuning->wgmxccchunk);
             }
         }
         else

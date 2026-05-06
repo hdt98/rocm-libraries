@@ -118,13 +118,24 @@ namespace TensileLite
                 {
                     auto rv = row.second->findBestSolution(problem, hardware, fitness);
 
-                    if(rv
-                       && dynamic_cast<Predicates::Contraction::EqualityMatching*>(
-                           row.first.value.get()))
-                        rv->tag = MySolution::MatchingTag::Equal;
-
                     if(rv)
                     {
+                        if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(
+                               row.first.value.get()))
+                            rv->tag = MySolution::MatchingTag::Equal;
+                        else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(
+                                    row.first.value.get()))
+                            rv->tag = MySolution::MatchingTag::GridBased;
+                        else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(
+                                    row.first.value.get()))
+                            rv->tag = MySolution::MatchingTag::Range;
+                        else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(
+                                    row.first.value.get()))
+                            rv->tag = MySolution::MatchingTag::FreeSize;
+                        else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(
+                                    row.first.value.get()))
+                            rv->tag = MySolution::MatchingTag::Prediction;
+
                         if(Debug::Instance().printDeviceSelection())
                         {
                             std::cout << "  Solution found (exact): " << rv->name()
@@ -137,10 +148,24 @@ namespace TensileLite
                 {
                     fallbackRv = row.second->findBestSolution(problem, hardware, fitness);
 
-                    if(fallbackRv
-                       && dynamic_cast<Predicates::Contraction::EqualityMatching*>(
-                           row.first.value.get()))
-                        fallbackRv->tag = MySolution::MatchingTag::Equal;
+                    if(fallbackRv)
+                    {
+                        if(dynamic_cast<Predicates::Contraction::EqualityMatching*>(
+                               row.first.value.get()))
+                            fallbackRv->tag = MySolution::MatchingTag::Equal;
+                        else if(dynamic_cast<Predicates::Contraction::GridBasedMatching*>(
+                                    row.first.value.get()))
+                            fallbackRv->tag = MySolution::MatchingTag::GridBased;
+                        else if(dynamic_cast<Predicates::Contraction::RangeMatching*>(
+                                    row.first.value.get()))
+                            fallbackRv->tag = MySolution::MatchingTag::Range;
+                        else if(dynamic_cast<Predicates::Contraction::FreeSizeMatching*>(
+                                    row.first.value.get()))
+                            fallbackRv->tag = MySolution::MatchingTag::FreeSize;
+                        else if(dynamic_cast<Predicates::Contraction::PredictionMatching*>(
+                                    row.first.value.get()))
+                            fallbackRv->tag = MySolution::MatchingTag::Prediction;
+                    }
                 }
             }
 

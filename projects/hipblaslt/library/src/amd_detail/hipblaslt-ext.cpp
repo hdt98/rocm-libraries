@@ -410,8 +410,10 @@ namespace hipblaslt_ext
     class GemmTuning::GemmTuningImpl
     {
     public:
-        uint16_t splitK = 0;
-        int16_t  wgm    = 0;
+        uint16_t splitK      = 0;
+        int16_t  wgm         = 0;
+        int16_t  wgmxcc      = 0;
+        int16_t  wgmxccchunk = 0;
     };
 
     GemmTuning::GemmTuning()
@@ -445,6 +447,16 @@ namespace hipblaslt_ext
         pimpl->wgm = wgm;
     }
 
+    void GemmTuning::setWgmXcc(int16_t wgmxcc)
+    {
+        pimpl->wgmxcc = wgmxcc;
+    }
+
+    void GemmTuning::setWgmXccChunk(int16_t wgmxccchunk)
+    {
+        pimpl->wgmxccchunk = wgmxccchunk;
+    }
+
     uint16_t GemmTuning::getSplitK() const
     {
         return pimpl->splitK;
@@ -453,6 +465,16 @@ namespace hipblaslt_ext
     int16_t GemmTuning::getWgm() const
     {
         return pimpl->wgm;
+    }
+
+    int16_t GemmTuning::getWgmXcc() const
+    {
+        return pimpl->wgmxcc;
+    }
+
+    int16_t GemmTuning::getWgmXccChunk() const
+    {
+        return pimpl->wgmxccchunk;
     }
 
     class GemmInputs::GemmInputsImpl
