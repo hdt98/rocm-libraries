@@ -103,6 +103,8 @@ context_t::context_t(const problem_t& problem, const hardware_t& hardware, const
     OLOG_DEBUG("MatrixInstruction: " << int(MI_M) << "x" << int(MI_N) << "x" << int(MI_K));
     OLOG_DEBUG("ElementSizeA (bits): " << int(a_bits));
     OLOG_DEBUG("ElementSizeB (bits): " << int(b_bits));
+    OLOG_DEBUG("Block Scale A: " << int(problem.a_mx_block_size));
+    OLOG_DEBUG("Block Scale B: " << int(problem.b_mx_block_size));
     OLOG_DEBUG("CacheHintsA: " << int(config.cache_hints_a));
     OLOG_DEBUG("CacheHintsB: " << int(config.cache_hints_b));
 
