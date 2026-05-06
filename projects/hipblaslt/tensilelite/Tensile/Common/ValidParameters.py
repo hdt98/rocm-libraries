@@ -1014,6 +1014,11 @@ validParameters = { # we need to make sure this matches develop
     #   "Auto":        triggers defaulting in Solution.assignDerivedParameters. The default is
     #                  TDM iff TDMInst != 0, otherwise BufferLoad.
     "MXLoadInst": ["Auto", "TDM", "BufferLoad", "GlobalLoad"],
+    # Enable PLR 0.5 to save vgprs
+    # 0: Disabled
+    # 1: Use PLR 0.5 for A
+    # 2: Use PLR 0.5 for B
+    "HalfPLR": [0, 1, 2]
 }
 
 newMIValidParameters = {
