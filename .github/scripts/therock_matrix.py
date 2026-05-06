@@ -55,6 +55,7 @@ project_map = {
             "-DTHEROCK_ENABLE_MIOPEN=ON",
             "-DTHEROCK_ENABLE_MIOPENPROVIDER=ON",
             "-DTHEROCK_ENABLE_COMPOSABLE_KERNEL=ON",
+            "-DTHEROCK_COMPOSABLE_KERNEL_FOR_MIOPEN_ONLY=ON",
         ],
         "projects_to_test": ["miopen", "miopenprovider"],
     },
