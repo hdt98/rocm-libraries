@@ -294,7 +294,7 @@ class AddrCalculation:
                 if not singleColAddrUpdated or not ss.optSrdIncForRow:
                     if tc == 'Bias' and kw.states.useBias == DataDirection.READ:
                         coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
-                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                         module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
                                                 shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -309,7 +309,7 @@ class AddrCalculation:
                         return module
                     if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and isSingleKernel:
                         if self.addrScaleAlphaVecVgpr:
-                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                             coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
                             module.add(VSubU32(dst=vgpr(self.addrScaleAlphaVecVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                             module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
@@ -324,7 +324,7 @@ class AddrCalculation:
                         return module
                     if tc == 'ScaleAVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                         if self.addrScaleAVecVgpr:
-                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 0)), comment="wgp0 * MT0"))
+                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                             module.add(VSubU32(dst=vgpr(self.addrScaleAVecVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                             module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAVecVgpr), \
                                                     shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -338,7 +338,7 @@ class AddrCalculation:
                         return module
                     if tc == 'ScaleBVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                         if self.addrScaleBVecVgpr:
-                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 1)), comment="wgp1 * MT1"))
+                            module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr("WorkGroup1"), comment="wgp1 * MT1"))
                             module.add(VSubU32(dst=vgpr(self.addrScaleBVecVgpr), src0=vgpr(self.coord1Vgpr), src1=sgpr(tmpSgpr)))
                             module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleBVecVgpr), \
                                                     shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -367,7 +367,7 @@ class AddrCalculation:
             if d1==0 and vc1==0:
                 if tc == 'Bias' and kw.states.useBias == DataDirection.READ:
                     coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                     module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
                                             shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -381,7 +381,7 @@ class AddrCalculation:
                     return module
                 if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and isSingleKernel:
                     if self.addrScaleAlphaVecVgpr:
-                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                         coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
                         module.add(VSubU32(dst=vgpr(self.addrScaleAlphaVecVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
@@ -396,7 +396,7 @@ class AddrCalculation:
                     return module
                 if tc == 'ScaleAVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                     if self.addrScaleAVecVgpr:
-                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 0)), comment="wgp0 * MT0"))
+                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                         module.add(VSubU32(dst=vgpr(self.addrScaleAVecVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAVecVgpr), \
                                                 shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -410,7 +410,7 @@ class AddrCalculation:
                     return module
                 if tc == 'ScaleBVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                     if self.addrScaleBVecVgpr:
-                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 1)), comment="wgp1 * MT1"))
+                        module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr("WorkGroup1"), comment="wgp1 * MT1"))
                         module.add(VSubU32(dst=vgpr(self.addrScaleBVecVgpr), src0=vgpr(self.coord1Vgpr), src1=sgpr(tmpSgpr)))
                         module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleBVecVgpr), \
                                                 shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -437,7 +437,7 @@ class AddrCalculation:
             # the byte address offset for that col and the mask in/out.
             if tc == 'Bias' and kw.states.useBias == DataDirection.READ:
                 coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
-                module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                 module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
                                         shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -451,7 +451,7 @@ class AddrCalculation:
                 return module
             if tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and isSingleKernel:
                 if self.addrScaleAlphaVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                     coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
                     module.add(VSubU32(dst=vgpr(self.addrScaleAlphaVecVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
@@ -466,7 +466,7 @@ class AddrCalculation:
                 return module
             if tc == 'ScaleAVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                 if self.addrScaleAVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 0)), comment="wgp0 * MT0"))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                     module.add(VSubU32(dst=vgpr(self.addrScaleAVecVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAVecVgpr), \
                                             shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -480,7 +480,7 @@ class AddrCalculation:
                 return module
             if tc == 'ScaleBVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                 if self.addrScaleBVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 1)), comment="wgp1 * MT1"))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr("WorkGroup1"), comment="wgp1 * MT1"))
                     module.add(VSubU32(dst=vgpr(self.addrScaleBVecVgpr), src0=vgpr(self.coord1Vgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleBVecVgpr), \
                                             shiftHex=hex(log2(kw.states.bpeCinternal)), \
@@ -715,7 +715,7 @@ class AddrCalculation:
 
         else:
             if tc == 'Bias' and kernel["ProblemType"]["UseBias"] and isSingleKernel:
-                module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                 coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
                 module.add(VSubU32(dst=vgpr(self.addrBiasVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                 module.add(VLShiftLeftB32(dst=vgpr(self.addrBiasVgpr), \
@@ -729,7 +729,7 @@ class AddrCalculation:
                                        comment="add lds offset"))
             elif tc == 'ScaleAlphaVec' and kernel["ProblemType"]["UseScaleAlphaVec"] and isSingleKernel:
                 if self.addrScaleAlphaVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr(kw.storeWorkGroupSgpr(kernel, dim)), comment="wgp%u * MT%u"%(dim, dim)))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile%u"%dim], src1=sgpr("WorkGroup%u" % dim), comment="wgp%u * MT%u"%(dim, dim)))
                     coordVgpr = self.coord0Vgpr if dim == 0 else self.coord1Vgpr
                     module.add(VSubU32(dst=vgpr(self.addrScaleAlphaVecVgpr), src0=vgpr(coordVgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAlphaVecVgpr), \
@@ -743,7 +743,7 @@ class AddrCalculation:
                                            comment="add lds offset"))
             elif tc == 'ScaleA' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                 if self.addrScaleAVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 0)), comment="wgp0 * MT0"))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile0"], src1=sgpr("WorkGroup0"), comment="wgp0 * MT0"))
                     module.add(VSubU32(dst=vgpr(self.addrScaleAVecVgpr), src0=vgpr(self.coord0Vgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleAVecVgpr), \
                                             shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \
@@ -756,7 +756,7 @@ class AddrCalculation:
                                        comment="add lds offset"))
             elif tc == 'ScaleBVec' and (kernel["ProblemType"]["UseScaleAB"] == "Vector") and isSingleKernel:
                 if self.addrScaleBVecVgpr:
-                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr(kw.storeWorkGroupSgpr(kernel, 1)), comment="wgp1 * MT1"))
+                    module.add(SMulI32(dst=sgpr(tmpSgpr), src0=kernel["MacroTile1"], src1=sgpr("WorkGroup1"), comment="wgp1 * MT1"))
                     module.add(VSubU32(dst=vgpr(self.addrScaleBVecVgpr), src0=vgpr(self.coord1Vgpr), src1=sgpr(tmpSgpr)))
                     module.add(VLShiftLeftB32(dst=vgpr(self.addrScaleBVecVgpr), \
                                             shiftHex=hex(log2(self.kernelWriter.states.bpeCinternal)), \

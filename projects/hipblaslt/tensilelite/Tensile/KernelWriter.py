@@ -2508,8 +2508,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
     module.addComment1("global read addresses: work-group")
     if not forceNoTileCode and not forPrefetchAcrossPersistent:
       module.add(self.graWorkGroup(kernel, tensorParametersA, tensorParametersB))
-      if self.isPrefetchAcrossPersistentEnabled(kernel):
-        module.add(self.prefetchAcrossPersistentSnapshot(kernel))
 
 
     self.dontAppendCode = forceNoTileCode
@@ -2880,7 +2878,9 @@ class KernelWriter(metaclass=abc.ABCMeta):
         moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st)
         module.add(replaceHolder(moduleTmp, 0))
         module.add(self.globalReadDo(kernel, 0, tensorParameters1st))
-        if not usePrimedSkip:
+        # PAP only primes the main A/B data. MX scale loads use low VGPR aliases
+        # that tail/store setup may reuse, so reload them at the next tile merge.
+        if not usePrimedSkip and not forPrefetchAcrossPersistent:
           if "MX" in tensorParameters1st:
             moduleTmp = self.directToLdsM0Update(kernel, 0, tensorParameters1st["MX"], skipWait=True)
             module.add(replaceHolder(moduleTmp, 0))
@@ -9286,7 +9286,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
     return ""
 
   ##############################################################################
-  # PAP: helper accessors for store-visible state
+  # PAP helpers
   ##############################################################################
   def isPrefetchAcrossPersistentEnabled(self, kernel):
     """Return True when PAP is enabled for this kernel."""
@@ -9295,27 +9295,6 @@ class KernelWriter(metaclass=abc.ABCMeta):
             and not kernel.get("SuppressNoLoadLoop", False)
             and kernel["PrefetchGlobalRead"] >= 1
             and not kernel.get("UseCustomMainLoopSchedule", 0))
-
-  def storeWorkGroupSgpr(self, kernel, dim):
-    """Return the SGPR name for store-visible WorkGroup state.
-
-    When PAP is active the live WorkGroup* holds the *next* tile's
-    state.  Store/fixup paths must read the snapshotted PrevWorkGroup*
-    instead.
-    """
-    if self.isPrefetchAcrossPersistentEnabled(kernel):
-      return "PrevWorkGroup%u" % dim
-    return "WorkGroup%u" % dim
-
-  def storeStreamKSgpr(self, kernel, sgprName):
-    """Return the SGPR name for store-visible StreamK state.
-
-    Accepted *sgprName* values: ``StreamKLocalStart``,
-    ``StreamKLocalEnd``, ``StreamKTileID``.
-    """
-    if self.isPrefetchAcrossPersistentEnabled(kernel):
-      return "Prev" + sgprName
-    return sgprName
 
   ##############################################################################
   # Function End

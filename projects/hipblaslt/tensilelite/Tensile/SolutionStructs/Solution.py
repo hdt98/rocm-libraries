@@ -1359,6 +1359,8 @@ class Solution(collections.abc.Mapping):
         if state["LocalSplitU"] > 1:
           reject(state, printRejectionReason, "Atomic Stream-K not working with LocalSplitU")
       if state.get("PrefetchAcrossPersistent", 0):
+        if state["StreamK"] != 3:
+          reject(state, printRejectionReason, "PrefetchAcrossPersistent is currently supported only with StreamK=3")
         if not state["BufferLoad"]:
           reject(state, printRejectionReason, "PrefetchAcrossPersistent requires BufferLoad")
         # if state["PrefetchGlobalRead"] < 2:

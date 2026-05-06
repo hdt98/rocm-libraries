@@ -12295,7 +12295,7 @@ class KernelWriterAssembly(KernelWriter):
       #   baseCol = (wg1/G)*(MT1*G) + (wg1%G),  G=min(lowbit(SizeJ/MT1), LVCB)
       assert kernel["BufferStore"]
       module.addSpaceLine()
-      module.add(SMulI32(dst=sgpr(wgMT1), src0="MT1", src1=sgpr(self.storeWorkGroupSgpr(kernel, 1)), comment="<- wg1*MT1"))
+      module.add(SMulI32(dst=sgpr(wgMT1), src0="MT1", src1=sgpr("WorkGroup1"), comment="<- wg1*MT1"))
 
       if kernel["BAddrInterleave"]:
         with self.allocTmpSgpr(6, tag="BInterleave_storeSrd") as tmpSgprInfo2:
@@ -12313,10 +12313,10 @@ class KernelWriterAssembly(KernelWriter):
           labelAfterShift = Label(self.labels.getNameInc("BInterleave_storeSrd_afterShift"), "")
 
           module.add(SSubU32(dst=sgpr(sMask), src0=sgpr("BInterleaveG"), src1=1, comment="mask=G-1"))
-          module.add(SAndB32(dst=sgpr(tmpS1), src0=sgpr(self.storeWorkGroupSgpr(kernel, 1)), src1=sgpr(sMask), comment="phase = wg1 & (G-1)"))
+          module.add(SAndB32(dst=sgpr(tmpS1), src0=sgpr("WorkGroup1"), src1=sgpr(sMask), comment="phase = wg1 & (G-1)"))
 
           # super = wg1 >> log2(G) (G in {2,4,8,16})
-          module.add(SMovB32(dst=sgpr(tmpS0), src=sgpr(self.storeWorkGroupSgpr(kernel, 1)), comment="super = wg1"))
+          module.add(SMovB32(dst=sgpr(tmpS0), src=sgpr("WorkGroup1"), comment="super = wg1"))
           module.add(SCmpEQU32(src0=sgpr("BInterleaveG"), src1=16))
           module.add(SCBranchSCC1(labelName=labelCase16.getLabelName()))
           module.add(SCmpEQU32(src0=sgpr("BInterleaveG"), src1=8))
@@ -12376,7 +12376,7 @@ class KernelWriterAssembly(KernelWriter):
         elif i != kernel["ProblemType"]["Index0"] and i != kernel["ProblemType"]["Index1"] and not isPackedIndex(kernel, i):
           # group index, this is higher-order Tensor dimension, just add to SRD base:
           isStridedBuffer = kernel["ProblemType"]["StridedBatched"] or kernel["_GlobalAccumulation"]
-          coord = sgpr(self.storeWorkGroupSgpr(kernel, 2)) if isStridedBuffer else None
+          coord = sgpr("WorkGroup2") if isStridedBuffer else None
           addToSrd = True if isStridedBuffer else False
         else:
           # could be packed higher-order index, just ignore
@@ -12551,7 +12551,7 @@ class KernelWriterAssembly(KernelWriter):
     module.add(SMovB32(dst=sgpr("SrdTD+2"), src="BufferOOB"))
     module.add(SMovB32(dst=sgpr("SrdTD+3"), src="Srd127_96", comment="Set bits 127_96 in post-loop SRD"))
 
-    module.add(SMulI32(dst=sgpr(tmpspgr0), src0="MT1", src1=sgpr(self.storeWorkGroupSgpr(kernel, 1)), comment=""))
+    module.add(SMulI32(dst=sgpr(tmpspgr0), src0="MT1", src1=sgpr("WorkGroup1"), comment=""))
     module.add(SMulHIU32(dst=sgpr(tmpspgr1+1), src0=sgpr(tmpspgr0), src1=sgpr("StrideD1J"), comment=""))
     module.add(SMulI32(dst=sgpr(tmpspgr1+0), src0=sgpr(tmpspgr0), src1=sgpr("StrideD1J"), comment=""))
 
@@ -12568,8 +12568,8 @@ class KernelWriterAssembly(KernelWriter):
     module.add(SAddU32(dst=sgpr("SrdTD+0"), src0=sgpr("AddressTD+0"), src1=sgpr(tmpspgr1+0), comment="add lo to SRTD" ))
     module.add(SAddCU32(dst=sgpr("SrdTD+1"), src0=sgpr("AddressTD+1"), src1=sgpr(tmpspgr1+1), comment="add hi to SRTD" ))
 
-    module.add(SMulHIU32(dst=sgpr(tmpspgr1+1), src0=sgpr(self.storeWorkGroupSgpr(kernel, 2)), src1=sgpr("StrideDK"), comment=""))
-    module.add(SMulI32(dst=sgpr(tmpspgr1+0), src0=sgpr(self.storeWorkGroupSgpr(kernel, 2)), src1=sgpr("StrideDK"), comment=""))
+    module.add(SMulHIU32(dst=sgpr(tmpspgr1+1), src0=sgpr("WorkGroup2"), src1=sgpr("StrideDK"), comment=""))
+    module.add(SMulI32(dst=sgpr(tmpspgr1+0), src0=sgpr("WorkGroup2"), src1=sgpr("StrideDK"), comment=""))
 
     module.add(SLShiftLeftB64(dst=sgpr(tmpspgr1,2), src=sgpr(tmpspgr1,2), shiftHex=log2(bpe), comment="scale by bpe"))
     module.add(SBranch(labelName=SrdTDGeneralBatched_End.getLabelName()))
@@ -13915,8 +13915,8 @@ class KernelWriterAssembly(KernelWriter):
     tmpS1  = tmpS0 + 1
     tmpS23 = tmpS1 + 1
 
-    wg0=self.storeWorkGroupSgpr(kernel, 0)
-    wg1=self.storeWorkGroupSgpr(kernel, 1)
+    wg0="WorkGroup0"
+    wg1="WorkGroup1"
 
     sizeBoundary = [0,0]
     sizeBoundary[0] = \
@@ -14266,7 +14266,7 @@ class KernelWriterAssembly(KernelWriter):
         with self.allocTmpSgpr(1,1) as tmpSgprRes:
           set_bs_label = Label(self.labels.getNameInc("Dont_Set_BiasStride"), "")
           tmpSgpr = tmpSgprRes.idx
-          module.add(SAddU32(dst=sgpr(tmpSgpr), src0=sgpr(self.storeWorkGroupSgpr(kernel, 2)), src1=hex(1)))
+          module.add(SAddU32(dst=sgpr(tmpSgpr), src0=sgpr("WorkGroup2"), src1=hex(1)))
           module.add(SMulI32(dst=sgpr(tmpSgpr), src0=sgpr("BiasStride"), src1=sgpr(tmpSgpr), comment="stride * (wg+1)"))
           module.add(SCmpEQU32(sgpr(tmpSgpr), 0, comment="bias stride = 0?"))
           if self.states.FactorDim == 3:
@@ -15840,7 +15840,7 @@ class KernelWriterAssembly(KernelWriter):
   def calculateVectorGlobalStride(self, kernel, offsetInVgpr, offsetOutVgpr, tmpSgpr, dim, strideName:str):
     module = Module("")
     def calculateVectorGlobalStrideCommon(s):
-      module.add(SMulI32(dst=sgpr(s), src0=sgpr(strideName), src1=sgpr(self.storeWorkGroupSgpr(self.states.kernel, 2)), comment="Stride * WG"))
+      module.add(SMulI32(dst=sgpr(s), src0=sgpr(strideName), src1=sgpr("WorkGroup2"), comment="Stride * WG"))
       module.add(VAddU32(dst=vgpr(offsetOutVgpr), src0=sgpr(s), src1=vgpr(offsetInVgpr), comment=f"coord {dim} = wgp{dim} * MT{dim} + thread offset + Stride * WG"))
     if tmpSgpr:
       calculateVectorGlobalStrideCommon(tmpSgpr)
@@ -16433,8 +16433,8 @@ class KernelWriterAssembly(KernelWriter):
     argOffset += 16 # advance dwordx4
     module.add(self.argLoader.loadKernArg("AddressSy", "KernArgAddress", sgprOffset=hex(argOffset), dword=2))
     module.add(SMulI32(sgpr("NumGroup"), sgpr("NumWorkGroups0"), sgpr("NumWorkGroups1"), "get total num_wgs"))
-    module.add(SMulI32(sgpr("WGIdx"), sgpr(self.storeWorkGroupSgpr(self.states.kernel, 1)), sgpr("NumWorkGroups0"), "wgId = wg1 * numWG0"))
-    module.add(SAddI32(sgpr("WGIdx"), sgpr("WGIdx"), sgpr(self.storeWorkGroupSgpr(self.states.kernel, 0)), "wgId += wg0"))
+    module.add(SMulI32(sgpr("WGIdx"), sgpr("WorkGroup1"), sgpr("NumWorkGroups0"), "wgId = wg1 * numWG0"))
+    module.add(SAddI32(sgpr("WGIdx"), sgpr("WGIdx"), sgpr("WorkGroup0"), "wgId += wg0"))
     module.addSpaceLine()
     module.add(SWaitCnt(kmcnt=0))
     module.addSpaceLine()
@@ -16804,17 +16804,31 @@ class KernelWriterAssembly(KernelWriter):
     return module
 
   ##############################################################################
-  # Snapshot store-visible state before PAP overwrites live WorkGroup/StreamK
+  # Snapshot current tile before PAP temporarily overwrites WorkGroup/StreamK
   ##############################################################################
   def prefetchAcrossPersistentSnapshot(self, kernel):
     module = Module("prefetchAcrossPersistentSnapshot")
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="snapshot WG0 for store"))
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="snapshot WG1 for store"))
-    module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="snapshot WG2 for store"))
-    module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="snapshot LocalStart for store"))
-    module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="snapshot LocalEnd for store"))
+    module.add(SMovB32(dst=sgpr("PrevWorkGroup0"), src=sgpr("WorkGroup0"), comment="checkpoint WG0 for PAP restore"))
+    module.add(SMovB32(dst=sgpr("PrevWorkGroup1"), src=sgpr("WorkGroup1"), comment="checkpoint WG1 for PAP restore"))
+    module.add(SMovB32(dst=sgpr("PrevWorkGroup2"), src=sgpr("WorkGroup2"), comment="checkpoint WG2 for PAP restore"))
+    module.add(SMovB32(dst=sgpr("PrevStreamKLocalStart"), src=sgpr("StreamKLocalStart"), comment="checkpoint LocalStart for PAP restore"))
+    module.add(SMovB32(dst=sgpr("PrevStreamKLocalEnd"), src=sgpr("StreamKLocalEnd"), comment="checkpoint LocalEnd for PAP restore"))
     if len(kernel["SpaceFillingAlgo"]):
-      module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="snapshot TileID for store"))
+      module.add(SMovB32(dst=sgpr("PrevStreamKTileID"), src=sgpr("StreamKTileID"), comment="checkpoint TileID for PAP restore"))
+    return module
+
+  def prefetchAcrossPersistentRestoreCurrentTile(self, kernel):
+    module = Module("prefetchAcrossPersistentRestoreCurrentTile")
+    # PAP temporarily maps WorkGroup*/StreamKLocal* to the next persistent tile
+    # so it can issue the first PGR early. Restore the current tile for the
+    # remaining NLL/tail code; StreamKIter already points at the next chunk.
+    module.add(SMovB32(dst=sgpr("WorkGroup0"), src=sgpr("PrevWorkGroup0"), comment="restore current WG0 after PAP"))
+    module.add(SMovB32(dst=sgpr("WorkGroup1"), src=sgpr("PrevWorkGroup1"), comment="restore current WG1 after PAP"))
+    module.add(SMovB32(dst=sgpr("WorkGroup2"), src=sgpr("PrevWorkGroup2"), comment="restore current WG2 after PAP"))
+    module.add(SMovB32(dst=sgpr("StreamKLocalStart"), src=sgpr("PrevStreamKLocalStart"), comment="restore current LocalStart after PAP"))
+    module.add(SMovB32(dst=sgpr("StreamKLocalEnd"), src=sgpr("PrevStreamKLocalEnd"), comment="restore current LocalEnd after PAP"))
+    if len(kernel["SpaceFillingAlgo"]):
+      module.add(SMovB32(dst=sgpr("StreamKTileID"), src=sgpr("PrevStreamKTileID"), comment="restore current TileID after PAP"))
     return module
 
   ##############################################################################
@@ -16835,8 +16849,10 @@ class KernelWriterAssembly(KernelWriter):
     module.add(SBarrier(comment="PAP: sync before next-tile prefetch"))
 
     skComponent = Component.StreamK.find(self)
+    module.add(self.prefetchAcrossPersistentSnapshot(kernel))
     module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
     module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, forPrefetchAcrossPersistent=True))
+    module.add(self.prefetchAcrossPersistentRestoreCurrentTile(kernel))
     module.add(skipLabel)
     return module
 

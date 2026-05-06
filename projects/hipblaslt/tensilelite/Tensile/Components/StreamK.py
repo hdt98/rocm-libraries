@@ -663,12 +663,12 @@ class StreamK(Component):
             writer.sgprPool.checkIn(tmpSgpr)
 
             # Skip to global write if WG started and finished tile
-            module.add(SCmpEQU32(src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalStart")), src1=0, comment="does wg start tile?"))
+            module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))
             module.add(SCBranchSCC0(labelName=skFixupTreeLabel.getLabelName(), comment="If we didn't start the tile, always to SK Tree fixup"))
             sIpt = writer.acquireStreamKConstSgpr(kernel, "ItersPerTile")
             if skConstsInVgprs:
                 module.add(VReadfirstlaneB32(dst=sgpr(sIpt), src=vgpr(writer.states.skConstVgprs["ItersPerTile"])))
-            module.add(SCmpEQU32(src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalEnd")), src1=sgpr(sIpt), comment="does wg finish tile?"))
+            module.add(SCmpEQU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr(sIpt), comment="does wg finish tile?"))
             writer.releaseStreamKConstSgpr(sIpt)
             module.add(SCBranchSCC1(labelName=skStoreLabel.getLabelName(), comment="Branch if started and finished tile, go to regular store code"))
 
@@ -750,7 +750,7 @@ class StreamK(Component):
             module.add(SCSelectB32(dst=sgpr(tmpSgpr+0), src0=0, src1=sgpr(tmpSgpr+0), comment="If True, don't sub any iters"))
             module.add(SSubU32(dst=sgpr(tmpSgpr+1), src0=sgpr(tmpSgpr+1), src1=sgpr(tmpSgpr+0), comment="extras = (offset-1) - (possible extras)"))
             module.add(SAddU32(dst=sgpr(tmpSgpr+2), src0=sgpr(tmpSgpr+2), src1=sgpr(tmpSgpr+1), comment="Add possible extra iters"))
-            module.add(SAddU32(dst=sgpr(tmpSgpr+0), src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalEnd")), src1=1, comment="Start of next wg"))
+            module.add(SAddU32(dst=sgpr(tmpSgpr+0), src0=sgpr("StreamKLocalEnd"), src1=1, comment="Start of next wg"))
             module.add(SAddU32(dst=sgpr(tmpSgpr+2), src0=sgpr(tmpSgpr+0), src1=sgpr(tmpSgpr+2)))
             sIpt = writer.acquireStreamKConstSgpr(kernel, "ItersPerTile")
             if writer.isStreamKConstantsToVgprEnabled(kernel):
@@ -801,7 +801,7 @@ class StreamK(Component):
             # Done fixup loop
             writer.sgprPool.checkIn(sIdxOffset)
             writer.sgprPool.checkIn(sFlagIdx)
-            module.add(SCmpEQU32(src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalStart")), src1=0, comment="does wg start tile?"))
+            module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))
             module.add(writer.longBranchScc0(skPartialsLabel, posNeg=1))
         else: # linear reduction
             skFixupLabel = Label(label=writer.labels.getNameInc("SK_Fixup"), comment="")
@@ -814,7 +814,7 @@ class StreamK(Component):
             tmpSgpr = writer.sgprPool.checkOut(4, "globalWriteElements")
             # if we did not start the tile, store partials
             # branch to beta == 0 store path
-            module.add(SCmpEQU32(src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalStart")), src1=0, comment="does wg start tile?"))
+            module.add(SCmpEQU32(src0=sgpr("StreamKLocalStart"), src1=0, comment="does wg start tile?"))
             module.add(writer.longBranchScc0(skPartialsLabel, posNeg=1))
             # module.add(SCBranchSCC0(labelName=skPartialsLabel.getLabelName(), comment="Branch if not start tile, store partials"))
 
@@ -824,7 +824,7 @@ class StreamK(Component):
                 sIpt = writer.acquireStreamKConstSgpr(kernel, "ItersPerTile")
                 if skConstsInVgprs:
                     module.add(VReadfirstlaneB32(dst=sgpr(sIpt), src=vgpr(writer.states.skConstVgprs["ItersPerTile"])))
-                module.add(SCmpEQU32(src0=sgpr(writer.storeStreamKSgpr(kernel, "StreamKLocalEnd")), src1=sgpr(sIpt), comment="does wg finish tile?"))
+                module.add(SCmpEQU32(src0=sgpr("StreamKLocalEnd"), src1=sgpr(sIpt), comment="does wg finish tile?"))
                 module.add(SCBranchSCC1(labelName=skStoreLabel.getLabelName(), comment="Branch if started and finished tile, go to regular store code"))
 
                 # if we started the tile but did not finish it, fix up step
