@@ -27,7 +27,6 @@ add_executable(
     descriptors/TestEngineConfigDescriptor.cpp
     descriptors/TestEngineDescriptor.cpp
     descriptors/TestEngineHeuristicDescriptor.cpp
-    descriptors/TestEngineHeuristicDescriptorAdditional.cpp
     descriptors/TestExecutionPlanDescriptor.cpp
     descriptors/TestGraphDescriptor.cpp
     descriptors/TestTensorDescriptor.cpp

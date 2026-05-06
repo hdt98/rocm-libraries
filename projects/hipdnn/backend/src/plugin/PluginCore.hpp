@@ -134,6 +134,11 @@ protected:
     // This function is called after the plugin is added to the plugin list.
     virtual void actionAfterAdding([[maybe_unused]] const Plugin& plugin) {}
 
+    // This function is called after the plugin list is cleared. Derived classes
+    // must override this to reset any auxiliary state kept in sync with _plugins
+    // (e.g. derived-class indexes populated from actionAfterAdding).
+    virtual void actionAfterClearing() {}
+
     // For cases where tests need to override the default plugin search paths
     static std::set<std::filesystem::path>
         getPluginSearchPaths(const char* envVarName,
@@ -250,6 +255,7 @@ private:
     {
         _plugins.clear();
         _loadedPluginFiles.clear();
+        actionAfterClearing();
     }
 
     void scanDirectoryForPlugins(const std::filesystem::path& dirPath,

@@ -89,6 +89,11 @@ protected:
         _policyIds.insert(plugin.policyId());
     }
 
+    void actionAfterClearing() override
+    {
+        _policyIds.clear();
+    }
+
 private:
     std::set<int64_t> _policyIds;
 };

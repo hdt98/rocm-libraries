@@ -228,6 +228,20 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidationRunsOnEachLoadCycle)
     EXPECT_GT(count1, 0) << "Should have loaded at least one plugin";
 }
 
+TEST_F(TestHeuristicPluginManagerValidationPaths, AbsoluteReloadResetsPolicyIdTracking)
+{
+    // Regression: ABSOLUTE-mode reload must clear the derived-class policy-id
+    // index, not just _plugins. Otherwise reloading a plugin whose policy id
+    // matches one from the previous load triggers a false "already exists"
+    // failure in validateBeforeAdding.
+    _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    const size_t firstCount = _manager->getPlugins().size();
+    ASSERT_GT(firstCount, 0u) << "Test precondition: at least one plugin must load";
+
+    EXPECT_NO_THROW(_manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    EXPECT_EQ(_manager->getPlugins().size(), firstCount);
+}
+
 // ========== Constructor Path Coverage ==========
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, ConstructorSetsUpValidationInfrastructure)
