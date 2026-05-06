@@ -83,8 +83,12 @@ void HeuristicPlugin::resolveSymbols()
 
 #undef GET_REQUIRED_SYMBOL
 
-    // Verify plugin type
-    auto pluginType = type();
+    validatePluginMetadata(*this);
+}
+
+void HeuristicPlugin::validatePluginMetadata(const HeuristicPlugin& plugin)
+{
+    auto pluginType = plugin.type();
     if(pluginType != HIPDNN_PLUGIN_TYPE_HEURISTIC)
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
@@ -94,7 +98,7 @@ void HeuristicPlugin::resolveSymbols()
 
     // Verify the plugin reports a non-empty library name (used purely for diagnostics now;
     // policy identity flows through the policy IDs enumerated below).
-    if(name().empty())
+    if(plugin.name().empty())
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
                               "Cannot load heuristic plugin: plugin name is empty");
@@ -102,10 +106,10 @@ void HeuristicPlugin::resolveSymbols()
 
     // Eagerly enumerate policies and validate that each policy ID matches the FNV-1a hash of
     // its canonical name. Mismatches indicate a malformed plugin and cause rejection at load.
-    const auto policyIds = getAllPolicyIds();
+    const auto policyIds = plugin.getAllPolicyIds();
     for(const int64_t policyId : policyIds)
     {
-        const auto policyName = getPolicyName(policyId);
+        const auto policyName = plugin.getPolicyName(policyId);
         if(policyName.empty())
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
@@ -160,21 +164,37 @@ std::vector<int64_t> HeuristicPlugin::getAllPolicyIds() const
         return _allPolicyIds;
     }
 
-    uint32_t numPolicies = 0;
+    uint32_t expectedCount = 0;
     invokeHeuristicFunction(
-        "get number of policies", _funcGetAllPolicyIds, nullptr, 0u, &numPolicies);
+        "get number of policies", _funcGetAllPolicyIds, nullptr, 0u, &expectedCount);
 
-    if(numPolicies == 0)
+    std::vector<int64_t> policyIds(expectedCount);
+    uint32_t actualCount = expectedCount;
+    if(expectedCount > 0)
+    {
+        invokeHeuristicFunction("get all policy IDs",
+                                _funcGetAllPolicyIds,
+                                policyIds.data(),
+                                expectedCount,
+                                &actualCount);
+    }
+
+    validatePolicyIdsBuffer(expectedCount, actualCount, policyIds);
+
+    _allPolicyIds = policyIds;
+    return policyIds;
+}
+
+void HeuristicPlugin::validatePolicyIdsBuffer(uint32_t expectedCount,
+                                              uint32_t actualCount,
+                                              std::vector<int64_t>& policyIds)
+{
+    if(expectedCount == 0)
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "No policies found in the plugin");
     }
 
-    const uint32_t maxPolicies = numPolicies;
-    std::vector<int64_t> policyIds(maxPolicies);
-    invokeHeuristicFunction(
-        "get all policy IDs", _funcGetAllPolicyIds, policyIds.data(), maxPolicies, &numPolicies);
-
-    if(numPolicies != maxPolicies)
+    if(actualCount != expectedCount)
     {
         throw HipdnnException(
             HIPDNN_STATUS_PLUGIN_ERROR,
@@ -186,9 +206,6 @@ std::vector<int64_t> HeuristicPlugin::getAllPolicyIds() const
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "Duplicate policy IDs found");
     }
-
-    _allPolicyIds = policyIds;
-    return policyIds;
 }
 
 std::string_view HeuristicPlugin::getPolicyName(int64_t policyId) const

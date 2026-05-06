@@ -81,6 +81,23 @@ public:
     virtual bool finalize(hipdnnHeuristicPolicyDescriptor_t desc) const;
     virtual std::vector<int64_t> getSortedEngineIds(hipdnnHeuristicPolicyDescriptor_t desc) const;
 
+    // Validation helpers shared between resolveSymbols() (run at load time) and
+    // unit tests. Each helper throws HipdnnException on failure.
+    //
+    // validatePluginMetadata: checks plugin type is HEURISTIC, plugin library
+    // name is non-empty, and every reported policy has a non-empty name whose
+    // FNV-1a hash matches its policy ID. Operates entirely through virtual
+    // accessors so a NiceMock can drive each rejection path.
+    static void validatePluginMetadata(const HeuristicPlugin& plugin);
+
+    // validatePolicyIdsBuffer: checks the raw policy ID buffer returned by a
+    // plugin: actual count matches the expected count from the prior count
+    // query, and the buffer contains no intra-plugin duplicates. Sorts
+    // policyIds in place.
+    static void validatePolicyIdsBuffer(uint32_t expectedCount,
+                                        uint32_t actualCount,
+                                        std::vector<int64_t>& policyIds);
+
 protected:
     // Error handling helper (must not throw, used during error handling)
     std::string_view getLastErrorString() const noexcept;

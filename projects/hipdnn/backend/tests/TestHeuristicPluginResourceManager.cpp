@@ -10,7 +10,6 @@
  */
 
 #include "HipdnnException.hpp"
-#include "descriptors/mocks/MockHeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 

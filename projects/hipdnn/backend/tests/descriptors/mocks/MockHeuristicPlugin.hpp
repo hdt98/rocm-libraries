@@ -23,15 +23,12 @@ public:
     MockHeuristicPlugin() = default;
 
     // Module metadata
-    MOCK_METHOD(std::string_view, apiVersion, (), (const, override));
     MOCK_METHOD(std::vector<int64_t>, getAllPolicyIds, (), (const, override));
     MOCK_METHOD(std::string_view, getPolicyName, (int64_t policyId), (const, override));
     MOCK_METHOD(std::string_view, name, (), (const, override));
-    MOCK_METHOD(std::string_view, version, (), (const, override));
+    MOCK_METHOD(hipdnnPluginType_t, type, (), (const, override));
 
     // Handle lifecycle
-    MOCK_METHOD(hipdnnHeuristicHandle_t, createHandle, (), (const, override));
-    MOCK_METHOD(void, destroyHandle, (hipdnnHeuristicHandle_t handle), (const, override));
     MOCK_METHOD(void,
                 setDeviceProperties,
                 (hipdnnHeuristicHandle_t handle,
