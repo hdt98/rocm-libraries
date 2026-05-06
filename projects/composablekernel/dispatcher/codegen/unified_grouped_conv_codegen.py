@@ -893,8 +893,6 @@ struct {kernel_name}_Launcher {{
     using WorkspaceDataType = float;
 
     static constexpr index_t NDimSpatial = Config::NDimSpatial;
-    // Two-stage forces VectorSizeC = 1 for workspace writes
-    static constexpr index_t VectorSizeC_TwoStage = 1;
 
     using GemmShape = TileGemmShape<
         sequence<Config::M_Tile, Config::N_Tile, Config::K_Tile>,
@@ -904,7 +902,7 @@ struct {kernel_name}_Launcher {{
     static constexpr auto ConvSpec = {self._get_conv_specialization(config.trait)};
     using GroupedConvTraitsType = GroupedConvTraits<
         NDimSpatial, ConvSpec, InLayout, WeiLayout, tuple<>, OutLayout,
-        Config::VectorSizeA, Config::VectorSizeB, VectorSizeC_TwoStage,
+        Config::VectorSizeA, Config::VectorSizeB, Config::VectorSizeC,
         Config::NumGroupsToMerge, Config::EnableSplitImage, Config::ExplicitGemm>;
 
     using TilePartitioner = GemmSpatiallyLocalTilePartitioner<

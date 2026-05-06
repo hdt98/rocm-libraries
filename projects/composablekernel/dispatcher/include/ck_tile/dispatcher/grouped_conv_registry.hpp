@@ -86,6 +86,9 @@ struct GroupedConvKernelKey
     int num_wave_groups     = 1;
     int num_groups_to_merge = 1;
 
+    // Convolution specialization (e.g., "default", "filter1x1_stride1_pad0")
+    std::string specialization = "default";
+
     // GPU architecture (for filter_by_arch)
     std::string arch = "gfx942";
 
@@ -101,7 +104,8 @@ struct GroupedConvKernelKey
                vector_size_a == other.vector_size_a && vector_size_b == other.vector_size_b &&
                vector_size_c == other.vector_size_c && block_per_cu == other.block_per_cu &&
                num_wave_groups == other.num_wave_groups &&
-               num_groups_to_merge == other.num_groups_to_merge && arch == other.arch;
+               num_groups_to_merge == other.num_groups_to_merge &&
+               specialization == other.specialization && arch == other.arch;
     }
 
     std::string to_string() const
@@ -118,7 +122,8 @@ struct GroupedConvKernelKey
                std::to_string(tile_k) + "_" + std::to_string(wave_m) + "x" +
                std::to_string(wave_n) + "x" + std::to_string(wave_k) + "_" +
                std::to_string(warp_m) + "x" + std::to_string(warp_n) + "x" +
-               std::to_string(warp_k) + "_" + pipeline;
+               std::to_string(warp_k) + "_" + pipeline +
+               (specialization != "default" ? "_" + specialization : "");
     }
 };
 
@@ -139,6 +144,7 @@ struct GroupedConvKernelKeyHash
         h ^= std::hash<int>{}(key.warp_n) << 10;
         h ^= std::hash<std::string>{}(key.pipeline) << 11;
         h ^= std::hash<std::string>{}(key.arch) << 12;
+        h ^= std::hash<std::string>{}(key.specialization) << 13;
         return h;
     }
 };

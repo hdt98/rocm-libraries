@@ -139,6 +139,15 @@ def generate_registration_header(headers, output_dir):
         if gm_match:
             num_groups_to_merge = int(gm_match.group(1))
 
+        # Parse specialization from name
+        specialization = "default"
+        if "filter1x1_stride1_pad0" in kname:
+            specialization = "filter1x1_stride1_pad0"
+        elif "filter1x1_pad0" in kname:
+            specialization = "filter1x1_pad0"
+        elif "filter3x3" in kname:
+            specialization = "filter3x3"
+
         reg_lines.append(f"    // Kernel {i}: {kname}")
         reg_lines.append("    {")
         reg_lines.append(f"        GroupedConvKernelKey key;")
@@ -166,6 +175,7 @@ def generate_registration_header(headers, output_dir):
         reg_lines.append(f"        key.block_per_cu       = {block_per_cu};")
         reg_lines.append(f"        key.num_wave_groups    = {num_wave_groups};")
         reg_lines.append(f"        key.num_groups_to_merge = {num_groups_to_merge};")
+        reg_lines.append(f'        key.specialization = "{specialization}";')
         reg_lines.append(f"        key.arch         = arch;")
         reg_lines.append(
             f"        auto run_fn = backends::make_conv_bwd_weight_run_fn<{launcher}, {ndim}>();"
