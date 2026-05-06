@@ -174,7 +174,22 @@ def generate_registration_header(headers, output_dir):
             f"        auto is_supported_fn = backends::make_conv_bwd_weight_is_supported_fn<{launcher}, {ndim}>();"
         )
         reg_lines.append(
+            f"#ifdef CK_EXPERIMENTAL_BUILDER"
+        )
+        reg_lines.append(
+            f"        auto instance_str = backends::get_instance_string<{launcher}>();"
+        )
+        reg_lines.append(
+            f'        auto inst = std::make_shared<GroupedConvKernelInstance>(key, "{kname}", std::move(run_fn), std::move(is_supported_fn), instance_str);'
+        )
+        reg_lines.append(
+            f"#else"
+        )
+        reg_lines.append(
             f'        auto inst = std::make_shared<GroupedConvKernelInstance>(key, "{kname}", std::move(run_fn), std::move(is_supported_fn));'
+        )
+        reg_lines.append(
+            f"#endif"
         )
         reg_lines.append(f"        registry.register_kernel(key, inst);")
         reg_lines.append("    }")

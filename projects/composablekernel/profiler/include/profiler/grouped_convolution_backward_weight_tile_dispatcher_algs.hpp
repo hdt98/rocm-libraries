@@ -14,7 +14,6 @@
 #include "../../experimental/builder/test/utils/conv_algorithm_type_utils.hpp"
 #include "grouped_convolution_signatures.hpp"
 #include "ck_tile/ref/naive_grouped_conv_bwd_weight_gpu.hpp"
-
 #include "ck_tile/builder/testing/filter_extent.hpp"
 #include "ck_tile/builder/testing/conv/fwd.hpp"
 #include "ck_tile/builder/testing/conv/ck_tile.hpp"
@@ -138,6 +137,20 @@ void run_cpu_validation(const ckt::Args<SIGNATURE>& args,
     ck_tile::check_err(wei, ref, "\tError: Incorrect results!");
 }
 
+std::string get_runtime_arch_name()
+{
+    hipDeviceProp_t props{};
+    int device = 0;
+    ck_tile::hip_check_error(hipGetDevice(&device));
+    ck_tile::hip_check_error(hipGetDeviceProperties(&props, device));
+    // Extract base arch name (e.g. "gfx950" from "gfx950:sramecc+:xnack-")
+    std::string name(props.gcnArchName);
+    auto pos = name.find(':');
+    if(pos != std::string::npos)
+        name = name.substr(0, pos);
+    return name;
+}
+
 /// @brief Dispatcher-based `run_grouped_conv_backward_weight_tile_algs()`.
 /// Iterates all registered dispatcher kernels instead of builder-generated .inc files.
 template <auto SIGNATURE>
@@ -153,7 +166,7 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
     std::string best_op_name, op_name;
     int best_split_k = 1;
     bool is_supported;
-    float avg_time;
+    float avg_time{0};
     bool all_instances_valid = true;
 
     using DataType =
@@ -175,7 +188,7 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
     // Get max possible value in the output for tolerance calculation
     const std::size_t weight_bytes_num = conv_param.template GetWeightByte<DataType>();
     std::vector<DataType> ref(weight_bytes_num / sizeof(DataType));
-    HIP_CHECK_ERROR(
+    ck_tile::hip_check_error(
         hipMemcpy(&ref.data()[0], reference.get().weight, weight_bytes_num, hipMemcpyDeviceToHost));
     const float max_accumulated_value = *std::max_element(ref.begin(), ref.end());
     const index_t num_accums = std::accumulate(std::begin(conv_param.output_spatial_lengths_),
@@ -189,7 +202,9 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
     static bool kernels_registered = false;
     if(!kernels_registered)
     {
-        ck_tile::dispatcher::register_all_grouped_conv_bwd_weight_kernels("gfx950");
+        const auto arch_name = get_runtime_arch_name();
+        std::cout << "Runtime arch: " << arch_name << std::endl;
+        ck_tile::dispatcher::register_all_grouped_conv_bwd_weight_kernels(arch_name);
         kernels_registered = true;
     }
 
@@ -212,6 +227,10 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
     ctx.repeat      = s_conf.nrepeat_;
     ctx.benchmarking = s_conf.time_kernel_;
 
+    // For verification purposes, we use the instance string as the op_name.
+    // This allows us to compare the tile based dispatcher output to the CK builder based output.
+    constexpr bool use_instance_string = true;
+
     // Iterate all kernels × split-K values
     for(const auto* kernel : all_kernels)
     {
@@ -219,7 +238,8 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
         {
             auto problem  = args_to_problem<SIGNATURE>(args, k_batch);
             ctx.split_k   = k_batch;
-            op_name       = kernel->name();
+
+            op_name       = kernel->name(use_instance_string);
 
             // Check support before launching
             is_supported = kernel->is_supported(problem);
@@ -238,73 +258,63 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
             {
                 std::cerr << "[Exception] " << op_name << " SplitK=" << k_batch
                           << " : " << e.what() << std::endl;
-                (void)hipDeviceSynchronize();
-                (void)hipGetLastError();
+                ck_tile::hip_check_error(hipDeviceSynchronize());
+                ck_tile::hip_check_error(hipGetLastError());
                 is_supported = false;
+            }
+
+            if((s_conf.time_kernel_ || s_conf.flush_cache_) && !dummy_run_executed)
+            {
+                // Run first instance twice when profiling to stabilize timing
+                try
+                {
+                    avg_time = kernel->run(problem, nullptr);
+                }
+                catch(const std::runtime_error& e)
+                {
+                    std::cerr << "[Exception] " << op_name << " SplitK=" << k_batch << " : " << e.what() << std::endl;
+                    ck_tile::hip_check_error(hipDeviceSynchronize());
+                    ck_tile::hip_check_error(hipGetLastError());
+                    is_supported = false;
+                }
+                dummy_run_executed = true;
             }
 
             if(is_supported)
             {
-                if((s_conf.time_kernel_ || s_conf.flush_cache_) && !dummy_run_executed)
-                {
-                    // Run first instance twice when profiling to stabilize timing
-                    try
-                    {
-                        avg_time = kernel->run(problem, nullptr);
-                    }
-                    catch(const std::runtime_error& e)
-                    {
-                        std::cerr << "[Exception dummy] " << op_name << " SplitK=" << k_batch
-                                  << " : " << e.what() << std::endl;
-                        (void)hipDeviceSynchronize();
-                        (void)hipGetLastError();
-                        is_supported = false;
-                    }
-                    dummy_run_executed = true;
-                }
+                ckt::ValidationReport report;
+                auto&& [rtol, atol] = get_rtol_atol<SIGNATURE>(num_accums, k_batch, max_accumulated_value);
+                ckt::Outputs<SIGNATURE>::reflect(
+                    args,
+                    [&](std::string_view name,
+                        const auto& desc,
+                        void* ckt::Outputs<SIGNATURE>::*ptr) {
+                        report.check(name, desc, outputs.*ptr, reference.get().*ptr, rtol, atol);
+                    });
 
-                if(is_supported)
+                const bool valid = report.get_errors().empty();
+                best_avg_time    = std::min(best_avg_time, avg_time);
+                best_op_name     = best_avg_time < avg_time ? best_op_name : op_name;
+                best_split_k     = best_avg_time < avg_time ? best_split_k : k_batch;
+                if(valid)
                 {
-                    ckt::ValidationReport report;
-                    auto&& [rtol, atol] =
-                        get_rtol_atol<SIGNATURE>(num_accums, k_batch, max_accumulated_value);
-                    ckt::Outputs<SIGNATURE>::reflect(
-                        args,
-                        [&](std::string_view name,
-                            const auto& desc,
-                            void* ckt::Outputs<SIGNATURE>::*ptr) {
-                            report.check(
-                                name, desc, outputs.*ptr, reference.get().*ptr, rtol, atol);
-                        });
-
-                    const bool valid = report.get_errors().empty();
-                    best_avg_time    = std::min(best_avg_time, avg_time);
-                    best_op_name     = best_avg_time < avg_time ? best_op_name : op_name;
-                    best_split_k     = best_avg_time < avg_time ? best_split_k : k_batch;
-                    if(valid)
-                    {
-                        std::cout << "[Valid] Perf: " << std::setw(10) << avg_time << " ms,"
-                                  << " " << op_name << ", SplitK " << k_batch << std::endl;
-                    }
-                    else
-                    {
-                        std::cout << "[Error] " << op_name << ", SplitK " << k_batch << std::endl;
-                        for(const auto& error : report.get_errors())
-                        {
-                            std::cout << "\tNumber of incorrect values: " << error.wrong_elements
-                                      << " Is all zero:" << error.is_all_zero()
-                                      << " max err: " << error.max_error << std::endl;
-                            ckt::Args<SIGNATURE> args_k_batch = args;
-                            args_k_batch.k_batch              = k_batch;
-                            run_cpu_validation<SIGNATURE>(args_k_batch, outputs, reference.get());
-                        }
-                        all_instances_valid = false;
-                    }
+                    std::cout << "[Valid] Perf: " << std::setw(10) << avg_time << " ms,"
+                                << " " << op_name << ", SplitK " << k_batch << std::endl;
                 }
-            }
-            else
-            {
-                std::cout << "[Not supported] " << op_name << ", SplitK " << k_batch << std::endl;
+                else
+                {
+                    std::cout << "[Error] " << op_name << ", SplitK " << k_batch << std::endl;
+                    for(const auto& error : report.get_errors())
+                    {
+                        std::cout << "\tNumber of incorrect values: " << error.wrong_elements
+                                    << " Is all zero:" << error.is_all_zero()
+                                    << " max err: " << error.max_error << std::endl;
+                        ckt::Args<SIGNATURE> args_k_batch = args;
+                        args_k_batch.k_batch              = k_batch;
+                        run_cpu_validation<SIGNATURE>(args_k_batch, outputs, reference.get());
+                    }
+                    all_instances_valid = false;
+                }
             }
         }
     }

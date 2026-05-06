@@ -160,14 +160,27 @@ class GroupedConvKernelInstance
     GroupedConvKernelInstance(const GroupedConvKernelKey& key,
                               const std::string& name,
                               RunFn run_fn,
-                              IsSupportedFn is_supported_fn = nullptr)
+                              IsSupportedFn is_supported_fn = nullptr,
+                              const std::string& instance_string = "")
         : key_(key), name_(name), run_fn_(std::move(run_fn)),
-          is_supported_fn_(std::move(is_supported_fn))
+          is_supported_fn_(std::move(is_supported_fn)),
+          instance_string_(instance_string)
     {
     }
 
     const GroupedConvKernelKey& key() const { return key_; }
-    const std::string& name() const { return name_; }
+
+    /// Return the kernel name.
+    /// @param use_instance_string  When true, return the CK Tile
+    ///        GetInstanceString() representation (e.g.
+    ///        "GroupedConvolutionBackwardWeightKernel<2,Default,...>")
+    ///        if available; otherwise fall back to the dispatcher name.
+    const std::string& name(bool use_instance_string = false) const
+    {
+        if(use_instance_string && !instance_string_.empty())
+            return instance_string_;
+        return name_;
+    }
 
     // Check whether this kernel supports the given problem.
     // Returns true if no IsSupportedFn was provided.
@@ -194,6 +207,7 @@ class GroupedConvKernelInstance
     std::string name_;
     RunFn run_fn_;
     IsSupportedFn is_supported_fn_;
+    std::string instance_string_;
 };
 
 // =============================================================================

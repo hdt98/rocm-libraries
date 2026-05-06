@@ -646,6 +646,8 @@ struct {kernel_name}_Launcher {{
     }}
 
     {self._get_is_supported_code(config, host_args_type, kernel_type, a_dtype, b_dtype, c_dtype)}
+
+    {self._get_instance_string_code(config, kernel_type, a_dtype, b_dtype, c_dtype)}
 }};
 
 // Launcher alias for tile_engine compatibility
@@ -773,6 +775,50 @@ constexpr const char* CONV_{direction_prefix}_KERNEL_NAME = {ns_name}::CONV_{dir
         auto kargs = Kernel::MakeKernelArgs(args);
         return Kernel::IsSupportedArgument(kargs);
     }}"""
+
+    def _get_instance_string_code(self, config, kernel_type, a_dtype, b_dtype, c_dtype) -> str:
+        """Generate the get_instance_string() static method for the launcher.
+
+        Constructs the same Kernel type and calls Kernel{}.GetInstanceString()
+        (available when CK_EXPERIMENTAL_BUILDER is defined).
+        """
+        tr = config.trait
+        pipeline_template = self._get_pipeline_template_args(tr.pipeline, "UniversalGemmProblem")
+
+        # For two-stage, the epilogue writes to fp32 workspace so VectorSizeC
+        # and the E data type differ.  The non-two-stage path is the common case.
+        return f"""#ifdef CK_EXPERIMENTAL_BUILDER
+    static std::string get_instance_string() {{
+        constexpr auto scheduler = Config::Scheduler;
+
+        using UniversalGemmProblem = UniversalGemmPipelineProblem<
+            {a_dtype}, {b_dtype}, AccDataType, GemmShape, GemmUniversalTraits,
+            scheduler,
+            element_wise::PassThrough, element_wise::PassThrough, {c_dtype},
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeA, GroupedConvTraitsType::VectorSizeB>;
+
+        using GemmPipeline = {pipeline_template};
+
+        using ConvEpilogue = CShuffleEpilogue<CShuffleEpilogueProblem<
+            {a_dtype}, {b_dtype}, tuple<>, AccDataType, {c_dtype},
+            typename GroupedConvTraitsType::ImplicitGemmDsLayout,
+            typename GroupedConvTraitsType::FixedGemmParams::ELayout,
+            element_wise::PassThrough,
+            TilePartitioner::MPerBlock, TilePartitioner::NPerBlock,
+            Config::M_Warp, Config::N_Warp, Config::M_Warp_Tile,
+            Config::N_Warp_Tile, Config::K_Warp_Tile,
+            GroupedConvTraitsType::FixedGemmParams::TransposeC,
+            Config::NumWaveGroups,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            Config::VectorSizeC, 1, Config::DoubleSmemBuffer>>;
+
+        using Kernel = {kernel_type}<
+            GroupedConvTraitsType, TilePartitioner, GemmPipeline, ConvEpilogue>;
+
+        return Kernel{{}}.GetInstanceString();
+    }}
+#endif"""
 
     def _get_launch_code(self) -> str:
         """Generate the kernel launch code for the non-two-stage launcher.
@@ -1021,6 +1067,40 @@ struct {kernel_name}_Launcher {{
         auto kargs = Kernel::MakeKernelArgs(args);
         return Kernel::IsSupportedArgument(kargs);
     }}
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+    static std::string get_instance_string() {{
+        constexpr auto scheduler = Config::Scheduler;
+
+        using UniversalGemmProblem = UniversalGemmPipelineProblem<
+            OutDataType, InDataType, AccDataType, GemmShape, GemmUniversalTraits,
+            scheduler,
+            element_wise::PassThrough, element_wise::PassThrough, WeiDataType,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeA, GroupedConvTraitsType::VectorSizeB>;
+
+        using GemmPipeline = {self._get_pipeline_template_args(tr.pipeline, "UniversalGemmProblem")};
+
+        // Two-stage: epilogue writes to fp32 workspace
+        using ConvEpilogue = CShuffleEpilogue<CShuffleEpilogueProblem<
+            OutDataType, InDataType, tuple<>, AccDataType, WorkspaceDataType,
+            typename GroupedConvTraitsType::ImplicitGemmDsLayout,
+            typename GroupedConvTraitsType::FixedGemmParams::ELayout,
+            element_wise::PassThrough,
+            TilePartitioner::MPerBlock, TilePartitioner::NPerBlock,
+            Config::M_Warp, Config::N_Warp, Config::M_Warp_Tile,
+            Config::N_Warp_Tile, Config::K_Warp_Tile,
+            GroupedConvTraitsType::FixedGemmParams::TransposeC,
+            Config::NumWaveGroups,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeC>>;
+
+        using Kernel = GroupedConvolutionBackwardWeightKernel<
+            GroupedConvTraitsType, TilePartitioner, GemmPipeline, ConvEpilogue>;
+
+        return Kernel{{}}.GetInstanceString();
+    }}
+#endif
 }};
 
 using {launcher_alias} = {kernel_name}_Launcher;

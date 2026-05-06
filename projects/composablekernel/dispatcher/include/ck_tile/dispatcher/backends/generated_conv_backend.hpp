@@ -180,6 +180,18 @@ inline GroupedConvKernelInstance::IsSupportedFn make_conv_bwd_data_is_supported_
     };
 }
 
+// -------------------------------------------------------------------------
+// Instance string extraction — get CK Tile GetInstanceString() representation
+// -------------------------------------------------------------------------
+
+#ifdef CK_EXPERIMENTAL_BUILDER
+template <typename LauncherType>
+inline std::string get_instance_string()
+{
+    return LauncherType::get_instance_string();
+}
+#endif
+
 } // namespace backends
 } // namespace dispatcher
 } // namespace ck_tile
