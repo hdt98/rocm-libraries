@@ -717,8 +717,11 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHan
  * @brief Gets information about a loaded heuristic policy by index.
  *
  * Retrieves metadata for a heuristic policy plugin, including policy ID, policy
- * name, plugin version, and API version. Policies are enumerated in the order they
- * appear in the default policy list.
+ * name, plugin version, and API version.
+ *
+ * @note The enumeration order is unspecified and may change between calls or
+ * between backend versions. Callers must not assume a stable ordering across
+ * indices; use the returned `policyId` as the identity, not `policyIndex`.
  *
  * This function uses a two-call pattern for string fields:
  * 1. First call: Pass all string buffers as `nullptr` to query required sizes.

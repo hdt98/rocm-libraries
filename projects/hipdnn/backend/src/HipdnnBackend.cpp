@@ -728,6 +728,9 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHand
         throwIfNull(pluginVersionLen);
         throwIfNull(apiVersionLen);
 
+        // Built from an unordered_map; ordering is unspecified and may change
+        // between calls. If a stable enumeration is ever required, an explicit
+        // ordering must be applied here rather than relied on from the source map.
         auto policyInfos = handle->getHeuristicPluginResourceManager()->getHeuristicPolicyInfos();
         if(policyIndex >= policyInfos.size())
         {
