@@ -10348,6 +10348,7 @@ class KernelWriterAssembly(KernelWriter):
 
     if tc == "Metadata" and kernel["enableTDMMetadata"]:
       comp: TensorDataMoverLoad = TensorDataMoverLoad.find(self)
+      comp.setMemToken([self.states.ldsTensorTokenIdx])
       imod.add(comp.issueLoad("tdmMetadataGroup0", "tdmMetadataGroup1", None, None))
       return imod 
 
