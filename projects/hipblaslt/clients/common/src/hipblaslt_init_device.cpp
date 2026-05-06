@@ -625,7 +625,13 @@ void hipblaslt_init_device(ABC_dims                 abc,
                          || std::is_same_v<T, hip_bfloat16>)
             {
                 constexpr unsigned int kNormDistOneSpecialSeed = 12345u;
-                size_t size_64 = stride >= lda ? lda * N + size_t(batch_count - 1) * stride : lda * N;
+                // Match integer_exact B / fp16_accumulator_probe B: stride==0 means packed batches;
+                // fill_batch must see a non-zero stride spanning each slab so special_idx and the
+                // Gaussian fill cover the full strided buffer (see testing_matmul.hpp size_*).
+                size_t effective_stride = stride ? std::max(stride, lda * N) : lda * N;
+                size_t size_64            = effective_stride >= lda
+                                 ? lda * N + size_t(batch_count - 1) * effective_stride
+                                 : lda * N;
                 if(size_64 == 0)
                 {
                     break;
@@ -640,7 +646,7 @@ void hipblaslt_init_device(ABC_dims                 abc,
                                     : (special_type == 1) ? -std::numeric_limits<float>::infinity()
                                                           : std::numeric_limits<float>::quiet_NaN();
                 T special_T = T(special_val);
-                fill_batch(A, M, N, lda, stride, batch_count,
+                fill_batch(A, M, N, lda, effective_stride, batch_count,
                            [base_seed = kNormDistOneSpecialSeed, special_idx, special_T] __device__(
                                size_t idx) -> T {
                                if(idx == special_idx)
