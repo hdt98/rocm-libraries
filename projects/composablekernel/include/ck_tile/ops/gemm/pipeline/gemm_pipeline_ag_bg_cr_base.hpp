@@ -109,6 +109,16 @@ struct GemmPipelineAgBgCrImplBase
         move_tile_window(dram_tile_window, dram_tile_window_step);
     }
 
+    // Store a tile to LDS. Applies an optional element-wise function first.
+    //
+    // PERFORMANCE NOTE: When `lds_tile_window` is a tile_window_with_static_lengths (bare
+    // window), this reconstructs tile_window_with_static_distribution internally on every
+    // call (~96 VALU for XOR coordinate computation). For hot loops where the window doesn't
+    // move, use MakeDistributedLdsStoreWindow() once before the loop, then call .store()
+    // directly on the returned window.
+    //
+    // When `lds_tile_window` is already a tile_window_with_static_distribution, the fast
+    // path is used automatically (no reconstruction).
     template <typename DstTileWindow, typename SrcBlockTile, typename ElementFunction>
     CK_TILE_DEVICE void LocalPrefill(DstTileWindow& lds_tile_window,
                                      const SrcBlockTile& src_block_tile,
@@ -123,6 +133,33 @@ struct GemmPipelineAgBgCrImplBase
                                      const SrcBlockTile& src_block_tile) const
     {
         store_tile(lds_tile_window, src_block_tile);
+    }
+
+    // Build a tile_window_with_static_distribution from a bare LDS window. The returned
+    // window pre-computes XOR coordinates once at construction, so repeated .store() calls
+    // skip the ~96 VALU of coord reconstruction that store_tile()/LocalPrefill would redo.
+    //
+    // `dstr` must match the distribution of the tensor passed to .store(). If the store
+    // path transposes first (e.g. MakeShuffledARegTileDistribution), pass that distribution.
+    //
+    // Usage pattern (once before the K-loop):
+    //     constexpr auto dstr = decltype(my_tensor)::get_tile_distribution();
+    //     auto fast_window = Base::MakeDistributedLdsStoreWindow(bare_window, dstr);
+    //     // hot loop:
+    //     fast_window.store(tensor);   // no coord reconstruction
+    //
+    // When NOT to use: if pre-computing the window coordinates would push VGPR usage
+    // above the budget (e.g. 512 VGPRs on gfx950), use LocalPrefill instead and accept
+    // the VALU cost. For double-buffered pipelines where only some windows fit in the
+    // VGPR budget, pre-compute the primary pair and use LocalPrefill for the alternate pair.
+    template <typename CopyLdsWindow, typename TileDistribution>
+    CK_TILE_DEVICE static auto MakeDistributedLdsStoreWindow(const CopyLdsWindow& copy_lds_window,
+                                                             const TileDistribution& dstr)
+    {
+        return make_tile_window(copy_lds_window.get_bottom_tensor_view(),
+                                copy_lds_window.get_window_lengths(),
+                                copy_lds_window.get_window_origin(),
+                                dstr);
     }
 
     template <typename DstBlockTile, typename SrcTileWindow, bool LoadTranspose = false>
