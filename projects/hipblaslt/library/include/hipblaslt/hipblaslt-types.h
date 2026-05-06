@@ -75,5 +75,33 @@ typedef int32_t hipblasLtInt32;
 }
 #endif
 
+/*
+ * Legacy *_EXT names were int constants mirroring hipDataType values. HIP now
+ * exposes HIP_R_6F_E2M3 / HIP_R_6F_E3M2 / HIP_R_4F_E2M1 in library_types.h.
+ * Provide macro aliases so existing consumers keep building (ROCM-24233).
+ */
+#if defined(__HIP_PLATFORM_AMD__) && !defined(__HIP_PLATFORM_NVIDIA__)
+#include <hip/library_types.h>
+#ifndef HIP_R_6F_E2M3_EXT
+#define HIP_R_6F_E2M3_EXT HIP_R_6F_E2M3
+#endif
+#ifndef HIP_R_6F_E3M2_EXT
+#define HIP_R_6F_E3M2_EXT HIP_R_6F_E3M2
+#endif
+#ifndef HIP_R_4F_E2M1_EXT
+#define HIP_R_4F_E2M1_EXT HIP_R_4F_E2M1
+#endif
+#else
+#ifndef HIP_R_6F_E2M3_EXT
+#define HIP_R_6F_E2M3_EXT 31
+#endif
+#ifndef HIP_R_6F_E3M2_EXT
+#define HIP_R_6F_E3M2_EXT 32
+#endif
+#ifndef HIP_R_4F_E2M1_EXT
+#define HIP_R_4F_E2M1_EXT 33
+#endif
+#endif
+
 int const HIP_R_8F_E5M3_EXT = 34;
 #endif /* _HIPBLASLT_TYPES_H_ */
