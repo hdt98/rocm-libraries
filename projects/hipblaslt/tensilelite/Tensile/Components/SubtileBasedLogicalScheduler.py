@@ -2100,11 +2100,18 @@ class LogicalScheduler:
             tiles = []
             for _ in range(count):
                 tile = TileInfo.RegisterTileInfo(writer.vgprPool)
-                for j in range(0, numRegs, 4):
-                    blockSize = min(4, numRegs - j)
-                    vstart = writer.vgprPool.checkOutAligned(blockSize, blockSize)
-                    for k in range(blockSize):
-                        tile.append(vstart + k)
+                # Single allocation guarantees the numRegs VGPRs are
+                # PHYSICALLY contiguous, which MFMA requires when it reads
+                # the tile via `vgpr(start, numRegs)`. The previous chunked
+                # version (numRegs/4 separate checkOutAligned calls) only
+                # guaranteed each 4-block was 4-aligned, not that the
+                # 4-blocks were adjacent - when the pool fragments, the
+                # 2nd chunk lands at a different VGPR than start+4 and
+                # MFMA silently aliases unrelated registers (manifests as
+                # FP8 data mismatches).
+                vstart = writer.vgprPool.checkOutAligned(numRegs, 4)
+                for k in range(numRegs):
+                    tile.append(vstart + k)
                 tiles.append(tile)
             return tiles
 
@@ -2127,9 +2134,12 @@ class LogicalScheduler:
         def _dealloc_tiles(tiles):
             for tile in tiles:
                 pool = tile.regList.regPool
-                for val in tile:
-                    if tile.index(val) % 4 == 0:
-                        pool.checkIn(val)
+                # Each tile was allocated with ONE checkOutAligned of
+                # numRegs dwords, so we check it back in with ONE
+                # call on regValues[0]. This mirrors the legacy
+                # deallocVgprTileRegisters in SubtileBasedKernel.py.
+                if tile.regList.regValues:
+                    pool.checkIn(tile.regList.regValues[0])
 
         _dealloc_tiles(self.vgprTilesA)
         _dealloc_tiles(self.vgprTilesB)
