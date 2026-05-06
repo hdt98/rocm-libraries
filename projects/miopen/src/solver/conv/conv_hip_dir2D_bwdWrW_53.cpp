@@ -31,7 +31,7 @@
 #include <miopen/stringutils.hpp>
 #include <miopen/env.hpp>
 
-MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53)
+MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_CONV_DIRECT_HIP_WRW53)
 
 namespace miopen {
 namespace solver {
@@ -39,10 +39,10 @@ namespace conv {
 
 using ProblemDescription = miopen::conv::ProblemDescription;
 
-bool ConvOclBwdWrW53::IsApplicable(const ExecutionContext& ctx,
+bool ConvHipBwdWrW53::IsApplicable(const ExecutionContext& ctx,
                                    const ProblemDescription& problem) const
 {
-    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_OCL_WRW53))
+    if(env::disabled(MIOPEN_DEBUG_CONV_DIRECT_HIP_WRW53))
         return false;
     const std::string name = ctx.GetStream().GetDeviceName();
     if(!(StartsWith(name, "gfx8") || StartsWith(name, "gfx90") || StartsWith(name, "gfx103")))
@@ -269,7 +269,7 @@ static inline void ComputeNumInputWidthLoops(
     }
 }
 
-size_t ConvOclBwdWrW53::GetWorkspaceSize(const ExecutionContext&,
+size_t ConvHipBwdWrW53::GetWorkspaceSize(const ExecutionContext&,
                                          const ProblemDescription& problem) const
 {
     std::size_t n_stacks = std::min(problem.GetBatchSize(), static_cast<std::size_t>(1));
@@ -292,7 +292,7 @@ size_t ConvOclBwdWrW53::GetWorkspaceSize(const ExecutionContext&,
         return 0;
 }
 
-ConvSolution ConvOclBwdWrW53::GetSolution(const ExecutionContext& ctx,
+ConvSolution ConvHipBwdWrW53::GetSolution(const ExecutionContext& ctx,
                                           const ProblemDescription& problem) const
 {
     ConvSolution result;
