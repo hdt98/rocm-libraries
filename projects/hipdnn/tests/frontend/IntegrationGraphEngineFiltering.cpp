@@ -71,18 +71,19 @@ protected:
     };
 
     // This suite verifies preferred_engine_id behavior, which is implemented
-    // by the Config heuristic plugin. The frontend test main() wires in only
-    // test_good_heuristic_plugin globally, so for this suite load Config as the
-    // primary policy and chain test_good_heuristic_plugin as the fallback for
-    // the cases where Config returns "not applicable".
+    // by the Config policy hosted inside the merged DefaultHeuristicsPlugin.
+    // The frontend test main() wires in only test_good_heuristic_plugin
+    // globally, so for this suite load DefaultHeuristicsPlugin as the primary
+    // and chain test_good_heuristic_plugin as the fallback for the cases where
+    // Config returns "not applicable".
     static void SetUpTestSuite()
     {
-        const auto configPluginPath
+        const auto defaultPluginPath
             = (std::filesystem::path(".") / "hipdnn_plugins" / "heuristics"
-               / hipdnn_data_sdk::utilities::getLibraryName("hipdnn_heuristic_config"))
+               / hipdnn_data_sdk::utilities::getLibraryName("hipdnn_heuristic_default"))
                   .string();
         const std::array<const char*, 2> heuristicPaths
-            = {configPluginPath.c_str(),
+            = {defaultPluginPath.c_str(),
                hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
         ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(heuristicPaths.size(),
                                                     heuristicPaths.data(),

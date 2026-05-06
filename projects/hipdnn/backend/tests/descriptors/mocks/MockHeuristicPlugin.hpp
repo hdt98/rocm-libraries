@@ -24,7 +24,8 @@ public:
 
     // Module metadata
     MOCK_METHOD(std::string_view, apiVersion, (), (const, override));
-    MOCK_METHOD(int64_t, policyId, (), (const, override));
+    MOCK_METHOD(std::vector<int64_t>, getAllPolicyIds, (), (const, override));
+    MOCK_METHOD(std::string_view, getPolicyName, (int64_t policyId), (const, override));
     MOCK_METHOD(std::string_view, name, (), (const, override));
     MOCK_METHOD(std::string_view, version, (), (const, override));
 
@@ -40,7 +41,7 @@ public:
     // Policy descriptor lifecycle
     MOCK_METHOD(hipdnnHeuristicPolicyDescriptor_t,
                 createPolicyDescriptor,
-                (hipdnnHeuristicHandle_t pluginHandle),
+                (hipdnnHeuristicHandle_t pluginHandle, int64_t policyId),
                 (const, override));
     MOCK_METHOD(void,
                 destroyPolicyDescriptor,

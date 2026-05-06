@@ -131,7 +131,7 @@ public:
         // Set up expectations for the mock plugin
         EXPECT_CALL(*_mockHeuristicPlugin, setDeviceProperties(mockHandle, _))
             .WillRepeatedly(Return());
-        EXPECT_CALL(*_mockHeuristicPlugin, createPolicyDescriptor(mockHandle))
+        EXPECT_CALL(*_mockHeuristicPlugin, createPolicyDescriptor(mockHandle, staticOrderingPolicyId))
             .WillRepeatedly(Return(mockDescriptor));
         EXPECT_CALL(*_mockHeuristicPlugin, destroyPolicyDescriptor(mockDescriptor))
             .WillRepeatedly(Return());

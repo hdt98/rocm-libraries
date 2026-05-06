@@ -224,7 +224,8 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     plugin->setDeviceProperties(handle, &devicePropsData);
 
     // Create policy descriptor (RAII so destroy runs even on ASSERT_* abort)
-    const auto descGuard = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    const auto descGuard = makeScopedPolicyDescriptor(
+        *plugin, plugin->createPolicyDescriptor(handle, policyInfos[0].policyId));
     ASSERT_NE(descGuard.get(), nullptr);
 
     // Set engine IDs
@@ -310,9 +311,13 @@ TEST_F(IntegrationHeuristicPlugin, MultipleDescriptorsFromSameHandle)
 
     // Create multiple descriptors from the same handle (RAII-wrapped so any
     // assertion abort below still releases them).
-    const auto desc1 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
-    const auto desc2 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
-    const auto desc3 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    const auto policyId = policyInfos[0].policyId;
+    const auto desc1 = makeScopedPolicyDescriptor(
+        *plugin, plugin->createPolicyDescriptor(handle, policyId));
+    const auto desc2 = makeScopedPolicyDescriptor(
+        *plugin, plugin->createPolicyDescriptor(handle, policyId));
+    const auto desc3 = makeScopedPolicyDescriptor(
+        *plugin, plugin->createPolicyDescriptor(handle, policyId));
 
     EXPECT_NE(desc1.get(), nullptr);
     EXPECT_NE(desc2.get(), nullptr);
@@ -371,7 +376,8 @@ TEST_F(IntegrationHeuristicPlugin, FinalizeWithEmptyEngineIdsSucceeds)
     hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
     ASSERT_NE(handle, nullptr);
 
-    const auto descGuard = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    const auto descGuard = makeScopedPolicyDescriptor(
+        *plugin, plugin->createPolicyDescriptor(handle, policyInfos[0].policyId));
     ASSERT_NE(descGuard.get(), nullptr);
 
     // Don't set any engine IDs - just finalize
@@ -481,20 +487,29 @@ TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryApiVersion)
 {
     const auto version = plugin().apiVersion();
     EXPECT_FALSE(version.empty());
-    EXPECT_EQ(version, "0.0.1"); // HIPDNN_HEURISTIC_API_VERSION
+    EXPECT_EQ(version, HIPDNN_HEURISTIC_API_VERSION);
 }
 
 TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyId)
 {
-    const auto policyId = plugin().policyId();
+    const auto policyIds = plugin().getAllPolicyIds();
+    ASSERT_EQ(policyIds.size(), 1u);
     const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
-    EXPECT_EQ(policyId, expectedId);
+    EXPECT_EQ(policyIds.front(), expectedId);
+}
+
+TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginName)
+{
+    const auto name = plugin().name();
+    EXPECT_EQ(name, "TestGoodHeuristicPlugin");
 }
 
 TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPolicyName)
 {
-    const auto name = plugin().name();
-    EXPECT_EQ(name, "TestGoodHeuristicPolicy");
+    const auto policyIds = plugin().getAllPolicyIds();
+    ASSERT_EQ(policyIds.size(), 1u);
+    const auto policyName = plugin().getPolicyName(policyIds.front());
+    EXPECT_EQ(policyName, "TestGoodHeuristicPolicy");
 }
 
 TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginVersion)
@@ -506,8 +521,9 @@ TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginVersion)
 TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
 {
     const auto handleGuard = makeScopedHandle(plugin(), plugin().createHandle());
-    const auto descGuard
-        = makeScopedPolicyDescriptor(plugin(), plugin().createPolicyDescriptor(handleGuard.get()));
+    const auto policyId = plugin().getAllPolicyIds().front();
+    const auto descGuard = makeScopedPolicyDescriptor(
+        plugin(), plugin().createPolicyDescriptor(handleGuard.get(), policyId));
 
     const std::vector<int64_t> inputIds = {1, 2, 3, 4, 5};
     plugin().setEngineIds(descGuard.get(), inputIds.data(), inputIds.size());
@@ -521,16 +537,17 @@ TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
     EXPECT_EQ(sortedIds, std::vector<int64_t>({5, 4, 3, 2, 1}));
 }
 
-TEST_F(IntegrationHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
+TEST_F(IntegrationHeuristicPluginLoadedGood, RealPluginCachesPolicyIds)
 {
-    // First call - ID is computed from policy name
-    const auto id1 = plugin().policyId();
+    // First call - IDs are queried from the plugin
+    const auto ids1 = plugin().getAllPolicyIds();
+    ASSERT_EQ(ids1.size(), 1u);
     const auto expectedId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
-    EXPECT_EQ(id1, expectedId);
+    EXPECT_EQ(ids1.front(), expectedId);
 
-    // Second call should return cached value
-    const auto id2 = plugin().policyId();
-    EXPECT_EQ(id2, id1);
+    // Second call should return the cached vector
+    const auto ids2 = plugin().getAllPolicyIds();
+    EXPECT_EQ(ids2, ids1);
 }
 
 // ====================================================================================
@@ -567,10 +584,16 @@ private:
 
 TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalPolicyNameHasName)
 {
-    // GetPolicyName is now required
+    // hipdnnPluginGetName is required
     const auto name = plugin().name();
     EXPECT_FALSE(name.empty());
-    EXPECT_EQ(name, "TestNoOptionalHeuristicPolicy");
+    EXPECT_EQ(name, "TestNoOptionalHeuristicPlugin");
+
+    // Each policy has a non-empty name
+    for(const int64_t policyId : plugin().getAllPolicyIds())
+    {
+        EXPECT_FALSE(plugin().getPolicyName(policyId).empty());
+    }
 }
 
 TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalSetLogLevelSucceeds)
@@ -587,8 +610,9 @@ TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalCanStill
     const auto handleGuard = makeScopedHandle(plugin(), plugin().createHandle());
     ASSERT_NE(handleGuard.get(), nullptr);
 
-    const auto descGuard
-        = makeScopedPolicyDescriptor(plugin(), plugin().createPolicyDescriptor(handleGuard.get()));
+    const auto policyId = plugin().getAllPolicyIds().front();
+    const auto descGuard = makeScopedPolicyDescriptor(
+        plugin(), plugin().createPolicyDescriptor(handleGuard.get(), policyId));
     ASSERT_NE(descGuard.get(), nullptr);
 
     const std::vector<int64_t> inputIds = {1, 2, 3};

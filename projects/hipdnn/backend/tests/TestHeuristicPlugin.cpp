@@ -95,19 +95,20 @@ TEST_F(TestHeuristicPlugin, MockPluginCanManageMultiplePolicyDescriptors)
     const NiceMock<MockHeuristicPlugin> plugin;
 
     const auto handle = makeFakeHandle(42);
+    constexpr int64_t POLICY_ID = 0xABCDEF;
     const auto desc1 = makeFakePolicyDescriptor(1);
     const auto desc2 = makeFakePolicyDescriptor(2);
     const auto desc3 = makeFakePolicyDescriptor(3);
 
-    EXPECT_CALL(plugin, createPolicyDescriptor(handle))
+    EXPECT_CALL(plugin, createPolicyDescriptor(handle, POLICY_ID))
         .WillOnce(Return(desc1))
         .WillOnce(Return(desc2))
         .WillOnce(Return(desc3));
 
     // Create multiple descriptors from same handle
-    const auto d1 = plugin.createPolicyDescriptor(handle);
-    const auto d2 = plugin.createPolicyDescriptor(handle);
-    const auto d3 = plugin.createPolicyDescriptor(handle);
+    const auto d1 = plugin.createPolicyDescriptor(handle, POLICY_ID);
+    const auto d2 = plugin.createPolicyDescriptor(handle, POLICY_ID);
+    const auto d3 = plugin.createPolicyDescriptor(handle, POLICY_ID);
 
     EXPECT_EQ(d1, desc1);
     EXPECT_EQ(d2, desc2);
@@ -142,6 +143,7 @@ TEST_F(TestHeuristicPlugin, MockPluginVerifiesCallSequence)
     const NiceMock<MockHeuristicPlugin> plugin;
 
     const auto handle = makeFakeHandle(42);
+    constexpr int64_t POLICY_ID = 0xABCDEF;
     const auto descriptor = makeFakePolicyDescriptor(100);
 
     {
@@ -149,7 +151,7 @@ TEST_F(TestHeuristicPlugin, MockPluginVerifiesCallSequence)
 
         EXPECT_CALL(plugin, createHandle()).WillOnce(Return(handle));
 
-        EXPECT_CALL(plugin, createPolicyDescriptor(handle)).WillOnce(Return(descriptor));
+        EXPECT_CALL(plugin, createPolicyDescriptor(handle, POLICY_ID)).WillOnce(Return(descriptor));
 
         EXPECT_CALL(plugin, destroyPolicyDescriptor(descriptor));
 
@@ -158,7 +160,7 @@ TEST_F(TestHeuristicPlugin, MockPluginVerifiesCallSequence)
 
     // Execute in expected order
     const auto h = plugin.createHandle();
-    const auto d = plugin.createPolicyDescriptor(h);
+    const auto d = plugin.createPolicyDescriptor(h, POLICY_ID);
     plugin.destroyPolicyDescriptor(d);
     plugin.destroyHandle(h);
 }
@@ -180,30 +182,26 @@ TEST_F(TestHeuristicPlugin, MockPluginCanReturnNullDescriptor)
     const NiceMock<MockHeuristicPlugin> plugin;
 
     const auto handle = makeFakeHandle(42);
+    constexpr int64_t POLICY_ID = 0xABCDEF;
 
-    EXPECT_CALL(plugin, createPolicyDescriptor(handle)).WillOnce(Return(nullptr));
+    EXPECT_CALL(plugin, createPolicyDescriptor(handle, POLICY_ID)).WillOnce(Return(nullptr));
 
-    const auto descriptor = plugin.createPolicyDescriptor(handle);
+    const auto descriptor = plugin.createPolicyDescriptor(handle, POLICY_ID);
     EXPECT_EQ(descriptor, nullptr);
 }
 
-// ========== Policy ID Caching Tests ==========
+// ========== Policy ID Enumeration Tests ==========
 
-TEST_F(TestHeuristicPlugin, MockPluginPolicyIdCanBeCached)
+TEST_F(TestHeuristicPlugin, MockPluginGetAllPolicyIdsReturnsConfiguredList)
 {
     const NiceMock<MockHeuristicPlugin> plugin;
 
-    const int64_t testPolicyId = 0xABCDEF;
+    const std::vector<int64_t> expectedIds = {0xAAAA, 0xBBBB, 0xCCCC};
 
-    // First call should query the mock
-    EXPECT_CALL(plugin, policyId()).Times(2).WillRepeatedly(Return(testPolicyId));
+    EXPECT_CALL(plugin, getAllPolicyIds()).Times(2).WillRepeatedly(Return(expectedIds));
 
-    // Multiple calls
-    const int64_t id1 = plugin.policyId();
-    const int64_t id2 = plugin.policyId();
-
-    EXPECT_EQ(id1, testPolicyId);
-    EXPECT_EQ(id2, testPolicyId);
+    EXPECT_EQ(plugin.getAllPolicyIds(), expectedIds);
+    EXPECT_EQ(plugin.getAllPolicyIds(), expectedIds);
 }
 
 // ========== Policy Name Edge Cases ==========

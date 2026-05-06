@@ -7,6 +7,8 @@
 #include "logging/Logging.hpp"
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
+#include <algorithm>
+
 namespace hipdnn_backend::plugin
 {
 
@@ -58,6 +60,10 @@ void HeuristicPlugin::resolveSymbols()
     // Optional base plugin symbols
     tryAssignSymbol(_funcSetLogLevel, "hipdnnPluginSetLogLevel");
 
+    // Required policy enumeration symbols
+    GET_REQUIRED_SYMBOL(_funcGetAllPolicyIds, "hipdnnHeuristicPluginGetAllPolicyIds");
+    GET_REQUIRED_SYMBOL(_funcGetPolicyName, "hipdnnHeuristicPluginGetPolicyName");
+
     // Required handle lifecycle symbols
     GET_REQUIRED_SYMBOL(_funcHandleCreate, "hipdnnHeuristicHandleCreate");
     GET_REQUIRED_SYMBOL(_funcHandleDestroy, "hipdnnHeuristicHandleDestroy");
@@ -86,15 +92,37 @@ void HeuristicPlugin::resolveSymbols()
                                   + std::to_string(pluginType));
     }
 
-    // Eagerly cache policy ID - it's always needed for plugin matching
-    // Compute it once during initialization rather than lazily
-    auto pluginName = name();
-    if(pluginName.empty())
+    // Verify the plugin reports a non-empty library name (used purely for diagnostics now;
+    // policy identity flows through the policy IDs enumerated below).
+    if(name().empty())
     {
         throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                              "Cannot load heuristic plugin: policy name is empty");
+                              "Cannot load heuristic plugin: plugin name is empty");
     }
-    _policyId = hipdnn_data_sdk::utilities::policyNameToId(pluginName);
+
+    // Eagerly enumerate policies and validate that each policy ID matches the FNV-1a hash of
+    // its canonical name. Mismatches indicate a malformed plugin and cause rejection at load.
+    const auto policyIds = getAllPolicyIds();
+    for(const int64_t policyId : policyIds)
+    {
+        const auto policyName = getPolicyName(policyId);
+        if(policyName.empty())
+        {
+            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                                  "Heuristic plugin returned empty name for policy ID "
+                                      + std::to_string(policyId));
+        }
+        const int64_t expectedId
+            = hipdnn_data_sdk::utilities::policyNameToId(std::string(policyName));
+        if(expectedId != policyId)
+        {
+            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
+                                  "Policy ID/name mismatch: plugin reported policy '"
+                                      + std::string(policyName) + "' with ID "
+                                      + std::to_string(policyId) + " but policyNameToId yields "
+                                      + std::to_string(expectedId));
+        }
+    }
 }
 
 std::string_view HeuristicPlugin::apiVersion() const
@@ -125,10 +153,49 @@ hipdnnPluginType_t HeuristicPlugin::type() const
     return pluginType;
 }
 
-int64_t HeuristicPlugin::policyId() const
+std::vector<int64_t> HeuristicPlugin::getAllPolicyIds() const
 {
-    // Policy ID is eagerly cached during construction in resolveSymbols()
-    return _policyId;
+    if(!_allPolicyIds.empty())
+    {
+        return _allPolicyIds;
+    }
+
+    uint32_t numPolicies = 0;
+    invokeHeuristicFunction(
+        "get number of policies", _funcGetAllPolicyIds, nullptr, 0u, &numPolicies);
+
+    if(numPolicies == 0)
+    {
+        throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "No policies found in the plugin");
+    }
+
+    const uint32_t maxPolicies = numPolicies;
+    std::vector<int64_t> policyIds(maxPolicies);
+    invokeHeuristicFunction(
+        "get all policy IDs", _funcGetAllPolicyIds, policyIds.data(), maxPolicies, &numPolicies);
+
+    if(numPolicies != maxPolicies)
+    {
+        throw HipdnnException(
+            HIPDNN_STATUS_PLUGIN_ERROR,
+            "Number of policies returned does not match the number reported by the plugin");
+    }
+
+    std::sort(policyIds.begin(), policyIds.end());
+    if(std::adjacent_find(policyIds.begin(), policyIds.end()) != policyIds.end())
+    {
+        throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR, "Duplicate policy IDs found");
+    }
+
+    _allPolicyIds = policyIds;
+    return policyIds;
+}
+
+std::string_view HeuristicPlugin::getPolicyName(int64_t policyId) const
+{
+    const char* name = nullptr;
+    invokeHeuristicFunction("get policy name", _funcGetPolicyName, policyId, &name);
+    return (name != nullptr) ? name : "";
 }
 
 hipdnnPluginStatus_t HeuristicPlugin::setLoggingCallback(hipdnnCallback_t callback) const
@@ -165,11 +232,12 @@ void HeuristicPlugin::setDeviceProperties(
 }
 
 hipdnnHeuristicPolicyDescriptor_t
-    HeuristicPlugin::createPolicyDescriptor(hipdnnHeuristicHandle_t pluginHandle) const
+    HeuristicPlugin::createPolicyDescriptor(hipdnnHeuristicHandle_t pluginHandle,
+                                            int64_t policyId) const
 {
     hipdnnHeuristicPolicyDescriptor_t desc = nullptr;
     invokeHeuristicFunction(
-        "create policy descriptor", _funcPolicyDescriptorCreate, pluginHandle, &desc);
+        "create policy descriptor", _funcPolicyDescriptorCreate, pluginHandle, policyId, &desc);
     return desc;
 }
 

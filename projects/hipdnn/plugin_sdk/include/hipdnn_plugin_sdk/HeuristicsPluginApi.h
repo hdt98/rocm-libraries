@@ -17,7 +17,7 @@
  * policy plugins that control engine ordering.
  *
  * IMPORTANT: Heuristic plugins must implement ALL base plugin functions from PluginApi.h:
- * - hipdnnPluginGetName - Returns the plugin name (e.g., "StaticOrdering")
+ * - hipdnnPluginGetName - Returns the plugin (shared library) name, used for diagnostics
  * - hipdnnPluginGetVersion - Returns the plugin implementation version
  * - hipdnnPluginGetApiVersion - Returns the API version this plugin supports
  * - hipdnnPluginGetType - Returns HIPDNN_PLUGIN_TYPE_HEURISTIC
@@ -26,6 +26,13 @@
  * - hipdnnPluginSetLogLevel - Sets the log level (optional)
  *
  * PLUS the heuristic-specific functions defined below.
+ *
+ * Multi-policy plugins: A single heuristic plugin shared library may expose one or more
+ * selection policies. Each policy is identified by a stable int64 policy ID (typically
+ * derived from a canonical policy name via hipdnn_data_sdk::utilities::policyNameToId).
+ * The host enumerates policies via hipdnnHeuristicPluginGetAllPolicyIds and resolves
+ * names via hipdnnHeuristicPluginGetPolicyName. A single plugin handle is shared across
+ * all policies of the same library; per-policy state lives in the policy descriptor.
  *
  * Status codes: Use hipdnnPluginStatus_t for all return values.
  * Serialized data: Device properties and graphs cross the ABI as hipdnnPluginConstData_t*.
@@ -77,6 +84,59 @@ typedef struct hipdnnHeuristicHandle_opaque* hipdnnHeuristicHandle_t;
 typedef struct hipdnnHeuristicPolicyDescriptor_opaque* hipdnnHeuristicPolicyDescriptor_t;
 
 /** @} */ // End of HeuristicPluginDataTypes group
+
+/**
+ * @defgroup HeuristicPluginPolicyEnumeration Heuristic Plugin Policy Enumeration
+ * @brief Functions for discovering the set of policies a plugin exposes.
+ * @{
+ */
+
+/**
+ * @brief Retrieves the IDs of all selection policies the plugin exposes.
+ *
+ * A heuristic plugin may expose one or more policies; each is identified by a
+ * stable int64 policy ID (typically the FNV-1a hash of a canonical policy
+ * name; see hipdnn_data_sdk::utilities::policyNameToId).
+ *
+ * This function follows the same two-pass query/retrieve pattern as
+ * hipdnnEnginePluginGetAllEngineIds:
+ *   1. Pass max_policies = 0 (and policy_ids may be NULL) to discover the
+ *      total count, written to *num_policies.
+ *   2. Allocate an array of that size and pass max_policies = N to fill it;
+ *      *num_policies is set to the number of IDs actually written.
+ *
+ * @param[out] policy_ids Array to receive policy IDs, or NULL when querying count.
+ * @param[in] max_policies Capacity of the policy_ids array; 0 to query count only.
+ * @param[out] num_policies On count query: total available policies.
+ *                          On retrieve: number of IDs written.
+ *
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
+ *
+ * @note Policy IDs must be unique within a plugin and stable for the lifetime
+ *       of the loaded library.
+ */
+HIPDNN_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
+    hipdnnHeuristicPluginGetAllPolicyIds(int64_t* policy_ids,
+                                         uint32_t max_policies,
+                                         uint32_t* num_policies);
+
+/**
+ * @brief Retrieves the canonical name of a specific policy.
+ *
+ * The host validates that policyNameToId(name) == policy_id; mismatches cause
+ * the plugin to be rejected at load time.
+ *
+ * @param[in] policy_id The policy ID (must come from hipdnnHeuristicPluginGetAllPolicyIds).
+ * @param[out] name Pointer to receive a NUL-terminated string owned by the plugin.
+ *                  Must remain valid for the lifetime of the loaded library.
+ *
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if policy_id is not exposed by this plugin.
+ */
+HIPDNN_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
+    hipdnnHeuristicPluginGetPolicyName(int64_t policy_id, const char** name);
+
+/** @} */ // End of HeuristicPluginPolicyEnumeration group
 
 /**
  * @defgroup HeuristicPluginHandleLifecycle Heuristic Plugin Handle Lifecycle
@@ -147,11 +207,12 @@ HIPDNN_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
  */
 
 /**
- * @brief Creates a new policy descriptor.
+ * @brief Creates a new policy descriptor for a specific policy of the plugin.
  *
  * The host calls this once per policy slot in EngineHeuristicDescriptor, binding the
- * descriptor to the given plugin handle. The descriptor stores per-slot state:
- * candidate engine IDs, serialized graph, and finalize result.
+ * descriptor to the given plugin handle and selecting which policy from the plugin
+ * the descriptor will execute. The descriptor stores per-slot state: candidate
+ * engine IDs, serialized graph, and finalize result.
  *
  * This BINDS the policy to the handle BEFORE Finalize, so selection code can treat the
  * handle as the source of device-properties session state (SetDeviceProperties).
@@ -160,12 +221,16 @@ HIPDNN_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
  * destroyed with the descriptor.
  *
  * @param[in] plugin_handle The plugin handle this descriptor is bound to.
+ * @param[in] policy_id The ID of the policy this descriptor will execute. Must be one
+ *                      of the IDs returned by hipdnnHeuristicPluginGetAllPolicyIds.
  * @param[out] out_desc Pointer to receive the created policy descriptor.
  *
- * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success, error code otherwise.
+ * @return HIPDNN_PLUGIN_STATUS_SUCCESS on success,
+ *         HIPDNN_PLUGIN_STATUS_BAD_PARAM if policy_id is not exposed by this plugin.
  */
 HIPDNN_PLUGIN_NODISCARD HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t plugin_handle,
+                                          int64_t policy_id,
                                           hipdnnHeuristicPolicyDescriptor_t* out_desc);
 
 /**

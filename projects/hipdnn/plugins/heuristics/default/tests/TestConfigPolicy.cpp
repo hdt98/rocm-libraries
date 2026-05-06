@@ -2,26 +2,29 @@
 // SPDX-License-Identifier:  MIT
 
 /**
- * @file TestConfigPlugin.cpp
- * @brief Unit tests for the Config heuristic plugin C ABI
+ * @file TestConfigPolicy.cpp
+ * @brief Per-policy tests for the SelectionHeuristic::Config policy hosted
+ *        inside the merged DefaultHeuristicsPlugin.
  *
  * Links the plugin's _private STATIC archive directly so the C ABI entry points
- * can be exercised without dlopen'ing the SHARED plugin. Covers handle and
- * descriptor lifecycle, BAD_PARAM branches on every entry point, the
- * applied=0 paths (empty candidates, missing graph, preferred not in
- * candidates, no preferred resolved), the applied=1 reorder path driven by
- * Graph.preferred_engine_id, and the HIPDNN_ENGINE_OVERRIDE_FILE path that
- * resolves a preferred engine by matching a JSON rule against a conv node.
+ * can be exercised without dlopen'ing the SHARED plugin. Covers descriptor
+ * lifecycle, BAD_PARAM branches, the applied=0 paths (empty candidates, missing
+ * graph, preferred not in candidates, no preferred resolved), the applied=1
+ * reorder path driven by Graph.preferred_engine_id, and the
+ * HIPDNN_ENGINE_OVERRIDE_FILE path that resolves a preferred engine by matching
+ * a JSON rule against a conv node.
  *
- * Rule-matching internals (op/dim/stride wildcards, first-match wins, JSON
- * parsing) are exercised in TestEngineOverrideConfig.cpp; this file covers the
- * end-to-end path from env var through Finalize to the reordered output.
+ * Plugin-level metadata, logging, handle lifecycle, and policy enumeration live
+ * in TestDefaultHeuristicsPlugin.cpp. Rule-matching internals (op/dim/stride
+ * wildcards, first-match wins, JSON parsing) are exercised in
+ * TestEngineOverrideConfig.cpp.
  */
 
 // HIPDNN_PLUGIN_STATIC_DEFINE / HIPDNN_HEURISTIC_PLUGIN_STATIC_DEFINE come
 // from target_compile_definitions in this test's CMakeLists.txt.
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 #include <hipdnn_test_sdk/utilities/FileUtilities.hpp>
@@ -48,8 +51,11 @@ const int64_t MIOPEN_DETERMINISTIC_ID
 const int64_t CUSTOM_ENGINE_ID
     = hipdnn_data_sdk::utilities::engineNameToId("Plugin1::CustomEngine");
 
+const int64_t CONFIG_POLICY_ID
+    = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
+
 /// Build a minimal serialized Graph FlatBuffer. Pass a value to set
-/// preferred_engine_id; pass std::nullopt to leave it unset. The Config plugin
+/// preferred_engine_id; pass std::nullopt to leave it unset. The Config policy
 /// only touches preferred_engine_id and (for the override-file path) the conv
 /// nodes - an empty node list is enough to exercise the preferred-engine
 /// branch.
@@ -145,14 +151,14 @@ private:
     std::filesystem::path _path;
 };
 
-class TestConfigPlugin : public ::testing::Test
+class TestConfigPolicy : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
         ASSERT_EQ(hipdnnHeuristicHandleCreate(&_handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
         ASSERT_NE(_handle, nullptr);
-        ASSERT_EQ(hipdnnHeuristicPolicyDescriptorCreate(_handle, &_desc),
+        ASSERT_EQ(hipdnnHeuristicPolicyDescriptorCreate(_handle, CONFIG_POLICY_ID, &_desc),
                   HIPDNN_PLUGIN_STATUS_SUCCESS);
         ASSERT_NE(_desc, nullptr);
     }
@@ -188,183 +194,50 @@ protected:
 
 } // namespace
 
-// ========== Plugin Metadata ==========
-
-TEST(TestConfigPluginMetadata, GetNameReturnsExpectedPolicyName)
-{
-    const char* name = nullptr;
-    EXPECT_EQ(hipdnnPluginGetName(&name), HIPDNN_PLUGIN_STATUS_SUCCESS);
-    EXPECT_STREQ(name, "SelectionHeuristic::Config");
-}
-
-TEST(TestConfigPluginMetadata, GetNameRejectsNull)
-{
-    EXPECT_EQ(hipdnnPluginGetName(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST(TestConfigPluginMetadata, GetVersionReturnsNonEmpty)
-{
-    const char* version = nullptr;
-    EXPECT_EQ(hipdnnPluginGetVersion(&version), HIPDNN_PLUGIN_STATUS_SUCCESS);
-    ASSERT_NE(version, nullptr);
-    EXPECT_GT(std::string_view(version).size(), 0u);
-}
-
-TEST(TestConfigPluginMetadata, GetVersionRejectsNull)
-{
-    EXPECT_EQ(hipdnnPluginGetVersion(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST(TestConfigPluginMetadata, GetApiVersionReturnsNonEmpty)
-{
-    const char* version = nullptr;
-    EXPECT_EQ(hipdnnPluginGetApiVersion(&version), HIPDNN_PLUGIN_STATUS_SUCCESS);
-    ASSERT_NE(version, nullptr);
-    EXPECT_GT(std::string_view(version).size(), 0u);
-}
-
-TEST(TestConfigPluginMetadata, GetApiVersionRejectsNull)
-{
-    EXPECT_EQ(hipdnnPluginGetApiVersion(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST(TestConfigPluginMetadata, GetTypeReturnsHeuristic)
-{
-    hipdnnPluginType_t type = HIPDNN_PLUGIN_TYPE_UNSPECIFIED;
-    EXPECT_EQ(hipdnnPluginGetType(&type), HIPDNN_PLUGIN_STATUS_SUCCESS);
-    EXPECT_EQ(type, HIPDNN_PLUGIN_TYPE_HEURISTIC);
-}
-
-TEST(TestConfigPluginMetadata, GetTypeRejectsNull)
-{
-    EXPECT_EQ(hipdnnPluginGetType(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-// ========== Logging ==========
-
-TEST(TestConfigPluginLogging, SetLoggingCallbackSucceedsWithNullCallback)
-{
-    EXPECT_EQ(hipdnnPluginSetLoggingCallback(nullptr), HIPDNN_PLUGIN_STATUS_SUCCESS);
-}
-
-TEST(TestConfigPluginLogging, SetLogLevelSucceeds)
-{
-    EXPECT_EQ(hipdnnPluginSetLogLevel(HIPDNN_SEV_WARN), HIPDNN_PLUGIN_STATUS_SUCCESS);
-}
-
-TEST(TestConfigPluginLogging, GetLastErrorStringWithNullDoesNotCrash)
-{
-    EXPECT_NO_FATAL_FAILURE(hipdnnPluginGetLastErrorString(nullptr));
-}
-
-TEST(TestConfigPluginLogging, GetLastErrorStringReturnsNonNullMessage)
-{
-    const char* msg = nullptr;
-    hipdnnPluginGetLastErrorString(&msg);
-    EXPECT_NE(msg, nullptr);
-}
-
-// ========== Handle Lifecycle ==========
-
-TEST(TestConfigPluginHandle, CreateAndDestroySucceed)
-{
-    hipdnnHeuristicHandle_t handle = nullptr;
-    EXPECT_EQ(hipdnnHeuristicHandleCreate(&handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
-    EXPECT_NE(handle, nullptr);
-    EXPECT_EQ(hipdnnHeuristicHandleDestroy(handle), HIPDNN_PLUGIN_STATUS_SUCCESS);
-}
-
-TEST(TestConfigPluginHandle, CreateRejectsNullOutPointer)
-{
-    EXPECT_EQ(hipdnnHeuristicHandleCreate(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST(TestConfigPluginHandle, DestroyRejectsNullHandle)
-{
-    EXPECT_EQ(hipdnnHeuristicHandleDestroy(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST_F(TestConfigPlugin, SetDevicePropertiesAcceptsNonEmptyBuffer)
-{
-    const std::array<uint8_t, 4> buffer{0xDE, 0xAD, 0xBE, 0xEF};
-    const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
-    EXPECT_EQ(hipdnnHeuristicHandleSetDeviceProperties(_handle, &data),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
-}
-
-TEST_F(TestConfigPlugin, SetDevicePropertiesRejectsNullHandle)
-{
-    const std::array<uint8_t, 1> buffer{0x01};
-    const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
-    EXPECT_EQ(hipdnnHeuristicHandleSetDeviceProperties(nullptr, &data),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST_F(TestConfigPlugin, SetDevicePropertiesRejectsNullBufferStruct)
-{
-    EXPECT_EQ(hipdnnHeuristicHandleSetDeviceProperties(_handle, nullptr),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST_F(TestConfigPlugin, SetDevicePropertiesRejectsNullBufferPointer)
-{
-    const hipdnnPluginConstData_t data{nullptr, 4};
-    EXPECT_EQ(hipdnnHeuristicHandleSetDeviceProperties(_handle, &data),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
-TEST_F(TestConfigPlugin, SetDevicePropertiesRejectsZeroSize)
-{
-    const std::array<uint8_t, 1> buffer{0x01};
-    const hipdnnPluginConstData_t data{buffer.data(), 0};
-    EXPECT_EQ(hipdnnHeuristicHandleSetDeviceProperties(_handle, &data),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
-}
-
 // ========== Policy Descriptor Lifecycle ==========
 
-TEST_F(TestConfigPlugin, DescriptorCreateRejectsNullHandle)
+TEST_F(TestConfigPolicy, DescriptorCreateRejectsNullHandle)
 {
     hipdnnHeuristicPolicyDescriptor_t desc = nullptr;
-    EXPECT_EQ(hipdnnHeuristicPolicyDescriptorCreate(nullptr, &desc),
+    EXPECT_EQ(hipdnnHeuristicPolicyDescriptorCreate(nullptr, CONFIG_POLICY_ID, &desc),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
     EXPECT_EQ(desc, nullptr);
 }
 
-TEST_F(TestConfigPlugin, DescriptorCreateRejectsNullOutPointer)
+TEST_F(TestConfigPolicy, DescriptorCreateRejectsNullOutPointer)
 {
-    EXPECT_EQ(hipdnnHeuristicPolicyDescriptorCreate(_handle, nullptr),
+    EXPECT_EQ(hipdnnHeuristicPolicyDescriptorCreate(_handle, CONFIG_POLICY_ID, nullptr),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST(TestConfigPluginDescriptor, DestroyRejectsNullDescriptor)
+TEST(TestConfigPolicyDescriptor, DestroyRejectsNullDescriptor)
 {
     EXPECT_EQ(hipdnnHeuristicPolicyDescriptorDestroy(nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 // ========== SetEngineIds ==========
 
-TEST_F(TestConfigPlugin, SetEngineIdsAcceptsValidIds)
+TEST_F(TestConfigPolicy, SetEngineIdsAcceptsValidIds)
 {
     const std::array<int64_t, 2> ids{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
     EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, ids.data(), ids.size()),
               HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
-TEST_F(TestConfigPlugin, SetEngineIdsAcceptsZeroCountWithNullPointer)
+TEST_F(TestConfigPolicy, SetEngineIdsAcceptsZeroCountWithNullPointer)
 {
     EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0),
               HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
-TEST(TestConfigPluginInputs, SetEngineIdsRejectsNullDescriptor)
+TEST(TestConfigPolicyInputs, SetEngineIdsRejectsNullDescriptor)
 {
     const std::array<int64_t, 1> ids{MIOPEN_ENGINE_ID};
     EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(nullptr, ids.data(), ids.size()),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, SetEngineIdsRejectsNullPointerWithCount)
+TEST_F(TestConfigPolicy, SetEngineIdsRejectsNullPointerWithCount)
 {
     EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 3),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
@@ -372,7 +245,7 @@ TEST_F(TestConfigPlugin, SetEngineIdsRejectsNullPointerWithCount)
 
 // ========== SetSerializedGraph ==========
 
-TEST_F(TestConfigPlugin, SetSerializedGraphAcceptsValidGraphBuffer)
+TEST_F(TestConfigPolicy, SetSerializedGraphAcceptsValidGraphBuffer)
 {
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
@@ -380,7 +253,7 @@ TEST_F(TestConfigPlugin, SetSerializedGraphAcceptsValidGraphBuffer)
               HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
-TEST(TestConfigPluginInputs, SetSerializedGraphRejectsNullDescriptor)
+TEST(TestConfigPolicyInputs, SetSerializedGraphRejectsNullDescriptor)
 {
     const std::array<uint8_t, 1> buffer{0x00};
     const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
@@ -388,13 +261,13 @@ TEST(TestConfigPluginInputs, SetSerializedGraphRejectsNullDescriptor)
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, SetSerializedGraphRejectsNullBufferStruct)
+TEST_F(TestConfigPolicy, SetSerializedGraphRejectsNullBufferStruct)
 {
     EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, nullptr),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, SetSerializedGraphRejectsNullBufferPointer)
+TEST_F(TestConfigPolicy, SetSerializedGraphRejectsNullBufferPointer)
 {
     const hipdnnPluginConstData_t data{nullptr, 16};
     EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, &data),
@@ -403,25 +276,25 @@ TEST_F(TestConfigPlugin, SetSerializedGraphRejectsNullBufferPointer)
 
 // ========== Finalize ==========
 
-TEST(TestConfigPluginFinalize, RejectsNullDescriptor)
+TEST(TestConfigPolicyFinalize, RejectsNullDescriptor)
 {
     int32_t applied = -1;
     EXPECT_EQ(hipdnnHeuristicPolicyFinalize(nullptr, &applied), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, FinalizeRejectsNullOutApplied)
+TEST_F(TestConfigPolicy, FinalizeRejectsNullOutApplied)
 {
     EXPECT_EQ(hipdnnHeuristicPolicyFinalize(_desc, nullptr), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, FinalizeWithNoCandidatesReportsNotApplied)
+TEST_F(TestConfigPolicy, FinalizeWithNoCandidatesReportsNotApplied)
 {
     int32_t applied = -1;
     EXPECT_EQ(hipdnnHeuristicPolicyFinalize(_desc, &applied), HIPDNN_PLUGIN_STATUS_SUCCESS);
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, FinalizeWithoutGraphReportsNotApplied)
+TEST_F(TestConfigPolicy, FinalizeWithoutGraphReportsNotApplied)
 {
     setCandidates({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID});
     int32_t applied = -1;
@@ -429,7 +302,7 @@ TEST_F(TestConfigPlugin, FinalizeWithoutGraphReportsNotApplied)
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, FinalizeRejectsInvalidGraphBuffer)
+TEST_F(TestConfigPolicy, FinalizeRejectsInvalidGraphBuffer)
 {
     setCandidates({MIOPEN_ENGINE_ID});
     // Junk that is large enough to pass SetSerializedGraph's null check but
@@ -441,7 +314,7 @@ TEST_F(TestConfigPlugin, FinalizeRejectsInvalidGraphBuffer)
     EXPECT_EQ(hipdnnHeuristicPolicyFinalize(_desc, &applied), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, FinalizeWithoutPreferredEngineReportsNotApplied)
+TEST_F(TestConfigPolicy, FinalizeWithoutPreferredEngineReportsNotApplied)
 {
     setCandidates({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID});
     setGraph(buildGraphBuffer(::flatbuffers::nullopt));
@@ -451,7 +324,7 @@ TEST_F(TestConfigPlugin, FinalizeWithoutPreferredEngineReportsNotApplied)
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, FinalizeWithPreferredNotInCandidatesReportsNotApplied)
+TEST_F(TestConfigPolicy, FinalizeWithPreferredNotInCandidatesReportsNotApplied)
 {
     setCandidates({MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID});
     setGraph(buildGraphBuffer(CUSTOM_ENGINE_ID));
@@ -461,7 +334,7 @@ TEST_F(TestConfigPlugin, FinalizeWithPreferredNotInCandidatesReportsNotApplied)
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, FinalizeMovesPreferredEngineToFrontPreservingOrder)
+TEST_F(TestConfigPolicy, FinalizeMovesPreferredEngineToFrontPreservingOrder)
 {
     // Candidate order chosen so the preferred (CUSTOM) is in the middle; the
     // others should keep their relative position behind it.
@@ -485,7 +358,7 @@ TEST_F(TestConfigPlugin, FinalizeMovesPreferredEngineToFrontPreservingOrder)
     EXPECT_EQ(sorted[2], MIOPEN_DETERMINISTIC_ID);
 }
 
-TEST_F(TestConfigPlugin, FinalizeResetsByLastSetEngineIdsCall)
+TEST_F(TestConfigPolicy, FinalizeResetsByLastSetEngineIdsCall)
 {
     // Initially eligible: preferred is in the candidate set.
     setCandidates({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID});
@@ -502,27 +375,27 @@ TEST_F(TestConfigPlugin, FinalizeResetsByLastSetEngineIdsCall)
 
 // ========== GetSortedEngineIds ==========
 
-TEST(TestConfigPluginGet, RejectsNullDescriptor)
+TEST(TestConfigPolicyGet, RejectsNullDescriptor)
 {
     size_t count = 0;
     EXPECT_EQ(hipdnnHeuristicPolicyGetSortedEngineIds(nullptr, nullptr, &count),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, GetRejectsNullCountPointer)
+TEST_F(TestConfigPolicy, GetRejectsNullCountPointer)
 {
     EXPECT_EQ(hipdnnHeuristicPolicyGetSortedEngineIds(_desc, nullptr, nullptr),
               HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
-TEST_F(TestConfigPlugin, GetReturnsNotInitializedBeforeFinalize)
+TEST_F(TestConfigPolicy, GetReturnsNotInitializedBeforeFinalize)
 {
     size_t count = 0;
     EXPECT_EQ(hipdnnHeuristicPolicyGetSortedEngineIds(_desc, nullptr, &count),
               HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED);
 }
 
-TEST_F(TestConfigPlugin, GetReturnsNotInitializedWhenFinalizeReportsNotApplied)
+TEST_F(TestConfigPolicy, GetReturnsNotInitializedWhenFinalizeReportsNotApplied)
 {
     // Finalize succeeds with applied=0 (no graph); descriptor stays
     // not-finalized so Get must refuse to return data.
@@ -536,7 +409,7 @@ TEST_F(TestConfigPlugin, GetReturnsNotInitializedWhenFinalizeReportsNotApplied)
               HIPDNN_PLUGIN_STATUS_NOT_INITIALIZED);
 }
 
-TEST_F(TestConfigPlugin, GetClipsToCallerProvidedCapacity)
+TEST_F(TestConfigPolicy, GetClipsToCallerProvidedCapacity)
 {
     setCandidates({MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID});
     setGraph(buildGraphBuffer(CUSTOM_ENGINE_ID));
@@ -557,7 +430,7 @@ TEST_F(TestConfigPlugin, GetClipsToCallerProvidedCapacity)
 // ========== HIPDNN_ENGINE_OVERRIDE_FILE end-to-end ==========
 //
 // These tests drive the override-file branch of Finalize: when
-// graph.preferred_engine_id is unset, the plugin reads
+// graph.preferred_engine_id is unset, the policy reads
 // HIPDNN_ENGINE_OVERRIDE_FILE, parses the JSON, and matches each conv-like
 // node against the rules. ScopedEnvironmentVariableSetter restores the
 // original env var on test exit; TempJsonOverrideFile cleans up the file.
@@ -587,7 +460,7 @@ const std::vector<int64_t> W_DIMS{2, 3, 1, 1};
 const std::vector<int64_t> W_STRIDES{3, 1, 1, 1};
 } // namespace
 
-TEST_F(TestConfigPlugin, OverrideFileMovesMatchedEngineToFront)
+TEST_F(TestConfigPolicy, OverrideFileMovesMatchedEngineToFront)
 {
     const TempJsonOverrideFile json(DETERMINISTIC_RULE_JSON);
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV,
@@ -612,7 +485,7 @@ TEST_F(TestConfigPlugin, OverrideFileMovesMatchedEngineToFront)
     EXPECT_EQ(sorted[2], CUSTOM_ENGINE_ID);
 }
 
-TEST_F(TestConfigPlugin, ExplicitPreferredEngineWinsOverOverrideFile)
+TEST_F(TestConfigPolicy, ExplicitPreferredEngineWinsOverOverrideFile)
 {
     // The override file would select MIOPEN_DETERMINISTIC, but the explicit
     // graph.preferred_engine_id hint must take precedence and short-circuit
@@ -640,7 +513,7 @@ TEST_F(TestConfigPlugin, ExplicitPreferredEngineWinsOverOverrideFile)
     EXPECT_EQ(sorted.front(), CUSTOM_ENGINE_ID);
 }
 
-TEST_F(TestConfigPlugin, OverrideFileWithNoMatchingRuleReportsNotApplied)
+TEST_F(TestConfigPolicy, OverrideFileWithNoMatchingRuleReportsNotApplied)
 {
     // Rule targets dim [99, 99, 99, 99] - no conv in the test graph matches.
     constexpr const char* JSON = R"({
@@ -667,7 +540,7 @@ TEST_F(TestConfigPlugin, OverrideFileWithNoMatchingRuleReportsNotApplied)
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, OverrideFilePathPointsAtMissingFileReportsNotApplied)
+TEST_F(TestConfigPolicy, OverrideFilePathPointsAtMissingFileReportsNotApplied)
 {
     // Env var set but file doesn't exist - loadFromEnv returns nullopt,
     // matchOverrideConfig returns nullopt, Finalize reports applied=0.
@@ -682,7 +555,7 @@ TEST_F(TestConfigPlugin, OverrideFilePathPointsAtMissingFileReportsNotApplied)
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, OverrideFileMatchedEngineNotInCandidatesReportsNotApplied)
+TEST_F(TestConfigPolicy, OverrideFileMatchedEngineNotInCandidatesReportsNotApplied)
 {
     // Rule selects MIOPEN_DETERMINISTIC but candidates exclude it.
     const TempJsonOverrideFile json(DETERMINISTIC_RULE_JSON);
@@ -697,7 +570,7 @@ TEST_F(TestConfigPlugin, OverrideFileMatchedEngineNotInCandidatesReportsNotAppli
     EXPECT_EQ(applied, 0);
 }
 
-TEST_F(TestConfigPlugin, OverrideFileRereadOnEachFinalize)
+TEST_F(TestConfigPolicy, OverrideFileRereadOnEachFinalize)
 {
     // Confirms loadFromEnv is no longer process-cached: pointing the env at a
     // different file between Finalize calls picks up the new rule. Same desc

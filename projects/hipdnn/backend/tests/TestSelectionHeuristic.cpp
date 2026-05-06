@@ -60,7 +60,7 @@ TEST_F(TestSelectionHeuristic, ConstructorWithValidInputs)
     // Expect createPolicyDescriptor to be called
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x1234);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
@@ -114,7 +114,7 @@ TEST_F(TestSelectionHeuristic, MoveConstructor)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     // Destroy should be called exactly once (when moved-to object is destroyed)
@@ -138,7 +138,7 @@ TEST_F(TestSelectionHeuristic, MoveAssignment)
     auto mockDescriptor1 = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x1111);
     auto mockDescriptor2 = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x2222);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor1))
         .WillOnce(::testing::Return(mockDescriptor2));
 
@@ -166,7 +166,7 @@ TEST_F(TestSelectionHeuristic, MoveAssignmentSelfAssignment)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x9999);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
@@ -190,7 +190,7 @@ TEST_F(TestSelectionHeuristic, SetEngineIds)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xAAAA);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     std::vector<int64_t> testEngineIds = {1, 2, 3, 4, 5};
@@ -212,7 +212,7 @@ TEST_F(TestSelectionHeuristic, SetSerializedGraph)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xBBBB);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     std::vector<uint8_t> graphData = {0x01, 0x02, 0x03};
@@ -232,7 +232,7 @@ TEST_F(TestSelectionHeuristic, FinalizeReturnsTrue)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xCCCC);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     EXPECT_CALL(*_mockPlugin, finalize(mockDescriptor)).WillOnce(::testing::Return(true));
@@ -249,7 +249,7 @@ TEST_F(TestSelectionHeuristic, FinalizeReturnsFalse)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xDDDD);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     EXPECT_CALL(*_mockPlugin, finalize(mockDescriptor)).WillOnce(::testing::Return(false));
@@ -266,7 +266,7 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIds)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     // The plugin output must be a permutation/subset of the IDs we hand in
@@ -292,7 +292,7 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsFabricatedId)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     const std::vector<int64_t> inputIds = {1, 2, 3};
@@ -315,7 +315,7 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsDuplicates)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     const std::vector<int64_t> inputIds = {1, 2, 3};
@@ -337,7 +337,7 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIdsRejectsOversizedOutput)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     const std::vector<int64_t> inputIds = {1, 2};
@@ -359,7 +359,7 @@ TEST_F(TestSelectionHeuristic, GetSortedEngineIdsAcceptsProperSubset)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xEEEE);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     // Plugin may decline some candidates and return a strict subset.
@@ -387,7 +387,7 @@ TEST_F(TestSelectionHeuristic, KeepsResourceManagerAliveAcrossCallerRelease)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xABCD);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
     EXPECT_CALL(*_mockPlugin, finalize(mockDescriptor)).WillOnce(::testing::Return(true));
     EXPECT_CALL(*_mockPlugin, destroyPolicyDescriptor(mockDescriptor)).Times(1);
@@ -413,7 +413,7 @@ TEST_F(TestSelectionHeuristic, DestructorHandlesExceptionInCleanup)
 
     auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0xFFFF);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor));
 
     // Destructor should catch and suppress exceptions
@@ -434,7 +434,7 @@ TEST_F(TestSelectionHeuristic, MoveAssignmentHandlesExceptionInCleanup)
     auto mockDescriptor1 = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x1001);
     auto mockDescriptor2 = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x2002);
 
-    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle))
+    EXPECT_CALL(*_mockPlugin, createPolicyDescriptor(_mockHandle, _policyId))
         .WillOnce(::testing::Return(mockDescriptor1))
         .WillOnce(::testing::Return(mockDescriptor2));
 

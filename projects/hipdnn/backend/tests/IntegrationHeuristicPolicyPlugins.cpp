@@ -242,7 +242,7 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PolicyDescriptorCreationSucceeds)
     ASSERT_NE(plugin, nullptr);
 
     // Create policy descriptor
-    auto descriptor = plugin->createPolicyDescriptor(pluginHandle);
+    auto descriptor = plugin->createPolicyDescriptor(pluginHandle, policyId);
     EXPECT_NE(descriptor, nullptr);
 
     // Clean up

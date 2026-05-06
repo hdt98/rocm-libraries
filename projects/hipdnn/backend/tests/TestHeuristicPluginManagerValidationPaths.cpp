@@ -92,20 +92,25 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ActionAfterAddingStoresPolicyI
 
     // Collect all policy IDs to verify actionAfterAdding was called
     std::set<int64_t> policyIds;
+    size_t totalPolicyCount = 0;
     for(const auto& plugin : plugins)
     {
-        const int64_t id = plugin->policyId();
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            ++totalPolicyCount;
 
-        // Each policy ID should be unique (actionAfterAdding should have tracked this)
-        EXPECT_EQ(policyIds.count(id), 0)
-            << "Policy ID " << id << " appears multiple times (actionAfterAdding tracking failed)";
+            // Each policy ID should be unique (actionAfterAdding should have tracked this)
+            EXPECT_EQ(policyIds.count(id), 0) << "Policy ID " << id
+                                              << " appears multiple times (actionAfterAdding "
+                                                 "tracking failed)";
 
-        policyIds.insert(id);
+            policyIds.insert(id);
+        }
     }
 
     // Should have loaded plugins with unique policy IDs
-    EXPECT_GT(policyIds.size(), 0) << "Should have loaded at least one plugin";
-    EXPECT_EQ(policyIds.size(), plugins.size()) << "All policy IDs should be unique";
+    EXPECT_GT(policyIds.size(), 0) << "Should have loaded at least one plugin policy";
+    EXPECT_EQ(policyIds.size(), totalPolicyCount) << "All policy IDs should be unique";
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyIdTrackingAcrossMultiplePlugins)
@@ -115,21 +120,25 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyIdTrackingAcrossMultiple
 
     const auto& plugins = _manager->getPlugins();
 
-    // Collect all policy IDs
+    // Collect all policy IDs from every loaded plugin/policy
     std::set<int64_t> policyIds;
+    size_t totalPolicyCount = 0;
     for(const auto& plugin : plugins)
     {
-        const int64_t id = plugin->policyId();
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            ++totalPolicyCount;
 
-        // Each policy ID should be unique (actionAfterAdding tracks this)
-        EXPECT_EQ(policyIds.count(id), 0)
-            << "Policy ID " << id << " appears multiple times (validateBeforeAdding failed)";
+            // Each policy ID should be unique (actionAfterAdding tracks this)
+            EXPECT_EQ(policyIds.count(id), 0)
+                << "Policy ID " << id << " appears multiple times (validateBeforeAdding failed)";
 
-        policyIds.insert(id);
+            policyIds.insert(id);
+        }
     }
 
-    // Should have as many unique IDs as plugins
-    EXPECT_EQ(policyIds.size(), plugins.size());
+    // Should have as many unique IDs as policies across all plugins
+    EXPECT_EQ(policyIds.size(), totalPolicyCount);
 }
 
 // ========== validateBeforeAdding() Tests - Policy Name Check ==========
@@ -157,13 +166,16 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyNameIsProvided)
 
     for(const auto& plugin : plugins)
     {
-        const std::string policyName(plugin->name());
+        // Plugin name must be non-empty (validated in HeuristicPluginManager)
+        const std::string pluginName(plugin->name());
+        EXPECT_FALSE(pluginName.empty()) << "Plugin has empty name";
 
-        // Policy name should be non-empty (validated in validateBeforeAdding lines 82-89)
-        EXPECT_FALSE(policyName.empty()) << "Policy ID " << plugin->policyId() << " has empty name";
-
-        // Should be a valid string
-        EXPECT_GT(policyName.length(), 0);
+        // Each policy must have a non-empty name (validated eagerly in HeuristicPlugin)
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            const std::string policyName(plugin->getPolicyName(policyId));
+            EXPECT_FALSE(policyName.empty()) << "Policy ID " << policyId << " has empty name";
+        }
     }
 }
 
@@ -178,15 +190,18 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidPluginPassesAllValidation
 
     for(const auto& plugin : plugins)
     {
-        // API version check (validateBeforeAdding lines 55-66)
+        // API version check
         const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
         EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
 
-        // Policy ID should be non-zero
-        EXPECT_NE(plugin->policyId(), 0);
-
-        // Policy name check (validateBeforeAdding lines 82-89)
+        // Plugin name check
         EXPECT_FALSE(plugin->name().empty());
+
+        // Each policy ID should be non-zero
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            EXPECT_NE(policyId, 0);
+        }
     }
 }
 
@@ -198,16 +213,17 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ActionAfterAddingExecutesForEa
 
     const auto& plugins = _manager->getPlugins();
 
-    // For each plugin loaded, actionAfterAdding should have:
-    // 1. Inserted policy ID into _policyIds set (line 94)
-    // This is verified indirectly by ensuring no duplicate IDs exist
-
+    // For each policy across all plugins, actionAfterAdding should have inserted the
+    // policy ID into _policyIds set. Verified indirectly by ensuring no duplicates exist.
     std::set<int64_t> observedIds;
     for(const auto& plugin : plugins)
     {
-        EXPECT_EQ(observedIds.count(plugin->policyId()), 0)
-            << "Duplicate policy ID detected - actionAfterAdding may have failed";
-        observedIds.insert(plugin->policyId());
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            EXPECT_EQ(observedIds.count(id), 0)
+                << "Duplicate policy ID detected - actionAfterAdding may have failed";
+            observedIds.insert(id);
+        }
     }
 }
 
@@ -284,11 +300,15 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidationIntegratesWithBaseCl
     for(const auto& plugin : plugins)
     {
         // These checks verify that validateBeforeAdding was called and passed
-        EXPECT_NE(plugin->policyId(), 0);
         EXPECT_FALSE(plugin->name().empty());
 
         const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
         EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
+
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            EXPECT_NE(policyId, 0);
+        }
     }
 }
 
@@ -311,8 +331,11 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, NoOptionalHeuristicPluginPasse
         {
             foundNoOptional = true;
             // Should pass all validation checks
-            EXPECT_NE(plugin->policyId(), 0);
             EXPECT_FALSE(name.empty());
+            for(const int64_t policyId : plugin->getAllPolicyIds())
+            {
+                EXPECT_NE(policyId, 0);
+            }
         }
     }
     EXPECT_TRUE(foundNoOptional) << "test_no_optional_heuristic_plugin should be loaded";
@@ -325,28 +348,30 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
     const auto& plugins = _manager->getPlugins();
     ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
 
-    // Match the exact good-plugin policy name. A loose substring match like
-    // "Good" || "Test" matches every test plugin (NoOptional, etc.) and would
-    // pass even if the good plugin failed to load.
-    constexpr const char* K_GOOD_POLICY_NAME = "TestGoodHeuristicPolicy";
+    // Match the exact good-plugin name. A loose substring match would pass even if
+    // the good plugin failed to load.
+    constexpr const char* K_GOOD_PLUGIN_NAME = "TestGoodHeuristicPlugin";
 
     bool foundGood = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
-        if(name == K_GOOD_POLICY_NAME)
+        if(name == K_GOOD_PLUGIN_NAME)
         {
             foundGood = true;
             // Verify it passed all validation:
-            // 1. API version (lines 55-66)
+            // 1. API version
             const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
             EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
 
-            // 2. Policy ID is unique and non-zero (lines 69-78)
-            EXPECT_NE(plugin->policyId(), 0);
-
-            // 3. Policy name is non-empty (lines 81-89)
+            // 2. Plugin name is non-empty
             EXPECT_FALSE(name.empty());
+
+            // 3. All policy IDs are unique and non-zero
+            for(const int64_t policyId : plugin->getAllPolicyIds())
+            {
+                EXPECT_NE(policyId, 0);
+            }
         }
     }
     EXPECT_TRUE(foundGood) << "test_good_heuristic_plugin should be loaded";
@@ -409,7 +434,7 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsReject
     probeA.loadPlugins({pluginA}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     ASSERT_EQ(probeA.getPlugins().size(), 1u)
         << "pluginA should load successfully on its own to be a valid baseline";
-    EXPECT_EQ(plugins.front()->policyId(), probeA.getPlugins().front()->policyId())
+    EXPECT_EQ(plugins.front()->getAllPolicyIds(), probeA.getPlugins().front()->getAllPolicyIds())
         << "Survivor should be pluginA (the first offered), not pluginB";
 }
 

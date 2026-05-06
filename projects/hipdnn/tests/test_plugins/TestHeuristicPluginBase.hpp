@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 #include <hipdnn_plugin_sdk/PluginLastErrorManager.hpp>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
@@ -41,20 +42,42 @@ hipdnnSeverity_t g_logLevel = HIPDNN_SEV_INFO;
 } // anonymous namespace
 
 /**
- * @brief Base class for test heuristic plugins with common implementations
+ * @brief Base class for test heuristic plugins with common implementations.
  *
- * Derived classes only need to override:
- * - getPolicyName() - return the policy name
- * - getApiVersion() - (optional) override to return wrong version for testing
- * - getPluginVersion() - (optional) override to customize version
+ * Single-policy convenience: derived classes only need to override getPolicyName()
+ * and a single-policy plugin will be exposed. Multi-policy plugins should override
+ * getAllPolicyNames() instead.
+ *
+ * Optional overrides:
+ * - getPluginName() - the plugin (library) name returned by hipdnnPluginGetName.
+ *   Defaults to "TestHeuristicPlugin"; override to test invalid plugin names.
+ * - getApiVersion() - return a wrong API version to test ABI rejection.
+ * - getPluginVersion() - customize plugin implementation version.
  */
 class TestHeuristicPluginBase
 {
 public:
     virtual ~TestHeuristicPluginBase() = default;
 
-    // Virtual methods to be overridden by derived classes
-    virtual const char* getPolicyName() const = 0;
+    // Single-policy convenience override (default implementation throws if not overridden
+    // and getAllPolicyNames is also unset).
+    virtual const char* getPolicyName() const
+    {
+        return "";
+    }
+
+    // Override for multi-policy plugins. Default implementation returns a single entry
+    // taken from getPolicyName(), so single-policy plugins keep their existing behavior.
+    virtual std::vector<std::string> getAllPolicyNames() const
+    {
+        return {std::string(getPolicyName())};
+    }
+
+    // Plugin (library) name returned by hipdnnPluginGetName. Distinct from policy names.
+    virtual const char* getPluginName() const
+    {
+        return "TestHeuristicPlugin";
+    }
 
     virtual const char* getPluginVersion() const
     {
@@ -100,8 +123,86 @@ public:
                 HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR, "plugin instance is null");
             return HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR;
         }
-        *name = getInstance()->getPolicyName();
+        *name = getInstance()->getPluginName();
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
+    }
+
+    // ========== Policy Enumeration ==========
+
+    // Cached policy names so the const char* returned to the C ABI remains valid for the
+    // lifetime of the loaded library.
+    static std::vector<std::string>& getCachedPolicyNames()
+    {
+        // NOLINTNEXTLINE(readability-identifier-naming)
+        static std::vector<std::string> sNames;
+        return sNames;
+    }
+
+    static const std::vector<std::string>& policyNames()
+    {
+        auto& cached = getCachedPolicyNames();
+        if(cached.empty() && getInstance() != nullptr)
+        {
+            cached = getInstance()->getAllPolicyNames();
+        }
+        return cached;
+    }
+
+    static hipdnnPluginStatus_t
+        getAllPolicyIds(int64_t* policyIds, uint32_t maxPolicies, uint32_t* numPolicies)
+    {
+        if(numPolicies == nullptr)
+        {
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
+                HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "num_policies pointer is null");
+            return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+        }
+        if(getInstance() == nullptr)
+        {
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
+                HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR, "plugin instance is null");
+            return HIPDNN_PLUGIN_STATUS_INTERNAL_ERROR;
+        }
+
+        const auto& names = policyNames();
+        const auto total = static_cast<uint32_t>(names.size());
+        *numPolicies = total;
+        if(policyIds == nullptr || maxPolicies == 0)
+        {
+            return HIPDNN_PLUGIN_STATUS_SUCCESS;
+        }
+        if(maxPolicies < total)
+        {
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
+                HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "max_policies smaller than available count");
+            return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+        }
+        for(uint32_t i = 0; i < total; ++i)
+        {
+            policyIds[i] = hipdnn_data_sdk::utilities::policyNameToId(names[i]);
+        }
+        return HIPDNN_PLUGIN_STATUS_SUCCESS;
+    }
+
+    static hipdnnPluginStatus_t getPolicyName(int64_t policyId, const char** name)
+    {
+        if(name == nullptr)
+        {
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
+                HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "name pointer is null");
+            return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+        }
+        for(const auto& candidate : policyNames())
+        {
+            if(hipdnn_data_sdk::utilities::policyNameToId(candidate) == policyId)
+            {
+                *name = candidate.c_str();
+                return HIPDNN_PLUGIN_STATUS_SUCCESS;
+            }
+        }
+        hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_BAD_PARAM,
+                                                                "unknown policy id");
+        return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
     }
 
     static hipdnnPluginStatus_t getVersion(const char** version)
@@ -224,6 +325,7 @@ public:
 
     static hipdnnPluginStatus_t
         policyDescriptorCreate(hipdnnHeuristicHandle_t handle,
+                               int64_t policyId,
                                hipdnnHeuristicPolicyDescriptor_t* outDescriptor)
     {
         if(handle == nullptr)
@@ -237,6 +339,22 @@ public:
             hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
                 HIPDNN_PLUGIN_STATUS_INVALID_VALUE, "out_descriptor pointer is null");
             return HIPDNN_PLUGIN_STATUS_INVALID_VALUE;
+        }
+
+        bool found = false;
+        for(const auto& candidate : policyNames())
+        {
+            if(hipdnn_data_sdk::utilities::policyNameToId(candidate) == policyId)
+            {
+                found = true;
+                break;
+            }
+        }
+        if(!found)
+        {
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
+                HIPDNN_PLUGIN_STATUS_BAD_PARAM, "unknown policy id");
+            return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
 
         auto* desc = new PolicyDescriptorImpl{};
@@ -388,6 +506,17 @@ public:
         return TestHeuristicPluginBase::getType(type);                                            \
     }                                                                                             \
                                                                                                   \
+    hipdnnPluginStatus_t hipdnnHeuristicPluginGetAllPolicyIds(                                    \
+        int64_t* policyIds, uint32_t maxPolicies, uint32_t* numPolicies)                          \
+    {                                                                                             \
+        return TestHeuristicPluginBase::getAllPolicyIds(policyIds, maxPolicies, numPolicies);     \
+    }                                                                                             \
+                                                                                                  \
+    hipdnnPluginStatus_t hipdnnHeuristicPluginGetPolicyName(int64_t policyId, const char** name)  \
+    {                                                                                             \
+        return TestHeuristicPluginBase::getPolicyName(policyId, name);                            \
+    }                                                                                             \
+                                                                                                  \
     hipdnnPluginStatus_t hipdnnPluginSetLoggingCallback(hipdnnCallback_t callback)                \
     {                                                                                             \
         return TestHeuristicPluginBase::setLoggingCallback(callback);                             \
@@ -422,9 +551,10 @@ public:
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \
         hipdnnHeuristicPolicyDescriptorCreate(hipdnnHeuristicHandle_t handle,                     \
+                                              int64_t policyId,                                   \
                                               hipdnnHeuristicPolicyDescriptor_t* outDescriptor)   \
     {                                                                                             \
-        return TestHeuristicPluginBase::policyDescriptorCreate(handle, outDescriptor);            \
+        return TestHeuristicPluginBase::policyDescriptorCreate(handle, policyId, outDescriptor);  \
     }                                                                                             \
                                                                                                   \
     hipdnnPluginStatus_t                                                                          \

@@ -33,7 +33,7 @@ SelectionHeuristic::SelectionHeuristic(
                    HIPDNN_STATUS_BAD_PARAM,
                    "No heuristic plugin loaded for policy ID " + std::to_string(_policyId));
 
-    _descriptor = plugin->createPolicyDescriptor(pluginHandle);
+    _descriptor = plugin->createPolicyDescriptor(pluginHandle, _policyId);
 }
 
 SelectionHeuristic::~SelectionHeuristic()

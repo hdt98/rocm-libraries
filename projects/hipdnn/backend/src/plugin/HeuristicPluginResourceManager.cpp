@@ -80,7 +80,9 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         return; // No plugins to initialize
     }
 
-    // Create plugin handles for all loaded heuristic plugins
+    // Create plugin handles for all loaded heuristic plugins. Each plugin has a single
+    // handle, but a plugin may expose multiple policies; every policy ID maps to the
+    // same handle (N:1).
     const auto& plugins = _pm->getPlugins();
     for(const auto& plugin : plugins)
     {
@@ -89,9 +91,8 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
             = plugin->setLoggingCallback(hipdnn_backend::logging::backendLoggingCallback);
         if(logStatus != HIPDNN_PLUGIN_STATUS_SUCCESS)
         {
-            HIPDNN_BACKEND_LOG_WARN(
-                "Failed to set logging callback on heuristic plugin with policy ID {}",
-                plugin->policyId());
+            HIPDNN_BACKEND_LOG_WARN("Failed to set logging callback on heuristic plugin '{}'",
+                                    plugin->name());
             continue;
         }
 
@@ -100,36 +101,40 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         hipdnn_backend::logging::getGlobalLogLevel(level);
         plugin->setLogLevel(level);
 
-        // Create plugin handle
+        // Create plugin handle (one per plugin, shared across all its policies)
         hipdnnHeuristicHandle_t handle = nullptr;
         try
         {
             handle = plugin->createHandle();
             if(handle == nullptr)
             {
-                HIPDNN_BACKEND_LOG_ERROR("Plugin with policy ID {} ({}) returned null handle "
-                                         "despite reporting success. Plugin will be unavailable.",
-                                         plugin->policyId(),
+                HIPDNN_BACKEND_LOG_ERROR("Heuristic plugin '{}' returned null handle despite "
+                                         "reporting success. Plugin will be unavailable.",
                                          plugin->name());
                 continue;
             }
         }
         catch(const HipdnnException& e)
         {
-            HIPDNN_BACKEND_LOG_ERROR("Failed to create handle for heuristic plugin with policy ID "
-                                     "{} ({}): {}. Plugin will be unavailable.",
-                                     plugin->policyId(),
+            HIPDNN_BACKEND_LOG_ERROR("Failed to create handle for heuristic plugin '{}': {}. "
+                                     "Plugin will be unavailable.",
                                      plugin->name(),
                                      e.what());
             continue;
         }
 
         _handleToPlugin[handle] = plugin.get();
-        _policyIdToHandle[plugin->policyId()] = handle;
 
-        HIPDNN_BACKEND_LOG_INFO("Created heuristic plugin handle for policy ID {} ({})",
-                                plugin->policyId(),
-                                plugin->name());
+        const auto policyIds = plugin->getAllPolicyIds();
+        for(const int64_t policyId : policyIds)
+        {
+            _policyIdToHandle[policyId] = handle;
+            HIPDNN_BACKEND_LOG_INFO(
+                "Registered heuristic policy ID {} ({}) from plugin '{}'",
+                policyId,
+                std::string(plugin->getPolicyName(policyId)),
+                plugin->name());
+        }
     }
 }
 
@@ -143,19 +148,16 @@ HeuristicPluginResourceManager::~HeuristicPluginResourceManager()
         }
         catch(const std::exception& e)
         {
-            HIPDNN_BACKEND_LOG_WARN("Failed to destroy handle for heuristic plugin '{}' (policy ID "
-                                    "{}) during cleanup: {}",
-                                    plugin->name(),
-                                    plugin->policyId(),
-                                    e.what());
+            HIPDNN_BACKEND_LOG_WARN(
+                "Failed to destroy handle for heuristic plugin '{}' during cleanup: {}",
+                plugin->name(),
+                e.what());
         }
         catch(...)
         {
             HIPDNN_BACKEND_LOG_WARN(
-                "Failed to destroy handle for heuristic plugin '{}' (policy ID {}) during cleanup: "
-                "unknown error",
-                plugin->name(),
-                plugin->policyId());
+                "Failed to destroy handle for heuristic plugin '{}' during cleanup: unknown error",
+                plugin->name());
         }
     };
 
@@ -236,10 +238,9 @@ void HeuristicPluginResourceManager::setDevicePropertiesOnAllHandles(
         }
         catch(const HipdnnException& e)
         {
-            HIPDNN_BACKEND_LOG_WARN(
-                "Failed to set device properties on heuristic plugin with policy ID {}: {}",
-                plugin->policyId(),
-                e.what());
+            HIPDNN_BACKEND_LOG_WARN("Failed to set device properties on heuristic plugin '{}': {}",
+                                    plugin->name(),
+                                    e.what());
             // Continue with other plugins
         }
     }
@@ -253,16 +254,20 @@ std::vector<HeuristicPolicyInfo> HeuristicPluginResourceManager::getHeuristicPol
     }
 
     std::vector<HeuristicPolicyInfo> infos;
-    infos.reserve(_handleToPlugin.size());
+    infos.reserve(_policyIdToHandle.size());
 
     for(const auto& [handle, plugin] : _handleToPlugin)
     {
-        HeuristicPolicyInfo info;
-        info.policyId = plugin->policyId();
-        info.policyName = std::string(plugin->name());
-        info.pluginVersion = std::string(plugin->version());
-        info.apiVersion = std::string(plugin->apiVersion());
-        infos.push_back(info);
+        const auto policyIds = plugin->getAllPolicyIds();
+        for(const int64_t policyId : policyIds)
+        {
+            HeuristicPolicyInfo info;
+            info.policyId = policyId;
+            info.policyName = std::string(plugin->getPolicyName(policyId));
+            info.pluginVersion = std::string(plugin->version());
+            info.apiVersion = std::string(plugin->apiVersion());
+            infos.push_back(info);
+        }
     }
 
     _cachedPolicyInfos = infos;

@@ -36,14 +36,17 @@ public:
 
     // Base plugin metadata (from PluginApi.h)
     std::string_view apiVersion() const override;
-    std::string_view name() const override; // Returns policy name (via hipdnnPluginGetName)
+    std::string_view name() const override; // Plugin (library) name (via hipdnnPluginGetName)
     std::string_view
         version() const override; // Returns plugin version (via hipdnnPluginGetVersion)
     hipdnnPluginType_t
         type() const override; // Returns HIPDNN_PLUGIN_TYPE_HEURISTIC (via hipdnnPluginGetType)
 
-    // Heuristic-specific metadata
-    virtual int64_t policyId() const; // Computed from name via policyNameToId
+    // Heuristic-specific metadata: a single plugin may expose multiple policies.
+    // getAllPolicyIds() is cached after first invocation; getPolicyName() is
+    // queried on demand and returns the canonical name reported by the plugin.
+    virtual std::vector<int64_t> getAllPolicyIds() const;
+    virtual std::string_view getPolicyName(int64_t policyId) const;
 
     // Plugin type - heuristic plugins return HEURISTIC
     static hipdnnPluginType_t getPluginType()
@@ -56,15 +59,15 @@ public:
 
     hipdnnPluginStatus_t setLogLevel(hipdnnSeverity_t level) const;
 
-    // Plugin handle lifecycle
+    // Plugin handle lifecycle (one handle per loaded plugin, shared across policies)
     virtual hipdnnHeuristicHandle_t createHandle() const;
     virtual void destroyHandle(hipdnnHeuristicHandle_t handle) const;
     virtual void setDeviceProperties(hipdnnHeuristicHandle_t handle,
                                      const hipdnnPluginConstData_t* devicePropsSerialized) const;
 
-    // Policy descriptor lifecycle
+    // Policy descriptor lifecycle (one descriptor per policy slot)
     virtual hipdnnHeuristicPolicyDescriptor_t
-        createPolicyDescriptor(hipdnnHeuristicHandle_t pluginHandle) const;
+        createPolicyDescriptor(hipdnnHeuristicHandle_t pluginHandle, int64_t policyId) const;
     virtual void destroyPolicyDescriptor(hipdnnHeuristicPolicyDescriptor_t desc) const;
 
     // Policy inputs
@@ -119,8 +122,9 @@ private:
     bool _initialized = false;
 #endif
 
-    // Cached metadata (eagerly initialized in resolveSymbols)
-    int64_t _policyId = -1;
+    // Cached policy IDs (lazily populated by getAllPolicyIds and validated in
+    // resolveSymbols). Mutable so the const accessor can fill the cache.
+    mutable std::vector<int64_t> _allPolicyIds;
 
     // Base plugin function pointers (from PluginApi.h)
     hipdnnPluginStatus_t (*_funcGetName)(const char**);
@@ -131,6 +135,10 @@ private:
     hipdnnPluginStatus_t (*_funcSetLogLevel)(hipdnnSeverity_t);
     void (*_funcGetLastErrorString)(const char**);
 
+    // Policy enumeration function pointers (heuristic-specific)
+    hipdnnPluginStatus_t (*_funcGetAllPolicyIds)(int64_t*, uint32_t, uint32_t*);
+    hipdnnPluginStatus_t (*_funcGetPolicyName)(int64_t, const char**);
+
     // Handle lifecycle function pointers
     hipdnnPluginStatus_t (*_funcHandleCreate)(hipdnnHeuristicHandle_t*);
     hipdnnPluginStatus_t (*_funcHandleDestroy)(hipdnnHeuristicHandle_t);
@@ -139,6 +147,7 @@ private:
 
     // Policy descriptor lifecycle function pointers
     hipdnnPluginStatus_t (*_funcPolicyDescriptorCreate)(hipdnnHeuristicHandle_t,
+                                                        int64_t,
                                                         hipdnnHeuristicPolicyDescriptor_t*);
     hipdnnPluginStatus_t (*_funcPolicyDescriptorDestroy)(hipdnnHeuristicPolicyDescriptor_t);
 

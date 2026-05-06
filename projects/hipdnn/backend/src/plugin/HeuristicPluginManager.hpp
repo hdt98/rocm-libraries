@@ -27,8 +27,14 @@ namespace hipdnn_backend::plugin
  *
  * Validation includes:
  * - Heuristic C ABI major version compatibility
- * - Unique policy IDs across all loaded heuristic plugins
- * - Policy name is provided via hipdnnPluginGetName()
+ * - Unique policy IDs across all loaded heuristic plugins (one plugin may expose many)
+ * - Plugin (library) name is provided via hipdnnPluginGetName()
+ *
+ * A single heuristic plugin shared library may expose one or more selection
+ * policies. Each policy is identified by a stable int64 policy ID derived from
+ * the canonical policy name (FNV-1a hash via policyNameToId). The plugin layer
+ * validates the policy ID/name pairing eagerly at load; this manager enforces
+ * uniqueness across all loaded plugins.
  */
 class HeuristicPluginManager : public PluginManagerBase<HeuristicPlugin>
 {
@@ -60,33 +66,40 @@ protected:
                                       + "Expected API version: " HIPDNN_HEURISTIC_API_VERSION);
         }
 
-        // Validate unique policy ID
-        const int64_t policyId = plugin.policyId();
-        if(_policyIds.find(policyId) != _policyIds.end())
-        {
-            throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,
-                                  "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
-                                  "Policy ID "
-                                      + std::to_string(policyId)
-                                      + " already exists in the list of loaded heuristic plugins.\n"
-                                      + "Each heuristic plugin must have a unique policy ID.");
-        }
-
-        // Validate policy name is provided (required for all heuristic plugins)
-        auto policyNameView = plugin.name();
-        if(policyNameView.empty())
+        // Validate plugin (library) name is provided
+        if(plugin.name().empty())
         {
             throw HipdnnException(
                 HIPDNN_STATUS_PLUGIN_ERROR,
                 "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
-                "Policy name is required but was not provided.\n"
-                "Plugin must implement hipdnnPluginGetName() and return a non-empty policy name.");
+                "Plugin name is required but was not provided.\n"
+                "Plugin must implement hipdnnPluginGetName() and return a non-empty name.");
+        }
+
+        // Validate every policy ID is globally unique across loaded plugins.
+        // The plugin layer (HeuristicPlugin::resolveSymbols) already checks intra-plugin
+        // uniqueness and policyNameToId(name) == policyId; here we extend the check across
+        // the full set of loaded plugins.
+        const auto policyIds = plugin.getAllPolicyIds();
+        for(const int64_t policyId : policyIds)
+        {
+            if(_policyIds.find(policyId) != _policyIds.end())
+            {
+                throw HipdnnException(
+                    HIPDNN_STATUS_PLUGIN_ERROR,
+                    "ERROR: HEURISTIC PLUGIN VALIDATION FAILED\n"
+                    "Policy ID "
+                        + std::to_string(policyId)
+                        + " already exists in the list of loaded heuristic plugins.\n"
+                        + "Each policy must have a unique ID.");
+            }
         }
     }
 
     void actionAfterAdding(const HeuristicPlugin& plugin) override
     {
-        _policyIds.insert(plugin.policyId());
+        const auto policyIds = plugin.getAllPolicyIds();
+        _policyIds.insert(policyIds.begin(), policyIds.end());
     }
 
     void actionAfterClearing() override
