@@ -272,11 +272,17 @@ struct DPPModifiers : public TypedModifier<DPPModifiers> {
     int row_bcast;
     int bound_ctrl;
 
-    DPPModifiers(int row_shr = -1, int row_bcast = -1, int bound_ctrl = -1)
+    // Raw dpp_ctrl string for modes not modelled as typed fields
+    // (e.g. "row_xmask:8", "row_shl:4"). Emitted verbatim.
+    std::string dppCtrl;
+
+    DPPModifiers(int row_shr = -1, int row_bcast = -1, int bound_ctrl = -1,
+                 const std::string& dppCtrl = "")
         : TypedModifier<DPPModifiers>(),
           row_shr(row_shr),
           row_bcast(row_bcast),
-          bound_ctrl(bound_ctrl) {}
+          bound_ctrl(bound_ctrl),
+          dppCtrl(dppCtrl) {}
 };
 
 struct VOP3Modifiers : public TypedModifier<VOP3Modifiers> {

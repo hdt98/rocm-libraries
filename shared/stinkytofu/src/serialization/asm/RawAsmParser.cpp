@@ -491,6 +491,24 @@ bool parseWaitAluSyntax(IRLexer& lexer, ParsedInstruction& inst) {
     return true;
 }
 
+/// Map of string key → string value used for parsed modifier fields.
+using FieldMap = std::unordered_map<std::string, std::string>;
+
+/// Returns true if the field map contains any DPP control modifier key.
+/// DPP is an add-on encoding variant layered on top of VOP formats —
+/// the assembler picks a wider encoding when DPP modifiers are present.
+bool hasDPPFields(const FieldMap& fields) {
+    // dpp_ctrl modes (13 symbolic names)
+    return fields.count("quad_perm") || fields.count("row_shl") || fields.count("row_shr") ||
+           fields.count("row_ror") || fields.count("wave_shl") || fields.count("wave_shr") ||
+           fields.count("wave_rol") || fields.count("wave_ror") || fields.count("row_mirror") ||
+           fields.count("row_half_mirror") || fields.count("row_bcast") ||
+           fields.count("row_share") || fields.count("row_xmask") ||
+           // other DPP encoding fields
+           fields.count("bound_ctrl") || fields.count("row_mask") || fields.count("bank_mask") ||
+           fields.count("fi");
+}
+
 /// Parse hwreg(id, offset, width) syntax and store as a LiteralString
 /// register on the instruction for verbatim round-trip emission.
 void parseHwregOperand(IRLexer& lexer, ParsedInstruction& inst,
@@ -698,7 +716,16 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
     // would be silently discarded below at the `modKey.empty()` early-return,
     // so flag the line as unrepresentable instead and let the caller fall
     // back to TEXTBLOCK pass-through.
-    if (modKey.empty() && sawAnyModifier) sawUnrepresentable = true;
+    // When no modKey was assigned from the microcode format, check if the
+    // collected fields match a known add-on modifier pattern. DPP is an
+    // add-on encoding variant whose base microcode format doesn't have a
+    // dedicated modKey — detect by checking for DPP-specific field names.
+    if (modKey.empty() && sawAnyModifier) {
+        if (hasDPPFields(fields))
+            modKey = "mod.dpp";
+        else
+            sawUnrepresentable = true;
+    }
 
     if (modKey.empty() || fields.empty()) return !sawUnrepresentable;
 
@@ -738,6 +765,22 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
         if (fields.count("offset")) modFields["offset"] = fields["offset"];
         if (fields.count("glc")) modFields["glc"] = "true";
         if (fields.count("nv")) modFields["nv"] = "true";
+
+    } else if (modKey == "mod.dpp") {
+        if (fields.count("row_shr")) modFields["row_shr"] = fields["row_shr"];
+        if (fields.count("row_bcast")) modFields["row_bcast"] = fields["row_bcast"];
+        if (fields.count("bound_ctrl")) modFields["bound_ctrl"] = fields["bound_ctrl"];
+        // Collect remaining (unmodelled) DPP fields into dppCtrl string for
+        // verbatim round-trip. Skip the typed fields handled above.
+        std::string dppCtrl;
+        for (const auto& [key, val] : fields) {
+            if (key == "row_shr" || key == "row_bcast" || key == "bound_ctrl") continue;
+            // Boolean flags (e.g. row_mirror) are stored as "true" —
+            // emit just the key, not "key:true".
+            dppCtrl = (val == "true") ? key : key + ":" + val;
+            break;
+        }
+        if (!dppCtrl.empty()) modFields["dppCtrl"] = dppCtrl;
 
     } else if (modKey == "mod.mfma") {
         if (fields.count("matrix_a_fmt")) modFields["matrix_a_fmt"] = fields["matrix_a_fmt"];

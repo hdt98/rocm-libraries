@@ -468,8 +468,12 @@ void deserializeVisit(StinkyInstruction* inst, const std::string& attrKey,
         if (fields.count("tokens")) {
             inst->addModifier(MemTokenData(getIntVector(fields, "tokens")));
         }
+    } else if (attrKey == "mod.dpp") {
+        inst->addModifier(
+            DPPModifiers(getInt(fields, "row_shr", -1), getInt(fields, "row_bcast", -1),
+                         getInt(fields, "bound_ctrl", -1), getStr(fields, "dppCtrl")));
     }
-    // mod.sdwa, mod.dpp, mod.vop3p, mod.true16: no deserialize support yet
+    // mod.sdwa, mod.vop3p, mod.true16: no deserialize support yet
 }
 
 }  // namespace

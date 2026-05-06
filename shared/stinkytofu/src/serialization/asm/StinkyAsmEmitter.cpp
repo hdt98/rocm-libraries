@@ -272,6 +272,7 @@ inline std::ostream& operator<<(std::ostream& os, const SDWAModifiers& sdwaMod) 
 }
 
 inline std::ostream& operator<<(std::ostream& os, const DPPModifiers& dppMod) {
+    if (!dppMod.dppCtrl.empty()) os << " " << dppMod.dppCtrl;
     if (dppMod.row_shr != -1) os << " row_shr:" << dppMod.row_shr;
     if (dppMod.row_bcast != -1) os << " row_bcast:" << dppMod.row_bcast;
     if (dppMod.bound_ctrl != -1) os << " bound_ctrl:" << dppMod.bound_ctrl;
