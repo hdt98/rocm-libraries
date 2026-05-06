@@ -33,7 +33,7 @@ set(TEST_KNOBS_PLUGIN_NAME "test_knobs_plugin")
 set(TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME "test_knob_constraint_validation_plugin")
 set(TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME "test_incompatible_version_plugin")
 
-# Heuristic plugin test names (RFC 0007)
+# Heuristic plugin test names
 set(TEST_GOOD_HEURISTIC_PLUGIN_NAME "test_good_heuristic_plugin")
 set(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME "test_incomplete_heuristic_api_plugin")
 set(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME "test_no_optional_heuristic_plugin")

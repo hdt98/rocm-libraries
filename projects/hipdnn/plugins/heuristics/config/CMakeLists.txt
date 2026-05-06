@@ -2,7 +2,7 @@
 # SPDX-License-Identifier:  MIT
 
 # Config Heuristic Plugin
-# RFC 0007: Well-known policy that honors graph-level preferences
+# Well-known policy that honors graph-level preferences
 # (Graph.preferred_engine_id) and the HIPDNN_ENGINE_OVERRIDE_FILE JSON config.
 
 project(hipdnn_heuristic_config VERSION 1.0.0 LANGUAGES CXX)

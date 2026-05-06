@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPolicyFramework.cpp
- * @brief Unit tests for RFC 0007 Heuristic Policy Framework
+ * @brief Unit tests for the Heuristic Policy Framework
  *
  * Tests cover:
  * - Policy enumeration and metadata via the public hipdnnGetHeuristicPolicy* APIs

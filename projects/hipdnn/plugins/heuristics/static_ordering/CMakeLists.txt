@@ -2,7 +2,7 @@
 # SPDX-License-Identifier:  MIT
 
 # StaticOrdering Heuristic Plugin
-# RFC 0007: Well-known policy that wraps utilities::sortEngineIds
+# Well-known policy that wraps utilities::sortEngineIds
 
 project(hipdnn_heuristic_static_ordering VERSION 1.0.0 LANGUAGES CXX)
 

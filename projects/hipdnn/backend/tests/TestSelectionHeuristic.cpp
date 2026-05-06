@@ -3,7 +3,7 @@
 
 /**
  * @file TestSelectionHeuristic.cpp
- * @brief Unit tests for SelectionHeuristic RAII wrapper (RFC 0007 Section 7)
+ * @brief Unit tests for SelectionHeuristic RAII wrapper
  *
  * Tests the C++ facade that wraps hipdnnHeuristicPolicyDescriptor_t lifecycle
  * and provides clean API over the heuristic plugin C ABI.

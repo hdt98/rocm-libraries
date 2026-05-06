@@ -13,7 +13,7 @@
 #include "handle/Handle.hpp"
 #include "utilities/EngineOrdering.hpp"
 
-// RFC 0007: Heuristics framework
+// Heuristics framework
 #include "heuristics/SelectionHeuristic.hpp"
 #include "logging/Logging.hpp"
 #include "plugin/HeuristicPlugin.hpp"
@@ -36,7 +36,7 @@ namespace hipdnn_backend
 
 std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
 {
-    // RFC 0007 Section 5.3 & 15: Policy order resolution
+    // Policy order resolution.
     // Priority: descriptor attr > handle > env > default
     // Storage and ABI are policy IDs (FNV-1a of the policy name); names are
     // hashed at the point they enter the system.
@@ -75,7 +75,7 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
                                  policyIds.size());
         return policyIds;
     }
-    // 4. Default policy list per RFC 0007 Section 5.3
+    // 4. Default policy list
     std::vector<int64_t> policyIds = {
         hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
         hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
@@ -86,8 +86,8 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
 
 void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orderedPolicyIds)
 {
-    // RFC 0007 Section 14.2: Ensure one SelectionHeuristic per policy slot
-    // If the policy list changed, recreate the slots
+    // Ensure one SelectionHeuristic per policy slot.
+    // If the policy list changed, recreate the slots.
 
     if(_orderedPolicyIds == orderedPolicyIds && !_policySlots.empty())
     {
@@ -121,7 +121,7 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
 
 void EngineHeuristicDescriptor::finalize()
 {
-    // RFC 0007 Section 14.2: Outer loop policy selection
+    // Outer loop policy selection
     THROW_IF_TRUE(isFinalized(),
                   HIPDNN_STATUS_BAD_PARAM,
                   "EngineHeuristicDescriptor::finalize() failed: Already finalized.");
@@ -141,8 +141,8 @@ void EngineHeuristicDescriptor::finalize()
     // Get candidate engine IDs from engine plugins
     auto candidates = engineRm->getApplicableEngineIds(_graph.get(), _findFirst);
 
-    // RFC 0007: If no engines available, finalize with empty result (no need to invoke heuristics)
-    // This is a valid state - not an error
+    // If no engines available, finalize with empty result (no need to invoke heuristics).
+    // This is a valid state - not an error.
     if(candidates.empty())
     {
         _engineIds.clear();
@@ -150,7 +150,7 @@ void EngineHeuristicDescriptor::finalize()
         return;
     }
 
-    // RFC 0007 Section 6 & 13.2: Query and serialize device properties
+    // Query and serialize device properties
     int currentDevice;
     auto status = hipGetDevice(&currentDevice);
     if(status != hipSuccess)
@@ -186,7 +186,7 @@ void EngineHeuristicDescriptor::finalize()
     devicePropsWrapper.ptr = devicePropsSerialized.data();
     devicePropsWrapper.size = devicePropsSerialized.size();
 
-    // RFC 0007 Section 13.1: Get serialized graph from GraphDescriptor
+    // Get serialized graph from GraphDescriptor
     const hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
 
     // Resolve ordered policy IDs
@@ -287,8 +287,8 @@ void EngineHeuristicDescriptor::finalize()
         }
     }
 
-    // RFC 0007 Section 14.2: If no policy succeeded, throw exception
-    // No hidden fallback to utilities::sortEngineIds
+    // If no policy succeeded, throw exception.
+    // No hidden fallback to utilities::sortEngineIds.
     if(!success)
     {
         throw HipdnnException(

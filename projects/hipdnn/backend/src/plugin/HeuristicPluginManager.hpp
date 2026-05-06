@@ -46,7 +46,7 @@ protected:
         using hipdnn_data_sdk::utilities::Version;
 
         // Validate heuristic C ABI major version against the heuristic API version
-        // (RFC 0007: heuristic plugin API has independent versioning from backend)
+        // (the heuristic plugin API has independent versioning from the backend)
         if(Version{plugin.apiVersion()}.major != HIPDNN_HEURISTIC_API_VERSION_MAJOR)
         {
             throw HipdnnException(HIPDNN_STATUS_PLUGIN_ERROR,

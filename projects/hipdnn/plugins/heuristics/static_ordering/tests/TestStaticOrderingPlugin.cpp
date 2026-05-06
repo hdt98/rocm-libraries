@@ -3,7 +3,7 @@
 
 /**
  * @file TestStaticOrderingPlugin.cpp
- * @brief Unit tests for the StaticOrdering heuristic plugin C ABI (RFC 0007)
+ * @brief Unit tests for the StaticOrdering heuristic plugin C ABI
  *
  * Links the plugin's _private STATIC archive directly so the C ABI entry points
  * can be exercised without dlopen'ing the SHARED plugin. Covers handle and

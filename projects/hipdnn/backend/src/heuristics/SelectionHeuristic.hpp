@@ -42,8 +42,6 @@ namespace hipdnn_backend::heuristics
  * lifetime; plugin and handle lookups happen by policy ID through the
  * manager. This protects against the manager being destroyed while a slot
  * still holds the descriptor.
- *
- * RFC 0007 Reference: Section 7
  */
 class SelectionHeuristic
 {

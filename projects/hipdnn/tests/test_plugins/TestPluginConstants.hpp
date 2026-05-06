@@ -115,9 +115,9 @@ inline const std::string& testIncompatibleVersionPluginPath()
     return s_testIncompatibleVersionPluginPath;
 }
 
-// Heuristic test plugins (RFC 0007). Policy name registered by
-// test_good_heuristic_plugin -- callers that need a specific policy should set
-// HIPDNN_HEURISTIC_POLICY_ORDER to this value via a scoped env guard.
+// Heuristic test plugins. Policy name registered by test_good_heuristic_plugin --
+// callers that need a specific policy should set HIPDNN_HEURISTIC_POLICY_ORDER to
+// this value via a scoped env guard.
 inline const char* testGoodHeuristicPolicyName() { return "TestGoodHeuristicPolicy"; }
 
 inline const std::string& testGoodHeuristicPluginPath()

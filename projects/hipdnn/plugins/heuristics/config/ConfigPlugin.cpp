@@ -20,8 +20,8 @@
  * NOT_APPLICABLE so the next policy in the chain (StaticOrdering by default)
  * runs.
  *
- * RFC 0007 Section 13.3: Graph-level preferences are interpreted by this policy,
- * not by hard-coded backend logic.
+ * Graph-level preferences are interpreted by this policy, not by hard-coded
+ * backend logic.
  */
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>

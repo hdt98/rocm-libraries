@@ -403,7 +403,7 @@ private:
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(
             engineConfigs, engineIds, engineHeuristicDesc, defaultEngineId.has_value()));
 
-        // The heuristic chain (RFC 0007) is responsible for honoring graph-level
+        // The heuristic chain is responsible for honoring graph-level
         // preferences such as preferred_engine_id via the SelectionHeuristic::Config
         // policy, which moves the preferred engine to the front of the result list.
         // The frontend trusts that ordering and selects index 0 unless

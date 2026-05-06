@@ -3,7 +3,7 @@
 
 /**
  * @file IntegrationHeuristicPolicyPlugins.cpp
- * @brief Integration tests for real heuristic policy plugins (RFC 0007)
+ * @brief Integration tests for real heuristic policy plugins
  *
  * These tests verify the actual heuristic policy plugins (Config, StaticOrdering):
  * - Plugin discovery and loading from installed location
@@ -114,8 +114,8 @@ TEST_F(IntegrationHeuristicPolicyPlugins, PluginManagerLoadsFromDefaultPath)
     // resolves to the test binary's location (bin/) not the backend library's (lib/)
     manager->loadPlugins({getTestPluginDirectory()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // RFC 0007: Plugin handles are created by HeuristicPluginResourceManager, not by bare manager
-    // The resource manager creates handles and can enumerate loaded plugins
+    // Plugin handles are created by HeuristicPluginResourceManager, not by the bare
+    // manager. The resource manager creates handles and can enumerate loaded plugins.
     auto resourceMgr = std::make_shared<HeuristicPluginResourceManager>(manager);
 
     // Enumerate loaded policies via resource manager
@@ -317,7 +317,7 @@ TEST_F(IntegrationHeuristicPolicyPlugins, AllPluginsHaveCompatibleApiVersion)
     auto policyInfos = heurRm->getHeuristicPolicyInfos();
 
     // All loaded plugins should have compatible API versions
-    // (major version matches heuristic API version, RFC 0007)
+    // (major version matches the heuristic API version)
     for(const auto& info : policyInfos)
     {
         EXPECT_FALSE(info.apiVersion.empty());

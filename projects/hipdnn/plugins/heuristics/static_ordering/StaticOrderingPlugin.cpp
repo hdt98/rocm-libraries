@@ -8,8 +8,8 @@
  * This plugin implements the legacy static ordering heuristic that prioritizes
  * MIOPEN_ENGINE and deprioritizes MIOPEN_ENGINE_DETERMINISTIC.
  *
- * RFC 0007 Section 9: This is a well-known policy plugin that provides
- * backward-compatible ordering semantics.
+ * This is a well-known policy plugin that provides backward-compatible
+ * ordering semantics.
  */
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>

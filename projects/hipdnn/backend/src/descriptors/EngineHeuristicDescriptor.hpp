@@ -27,10 +27,10 @@ private:
     bool _heuristicModeSet = false;
     bool _findFirst = false;
 
-    // RFC 0007 Section 14 & 15: Heuristics framework integration
+    // Heuristics framework integration
     std::vector<int64_t> _orderedPolicyIds;
     std::vector<std::unique_ptr<heuristics::SelectionHeuristic>> _policySlots;
-    std::vector<int64_t> _policyOrder; // RFC 0007 Section 15: descriptor-level policy IDs
+    std::vector<int64_t> _policyOrder; // descriptor-level policy IDs
     bool _policyOrderSet = false;
 
     // Resolve policy order from descriptor/handle/env/default

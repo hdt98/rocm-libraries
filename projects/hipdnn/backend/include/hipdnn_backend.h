@@ -698,9 +698,9 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetEngineInfo_ext(hipdnnHandle_t hand
 /**
  * @brief Gets the count of loaded heuristic policies.
  *
- * RFC 0007 Section 16: Returns the number of heuristic policy plugins that have been
- * successfully loaded and validated by the backend. This count includes all policies
- * available for use in the outer loop engine selection.
+ * Returns the number of heuristic policy plugins that have been successfully loaded
+ * and validated by the backend. This count includes all policies available for use
+ * in the outer loop engine selection.
  *
  * @param[in]  handle       A valid hipDNN handle.
  * @param[out] numPolicies  Pointer where the policy count will be stored.
@@ -716,9 +716,9 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHan
 /**
  * @brief Gets information about a loaded heuristic policy by index.
  *
- * RFC 0007 Section 16: Retrieves metadata for a heuristic policy plugin, including
- * policy ID, policy name, plugin version, and API version. Policies are enumerated
- * in the order they appear in the default policy list.
+ * Retrieves metadata for a heuristic policy plugin, including policy ID, policy
+ * name, plugin version, and API version. Policies are enumerated in the order they
+ * appear in the default policy list.
  *
  * This function uses a two-call pattern for string fields:
  * 1. First call: Pass all string buffers as `nullptr` to query required sizes.

@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPluginResourceManager.cpp
- * @brief Unit tests for HeuristicPluginResourceManager (RFC 0007 Part 1)
+ * @brief Unit tests for HeuristicPluginResourceManager
  *
  * These tests verify the plugin resource management layer that provides
  * per-handle plugin lifecycle management and policy lookup.

@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPluginManagerValidationPaths.cpp
- * @brief Tests for HeuristicPluginManager validation code paths (RFC 0007)
+ * @brief Tests for HeuristicPluginManager validation code paths
  *
  * These tests load actual test plugins to exercise validateBeforeAdding() and
  * actionAfterAdding() to improve coverage of HeuristicPluginManager.hpp

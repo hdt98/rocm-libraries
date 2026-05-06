@@ -86,7 +86,7 @@ typedef enum
     /**
      * @brief Ordered list of heuristic policy IDs for engine selection (array of int64, extension)
      *
-     * Specifies the policy order for the outer loop in RFC 0007. Each element is an int64_t
+     * Specifies the policy order for the heuristic outer loop. Each element is an int64_t
      * policy ID, produced by hashing a policy name (e.g., "SelectionHeuristic::Config",
      * "SelectionHeuristic::StaticOrdering") with hipdnn_data_sdk::utilities::policyNameToId.
      * Hashing is performed by the caller before the C ABI; the backend stores and dispatches

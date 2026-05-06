@@ -83,7 +83,7 @@ set(test_good_default_plugin_OUTPUT_DIR "${HIPDNN_TEST_PLUGIN_DIR}/default")
 set(test_good_default_plugin_INSTALL_DIR "${HIPDNN_TEST_PLUGIN_INSTALL_DIR}/default")
 add_test_plugin(${TEST_GOOD_DEFAULT_PLUGIN_NAME} TestGoodDefaultPlugin.cpp)
 
-# Heuristic test plugins (RFC 0007 Part 1)
+# Heuristic test plugins
 # test_good_heuristic_plugin implements the full heuristic plugin API
 add_test_plugin(${TEST_GOOD_HEURISTIC_PLUGIN_NAME} TestGoodHeuristicPlugin.cpp)
 

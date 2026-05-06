@@ -3,5 +3,5 @@
 
 # hipDNN Plugins Directory
 
-# Heuristic plugins (RFC 0007)
+# Heuristic plugins
 add_subdirectory(heuristics)

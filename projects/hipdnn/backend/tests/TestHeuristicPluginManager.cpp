@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPluginManager.cpp
- * @brief Unit tests for HeuristicPluginManager validation logic (RFC 0007 Part 1)
+ * @brief Unit tests for HeuristicPluginManager validation logic
  *
  * These tests verify the plugin discovery and validation layer including:
  * - API version compatibility validation

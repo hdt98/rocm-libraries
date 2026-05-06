@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPlugin.cpp
- * @brief Unit tests for HeuristicPlugin class (RFC 0007 Part 1)
+ * @brief Unit tests for HeuristicPlugin class
  *
  * These tests verify the plugin wrapper class including:
  * - Symbol resolution and error handling
