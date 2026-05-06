@@ -421,9 +421,9 @@ struct GemmPipelineAgBgCrCompV4 : public BaseGemmPipelineAgBgCrCompV4<Problem>
             // Cache distributed LDS store windows - pre_computed_coords_ computed once,
             // reused on every store() call inside the hot loop.
             auto a_lds_store_window0 =
-                Base::MakeCachedLdsStoreWindow(a_copy_lds_window0, a_store_dstr);
+                Base::MakeDistributedLdsStoreWindow(a_copy_lds_window0, a_store_dstr);
             auto b_lds_store_window0 =
-                Base::MakeCachedLdsStoreWindow(b_copy_lds_window0, b_store_dstr);
+                Base::MakeDistributedLdsStoreWindow(b_copy_lds_window0, b_store_dstr);
 
             // Helpers to transpose-then-store (or store directly) into a cached LDS window.
             auto store_a = [&](auto& lds_store_window, const auto& src) {

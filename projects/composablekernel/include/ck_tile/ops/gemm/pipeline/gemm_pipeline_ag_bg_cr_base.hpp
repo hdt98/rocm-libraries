@@ -125,11 +125,15 @@ struct GemmPipelineAgBgCrImplBase
         store_tile(lds_tile_window, src_block_tile);
     }
 
-    // Returns a tile_window_with_static_distribution whose pre_computed_coords_ are computed
-    // once at construction time, avoiding redundant coord recomputation on each store call.
+    // Build a tile_window_with_static_distribution from a bare LDS window. The returned
+    // window pre-computes XOR coordinates once at construction, so repeated .store() calls
+    // skip the ~96 VALU of coord reconstruction that store_tile()/LocalPrefill would redo.
+    //
+    // `dstr` must match the distribution of the tensor passed to .store(). If the store
+    // path transposes first (e.g. MakeShuffledARegTileDistribution), pass that distribution.
     template <typename CopyLdsWindow, typename TileDistribution>
-    CK_TILE_DEVICE static auto MakeCachedLdsStoreWindow(CopyLdsWindow& copy_lds_window,
-                                                        TileDistribution dstr)
+    CK_TILE_DEVICE static auto MakeDistributedLdsStoreWindow(CopyLdsWindow& copy_lds_window,
+                                                             TileDistribution dstr)
     {
         return make_tile_window(copy_lds_window.get_bottom_tensor_view(),
                                 copy_lds_window.get_window_lengths(),
