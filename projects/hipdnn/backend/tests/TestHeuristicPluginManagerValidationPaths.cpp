@@ -334,100 +334,42 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
 {
+    // ABSOLUTE mode accepts a single plugin file path, so we can load just the bad
+    // plugin directly from the build tree instead of copying it to a temp dir.
+    const auto badPlugin
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
 
-    // Build path to bad plugin in a separate directory to isolate it
-    const auto badPluginDir = std::filesystem::temp_directory_path() / "hipdnn_bad_api_test";
-    std::filesystem::create_directories(badPluginDir);
+    _manager->loadPlugins({badPlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Copy the bad plugin to isolated directory
-    const std::string pluginFilename
-        = hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
-    const auto srcPlugin = _testPluginPath / pluginFilename;
-    const auto dstPlugin = badPluginDir / pluginFilename;
-    std::filesystem::copy_file(
-        srcPlugin, dstPlugin, std::filesystem::copy_options::overwrite_existing);
-
-    // Loading plugin with wrong API version - loadPlugins logs errors but doesn't throw
-    _manager->loadPlugins({badPluginDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-    // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Bad API version plugin should be rejected";
-
-    // Unload any resources before cleanup (Windows DLL safety)
-    _manager.reset();
-
-    // Cleanup
-    std::filesystem::remove_all(badPluginDir);
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 {
+    const auto emptyNamePlugin
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
 
-    // Build path to empty name plugin in a separate directory to isolate it
-    const auto emptyNameDir = std::filesystem::temp_directory_path() / "hipdnn_empty_name_test";
-    std::filesystem::create_directories(emptyNameDir);
+    _manager->loadPlugins({emptyNamePlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Copy the empty name plugin to isolated directory
-    const std::string pluginFilename
-        = hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
-    const auto srcPlugin = _testPluginPath / pluginFilename;
-    const auto dstPlugin = emptyNameDir / pluginFilename;
-    std::filesystem::copy_file(
-        srcPlugin, dstPlugin, std::filesystem::copy_options::overwrite_existing);
-
-    // Loading plugin with empty policy name - loadPlugins logs errors but doesn't throw
-    _manager->loadPlugins({emptyNameDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-    // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Empty policy name plugin should be rejected";
-
-    // Unload any resources before cleanup (Windows DLL safety)
-    _manager.reset();
-
-    // Cleanup
-    std::filesystem::remove_all(emptyNameDir);
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsRejected)
 {
+    const auto pluginA
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
+    const auto pluginB
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
 
-    // Build path to duplicate plugins in a separate directory to isolate them
-    const auto duplicateDir = std::filesystem::temp_directory_path() / "hipdnn_duplicate_id_test";
-    std::filesystem::create_directories(duplicateDir);
-
-    // Copy both duplicate plugins to isolated directory
-    const std::string pluginFilenameA
-        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
-    const std::string pluginFilenameB
-        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
-    const auto srcPluginA = _testPluginPath / pluginFilenameA;
-    const auto srcPluginB = _testPluginPath / pluginFilenameB;
-    const auto dstPluginA = duplicateDir / pluginFilenameA;
-    const auto dstPluginB = duplicateDir / pluginFilenameB;
-
-    if(std::filesystem::exists(srcPluginA) && std::filesystem::exists(srcPluginB))
-    {
-        std::filesystem::copy_file(
-            srcPluginA, dstPluginA, std::filesystem::copy_options::overwrite_existing);
-        std::filesystem::copy_file(
-            srcPluginB, dstPluginB, std::filesystem::copy_options::overwrite_existing);
-
-        // Load directory with both duplicate plugins - loadPlugins logs errors but doesn't throw
-        _manager->loadPlugins({duplicateDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-        // Only one plugin should have loaded - the second should be rejected due to duplicate ID
-        EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
-
-        // Unload plugins before cleanup (Windows keeps DLLs locked until unloaded)
-        _manager.reset();
-
-        // Cleanup
-        std::filesystem::remove_all(duplicateDir);
-    }
-    else
+    if(!std::filesystem::exists(pluginA) || !std::filesystem::exists(pluginB))
     {
         GTEST_SKIP() << "test_duplicate_policy_id plugins not found";
     }
+
+    _manager->loadPlugins({pluginA, pluginB}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+
+    // Only one plugin should have loaded - the second should be rejected due to duplicate ID
+    EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
 }
 
 // ========== Edge Case: Empty Plugin Directory ==========

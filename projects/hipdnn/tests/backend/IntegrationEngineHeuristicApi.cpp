@@ -3,6 +3,8 @@
 
 #include "TestUtil.hpp"
 #include "hipdnn_backend.h"
+#include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
+#include <optional>
 #include <test_plugins/TestPluginConstants.hpp>
 
 #include <gtest/gtest.h>
@@ -21,14 +23,25 @@ protected:
     hipdnnBackendDescriptor_t _engineHeuristic = nullptr;
     hipdnnBackendDescriptor_t _graph = nullptr;
     hipdnnHandle_t _handle = nullptr;
+    std::optional<hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter> _policyOrderEnv;
 
     void SetUp() override
     {
-        const std::array<const char*, 1> paths
+        const std::array<const char*, 1> enginePaths
             = {hipdnn_tests::plugin_constants::testGoodPluginPath().c_str()};
         ASSERT_EQ(hipdnnSetEnginePluginPaths_ext(
-                      paths.size(), paths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                      enginePaths.size(), enginePaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
+
+        const std::array<const char*, 1> heuristicPaths
+            = {hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
+        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(heuristicPaths.size(),
+                                                    heuristicPaths.data(),
+                                                    HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+
+        _policyOrderEnv.emplace("HIPDNN_HEURISTIC_POLICY_ORDER",
+                                hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
 
         ASSERT_EQ(hipdnnCreate(&_handle), HIPDNN_STATUS_SUCCESS);
         EXPECT_EQ(

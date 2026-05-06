@@ -14,6 +14,7 @@
 #include "hipdnn_backend.h"
 #include "logging/Logging.hpp"
 #include "plugin/EnginePluginResourceManager.hpp"
+#include "plugin/HeuristicPluginResourceManager.hpp"
 
 #include <hipdnn_backend/version.h>
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
@@ -476,6 +477,36 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetEnginePluginPaths_ext(
 
         hipdnn_backend::plugin::EnginePluginResourceManager::setPluginPaths(pathsVec, loadingMode);
         LOG_API_SUCCESS(apiName, "set_plugin_paths={}", loadingMode);
+        return HIPDNN_STATUS_SUCCESS;
+    });
+}
+
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetHeuristicPluginPaths_ext(
+    size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode)
+{
+    LOG_API_ENTRY("numPaths={}, pluginPaths_ptr={:p}, loadingMode={}",
+                  numPaths,
+                  static_cast<const void*>(pluginPaths),
+                  loadingMode);
+
+    return hipdnn_backend::tryCatch([&, apiName = __func__] {
+        if(numPaths > 0)
+        {
+            throwIfNull(pluginPaths);
+        }
+
+        std::vector<std::filesystem::path> pathsVec;
+        pathsVec.reserve(numPaths);
+
+        for(size_t i = 0; i < numPaths; ++i)
+        {
+            throwIfNull(pluginPaths[i]);
+            pathsVec.emplace_back(pluginPaths[i]);
+        }
+
+        hipdnn_backend::plugin::HeuristicPluginResourceManager::setPluginPaths(pathsVec,
+                                                                               loadingMode);
+        LOG_API_SUCCESS(apiName, "set_heuristic_plugin_paths={}", loadingMode);
         return HIPDNN_STATUS_SUCCESS;
     });
 }

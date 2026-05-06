@@ -26,11 +26,10 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
-#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
+#include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
 
-#include <cstdlib>
 #include <memory>
 #include <vector>
 
@@ -569,43 +568,6 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, MultipleSetPolicyOrderCalls)
 
 // ========== Policy Order Resolution: Environment Variable ==========
 
-// Scope-guarded HIPDNN_HEURISTIC_POLICY_ORDER setter that restores prior state on
-// destruction so a failing assertion can't leave the env polluted for sibling tests.
-namespace
-{
-class ScopedPolicyOrderEnv
-{
-public:
-    explicit ScopedPolicyOrderEnv(const std::string& value)
-    {
-        const auto prior = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
-        if(!prior.empty())
-        {
-            _hadPrior = true;
-            _prior = prior;
-        }
-        hipdnn_data_sdk::utilities::setEnv("HIPDNN_HEURISTIC_POLICY_ORDER", value.c_str());
-    }
-    ~ScopedPolicyOrderEnv()
-    {
-        if(_hadPrior)
-        {
-            hipdnn_data_sdk::utilities::setEnv("HIPDNN_HEURISTIC_POLICY_ORDER", _prior.c_str());
-        }
-        else
-        {
-            hipdnn_data_sdk::utilities::unsetEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
-        }
-    }
-    ScopedPolicyOrderEnv(const ScopedPolicyOrderEnv&) = delete;
-    ScopedPolicyOrderEnv& operator=(const ScopedPolicyOrderEnv&) = delete;
-
-private:
-    bool _hadPrior = false;
-    std::string _prior;
-};
-} // namespace
-
 TEST_F(TestEngineHeuristicDescriptorAdditional, EnvironmentVariablePolicyOrderIsRespected)
 {
     // The mock setup in setupMockHeuristicPlugin() makes Config return a null
@@ -613,7 +575,8 @@ TEST_F(TestEngineHeuristicDescriptorAdditional, EnvironmentVariablePolicyOrderIs
     // override, the default order [Config, StaticOrdering] therefore succeeds
     // via StaticOrdering. Restricting the env-var order to Config alone should
     // make finalize() throw, proving the env var supersedes the default.
-    const ScopedPolicyOrderEnv guard("SelectionHeuristic::Config");
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
 
     auto heur = getEngineHeuristicDescriptor();
     setGraph();
@@ -631,7 +594,8 @@ TEST_F(TestEngineHeuristicDescriptorAdditional,
     // Same mock setup. Env var lists only Config (which would throw on its own),
     // but the descriptor-level attribute lists only StaticOrdering. The descriptor
     // attribute is highest priority, so finalize() must succeed.
-    const ScopedPolicyOrderEnv guard("SelectionHeuristic::Config");
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
 
     auto heur = getEngineHeuristicDescriptor();
 

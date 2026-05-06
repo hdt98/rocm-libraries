@@ -500,6 +500,28 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetEnginePluginPaths_ext(
     size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode);
 
 /**
+ * @brief Sets the search paths for hipDNN heuristic plugins.
+ *
+ * Mirrors @ref hipdnnSetEnginePluginPaths_ext for the heuristic plugin search domain.
+ * Must be called before creating a hipDNN handle, as heuristic plugins are loaded
+ * during handle creation.
+ *
+ * Paths can be either directories or specific plugin files. Relative paths are resolved
+ * from the location of the libhipdnn_backend.so file.
+ *
+ * @param[in] numPaths       The number of paths in the `pluginPaths` array.
+ * @param[in] pluginPaths    An array of relative or absolute path strings.
+ * @param[in] loadingMode    Specifies whether to add paths to or replace the default search paths.
+ *
+ * @retval HIPDNN_STATUS_SUCCESS                  The operation was successful.
+ * @retval HIPDNN_STATUS_BAD_PARAM_NULL_POINTER   `pluginPaths` is nullptr when `numPaths` is greater than 0.
+ * @retval HIPDNN_STATUS_NOT_SUPPORTED            Called with active handle.
+ * @retval HIPDNN_STATUS_INTERNAL_ERROR           An internal error occurred.
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetHeuristicPluginPaths_ext(
+    size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode);
+
+/**
  * @brief Sets the plugin unloading mode for hipDNN.
  *
  * This function controls when plugins are unloaded from memory. By default, lazy unloading (HIPDNN_PLUGIN_UNLOAD_LAZY)
