@@ -218,11 +218,4 @@ add_dependencies(hipdnn_backend_tests
     ${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME}
 )
 
-# Add dependencies on default heuristic plugins (RFC 0007)
-# These ensure Config and StaticOrdering plugins are built before tests run
-add_dependencies(hipdnn_backend_tests
-    hipdnn_heuristic_config
-    hipdnn_heuristic_static_ordering
-)
-
 add_unit_test_target(hipdnn_backend_tests ${CMAKE_CURRENT_BINARY_DIR})
