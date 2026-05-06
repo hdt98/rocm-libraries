@@ -5291,7 +5291,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               f"Dataflow graph comparison failed for kernel {kernel_label}: "
               f"{len(graph_failures)} edge difference(s):\n  "
               + "\n  ".join(
-                f.format(ctx.cms.main_loop.get(0))
+                f.format()
                 for f in graph_failures
               )
             )
@@ -5302,7 +5302,7 @@ class KernelWriter(metaclass=abc.ABCMeta):
               f"Wait-coverage validation failed for kernel {kernel_label}: "
               f"{len(wait_failures)} failure(s):\n  "
               + "\n  ".join(
-                f.format(ctx.cms.main_loop.get(0))
+                f.format()
                 for f in wait_failures
               )
             )
