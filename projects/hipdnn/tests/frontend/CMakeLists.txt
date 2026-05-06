@@ -105,8 +105,8 @@ add_dependencies(
     test_incomplete_api_plugin
     test_knobs_plugin
     test_knob_constraint_validation_plugin
+    test_good_heuristic_plugin
     hipdnn_heuristic_config
-    hipdnn_heuristic_static_ordering
 )
 
 clang_tidy_check(hipdnn_public_frontend_tests)
