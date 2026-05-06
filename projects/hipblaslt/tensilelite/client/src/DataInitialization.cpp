@@ -28,6 +28,7 @@
 
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
 #include <mxDataGen.hpp>
+#include <mxDataGenerator/dataTypeInfo.hpp>   // DGen::toFloat / toFloatPacked templates
 #endif
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
@@ -41,6 +42,9 @@
 #include <list>
 #include <map>
 #include <tuple>
+#include <cassert>     // dumpMXSideForDebug enforces batch == 1 with assert
+#include <fstream>     // dumpMXSideForDebug writes text files
+#include <iomanip>     // std::hex / std::setw / std::setfill for hex pretty-printing
 
 namespace TensileLite
 {
@@ -1756,9 +1760,9 @@ namespace TensileLite
             // bytes the kernel sees are identical to the bytes the reference reads. We
             // gate on m_mxScaleFormat > 0 because that is the user-visible signal that
             // they opted into the subtile / pre-swizzle layout.
-            bool useMXGenerator = isMXFP4Problem(problem) && m_mxScaleFormat > 0;
+            bool useMXGenerator = isMXFP4OrFP8Problem(problem) && m_mxScaleFormat > 0;
             if(useMXGenerator)
-                initializeMXDataForFP4(problem);
+                initializeMXDataForFP4OrFP8(problem);
 
             auto& tensors = problem.tensors();
             for(size_t i = 0; i < m_vdata.size(); i++)
@@ -1851,6 +1855,312 @@ namespace TensileLite
                         "initializeMXData: unsupported MX scale element type for generateMXInput");
                 }
             }
+
+            // ---------------------------------------------------------------------
+            //  MX *data*-element dtype mapper (counterpart of the scale mapper above).
+            //  generateMXInput() takes a hipDataType for the data tensor too;
+            //      Float4  -> HIP_R_4F_E2M1   (OCP E2M1, 2 elems / byte)
+            //      Float8  -> HIP_R_8F_E4M3   (OCP E4M3, 1 elem / byte)
+            //      BFloat8 -> HIP_R_8F_E5M2   (OCP E5M2, 1 elem / byte)
+            // ---------------------------------------------------------------------
+            hipDataType hipMxDataTypeForDataGenerator(rocisa::DataType dataType)
+            {
+                switch(dataType)
+                {
+                    case rocisa::DataType::Float4:
+                        return static_cast<hipDataType>(HIP_R_4F_E2M1);
+                    case rocisa::DataType::Float8:
+                        return HIP_R_8F_E4M3;
+                    case rocisa::DataType::BFloat8:
+                        return HIP_R_8F_E5M2;
+                    default:
+                        throw std::runtime_error(
+                                "initializeMXData: unsupported MX data element type for generateMXInput");
+                }
+            }
+
+            // ---------------------------------------------------------------------
+            // Below are helper functions (for debuggging) to set the values/scales of inputs:
+            //
+            //  randomFP4DataAndFixScales:
+            //      scale[]  = scaleByte (default 0x7F = E8M0 bias 127 -> 2^0 = 1.0)
+            //      data[i]  = high|low nibbles drawn from the OCP E2M1 set
+            //                 {0x0,0x1,0x2, 0x8,0x9,0xA} so |value| <= 1.0.
+            //
+            // Usage:
+            //   randomFP4DataAndFixScales(pristineData.cpuInput.valid.get(),
+            //                             dataTensor.totalAllocatedBytes(),
+            //                             pristineE8.cpuInput.valid.get(),
+            //                             scaleTensor.totalAllocatedBytes());
+            //
+            //  randomFP8DataAndFixScales:
+            //      scale[]  = scaleByte
+            //      data[i]  = sign(1b) | mag, where mag is uniform in [0, maxMag];
+            //                 maxMag = 0x38 for E4M3 (= +1.0) and 0x3C for E5M2
+            //                 (= +1.0). Any byte b satisfying (b & 0x7F) <= maxMag
+            //                 is a representable value with |v| <= 1, so this
+            //                 produces well-defined inputs (no NaN/Inf).
+            //
+            // Usage:
+            //   randomFP8DataAndFixScales(dataTensor.dataType(),
+            //                             pristineData.cpuInput.valid.get(),
+            //                             dataTensor.totalAllocatedBytes(),
+            //                             pristineE8.cpuInput.valid.get(),
+            //                             scaleTensor.totalAllocatedBytes());
+            //
+            //
+            //  fixBytes / fixDataAndScaleBytes: brute "memset-everywhere" knobs.
+            //  Useful for hand-checking the kernel against a single known byte
+            //  (e.g. 0x30 in E4M3 == 2^-7 = 0.0078125).
+            //
+            // Usage:
+            //   fixBytes(pristineData.cpuInput.valid.get(),
+            //            dataTensor.totalAllocatedBytes(),
+            //            0x38);                       // every elem == +1.0
+            //
+            //   fixDataAndScaleBytes(pristineData.cpuInput.valid.get(),
+            //                        dataTensor.totalAllocatedBytes(),
+            //                        pristineE8.cpuInput.valid.get(),
+            //                        scaleTensor.totalAllocatedBytes(),
+            //                        0x7E,            // scale = 2^-1 = 0.5
+            //                        0x30);           // payload = 2^-7
+            //
+            //
+            //  identityFP8DataAndFixScales:
+            //      scale[]                 = scaleByte (default 0x7F = scale 1.0)
+            //      data[]                  = 0x00
+            //      data[i, i] (diag)       = +1.0 byte for the dtype
+            //          E4M3 (Float8)  -> 0x38  (exp=7,  m=0 -> 2^0 = 1.0)
+            //          E5M2 (BFloat8) -> 0x3C  (exp=15, m=0 -> 2^0 = 1.0)
+            //
+            // Usage:
+            //    identityFP8DataAndFixScales(tensorA.dataType(),
+            //                                pristineA.cpuInput.valid.get(),
+            //                                problem.a(),
+            //                                pristineE8A.cpuInput.valid.get(),
+            //                                problem.mxsa().totalAllocatedBytes());
+            //
+            //  Per-batch independent identity is written when the data tensor is 3D.
+            //  FP8 packing == 1, so the TensorDescriptor strides are byte offsets
+            //  and totalAllocatedBytes() == totalAllocatedElements().
+            //  Combined with scale 1.0 the kernel sees a true logical identity
+            //  matrix, so any C = A * B becomes C = B (for A=I), making the GPU
+            //  output 1:1 inspectable against the input.
+            // ---------------------------------------------------------------------
+            void randomFP4DataAndFixScales(void*   data,
+                    size_t  numDataBytes,
+                    void*   scale,
+                    size_t  numScaleBytes,
+                    uint8_t scaleByte = 0x7F)
+            {
+                std::memset(scale, scaleByte, numScaleBytes);
+                static constexpr uint8_t kFP4Nibbles[6] = {0x0, 0x1, 0x2, 0x8, 0x9, 0xA};
+                auto* bytes = static_cast<uint8_t*>(data);
+                for(size_t i = 0; i < numDataBytes; ++i)
+                {
+                    uint8_t hi = kFP4Nibbles[getThreadLocalRandInt() % 6];
+                    uint8_t lo = kFP4Nibbles[getThreadLocalRandInt() % 6];
+                    bytes[i]   = static_cast<uint8_t>((hi << 4) | lo);
+                }
+            }
+            void randomFP8DataAndFixScales(rocisa::DataType dataType,
+                    void*            data,
+                    size_t           numDataBytes,
+                    void*            scale,
+                    size_t           numScaleBytes,
+                    uint8_t          scaleByte = 0x7F)
+            {
+                std::memset(scale, scaleByte, numScaleBytes);
+                uint8_t maxMagByte;
+                if(dataType == rocisa::DataType::Float8)        // OCP E4M3
+                    maxMagByte = 0x38;                          // exp=7,  m=0 -> +1.0
+                else if(dataType == rocisa::DataType::BFloat8)  // OCP E5M2
+                    maxMagByte = 0x3C;                          // exp=15, m=0 -> +1.0
+                else
+                    throw std::runtime_error(
+                            "randomFP8DataAndFixScales: unsupported FP8 data type");
+                int const numMagValues = static_cast<int>(maxMagByte) + 1;
+                auto* bytes = static_cast<uint8_t*>(data);
+                for(size_t i = 0; i < numDataBytes; ++i)
+                {
+                    uint8_t mag  = static_cast<uint8_t>(getThreadLocalRandInt() % numMagValues);
+                    uint8_t sign = static_cast<uint8_t>((getThreadLocalRandInt() & 1) << 7);
+                    bytes[i]     = static_cast<uint8_t>(sign | mag);
+                }
+            }
+            void fixBytes(void* data, size_t numBytes, uint8_t fillByte = 0x30)
+            {
+                std::memset(data, fillByte, numBytes);
+            }
+            void fixDataAndScaleBytes(void*   data,
+                    size_t  numDataBytes,
+                    void*   scale,
+                    size_t  numScaleBytes,
+                    uint8_t scaleByte    = 0x7E,
+                    uint8_t dataFillByte = 0x30)
+            {
+                std::memset(scale, scaleByte, numScaleBytes);
+                fixBytes(data, numDataBytes, dataFillByte);
+            }
+            void identityFP8DataAndFixScales(rocisa::DataType         dataType,
+                    void*                    data,
+                    TensorDescriptor const&  dataTensor,
+                    void*                    scale,
+                    size_t                   numScaleBytes,
+                    uint8_t                  scaleByte = 0x7F)
+            {
+                std::memset(scale, scaleByte, numScaleBytes);
+                std::memset(data,  0x00,      dataTensor.totalAllocatedBytes());
+                uint8_t oneByte;
+                if(dataType == rocisa::DataType::Float8)        // OCP E4M3
+                    oneByte = 0x38;                             // 2^0 = 1.0
+                else if(dataType == rocisa::DataType::BFloat8)  // OCP E5M2
+                    oneByte = 0x3C;                             // 2^0 = 1.0
+                else
+                    throw std::runtime_error(
+                            "identityFP8DataAndFixScales: unsupported FP8 data type");
+                auto const& sizes       = dataTensor.sizes();
+                auto const& strides     = dataTensor.strides();
+                size_t      rows        = sizes[0];
+                size_t      cols        = sizes[1];
+                size_t      strideRow   = strides[0];
+                size_t      strideCol   = strides[1];
+                size_t      batchCount  = sizes.size()   > 2 ? sizes[2]   : 1;
+                size_t      batchStride = strides.size() > 2 ? strides[2] : 0;
+                size_t      diag        = std::min(rows, cols);
+                auto* bytes = static_cast<uint8_t*>(data);
+                for(size_t b = 0; b < batchCount; ++b)
+                {
+                    uint8_t* batchPtr = bytes + b * batchStride;
+                    for(size_t i = 0; i < diag; ++i)
+                        batchPtr[i * strideRow + i * strideCol] = oneByte;
+                }
+            }
+
+
+            // ---------------------------------------------------------------------
+            //  Forensic dump (debug-only). Writes four text files for one MX side:
+            //
+            //    ${prefix}_data_bytes.txt   raw data bytes  : "0xAAAAAAAA  0xHH"
+            //    ${prefix}_scale_bytes.txt  raw scale bytes : "0xAAAAAAAA  0xHH"
+            //    ${prefix}_scale_float.txt  scale as float  : "<i> <2^(byte-127)>"
+            //    ${prefix}_data_float.txt   data as float matrix
+            //
+            //  decodeE8M0:    matches mxScaleElementAsFloat(rocisa::DataType::E8,..)
+            //                 used by Reference.cpp - keep them in sync.
+            //  decodeMXElement: thin dispatch over DGen::toFloatPacked / toFloat
+            //                   for the three supported element types.
+            // ---------------------------------------------------------------------
+            float decodeE8M0(uint8_t b)
+            {
+                if(b == 0x00) return 0.0f;
+                if(b == 0xFF) return std::numeric_limits<float>::quiet_NaN();
+                return std::ldexp(1.0f, static_cast<int>(b) - 127);
+            }
+            float decodeMXElement(rocisa::DataType dataType,
+                    uint8_t const*   scalePtr,
+                    uint8_t const*   dataPtr,
+                    size_t           scaleIndex,
+                    size_t           elemIndex)
+            {
+                switch(dataType)
+                {
+                    case rocisa::DataType::Float4:  // OCP E2M1, packed 2/byte
+                        return DGen::toFloatPacked<DGen::ocp_e2m1_mxfp4>(
+                                scalePtr, dataPtr, scaleIndex, elemIndex);
+                    case rocisa::DataType::Float8:  // OCP E4M3
+                        return DGen::toFloat<DGen::ocp_e4m3_mxfp8>(
+                                scalePtr, dataPtr, scaleIndex, elemIndex);
+                    case rocisa::DataType::BFloat8: // OCP E5M2
+                        return DGen::toFloat<DGen::ocp_e5m2_mxfp8>(
+                                scalePtr, dataPtr, scaleIndex, elemIndex);
+                    default:
+                        return std::numeric_limits<float>::quiet_NaN();
+                }
+            }
+
+            // ---------------------------------------------------------------------
+            // Usage:
+            //      dumpMXSideForDebug("dbg_A",
+            //                         tensorA.dataType(),
+            //                         pristineA.cpuInput.valid.get(),
+            //                         problem.a(),
+            //                         pristineE8A.cpuInput.valid.get(),
+            //                         problem.mxsa(),
+            //                         problem.mxBlockA());
+            // ---------------------------------------------------------------------
+            void dumpMXSideForDebug(std::string const&      prefix,
+                    rocisa::DataType        dataType,
+                    void const*             dataPtr,
+                    TensorDescriptor const& tensor,
+                    void const*             scalePtr,
+                    TensorDescriptor const& scaleTensor,
+                    size_t                  mxBlock)
+            {
+                // Single-batch invariant. A 3D tensor whose batch dim is 1 is also
+                // legal because that's what TensorDescriptor::sizes() may return for
+                // strided 2D shapes that were promoted to rank 3 by the caller.
+                assert(tensor.sizes().size() <= 2
+                        || (tensor.sizes().size() == 3 && tensor.sizes()[2] == 1));
+                assert(scaleTensor.sizes().size() <= 2
+                        || (scaleTensor.sizes().size() == 3 && scaleTensor.sizes()[2] == 1));
+
+                auto const* dp = static_cast<uint8_t const*>(dataPtr);
+                auto const* sp = static_cast<uint8_t const*>(scalePtr);
+
+                size_t const dataBytes  = tensor.totalAllocatedBytes();
+                size_t const scaleBytes = scaleTensor.totalAllocatedBytes();
+
+                {   // (1) raw data bytes
+                    std::ofstream f(prefix + "_data_bytes.txt");
+                    f << std::hex << std::setfill('0');
+                    for(size_t i = 0; i < dataBytes; ++i)
+                        f << "0x" << std::setw(8) << i << "  0x" << std::setw(2)
+                            << static_cast<unsigned>(dp[i]) << '\n';
+                }
+                {   // (2) raw scale bytes
+                    std::ofstream f(prefix + "_scale_bytes.txt");
+                    f << std::hex << std::setfill('0');
+                    for(size_t i = 0; i < scaleBytes; ++i)
+                        f << "0x" << std::setw(8) << i << "  0x" << std::setw(2)
+                            << static_cast<unsigned>(sp[i]) << '\n';
+                }
+                {   // (3) scale decoded as float
+                    std::ofstream f(prefix + "_scale_float.txt");
+                    f << std::scientific << std::setprecision(9);
+                    for(size_t i = 0; i < scaleBytes; ++i)
+                        f << std::dec << i << ' ' << decodeE8M0(sp[i]) << '\n';
+                }
+                {   // (4) data as decoded float matrix (canonical scale layout)
+                    std::ofstream f(prefix + "_data_float.txt");
+                    f << std::scientific << std::setprecision(9);
+
+                    size_t const rows  = tensor.sizes()[0];
+                    size_t const cols  = tensor.sizes()[1];
+                    size_t const dStr0 = tensor.strides()[0];
+                    size_t const dStr1 = tensor.strides()[1];
+                    size_t const sStr0 = scaleTensor.strides()[0];
+                    size_t const sStr1 = scaleTensor.strides()[1];
+
+                    for(size_t r = 0; r < rows; ++r)
+                    {
+                        for(size_t c = 0; c < cols; ++c)
+                        {
+                            size_t const elemIdx = r * dStr0 + c * dStr1;
+                            // Canonical scale position: scale block along dim0
+                            // because strides[0]==1 is the K-fast layout chosen
+                            // by setMXScale{A,B}. If your scale tensor packs
+                            // differently, swap (sR, sC) below.
+                            size_t const sR      = mxBlock ? (r / mxBlock) : 0;
+                            size_t const sC      = c;
+                            size_t const sIdx    = sR * sStr0 + sC * sStr1;
+                            f << decodeMXElement(dataType, sp, dp, sIdx, elemIdx);
+                            f << (c + 1 == cols ? '\n' : ' ');
+                        }
+                    }
+                }
+            }
+
         } // namespace
 
         static std::string_view initModeToMXMethod(InitMode mode)
@@ -1872,13 +2182,14 @@ namespace TensileLite
             }
         }
 
-        void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
+        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
-            // can safely skip them. For MX-FP4 sides we drive mxDataGenerator (so the values
-            // are coordinated with their E8 scales); for any non-FP4 side (e.g. MX-B6 or non-MX
-            // mixed-mode) we fall back to the same initArray path the default loop would have
-            // taken, to avoid leaving the malloc'd buffers uninitialized.
+            // can safely skip them. For MX-FP4 / MX-FP8 / MX-BFloat8 sides we drive
+            // mxDataGenerator (so the values are coordinated with their E8 scales); for any
+            // non-FP4/FP8 side (e.g. MX-B6 or non-MX mixed-mode) we fall back to the same
+            // initArray path the default loop would have taken, to avoid leaving the
+            // malloc'd buffers uninitialized
             auto const& tensors = problem.tensors();
 
             auto initTensorFromDefault = [&](int i) {
@@ -1940,7 +2251,7 @@ namespace TensileLite
                 }
             }
 
-            if(isMXFP4Tensor(problem.a(), problem.mxBlockA()))
+            if(isMXFP4OrFP8Tensor(problem.a(), problem.mxBlockA()))
             {
                 auto const& tensorA = problem.a();
                 auto        rows    = tensorA.sizes()[0];
@@ -1949,16 +2260,23 @@ namespace TensileLite
                 size_t      batchCount = tensorA.sizes().size() > 2 ? tensorA.sizes()[2] : 1;
 
                 auto& pristineA
-                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[rocisa::DataType::Float4];
+                    = m_vdata[ContractionProblemGemm::TENSOR::A].pristine[tensorA.dataType()];
                 auto& pristineE8A
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSA].pristine[problem.mxsa().dataType()];
 
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
+                // FP4: 2 elements packed per byte (packing=2); FP8: 1 element per byte
+                // (packing=1). Compute byte stride generically via DataTypeInfo so we
+                // never hard-code /2 again the next time a new dtype shows u
                 size_t dataBatchStrideBytes = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
                 {
-                    dataBatchStrideBytes  = tensorA.strides()[2] / 2;
+                    auto const  dataInfo         = DataTypeInfo::Get(tensorA.dataType());
+                    float const logicalBytesEach
+                        = static_cast<float>(dataInfo.elementSize)
+                        / static_cast<float>(std::max<size_t>(1, dataInfo.packing));
+                    dataBatchStrideBytes
+                        = multiplyElementSize(tensorA.strides()[2], logicalBytesEach);
                     auto const& mxsaTensor = problem.mxsa();
                     scaleBatchStrideBytes = mxsaTensor.strides()[mxsaTensor.sizes().size() - 1];
                 }
@@ -1976,7 +2294,7 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8A.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    generateMXInput(hipMxDataTypeForDataGenerator(tensorA.dataType()),
                                     hipMxScaleTypeForDataGenerator(problem.mxTypeA()),
                                     dataPtr,
                                     scalePtr,
@@ -1996,7 +2314,7 @@ namespace TensileLite
             }
             else
             {
-                // A is not FP4 (or mxBlockA == 0). The default-init loop will skip A and
+                // A is not FP4/FP8 (or mxBlockA == 0). The default-init loop will skip A and
                 // MXSA because useMXGenerator is true, so seed them here with the same
                 // initArray path the default loop would have used.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::A);
@@ -2004,7 +2322,7 @@ namespace TensileLite
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSA);
             }
 
-            if(isMXFP4Tensor(problem.b(), problem.mxBlockB()))
+            if(isMXFP4OrFP8Tensor(problem.b(), problem.mxBlockB()))
             {
                 auto const& tensorB = problem.b();
                 auto        rows    = tensorB.sizes()[0];
@@ -2013,16 +2331,22 @@ namespace TensileLite
                 size_t      batchCount = tensorB.sizes().size() > 2 ? tensorB.sizes()[2] : 1;
 
                 auto& pristineB
-                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[rocisa::DataType::Float4];
+                    = m_vdata[ContractionProblemGemm::TENSOR::B].pristine[tensorB.dataType()];
                 auto& pristineE8B
                     = m_vdata[ContractionProblemGemm::TENSOR::MXSB].pristine[problem.mxsb().dataType()];
 
-                // FP4: 2 elements packed per byte, batch stride in bytes = strides[2] / 2
+                // FP4: 2 elements packed per byte (packing=2); FP8: 1 element per byte
+                // (packing=1). Generic byte-stride via DataTypeInfo (see A side above).
                 size_t dataBatchStrideBytes = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
                 {
-                    dataBatchStrideBytes  = tensorB.strides()[2] / 2;
+                    auto const  dataInfo         = DataTypeInfo::Get(tensorB.dataType());
+                    float const logicalBytesEach
+                        = static_cast<float>(dataInfo.elementSize)
+                        / static_cast<float>(std::max<size_t>(1, dataInfo.packing));
+                    dataBatchStrideBytes
+                        = multiplyElementSize(tensorB.strides()[2], logicalBytesEach);
                     auto const& mxsbTensor = problem.mxsb();
                     scaleBatchStrideBytes = mxsbTensor.strides()[mxsbTensor.sizes().size() - 1];
                 }
@@ -2040,7 +2364,7 @@ namespace TensileLite
                                      + b * dataBatchStrideBytes;
                     auto* scalePtr = static_cast<uint8_t*>(pristineE8B.cpuInput.valid.get())
                                      + b * scaleBatchStrideBytes;
-                    generateMXInput((hipDataType)HIP_R_4F_E2M1,
+                    generateMXInput(hipMxDataTypeForDataGenerator(tensorB.dataType()),
                                     hipMxScaleTypeForDataGenerator(problem.mxTypeB()),
                                     dataPtr,
                                     scalePtr,
@@ -2060,7 +2384,7 @@ namespace TensileLite
             }
             else
             {
-                // B is not FP4 (or mxBlockB == 0). Same fallback rationale as the A side.
+                // B is not FP4/FP8 (or mxBlockB == 0). Same fallback rationale as the A side.
                 initTensorFromDefault(ContractionProblemGemm::TENSOR::B);
                 if(problem.mxBlockB() > 0)
                     initTensorFromDefault(ContractionProblemGemm::TENSOR::MXSB);
