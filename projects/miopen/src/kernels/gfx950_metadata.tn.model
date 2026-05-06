@@ -1,5 +1,5 @@
 {
-    "generated_on": "27 Mar 2026, 10:51:31",
+    "generated_on": "05 May 2026, 12:44:31",
     "gpu": {
         "num_cu": 256,
         "arch": "gfx950"
@@ -9,9 +9,10 @@
     },
     "sessions": [
         1,
-        3
+        3,
+        5
     ],
-    "note": "Data merged from sessions: [1, 3]",
+    "note": "Data merged from sessions: [1, 3, 5]",
     "num_inputs": 21,
     "num_solvers": 21,
     "num_outputs": 23,
