@@ -28,6 +28,7 @@
 
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
 #include <mxDataGen.hpp>
+#include <mxDataGenerator/dataTypeInfo.hpp>
 #endif
 #include "TensorDataManipulation.hpp"
 #include "Utility.hpp"
@@ -41,6 +42,8 @@
 #include <list>
 #include <map>
 #include <tuple>
+#include <fstream>
+#include <iomanip>
 
 namespace TensileLite
 {
@@ -2013,6 +2016,126 @@ namespace TensileLite
             }
         }
 
+	// Decode an E8M0 scale byte: 0 -> 0, 0xFF -> NaN, otherwise 2^(byte - 127).
+	// Matches mxScaleElementAsFloat(rocisa::DataType::E8, ...) used by Reference.cpp.
+	inline float decodeE8M0(uint8_t b)
+	{
+	    if(b == 0x00) return 0.0f;
+	    if(b == 0xFF) return std::numeric_limits<float>::quiet_NaN();
+	    return std::ldexp(1.0f, static_cast<int>(b) - 127);
+	}
+	// Decode one logical element of A or B (FP4 packed / FP8 unpacked) using the
+	// E8M0 scale at the canonical scale index. Returns NaN for unsupported types.
+	inline float decodeMXElement(rocisa::DataType dataType,
+		uint8_t const*   scalePtr,
+		uint8_t const*   dataPtr,
+		size_t           scaleIndex,
+		size_t           elemIndex)
+	{
+	    switch(dataType)
+	    {
+		case rocisa::DataType::Float4: // OCP E2M1, packed 2/byte
+		    return DGen::toFloatPacked<DGen::ocp_e2m1_mxfp4>(
+			    scalePtr, dataPtr, scaleIndex, elemIndex);
+		case rocisa::DataType::Float8: // OCP E4M3
+		    return DGen::toFloat<DGen::ocp_e4m3_mxfp8>(
+			    scalePtr, dataPtr, scaleIndex, elemIndex);
+		case rocisa::DataType::BFloat8: // OCP E5M2
+		    return DGen::toFloat<DGen::ocp_e5m2_mxfp8>(
+			    scalePtr, dataPtr, scaleIndex, elemIndex);
+		default:
+		    return std::numeric_limits<float>::quiet_NaN();
+	    }
+	}
+	// Dump four debug files for one MX-FP4/FP8 side and its E8M0 scale buffer:
+	//   ${prefix}_data_bytes.txt   raw data bytes  : "<flat_idx>  0xHH" per line
+	//   ${prefix}_scale_bytes.txt  raw scale bytes : "<flat_idx>  0xHH" per line
+	//   ${prefix}_scale_float.txt  scale as float  : "<flat_idx> <2^(byte-127)>"
+	//   ${prefix}_data_float.txt   data as float matrix, decoded with the
+	//                              CANONICAL-position scale (i.e. assuming the
+	//                              scale buffer is NOT pre-swizzled). This is
+	//                              exactly what Reference.cpp reads, so any
+	//                              mismatch with what the GPU sees points
+	//                              straight at a swizzle/layout bug.
+	// Multi-batch is handled: each batch slice is written sequentially with
+	// a "# batch <b>" header in the float matrix file.
+	void dumpMXSideForDebug(std::string const&      prefix,
+		rocisa::DataType        dataType,
+		void const*             dataPtr,
+		TensorDescriptor const& tensor,
+		void const*             scalePtr,
+		TensorDescriptor const& scaleTensor,
+		size_t                  mxBlock)
+	{
+	    auto const* dp = static_cast<uint8_t const*>(dataPtr);
+	    auto const* sp = static_cast<uint8_t const*>(scalePtr);
+	    // (1) raw data bytes
+	    size_t const dataBytes = tensor.totalAllocatedBytes();
+	    {
+		std::ofstream f(prefix + "_data_bytes.txt");
+		f << std::hex << std::setfill('0');
+		for(size_t i = 0; i < dataBytes; ++i)
+		    f << "0x" << std::setw(8) << i << "  0x" << std::setw(2)
+			<< static_cast<unsigned>(dp[i]) << '\n';
+	    }
+	    // (2) raw scale bytes
+	    size_t const scaleBytes = scaleTensor.totalAllocatedBytes();
+	    {
+		std::ofstream f(prefix + "_scale_bytes.txt");
+		f << std::hex << std::setfill('0');
+		for(size_t i = 0; i < scaleBytes; ++i)
+		    f << "0x" << std::setw(8) << i << "  0x" << std::setw(2)
+			<< static_cast<unsigned>(sp[i]) << '\n';
+	    }
+	    // (3) scale as decoded float
+	    {
+		std::ofstream f(prefix + "_scale_float.txt");
+		f << std::scientific << std::setprecision(9);
+		for(size_t i = 0; i < scaleBytes; ++i)
+		    f << std::dec << i << ' ' << decodeE8M0(sp[i]) << '\n';
+	    }
+	    // (4) data as decoded float matrix (canonical scale layout)
+	    {
+		std::ofstream f(prefix + "_data_float.txt");
+		f << std::scientific << std::setprecision(9);
+		auto const& sizes      = tensor.sizes();
+		auto const& strides    = tensor.strides();
+		size_t const rows      = sizes[0];
+		size_t const cols      = sizes[1];
+		size_t const batchCnt  = sizes.size()   > 2 ? sizes[2]   : 1;
+		size_t const dBatchStr = strides.size() > 2 ? strides[2] : 0;
+		size_t const sBatchStr = scaleTensor.strides().size() > 2
+		    ? scaleTensor.strides()[2]
+		    : 0;
+		size_t const sStr0 = scaleTensor.strides()[0];
+		size_t const sStr1 = scaleTensor.strides()[1];
+		for(size_t b = 0; b < batchCnt; ++b)
+		{
+		    if(batchCnt > 1)
+			f << "# batch " << b << '\n';
+		    size_t const dBatch = b * dBatchStr;
+		    size_t const sBatch = b * sBatchStr;
+		    for(size_t r = 0; r < rows; ++r)
+		    {
+			for(size_t c = 0; c < cols; ++c)
+			{
+			    size_t const elemIdx
+				= dBatch + r * strides[0] + c * strides[1];
+			    // canonical scale position: dim0 contiguous, scale block
+			    // along dim0 because strides[0]==1 is the K-fast layout
+			    // chosen by setMXScale{A,B}. If your scale tensor packs
+			    // differently, swap (sR, sC) below.
+			    size_t const sR = mxBlock ? (r / mxBlock) : 0;
+			    size_t const sC = c;
+			    size_t const sIdx = sBatch + sR * sStr0 + sC * sStr1;
+			    f << decodeMXElement(dataType, sp, dp, sIdx, elemIdx);
+			    f << (c + 1 == cols ? '\n' : ' ');
+			}
+		    }
+		}
+	    }
+	}
+
         void DataInitialization::initializeMXDataForFP4(ContractionProblemGemm const& problem)
         {
             // Initializes A, B, MXSA, MXSB so the default-init loop in initializeCPUInputs
@@ -2195,6 +2318,16 @@ namespace TensileLite
 		//	0x7E, // fixed scale byte
 		//	0x30  // FP8 payload byte - change per-type if desired
 		//	);
+
+
+		// [+] Debug dump of A and its E8M0 scale right after generation,
+		dumpMXSideForDebug("dbg_A",
+			tensorA.dataType(),
+			pristineA.cpuInput.valid.get(),
+			problem.a(),
+			pristineE8A.cpuInput.valid.get(),
+			problem.mxsa(),
+			problem.mxBlockA());
             }
             else
             {
@@ -2320,6 +2453,13 @@ namespace TensileLite
 		//	problem.mxsb().totalAllocatedBytes(), 0x7F, 0x38);
 
 
+		dumpMXSideForDebug("dbg_B",
+			tensorB.dataType(),
+			pristineB.cpuInput.valid.get(),
+			problem.b(),
+			pristineE8B.cpuInput.valid.get(),
+			problem.mxsb(),
+			problem.mxBlockB());
             }
             else
             {
