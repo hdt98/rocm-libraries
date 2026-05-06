@@ -24,7 +24,6 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
-#include <string>
 
 #include <hip/hip_runtime.h>
 #include <mpi.h>
@@ -32,6 +31,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "../../../shared/CLI11.hpp"
 #include "rocfft.h"
 
 // Check all ranks for an rocFFT non-success status.
@@ -90,46 +90,25 @@ int main(int argc, char** argv)
 
     // Number of independent FFTs of size `length` to perform in a
     // single execution.  Override at runtime with `--nbatch N` (or
-    // `-b N`).
+    // `-b N`).  This example only decomposes the FFT spatially
+    // (along the slowest spatial dimension), so every rank holds
+    // its slab of all `nbatch` transforms.  Set to 1 to reproduce
+    // the unbatched case.
     size_t nbatch = 4;
 
-    for(int i = 1; i < argc; ++i)
+    // MPI launchers replicate argv to every rank, so parsing
+    // identically on each rank gives a consistent value.
+    CLI::App app{"rocFFT batched MPI example"};
+    app.add_option("-b,--nbatch", nbatch, "Number of batched 2-D transforms")
+        ->default_val(nbatch)
+        ->check(CLI::PositiveNumber);
+    try
     {
-        const std::string arg        = argv[i];
-        auto              take_value = [&](const std::string& v) {
-            try
-            {
-                const long long n = std::stoll(v);
-                if(n < 1)
-                    throw std::invalid_argument("must be >= 1");
-                nbatch = static_cast<size_t>(n);
-            }
-            catch(const std::exception& e)
-            {
-                if(mpi_rank == 0)
-                    std::cerr << "ignoring invalid --nbatch value '" << v << "': " << e.what()
-                              << "\n";
-            }
-        };
-        if((arg == "--nbatch" || arg == "-b") && i + 1 < argc)
-        {
-            take_value(argv[++i]);
-        }
-        else if(arg.rfind("--nbatch=", 0) == 0)
-        {
-            take_value(arg.substr(std::string("--nbatch=").size()));
-        }
-        else if(arg == "--help" || arg == "-h")
-        {
-            if(mpi_rank == 0)
-            {
-                std::cout << "Usage: " << argv[0] << " [--nbatch N | -b N]\n"
-                          << "  --nbatch N   Number of batched 2-D transforms "
-                             "(default: 4, must be >= 1)\n";
-            }
-            MPI_Finalize();
-            return 0;
-        }
+        app.parse(argc, argv);
+    }
+    catch(const CLI::ParseError& e)
+    {
+        return app.exit(e);
     }
 
     const rocfft_transform_type   direction = rocfft_transform_type_complex_forward;
