@@ -376,9 +376,6 @@ NB_MODULE(origami, m) {
   m.def("att_round_elements_to_128B",
         &origami::attention::round_elements_to_128B,
         "Round elements to 128B boundary for attention");
-  m.def("att_compute_cvt_overhead",
-        &origami::attention::compute_cvt_overhead,
-        "Compute conversion overhead for attention");
   m.def("att_compute_mem_bw_from_occupancy",
         &origami::attention::compute_mem_bw_from_occupancy,
         "Compute memory bandwidth from occupancy for attention");

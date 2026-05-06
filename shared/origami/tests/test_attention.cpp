@@ -438,38 +438,6 @@ TEST_CASE("Attention: compute_number_matrix_instructions", "[attention]") {
   }
 }
 
-TEST_CASE("Attention: compute_cvt_overhead", "[attention]") {
-  for (int gpu_arch : test_architectures) {
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - always returns 0 for attention") {
-      auto hardware = make_hardware(gpu_arch);
-      auto problem  = make_problem(2047, 2047, 4096);
-      auto config   = make_config(256, 256, 64, 32, 32, 8, false, 1);
-
-      auto result = origami::attention::compute_cvt_overhead(problem, hardware, config);
-      REQUIRE(result == 0.0);
-    }
-
-    DYNAMIC_SECTION("gfx" << gpu_arch << " - returns 0 even for XFloat32") {
-      auto hardware = make_hardware(gpu_arch);
-      origami::problem_t problem = {
-          .size            = {8097, 8001, 4096},
-          .batch           = 1,
-          .a_transpose     = origami::transpose_t::N,
-          .b_transpose     = origami::transpose_t::T,
-          .a_dtype         = origami::data_type_t::BFloat16,
-          .b_dtype         = origami::data_type_t::BFloat16,
-          .mi_dtype        = origami::data_type_t::XFloat32,
-          .a_mx_block_size = 0,
-          .b_mx_block_size = 0,
-      };
-      auto config = make_config(256, 256, 64, 32, 32, 8, false, 1);
-
-      auto result = origami::attention::compute_cvt_overhead(problem, hardware, config);
-      REQUIRE(result == 0.0);
-    }
-  }
-}
-
 TEST_CASE("Attention: compute_mt_compute_latency", "[attention]") {
   for (int gpu_arch : test_architectures) {
     DYNAMIC_SECTION("gfx" << gpu_arch << " - standard tile") {

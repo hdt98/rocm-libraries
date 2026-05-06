@@ -505,7 +505,7 @@ class hardware_t {
    * @param arch GPU architecture type
    * @param N_CU Number of compute units
    * @param lds_capacity LDS capacity in bytes
-   * @param rf_capacity LDS capacity in bytes
+   * @param rf_capacity RF capacity in bytes
    * @param constants Architecture-specific constants
    * @param L2_capacity L2 cache capacity in bytes
    * @param compute_clock_ghz Compute clock frequency in GHz

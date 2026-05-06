@@ -916,8 +916,8 @@ double compute_total_latency(const problem_t& problem,
   assert(config.is_valid());
   bool debug = runtime_options::get().debug_enabled;
 
-  std::cerr << "[GEMM] compute_total_latency called, Logger enabled="
-            << Logger::instance().is_enabled() << std::endl;
+  OLOG_DEBUG("[GEMM] compute_total_latency called, Logger enabled="
+            << Logger::instance().is_enabled());
 
   OLOG_DEBUG("=== GEMM compute_total_latency START ===");
   OLOG_DEBUG("Problem: M=" << problem.size.m << " N=" << problem.size.n

@@ -112,17 +112,6 @@ double emulated_tf32_arithmetic_intensity(double m, double n, double k, double b
 size_t compute_number_matrix_instructions(dim3_t mt, dim3_t mi);
 
 /**
- * @brief Compute TF32 conversion overhead.
- *
- * @param problem Problem description (M, N, K, etc.)
- * @param hardware Hardware characteristics (@see origami::hardware_t)
- * @param config Kernel configuration.
- * @return double Latency in cycles.
- */
-double compute_cvt_overhead(const problem_t& problem,
-                                          const hardware_t& hardware,
-                                          const config_t& config);
-/**
  * @brief Compute the latency to process a single macro-tile for the given problem and hardware.
  *
  * @param problem Problem description (M, N, K, etc.)

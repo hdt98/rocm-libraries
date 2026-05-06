@@ -76,7 +76,6 @@ try:
         att_arithmetic_intensity,
         att_emulated_tf32_arithmetic_intensity,
         att_round_elements_to_128B,
-        att_compute_cvt_overhead,
         att_compute_mem_bw_from_occupancy,
         att_compute_l2_hit_rate_global,
     )
@@ -156,7 +155,6 @@ __all__ = [
     "att_arithmetic_intensity",
     "att_emulated_tf32_arithmetic_intensity",
     "att_round_elements_to_128B",
-    "att_compute_cvt_overhead",
     "att_compute_mem_bw_from_occupancy",
     "att_compute_l2_hit_rate_global",
 ]

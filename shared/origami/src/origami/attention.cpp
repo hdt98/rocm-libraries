@@ -125,13 +125,6 @@ double emulated_tf32_arithmetic_intensity(double m, double n, double k, double b
   return numerator / denominator;
 }
 
-double compute_cvt_overhead(const problem_t& problem,
-                            const hardware_t& hardware,
-                            const config_t& config) {
-  // TF32 conversion overhead is not applicable to flash attention.
-  return 0.0;
-}
-
 size_t compute_mt_compute_latency(const problem_t& problem,
                                   const hardware_t& hardware,
                                   const config_t& config) {
@@ -630,6 +623,10 @@ double compute_total_latency(const problem_t& problem,
   OLOG_DEBUG("Problem: M=" << problem.size.m << " N=" << problem.size.n
              << " K=" << problem.size.k << " batch=" << problem.batch
              << " q_heads=" << problem.q_heads);
+  /*
+             << " kv_heads=" << problem.kv_heads
+             << " head_dim=" << problem.head_dim);
+  */
   OLOG_DEBUG("Hardware: N_CU=" << hardware.N_CU << " max_cus=" << max_cus);
 
   // Problem dimensions: M=Q_SEQ, N=K_SEQ, K=H_DIM
@@ -684,7 +681,7 @@ double compute_total_latency(const problem_t& problem,
 
   // --- Number of pipeline iterations ---
   // Total work = batch * grid_M * grid_N * grid_K tiles distributed across N_CU CUs
-  const size_t adjustment_factor = 8;
+  const size_t adjustment_factor = 8; // adjusting amount of work for prolog or epilogue bound tile sizes
   double total_tiles = static_cast<double>(adjustment_factor) *
                        static_cast<double>(batch) *
                        static_cast<double>(q_heads) *

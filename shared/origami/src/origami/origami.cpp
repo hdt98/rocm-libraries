@@ -544,7 +544,7 @@ std::vector<prediction_result_t> rank_configs(const problem_t& problem,
   std::vector<prediction_result_wrapper_t> latencies_configs;
   latencies_configs.reserve(configs.size());
 
-  std::cerr << "[rank_configs] Model type: " << (model == model_t::attention ? "attention" : "gemm") << std::endl;
+  OLOG_DEBUG("[rank_configs] Model type: " << (model == model_t::attention ? "attention" : "gemm"));
 
   OLOG_DEBUG("=== rank_configs START ===");
   OLOG_DEBUG("Ranking " << configs.size() << " configs for problem M="
