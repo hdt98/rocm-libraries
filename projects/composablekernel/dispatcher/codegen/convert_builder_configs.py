@@ -75,12 +75,12 @@ def map_pipeline_version(version_str):
     """Map CK Builder pipeline version to dispatcher pipeline string."""
     mapping = {
         "V1": "compv1",
-        "V2": "compv2",
+        "V2": "mem",
         "V3": "compv3",
         "V4": "compv4",
         "V5": "compv5",
         "V6": "compv6",
-        "ASYNC_V1": "mem",
+        "ASYNC_V1": "basic_async_v1",
         "ASYNC_V4": "mem",
     }
     return mapping.get(version_str, version_str.lower())

@@ -449,9 +449,7 @@ struct {kernel_name}_Config {{
     static constexpr index_t NumWaveGroups = {config.num_wave_groups};
     static constexpr index_t NumGroupsToMerge = {tr.num_groups_to_merge};
     static constexpr bool EnableSplitImage = {str(tr.split_image).lower()};
-    // ExplicitGemm requires pipeline v3+ (v1/v2 operator() doesn't support the 6-arg call
-    // used by BatchedGemmKernel/UniversalGemmKernel). Force false for v1/v2.
-    static constexpr bool ExplicitGemm = {str(tr.explicit_gemm and tr.pipeline not in ("compv1", "basic_v1", "compv2", "basic_v2")).lower()};
+    static constexpr bool ExplicitGemm = {str(tr.explicit_gemm).lower()};
     static constexpr index_t NDimSpatial = {config.ndim_spatial};
     
     // Target architecture
@@ -507,7 +505,7 @@ struct {kernel_name}_Config {{
 
         # Pipeline v1 uses 2-arg TailHandler(Run, has_hot_loop) with 1-arg Run lambda.
         # All other pipelines use 3-arg TailHandler(Run, has_hot_loop, tail_num) with 2-arg Run lambda.
-        is_v1_pipeline = tr.pipeline in ("compv1", "basic_v1")
+        is_v1_pipeline = tr.pipeline in ("compv1", "basic_v1", "basic_async_v1")
         run_lambda_extra_param = "" if is_v1_pipeline else ", const auto tail_number_"
         tail_handler_extra_arg = "" if is_v1_pipeline else ", tail_num"
         tail_num_decl = "" if is_v1_pipeline else "const TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);"
@@ -1312,12 +1310,12 @@ def load_configs_from_json(
             specialization=inst.get("specialization", "default"),
         )
 
-        # Skip v2 pipeline for bwd_weight — the CK Tile GroupedConvolutionBackwardWeightKernel
-        # doesn't support v2 pipeline (GemmPipelineAGmemBGmemCRegV2 has incompatible operator()
-        # signatures and static_asserts for the block window dimensions used in bwd_weight).
-        # The builder used old CK device operations for v2 bwd_weight, not CK Tile kernels.
+        # compv2/basic_v2 (GemmPipelineAGmemBGmemCRegV2) is not compatible with
+        # CK Tile's GroupedConvolutionBackwardWeightKernel. The builder maps
+        # PipelineVersion::V2 to GemmPipelineAgBgCrMem (i.e. "mem"), not to
+        # GemmPipelineAGmemBGmemCRegV2. Skip if any config somehow has compv2.
         if variant == GroupedConvVariant.BACKWARD_WEIGHT and trait.pipeline in ("compv2", "basic_v2"):
-            log.info(f"Skipping instance {inst['id']}: v2 pipeline not supported for bwd_weight in CK Tile")
+            log.info(f"Skipping instance {inst['id']}: compv2/basic_v2 pipeline not compatible with CK Tile bwd_weight")
             continue
 
         config = GroupedConvKernelConfig(
