@@ -72,6 +72,11 @@ Tests:
    function: matmul, transA: N, transB: N, M: 64, N: 64, K: 64, alpha: 1.0, beta: 0.0,
    initialization: inf }
 
+# Smoke: norm_dist_one_special (Gaussian fill + one FP special); batch_count 2 exercises packed strided buffers.
+- {name: matmul_norm_dist_one_special_smoke, category: quick, precision: *real_precisions,
+   function: matmul, transA: N, transB: N, M: 32, N: 32, K: 32, alpha: 1.0, beta: 0.0,
+   batch_count: 2, initialization: norm_dist_one_special }
+
 - name: matmul_one
   category: quick
   function:
