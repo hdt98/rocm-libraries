@@ -4,6 +4,7 @@
 set(GEMM_PRESHUFFLE_DATATYPE "fp16;fp8;bf16;bf8" CACHE STRING "List of datatypes for GEMM Preshuffle (semicolon-separated)")
 set(GEMM_PRESHUFFLE_LAYOUT "rcr" CACHE STRING "List of layout for GEMM Preshuffle (semicolon-separated)")
 set(GEMM_PRESHUFFLE_CONFIG_FILE "" CACHE STRING "Custom config file name (without path, must be in configs/ folder)")
+set(GEMM_PRESHUFFLE_MAX_INSTANCES "" CACHE STRING "Max kernel instances per (dtype, layout) combo (empty = no cap)")
 option(ENABLE_CCACHE_GEMM_PRESHUFFLE "Enable ccache for GEMM Preshuffle ops compilation" OFF)
 
 # Store the directory path for use in functions
@@ -163,6 +164,12 @@ function(build_individual_gemm_preshuffle_targets datatype layout)
     # Create working directory first
     file(MAKE_DIRECTORY ${working_path})
     
+    # Build optional args for instance builder
+    set(extra_list_args "")
+    if(NOT "${GEMM_PRESHUFFLE_MAX_INSTANCES}" STREQUAL "")
+        list(APPEND extra_list_args --max-instances ${GEMM_PRESHUFFLE_MAX_INSTANCES})
+    endif()
+
     # First, just list the kernels (fast operation)
     message(VERBOSE "  Listing kernel configurations...")
     message(VERBOSE "  GPU Targets: ${GEMM_PRESHUFFLE_GPU_TARGETS_INDIVIDUAL}")
@@ -174,6 +181,7 @@ function(build_individual_gemm_preshuffle_targets datatype layout)
                 --layout ${layout}
                 --config_json ${json_blob}
                 --list_kernels
+                ${extra_list_args}
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret
         OUTPUT_VARIABLE list_output

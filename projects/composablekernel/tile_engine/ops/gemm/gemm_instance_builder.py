@@ -43,6 +43,8 @@ class GemmKernelBuilder:
         datatype,
         layout,
         config_json=None,
+        max_instances=None,
+        seed=None,
     ):
         self.kernel_name_prefix = kernel_name_prefix
         self.working_path = Path(working_path)
@@ -50,6 +52,8 @@ class GemmKernelBuilder:
         self.datatype = datatype
         self.layout = layout
         self.config_json = config_json
+        self.max_instances = max_instances
+        self.seed = seed
 
         # Create working directory if it doesn't exist
         self.working_path.mkdir(parents=True, exist_ok=True)
@@ -95,6 +99,30 @@ class GemmKernelBuilder:
                         "trait_combo": trait_combo,
                     }
                 )
+
+        # Deterministic sampling when max_instances is set
+        if self.max_instances is not None and len(kernel_list) > self.max_instances:
+            import hashlib
+            import datetime
+            import random
+
+            if self.seed is not None:
+                effective_seed = self.seed
+            else:
+                date_str = datetime.date.today().isoformat()
+                seed_material = (
+                    f"{date_str}:{self.gpu_target}:{self.datatype}:{self.layout}"
+                )
+                effective_seed = int(
+                    hashlib.sha256(seed_material.encode()).hexdigest(), 16
+                ) % (2**32)
+            rng = random.Random(effective_seed)
+            rng.shuffle(kernel_list)
+            kernel_list = kernel_list[: self.max_instances]
+            print(
+                f"Sampled {len(kernel_list)} instances from feasible set "
+                f"(max_instances={self.max_instances}, seed={effective_seed})"
+            )
 
         # Write kernel count
         with open(

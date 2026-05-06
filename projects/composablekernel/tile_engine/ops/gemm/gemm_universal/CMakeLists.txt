@@ -4,6 +4,7 @@
 set(GEMM_UNIVERSAL_DATATYPE "fp8;fp16" CACHE STRING "List of datatypes for GEMM Universal (semicolon-separated)")
 set(GEMM_UNIVERSAL_LAYOUT "rcr;rrr;crr;ccr" CACHE STRING "List of layout for GEMM Universal (semicolon-separated)")
 set(GEMM_UNIVERSAL_CONFIG_FILE "" CACHE STRING "Custom config file name (without path, must be in configs/ folder)")
+set(GEMM_UNIVERSAL_MAX_INSTANCES "" CACHE STRING "Max kernel instances per (dtype, layout) combo (empty = no cap)")
 option(ENABLE_CCACHE_GEMM_UNIVERSAL "Enable ccache for GEMM Universal ops compilation" OFF)
 
 # Store the directory path for use in functions
@@ -171,6 +172,12 @@ function(build_individual_gemm_universal_targets datatype layout)
                 --gpu_target ${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL}
                 --list_kernels ")
 
+    # Build optional args for instance builder
+    set(extra_list_args "")
+    if(NOT "${GEMM_UNIVERSAL_MAX_INSTANCES}" STREQUAL "")
+        list(APPEND extra_list_args --max-instances ${GEMM_UNIVERSAL_MAX_INSTANCES})
+    endif()
+
     # First, just list the kernels (fast operation)
     message(VERBOSE "  Listing kernel configurations...")
     execute_process(
@@ -180,7 +187,8 @@ function(build_individual_gemm_universal_targets datatype layout)
                 --layout ${layout}
                 --config_json ${json_blob}
                 --gpu_target ${GEMM_UNIVERSAL_GPU_TARGETS_INDIVIDUAL}
-                --list_kernels  
+                --list_kernels
+                ${extra_list_args}
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret
         OUTPUT_VARIABLE list_output

@@ -5,6 +5,7 @@ set(GEMM_MULTI_D_DATATYPE "fp16" CACHE STRING "List of datatypes for GEMM Multi 
 set(GEMM_MULTI_D_LAYOUT "rcrr;rrrr;crrr;ccrr" CACHE STRING "List of layout for GEMM Multi D (semicolon-separated)")
 set(GEMM_MULTI_D_CONFIG_FILE "" CACHE STRING "Custom config file name (without path, must be in configs/ folder)")
 set(GEMM_MULTI_D_ELEMENTWISE_FUNCTION "mul"  CACHE STRING "Elementwise function")
+set(GEMM_MULTI_D_MAX_INSTANCES "" CACHE STRING "Max kernel instances per (dtype, layout) combo (empty = no cap)")
 
 option(ENABLE_CCACHE_GEMM_MULTI_D "Enable ccache for GEMM Multi D ops compilation" OFF)
 
@@ -175,6 +176,12 @@ function(build_individual_gemm_multi_d_targets datatype layout)
                 --gpu_target ${GEMM_MULTI_D_GPU_TARGETS_INDIVIDUAL}
                 --list_kernels ")
 
+    # Build optional args for instance builder
+    set(extra_list_args "")
+    if(NOT "${GEMM_MULTI_D_MAX_INSTANCES}" STREQUAL "")
+        list(APPEND extra_list_args --max-instances ${GEMM_MULTI_D_MAX_INSTANCES})
+    endif()
+
     # First, just list the kernels (fast operation)
     message(VERBOSE "  Listing kernel configurations...")
     execute_process(
@@ -185,7 +192,8 @@ function(build_individual_gemm_multi_d_targets datatype layout)
                 --elementwise_function ${GEMM_MULTI_D_ELEMENTWISE_FUNCTION}
                 --config_json ${json_blob}
                 --gpu_target ${GEMM_MULTI_D_GPU_TARGETS_INDIVIDUAL}
-                --list_kernels  
+                --list_kernels
+                ${extra_list_args}
         WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
         RESULT_VARIABLE ret
         OUTPUT_VARIABLE list_output
