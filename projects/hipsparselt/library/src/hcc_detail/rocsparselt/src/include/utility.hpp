@@ -58,25 +58,25 @@ constexpr const char* rocsparselt_transpose_letter(rocsparselt_operation op)
 template <typename>
 static constexpr char rocsparselt_precision_string[] = "invalid";
 template <>
-static constexpr char rocsparselt_precision_string<hip_bfloat16>[] = "bf16_r";
+inline constexpr char rocsparselt_precision_string<hip_bfloat16>[] = "bf16_r";
 template <>
-static constexpr char rocsparselt_precision_string<__half>[] = "f16_r";
+inline constexpr char rocsparselt_precision_string<__half>[] = "f16_r";
 template <>
-static constexpr char rocsparselt_precision_string<float>[] = "f32_r";
+inline constexpr char rocsparselt_precision_string<float>[] = "f32_r";
 template <>
-static constexpr char rocsparselt_precision_string<double>[] = "f64_r";
+inline constexpr char rocsparselt_precision_string<double>[] = "f64_r";
 template <>
-static constexpr char rocsparselt_precision_string<int8_t>[] = "i8_r";
+inline constexpr char rocsparselt_precision_string<int8_t>[] = "i8_r";
 template <>
-static constexpr char rocsparselt_precision_string<uint8_t>[] = "u8_r";
+inline constexpr char rocsparselt_precision_string<uint8_t>[] = "u8_r";
 template <>
-static constexpr char rocsparselt_precision_string<int32_t>[] = "i32_r";
+inline constexpr char rocsparselt_precision_string<int32_t>[] = "i32_r";
 template <>
-static constexpr char rocsparselt_precision_string<uint32_t>[] = "u32_r";
+inline constexpr char rocsparselt_precision_string<uint32_t>[] = "u32_r";
 template <>
-static constexpr char rocsparselt_precision_string<__hip_fp8_e4m3>[] = "f8_r";
+inline constexpr char rocsparselt_precision_string<__hip_fp8_e4m3>[] = "f8_r";
 template <>
-static constexpr char rocsparselt_precision_string<__hip_fp8_e5m2>[] = "bf8_r";
+inline constexpr char rocsparselt_precision_string<__hip_fp8_e5m2>[] = "bf8_r";
 
 std::string prefix(const char* layer, const char* caller);
 
