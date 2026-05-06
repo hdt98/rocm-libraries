@@ -24,8 +24,6 @@
  *
  *******************************************************************************/
 
-#include <functional>
-
 #include <miopen/conv/data_invoke_params.hpp>
 #include <miopen/conv/wrw_invoke_params.hpp>
 #include <miopen/errors.hpp>
@@ -669,71 +667,6 @@ void RunSolverBwd(const miopen::solver::conv::ConvSolverInterface& solv,
 //**********************************
 // Wrw
 //**********************************
-
-// Runs the Wrw solver kernel exactly once and returns the resulting weights tensor.
-// The ProblemDescription and ExecutionContext are constructed *inside* this helper
-// so that any environment-variable changes made between successive calls (e.g. by
-// a backend selector) are picked up by ExecutionContext::DetectRocm() each time.
-template <typename Tin, typename Twei, typename Tout>
-tensor<Twei> RunWrwKernelOnce(const miopen::solver::conv::ConvSolverInterface& solv,
-                              const UnitTestConvSolverParams& params,
-                              const tensor<Tin>& input,
-                              const tensor<Tout>& output,
-                              const tensor<Twei>& weights_template,
-                              const miopen::ConvolutionDescriptor& conv_desc)
-{
-    auto weights = weights_template;
-    std::fill(weights.begin(), weights.end(), Twei());
-
-    auto&& handle = get_handle();
-    auto in_dev   = handle.Write(input.data);
-    auto wei_dev  = handle.Write(weights.data);
-    auto out_dev  = handle.Write(output.data);
-
-    const auto tensors = miopen::ConvWrwTensors{
-        output.desc, out_dev.get(), input.desc, in_dev.get(), weights.desc, wei_dev.get()};
-
-    const auto problem = miopen::conv::ProblemDescription(
-        output.desc, weights.desc, input.desc, conv_desc, miopen::conv::Direction::BackwardWeights);
-    const auto ctx = [&] {
-        auto tmp = miopen::ExecutionContext{&handle};
-        problem.SetupFloats(tmp);
-        problem.SetupComputeType(tmp);
-        return std::move(tmp);
-    }();
-
-    if(!solv.IsApplicable(ctx, problem))
-    {
-        // Do not put GTEST_SKIP here.
-        // The usage of non-applicable config should be considered as a bug in the test.
-        ADD_FAILURE() << "IsApplicable failed!";
-        return weights;
-    }
-
-    Workspace wspace;
-    if(solv.MayNeedWorkspace())
-    {
-        const auto cur_sol_ws = solv.GetWorkspaceSize(ctx, problem);
-        wspace.resize(cur_sol_ws);
-    }
-
-    const auto invoke_params = miopen::conv::WrWInvokeParams{
-        tensors, wspace.ptr(), wspace.size(), conv_desc.attribute.gfx90aFp16alt.GetWrW()};
-
-    const auto sol = FindSolution(solv, params, ctx, problem, invoke_params);
-    if(!sol.Succeeded() || !sol.invoker_factory)
-    {
-        ADD_FAILURE() << "FindSolution failed!";
-        return weights;
-    }
-    const auto invoker = handle.PrepareInvoker(*sol.invoker_factory, sol.construction_params);
-    (invoker)(handle, invoke_params);
-    handle.Finish();
-
-    weights.data = handle.Read<Twei>(wei_dev, weights.data.size());
-    return weights;
-}
-
 template <typename Tin, typename Twei, typename Tout, typename Tref>
 void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
                   const UnitTestConvSolverParams& params,
@@ -764,17 +697,50 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
     output.generate(GenConvData<Tout, Twei>{output_desc.GetLengths()});
     std::fill(weights.begin(), weights.end(), Twei());
 
+    auto&& handle = get_handle();
+    auto in_dev   = handle.Write(input.data);
+    auto wei_dev  = handle.Write(weights.data);
+    auto out_dev  = handle.Write(output.data);
+
     //**********************************
     // Run solver
     //**********************************
 
-    // Build a problem description here so we can query UseTF32() for the verify
-    // call below; the helper builds its own internally for the kernel invocation.
+    const auto tensors = miopen::ConvWrwTensors{
+        output.desc, out_dev.get(), input.desc, in_dev.get(), weights.desc, wei_dev.get()};
+
     const auto problem = miopen::conv::ProblemDescription(
         output.desc, weights.desc, input.desc, conv_desc, miopen::conv::Direction::BackwardWeights);
+    const auto ctx = [&] {
+        auto tmp = miopen::ExecutionContext{&handle};
+        problem.SetupFloats(tmp);
+        problem.SetupComputeType(tmp);
+        return std::move(tmp);
+    }();
 
-    auto out_weights =
-        RunWrwKernelOnce<Tin, Twei, Tout>(solv, params, input, output, weights, conv_desc);
+    if(!solv.IsApplicable(ctx, problem))
+    {
+        // Do not put GTEST_SKIP here.
+        // The usage of non-applicable config should be considered as a bug in the test.
+        GTEST_FAIL() << "IsApplicable failed!";
+    }
+
+    Workspace wspace;
+    if(solv.MayNeedWorkspace())
+    {
+        const auto cur_sol_ws = solv.GetWorkspaceSize(ctx, problem);
+        wspace.resize(cur_sol_ws);
+    }
+
+    const auto invoke_params = miopen::conv::WrWInvokeParams{
+        tensors, wspace.ptr(), wspace.size(), conv_desc.attribute.gfx90aFp16alt.GetWrW()};
+
+    const auto sol = FindSolution(solv, params, ctx, problem, invoke_params);
+    ASSERT_TRUE(sol.Succeeded());
+    ASSERT_TRUE(sol.invoker_factory);
+    const auto invoker = handle.PrepareInvoker(*sol.invoker_factory, sol.construction_params);
+    (invoker)(handle, invoke_params);
+    handle.Finish();
 
     //**********************************
     // Verify
@@ -805,7 +771,9 @@ void RunSolverWrw(const miopen::solver::conv::ConvSolverInterface& solv,
         ref_weights = ref_conv_wrw(input, ref_weights, output, conv_desc);
     }
 
-    VerifyData(out_weights.data,
+    weights.data = handle.Read<Twei>(wei_dev, weights.data.size());
+
+    VerifyData(weights.data,
                ref_weights.data,
                algo,
                miopen::conv::Direction::BackwardWeights,
@@ -888,101 +856,6 @@ void RunSolver(const miopen::solver::conv::ConvSolverInterface& solver,
 }
 
 } // namespace
-
-//**********************************
-// Wrw cross-backend comparison
-//**********************************
-template <typename Tin, typename Twei, typename Tout>
-void RunSolverWrwCompareBackends(const miopen::solver::conv::ConvSolverInterface& solv,
-                                 const UnitTestConvSolverParams& params,
-                                 const ConvTestCase& conv_config,
-                                 miopenConvAlgorithm_t algo,
-                                 const std::function<void()>& select_backend_a,
-                                 const std::function<void()>& select_backend_b)
-{
-    //**********************************
-    // Prepare (shared across both backends)
-    //**********************************
-
-    auto input   = tensor<Tin>{conv_config.GetXTensorDescriptor()};
-    auto weights = tensor<Twei>{conv_config.GetWTensorDescriptor()};
-
-    const auto conv_desc = conv_config.GetConv();
-
-    const auto output_desc =
-        conv_desc.GetForwardOutputTensor(input.desc, weights.desc, miopen_type<Tout>{});
-
-    if(output_desc.GetLayoutEnum() == miopenTensorCHWNc4 ||
-       output_desc.GetLayoutEnum() == miopenTensorCHWNc8)
-    {
-        throw std::runtime_error("GenConvData do not support CHWNc filter layout");
-    }
-
-    auto output = tensor<Tout>{output_desc};
-
-    input.generate(GenConvData<Tin, Twei>{output_desc.GetLengths()});
-    output.generate(GenConvData<Tout, Twei>{output_desc.GetLengths()});
-
-    const auto problem = miopen::conv::ProblemDescription(
-        output.desc, weights.desc, input.desc, conv_desc, miopen::conv::Direction::BackwardWeights);
-
-    //**********************************
-    // Run on backend A, then backend B. Backend selection happens *between*
-    // calls so that the helper's per-call ExecutionContext::DetectRocm() picks
-    // up the new env-var state.
-    //**********************************
-
-    select_backend_a();
-    auto out_a = RunWrwKernelOnce<Tin, Twei, Tout>(solv, params, input, output, weights, conv_desc);
-
-    select_backend_b();
-    auto out_b = RunWrwKernelOnce<Tin, Twei, Tout>(solv, params, input, output, weights, conv_desc);
-
-    //**********************************
-    // Verify backend B against backend A directly (no CPU oracle).
-    //**********************************
-
-    VerifyData(out_b.data,
-               out_a.data,
-               algo,
-               miopen::conv::Direction::BackwardWeights,
-               params.tolerances,
-               problem.UseTF32());
-}
-
-template <typename T>
-void RunSolverWrwCompareBackends(const miopen::solver::conv::ConvSolverInterface& solv,
-                                 const UnitTestConvSolverParams& params,
-                                 const ConvTestCase& conv_config,
-                                 miopenConvAlgorithm_t algo,
-                                 const std::function<void()>& select_backend_a,
-                                 const std::function<void()>& select_backend_b)
-{
-    RunSolverWrwCompareBackends<T, T, T>(
-        solv, params, conv_config, algo, select_backend_a, select_backend_b);
-}
-
-// Explicit instantiations for the dtypes used by current tests.
-template void
-RunSolverWrwCompareBackends<half_float::half>(const miopen::solver::conv::ConvSolverInterface&,
-                                              const UnitTestConvSolverParams&,
-                                              const ConvTestCase&,
-                                              miopenConvAlgorithm_t,
-                                              const std::function<void()>&,
-                                              const std::function<void()>&);
-template void
-RunSolverWrwCompareBackends<bfloat16>(const miopen::solver::conv::ConvSolverInterface&,
-                                      const UnitTestConvSolverParams&,
-                                      const ConvTestCase&,
-                                      miopenConvAlgorithm_t,
-                                      const std::function<void()>&,
-                                      const std::function<void()>&);
-template void RunSolverWrwCompareBackends<float>(const miopen::solver::conv::ConvSolverInterface&,
-                                                 const UnitTestConvSolverParams&,
-                                                 const ConvTestCase&,
-                                                 miopenConvAlgorithm_t,
-                                                 const std::function<void()>&,
-                                                 const std::function<void()>&);
 
 void UnitTestConvSolverBase::SetUpImpl(const UnitTestConvSolverParams& params)
 {
