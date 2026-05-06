@@ -398,6 +398,8 @@ struct BlockFmhaFwdV3Pipeline
     using VLayout = remove_cvref_t<typename BlockFmhaShape::VLayout>;
     static_assert(std::is_same_v<VLayout, ck_tile::tensor_layout::gemm::RowMajor>);
 
+    static constexpr const char* name = "qr_async_trload_v3";
+
     static constexpr ck_tile::index_t kBlockSize = Problem::kBlockSize;
 
     static constexpr ck_tile::index_t kM0           = BlockFmhaShape::kM0;

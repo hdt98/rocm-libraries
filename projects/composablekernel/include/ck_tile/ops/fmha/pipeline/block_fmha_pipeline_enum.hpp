@@ -42,6 +42,12 @@ struct BlockFmhaPipelineEnumToStr<BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD>
 };
 
 template <>
+struct BlockFmhaPipelineEnumToStr<BlockFmhaPipelineEnum::QRKSVS_ASYNC_TRLOAD_V3>
+{
+    static constexpr const char* name = "qr_async_trload_v3";
+};
+
+template <>
 struct BlockFmhaPipelineEnumToStr<BlockFmhaPipelineEnum::QRKSVS_HPAD>
 {
     static constexpr const char* name = "qr_hpad";
