@@ -410,19 +410,32 @@ void deserializeVisit(StinkyInstruction* inst, const std::string& attrKey,
     } else if (attrKey == "mod.swaitstorecnt") {
         inst->addModifier(SWaitStoreCntData(static_cast<int8_t>(getInt(fields, "storecnt", -1))));
     } else if (attrKey == "mod.mfma") {
+        // Build inputPermute from individual matrix format fields when not
+        // provided as a pre-built string (RawAsmParser provides individual
+        // fields, STIR/pipeline path provides the pre-built string).
+        std::string inputPermute = getStr(fields, "inputPermute");
+        if (inputPermute.empty()) {
+            for (const auto& key :
+                 {"matrix_a_fmt", "matrix_b_fmt", "matrix_a_scale_fmt", "matrix_b_scale_fmt"}) {
+                auto it = fields.find(key);
+                if (it != fields.end()) {
+                    if (!inputPermute.empty()) inputPermute += ' ';
+                    inputPermute += std::string(key) + ":" + it->second;
+                }
+            }
+        }
         bool isMX = getBool(fields, "isMXMFMA", false);
         if (isMX) {
-            inst->addModifier(MFMAModifiers(
-                getStr(fields, "inputPermute"), getStr(fields, "scaleStr"),
-                getStr(fields, "negStr"), getBool(fields, "reuseA", false),
-                getBool(fields, "reuseB", false), getInt(fields, "mxInstType", 0),
-                getInt(fields, "mxScaleAType", 0), getInt(fields, "mxScaleBType", 0)));
+            inst->addModifier(
+                MFMAModifiers(inputPermute, getStr(fields, "scaleStr"), getStr(fields, "negStr"),
+                              getBool(fields, "reuseA", false), getBool(fields, "reuseB", false),
+                              getInt(fields, "mxInstType", 0), getInt(fields, "mxScaleAType", 0),
+                              getInt(fields, "mxScaleBType", 0)));
         } else {
             inst->addModifier(
-                MFMAModifiers(getStr(fields, "inputPermute"), getStr(fields, "scaleStr"),
-                              getStr(fields, "negStr"), getBool(fields, "reuseA", false),
-                              getBool(fields, "reuseB", false), getBool(fields, "neg_lo", false),
-                              getBool(fields, "neg_hi", false)));
+                MFMAModifiers(inputPermute, getStr(fields, "scaleStr"), getStr(fields, "negStr"),
+                              getBool(fields, "reuseA", false), getBool(fields, "reuseB", false),
+                              getBool(fields, "neg_lo", false), getBool(fields, "neg_hi", false)));
         }
     } else if (attrKey == "mod.delayalu") {
         auto toInstType = [](const std::string& s) {

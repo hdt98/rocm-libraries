@@ -588,6 +588,10 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
         case MicrocodeFormat::MC_SMEM:
             modKey = "mod.smem";
             break;
+        case MicrocodeFormat::MC_VOP3PX2:
+        case MicrocodeFormat::MC_VOP3PX3:
+            modKey = "mod.mfma";
+            break;
         default:
             break;
     }
@@ -652,14 +656,11 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
                 fields[tok] = std::move(folded);
                 sawAnyModifier = true;
             } else if (vk == TokenKind::Identifier) {
-                // `th:TH_LOAD_NT`, `scope:SCOPE_DEV`, `matrix_a_fmt:MATRIX_FMT_FP8`,
-                // etc. — gfx12+ memory-hint / matrix-format syntax. Not
-                // modelled by any of the existing modifier structs, so
-                // consume the rhs to keep the lexer in sync but signal
-                // that the line cannot be losslessly round-tripped via
-                // inst.modifiers; the caller will route to TEXTBLOCK.
-                lexer.consume();
-                sawUnrepresentable = true;
+                // key:Identifier modifiers (e.g. matrix_a_fmt:MATRIX_FMT_FP8,
+                // th:TH_LOAD_NT, scope:SCOPE_DEV). Store in fields for the
+                // modKey dispatch below. Formats without a modifier namespace
+                // are caught by the modKey.empty() check after the loop.
+                fields[tok] = std::string(lexer.consume().text);
                 sawAnyModifier = true;
             }
         } else if (lexer.peek().kind == TokenKind::LeftParen) {
@@ -737,6 +738,16 @@ bool parseModifiers(IRLexer& lexer, ParsedInstruction& inst, const HwInstDesc* h
         if (fields.count("offset")) modFields["offset"] = fields["offset"];
         if (fields.count("glc")) modFields["glc"] = "true";
         if (fields.count("nv")) modFields["nv"] = "true";
+
+    } else if (modKey == "mod.mfma") {
+        if (fields.count("matrix_a_fmt")) modFields["matrix_a_fmt"] = fields["matrix_a_fmt"];
+        if (fields.count("matrix_b_fmt")) modFields["matrix_b_fmt"] = fields["matrix_b_fmt"];
+        if (fields.count("matrix_a_scale_fmt"))
+            modFields["matrix_a_scale_fmt"] = fields["matrix_a_scale_fmt"];
+        if (fields.count("matrix_b_scale_fmt"))
+            modFields["matrix_b_scale_fmt"] = fields["matrix_b_scale_fmt"];
+        if (fields.count("matrix_a_reuse")) modFields["reuseA"] = "true";
+        if (fields.count("matrix_b_reuse")) modFields["reuseB"] = "true";
     }
 
     return !sawUnrepresentable;
