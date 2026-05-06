@@ -552,11 +552,11 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
                     auto a_shuffle_tmp = make_static_distributed_tensor<ADataType>(
                         Policy::template MakeShuffledARegTileDistribution<Problem>());
                     transpose_tile2d(a_shuffle_tmp, src);
-                    a_lds_store_window.store(a_shuffle_tmp);
+                    Base::LocalStore(a_lds_store_window, a_shuffle_tmp);
                 }
                 else
                 {
-                    a_lds_store_window.store(src);
+                    Base::LocalStore(a_lds_store_window, src);
                 }
             };
             auto store_b_to_lds = [&](const auto& src) {
@@ -565,11 +565,11 @@ struct GemmPipelineAgBgCrCompV3 : public BaseGemmPipelineAgBgCrCompV3<Problem>
                     auto b_shuffle_tmp = make_static_distributed_tensor<BDataType>(
                         Policy::template MakeShuffledBRegTileDistribution<Problem>());
                     transpose_tile2d(b_shuffle_tmp, src);
-                    b_lds_store_window.store(b_shuffle_tmp);
+                    Base::LocalStore(b_lds_store_window, b_shuffle_tmp);
                 }
                 else
                 {
-                    b_lds_store_window.store(src);
+                    Base::LocalStore(b_lds_store_window, src);
                 }
             };
 
