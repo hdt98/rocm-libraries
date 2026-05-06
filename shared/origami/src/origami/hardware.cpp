@@ -49,7 +49,7 @@ hardware_t::hardware_t(architecture_t arch,
           arch,
           N_CU,
           lds_capacity,
-          rf_capacity > 0 ? rf_capacity : constants.rf_capacity_per_cu,
+          rf_capacity,
           constants.num_xcds,
           1e9 * constants.mem1_perf_ratio / (compute_clock_ghz * 1e6),
           1e9 * constants.mem2_perf_ratio / (memory_clock_ghz * 1e6 * constants.mem_clock_ratio),
@@ -89,7 +89,7 @@ hardware_t hardware_t::get_hardware_for_properties(hipDeviceProp_t properties) {
   return hardware_t(arch_enum,
                     properties.multiProcessorCount,
                     properties.sharedMemPerBlock,
-                    0,  // rf_capacity - use default from architecture constants
+                    properties.regsPerBlock * 4,  // RF capacity from device (regsPerBlock is in 32-bit registers, convert to bytes)
                     constants,
                     properties.l2CacheSize,
                     properties.clockRate / 1.e6,
