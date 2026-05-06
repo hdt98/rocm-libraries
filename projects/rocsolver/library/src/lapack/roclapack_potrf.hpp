@@ -683,6 +683,173 @@ void rocsolver_potrf_getMemorySize(const I n,
     *p_size_iinfo = std::max(*p_size_iinfo, size_iinfo);
 }
 
+template <bool BATCHED, typename T, typename I, typename UA, typename UC, typename S = decltype(std::real(T{}))>
+static inline rocblas_status potrf_syrk(rocblas_handle handle,
+                                        rocblas_fill const uplo,
+                                        rocblas_operation const trans,
+
+                                        I const n,
+
+                                        I const k,
+
+                                        S* alpha,
+
+                                        UA A,
+                                        rocblas_stride const shiftA,
+                                        I const lda,
+                                        rocblas_stride const strideA,
+
+                                        S* beta,
+
+                                        UC C,
+                                        rocblas_stride const shiftC,
+                                        I const ldc,
+                                        rocblas_stride const strideC,
+
+                                        I const batch_count)
+{
+    rocblas_status istat = rocblas_status_success;
+
+    if(use_syrk)
+    {
+        istat = rocblasCall_syrk_herk<BATCHED, T>(handle, uplo, trans,
+
+                                                  n, k,
+
+                                                  alpha,
+
+                                                  A, shiftA, lda, strideA,
+
+                                                  beta,
+
+                                                  C, shiftC, ldc, strideC,
+
+                                                  batch_count);
+    }
+    else
+    {
+        I const mm = n;
+        I const nn = n;
+        I const kk = k;
+
+        T** work = nullptr;
+
+        I const inc1 = 1;
+        I const inc2 = 1;
+        I const inc3 = 1;
+
+        T lalpha = *alpha;
+        T lbeta = *beta;
+
+        // ------------------------------------------------------------------
+        // C <- alpha * A * A' + beta * C,   trans == rocblas_operation_none
+        // C <- alpha * A' * A + beta * C,   otherwise
+        //
+        // C is n by n
+        // ------------------------------------------------------------------
+        bool const is_no_trans = (trans == rocblas_operation_none);
+
+        rocblas_operation trans1
+            = (is_no_trans) ? rocblas_operation_none : rocblas_operation_conjugate_transpose;
+        rocblas_operation trans2
+            = (is_no_trans) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
+
+        istat = rocsolver_gemm(
+
+            handle, trans1, trans2, mm, nn, kk,
+
+            &lalpha,
+
+            A, shiftA, lda, strideA,
+
+            A, shiftA, lda, strideA,
+
+            &lbeta,
+
+            C, shiftC, ldc, strideC,
+
+            batch_count, work);
+    }
+    return istat;
+}; // end potrf_syrk
+
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename UA, typename UB>
+static inline rocblas_status potrf_trsm(rocblas_handle handle,
+                                        rocblas_side const side,
+                                        rocblas_fill const uplo,
+                                        rocblas_operation const trans,
+                                        rocblas_diagonal const diag,
+
+                                        I const mm,
+                                        I const nn,
+
+                                        UA A,
+                                        rocblas_stride const shiftA,
+                                        I const lda,
+                                        rocblas_stride const strideA,
+
+                                        UB B,
+                                        rocblas_stride const shiftB,
+                                        I const ldb,
+                                        rocblas_stride const strideB,
+
+                                        I const batch_count,
+
+                                        bool const optim_mem,
+                                        void* const work1,
+                                        void* const work2,
+                                        void* const work3,
+                                        void* const work4)
+{
+    rocblas_status istat = rocblas_status_success;
+
+    if(use_rocblas_trsm)
+    {
+        T alpha = 1;
+        istat = rocblasCall_trsm<T, I>(handle, side, uplo, trans, diag,
+
+                                       mm, nn,
+
+                                       &alpha,
+
+                                       A, shiftA, lda, strideA,
+
+                                       B, shiftB, ldb, strideB,
+
+                                       batch_count, optim_mem, work1, work2, work3, work4);
+    }
+    else
+    {
+        if(uplo == rocblas_fill_upper)
+        {
+            istat = rocsolver_trsm_upper<BATCHED, STRIDED, T>(handle, side, trans, diag,
+
+                                                              mm, nn,
+
+                                                              A, shiftA, lda, strideA,
+
+                                                              B, shiftB, ldb, strideB,
+
+                                                              batch_count, optim_mem, work1, work2,
+                                                              work3, work4);
+        }
+        else
+        {
+            istat = rocsolver_trsm_lower<BATCHED, STRIDED, T>(handle, side, trans, diag, mm, nn,
+
+                                                              A, shiftA, lda, strideA,
+
+                                                              B, shiftB, ldb, strideB,
+
+                                                              batch_count, optim_mem, work1, work2,
+                                                              work3, work4);
+        }
+
+    } // end if use_rocblas_trsm
+
+    return istat;
+}; // end potrf_trsm
+
 // --------------------------------------------------------------
 // This is the classic block algorithm for Cholesky factorization
 // using a fixed size block size
@@ -946,25 +1113,28 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
         return istat;
     }
-
+#if(0)
     auto potrf_syrk
-        = [=](rocblas_fill const uplo,
+        = [](rocblas_handle handle,
 
-              rocblas_operation const trans,
+             rocblas_fill const uplo,
 
-              I const n,
+             rocblas_operation const trans,
 
-              I const k,
+             I const n,
 
-              S* alpha,
+             I const k,
 
-              auto A, rocblas_stride const shiftA, I const lda, rocblas_stride const strideA,
+             S* alpha,
 
-              S* beta,
+             auto A, rocblas_stride const shiftA, I const lda, rocblas_stride const strideA,
 
-              auto C, rocblas_stride const shiftC, I const ldc, rocblas_stride const strideC
+             S* beta,
 
-              ) -> rocblas_status {
+             auto C, rocblas_stride const shiftC, I const ldc, rocblas_stride const strideC,
+             I const batch_count
+
+             ) -> rocblas_status {
         rocblas_status istat = rocblas_status_success;
 
         if(use_syrk)
@@ -1031,15 +1201,21 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
     }; // end potrf_syrk
 
     auto potrf_trsm
-        = [=](rocblas_side const side, rocblas_fill const uplo, rocblas_operation const trans,
-              rocblas_diagonal const diag,
+        = [](rocblas_handle handle, rocblas_side const side, rocblas_fill const uplo,
+             rocblas_operation const trans, rocblas_diagonal const diag,
 
-              I const mm, I const nn,
+             I const mm, I const nn,
 
-              auto A, rocblas_stride const shiftA, I const lda, rocblas_stride const strideA,
+             auto A, rocblas_stride const shiftA, I const lda, rocblas_stride const strideA,
 
-              auto B, rocblas_stride const shiftB, I const ldb,
-              rocblas_stride const strideB) -> rocblas_status {
+             auto B, rocblas_stride const shiftB, I const ldb, rocblas_stride const strideB,
+
+             I const batch_count,
+
+             bool const optim_mem, void* const work1, void* const work2, void* const work3,
+             void* const work4
+
+             ) -> rocblas_status {
         rocblas_status istat = rocblas_status_success;
 
         if(use_rocblas_trsm)
@@ -1088,6 +1264,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
         return istat;
     }; // end potrf_trsm
+#endif
 
     // -----------------------------
     // check for special sizes for n
@@ -1140,13 +1317,18 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             // ---------------------
             rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
 
-            istat = potrf_trsm(side, uplo, trans, diag,
+            istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, side, uplo, trans, diag,
 
-                               mm, nn,
+                mm, nn,
 
-                               A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
 
-                               A, shiftA + loffset, lda, strideA); // submatrix for A12 or A21
+                A, shiftA + loffset, lda, strideA,
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4); // submatrix for A12 or A21
         }
         if(istat != rocblas_status_success)
         {
@@ -1173,19 +1355,18 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             rocblas_operation const trans
                 = (use_upper_part) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
 
-            istat = potrf_syrk(
+            istat = potrf_syrk<BATCHED, T, I>(handle, uplo, trans,
 
-                uplo, trans,
+                                              nn, kk,
 
-                nn, kk,
+                                              &alpha,
 
-                &alpha,
+                                              A, shiftA + loffset, lda, strideA, // submatrix U12 or L21
 
-                A, shiftA + loffset, lda, strideA, // submatrix U12 or L21
+                                              &beta,
 
-                &beta,
-
-                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
+                                              A, shiftA + idx2D(n1, n1, lda), lda, strideA,
+                                              batch_count // submatrix A22
 
             );
         }
@@ -1257,13 +1438,18 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             // ---------------------
             rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
 
-            istat = potrf_trsm(side, uplo, trans, diag,
+            istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, side, uplo, trans, diag,
 
-                               mm, nn,
+                mm, nn,
 
-                               A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
 
-                               A, shiftA + loffset, lda, strideA); // submatrix for A12 or A21
+                A, shiftA + loffset, lda, strideA,
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4); // submatrix for A12 or A21
         }
         if(istat != rocblas_status_success)
         {
@@ -1290,9 +1476,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             rocblas_operation const trans
                 = (use_upper_part) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
 
-            istat = potrf_syrk(
-
-                uplo, trans,
+            istat = potrf_syrk<BATCHED, T, I>(
+                handle, uplo, trans,
 
                 nn, kk,
 
@@ -1302,9 +1487,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 &beta,
 
-                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
-
-            );
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
+                batch_count);
         }
         if(istat != rocblas_status_success)
         {
@@ -1370,13 +1554,18 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             // ---------------------
             rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
 
-            istat = potrf_trsm(side, uplo, trans, diag,
+            istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, side, uplo, trans, diag,
 
-                               mm, nn,
+                mm, nn,
 
-                               A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
 
-                               A, shiftA + loffset, lda, strideA); // submatrix for A12 or A21
+                A, shiftA + loffset, lda, strideA,
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4); // submatrix for A12 or A21
         }
         if(istat != rocblas_status_success)
         {
@@ -1403,9 +1592,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             rocblas_operation const trans
                 = (use_upper_part) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
 
-            istat = potrf_syrk(
-
-                uplo, trans,
+            istat = potrf_syrk<BATCHED, T, I>(
+                handle, uplo, trans,
 
                 nn, kk,
 
@@ -1415,9 +1603,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 &beta,
 
-                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
-
-            );
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
+                batch_count);
         }
         if(istat != rocblas_status_success)
         {
@@ -1494,16 +1681,19 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             I const mm = n1;
             I const nn = n2;
 
-            rocblas_status const istat
-                = potrf_trsm(rocblas_side_left, rocblas_fill_upper,
-                             rocblas_operation_conjugate_transpose, rocblas_diagonal_non_unit,
+            rocblas_status const istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, rocblas_side_left, rocblas_fill_upper,
+                rocblas_operation_conjugate_transpose, rocblas_diagonal_non_unit,
 
-                             mm, nn,
+                mm, nn,
 
-                             A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix U11
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix U11
 
-                             A, shiftA + idx2D(0, n1, lda), lda, strideA // submatrix U12
-                );
+                A, shiftA + idx2D(0, n1, lda), lda, strideA, // submatrix U12
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4);
 
             if(istat != rocblas_status_success)
             {
@@ -1517,9 +1707,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         {
             I const nn = n2;
             I const kk = n1;
-            rocblas_status const istat = potrf_syrk(
-
-                uplo, rocblas_operation_conjugate_transpose,
+            rocblas_status const istat = potrf_syrk<BATCHED, T, I>(
+                handle, uplo, rocblas_operation_conjugate_transpose,
 
                 nn, kk,
 
@@ -1529,9 +1718,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 &s_one,
 
-                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
-
-            );
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
+                batch_count);
             if(istat != rocblas_status_success)
             {
                 return istat;
@@ -1607,16 +1795,19 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
             I const mm = n2;
             I const nn = n1;
 
-            rocblas_status const istat
-                = potrf_trsm(rocblas_side_right, rocblas_fill_lower,
-                             rocblas_operation_conjugate_transpose, rocblas_diagonal_non_unit,
+            rocblas_status const istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, rocblas_side_right, rocblas_fill_lower,
+                rocblas_operation_conjugate_transpose, rocblas_diagonal_non_unit,
 
-                             mm, nn,
+                mm, nn,
 
-                             A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix L11
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix L11
 
-                             A, shiftA + idx2D(n1, 0, lda), lda, strideA // submatrix L21
-                );
+                A, shiftA + idx2D(n1, 0, lda), lda, strideA, // submatrix L21
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4);
 
             if(istat != rocblas_status_success)
             {
@@ -1630,9 +1821,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         {
             I const nn = n2;
             I const kk = n1;
-            rocblas_status const istat = potrf_syrk(
-
-                uplo, rocblas_operation_none,
+            rocblas_status const istat = potrf_syrk<BATCHED, T, I>(
+                handle, uplo, rocblas_operation_none,
 
                 nn, kk,
 
@@ -1642,9 +1832,8 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
                 &s_one,
 
-                A, shiftA + idx2D(n1, n1, lda), lda, strideA // submatrix A22
-
-            );
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
+                batch_count);
 
             if(istat != rocblas_status_success)
             {
