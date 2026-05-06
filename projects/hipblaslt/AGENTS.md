@@ -15,7 +15,7 @@ This directory (`projects/hipblaslt`) is one component of the larger `rocm-libra
 | `library/include/hipblaslt/` | Public C/C++ headers (`hipblaslt.h`, `hipblaslt-ext.hpp`, etc.) |
 | `library/src/amd_detail/` | hipBLASLt API implementation (thin layer over rocblaslt) |
 | `library/src/amd_detail/rocblaslt/` | Internal GEMM dispatch, handle/aux, Tensile host integration (`tensile_host.cpp`), user-driven tuning, transform ops, legacy rocRoller kernels under `src/rocroller/` |
-| `tensilelite/` | Kernel generator + runtime (Python + C++/Nanobind). Has its own `AGENTS.md` — read it before touching anything inside |
+| `tensilelite/` | Kernel generator + runtime (Python + C++/Nanobind). |
 | `clients/tests/` | gtest binary (`hipblaslt-test`) driven by YAML in `clients/tests/data/` (`matmul_gtest.yaml`, `auxiliary_gtest.yaml`, `smoke_gtest.yaml`, `rocroller_gtest.yaml`, …) |
 | `clients/bench/` | Benchmark binary (`hipblaslt-bench`) |
 | `clients/samples/` | Standalone usage examples (`01_hipblaslt_gemm`, …) |
@@ -72,7 +72,7 @@ To skip a test on a known-broken platform, add an entry under `clients/tests/dat
 
 ## When working in `tensilelite/`
 
-`tensilelite/` is a self-contained subproject with its own toolchain (tox, invoke, rocisa C++ module). It has its own `AGENTS.md` covering kernel-generation workflow, rocisa, and the three-phase BenchmarkProblems → LibraryLogic → ClientWriter pipeline. Read that file before editing kernel codegen or YAML test logic there — the commands and gotchas (e.g. `tox -e unit` requiring a prior `invoke build-client`) do not apply at the hipBLASLt top level.
+`tensilelite/` is a self-contained subproject with its own toolchain (tox, invoke, rocisa C++ module). It has its own guide file covering kernel-generation workflow, rocisa, and the three-phase BenchmarkProblems → LibraryLogic → ClientWriter pipeline. Read that file before editing kernel codegen or YAML test logic there — the commands and gotchas (e.g. `tox -e unit` requiring a prior `invoke build-client`) do not apply at the hipBLASLt top level.
 
 ## Gotchas specific to this top-level
 
