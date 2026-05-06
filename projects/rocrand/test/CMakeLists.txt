@@ -49,6 +49,9 @@ function(add_relative_test test_name test_target)
     if(RUN_SLOW_TESTS)
       set_tests_properties("${test_name}" PROPERTIES "ENVIRONMENT" "RUN_SLOW_TESTS=1")
     endif()
+    # Track every rocRAND test target so the shared CTest categorization can
+    # later attach --gtest_filter category suites to each one.
+    set_property(GLOBAL APPEND PROPERTY ROCRAND_TEST_TARGETS "${test_target}")
 endfunction()
 
 # Get rocRAND tests source files
@@ -139,6 +142,53 @@ add_subdirectory(linkage)
 
 # Add tests for the internal APIs
 add_subdirectory(internal)
+
+# ****************************************************************************
+# Test Filter Standardization
+# ****************************************************************************
+#
+# Wires every rocRAND test binary into the shared rocm-libraries CTest
+# categorization (see ${ROCM_LIBRARIES_ROOT}/shared/ctest/). For each tracked
+# test target we register one extra CTest entry per category defined in
+# test_categories.yaml. Each entry invokes the binary with a
+# `--gtest_filter=...` derived from the YAML, and is tagged with the category
+# labels and timeout. This lets users select tiers via standard ctest labels:
+#
+#   ctest -L quick       # fast sanity checks
+#   ctest -L standard    # full gtest run
+#
+# The original per-binary tests added by add_relative_test() above are kept
+# untouched, so existing workflows are not affected.
+if(EXISTS "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+    include("${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake")
+
+    set(ROCRAND_TEST_CATEGORIES_YAML "${CMAKE_CURRENT_SOURCE_DIR}/test_categories.yaml")
+    if(EXISTS "${ROCRAND_TEST_CATEGORIES_YAML}")
+        message(STATUS "Applying test categories for rocRAND")
+        get_property(_rr_test_targets GLOBAL PROPERTY ROCRAND_TEST_TARGETS)
+        foreach(_rr_t IN LISTS _rr_test_targets)
+            get_target_property(_rr_dir ${_rr_t} RUNTIME_OUTPUT_DIRECTORY)
+            if(NOT _rr_dir OR _rr_dir STREQUAL "_rr_dir-NOTFOUND")
+                set(_rr_dir "${CMAKE_BINARY_DIR}/test")
+            endif()
+            apply_test_category_labels(
+                ${_rr_t}
+                "${ROCRAND_TEST_CATEGORIES_YAML}"
+                "${_rr_dir}"
+                "${INSTALL_TEST_FILE}"
+            )
+        endforeach()
+    else()
+        message(STATUS
+            "rocRAND test_categories.yaml not found at "
+            "${ROCRAND_TEST_CATEGORIES_YAML} - skipping test category labels")
+    endif()
+else()
+    message(STATUS
+        "Shared CTest categories not found at "
+        "${ROCM_LIBRARIES_ROOT}/shared/ctest/TestCategories.cmake - "
+        "skipping rocRAND test category labels")
+endif()
 
 rocm_install(
     FILES "${INSTALL_TEST_FILE}"
