@@ -453,10 +453,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineHeuristicDescriptorEngineConfigs)
             HIPDNN_ATTR_ENGINEHEUR_RESULTS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, nullptr, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    for(size_t i = 0; i < 3; ++i)
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    for(auto& owned : ownedConfigs)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        owned = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_RESULTS,
@@ -473,13 +479,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineHeuristicDescriptorEngineConfigs)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 3);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
-
-    configs.clear();
 
     ScopedDescriptor singleConfig(createDescriptorPtr<EngineConfigDescriptor>());
 
@@ -503,10 +502,17 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNullConfig)
     EXPECT_CALL(*_mockEnginePluginResourceManager, destroyEngineDetails(_, _))
         .WillRepeatedly(Return());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    configs[0] = createDescriptorPtr<EngineConfigDescriptor>();
-    configs[1] = nullptr;
-    configs[2] = createDescriptorPtr<EngineConfigDescriptor>();
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    ownedConfigs[0] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    // ownedConfigs[1] left as default (nullptr) to trigger the null-element path
+    ownedConfigs[2] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
+    }
 
     EXPECT_CALL(*getMockGraph(), isFinalized()).WillRepeatedly(Return(true));
     int64_t count = 0;
@@ -516,11 +522,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNullConfig)
                                                   &count,
                                                   configs.data()),
                                HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
@@ -534,10 +535,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
 
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    for(size_t i = 0; i < 3; ++i)
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    for(auto& owned : ownedConfigs)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        owned = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     int64_t count = 0;
@@ -547,11 +554,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 0);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
@@ -568,10 +570,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
     EXPECT_CALL(*_mockEnginePluginResourceManager, destroyEngineDetails(_, _))
         .WillRepeatedly(Return());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(5);
+    std::vector<ScopedDescriptor> ownedConfigs(5);
     for(size_t i = 0; i < 3; ++i)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        ownedConfigs[i] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     int64_t count = 0;
@@ -581,11 +589,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 3);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsCountOnly)

@@ -28,6 +28,7 @@
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
+#include <hipdnn_data_sdk/utilities/ScopedResource.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <flatbuffers/flatbuffers.h>
@@ -64,6 +65,30 @@ public:
     }
 };
 
+// RAII guards for plugin opaque handles. The handle and policy descriptor are
+// allocated by the plugin's C ABI (`createHandle` / `createPolicyDescriptor`)
+// and must be released via the matching destroy call. Without a guard, any
+// ASSERT_* abort or thrown exception between create and destroy leaks under
+// ASAN. Built on top of the shared ScopedResource<T> utility.
+inline auto makeScopedHandle(const HeuristicPlugin& plugin, hipdnnHeuristicHandle_t handle)
+{
+    return hipdnn_data_sdk::utilities::ScopedResource<hipdnnHeuristicHandle_t>(
+        handle,
+        [p = &plugin](hipdnnHeuristicHandle_t h) {
+            if(h != nullptr) { p->destroyHandle(h); }
+        });
+}
+
+inline auto makeScopedPolicyDescriptor(const HeuristicPlugin& plugin,
+                                       hipdnnHeuristicPolicyDescriptor_t desc)
+{
+    return hipdnn_data_sdk::utilities::ScopedResource<hipdnnHeuristicPolicyDescriptor_t>(
+        desc,
+        [p = &plugin](hipdnnHeuristicPolicyDescriptor_t d) {
+            if(d != nullptr) { p->destroyPolicyDescriptor(d); }
+        });
+}
+
 } // namespace
 
 // ====================================================================================
@@ -99,18 +124,13 @@ TEST_F(IntegrationHeuristicPlugin, CompleteHandleLifecycleWithGoodPlugin)
     const auto policyInfos = rm->getHeuristicPolicyInfos();
     ASSERT_FALSE(policyInfos.empty());
 
-    // Find the good test plugin
-    const HeuristicPlugin* plugin = nullptr;
-    hipdnnHeuristicHandle_t handle = nullptr;
-    for(const auto& info : policyInfos)
-    {
-        plugin = rm->getPluginForPolicyId(info.policyId);
-        if(plugin != nullptr)
-        {
-            handle = rm->getHeuristicHandleForPolicyId(info.policyId);
-            break;
-        }
-    }
+    // Look up the good test plugin by its known policy id rather than scanning
+    // — getPluginForPolicyId is non-null for any id sourced from
+    // getHeuristicPolicyInfos(), so a "find the first non-null" loop is dead.
+    const auto goodPolicyId
+        = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
+    const HeuristicPlugin* plugin = rm->getPluginForPolicyId(goodPolicyId);
+    hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(goodPolicyId);
 
     ASSERT_NE(plugin, nullptr);
     ASSERT_NE(handle, nullptr);
@@ -203,29 +223,26 @@ TEST_F(IntegrationHeuristicPlugin, CompleteWorkflowWithDevicePropertiesAndFinali
     devicePropsData.size = serialized.size();
     plugin->setDeviceProperties(handle, &devicePropsData);
 
-    // Create policy descriptor
-    auto desc = plugin->createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
+    // Create policy descriptor (RAII so destroy runs even on ASSERT_* abort)
+    const auto descGuard = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    ASSERT_NE(descGuard.get(), nullptr);
 
     // Set engine IDs
     const std::vector<int64_t> engineIds = {1000, 2000, 3000};
-    plugin->setEngineIds(desc, engineIds.data(), engineIds.size());
+    plugin->setEngineIds(descGuard.get(), engineIds.data(), engineIds.size());
 
     // Set serialized graph
     const std::vector<uint8_t> graphBytes = {10, 20, 30};
     hipdnnPluginConstData_t serializedGraph;
     serializedGraph.ptr = graphBytes.data();
     serializedGraph.size = graphBytes.size();
-    plugin->setSerializedGraph(desc, &serializedGraph);
+    plugin->setSerializedGraph(descGuard.get(), &serializedGraph);
 
     // Finalize
-    plugin->finalize(desc);
+    plugin->finalize(descGuard.get());
 
     // Get results
-    const auto sortedIds = plugin->getSortedEngineIds(desc);
-
-    // Clean up
-    plugin->destroyPolicyDescriptor(desc);
+    const auto sortedIds = plugin->getSortedEngineIds(descGuard.get());
 }
 
 // ========== Plugin Metadata Coverage ==========
@@ -291,22 +308,18 @@ TEST_F(IntegrationHeuristicPlugin, MultipleDescriptorsFromSameHandle)
     hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
     ASSERT_NE(handle, nullptr);
 
-    // Create multiple descriptors from the same handle
-    auto desc1 = plugin->createPolicyDescriptor(handle);
-    auto desc2 = plugin->createPolicyDescriptor(handle);
-    auto desc3 = plugin->createPolicyDescriptor(handle);
+    // Create multiple descriptors from the same handle (RAII-wrapped so any
+    // assertion abort below still releases them).
+    const auto desc1 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    const auto desc2 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    const auto desc3 = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
 
-    EXPECT_NE(desc1, nullptr);
-    EXPECT_NE(desc2, nullptr);
-    EXPECT_NE(desc3, nullptr);
+    EXPECT_NE(desc1.get(), nullptr);
+    EXPECT_NE(desc2.get(), nullptr);
+    EXPECT_NE(desc3.get(), nullptr);
 
     // Note: Test plugins may return the same hardcoded pointer for simplicity,
     // but real plugins should return distinct descriptors. We just verify they're created.
-
-    // Clean up all
-    plugin->destroyPolicyDescriptor(desc1);
-    plugin->destroyPolicyDescriptor(desc2);
-    plugin->destroyPolicyDescriptor(desc3);
 }
 
 // ========== Error Path Tests ==========
@@ -358,17 +371,15 @@ TEST_F(IntegrationHeuristicPlugin, FinalizeWithEmptyEngineIdsSucceeds)
     hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(policyInfos[0].policyId);
     ASSERT_NE(handle, nullptr);
 
-    auto desc = plugin->createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
+    const auto descGuard = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle));
+    ASSERT_NE(descGuard.get(), nullptr);
 
     // Don't set any engine IDs - just finalize
-    plugin->finalize(desc);
+    plugin->finalize(descGuard.get());
 
     // Get sorted IDs (should be empty)
-    const auto sortedIds = plugin->getSortedEngineIds(desc);
+    const auto sortedIds = plugin->getSortedEngineIds(descGuard.get());
     EXPECT_TRUE(sortedIds.empty());
-
-    plugin->destroyPolicyDescriptor(desc);
 }
 
 // ========== Error Path: Multiple Policy Lookups (Same Handle/Plugin Reuse) ==========
@@ -494,22 +505,20 @@ TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanQueryPluginVersion)
 
 TEST_F(IntegrationHeuristicPluginLoadedGood, LoadedPluginCanGetSortedEngineIds)
 {
-    const auto handle = plugin().createHandle();
-    const auto desc = plugin().createPolicyDescriptor(handle);
+    const auto handleGuard = makeScopedHandle(plugin(), plugin().createHandle());
+    const auto descGuard
+        = makeScopedPolicyDescriptor(plugin(), plugin().createPolicyDescriptor(handleGuard.get()));
 
     const std::vector<int64_t> inputIds = {1, 2, 3, 4, 5};
-    plugin().setEngineIds(desc, inputIds.data(), inputIds.size());
-    plugin().finalize(desc);
+    plugin().setEngineIds(descGuard.get(), inputIds.data(), inputIds.size());
+    plugin().finalize(descGuard.get());
 
     std::vector<int64_t> sortedIds;
-    ASSERT_NO_THROW({ sortedIds = plugin().getSortedEngineIds(desc); });
+    ASSERT_NO_THROW({ sortedIds = plugin().getSortedEngineIds(descGuard.get()); });
 
     // Good plugin reverses the order
     EXPECT_EQ(sortedIds.size(), inputIds.size());
     EXPECT_EQ(sortedIds, std::vector<int64_t>({5, 4, 3, 2, 1}));
-
-    plugin().destroyPolicyDescriptor(desc);
-    plugin().destroyHandle(handle);
 }
 
 TEST_F(IntegrationHeuristicPluginLoadedGood, RealPluginCachesPolicyId)
@@ -575,23 +584,21 @@ TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalSetLogLe
 TEST_F(IntegrationHeuristicPluginLoadedNoOptional, PluginWithoutOptionalCanStillExecuteWorkflow)
 {
     // Full workflow should work despite missing optional functions
-    const auto handle = plugin().createHandle();
-    ASSERT_NE(handle, nullptr);
+    const auto handleGuard = makeScopedHandle(plugin(), plugin().createHandle());
+    ASSERT_NE(handleGuard.get(), nullptr);
 
-    const auto desc = plugin().createPolicyDescriptor(handle);
-    ASSERT_NE(desc, nullptr);
+    const auto descGuard
+        = makeScopedPolicyDescriptor(plugin(), plugin().createPolicyDescriptor(handleGuard.get()));
+    ASSERT_NE(descGuard.get(), nullptr);
 
     const std::vector<int64_t> inputIds = {1, 2, 3};
-    plugin().setEngineIds(desc, inputIds.data(), inputIds.size());
+    plugin().setEngineIds(descGuard.get(), inputIds.data(), inputIds.size());
 
-    const bool applied = plugin().finalize(desc);
+    const bool applied = plugin().finalize(descGuard.get());
     EXPECT_FALSE(applied); // This plugin declines to apply
 
-    const auto sortedIds = plugin().getSortedEngineIds(desc);
+    const auto sortedIds = plugin().getSortedEngineIds(descGuard.get());
     EXPECT_TRUE(sortedIds.empty()); // Returns empty list
-
-    plugin().destroyPolicyDescriptor(desc);
-    plugin().destroyHandle(handle);
 }
 
 // ====================================================================================

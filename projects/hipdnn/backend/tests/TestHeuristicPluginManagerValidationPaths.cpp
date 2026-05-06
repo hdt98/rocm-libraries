@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
+#include <hipdnn_test_sdk/utilities/FileUtilities.hpp>
 
 // Test plugin name constants (defined here because CMake ordering prevents proper macro propagation)
 namespace
@@ -246,11 +247,13 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, AbsoluteReloadResetsPolicyIdTr
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, ConstructorSetsUpValidationInfrastructure)
 {
-    // Constructor initializes with search paths and empty _policyIds set
+    // Constructor initializes with search paths and empty _policyIds set.
+    // Assert against the freshly-constructed local manager (not the fixture's),
+    // otherwise the test is just re-checking SetUp's invariant.
     const HeuristicPluginManager manager;
 
     // Should start with no plugins
-    EXPECT_TRUE(_manager->getPlugins().empty());
+    EXPECT_TRUE(manager.getPlugins().empty());
 }
 
 // ========== Destructor Path Coverage ==========
@@ -322,13 +325,18 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
     const auto& plugins = _manager->getPlugins();
     ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
 
-    bool foundGoodOrTest = false;
+    // Match the exact good-plugin policy name. A loose substring match like
+    // "Good" || "Test" matches every test plugin (NoOptional, etc.) and would
+    // pass even if the good plugin failed to load.
+    constexpr const char* K_GOOD_POLICY_NAME = "TestGoodHeuristicPolicy";
+
+    bool foundGood = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
-        if(name.find("Good") != std::string::npos || name.find("Test") != std::string::npos)
+        if(name == K_GOOD_POLICY_NAME)
         {
-            foundGoodOrTest = true;
+            foundGood = true;
             // Verify it passed all validation:
             // 1. API version (lines 55-66)
             const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
@@ -341,7 +349,7 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
             EXPECT_FALSE(name.empty());
         }
     }
-    EXPECT_TRUE(foundGoodOrTest) << "test_good_heuristic_plugin should be loaded";
+    EXPECT_TRUE(foundGood) << "test_good_heuristic_plugin should be loaded";
 }
 
 // ========== Validation Failure Tests ==========
@@ -353,6 +361,11 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
     const auto badPlugin
         = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
 
+    // Without this precondition, loadPlugins silently no-ops on a missing file
+    // and the empty-plugins assertion below would pass vacuously.
+    ASSERT_TRUE(std::filesystem::exists(badPlugin))
+        << "Test precondition: bad-API-version plugin missing at " << badPlugin;
+
     _manager->loadPlugins({badPlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Bad API version plugin should be rejected";
@@ -362,6 +375,9 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 {
     const auto emptyNamePlugin
         = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
+
+    ASSERT_TRUE(std::filesystem::exists(emptyNamePlugin))
+        << "Test precondition: empty-name plugin missing at " << emptyNamePlugin;
 
     _manager->loadPlugins({emptyNamePlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
@@ -382,23 +398,34 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsReject
 
     _manager->loadPlugins({pluginA, pluginB}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Only one plugin should have loaded - the second should be rejected due to duplicate ID
-    EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
+    // Only one plugin should have loaded - the second should be rejected due to duplicate ID.
+    const auto& plugins = _manager->getPlugins();
+    ASSERT_EQ(plugins.size(), 1u) << "Only first duplicate plugin should load";
+
+    // The survivor must be the first one offered (pluginA). Verifying the
+    // policy id pins down ordering — without this the size check would still
+    // pass if pluginA was rejected for an unrelated reason and pluginB loaded.
+    HeuristicPluginManager probeA;
+    probeA.loadPlugins({pluginA}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    ASSERT_EQ(probeA.getPlugins().size(), 1u)
+        << "pluginA should load successfully on its own to be a valid baseline";
+    EXPECT_EQ(plugins.front()->policyId(), probeA.getPlugins().front()->policyId())
+        << "Survivor should be pluginA (the first offered), not pluginB";
 }
 
 // ========== Edge Case: Empty Plugin Directory ==========
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyDirectorySkipsValidation)
 {
-
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_empty_heur_test";
-    std::filesystem::create_directories(emptyDir);
+    // ScopedDirectory creates the dir and remove_all's it on destruction, so
+    // the temp dir is cleaned up even if an assertion below aborts.
+    const auto uniqueName = std::string("hipdnn_empty_heur_test_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
     // Load from empty directory - no plugins to validate
-    _manager->loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    _manager->loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     EXPECT_TRUE(_manager->getPlugins().empty());
-
-    std::filesystem::remove(emptyDir);
 }

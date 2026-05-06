@@ -16,6 +16,7 @@
 #include "plugin/HeuristicPluginManager.hpp"
 
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
+#include <hipdnn_test_sdk/utilities/FileUtilities.hpp>
 
 #include <filesystem>
 #include <gtest/gtest.h>
@@ -54,16 +55,12 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsFromEmptyDirectorySucceeds)
 {
     HeuristicPluginManager manager;
 
-    // Create a temporary empty directory
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_test_empty";
-    std::filesystem::create_directories(emptyDir);
+    const auto uniqueName = std::string("hipdnn_test_empty_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
-    // Should not throw when loading from empty directory
-    EXPECT_NO_THROW(manager.loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
-
-    // Cleanup
-    std::filesystem::remove(emptyDir);
+    EXPECT_NO_THROW(manager.loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 }
 
 TEST_F(TestHeuristicPluginManager, LoadPluginsFromNonexistentDirectorySucceeds)
@@ -249,12 +246,11 @@ TEST_F(TestHeuristicPluginManager, GetPluginsAfterEmptyLoadReturnsEmpty)
 {
     HeuristicPluginManager manager;
 
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_empty_load_test";
-    std::filesystem::create_directories(emptyDir);
+    const auto uniqueName = std::string("hipdnn_empty_load_test_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
-    manager.loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    manager.loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     EXPECT_TRUE(manager.getPlugins().empty());
-
-    std::filesystem::remove(emptyDir);
 }
