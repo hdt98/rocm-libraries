@@ -35,7 +35,6 @@ namespace ck_tile {
 // Construction pre-computes XOR address coordinates (~96 VALU), but subsequent
 // .load()/.store() calls reuse the pre-computed coordinates with no reconstruction.
 // Prefer this type for windows accessed repeatedly in a loop.
-// See also: MakeDistributedLdsStoreWindow in the pipeline base class.
 template <typename BottomTensorView_,
           typename WindowLengths_,
           typename StaticTileDistribution_,

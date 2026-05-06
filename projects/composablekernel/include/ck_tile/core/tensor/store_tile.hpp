@@ -17,10 +17,9 @@
 namespace ck_tile {
 
 // Reconstructs tile_window_with_static_distribution on every call, pre-computing XOR
-// address coordinates (~96 VALU) before storing. For one-shot stores this is fine. For
-// repeated stores in a hot loop, prefer constructing the distributed window once via
-// MakeDistributedLdsStoreWindow or make_tile_window(view, lengths, origin, dstr), then
-// calling .store() directly.
+// address coordinates before storing. For one-shot stores this is fine. For repeated
+// stores in a hot loop, prefer constructing the distributed window once via
+// make_tile_window(view, lengths, origin, dstr), then calling .store() directly.
 template <typename BottomTensorView_,
           typename WindowLengths_,
           typename TileDistribution_,

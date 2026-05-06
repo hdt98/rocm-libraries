@@ -113,7 +113,8 @@ struct GemmPipelineAgBgCrImplBase
     //
     // PERFORMANCE NOTE: When `lds_tile_window` is a tile_window_with_static_lengths (bare
     // window), this reconstructs tile_window_with_static_distribution internally on every
-    // call (~96 VALU for XOR coordinate computation). For hot loops where the window doesn't
+    // call (significant VALU overhead for XOR coordinate computation (~96 for typical
+    // configurations)). For hot loops where the window doesn't
     // move, use MakeDistributedLdsStoreWindow() once before the loop, then call
     // LocalStore() on the returned window.
     //
@@ -137,7 +138,8 @@ struct GemmPipelineAgBgCrImplBase
 
     // Build a tile_window_with_static_distribution from a bare LDS window. The returned
     // window pre-computes XOR coordinates once at construction, so repeated .store() calls
-    // skip the ~96 VALU of coord reconstruction that store_tile()/LocalPrefill would redo.
+    // skip the significant VALU cost of coord reconstruction that store_tile()/LocalPrefill
+    // would redo (~96 for typical configurations).
     //
     // `dstr` must match the distribution of the tensor passed to .store(). If the store
     // path transposes first (e.g. MakeShuffledARegTileDistribution), pass that distribution.
@@ -170,16 +172,23 @@ struct GemmPipelineAgBgCrImplBase
     CK_TILE_DEVICE void LocalStore(DistributedWindow& lds_tile_window,
                                    const SrcBlockTile& src_block_tile) const
     {
+        static_assert(is_tile_window_with_static_distribution_v<remove_cvref_t<DistributedWindow>>,
+                      "LocalStore requires a tile_window_with_static_distribution. "
+                      "Use MakeDistributedLdsStoreWindow() to create one, or call "
+                      "LocalStoreWithCoordRecompute() for bare windows.");
         store_tile(lds_tile_window, src_block_tile);
     }
 
-    // Store a tile to LDS, recomputing XOR coordinates on the fly (~96 VALU).
+    // Store a tile to LDS, recomputing XOR coordinates on the fly (significant VALU cost).
     // Use this when VGPR budget is too tight to hold pre-computed coordinates,
     // or for one-shot stores outside hot loops.
     template <typename BareWindow, typename SrcBlockTile>
     CK_TILE_DEVICE void LocalStoreWithCoordRecompute(BareWindow& lds_tile_window,
                                                      const SrcBlockTile& src_block_tile) const
     {
+        static_assert(is_tile_window_with_static_lengths_v<remove_cvref_t<BareWindow>>,
+                      "LocalStoreWithCoordRecompute requires a tile_window_with_static_lengths. "
+                      "If you have a pre-computed distributed window, use LocalStore() instead.");
         store_tile(lds_tile_window, src_block_tile);
     }
 
