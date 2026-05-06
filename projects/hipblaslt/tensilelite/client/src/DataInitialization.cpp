@@ -2266,7 +2266,7 @@ namespace TensileLite
 
                 // FP4: 2 elements packed per byte (packing=2); FP8: 1 element per byte
                 // (packing=1). Compute byte stride generically via DataTypeInfo so we
-                // never hard-code /2 again the next time a new dtype shows u
+                // never hard-code /2 again the next time a new dtype shows up
                 size_t dataBatchStrideBytes = 0;
                 size_t scaleBatchStrideBytes = 0;
                 if(batchCount > 1)
@@ -2391,10 +2391,10 @@ namespace TensileLite
             }
         }
 #else  // HIPBLASLT_ENABLE_MXDATAGENERATOR
-        void DataInitialization::initializeMXData(ContractionProblemGemm const& /*problem*/)
+        void DataInitialization::initializeMXDataForFP4OrFP8(ContractionProblemGemm const& /*problem*/)
         {
             // The MX data generator is disabled at build time. Reaching this
-            // path means a problem requiring MX FP4 initialization was issued
+            // path means a problem requiring MX FP4 or MX FP8 initialization was issued
             // against a build that doesn't include mxDataGenerator support.
             throw std::runtime_error(
                 "MX data initialization requires HIPBLASLT_ENABLE_MXDATAGENERATOR=ON at build time");
