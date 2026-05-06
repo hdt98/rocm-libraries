@@ -177,8 +177,9 @@ def main():
     parser.add_argument(
         "--datatype",
         required=True,
-        choices=["fp16", "fp8", "bf16", "bf8"],
-        help="Data type",
+        choices=["fp16", "fp8", "bf16", "bf8", "fp8_fp8", "bf8_bf8"],
+        help="Data type. fp8 -> A=B=fp8, C=fp16 (default promotion). "
+        "fp8_fp8 -> A=B=C=fp8 (no promotion). Same for bf8/bf8_bf8.",
     )
     parser.add_argument(
         "--layout",
@@ -213,8 +214,9 @@ def main():
 
     args = parser.parse_args()
 
-    assert args.datatype in ["fp16", "bf16", "fp8", "bf8"], (
-        f"Invalid datatype string: {args.datatype} (supported datatypes are [fp16, bf16, fp8, and bf8])"
+    assert args.datatype in ["fp16", "bf16", "fp8", "bf8", "fp8_fp8", "bf8_bf8"], (
+        f"Invalid datatype string: {args.datatype} (supported datatypes are "
+        f"[fp16, bf16, fp8, bf8, fp8_fp8, bf8_bf8])"
     )
 
     layout_parts = args.layout.lower()

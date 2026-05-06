@@ -242,15 +242,22 @@ class GemmKernelBuilder:
                 return False
 
         # Determine data types for validation
-        a_datatype = self.datatype
-        b_datatype = self.datatype
-        c_datatype = self.datatype
+        # fp8_fp8 / bf8_bf8 -> A=B=C=fp8/bf8 (no fp16 promotion)
+        # fp8 / bf8         -> A=B=fp8/bf8, C=fp16 (default promotion)
+        if self.datatype in ["fp8_fp8", "bf8_bf8"]:
+            input_dt = "fp8" if self.datatype == "fp8_fp8" else "bf8"
+            a_datatype = input_dt
+            b_datatype = input_dt
+            c_datatype = input_dt
+        else:
+            a_datatype = self.datatype
+            b_datatype = self.datatype
+            c_datatype = self.datatype
+            # Special handling for certain data types
+            if self.datatype in ["fp8", "bf8"]:
+                c_datatype = "fp16"
 
         layout = self.layout
-
-        # Special handling for certain data types
-        if self.datatype in ["fp8", "bf8"]:
-            c_datatype = "fp16"
 
         # Use the comprehensive validation function
         return is_tile_config_valid(
@@ -428,10 +435,17 @@ class GemmKernelBuilder:
         # Determine accumulator type based on datatype
         acc_type = "float"
 
-        # Determine output type
-        c_type = self.datatype
-        if self.datatype in ["fp8", "bf8"]:
-            c_type = "fp16"
+        # Determine input/output types
+        # fp8_fp8 / bf8_bf8 -> A=B=C=fp8/bf8 (no promotion)
+        # fp8 / bf8         -> A=B=fp8/bf8, C=fp16 (default promotion)
+        if self.datatype in ["fp8_fp8", "bf8_bf8"]:
+            input_type = "fp8" if self.datatype == "fp8_fp8" else "bf8"
+            c_type = input_type
+        else:
+            input_type = self.datatype
+            c_type = self.datatype
+            if self.datatype in ["fp8", "bf8"]:
+                c_type = "fp16"
 
         # Assign layouts based on self.layout
         if self.kernel_name_prefix == "gemm_multi_d":
@@ -444,15 +458,15 @@ class GemmKernelBuilder:
             a_layout, b_layout, c_layout = get_abc_layouts(self.layout)
 
         instance_code = f"""
-using ADataType = {get_dtype_string(self.datatype)};
-using BDataType = {get_dtype_string(self.datatype)};
+using ADataType = {get_dtype_string(input_type)};
+using BDataType = {get_dtype_string(input_type)};
 using AccDataType = {acc_type};
 using CDataType = {get_dtype_string(c_type)};"""
 
         if self.kernel_name_prefix == "gemm_multi_d":
             instance_code += f"""
-using D0DataType = {get_dtype_string(self.datatype)};
-using D1DataType = {get_dtype_string(self.datatype)};
+using D0DataType = {get_dtype_string(input_type)};
+using D1DataType = {get_dtype_string(input_type)};
 using DsDataType = ck_tile::tuple<D0DataType, D1DataType>;"""
 
         instance_code += f"""
