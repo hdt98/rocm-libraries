@@ -114,8 +114,8 @@ struct GemmPipelineAgBgCrImplBase
     // PERFORMANCE NOTE: When `lds_tile_window` is a tile_window_with_static_lengths (bare
     // window), this reconstructs tile_window_with_static_distribution internally on every
     // call (~96 VALU for XOR coordinate computation). For hot loops where the window doesn't
-    // move, use MakeDistributedLdsStoreWindow() once before the loop, then call .store()
-    // directly on the returned window.
+    // move, use MakeDistributedLdsStoreWindow() once before the loop, then call
+    // LocalStore() on the returned window.
     //
     // When `lds_tile_window` is already a tile_window_with_static_distribution, the fast
     // path is used automatically (no reconstruction).
@@ -146,12 +146,13 @@ struct GemmPipelineAgBgCrImplBase
     //     constexpr auto dstr = decltype(my_tensor)::get_tile_distribution();
     //     auto fast_window = Base::MakeDistributedLdsStoreWindow(bare_window, dstr);
     //     // hot loop:
-    //     fast_window.store(tensor);   // no coord reconstruction
+    //     Base::LocalStore(fast_window, tensor);   // no coord reconstruction
     //
     // When NOT to use: if pre-computing the window coordinates would push VGPR usage
-    // above the budget (e.g. 512 VGPRs on gfx950), use LocalPrefill instead and accept
-    // the VALU cost. For double-buffered pipelines where only some windows fit in the
-    // VGPR budget, pre-compute the primary pair and use LocalPrefill for the alternate pair.
+    // above the budget (e.g. 512 VGPRs on gfx950), use LocalStoreWithCoordRecompute
+    // instead and accept the VALU cost. For double-buffered pipelines where only some
+    // windows fit in the VGPR budget, pre-compute the primary pair and use
+    // LocalStoreWithCoordRecompute for the alternate pair.
     template <typename CopyLdsWindow, typename TileDistribution>
     CK_TILE_DEVICE static auto MakeDistributedLdsStoreWindow(const CopyLdsWindow& copy_lds_window,
                                                              const TileDistribution& dstr)
@@ -160,6 +161,26 @@ struct GemmPipelineAgBgCrImplBase
                                 copy_lds_window.get_window_lengths(),
                                 copy_lds_window.get_window_origin(),
                                 dstr);
+    }
+
+    // Store a tile to LDS using a pre-computed distributed window. Coordinates are already
+    // computed, so this call does zero VALU for address setup. The window must have been
+    // created via MakeDistributedLdsStoreWindow.
+    template <typename DistributedWindow, typename SrcBlockTile>
+    CK_TILE_DEVICE void LocalStore(DistributedWindow& lds_tile_window,
+                                   const SrcBlockTile& src_block_tile) const
+    {
+        store_tile(lds_tile_window, src_block_tile);
+    }
+
+    // Store a tile to LDS, recomputing XOR coordinates on the fly (~96 VALU).
+    // Use this when VGPR budget is too tight to hold pre-computed coordinates,
+    // or for one-shot stores outside hot loops.
+    template <typename BareWindow, typename SrcBlockTile>
+    CK_TILE_DEVICE void LocalStoreWithCoordRecompute(BareWindow& lds_tile_window,
+                                                     const SrcBlockTile& src_block_tile) const
+    {
+        store_tile(lds_tile_window, src_block_tile);
     }
 
     template <typename DstBlockTile, typename SrcTileWindow, bool LoadTranspose = false>
