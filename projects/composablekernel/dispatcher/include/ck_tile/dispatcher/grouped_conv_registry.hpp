@@ -154,17 +154,29 @@ using GroupedConvKernelInstancePtr = std::shared_ptr<GroupedConvKernelInstance>;
 class GroupedConvKernelInstance
 {
     public:
-    using RunFn = std::function<float(const GroupedConvProblem&, void*)>;
+    using RunFn          = std::function<float(const GroupedConvProblem&, void*)>;
+    using IsSupportedFn  = std::function<bool(const GroupedConvProblem&)>;
 
     GroupedConvKernelInstance(const GroupedConvKernelKey& key,
                               const std::string& name,
-                              RunFn run_fn)
-        : key_(key), name_(name), run_fn_(std::move(run_fn))
+                              RunFn run_fn,
+                              IsSupportedFn is_supported_fn = nullptr)
+        : key_(key), name_(name), run_fn_(std::move(run_fn)),
+          is_supported_fn_(std::move(is_supported_fn))
     {
     }
 
     const GroupedConvKernelKey& key() const { return key_; }
     const std::string& name() const { return name_; }
+
+    // Check whether this kernel supports the given problem.
+    // Returns true if no IsSupportedFn was provided.
+    bool is_supported(const GroupedConvProblem& problem) const
+    {
+        if(is_supported_fn_)
+            return is_supported_fn_(problem);
+        return true;
+    }
 
     float run(const GroupedConvProblem& problem, void* stream = nullptr) const
     {
@@ -181,6 +193,7 @@ class GroupedConvKernelInstance
     GroupedConvKernelKey key_;
     std::string name_;
     RunFn run_fn_;
+    IsSupportedFn is_supported_fn_;
 };
 
 // =============================================================================

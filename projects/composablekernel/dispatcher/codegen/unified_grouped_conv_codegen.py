@@ -16,6 +16,7 @@ Based on the GEMM codegen pattern.
 """
 
 import argparse
+import json
 import logging
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
@@ -96,6 +97,7 @@ class GroupedConvTraitConfig(TraitConfigBase):
     split_image: bool = False
     explicit_gemm: bool = False
     two_stage: bool = False
+    specialization: str = "default"  # default, filter1x1_pad0, filter1x1_stride1_pad0, filter3x3
 
 
 # Backward compatibility alias
@@ -224,6 +226,10 @@ class GroupedConvKernelConfig:
         if tr.two_stage:
             name += "_2stage"
 
+        # Specialization suffix (only if non-default)
+        if hasattr(tr, "specialization") and tr.specialization != "default":
+            name += f"_{tr.specialization}"
+
         # Padding suffix (only if not all enabled)
         if not (tr.pad_m and tr.pad_n and tr.pad_k):
             name += f"_pad{int(tr.pad_m)}{int(tr.pad_n)}{int(tr.pad_k)}"
@@ -241,12 +247,15 @@ class GroupedConvKernelConfig:
         # Backward operations have stricter pipeline requirements:
         # - Backward weight: compv4/compv5 have transpose_tile2d issues
         # - Backward data: compv4 has get_length issues in bwd_data kernel
-        # Both backward operations ONLY support compv3 and mem pipelines
+        # Both backward operations support compv1/compv2/compv3/mem pipelines
         if self.variant in (
             GroupedConvVariant.BACKWARD_WEIGHT,
             GroupedConvVariant.BACKWARD_DATA,
         ):
-            if self.trait.pipeline not in ("compv3", "mem"):
+            if self.trait.pipeline not in (
+                "compv1", "compv2", "compv3", "compv4",
+                "basic_v1", "basic_v2", "mem",
+            ):
                 return False
 
         # Check warp configuration (from arch_specs)
@@ -284,6 +293,9 @@ class GroupedConvTypeMappings:
     # compv4/compv5/compv6/comp_async/basic_async_v1 use their own default policy.
     PIPELINE_TO_CK = {
         "basic_v1": "GemmPipeline::BASIC_V1",
+        "basic_v2": "GemmPipeline::BASIC_V2",
+        "compv1": "GemmPipeline::BASIC_V1",  # alias used by dispatcher/converter
+        "compv2": "GemmPipeline::BASIC_V2",  # alias used by dispatcher/converter
         "mem": "GemmPipeline::MEMORY",
         "compv3": "GemmPipeline::COMPUTE_V3",
         "compv4": "GemmPipeline::COMPUTE_V4",
@@ -437,7 +449,9 @@ struct {kernel_name}_Config {{
     static constexpr index_t NumWaveGroups = {config.num_wave_groups};
     static constexpr index_t NumGroupsToMerge = {tr.num_groups_to_merge};
     static constexpr bool EnableSplitImage = {str(tr.split_image).lower()};
-    static constexpr bool ExplicitGemm = {str(tr.explicit_gemm).lower()};
+    // ExplicitGemm requires pipeline v3+ (v1/v2 operator() doesn't support the 6-arg call
+    // used by BatchedGemmKernel/UniversalGemmKernel). Force false for v1/v2.
+    static constexpr bool ExplicitGemm = {str(tr.explicit_gemm and tr.pipeline not in ("compv1", "basic_v1", "compv2", "basic_v2")).lower()};
     static constexpr index_t NDimSpatial = {config.ndim_spatial};
     
     // Target architecture
@@ -491,6 +505,13 @@ struct {kernel_name}_Config {{
             direction_prefix = "FWD"
             launcher_alias = "SelectedConvKernelLauncher"
 
+        # Pipeline v1 uses 2-arg TailHandler(Run, has_hot_loop) with 1-arg Run lambda.
+        # All other pipelines use 3-arg TailHandler(Run, has_hot_loop, tail_num) with 2-arg Run lambda.
+        is_v1_pipeline = tr.pipeline in ("compv1", "basic_v1")
+        run_lambda_extra_param = "" if is_v1_pipeline else ", const auto tail_number_"
+        tail_handler_extra_arg = "" if is_v1_pipeline else ", tail_num"
+        tail_num_decl = "" if is_v1_pipeline else "const TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);"
+
         # Create valid C++ namespace name
         ns_name = "ns_" + kernel_name.replace("-", "_")
 
@@ -530,7 +551,7 @@ struct {kernel_name}_Launcher {{
         sequence<Config::M_Warp_Tile, Config::N_Warp_Tile, Config::K_Warp_Tile>>;
     
     // Convolution traits
-    static constexpr auto ConvSpec = ConvolutionSpecialization::Default;
+    static constexpr auto ConvSpec = {self._get_conv_specialization(config.trait)};
     using GroupedConvTraitsType = GroupedConvTraits<
         NDimSpatial, ConvSpec, InLayout, WeiLayout, tuple<>, OutLayout,
         Config::VectorSizeA, Config::VectorSizeB, Config::VectorSizeC,
@@ -574,12 +595,12 @@ struct {kernel_name}_Launcher {{
         const index_t K_split = (gemm_k + k_grain - 1) / k_grain * Config::K_Tile;
         const index_t num_loop = TilePartitioner::GetLoopNum(K_split);
         const bool has_hot_loop = BaseGemmPipeline::BlockHasHotloop(num_loop);
-        const TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
-        
+        {tail_num_decl}
+
         float ave_time{{0}};
-        
+
         constexpr auto scheduler = Config::Scheduler;
-        
+
         using UniversalGemmProblem = UniversalGemmPipelineProblem<
             {a_dtype}, {b_dtype}, AccDataType, GemmShape, GemmUniversalTraits,
             scheduler,
@@ -605,25 +626,26 @@ struct {kernel_name}_Launcher {{
         using Kernel = {kernel_type}<
             GroupedConvTraitsType, TilePartitioner, GemmPipeline, ConvEpilogue>;
         
-        const auto Run = [&](const auto has_hot_loop_, const auto tail_number_) {{
+        const auto Run = [&](const auto has_hot_loop_{run_lambda_extra_param}) {{
             auto kargs = Kernel::MakeKernelArgs(args);
-            
+
             if (!Kernel::IsSupportedArgument(kargs)) {{
                 throw std::runtime_error("Arguments not supported for grouped conv kernel");
             }}
-            
+
             const dim3 grids = Kernel::GridSize(kargs);
             const dim3 blocks = Kernel::BlockSize();
-            
-            ave_time = launch_kernel(s, make_kernel<Config::kBlockPerCu>(
-                Kernel{{}}, grids, blocks, 0, kargs));
-            
+
+            {self._get_launch_code()}
+
             return ave_time;
         }};
-        
-        BaseGemmPipeline::TailHandler(Run, has_hot_loop, tail_num);
+
+        BaseGemmPipeline::TailHandler(Run, has_hot_loop{tail_handler_extra_arg});
         return ave_time;
     }}
+
+    {self._get_is_supported_code(config, host_args_type, kernel_type, a_dtype, b_dtype, c_dtype)}
 }};
 
 // Launcher alias for tile_engine compatibility
@@ -645,12 +667,27 @@ constexpr const char* CONV_{direction_prefix}_KERNEL_NAME = {ns_name}::CONV_{dir
     # as a second template parameter for conv-specific LDS layout.
     # (from conv_configs.hpp PipelineTypeTraits -- basic_v1/mem/compv3)
     # CompV4/V5/V6/comp_async/basic_async_v1 use their own default policies.
-    _CONV_POLICY_PIPELINES = {"basic_v1", "mem", "compv3"}
+    _CONV_POLICY_PIPELINES = {"basic_v1", "basic_v2", "compv1", "compv2", "mem", "compv3"}
+
+    _SPECIALIZATION_TO_CK = {
+        "default": "ConvolutionSpecialization::Default",
+        "filter1x1_pad0": "ConvolutionSpecialization::Filter1x1Pad0",
+        "filter1x1_stride1_pad0": "ConvolutionSpecialization::Filter1x1Stride1Pad0",
+        "filter3x3": "ConvolutionSpecialization::Filter3x3",
+    }
+
+    def _get_conv_specialization(self, trait) -> str:
+        """Get C++ ConvolutionSpecialization enum from trait."""
+        spec = getattr(trait, "specialization", "default")
+        return self._SPECIALIZATION_TO_CK.get(spec, "ConvolutionSpecialization::Default")
 
     def _get_pipeline(self, pipeline: str) -> str:
         """Get pipeline class name."""
         pipelines = {
             "basic_v1": "GemmPipelineAGmemBGmemCRegV1",
+            "basic_v2": "GemmPipelineAGmemBGmemCRegV2",
+            "compv1": "GemmPipelineAGmemBGmemCRegV1",  # alias
+            "compv2": "GemmPipelineAGmemBGmemCRegV2",  # alias
             "mem": "GemmPipelineAgBgCrMem",
             "compv3": "GemmPipelineAgBgCrCompV3",
             "compv4": "GemmPipelineAgBgCrCompV4",
@@ -680,6 +717,9 @@ constexpr const char* CONV_{direction_prefix}_KERNEL_NAME = {ns_name}::CONV_{dir
         """
         pipelines = {
             "basic_v1": "BaseGemmPipelineAGmemBGmemCRegV1",
+            "basic_v2": "BaseGemmPipelineAGmemBGmemCRegV2",
+            "compv1": "BaseGemmPipelineAGmemBGmemCRegV1",  # alias
+            "compv2": "BaseGemmPipelineAGmemBGmemCRegV2",  # alias
             "mem": "BaseGemmPipelineAgBgCrMem",
             "compv3": "BaseGemmPipelineAgBgCrCompV3",
             "compv4": "BaseGemmPipelineAgBgCrCompV4",
@@ -689,6 +729,93 @@ constexpr const char* CONV_{direction_prefix}_KERNEL_NAME = {ns_name}::CONV_{dir
             "basic_async_v1": "BaseGemmPipelineAGmemBGmemCRegV1",
         }
         return pipelines.get(pipeline, "BaseGemmPipelineAgBgCrCompV3")
+
+    def _get_is_supported_code(self, config, host_args_type, kernel_type, a_dtype, b_dtype, c_dtype) -> str:
+        """Generate the is_supported() static method for the launcher.
+
+        Constructs the same Kernel type as launch() and calls
+        MakeKernelArgs + IsSupportedArgument without actually launching.
+        """
+        tr = config.trait
+        pipeline_template = self._get_pipeline_template_args(tr.pipeline, "UniversalGemmProblem")
+
+        return f"""static bool is_supported(const ck_tile::conv::ConvParam& conv_param, int k_batch) {{
+        {host_args_type} args(conv_param,
+            nullptr, nullptr, {{}}, nullptr, k_batch);
+
+        constexpr auto scheduler = Config::Scheduler;
+
+        using UniversalGemmProblem = UniversalGemmPipelineProblem<
+            {a_dtype}, {b_dtype}, AccDataType, GemmShape, GemmUniversalTraits,
+            scheduler,
+            element_wise::PassThrough, element_wise::PassThrough, {c_dtype},
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeA, GroupedConvTraitsType::VectorSizeB>;
+
+        using GemmPipeline = {pipeline_template};
+
+        using ConvEpilogue = CShuffleEpilogue<CShuffleEpilogueProblem<
+            {a_dtype}, {b_dtype}, tuple<>, AccDataType, {c_dtype},
+            typename GroupedConvTraitsType::ImplicitGemmDsLayout,
+            typename GroupedConvTraitsType::FixedGemmParams::ELayout,
+            element_wise::PassThrough,
+            TilePartitioner::MPerBlock, TilePartitioner::NPerBlock,
+            Config::M_Warp, Config::N_Warp, Config::M_Warp_Tile,
+            Config::N_Warp_Tile, Config::K_Warp_Tile,
+            GroupedConvTraitsType::FixedGemmParams::TransposeC,
+            Config::NumWaveGroups,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            Config::VectorSizeC, 1, Config::DoubleSmemBuffer>>;
+
+        using Kernel = {kernel_type}<
+            GroupedConvTraitsType, TilePartitioner, GemmPipeline, ConvEpilogue>;
+
+        auto kargs = Kernel::MakeKernelArgs(args);
+        return Kernel::IsSupportedArgument(kargs);
+    }}"""
+
+    def _get_launch_code(self) -> str:
+        """Generate the kernel launch code for the non-two-stage launcher.
+
+        For bwd_weight with split-K, we need to zero the output buffer before
+        each kernel launch since atomic accumulation is used.
+        For bwd_data with split-K, we similarly zero the dX buffer.
+        For forward, no zeroing is needed.
+        """
+        kernel_launch = (
+            "make_kernel<Config::kBlockPerCu>(Kernel{}, grids, blocks, 0, kargs)"
+        )
+        if self.variant == GroupedConvVariant.BACKWARD_WEIGHT:
+            return f"""// Compute zeroing size for split-K atomic accumulation
+            const std::size_t zeroing_size = std::accumulate(
+                std::begin(kargs.wei_g_k_c_xs_lengths.data),
+                std::end(kargs.wei_g_k_c_xs_lengths.data),
+                std::size_t{{1}}, std::multiplies<std::size_t>());
+            auto preprocess = [&]() {{
+                if(kargs.k_batch > 1) {{
+                    hip_check_error(hipMemsetAsync(
+                        kargs.wei_ptr, 0,
+                        zeroing_size * sizeof(WeiDataType),
+                        s.stream_id_));
+                }}
+            }};
+            ave_time = launch_kernel_time_mask(s, preprocess, {kernel_launch});"""
+        elif self.variant == GroupedConvVariant.BACKWARD_DATA:
+            return f"""// Compute zeroing size for split-K atomic accumulation
+            const std::size_t zeroing_size = std::accumulate(
+                std::begin(kargs.in_g_n_c_wis_lengths.data),
+                std::end(kargs.in_g_n_c_wis_lengths.data),
+                std::size_t{{1}}, std::multiplies<std::size_t>());
+            auto preprocess = [&]() {{
+                hip_check_error(hipMemsetAsync(
+                    kargs.in_ptr, 0,
+                    zeroing_size * sizeof(InDataType),
+                    s.stream_id_));
+            }};
+            ave_time = launch_kernel_time_mask(s, preprocess, {kernel_launch});"""
+        else:
+            return f"ave_time = launch_kernel(s, {kernel_launch});"
+
 
     def _kernel_instance_two_stage(
         self, config: GroupedConvKernelConfig, kernel_name: str
@@ -730,7 +857,7 @@ struct {kernel_name}_Launcher {{
         sequence<Config::M_Warp, Config::N_Warp, Config::K_Warp>,
         sequence<Config::M_Warp_Tile, Config::N_Warp_Tile, Config::K_Warp_Tile>>;
 
-    static constexpr auto ConvSpec = ConvolutionSpecialization::Default;
+    static constexpr auto ConvSpec = {self._get_conv_specialization(config.trait)};
     using GroupedConvTraitsType = GroupedConvTraits<
         NDimSpatial, ConvSpec, InLayout, WeiLayout, tuple<>, OutLayout,
         Config::VectorSizeA, Config::VectorSizeB, VectorSizeC_TwoStage,
@@ -764,16 +891,6 @@ struct {kernel_name}_Launcher {{
     using BaseGemmPipeline = {self._get_base_pipeline(tr.pipeline)}<GemmPipelineProblem>;
 
     static float launch(const GroupedConvBwdWeightHostArgs& args, const stream_config& s) {{
-        const index_t gemm_k = args.N_ * std::accumulate(
-            args.output_spatial_lengths_.begin(), args.output_spatial_lengths_.end(),
-            1, std::multiplies<index_t>());
-
-        const index_t k_grain = args.k_batch * Config::K_Tile;
-        const index_t K_split = (gemm_k + k_grain - 1) / k_grain * Config::K_Tile;
-        const index_t num_loop = TilePartitioner::GetLoopNum(K_split);
-        const bool has_hot_loop = BaseGemmPipeline::BlockHasHotloop(num_loop);
-        const TailNumber tail_num = BaseGemmPipeline::GetBlockLoopTailNum(num_loop);
-
         float ave_time{{0}};
 
         constexpr auto scheduler = Config::Scheduler;
@@ -868,6 +985,42 @@ struct {kernel_name}_Launcher {{
 
         return ave_time;
     }}
+
+    static bool is_supported(const ck_tile::conv::ConvParam& conv_param, int k_batch) {{
+        GroupedConvBwdWeightHostArgs args(conv_param,
+            nullptr, nullptr, {{}}, nullptr, k_batch);
+
+        constexpr auto scheduler = Config::Scheduler;
+
+        using UniversalGemmProblem = UniversalGemmPipelineProblem<
+            OutDataType, InDataType, AccDataType, GemmShape, GemmUniversalTraits,
+            scheduler,
+            element_wise::PassThrough, element_wise::PassThrough, WeiDataType,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeA, GroupedConvTraitsType::VectorSizeB>;
+
+        using GemmPipeline = {self._get_pipeline_template_args(tr.pipeline, "UniversalGemmProblem")};
+
+        // Epilogue writes to fp32 workspace (not fp16 output)
+        using ConvEpilogue = CShuffleEpilogue<CShuffleEpilogueProblem<
+            OutDataType, InDataType, tuple<>, AccDataType, WorkspaceDataType,
+            typename GroupedConvTraitsType::ImplicitGemmDsLayout,
+            typename GroupedConvTraitsType::FixedGemmParams::ELayout,
+            element_wise::PassThrough,
+            TilePartitioner::MPerBlock, TilePartitioner::NPerBlock,
+            Config::M_Warp, Config::N_Warp, Config::M_Warp_Tile,
+            Config::N_Warp_Tile, Config::K_Warp_Tile,
+            GroupedConvTraitsType::FixedGemmParams::TransposeC,
+            Config::NumWaveGroups,
+            GroupedConvTraitsType::FixedGemmParams::FixedVectorSize,
+            GroupedConvTraitsType::VectorSizeC>>;
+
+        using Kernel = GroupedConvolutionBackwardWeightKernel<
+            GroupedConvTraitsType, TilePartitioner, GemmPipeline, ConvEpilogue>;
+
+        auto kargs = Kernel::MakeKernelArgs(args);
+        return Kernel::IsSupportedArgument(kargs);
+    }}
 }};
 
 using {launcher_alias} = {kernel_name}_Launcher;
@@ -894,6 +1047,10 @@ class GroupedConvDispatcherWrapperGenerator:
     # Static mappings for pipeline and scheduler enum names (matches kernel_key.hpp)
     PIPELINE_TO_DISPATCHER = {
         "mem": "Pipeline::Mem",
+        "compv1": "Pipeline::CompV1",
+        "compv2": "Pipeline::CompV2",
+        "basic_v1": "Pipeline::CompV1",
+        "basic_v2": "Pipeline::CompV2",
         "compv3": "Pipeline::CompV3",
         "compv4": "Pipeline::CompV4",
         "compv5": "Pipeline::CompV5",
@@ -1014,6 +1171,105 @@ using {launcher_alias} = {kernel_name}_Launcher;
 # ============================================================================
 # Configuration Parser
 # ============================================================================
+
+
+def load_configs_from_json(
+    config_path: Path,
+    arch: str = "gfx942",
+    instance_id: Optional[int] = None,
+) -> List[GroupedConvKernelConfig]:
+    """Load kernel configurations from a JSON config file.
+
+    Args:
+        config_path: Path to JSON config file (as produced by convert_builder_configs.py)
+        arch: Target GPU architecture
+        instance_id: If specified, load only the instance with this ID
+
+    Returns:
+        List of GroupedConvKernelConfig objects
+    """
+    with open(config_path, "r") as f:
+        data = json.load(f)
+
+    variant_map = {
+        "forward": GroupedConvVariant.FORWARD,
+        "fwd": GroupedConvVariant.FORWARD,
+        "bwd_data": GroupedConvVariant.BACKWARD_DATA,
+        "bwd_weight": GroupedConvVariant.BACKWARD_WEIGHT,
+    }
+    variant = variant_map.get(data["variant"])
+    if variant is None:
+        raise ValueError(f"Unknown variant: {data['variant']}")
+
+    ndim_spatial = data["ndim_spatial"]
+    layout = data["layout"]
+    datatype = data["datatype"]
+
+    instances = data["instances"]
+    if instance_id is not None:
+        instances = [inst for inst in instances if inst["id"] == instance_id]
+        if not instances:
+            raise ValueError(f"Instance ID {instance_id} not found in {config_path}")
+
+    configs = []
+    for inst in instances:
+        # Map specialization to pipeline constraints
+        # Specializations like filter1x1_stride1_pad0 don't change the pipeline config
+        # but are tracked in the trait for kernel naming and runtime checks
+
+        trait = GroupedConvTraitConfig(
+            pipeline=inst["pipeline"],
+            scheduler=inst["scheduler"],
+            epilogue=inst["epilogue"],
+            pad_m=True,
+            pad_n=True,
+            pad_k=True,
+            double_smem_buffer=inst.get("double_smem_buffer", False),
+            num_groups_to_merge=inst.get("num_groups_to_merge", 1),
+            split_image=inst.get("split_image", False),
+            explicit_gemm=inst.get("explicit_gemm", False),
+            two_stage=inst.get("two_stage", False),
+            specialization=inst.get("specialization", "default"),
+        )
+
+        # Skip v2 pipeline for bwd_weight — the CK Tile GroupedConvolutionBackwardWeightKernel
+        # doesn't support v2 pipeline (GemmPipelineAGmemBGmemCRegV2 has incompatible operator()
+        # signatures and static_asserts for the block window dimensions used in bwd_weight).
+        # The builder used old CK device operations for v2 bwd_weight, not CK Tile kernels.
+        if variant == GroupedConvVariant.BACKWARD_WEIGHT and trait.pipeline in ("compv2", "basic_v2"):
+            log.info(f"Skipping instance {inst['id']}: v2 pipeline not supported for bwd_weight in CK Tile")
+            continue
+
+        config = GroupedConvKernelConfig(
+            tile=TileConfig(
+                tile_m=inst["tile_m"],
+                tile_n=inst["tile_n"],
+                tile_k=inst["tile_k"],
+                warp_m=inst["warp_m"],
+                warp_n=inst["warp_n"],
+                warp_k=inst["warp_k"],
+                warp_tile_m=inst["warp_tile_m"],
+                warp_tile_n=inst["warp_tile_n"],
+                warp_tile_k=inst["warp_tile_k"],
+            ),
+            trait=trait,
+            variant=variant,
+            ndim_spatial=ndim_spatial,
+            arch=arch,
+            layout=layout,
+            vector_size_a=inst["vector_size_a"],
+            vector_size_b=inst["vector_size_b"],
+            vector_size_c=inst["vector_size_c"],
+            block_per_cu=inst.get("block_per_cu", 1),
+            num_wave_groups=inst.get("num_wave_groups", 1),
+        )
+        configs.append(config)
+
+    log.info(
+        f"Loaded {len(configs)} configs from {config_path} "
+        f"(variant={data['variant']}, layout={layout}, dtype={datatype})"
+    )
+    return configs
 
 
 def get_default_configs(
@@ -1596,6 +1852,22 @@ def main():
         help="List configurations without generating",
     )
 
+    # JSON config file (from convert_builder_configs.py)
+    parser.add_argument(
+        "--config-file",
+        type=Path,
+        default=None,
+        help="Path to JSON config file (from convert_builder_configs.py). "
+             "Overrides --variant, --ndim, and individual tile/pipeline args.",
+    )
+    parser.add_argument(
+        "--instance-id",
+        type=int,
+        default=None,
+        help="Generate only the instance with this ID from the config file. "
+             "Requires --config-file.",
+    )
+
     # Individual kernel configuration (when not using predefined configs)
     parser.add_argument("--tile-m", type=int, help="Block tile M dimension")
     parser.add_argument("--tile-n", type=int, help="Block tile N dimension")
@@ -1656,12 +1928,20 @@ def main():
     }
     requested_variants = [variant_map[v] for v in args.variant]
 
-    # Check if user specified custom configuration
-    custom_config = (
-        args.tile_m is not None or args.tile_n is not None or args.pipeline is not None
-    )
+    # Validate --instance-id requires --config-file
+    if args.instance_id is not None and args.config_file is None:
+        parser.error("--instance-id requires --config-file")
 
-    if custom_config:
+    # Check if user specified a JSON config file
+    if args.config_file is not None:
+        filtered_configs = load_configs_from_json(
+            args.config_file, arch=args.arch, instance_id=args.instance_id
+        )
+        # Extract datatype from JSON config for code generation
+        with open(args.config_file, "r") as f:
+            config_data = json.load(f)
+        args.datatype = [config_data["datatype"]]
+    elif args.tile_m is not None or args.tile_n is not None or args.pipeline is not None:
         # Build custom config from CLI arguments
         tile = TileConfig(
             tile_m=args.tile_m or 128,
@@ -1719,7 +1999,7 @@ def main():
         print(f"  Spatial dims: {args.ndim}")
         print(f"\nConfigurations ({len(filtered_configs)}):")
         for cfg in filtered_configs:
-            print(f"  - {cfg.name('fp16')}")
+            print(f"  - {cfg.name(args.datatype[0])}")
             print(f"      Tile: {cfg.tile.tile_m}x{cfg.tile.tile_n}x{cfg.tile.tile_k}")
             print(f"      Warp: {cfg.tile.warp_m}x{cfg.tile.warp_n}x{cfg.tile.warp_k}")
             print(
@@ -1733,11 +2013,11 @@ def main():
             )
         return
 
-    # Generate
+    # Generate (disable arch filter when using pre-validated JSON configs)
     codegen = UnifiedGroupedConvCodegen(
         output_dir=args.output,
         gpu_target=args.arch,
-        enable_arch_filter=True,
+        enable_arch_filter=(args.config_file is None),
     )
     results = codegen.generate_all(
         configs=filtered_configs, datatypes=args.datatype, parallel=True
