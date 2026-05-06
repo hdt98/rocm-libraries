@@ -1,0 +1,356 @@
+################################################################################
+#
+# Copyright (C) 2025 Advanced Micro Devices, Inc. All rights reserved.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+################################################################################
+
+import pytest
+from unittest.mock import patch
+
+pytestmark = pytest.mark.unit
+
+from Tensile.TensileClientConfig import (
+    getGlobalParams,
+    getProblemDict,
+    getSizeList,
+    parseConfig
+)
+
+
+class TestGetGlobalParams:
+    """Tests for getGlobalParams function."""
+
+    def test_extracts_global_params_from_config(self):
+        """Test extracts GlobalParameters when present."""
+        config = {
+            "GlobalParameters": {
+                "MinimumRequiredVersion": "4.0.0",
+                "PrintLevel": 1
+            }
+        }
+
+        result = getGlobalParams(config)
+
+        assert result == config["GlobalParameters"]
+        assert result["MinimumRequiredVersion"] == "4.0.0"
+        assert result["PrintLevel"] == 1
+
+    def test_returns_none_when_no_global_params(self):
+        """Test returns None when GlobalParameters not in config."""
+        config = {
+            "BenchmarkProblems": [],
+            "OtherKey": "value"
+        }
+
+        result = getGlobalParams(config)
+
+        assert result is None
+
+    def test_handles_none_config(self):
+        """Test handles None config gracefully."""
+        result = getGlobalParams(None)
+        assert result is None
+
+    def test_handles_empty_dict(self):
+        """Test handles empty dict config."""
+        result = getGlobalParams({})
+        assert result is None
+
+    def test_handles_non_dict_config(self):
+        """Test handles non-dict config (TypeError)."""
+        result = getGlobalParams([1, 2, 3])
+        assert result is None
+
+    def test_handles_string_config(self):
+        """Test handles string config."""
+        result = getGlobalParams("not a dict")
+        assert result is None
+
+
+class TestGetProblemDict:
+    """Tests for getProblemDict function."""
+
+    @patch('Tensile.TensileClientConfig.printWarning')
+    def test_extracts_from_benchmark_problems(self, mock_warning):
+        """Test extracts problem dict from BenchmarkProblems."""
+        problem_dict = {"OperationType": "GEMM", "DataType": "s"}
+        config = {
+            "BenchmarkProblems": [
+                [problem_dict, {"other": "data"}]
+            ]
+        }
+
+        result = getProblemDict(config)
+
+        assert result == problem_dict
+        mock_warning.assert_not_called()
+
+    @patch('Tensile.TensileClientConfig.printWarning')
+    def test_warns_on_multiple_benchmark_problems(self, mock_warning):
+        """Test warns when multiple BenchmarkProblems exist."""
+        problem1 = {"OperationType": "GEMM"}
+        problem2 = {"OperationType": "Other"}
+        config = {
+            "BenchmarkProblems": [
+                [problem1, {}],
+                [problem2, {}]
+            ]
+        }
+
+        result = getProblemDict(config)
+
+        assert result == problem1  # Returns first
+        mock_warning.assert_called_once()
+        assert "More than one" in str(mock_warning.call_args)
+
+    def test_extracts_from_problem_type_key(self):
+        """Test extracts from ProblemType key (solution selection format)."""
+        problem_dict = {"OperationType": "GEMM", "DataType": "d"}
+        config = {
+            "ProblemType": problem_dict
+        }
+
+        result = getProblemDict(config)
+
+        assert result == problem_dict
+
+    def test_prefers_benchmark_problems_over_problem_type(self):
+        """Test BenchmarkProblems takes precedence over ProblemType."""
+        benchmark_problem = {"OperationType": "GEMM", "Source": "benchmark"}
+        problem_type = {"OperationType": "GEMM", "Source": "problemtype"}
+        config = {
+            "BenchmarkProblems": [[benchmark_problem, {}]],
+            "ProblemType": problem_type
+        }
+
+        result = getProblemDict(config)
+
+        assert result == benchmark_problem
+        assert result["Source"] == "benchmark"
+
+    def test_returns_none_when_no_problem_dict(self):
+        """Test returns None when no problem dict found."""
+        config = {
+            "GlobalParameters": {},
+            "OtherKey": "value"
+        }
+
+        result = getProblemDict(config)
+
+        assert result is None
+
+    def test_handles_none_config(self):
+        """Test handles None config."""
+        result = getProblemDict(None)
+        assert result is None
+
+    def test_handles_empty_dict(self):
+        """Test handles empty dict config."""
+        result = getProblemDict({})
+        assert result is None
+
+    def test_handles_malformed_benchmark_problems(self):
+        """Test handles malformed BenchmarkProblems structure."""
+        config = {
+            "BenchmarkProblems": "not a list"
+        }
+
+        result = getProblemDict(config)
+
+        assert result is None
+
+
+class TestGetSizeList:
+    """Tests for getSizeList function."""
+
+    def test_extracts_from_benchmark_final_parameters(self):
+        """Test extracts size list from BenchmarkFinalParameters."""
+        size_list = [{"Exact": [128, 128, 128]}, {"Exact": [256, 256, 256]}]
+        config = {
+            "BenchmarkProblems": [
+                [{}, {
+                    "BenchmarkFinalParameters": [
+                        {"ProblemSizes": size_list}
+                    ]
+                }]
+            ]
+        }
+
+        result = getSizeList(config)
+
+        assert result == size_list
+
+    def test_recognizes_config_as_size_list_exact(self):
+        """Test recognizes whole config as size list (Exact format)."""
+        size_list = [
+            {"Exact": [128, 128, 128]},
+            {"Exact": [256, 256, 256]}
+        ]
+
+        result = getSizeList(size_list)
+
+        assert result == size_list
+
+    def test_recognizes_config_as_size_list_range(self):
+        """Test recognizes whole config as size list (Range format)."""
+        size_list = [
+            {"Range": [[128, 256, 64], [128], [128]]},
+            {"Range": [[512, 1024, 128], [512], [512]]}
+        ]
+
+        result = getSizeList(size_list)
+
+        assert result == size_list
+
+    def test_recognizes_mixed_exact_range_size_list(self):
+        """Test recognizes mixed Exact/Range size list."""
+        size_list = [
+            {"Exact": [128, 128, 128]},
+            {"Range": [[256, 512, 64], [256], [256]]}
+        ]
+
+        result = getSizeList(size_list)
+
+        assert result == size_list
+
+    def test_rejects_invalid_size_list_missing_keys(self):
+        """Test rejects list without Exact or Range keys."""
+        invalid_list = [
+            {"Invalid": [128, 128, 128]},
+            {"Exact": [256, 256, 256]}
+        ]
+
+        result = getSizeList(invalid_list)
+
+        assert result is None
+
+    def test_rejects_non_dict_items_in_list(self):
+        """Test rejects list with non-dict items."""
+        invalid_list = [
+            {"Exact": [128, 128, 128]},
+            "not a dict"
+        ]
+
+        result = getSizeList(invalid_list)
+
+        assert result is None
+
+    def test_returns_none_for_non_list_config(self):
+        """Test returns None for non-list config without BenchmarkProblems."""
+        config = {
+            "GlobalParameters": {},
+            "ProblemType": {}
+        }
+
+        result = getSizeList(config)
+
+        assert result is None
+
+    def test_handles_none_config(self):
+        """Test handles None config."""
+        result = getSizeList(None)
+        assert result is None
+
+    def test_handles_empty_list(self):
+        """Test handles empty list."""
+        result = getSizeList([])
+        # Empty list doesn't match size list pattern
+        assert result is None
+
+    def test_handles_malformed_benchmark_structure(self):
+        """Test handles malformed benchmark structure."""
+        config = {
+            "BenchmarkProblems": "not a list"
+        }
+
+        result = getSizeList(config)
+
+        assert result is None
+
+
+class TestParseConfig:
+    """Tests for parseConfig function."""
+
+    def test_parses_complete_config(self):
+        """Test parses config with all three components."""
+        global_params = {"MinimumRequiredVersion": "4.0.0"}
+        problem_dict = {"OperationType": "GEMM"}
+        size_list = [{"Exact": [128, 128, 128]}]
+
+        config = {
+            "GlobalParameters": global_params,
+            "ProblemType": problem_dict
+        }
+        # Pass size_list as the config itself
+        config_with_sizes = {
+            "GlobalParameters": global_params,
+            "BenchmarkProblems": [
+                [problem_dict, {
+                    "BenchmarkFinalParameters": [
+                        {"ProblemSizes": size_list}
+                    ]
+                }]
+            ]
+        }
+
+        (gp, pd, sl) = parseConfig(config_with_sizes)
+
+        assert gp == global_params
+        assert pd == problem_dict
+        assert sl == size_list
+
+    def test_parses_partial_config(self):
+        """Test parses config with only some components."""
+        problem_dict = {"OperationType": "GEMM"}
+        config = {
+            "ProblemType": problem_dict
+        }
+
+        (gp, pd, sl) = parseConfig(config)
+
+        assert gp is None
+        assert pd == problem_dict
+        assert sl is None
+
+    def test_parses_empty_config(self):
+        """Test parses empty config."""
+        (gp, pd, sl) = parseConfig({})
+
+        assert gp is None
+        assert pd is None
+        assert sl is None
+
+    def test_parses_size_list_only_config(self):
+        """Test parses config that is just a size list."""
+        size_list = [{"Exact": [128, 128, 128]}]
+
+        (gp, pd, sl) = parseConfig(size_list)
+
+        assert gp is None
+        assert pd is None
+        assert sl == size_list
+
+    def test_returns_tuple_of_three(self):
+        """Test always returns tuple of exactly 3 elements."""
+        result = parseConfig({})
+
+        assert isinstance(result, tuple)
+        assert len(result) == 3
