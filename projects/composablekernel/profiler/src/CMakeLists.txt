@@ -156,6 +156,95 @@ if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
 endif()
 
 
+# =============================================================================
+# CK Tile Dispatcher: Generate and compile CK Tile conv kernels
+# =============================================================================
+if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
+  find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
+  # Extract first GPU target for codegen
+  string(REPLACE ";" " " _GPU_TARGETS_SPACE "${GPU_TARGETS}")
+  string(REPLACE " " ";" _GPU_TARGETS_LIST "${_GPU_TARGETS_SPACE}")
+  list(GET _GPU_TARGETS_LIST 0 _GPU_TARGET)
+
+  set(DISPATCHER_DIR "${PROJECT_SOURCE_DIR}/dispatcher")
+  set(DISPATCHER_CODEGEN "${DISPATCHER_DIR}/codegen/unified_grouped_conv_codegen.py")
+  set(DISPATCHER_CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/backward_weight")
+  set(DISPATCHER_GEN_SCRIPT "${DISPATCHER_DIR}/scripts/generate_profiler_bwd_weight_kernels.py")
+  set(DISPATCHER_KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_weight_kernels")
+  set(DISPATCHER_CONFIG_SET "tests" CACHE STRING "Dispatcher config set: tests or profiler")
+
+  if(NOT EXISTS ${DISPATCHER_KERNEL_DIR}/register_all_grouped_conv_kernels.hpp)
+    file(MAKE_DIRECTORY ${DISPATCHER_KERNEL_DIR})
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} ${DISPATCHER_GEN_SCRIPT}
+              --config-dir ${DISPATCHER_CONFIG_DIR}
+              --codegen ${DISPATCHER_CODEGEN}
+              --output-dir ${DISPATCHER_KERNEL_DIR}
+              --arch ${_GPU_TARGET}
+              --config-set ${DISPATCHER_CONFIG_SET}
+      RESULT_VARIABLE ret
+      OUTPUT_VARIABLE output
+      ERROR_VARIABLE error
+      WORKING_DIRECTORY ${DISPATCHER_DIR}/codegen
+    )
+    if(NOT ret EQUAL 0)
+      message(FATAL_ERROR "Dispatcher kernel generation failed.\nReturn: ${ret}\nOutput: ${output}\nError: ${error}")
+    endif()
+    message(STATUS "Dispatcher bwd_weight kernels generated: ${output}")
+  endif()
+
+  # Collect generated kernel .hpp files and create .cpp wrappers for compilation
+  file(GLOB DISPATCHER_KERNEL_HEADERS "${DISPATCHER_KERNEL_DIR}/grouped_conv_bwd_weight_*.hpp")
+  set(DISPATCHER_KERNEL_SOURCES "")
+  foreach(HEADER ${DISPATCHER_KERNEL_HEADERS})
+    get_filename_component(STEM ${HEADER} NAME_WE)
+    set(WRAPPER_CPP "${DISPATCHER_KERNEL_DIR}/${STEM}.cpp")
+    if(NOT EXISTS ${WRAPPER_CPP})
+      file(WRITE ${WRAPPER_CPP} "// Auto-generated wrapper\n#include \"${STEM}.hpp\"\n")
+    endif()
+    list(APPEND DISPATCHER_KERNEL_SOURCES ${WRAPPER_CPP})
+  endforeach()
+
+  if(DISPATCHER_KERNEL_SOURCES)
+    add_library(device_grouped_conv_bwd_weight_dispatcher_instances OBJECT ${DISPATCHER_KERNEL_SOURCES})
+    target_include_directories(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE
+      ${PROJECT_SOURCE_DIR}/include
+      ${PROJECT_SOURCE_DIR}/dispatcher/include
+      ${DISPATCHER_KERNEL_DIR}
+    )
+    target_compile_options(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE
+      -DCK_TILE_FLOAT_TO_BFLOAT16_DEFAULT=0
+      -mllvm -enable-noalias-to-md-conversion=0
+      -Wno-undefined-func-template
+      -Wno-float-equal
+      -Wno-header-hygiene
+      -Wno-unused-parameter
+      -Wno-missing-variable-declarations
+    )
+    if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
+      target_compile_options(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE --offload-compress)
+    endif()
+    set_target_properties(device_grouped_conv_bwd_weight_dispatcher_instances PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    message(STATUS "Dispatcher bwd_weight instances: ${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_weight_kernels (${DISPATCHER_CONFIG_SET})")
+  endif()
+
+  # Add include path and link dispatcher kernel objects to profiler
+  target_include_directories(${PROFILER_EXECUTABLE} PRIVATE
+    ${PROJECT_SOURCE_DIR}/dispatcher/include
+    ${DISPATCHER_KERNEL_DIR}
+  )
+  target_compile_options(${PROFILER_EXECUTABLE} PRIVATE
+    -Wno-undefined-func-template
+    -Wno-float-equal
+    -Wno-ctad-maybe-unsupported
+    -Wno-old-style-cast
+  )
+  if(TARGET device_grouped_conv_bwd_weight_dispatcher_instances)
+    target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE device_grouped_conv_bwd_weight_dispatcher_instances)
+  endif()
+endif()
+
 set(DEVICE_INSTANCES "")
 list(APPEND DEVICE_INSTANCES device_gemm_instance)
 list(APPEND DEVICE_INSTANCES device_normalization_fwd_instance)
@@ -275,7 +364,9 @@ endif()
 if(SUPPORTED_GPU_TARGETS MATCHES "gfx9")
   if(CK_EXPERIMENTAL_BUILDER)
     list(APPEND DEVICE_INSTANCES device_grouped_conv_fwd_tile_instances)
-    list(APPEND DEVICE_INSTANCES device_grouped_conv_bwd_weight_tile_instances)
+    if(NOT CK_TILE_DISPATCHER)
+      list(APPEND DEVICE_INSTANCES device_grouped_conv_bwd_weight_tile_instances)
+    endif()
     list(APPEND DEVICE_INSTANCES device_grouped_conv_bwd_data_tile_instances)
   endif()
 endif()
