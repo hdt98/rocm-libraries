@@ -201,9 +201,18 @@ def collect_projects_to_run(subtrees):
         if subtree in subtree_to_project_map:
             projects.add(subtree_to_project_map.get(subtree))
 
-    # Try to get test dependencies from TheRock's determine_rocm_test_dependencies.py
+    # For each component, get tests from TheRock's script.
+    # If TheRock returns deps, use them; otherwise fall back to project_map.
     component_names = extract_component_names_from_subtrees(subtrees)
-    dynamic_test_deps = get_test_dependencies_from_therock(component_names)
+    tests_per_component = {}
+    components_needing_fallback = set()
+
+    for component in component_names:
+        deps = get_test_dependencies_from_therock([component])
+        if deps:
+            tests_per_component[component] = deps
+        else:
+            components_needing_fallback.add(component)
 
     for project in list(projects):
         # Check if an optional math component was included.
@@ -272,18 +281,19 @@ def collect_projects_to_run(subtrees):
                 set(project_map_data["cmake_options"])
             )
 
-            # Use dynamic test dependencies from TheRock if available,
-            # combined with hardcoded projects_to_test.
-            # Falls back to hardcoded projects_to_test only if TheRock script unavailable.
-            if dynamic_test_deps is not None:
-                # Combine dynamic deps with hardcoded projects_to_test
-                combined_tests = set(project_map_data["projects_to_test"])
-                combined_tests.update(dynamic_test_deps)
-                project_map_data["projects_to_test"] = list(combined_tests)
-            else:
-                project_map_data["projects_to_test"] = list(
-                    set(project_map_data["projects_to_test"])
-                )
+            # Collect tests: use TheRock deps for components that have them,
+            # fall back to hardcoded for components that don't.
+            tests_to_run = set()
+
+            # Add test deps for components that have them from TheRock
+            for component, deps in tests_per_component.items():
+                tests_to_run.update(deps)
+
+            # For components needing fallback, use hardcoded projects_to_test
+            if components_needing_fallback:
+                tests_to_run.update(project_map_data["projects_to_test"])
+
+            project_map_data["projects_to_test"] = list(tests_to_run)
 
             cmake_flag_options = " ".join(project_map_data["cmake_options"])
             projects_to_test_options = ",".join(project_map_data["projects_to_test"])
