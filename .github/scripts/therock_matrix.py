@@ -3,6 +3,32 @@ This dictionary is used to map specific file directory changes to the correspond
 """
 
 import os
+import sys
+from pathlib import Path
+
+# TheRock is checked out at ./TheRock during CI
+THEROCK_DIR = Path.cwd() / "TheRock"
+
+
+def get_test_dependencies_from_therock(component_names):
+    """
+    Get test dependencies using TheRock's determine_rocm_test_dependencies.py.
+    Returns None if TheRock or the script is not available.
+    """
+    test_tools_path = THEROCK_DIR / "test_tools"
+    if not test_tools_path.exists():
+        return None
+
+    sys.path.insert(0, str(test_tools_path))
+    try:
+        from determine_rocm_test_dependencies import get_rocm_test_dependencies
+
+        return get_rocm_test_dependencies(component_names, THEROCK_DIR)
+    except ImportError:
+        return None
+    finally:
+        if str(test_tools_path) in sys.path:
+            sys.path.remove(str(test_tools_path))
 
 subtree_to_project_map = {
     "dnn-providers/fusilli-provider": "fusilli-provider",
@@ -153,6 +179,20 @@ dependency_graph = {
 }
 
 
+def extract_component_names_from_subtrees(subtrees):
+    """Extract component names from subtree paths.
+
+    E.g., 'projects/rocprim' -> 'rocprim', 'shared/tensile' -> 'tensile'
+    """
+    components = []
+    for subtree in subtrees:
+        # Extract the last part of the path as the component name
+        parts = subtree.split("/")
+        if len(parts) >= 2:
+            components.append(parts[-1])
+    return components
+
+
 def collect_projects_to_run(subtrees):
     platform = os.getenv("PLATFORM")
     projects = set()
@@ -160,6 +200,10 @@ def collect_projects_to_run(subtrees):
     for subtree in subtrees:
         if subtree in subtree_to_project_map:
             projects.add(subtree_to_project_map.get(subtree))
+
+    # Try to get test dependencies from TheRock's determine_rocm_test_dependencies.py
+    component_names = extract_component_names_from_subtrees(subtrees)
+    dynamic_test_deps = get_test_dependencies_from_therock(component_names)
 
     for project in list(projects):
         # Check if an optional math component was included.
@@ -227,9 +271,19 @@ def collect_projects_to_run(subtrees):
             project_map_data["cmake_options"] = list(
                 set(project_map_data["cmake_options"])
             )
-            project_map_data["projects_to_test"] = list(
-                set(project_map_data["projects_to_test"])
-            )
+
+            # Use dynamic test dependencies from TheRock if available,
+            # combined with hardcoded projects_to_test.
+            # Falls back to hardcoded projects_to_test only if TheRock script unavailable.
+            if dynamic_test_deps is not None:
+                # Combine dynamic deps with hardcoded projects_to_test
+                combined_tests = set(project_map_data["projects_to_test"])
+                combined_tests.update(dynamic_test_deps)
+                project_map_data["projects_to_test"] = list(combined_tests)
+            else:
+                project_map_data["projects_to_test"] = list(
+                    set(project_map_data["projects_to_test"])
+                )
 
             cmake_flag_options = " ".join(project_map_data["cmake_options"])
             projects_to_test_options = ",".join(project_map_data["projects_to_test"])
