@@ -23,6 +23,7 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
 #include <cstdlib>
@@ -54,11 +55,13 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
     //     return handle->getHeuristicPolicyOrder();
     // }
     // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
-    if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
+    // Use the data_sdk getEnv() wrapper rather than std::getenv() so that this
+    // reads the live process environment block on Windows.
+    const std::string envStr = hipdnn_data_sdk::utilities::getEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
+    if(!envStr.empty())
     {
         // Parse comma-separated policy names and hash to IDs
         std::vector<int64_t> policyIds;
-        const std::string envStr(envPolicyOrder);
         std::istringstream iss(envStr);
         std::string token;
         while(std::getline(iss, token, ','))
