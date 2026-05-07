@@ -67,6 +67,15 @@ option(MIOPEN_STANDALONE_BUILD
     ${_MIOPEN_STANDALONE_DEFAULT})
 unset(_MIOPEN_STANDALONE_DEFAULT)
 
+# Standalone (FetchContent-only) builds don't have a system rocMLIR or OpenCL
+# stack to depend on. Pre-seed the relevant cache entries so a bare `cmake ..`
+# produces a working HIP build. Explicit -D on the command line still wins,
+# since these set(... CACHE) calls are no-ops when the entry already exists.
+if(MIOPEN_STANDALONE_BUILD)
+    set(MIOPEN_BACKEND "HIP" CACHE STRING "Which of MIOpens's backends to use?")
+    set(MIOPEN_USE_MLIR OFF CACHE BOOL "Use MLIR compilation backend")
+endif()
+
 project(MIOpen CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -101,6 +110,10 @@ set(MIOPEN_ENABLE_SQLITE_KERN_CACHE On CACHE BOOL "")
 option(BUILD_SHARED_LIBS "Create shared libraries" ON)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+
+if(MIOPEN_STANDALONE_BUILD)
+    include(cmake/ThirdParty.cmake)
+endif()
 
 if(MIOPEN_ENABLE_SQLITE)
     # MIOpen now depends on SQLite as well

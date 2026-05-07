@@ -87,7 +87,10 @@ endif()
 if(WIN32)
     list(APPEND __clang_cxx_compile_options
         -fms-extensions
-        -fms-compatibility)
+        -fms-compatibility
+        -Wno-ignored-attributes
+        -Wno-language-extension-token
+        )
 endif()
 
 add_compile_options(
