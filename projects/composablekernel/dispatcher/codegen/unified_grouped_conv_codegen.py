@@ -237,7 +237,12 @@ class GroupedConvKernelConfig:
         return name
 
     def is_valid_for_arch(self, arch: Optional[str] = None) -> bool:
-        """Check if configuration is valid for target architecture"""
+        """Check if configuration is valid for target architecture.
+
+        Note: irregular vector sizes and multi-warp tile dimensions are
+        validated upstream in convert_builder_configs.py before JSON configs
+        are generated — they never reach this point.
+        """
         target_arch = arch if arch is not None else self.arch
 
         # Check trait validity
@@ -245,15 +250,15 @@ class GroupedConvKernelConfig:
             return False
 
         # Backward operations have stricter pipeline requirements:
-        # - Backward weight: compv4/compv5 have transpose_tile2d issues
+        # - Backward weight: compv5 has transpose_tile2d issues
         # - Backward data: compv4 has get_length issues in bwd_data kernel
-        # Both backward operations support compv1/compv2/compv3/mem pipelines
+        # Both backward operations support compv1/compv2/compv3/compv4/compv6/mem pipelines
         if self.variant in (
             GroupedConvVariant.BACKWARD_WEIGHT,
             GroupedConvVariant.BACKWARD_DATA,
         ):
             if self.trait.pipeline not in (
-                "compv1", "compv2", "compv3", "compv4",
+                "compv1", "compv2", "compv3", "compv4", "compv6",
                 "basic_v1", "basic_v2", "mem",
             ):
                 return False
@@ -1130,6 +1135,7 @@ class GroupedConvDispatcherWrapperGenerator:
         "compv3": "Pipeline::CompV3",
         "compv4": "Pipeline::CompV4",
         "compv5": "Pipeline::CompV5",
+        "compv6": "Pipeline::CompV6",
         "preshufflev1": "Pipeline::PreShuffleV1",
         "preshufflev2": "Pipeline::PreShuffleV2",
     }

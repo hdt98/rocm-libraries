@@ -128,7 +128,7 @@ def generate_registration_source(headers, output_dir):
 
         # Parse pipeline, scheduler, epilogue from name
         pipeline = "compv3"
-        for p in ["compv1", "compv2", "compv3", "compv4", "compv5", "mem"]:
+        for p in ["compv1", "compv2", "compv3", "compv4", "compv5", "compv6", "mem"]:
             if f"_{p}_" in kname:
                 pipeline = p
                 break

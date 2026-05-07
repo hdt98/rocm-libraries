@@ -12,12 +12,13 @@
 # converter therefore deduplicates the output so each unique dispatcher config
 # appears exactly once in the JSON.
 #
-# Three categories of Builder instances are skipped entirely because the
-# dispatcher codegen does not yet support them:
-#   1. Irregular vector sizes (odd values other than 1)
-#   2. V6 (compv6) pipeline — maps from old CK V5
-#   3. Multi-warp per continuous tile dimension
-#       (tile_m > warp_size * vec_a, or tile_n > warp_size * vec_b)
+# Two categories of Builder instances are skipped because of hardware or
+# architecture limitations (the Builder's generate_instances.py also skips them):
+#   1. Irregular vector sizes (odd values other than 1) — AMD GPUs only have
+#      vector load instructions for widths 1, 2, 4, 8, 16
+#   2. Multi-warp per continuous tile dimension
+#      (tile_m > warp_size * vec_a, or tile_n > warp_size * vec_b) — the
+#      codegen assumes single-warp coverage per tile dimension for data loading
 #
 # Usage:
 #   python3 convert_builder_configs.py \
@@ -242,15 +243,14 @@ def parse_bwd_weight_instance(instance_id, instance, problem_name):
     dtype = get_dtype_str(problem_name)
     k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
-    # Apply same skip rules as generate_instances.py
+    # Skip rules — same as generate_instances.py (see module docstring for details)
     if not check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector):
-        print(f"Skipping instance {instance_id}: irregular vector sizes")
-        return None
-    if pipeline_version == "V6":
-        print(f"Skipping instance {instance_id}: V6 not supported")
+        print(f"Skipping instance {instance_id}: irregular vector sizes "
+              f"(vec {a_scalar_per_vector},{b_scalar_per_vector},{c_scalar_per_vector})")
         return None
     if m_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
-        print(f"Skipping instance {instance_id}: multiple warps per continuous tile dim")
+        print(f"Skipping instance {instance_id}: multi-warp per continuous tile dim "
+              f"(tile {m_per_block}x{n_per_block}, vec {a_scalar_per_vector},{b_scalar_per_vector})")
         return None
 
     if is_explicit_gemm:

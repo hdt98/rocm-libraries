@@ -104,6 +104,11 @@ def get_k_mfma(dtype, m_per_xdl, n_per_xdl):
             return 16
 
 def check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector):
+    """Reject odd vector sizes (except 1).
+
+    AMD GPU vector load instructions only support widths 1, 2, 4, 8, 16.
+    Odd sizes like 3, 5, 7, 13 have no corresponding hardware instruction.
+    """
     if a_scalar_per_vector != 1 and a_scalar_per_vector % 2 != 0:
         return False
     if b_scalar_per_vector != 1 and b_scalar_per_vector % 2 != 0:
@@ -452,12 +457,16 @@ def parse_bwd_weight_instances(instances, problem_name):
 
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
+        # Skip irregular vector sizes — no HW vector load instructions for odd widths
         if check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector) == False:
             print(f"Skipping instance {instance_id} with irregular load since it's not supported yet.")
             continue
         if pipeline_version == "V6":
             print(f"Skipping instance {instance_id} with V6 since it's not supported yet.")
             continue
+        # Skip multi-warp: when tile_m > warp_size * vec_a (or tile_n > ... * vec_b),
+        # a single warp can't cover the tile dimension, requiring multi-warp thread
+        # mapping that the codegen doesn't generate.
         if m_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
             print(f"Skipping instance {instance_id} with multiple warps per continous tile dim since it's not supported yet.")
             continue
@@ -580,12 +589,14 @@ def parse_bwd_data_instances(instances, problem_name):
 
         k_per_xdl = max(k1, get_k_mfma(dtype, m_per_xdl, n_per_xdl))
 
+        # Skip irregular vector sizes — no HW vector load instructions for odd widths
         if check_vectors(a_scalar_per_vector, b_scalar_per_vector, c_scalar_per_vector) == False:
             print(f"Skipping instance {instance_id} with irregular load since it's not supported yet.")
             continue
         if pipeline_version == "V6":
             print(f"Skipping instance {instance_id} with V6 since it's not supported yet.")
             continue
+        # Skip multi-warp: single warp can't cover tile dim when it exceeds warp_size * vec
         if k_per_block > (warp_size * a_scalar_per_vector) or n_per_block > (warp_size * b_scalar_per_vector):
             print(f"Skipping instance {instance_id} with multiple warps per continous tile dim since it's not supported yet.")
             continue

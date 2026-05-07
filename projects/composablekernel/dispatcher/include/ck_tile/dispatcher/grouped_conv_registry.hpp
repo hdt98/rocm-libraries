@@ -160,15 +160,17 @@ using GroupedConvKernelInstancePtr = std::shared_ptr<GroupedConvKernelInstance>;
 class GroupedConvKernelInstance
 {
     public:
-    using RunFn          = std::function<float(const GroupedConvProblem&, void*)>;
-    using IsSupportedFn  = std::function<bool(const GroupedConvProblem&)>;
+    using RunFn         = std::function<float(const GroupedConvProblem&, void*)>;
+    using IsSupportedFn = std::function<bool(const GroupedConvProblem&)>;
 
     GroupedConvKernelInstance(const GroupedConvKernelKey& key,
                               const std::string& name,
                               RunFn run_fn,
-                              IsSupportedFn is_supported_fn = nullptr,
+                              IsSupportedFn is_supported_fn      = nullptr,
                               const std::string& instance_string = "")
-        : key_(key), name_(name), run_fn_(std::move(run_fn)),
+        : key_(key),
+          name_(name),
+          run_fn_(std::move(run_fn)),
           is_supported_fn_(std::move(is_supported_fn)),
           instance_string_(instance_string)
     {

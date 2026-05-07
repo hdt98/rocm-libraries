@@ -1,11 +1,11 @@
-// Copyright (c) Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier: MIT
+// Copyright (c) 2025, Advanced Micro Devices, Inc. All rights reserved.
 
 /**
  * AUTO-GENERATED FILE - DO NOT EDIT DIRECTLY!
  *
  * Generated from: arch_specs.json
- * Generated at: 2026-01-05T19:34:01.229811
+ * Generated at: 2026-05-07T14:28:40.426101
  *
  * To update this file:
  * 1. Edit arch_specs.json
@@ -138,6 +138,8 @@ inline std::size_t get_lds_capacity(Pipeline pipeline)
         return 32768;
     if(pipeline == Pipeline::CompV5)
         return 65536;
+    if(pipeline == Pipeline::CompV6)
+        return 32768;
     if(pipeline == Pipeline::PreShuffleV1)
         return 32768;
     if(pipeline == Pipeline::PreShuffleV2)
