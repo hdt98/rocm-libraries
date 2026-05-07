@@ -109,7 +109,7 @@ ConvSolution Op2dTensorLite::GetSolution([[maybe_unused]] const ExecutionContext
     size_t local_threads = 256;
 
     // for naive tensor ops
-    auto&& [RD_BLCK, READ_TYPE] = GetRDBLCKandREADTYPEHIP(cTensorDesc.GetElementSize(), data_type);
+    auto&& [RD_BLCK, READ_TYPE] = GetRDBLCKandREADTYPEHIP(clens[2], data_type);
 
     size_t total_work = std::max(clens[2] / RD_BLCK, size_t(1));
     size_t grp_sz     = (total_work + local_threads - 1) / local_threads;
