@@ -755,6 +755,75 @@ def buildHipClangJob(Map conf=[:]){
         return retimage
 }
 
+def runAsanTests(String gpuLabel, String gfxFamily) {
+    node(rocmnode(gpuLabel)) {
+        try {
+            withWorkingDir {
+                def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
+                def video_id = sh(returnStdout: true, script: 'getent group video | cut -d: -f3').trim()
+                def render_id = sh(returnStdout: true, script: 'getent group render | cut -d: -f3').trim()
+                def dockerOpts = "--device=/dev/kfd --device=/dev/dri " +
+                                 "--group-add video --group-add render " +
+                                 "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined " +
+                                 "--group-add=${video_id} --group-add=${render_id}"
+                withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
+                    docker.image(asanImage).pull()
+                }
+                withDockerContainer(image: asanImage, args: dockerOpts) {
+                    timeout(time: 420, unit: 'MINUTES') {
+                        // Step 1: build MIOpen from PR source with ASAN flags and install
+                        // into ROCM_PATH so miopen_gtest lands at ${ROCM_PATH}/bin/.
+                        // ROCM_PATH, THEROCK_BIN_DIR, LD_LIBRARY_PATH, HSA_XNACK are
+                        // already set in the image ENV (from Dockerfile.ASAN).
+                        sh """
+                            set -e
+                            cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
+                            rm -rf build && mkdir build && cd build
+
+                            export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname \$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so))
+
+                            CXX=\${ROCM_PATH}/llvm/bin/clang++ cmake \\
+                                -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
+                                -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1" \\
+                                -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g -shared-libasan" \\
+                                -DCMAKE_INSTALL_PREFIX=\${ROCM_PATH} \\
+                                -DCMAKE_PREFIX_PATH="\${ROCM_PATH};\${ROCM_PATH}/lib" \\
+                                -DMIOPEN_USE_COMPOSABLEKERNEL=ON \\
+                                -DMIOPEN_TEST_DISCRETE=OFF \\
+                                -DMIOPEN_INSTALL_GPU_DATABASES=${gfxFamily} \\
+                                -DGPU_TARGETS="${gfxFamily}:xnack+" \\
+                                -DHIP_PLATFORM=amd \\
+                                -DBUILD_TESTING=ON \\
+                                -DENABLE_ASAN_PACKAGING=ON \\
+                                -DTHEROCK_SANITIZER=ASAN \\
+                                ..
+
+                            ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
+                        """.stripIndent()
+
+                        // Step 2: run the TheRock test script with the newly installed
+                        // miopen_gtest. detect_leaks=0 to avoid known leak false-positives;
+                        // abort_on_error=1 so ASAN violations produce clear failures.
+                        sh """
+                            set -e
+                            export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
+                            . /opt/venv/bin/activate
+                            cd /TheRock
+                            THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
+                            AMDGPU_FAMILIES=${gfxFamily} \\
+                            TEST_TYPE=full \\
+                            ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \\
+                            python build_tools/github_actions/test_executable_scripts/test_miopen.py
+                        """.stripIndent()
+                    }
+                }
+            }
+        } finally {
+            cleanWs()
+        }
+    }
+}
+
 def RunPerfTest(Map conf=[:]){
     def dockerOpts="--device=/dev/kfd --device=/dev/dri --group-add video --group-add render --cap-add=SYS_PTRACE --security-opt seccomp=unconfined"
     try {
