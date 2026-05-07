@@ -42,9 +42,6 @@
 #include <list>
 #include <map>
 #include <tuple>
-#include <cassert>     // dumpMXSideForDebug enforces batch == 1 with assert
-#include <fstream>     // dumpMXSideForDebug writes text files
-#include <iomanip>     // std::hex / std::setw / std::setfill for hex pretty-printing
 
 namespace TensileLite
 {
