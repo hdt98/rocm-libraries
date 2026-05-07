@@ -772,6 +772,7 @@ pipeline {
                         beforeAgent true
                         expression { params.TARGET_GFX942 }
                     }
+                    agent none
                     steps {
                         script {
                             runAsanTests("gfx942", "gfx942")
