@@ -196,13 +196,18 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                                 export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname \$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so))
 
                                 CXX=\${ROCM_PATH}/llvm/bin/clang++ cmake \\
+                                    -DMIOPEN_TEST_FLAGS="--disable-verification-cache" \\
                                     -DCMAKE_BUILD_TYPE=RelWithDebInfo \\
                                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g1" \\
                                     -DCMAKE_CXX_FLAGS="-fsanitize=address -fno-omit-frame-pointer -g -shared-libasan" \\
                                     -DCMAKE_INSTALL_PREFIX=\${ROCM_PATH} \\
                                     -DCMAKE_PREFIX_PATH="\${ROCM_PATH};\${ROCM_PATH}/lib" \\
+                                    -DMIOPEN_USE_MLIR=OFF \\
                                     -DMIOPEN_USE_COMPOSABLEKERNEL=ON \\
                                     -DMIOPEN_TEST_DISCRETE=OFF \\
+                                    -DMIOPEN_GPU_SYNC=OFF \\
+                                    -DGTEST_PARALLEL_LEVEL=4 \\
+                                    -DMIOPEN_TEST_ALL=ON \\
                                     -DMIOPEN_INSTALL_GPU_DATABASES=${gfxFamily} \\
                                     -DGPU_TARGETS="${gfxFamily}:xnack+" \\
                                     -DHIP_PLATFORM=amd \\
