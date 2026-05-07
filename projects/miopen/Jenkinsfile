@@ -180,7 +180,8 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                 def dockerOpts = "--device=/dev/kfd --device=/dev/dri " +
                                  "--group-add video --group-add render " +
                                  "--cap-add=SYS_PTRACE --security-opt seccomp=unconfined " +
-                                 "--group-add=${video_id} --group-add=${render_id}"
+                                 "--group-add=${video_id} --group-add=${render_id} " +
+                                 "-v ${env.WORKSPACE}:${env.WORKSPACE}"
                 utils.setGithubStatus(variant, 'pending', 'In progress')
                 try {
                     withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
@@ -191,6 +192,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                             sh """
                                 set -e
                                 cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
+                                LOGNAME=temp-user dvc pull -v
                                 rm -rf build && mkdir build && cd build
 
                                 export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$(dirname \$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so))
@@ -207,7 +209,6 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                                     -DMIOPEN_TEST_DISCRETE=OFF \\
                                     -DMIOPEN_GPU_SYNC=OFF \\
                                     -DGTEST_PARALLEL_LEVEL=4 \\
-                                    -DMIOPEN_TEST_ALL=ON \\
                                     -DMIOPEN_INSTALL_GPU_DATABASES=${gfxFamily} \\
                                     -DGPU_TARGETS="${gfxFamily}:xnack+" \\
                                     -DHIP_PLATFORM=amd \\
