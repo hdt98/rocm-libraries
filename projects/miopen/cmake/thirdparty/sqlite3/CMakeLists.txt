@@ -43,6 +43,16 @@ target_link_libraries(miopen_sqlite3 PRIVATE
 # Provide the canonical SQLite::SQLite3 alias that FindSQLite3 would create.
 add_library(SQLite::SQLite3 ALIAS miopen_sqlite3)
 
+# MIOpen privately links to SQLite::SQLite3, so CMake requires miopen_sqlite3 to
+# live in the same export set as MIOpen for install(EXPORT miopen-targets) to validate.
+include(GNUInstallDirs)
+install(TARGETS miopen_sqlite3
+    EXPORT miopen-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 # 3510300 → 3.51.3
 set(SQLite3_FOUND TRUE PARENT_SCOPE)
 set(SQLite3_INCLUDE_DIR "${SQLITE3_UPSTREAM_SOURCE_DIR}" PARENT_SCOPE)

@@ -45,6 +45,16 @@ target_include_directories(miopen_bz2
 # Provide the canonical BZip2::BZip2 alias that find_package(BZip2) would create.
 add_library(BZip2::BZip2 ALIAS miopen_bz2)
 
+# MIOpen privately links to BZip2::BZip2, so CMake requires miopen_bz2 to live
+# in the same export set as MIOpen for install(EXPORT miopen-targets) to validate.
+include(GNUInstallDirs)
+install(TARGETS miopen_bz2
+    EXPORT miopen-targets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 # Set the legacy variables that some consumers still read (FindBZip2 sets
 # these when it succeeds; FetchContent's find_package redirection does not).
 set(BZIP2_FOUND TRUE PARENT_SCOPE)
