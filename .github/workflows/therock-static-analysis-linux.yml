@@ -7,8 +7,10 @@
 #
 # Notes:
 # - Build steps mirror .github/workflows/therock-ci-linux.yml (keep in sync).
-# - Analysis uses a portable LLVM 20 toolchain (clang-tidy includes
-#   clang-analyzer-* checks). TheRock's bundled amd-llvm is built with the
+# - Analysis uses a portable LLVM binary tarball (clang-tidy includes
+#   clang-analyzer-* checks). Recent llvmorg tags often omit Linux x86_64
+#   prebuilts; defaults point at a known-good release asset.
+#   TheRock's bundled amd-llvm is built with the
 #   static analyzer disabled for faster compiler builds; that is unchanged here.
 # - Full-stack builds are large; use workflow_dispatch and optional cmake_options
 #   to narrow features when experimenting.
@@ -43,10 +45,14 @@ on:
         description: "Parallel jobs for run-clang-tidy"
         type: string
         default: "8"
-      llvm_version:
-        description: "LLVM release for clang-tidy tarball (llvmorg-X.Y.Z)"
+      llvmorg_tag:
+        description: "llvm/llvm-project release tag without prefix (e.g. 18.1.8 for llvmorg-18.1.8)"
         type: string
-        default: "20.1.5"
+        default: "18.1.8"
+      llvm_tarball_suffix:
+        description: "Suffix after clang+llvm-<tag>- in GitHub release asset basename (no .tar.xz)"
+        type: string
+        default: "x86_64-linux-gnu-ubuntu-18.04"
 
 permissions:
   contents: read
@@ -71,7 +77,8 @@ jobs:
       CMAKE_OPTIONS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.cmake_options || '' }}
       THEROCK_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.therock_ref || '70a6335b27d48f3781ba07eab89269f75a00f527' }}
       TIDY_JOBS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tidy_jobs || '8' }}
-      LLVM_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.llvm_version || '20.1.5' }}
+      LLVMORG_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.llvmorg_tag || '18.1.8' }}
+      LLVM_TARBALL_SUFFIX: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.llvm_tarball_suffix || 'x86_64-linux-gnu-ubuntu-18.04' }}
       TEATIME_FORCE_INTERACTIVE: "0"
       AWS_SHARED_CREDENTIALS_FILE: /home/awsconfig/credentials.ini
 
@@ -94,15 +101,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.llvm-tidy-toolchain
-          key: llvm-tidy-${{ env.LLVM_VERSION }}-clang-ubuntu22-tar
+          key: llvm-tidy-${{ env.LLVMORG_TAG }}-${{ env.LLVM_TARBALL_SUFFIX }}
 
       - name: Install portable LLVM for run-clang-tidy
         if: steps.llvm-cache.outputs.cache-hit != 'true'
         run: |
           set -eux
-          V="${{ env.LLVM_VERSION }}"
-          NAME="clang+llvm-${V}-x86_64-linux-gnu-ubuntu-22.04"
-          URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${V}/${NAME}.tar.xz"
+          TAG="${LLVMORG_TAG}"
+          NAME="clang+llvm-${TAG}-${LLVM_TARBALL_SUFFIX}"
+          URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${TAG}/${NAME}.tar.xz"
           rm -rf "$GITHUB_WORKSPACE/.llvm-tidy-toolchain"
           mkdir -p /tmp/llvm-dl
           curl -fsSL "$URL" -o "/tmp/llvm-dl/${NAME}.tar.xz"
