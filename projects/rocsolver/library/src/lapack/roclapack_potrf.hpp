@@ -1236,17 +1236,16 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
 }
 
 // ---------------------------------------------------------------
-// This is the recursive formulation of the Cholesky factorization
+// This is the conceptually recursive formulation of the Cholesky factorization
+// but implemented without C++ recursion
 //
-// There is early termination of recursion if the matrix is sufficiently small
-// and switches to the classic blocked version
 // ---------------------------------------------------------------
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                                                   const rocblas_fill uplo,
-                                                  const I n,
+                                                  const I n_in,
                                                   U A,
-                                                  const rocblas_stride shiftA,
+                                                  const rocblas_stride shiftA_in,
                                                   const I lda,
                                                   const rocblas_stride strideA,
                                                   INFO* info,
@@ -1258,6 +1257,308 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
                                                   void* work4,
                                                   bool optim_mem,
                                                   const I row_offset_in)
+{
+    bool const use_upper_part = (uplo == rocblas_fill_upper);
+    // ------------------------------------
+    // constants for rocblas functions calls
+    // ------------------------------------
+
+    I const NB = POTF2_MAX_SMALL_SIZE(T);
+    rocblas_status istat = rocblas_status_success;
+
+    auto idx2D = [](auto i, auto j, auto ld) { return (i + j * static_cast<int64_t>(ld)); };
+
+    // --------------------------------------
+    // local variables  n, shiftA, row_offset
+    // are modified inside while loop
+    // --------------------------------------
+    I n = n_in;
+    rocblas_stride shiftA = shiftA_in;
+    I row_offset = row_offset_in;
+
+    while(n >= 1)
+    {
+        if(n <= NB)
+        {
+            istat = potf2_run_small<T>(handle, uplo, n,
+
+                                       A, shiftA, lda, strideA,
+
+                                       info, batch_count, row_offset);
+            break;
+        }
+
+        // ----------------------------------------
+        // NOTE: assume split_n picks n1 = 2^k * NB
+        // ----------------------------------------
+        I const n1 = std::min(I(1024 * NB), split_n<T>(n));
+        I const n2 = n - n1;
+
+        // ----------------------------
+        // factorize A11, size n1 by n1
+        // ----------------------------
+        {
+            I const nn = n1;
+
+            if(n1 == 1 * NB)
+            {
+                rocblas_status const istat
+                    = rocsolver_potrf_NB_template<1, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                        handle, uplo, nn,
+
+                        A, shiftA, lda, strideA,
+
+                        info, batch_count,
+
+                        scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 2 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<2, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 4 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<4, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 8 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<8, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 16 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<16, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 32 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<32, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 64 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<64, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 128 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<128, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 256 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<256, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 512 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<512, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+            else if(n1 == 1024 * NB)
+            {
+                istat = rocsolver_potrf_NB_template<1024, BATCHED, STRIDED, T, I, INFO, S, U>(
+
+                    handle, uplo, nn,
+
+                    A, shiftA, lda, strideA,
+
+                    info, batch_count,
+
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
+            }
+        }
+
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // -------------------------------------
+        // update A12  n1 by n2  if use_upper_part
+        // update A21  n2 by n1  otherwise
+        //
+        // step 2:   A12 = U11' * U12, or   U12 = U11' \ A12,  trsm
+        // step 2:   A21 = L21 * L11', or   L21 = A21 / L11',  trsm
+        // -------------------------------------
+
+        rocblas_stride const loffset_A12 = idx2D(0, n1, lda);
+        rocblas_stride const loffset_A21 = idx2D(n1, 0, lda);
+
+        {
+            I const mm = (use_upper_part) ? n1 : n2;
+            I const nn = (use_upper_part) ? n2 : n1;
+
+            rocblas_side const side = (use_upper_part) ? rocblas_side_left : rocblas_side_right;
+
+            rocblas_operation const trans = rocblas_operation_conjugate_transpose;
+            rocblas_diagonal const diag = rocblas_diagonal_non_unit;
+
+            // ---------------------
+            // offset for A12 or A21
+            // ---------------------
+            rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
+
+            istat = potrf_trsm<BATCHED, STRIDED, T, I>(
+                handle, side, uplo, trans, diag,
+
+                mm, nn,
+
+                A, shiftA + idx2D(0, 0, lda), lda, strideA, // submatrix A11
+
+                A, shiftA + loffset, lda, strideA,
+
+                batch_count,
+
+                optim_mem, work1, work2, work3, work4); // submatrix for A12 or A21
+        }
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // ------------------
+        // SYRK to update A22
+        //
+        // step 3a:  A22 = A22 - U12' * U12,   syrk
+        // step 3a:  A22 = A22 - L21 * L21',   syrk
+        // ------------------
+        {
+            I const nn = n2;
+            I const kk = n1;
+            S alpha = -1;
+            S beta = 1;
+
+            // --------------------
+            // submatrix U12 or L21
+            // --------------------
+            rocblas_stride const loffset = (use_upper_part) ? loffset_A12 : loffset_A21;
+
+            rocblas_operation const trans
+                = (use_upper_part) ? rocblas_operation_conjugate_transpose : rocblas_operation_none;
+
+            istat = potrf_syrk<BATCHED, T, I>(
+                handle, uplo, trans,
+
+                nn, kk,
+
+                &alpha,
+
+                A, shiftA + loffset, lda, strideA, // submatrix U12 or L21
+
+                &beta,
+
+                A, shiftA + idx2D(n1, n1, lda), lda, strideA, // submatrix A22
+                batch_count);
+        }
+
+        if(istat != rocblas_status_success)
+        {
+            return istat;
+        }
+
+        // ----------------------------
+        // get ready for next iteration
+        // for factorizing A22, size n2 by n2
+        // ----------------------------
+        shiftA += idx2D(n1, n1, lda);
+        row_offset += n1;
+
+        n = n2;
+    } // end while
+
+    return istat;
+}
+
+// ---------------------------------------------------------------
+// This is the recursive formulation of the Cholesky factorization
+//
+// There is early termination of recursion if the matrix is sufficiently small
+// and switches to the classic blocked version
+// ---------------------------------------------------------------
+template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
+rocblas_status rocsolver_potrf_recursion_template_org(rocblas_handle handle,
+                                                      const rocblas_fill uplo,
+                                                      const I n,
+                                                      U A,
+                                                      const rocblas_stride shiftA,
+                                                      const I lda,
+                                                      const rocblas_stride strideA,
+                                                      INFO* info,
+                                                      const I batch_count,
+                                                      T* scalars,
+                                                      void* work1,
+                                                      void* work2,
+                                                      void* work3,
+                                                      void* work4,
+                                                      bool optim_mem,
+                                                      const I row_offset_in)
 {
     bool const use_upper_part = (uplo == rocblas_fill_upper);
     // ------------------------------------
