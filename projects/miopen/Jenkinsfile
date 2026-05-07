@@ -788,7 +788,7 @@ pipeline {
                     node(rocmnode("docker")) {
                         try {
                             withWorkingDir {
-                                buildAsanDockerImage()
+                                buildAsanDockerImage(asanRunId: env.ASAN_ARTIFACTS_RUN_ID, amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
                             }
                         } finally {
                             cleanWs()
