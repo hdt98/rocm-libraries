@@ -2272,11 +2272,8 @@ namespace TensileLite
                 if(batchCount > 1)
                 {
                     auto const  dataInfo         = DataTypeInfo::Get(tensorA.dataType());
-                    float const logicalBytesEach
-                        = static_cast<float>(dataInfo.elementSize)
-                        / static_cast<float>(std::max<size_t>(1, dataInfo.packing));
                     dataBatchStrideBytes
-                        = multiplyElementSize(tensorA.strides()[2], logicalBytesEach);
+                        = multiplyElementSize(tensorA.strides()[2], static_cast<float>(dataInfo.elementSize));
                     auto const& mxsaTensor = problem.mxsa();
                     scaleBatchStrideBytes = mxsaTensor.strides()[mxsaTensor.sizes().size() - 1];
                 }
@@ -2342,11 +2339,8 @@ namespace TensileLite
                 if(batchCount > 1)
                 {
                     auto const  dataInfo         = DataTypeInfo::Get(tensorB.dataType());
-                    float const logicalBytesEach
-                        = static_cast<float>(dataInfo.elementSize)
-                        / static_cast<float>(std::max<size_t>(1, dataInfo.packing));
                     dataBatchStrideBytes
-                        = multiplyElementSize(tensorB.strides()[2], logicalBytesEach);
+                        = multiplyElementSize(tensorB.strides()[2], static_cast<float>(dataInfo.elementSize));
                     auto const& mxsbTensor = problem.mxsb();
                     scaleBatchStrideBytes = mxsbTensor.strides()[mxsbTensor.sizes().size() - 1];
                 }
