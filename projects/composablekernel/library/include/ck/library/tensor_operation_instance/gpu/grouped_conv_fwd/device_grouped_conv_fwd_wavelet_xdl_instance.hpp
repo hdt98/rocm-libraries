@@ -36,26 +36,26 @@ using AC_K32_TL64  = S<4, 16, 1>;
 using AC_K32_TL128 = S<4, 32, 1>;
 using AC_K32_TL256 = S<4, 64, 1>;
 //   K=64 (AK0=8):
-using AC_K64_TL64  = S<8,  8, 1>;
+using AC_K64_TL64  = S<8, 8, 1>;
 using AC_K64_TL128 = S<8, 16, 1>;
 using AC_K64_TL256 = S<8, 32, 1>;
 //   K=128 (AK0=16):
-using AC_K128_TL64  = S<16,  4, 1>;
-using AC_K128_TL128 = S<16,  8, 1>;
+using AC_K128_TL64  = S<16, 4, 1>;
+using AC_K128_TL128 = S<16, 8, 1>;
 using AC_K128_TL256 = S<16, 16, 1>;
 
 // CDE block transfer cluster: depends on wN and TMath.
 //   wN=1 (ShufN=32): Csv=4, cluster=S<1,TMath/8,1,8>
-using CDE_wN1_TM64  = S<1,  8, 1, 8>;
+using CDE_wN1_TM64  = S<1, 8, 1, 8>;
 using CDE_wN1_TM128 = S<1, 16, 1, 8>;
 using CDE_wN1_TM256 = S<1, 32, 1, 8>;
 //   wN=2 (ShufN=64): Csv=8, cluster=S<1,TMath/8,1,8>  (same dims, different Csv passed separately)
-using CDE_wN2_TM64  = S<1,  8, 1, 8>;
+using CDE_wN2_TM64  = S<1, 8, 1, 8>;
 using CDE_wN2_TM128 = S<1, 16, 1, 8>;
 using CDE_wN2_TM256 = S<1, 32, 1, 8>;
 //   wN=4 (ShufN=128): Csv=8, cluster=S<1,TMath/16,1,16>
-using CDE_wN4_TM64  = S<1,  4, 1, 16>;
-using CDE_wN4_TM128 = S<1,  8, 1, 16>;
+using CDE_wN4_TM64  = S<1, 4, 1, 16>;
+using CDE_wN4_TM128 = S<1, 8, 1, 16>;
 using CDE_wN4_TM256 = S<1, 16, 1, 16>;
 
 // ---- Extra CDE aliases for MPerXDL=NPerXDL=16 ----
@@ -427,8 +427,8 @@ WAVELET_INST(256, 256,  64, 128, 128, 2, 1, AC_K128_TL256, CDE_wN4_TM256, 8)
 // WAVELET_INST( 64,  64,  64, 128, 128, 2, 4, AC_K128_TL64,  CDE_wN1_TM64,  4),
 // WAVELET_INST(128,  64,  64, 128, 128, 2, 4, AC_K128_TL128, CDE_wN1_TM64,  4),
 // WAVELET_INST(256,  64,  64, 128, 128, 2, 4, AC_K128_TL256, CDE_wN1_TM64,  4)
-// clang-format on
->;
+    // clang-format on
+    >;
 
 #undef WAVELET_INST
 

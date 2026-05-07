@@ -75,12 +75,14 @@ __global__ void
 #if CK_USE_LAUNCH_BOUNDS
 __launch_bounds__(GridwiseGemm::LaunchBlockSize, MinimumOccupancy)
 #endif
-    kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3(typename GridwiseGemm::Argument karg,
-                                            const AGridDesc_AK0_M_K1 a_grid_desc_ak0_m_ak1,
-                                            const BGridDesc_BK0_N_K1 b_grid_desc_bk0_n_bk1,
-                                            const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock c_grid_desc_mblock_mperblock_nblock_nperblock,
-                                            const ComputePtrOffset compute_ptr_offset_of_groups,
-                                            const ComputePtrOffset compute_ptr_offset_of_n)
+    kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3(
+        typename GridwiseGemm::Argument karg,
+        const AGridDesc_AK0_M_K1 a_grid_desc_ak0_m_ak1,
+        const BGridDesc_BK0_N_K1 b_grid_desc_bk0_n_bk1,
+        const CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock
+            c_grid_desc_mblock_mperblock_nblock_nperblock,
+        const ComputePtrOffset compute_ptr_offset_of_groups,
+        const ComputePtrOffset compute_ptr_offset_of_n)
 {
 #if defined(__gfx9__) || defined(__gfx11__) || defined(__gfx12__)
     if constexpr(GridwiseGemm::template IsValidCompilationParameter<CGlobalMemoryDataOperation>())
@@ -106,17 +108,16 @@ __launch_bounds__(GridwiseGemm::LaunchBlockSize, MinimumOccupancy)
         GridwiseGemm::template Run<decltype(a_grid_desc_ak0_m_ak1),
                                    decltype(b_grid_desc_bk0_n_bk1),
                                    decltype(c_grid_desc_mblock_mperblock_nblock_nperblock),
-                                    HasMainKBlockLoop,
-                                    CGlobalMemoryDataOperation,
-                                    true>(
-            karg.p_a_grid + a_group_offset + a_n_offset,
-            karg.p_b_grid + b_group_offset,
-            karg.p_c_grid + e_group_offset + e_n_offset,
-            p_shared,
-            karg,
-            a_grid_desc_ak0_m_ak1,
-            b_grid_desc_bk0_n_bk1,
-            c_grid_desc_mblock_mperblock_nblock_nperblock);
+                                   HasMainKBlockLoop,
+                                   CGlobalMemoryDataOperation,
+                                   true>(karg.p_a_grid + a_group_offset + a_n_offset,
+                                         karg.p_b_grid + b_group_offset,
+                                         karg.p_c_grid + e_group_offset + e_n_offset,
+                                         p_shared,
+                                         karg,
+                                         a_grid_desc_ak0_m_ak1,
+                                         b_grid_desc_bk0_n_bk1,
+                                         c_grid_desc_mblock_mperblock_nblock_nperblock);
     }
 #else
     ignore = karg;
@@ -339,11 +340,11 @@ struct DeviceGroupedConvFwdMultipleABD_WaveletModel_Xdl_CShuffle_V3
 
         const auto AK0 = K / K1;
 
-        return transform_tensor_descriptor(in_gemmm_gemmk_desc,
-                                           make_tuple(make_unmerge_transform(make_tuple(AK0, K1)),
-                                                      make_pass_through_transform(M)),
-                                           make_tuple(Sequence<1>{}, Sequence<0>{}),
-                                           make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
+        return transform_tensor_descriptor(
+            in_gemmm_gemmk_desc,
+            make_tuple(make_unmerge_transform(make_tuple(AK0, K1)), make_pass_through_transform(M)),
+            make_tuple(Sequence<1>{}, Sequence<0>{}),
+            make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
     }
 
     template <typename BLay>
@@ -369,11 +370,11 @@ struct DeviceGroupedConvFwdMultipleABD_WaveletModel_Xdl_CShuffle_V3
 
         const auto BK0 = K / K1;
 
-        return transform_tensor_descriptor(wei_gemmn_gemmk_desc,
-                                           make_tuple(make_unmerge_transform(make_tuple(BK0, K1)),
-                                                      make_pass_through_transform(N)),
-                                           make_tuple(Sequence<1>{}, Sequence<0>{}),
-                                           make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
+        return transform_tensor_descriptor(
+            wei_gemmn_gemmk_desc,
+            make_tuple(make_unmerge_transform(make_tuple(BK0, K1)), make_pass_through_transform(N)),
+            make_tuple(Sequence<1>{}, Sequence<0>{}),
+            make_tuple(Sequence<0, 2>{}, Sequence<1>{}));
     }
 
     template <typename ELay>
@@ -929,61 +930,62 @@ struct DeviceGroupedConvFwdMultipleABD_WaveletModel_Xdl_CShuffle_V3
             const auto Run = [&](const auto& kernel) {
                 if(stream_config.flush_cache)
                 {
-                    ave_time +=
-                        launch_and_time_kernel_flush_cache(stream_config,
-                                                           kernel,
-                                                           dim3(gdx, gdy, gdz),
-                                                           dim3(LaunchBlockSize),
-                                                           0,
-                                                           gemm_arg,
-                                                           arg.a_grid_desc_ak0_m_ak1_,
-                                                           arg.b_grid_desc_bk0_n_bk1_,
-                                                           arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                                           arg.compute_ptr_offset_of_groups_,
-                                                           arg.compute_ptr_offset_of_n_);
+                    ave_time += launch_and_time_kernel_flush_cache(
+                        stream_config,
+                        kernel,
+                        dim3(gdx, gdy, gdz),
+                        dim3(LaunchBlockSize),
+                        0,
+                        gemm_arg,
+                        arg.a_grid_desc_ak0_m_ak1_,
+                        arg.b_grid_desc_bk0_n_bk1_,
+                        arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,
+                        arg.compute_ptr_offset_of_groups_,
+                        arg.compute_ptr_offset_of_n_);
                 }
                 else
                 {
-                    ave_time += launch_and_time_kernel(stream_config,
-                                                       kernel,
-                                                       dim3(gdx, gdy, gdz),
-                                                       dim3(LaunchBlockSize),
-                                                       0,
-                                                       gemm_arg,
-                                                       arg.a_grid_desc_ak0_m_ak1_,
-                                                       arg.b_grid_desc_bk0_n_bk1_,
-                                                       arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,
-                                                       arg.compute_ptr_offset_of_groups_,
-                                                       arg.compute_ptr_offset_of_n_);
+                    ave_time +=
+                        launch_and_time_kernel(stream_config,
+                                               kernel,
+                                               dim3(gdx, gdy, gdz),
+                                               dim3(LaunchBlockSize),
+                                               0,
+                                               gemm_arg,
+                                               arg.a_grid_desc_ak0_m_ak1_,
+                                               arg.b_grid_desc_bk0_n_bk1_,
+                                               arg.c_grid_desc_mblock_mperblock_nblock_nperblock_,
+                                               arg.compute_ptr_offset_of_groups_,
+                                               arg.compute_ptr_offset_of_n_);
                 }
             };
 
             if(has_main_k_block_loop)
             {
                 // Tail number always full - only v1 now
-                const auto kernel =
-                    kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3<GridwiseGemm,
-                                                            ComputePtrOffset,
-                                                            DeviceOp::AGridDesc_AK0_M_AK1,
-                                                            DeviceOp::BGridDesc_BK0_N_BK1,
-                                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
-                                                            true,
-                                                            InMemoryDataOperationEnum::Set,
-                                                            minimum_occupancy>;
+                const auto kernel = kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3<
+                    GridwiseGemm,
+                    ComputePtrOffset,
+                    DeviceOp::AGridDesc_AK0_M_AK1,
+                    DeviceOp::BGridDesc_BK0_N_BK1,
+                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
+                    true,
+                    InMemoryDataOperationEnum::Set,
+                    minimum_occupancy>;
                 Run(kernel);
             }
             else
             {
                 // Tail number always 1
-                const auto kernel =
-                    kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3<GridwiseGemm,
-                                                            ComputePtrOffset,
-                                                            DeviceOp::AGridDesc_AK0_M_AK1,
-                                                            DeviceOp::BGridDesc_BK0_N_BK1,
-                                                            DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
-                                                            false,
-                                                            InMemoryDataOperationEnum::Set,
-                                                            minimum_occupancy>;
+                const auto kernel = kernel_grouped_conv_fwd_wavelet_model_xdl_cshuffle_v3<
+                    GridwiseGemm,
+                    ComputePtrOffset,
+                    DeviceOp::AGridDesc_AK0_M_AK1,
+                    DeviceOp::BGridDesc_BK0_N_BK1,
+                    DeviceOp::CGridDesc_MBlock_MPerBlock_NBlock_NPerBlock,
+                    false,
+                    InMemoryDataOperationEnum::Set,
+                    minimum_occupancy>;
                 Run(kernel);
             }
 

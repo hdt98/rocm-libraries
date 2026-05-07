@@ -1857,8 +1857,8 @@ struct DeviceGroupedConvFwdMultipleABD_Xdl_CShuffle_V3
 
         if(ck::EnvIsEnabled(CK_ENV(CK_LOGGING)))
         {
-                std::cout << "End of issuported, returning false" << " In " << __FILE__ << ":" << __LINE__
-                          << ", in function: " << __func__ << std::endl;
+            std::cout << "End of issuported, returning false" << " In " << __FILE__ << ":"
+                      << __LINE__ << ", in function: " << __func__ << std::endl;
         }
         return false;
     }

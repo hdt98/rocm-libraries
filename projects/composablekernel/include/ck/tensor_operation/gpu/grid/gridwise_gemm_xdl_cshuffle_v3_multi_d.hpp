@@ -983,8 +983,8 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
         if constexpr(NXdlPerWave % CShuffleNXdlPerWavePerShuffle != 0)
         {
 #if DEBUG_LOG
-                std::cout << "NXdlPerWave mod CShuffleNXdlPerWavePerShuffle != 0 in" << __FILE__
-                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+            std::cout << "NXdlPerWave mod CShuffleNXdlPerWavePerShuffle != 0 in" << __FILE__ << ":"
+                      << __LINE__ << ", in function: " << __func__ << std::endl;
 
 #endif // DEBUG_LOG
             return false;
@@ -1050,8 +1050,8 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if((KReadPadSplited * (karg.KBatch - 1)) >= karg.K)
             {
 #if DEBUG_LOG
-                std::cout << "(KReadPadSplited * (karg.KBatch - 1)) >= karg.K in" << __FILE__
-                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                std::cout << "(KReadPadSplited * (karg.KBatch - 1)) >= karg.K in" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
 
 #endif // DEBUG_LOG
                 return false;
@@ -1155,26 +1155,13 @@ struct GridwiseGemmMultiD_xdl_cshuffle_v3
             if(num_k_loop <= BlockwiseGemmPipe::PrefetchStages)
             {
 #if DEBUG_LOG
-                std::cout << "num_k_loop <= BlockwiseGemmPipe::PrefetchStages in" << __FILE__
-                          << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
+                std::cout << "num_k_loop <= BlockwiseGemmPipe::PrefetchStages in" << __FILE__ << ":"
+                          << __LINE__ << ", in function: " << __func__ << std::endl;
 
 #endif // DEBUG_LOG
                 return false;
             }
         }
-
-//         constexpr long_index_t TwoGB = (long_index_t{1} << 31);
-//         if(!(karg.M * karg.K * sizeof(ADataType) <= TwoGB &&
-//              karg.N * karg.K * sizeof(BDataType) <= TwoGB &&
-//              karg.M * karg.N * sizeof(CDataType) <= TwoGB))
-//         {
-// #if DEBUG_LOG
-//                 std::cout << "M N K: (" << karg.M << " " << karg.N << " " << karg.K << ") Tensor bigger than 2GB in" << __FILE__
-//                           << ":" << __LINE__ << ", in function: " << __func__ << std::endl;
-
-// #endif // DEBUG_LOG
-//             return false;
-//         }
 
         // TODO: also check validity of all components (blockwise-copy, threadwise-copy, etc)
         return true;
