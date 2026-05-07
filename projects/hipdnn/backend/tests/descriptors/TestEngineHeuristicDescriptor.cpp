@@ -19,7 +19,9 @@
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/engine_details_generated.h>
+#include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
 
 #include <memory>
 #include <vector>
@@ -95,13 +97,19 @@ public:
     {
         // Mock policy IDs for both well-known policies
         const int64_t configPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::Config");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config");
         const int64_t staticOrderingPolicyId
-            = hipdnn_data_sdk::utilities::engineNameToId("SelectionHeuristic::StaticOrdering");
+            = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
 
         // Mock handles and descriptors
         auto mockHandle = reinterpret_cast<hipdnnHeuristicHandle_t>(0x1234);
         auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
+
+        // Catch-all for unknown policy IDs (must be set first; gmock matches LIFO).
+        EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(_))
+            .WillRepeatedly(Return(nullptr));
+        EXPECT_CALL(*_mockHeuristicPluginResourceManager, getHeuristicHandleForPolicyId(_))
+            .WillRepeatedly(Return(nullptr));
 
         // Set up expectations for resource manager - Config policy returns nullptr (skips)
         EXPECT_CALL(*_mockHeuristicPluginResourceManager, getPluginForPolicyId(configPolicyId))
@@ -123,7 +131,8 @@ public:
         // Set up expectations for the mock plugin
         EXPECT_CALL(*_mockHeuristicPlugin, setDeviceProperties(mockHandle, _))
             .WillRepeatedly(Return());
-        EXPECT_CALL(*_mockHeuristicPlugin, createPolicyDescriptor(mockHandle))
+        EXPECT_CALL(*_mockHeuristicPlugin,
+                    createPolicyDescriptor(mockHandle, staticOrderingPolicyId))
             .WillRepeatedly(Return(mockDescriptor));
         EXPECT_CALL(*_mockHeuristicPlugin, destroyPolicyDescriptor(mockDescriptor))
             .WillRepeatedly(Return());
@@ -144,6 +153,11 @@ public:
         // Return the same engine IDs that were set
         EXPECT_CALL(*_mockHeuristicPlugin, getSortedEngineIds(mockDescriptor))
             .WillRepeatedly([this]() { return _mockStoredEngineIds; });
+
+        EXPECT_CALL(*getMockGraph(), getSerializedGraph()).WillRepeatedly([]() {
+            static const std::vector<uint8_t> s_dummyData = {0x01, 0x02, 0x03};
+            return hipdnnPluginConstData_t{s_dummyData.data(), s_dummyData.size()};
+        });
     }
 
 protected:
@@ -440,10 +454,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineHeuristicDescriptorEngineConfigs)
             HIPDNN_ATTR_ENGINEHEUR_RESULTS, HIPDNN_TYPE_BACKEND_DESCRIPTOR, 1, nullptr, nullptr),
         HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    for(size_t i = 0; i < 3; ++i)
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    for(auto& owned : ownedConfigs)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        owned = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_RESULTS,
@@ -460,13 +480,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineHeuristicDescriptorEngineConfigs)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 3);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
-
-    configs.clear();
 
     ScopedDescriptor singleConfig(createDescriptorPtr<EngineConfigDescriptor>());
 
@@ -490,10 +503,17 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNullConfig)
     EXPECT_CALL(*_mockEnginePluginResourceManager, destroyEngineDetails(_, _))
         .WillRepeatedly(Return());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    configs[0] = createDescriptorPtr<EngineConfigDescriptor>();
-    configs[1] = nullptr;
-    configs[2] = createDescriptorPtr<EngineConfigDescriptor>();
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    ownedConfigs[0] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    // ownedConfigs[1] left as default (nullptr) to trigger the null-element path
+    ownedConfigs[2] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
+    }
 
     EXPECT_CALL(*getMockGraph(), isFinalized()).WillRepeatedly(Return(true));
     int64_t count = 0;
@@ -503,11 +523,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNullConfig)
                                                   &count,
                                                   configs.data()),
                                HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
@@ -521,10 +536,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
 
     ASSERT_NO_THROW(heur->finalize());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(3);
-    for(size_t i = 0; i < 3; ++i)
+    std::vector<ScopedDescriptor> ownedConfigs(3);
+    for(auto& owned : ownedConfigs)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        owned = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     int64_t count = 0;
@@ -534,11 +555,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsWithNoEngineIds)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 0);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
@@ -555,10 +571,16 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
     EXPECT_CALL(*_mockEnginePluginResourceManager, destroyEngineDetails(_, _))
         .WillRepeatedly(Return());
 
-    std::vector<hipdnnBackendDescriptor_t> configs(5);
+    std::vector<ScopedDescriptor> ownedConfigs(5);
     for(size_t i = 0; i < 3; ++i)
     {
-        configs[i] = createDescriptorPtr<EngineConfigDescriptor>();
+        ownedConfigs[i] = ScopedDescriptor(createDescriptorPtr<EngineConfigDescriptor>());
+    }
+    std::vector<hipdnnBackendDescriptor_t> configs;
+    configs.reserve(ownedConfigs.size());
+    for(auto& owned : ownedConfigs)
+    {
+        configs.push_back(owned.get());
     }
 
     int64_t count = 0;
@@ -568,11 +590,6 @@ TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsRequestMoreThanAvailable)
                                        &count,
                                        static_cast<void*>(configs.data())));
     ASSERT_EQ(count, 3);
-
-    for(auto config : configs)
-    {
-        delete config;
-    }
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetEngineConfigsCountOnly)
@@ -685,4 +702,470 @@ TEST_F(TestEngineHeuristicDescriptor, FinalizeWithFindFirstPassesToPluginManager
     EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, true))
         .WillOnce(Return(std::vector<int64_t>{1}));
     ASSERT_NO_THROW(heur->finalize());
+}
+
+// ========== Policy Order API Tests ==========
+
+TEST_F(TestEngineHeuristicDescriptor, SetPolicyOrderValid)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("Policy1"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy2"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy3"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+}
+
+TEST_F(TestEngineHeuristicDescriptor, SetPolicyOrderInvalidType)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    const char dummy = '\0';
+
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 1, &dummy),
+        HIPDNN_STATUS_BAD_PARAM);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, SetPolicyOrderNullPointer)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, nullptr),
+        HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderWhenNotSet)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    // With no descriptor-level override and no env var, resolveHeuristicPolicyOrder
+    // falls through to the built-in default: Config + StaticOrdering.
+    int64_t count = 999;
+    ASSERT_NO_THROW(heur->getAttribute(
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
+    ASSERT_EQ(count, 2);
+
+    std::vector<int64_t> buffer(2);
+    ASSERT_NO_THROW(heur->getAttribute(
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 2, &count, buffer.data()));
+    ASSERT_EQ(count, 2);
+    EXPECT_EQ(buffer[0], hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"));
+    EXPECT_EQ(buffer[1],
+              hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"));
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderCountOnly)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    int64_t count = 0;
+    ASSERT_NO_THROW(heur->getAttribute(
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
+    ASSERT_EQ(count, static_cast<int64_t>(policyIds.size()));
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderInvalidType)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<char> buffer(256);
+    int64_t count = 0;
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->getAttribute(
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 256, &count, buffer.data()),
+        HIPDNN_STATUS_BAD_PARAM);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNullPointer)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->getAttribute(
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr, nullptr),
+        HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNegativeRequestedCount)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<int64_t> buffer(4);
+    int64_t count = 0;
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->getAttribute(
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, -1, &count, buffer.data()),
+        HIPDNN_STATUS_BAD_PARAM);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderBufferTooSmall)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    // Request fewer elements than the descriptor holds; should truncate.
+    std::vector<int64_t> buffer(1);
+    int64_t count = 0;
+    ASSERT_NO_THROW(heur->getAttribute(
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &count, buffer.data()));
+    ASSERT_EQ(count, 1);
+    ASSERT_EQ(buffer[0], policyIds[0]);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderRoundTrip)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<int64_t> getBuffer(policyIds.size());
+    int64_t count = 0;
+    ASSERT_NO_THROW(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(getBuffer.size()),
+                                       &count,
+                                       getBuffer.data()));
+
+    ASSERT_EQ(count, static_cast<int64_t>(policyIds.size()));
+    for(size_t i = 0; i < policyIds.size(); ++i)
+    {
+        ASSERT_EQ(getBuffer[i], policyIds[i]);
+    }
+}
+
+// ========== Exception Handling Tests ==========
+
+TEST_F(TestEngineHeuristicDescriptor, FinalizeWithAllPoliciesFailing)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    // Make both policies fail
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
+
+    EXPECT_CALL(*_mockHeuristicPlugin, finalize(mockDescriptor)).WillRepeatedly(Return(false));
+
+    // finalize() should throw when all policies fail
+    ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, FinalizeWithPolicyThrowingException)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+
+    auto mockDescriptor = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(0x5678);
+
+    // First call to setEngineIds throws
+    EXPECT_CALL(*_mockHeuristicPlugin, setEngineIds(mockDescriptor, _, _))
+        .WillOnce(
+            Throw(HipdnnException(HIPDNN_STATUS_INTERNAL_ERROR, "Mock setEngineIds failure")));
+
+    // finalize() should throw when all policies fail (including exception paths)
+    ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
+}
+
+// ========== toString Tests ==========
+
+TEST_F(TestEngineHeuristicDescriptor, ToStringBeforeFinalize)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    const std::string str = heur->toString();
+    ASSERT_NE(str.find("EngineHeuristicDescriptor"), std::string::npos);
+    ASSERT_NE(str.find("unset"), std::string::npos);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, ToStringAfterSetHeurMode)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setHeuristicMode();
+    const std::string str = heur->toString();
+    ASSERT_NE(str.find("EngineHeuristicDescriptor"), std::string::npos);
+    ASSERT_NE(str.find("heuristicMode"), std::string::npos);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, ToStringAfterSetGraph)
+{
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    const std::string str = heur->toString();
+    ASSERT_NE(str.find("graph="), std::string::npos);
+    ASSERT_EQ(str.find("graph=null"), std::string::npos); // Should not be null
+}
+
+TEST_F(TestEngineHeuristicDescriptor, ToStringWithPolicyOrder)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("Policy1"),
+        hipdnn_data_sdk::utilities::policyNameToId("Policy2"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    const std::string str = heur->toString();
+    ASSERT_NE(str.find("policyOrder"), std::string::npos);
+    ASSERT_NE(str.find(hipdnn_data_sdk::utilities::formatEngineIdHex(policyIds[0])),
+              std::string::npos);
+    ASSERT_NE(str.find(hipdnn_data_sdk::utilities::formatEngineIdHex(policyIds[1])),
+              std::string::npos);
+}
+
+// ========== Edge Case Tests ==========
+
+TEST_F(TestEngineHeuristicDescriptor, SetEmptyPolicyOrder)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    // Setting an empty policy order is allowed at the attribute level; finalize()
+    // would later fail because no policy can be selected, but that is exercised by
+    // FinalizeWithAllPoliciesFailing. Here we only verify the attribute path.
+    ASSERT_NO_THROW(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
+}
+
+TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNullElementCount)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(policyIds.size()),
+                                       policyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<int64_t> getBuffer(16);
+    ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                                  HIPDNN_TYPE_INT64,
+                                                  static_cast<int64_t>(getBuffer.size()),
+                                                  nullptr,
+                                                  getBuffer.data()),
+                               HIPDNN_STATUS_BAD_PARAM_NULL_POINTER);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, MultipleSetPolicyOrderCalls)
+{
+    auto heur = getEngineHeuristicDescriptor();
+
+    // First set
+    {
+        const std::vector<int64_t> policyIds = {
+            hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+        };
+        ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                           HIPDNN_TYPE_INT64,
+                                           static_cast<int64_t>(policyIds.size()),
+                                           policyIds.data()));
+    }
+
+    // Second set should override
+    const std::vector<int64_t> secondPolicyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(secondPolicyIds.size()),
+                                       secondPolicyIds.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1}));
+    ASSERT_NO_THROW(heur->finalize());
+
+    std::vector<int64_t> getBuffer(secondPolicyIds.size());
+    int64_t count = 0;
+    ASSERT_NO_THROW(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(getBuffer.size()),
+                                       &count,
+                                       getBuffer.data()));
+
+    ASSERT_EQ(count, static_cast<int64_t>(secondPolicyIds.size()));
+    for(size_t i = 0; i < secondPolicyIds.size(); ++i)
+    {
+        ASSERT_EQ(getBuffer[i], secondPolicyIds[i]);
+    }
+}
+
+// ========== Policy Order Resolution: Environment Variable ==========
+
+TEST_F(TestEngineHeuristicDescriptor, EnvironmentVariablePolicyOrderIsRespected)
+{
+    // The mock setup in setupMockHeuristicPlugin() makes Config return a null
+    // handle (skipped) and StaticOrdering succeed. With no descriptor-level
+    // override, the default order [Config, StaticOrdering] therefore succeeds
+    // via StaticOrdering. Restricting the env-var order to Config alone should
+    // make finalize() throw, proving the env var supersedes the default.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
+
+    auto heur = getEngineHeuristicDescriptor();
+    setGraph();
+    setHeuristicMode();
+
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
+}
+
+TEST_F(TestEngineHeuristicDescriptor, DescriptorPolicyOrderTakesPrecedenceOverEnvironment)
+{
+    // Same mock setup. Env var lists only Config (which would throw on its own),
+    // but the descriptor-level attribute lists only StaticOrdering. The descriptor
+    // attribute is highest priority, so finalize() must succeed.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter guard(
+        "HIPDNN_HEURISTIC_POLICY_ORDER", "SelectionHeuristic::Config");
+
+    auto heur = getEngineHeuristicDescriptor();
+
+    const std::vector<int64_t> descriptorOrder = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+    ASSERT_NO_THROW(heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
+                                       HIPDNN_TYPE_INT64,
+                                       static_cast<int64_t>(descriptorOrder.size()),
+                                       descriptorOrder.data()));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    ASSERT_NO_THROW(heur->finalize());
+}
+
+// ========== Failure Handling: Empty Policy List ==========
+
+TEST_F(TestEngineHeuristicDescriptor, FinalizeWithEmptyPolicyListThrows)
+{
+    // Empty policy list reaches the "no policy succeeded" path via a different
+    // route from FinalizeWithAllPoliciesFailing: the outer loop never executes
+    // because there are no slots to try. Both paths must produce the same throw.
+    auto heur = getEngineHeuristicDescriptor();
+
+    ASSERT_NO_THROW(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
+
+    setGraph();
+    setHeuristicMode();
+    EXPECT_CALL(*_mockEnginePluginResourceManager, getApplicableEngineIds(_, _))
+        .WillRepeatedly(Return(std::vector<int64_t>{1, 2}));
+
+    ASSERT_THROW_HIPDNN_STATUS(heur->finalize(), HIPDNN_STATUS_INTERNAL_ERROR);
 }

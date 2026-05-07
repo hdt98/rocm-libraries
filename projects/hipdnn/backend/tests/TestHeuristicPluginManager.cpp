@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPluginManager.cpp
- * @brief Unit tests for HeuristicPluginManager validation logic (RFC 0007 Part 1)
+ * @brief Unit tests for HeuristicPluginManager validation logic
  *
  * These tests verify the plugin discovery and validation layer including:
  * - API version compatibility validation
@@ -14,6 +14,9 @@
 #include "HipdnnException.hpp"
 #include "plugin/HeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
+
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
+#include <hipdnn_test_sdk/utilities/FileUtilities.hpp>
 
 #include <filesystem>
 #include <gtest/gtest.h>
@@ -34,7 +37,7 @@ protected:
     // Helper to create a valid policy name/ID pair
     static std::pair<std::string, int64_t> makeValidPolicyPair(const std::string& baseName)
     {
-        const int64_t policyId = hipdnn_data_sdk::utilities::engineNameToId(baseName);
+        const int64_t policyId = hipdnn_data_sdk::utilities::policyNameToId(baseName);
         return {baseName, policyId};
     }
 };
@@ -46,31 +49,18 @@ TEST_F(TestHeuristicPluginManager, ConstructorSucceeds)
     EXPECT_NO_THROW(const HeuristicPluginManager manager);
 }
 
-TEST_F(TestHeuristicPluginManager, ConstructorInitializesSearchPaths)
-{
-    const HeuristicPluginManager manager;
-
-    // Manager should be created (implementation uses default search paths)
-    // We can't easily test internal state, but construction should succeed
-    SUCCEED();
-}
-
 // ========== Plugin Loading Tests ==========
 
 TEST_F(TestHeuristicPluginManager, LoadPluginsFromEmptyDirectorySucceeds)
 {
     HeuristicPluginManager manager;
 
-    // Create a temporary empty directory
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_test_empty";
-    std::filesystem::create_directories(emptyDir);
+    const auto uniqueName = std::string("hipdnn_test_empty_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
-    // Should not throw when loading from empty directory
-    EXPECT_NO_THROW(manager.loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
-
-    // Cleanup
-    std::filesystem::remove(emptyDir);
+    EXPECT_NO_THROW(manager.loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 }
 
 TEST_F(TestHeuristicPluginManager, LoadPluginsFromNonexistentDirectorySucceeds)
@@ -97,20 +87,9 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithMultiplePathsSucceeds)
     EXPECT_NO_THROW(manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
 }
 
-// ========== Validation Tests - API Version ==========
-
 // Note: Actual validation happens inside validateBeforeAdding() which is protected.
-// We test it indirectly through loadPlugins() with real plugin files, but those
-// tests are in integration tests. Here we verify the manager's structure supports validation.
-
-TEST_F(TestHeuristicPluginManager, ManagerSupportsValidation)
-{
-    const HeuristicPluginManager manager;
-
-    // The manager should be constructed with validation capabilities
-    // This is a structural test - actual validation tested via integration tests
-    SUCCEED();
-}
+// It is exercised end-to-end in TestHeuristicPluginManagerValidationPaths.cpp using
+// real test plugins.
 
 // ========== Multiple Load Cycles Tests ==========
 
@@ -154,8 +133,8 @@ TEST_F(TestHeuristicPluginManager, MultipleInstancesAreIndependent)
     manager2.loadPlugins({std::filesystem::temp_directory_path() / "path2"},
                          HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Both should work independently
-    SUCCEED();
+    EXPECT_TRUE(manager1.getPlugins().empty());
+    EXPECT_TRUE(manager2.getPlugins().empty());
 }
 
 // ========== Edge Cases Tests ==========
@@ -179,64 +158,6 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithSamePathTwiceSucceeds)
     // Set automatically handles duplicates, but test that loading twice works
     manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     EXPECT_NO_THROW(manager.loadPlugins(paths, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
-}
-
-// ========== Destructor Tests ==========
-
-TEST_F(TestHeuristicPluginManager, DestructorCleansUpResources)
-{
-    {
-        HeuristicPluginManager manager;
-        manager.loadPlugins({std::filesystem::temp_directory_path() / "test"},
-                            HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-    } // manager destroyed here
-
-    // If we get here without crashes, cleanup succeeded
-    SUCCEED();
-}
-
-TEST_F(TestHeuristicPluginManager, MultipleDestructionsSucceed)
-{
-    for(int i = 0; i < 10; ++i)
-    {
-        HeuristicPluginManager manager;
-        manager.loadPlugins({std::filesystem::temp_directory_path() / "test"},
-                            HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-        // Destroyed at end of loop
-    }
-
-    SUCCEED();
-}
-
-// ========== Policy ID Tracking Tests ==========
-
-TEST_F(TestHeuristicPluginManager, ManagerTracksLoadedPolicies)
-{
-    const HeuristicPluginManager manager;
-
-    // After construction, no policies should be loaded
-    // This verifies the manager maintains internal state for policy tracking
-    // Actual policy ID validation tested via integration tests with real plugins
-    SUCCEED();
-}
-
-// ========== Search Path Tests ==========
-
-TEST_F(TestHeuristicPluginManager, DefaultSearchPathsAreUsed)
-{
-    const HeuristicPluginManager manager;
-
-    // Manager should initialize with default search paths
-    // (implementation detail - verified indirectly)
-    SUCCEED();
-}
-
-TEST_F(TestHeuristicPluginManager, EnvironmentVariablePathsAreSupported)
-{
-    // The manager uses getPluginSearchPaths() which checks HIPDNN_HEURISTIC_PLUGIN_DIR
-    // This is tested indirectly through construction
-    const HeuristicPluginManager manager;
-    SUCCEED();
 }
 
 // ========== Plugin Loading Mode Tests ==========
@@ -269,20 +190,24 @@ TEST_F(TestHeuristicPluginManager, LoadPluginsWithAdditiveModeAdds)
     const std::set<std::filesystem::path> paths2
         = {std::filesystem::temp_directory_path() / "path2"};
 
-    manager.loadPlugins(paths1, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-    manager.loadPlugins(paths2, HIPDNN_PLUGIN_LOADING_ADDITIVE);
-
-    // Should not crash - additive mode should preserve existing plugins
-    SUCCEED();
+    // Exercise the additive code path. With non-existent paths the plugin count
+    // stays at 0, but the additive branch in PluginManagerBase::loadPlugins is
+    // executed and any leak/crash inside it would be caught under ASAN.
+    EXPECT_NO_THROW(manager.loadPlugins(paths1, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    EXPECT_NO_THROW(manager.loadPlugins(paths2, HIPDNN_PLUGIN_LOADING_ADDITIVE));
 }
+
+// Destructor coverage with real loaded plugins lives in
+// TestHeuristicPluginManagerValidationPaths.cpp::DestructorUnloadsLoadedPluginLibraries,
+// where _testPluginPath provides actual shared libraries to exercise the unload path.
 
 // ========== Policy ID/Name Validation Tests ==========
 
 TEST_F(TestHeuristicPluginManager, PolicyNameToIdIsConsistent)
 {
     const std::string name1 = "SelectionHeuristic::Config";
-    const int64_t id1a = hipdnn_data_sdk::utilities::engineNameToId(name1);
-    const int64_t id1b = hipdnn_data_sdk::utilities::engineNameToId(name1);
+    const int64_t id1a = hipdnn_data_sdk::utilities::policyNameToId(name1);
+    const int64_t id1b = hipdnn_data_sdk::utilities::policyNameToId(name1);
 
     EXPECT_EQ(id1a, id1b);
 }
@@ -292,8 +217,8 @@ TEST_F(TestHeuristicPluginManager, DifferentNamesProduceDifferentIds)
     const std::string name1 = "SelectionHeuristic::Config";
     const std::string name2 = "SelectionHeuristic::StaticOrdering";
 
-    const int64_t id1 = hipdnn_data_sdk::utilities::engineNameToId(name1);
-    const int64_t id2 = hipdnn_data_sdk::utilities::engineNameToId(name2);
+    const int64_t id1 = hipdnn_data_sdk::utilities::policyNameToId(name1);
+    const int64_t id2 = hipdnn_data_sdk::utilities::policyNameToId(name2);
 
     EXPECT_NE(id1, id2);
 }
@@ -301,7 +226,7 @@ TEST_F(TestHeuristicPluginManager, DifferentNamesProduceDifferentIds)
 TEST_F(TestHeuristicPluginManager, PolicyIdIsNonZero)
 {
     const std::string name = "SelectionHeuristic::Config";
-    const int64_t id = hipdnn_data_sdk::utilities::engineNameToId(name);
+    const int64_t id = hipdnn_data_sdk::utilities::policyNameToId(name);
 
     EXPECT_NE(id, 0);
 }
@@ -309,7 +234,7 @@ TEST_F(TestHeuristicPluginManager, PolicyIdIsNonZero)
 TEST_F(TestHeuristicPluginManager, EmptyPolicyNameProducesZeroId)
 {
     const std::string emptyName;
-    const int64_t id = hipdnn_data_sdk::utilities::engineNameToId(emptyName);
+    const int64_t id = hipdnn_data_sdk::utilities::policyNameToId(emptyName);
 
     // Empty string should produce a specific ID (FNV-1a hash of empty string)
     EXPECT_EQ(id, 0);
@@ -321,12 +246,11 @@ TEST_F(TestHeuristicPluginManager, GetPluginsAfterEmptyLoadReturnsEmpty)
 {
     HeuristicPluginManager manager;
 
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_empty_load_test";
-    std::filesystem::create_directories(emptyDir);
+    const auto uniqueName = std::string("hipdnn_empty_load_test_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
-    manager.loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    manager.loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
     EXPECT_TRUE(manager.getPlugins().empty());
-
-    std::filesystem::remove(emptyDir);
 }

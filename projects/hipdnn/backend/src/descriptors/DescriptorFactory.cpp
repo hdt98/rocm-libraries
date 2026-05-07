@@ -30,6 +30,9 @@
 #include "SdpaFwdOperationDescriptor.hpp"
 #include "TensorDescriptor.hpp"
 #include "VariantDescriptor.hpp"
+// Required: EngineHeuristicDescriptor holds std::unique_ptr<SelectionHeuristic>
+// via forward declaration, so the complete type must be visible where
+// make_shared<EngineHeuristicDescriptor>() instantiates the destructor.
 #include "heuristics/SelectionHeuristic.hpp"
 #include "logging/Logging.hpp"
 

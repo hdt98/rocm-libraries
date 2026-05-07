@@ -404,6 +404,42 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t
                                             char* serializedJsonGraph);
 
 /*!
+ * @brief Retrieves the serialized backend execution plan from a finalized execution plan.
+ *
+ * Uses the standard two-call pattern: call first with @p serializedPlan set to @c nullptr to query
+ * the required buffer size, then call again with a caller-allocated buffer to receive the data.
+ * The descriptor must be a finalized HIPDNN_BACKEND_EXECUTION_PLAN_DESCRIPTOR. The returned bytes
+ * contain a hipDNN FlatBuffer envelope with routing metadata, plan tensor UIDs, and opaque
+ * plugin-specific execution context bytes.
+ *
+ * @param [in]  descriptor        A finalized execution plan descriptor.
+ * @param [in]  requestedByteSize Size of the caller-allocated buffer in bytes.
+ *                                Ignored when @p serializedPlan is @c nullptr.
+ * @param [out] planByteSize      Pointer to receive the size of the serialized plan in bytes.
+ * @param [out] serializedPlan    Caller-allocated buffer to receive the serialized plan data,
+ *                                or @c nullptr to query the required size only.
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t
+    hipdnnBackendGetSerializedExecutionPlan_ext(hipdnnBackendDescriptor_t descriptor,
+                                                size_t requestedByteSize,
+                                                size_t* planByteSize,
+                                                uint8_t* serializedPlan);
+
+/*!
+ * @brief Creates and deserializes a backend execution plan descriptor.
+ *
+ * @param [in]  handle         A hipDNN handle used to access loaded engine plugins.
+ * @param [out] descriptor     Pointer to the created execution plan descriptor.
+ * @param [in]  serializedPlan Pointer to bytes produced by hipdnnBackendGetSerializedExecutionPlan_ext().
+ * @param [in]  planByteSize   Size of @p serializedPlan in bytes.
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t
+    hipdnnBackendCreateAndDeserializeExecutionPlan_ext(hipdnnHandle_t handle,
+                                                       hipdnnBackendDescriptor_t* descriptor,
+                                                       const uint8_t* serializedPlan,
+                                                       size_t planByteSize);
+
+/*!
  * @brief Creates and deserializes a graph from a JSON string into a backend descriptor.
  *
  * This function creates a backend descriptor and deserializes a graph from a JSON string
@@ -461,6 +497,28 @@ HIPDNN_BACKEND_EXPORT void hipdnnLoggingCallback_ext(hipdnnSeverity_t severity, 
  * @retval HIPDNN_STATUS_INTERNAL_ERROR    An internal error occurred.
  */
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetEnginePluginPaths_ext(
+    size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode);
+
+/**
+ * @brief Sets the search paths for hipDNN heuristic plugins.
+ *
+ * Mirrors @ref hipdnnSetEnginePluginPaths_ext for the heuristic plugin search domain.
+ * Must be called before creating a hipDNN handle, as heuristic plugins are loaded
+ * during handle creation.
+ *
+ * Paths can be either directories or specific plugin files. Relative paths are resolved
+ * from the location of the libhipdnn_backend.so file.
+ *
+ * @param[in] numPaths       The number of paths in the `pluginPaths` array.
+ * @param[in] pluginPaths    An array of relative or absolute path strings.
+ * @param[in] loadingMode    Specifies whether to add paths to or replace the default search paths.
+ *
+ * @retval HIPDNN_STATUS_SUCCESS                  The operation was successful.
+ * @retval HIPDNN_STATUS_BAD_PARAM_NULL_POINTER   `pluginPaths` is nullptr when `numPaths` is greater than 0.
+ * @retval HIPDNN_STATUS_NOT_SUPPORTED            Called with active handle.
+ * @retval HIPDNN_STATUS_INTERNAL_ERROR           An internal error occurred.
+ */
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetHeuristicPluginPaths_ext(
     size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode);
 
 /**
@@ -640,9 +698,9 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetEngineInfo_ext(hipdnnHandle_t hand
 /**
  * @brief Gets the count of loaded heuristic policies.
  *
- * RFC 0007 Section 16: Returns the number of heuristic policy plugins that have been
- * successfully loaded and validated by the backend. This count includes all policies
- * available for use in the outer loop engine selection.
+ * Returns the number of heuristic policy plugins that have been successfully loaded
+ * and validated by the backend. This count includes all policies available for use
+ * in the outer loop engine selection.
  *
  * @param[in]  handle       A valid hipDNN handle.
  * @param[out] numPolicies  Pointer where the policy count will be stored.
@@ -658,9 +716,12 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyCount_ext(hipdnnHan
 /**
  * @brief Gets information about a loaded heuristic policy by index.
  *
- * RFC 0007 Section 16: Retrieves metadata for a heuristic policy plugin, including
- * policy ID, policy name, plugin version, and API version. Policies are enumerated
- * in the order they appear in the default policy list.
+ * Retrieves metadata for a heuristic policy plugin, including policy ID, policy
+ * name, plugin version, and API version.
+ *
+ * @note The enumeration order is unspecified and may change between calls or
+ * between backend versions. Callers must not assume a stable ordering across
+ * indices; use the returned `policyId` as the identity, not `policyIndex`.
  *
  * This function uses a two-call pattern for string fields:
  * 1. First call: Pass all string buffers as `nullptr` to query required sizes.

@@ -3,7 +3,7 @@
 
 /**
  * @file TestHeuristicPluginManagerValidationPaths.cpp
- * @brief Tests for HeuristicPluginManager validation code paths (RFC 0007)
+ * @brief Tests for HeuristicPluginManager validation code paths
  *
  * These tests load actual test plugins to exercise validateBeforeAdding() and
  * actionAfterAdding() to improve coverage of HeuristicPluginManager.hpp
@@ -18,6 +18,7 @@
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
+#include <hipdnn_test_sdk/utilities/FileUtilities.hpp>
 
 // Test plugin name constants (defined here because CMake ordering prevents proper macro propagation)
 namespace
@@ -91,20 +92,25 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ActionAfterAddingStoresPolicyI
 
     // Collect all policy IDs to verify actionAfterAdding was called
     std::set<int64_t> policyIds;
+    size_t totalPolicyCount = 0;
     for(const auto& plugin : plugins)
     {
-        const int64_t id = plugin->policyId();
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            ++totalPolicyCount;
 
-        // Each policy ID should be unique (actionAfterAdding should have tracked this)
-        EXPECT_EQ(policyIds.count(id), 0)
-            << "Policy ID " << id << " appears multiple times (actionAfterAdding tracking failed)";
+            // Each policy ID should be unique (actionAfterAdding should have tracked this)
+            EXPECT_EQ(policyIds.count(id), 0) << "Policy ID " << id
+                                              << " appears multiple times (actionAfterAdding "
+                                                 "tracking failed)";
 
-        policyIds.insert(id);
+            policyIds.insert(id);
+        }
     }
 
     // Should have loaded plugins with unique policy IDs
-    EXPECT_GT(policyIds.size(), 0) << "Should have loaded at least one plugin";
-    EXPECT_EQ(policyIds.size(), plugins.size()) << "All policy IDs should be unique";
+    EXPECT_GT(policyIds.size(), 0) << "Should have loaded at least one plugin policy";
+    EXPECT_EQ(policyIds.size(), totalPolicyCount) << "All policy IDs should be unique";
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyIdTrackingAcrossMultiplePlugins)
@@ -114,21 +120,25 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyIdTrackingAcrossMultiple
 
     const auto& plugins = _manager->getPlugins();
 
-    // Collect all policy IDs
+    // Collect all policy IDs from every loaded plugin/policy
     std::set<int64_t> policyIds;
+    size_t totalPolicyCount = 0;
     for(const auto& plugin : plugins)
     {
-        const int64_t id = plugin->policyId();
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            ++totalPolicyCount;
 
-        // Each policy ID should be unique (actionAfterAdding tracks this)
-        EXPECT_EQ(policyIds.count(id), 0)
-            << "Policy ID " << id << " appears multiple times (validateBeforeAdding failed)";
+            // Each policy ID should be unique (actionAfterAdding tracks this)
+            EXPECT_EQ(policyIds.count(id), 0)
+                << "Policy ID " << id << " appears multiple times (validateBeforeAdding failed)";
 
-        policyIds.insert(id);
+            policyIds.insert(id);
+        }
     }
 
-    // Should have as many unique IDs as plugins
-    EXPECT_EQ(policyIds.size(), plugins.size());
+    // Should have as many unique IDs as policies across all plugins
+    EXPECT_EQ(policyIds.size(), totalPolicyCount);
 }
 
 // ========== validateBeforeAdding() Tests - Policy Name Check ==========
@@ -156,13 +166,16 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, PolicyNameIsProvided)
 
     for(const auto& plugin : plugins)
     {
-        const std::string policyName(plugin->name());
+        // Plugin name must be non-empty (validated in HeuristicPluginManager)
+        const std::string pluginName(plugin->name());
+        EXPECT_FALSE(pluginName.empty()) << "Plugin has empty name";
 
-        // Policy name should be non-empty (validated in validateBeforeAdding lines 82-89)
-        EXPECT_FALSE(policyName.empty()) << "Policy ID " << plugin->policyId() << " has empty name";
-
-        // Should be a valid string
-        EXPECT_GT(policyName.length(), 0);
+        // Each policy must have a non-empty name (validated eagerly in HeuristicPlugin)
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            const std::string policyName(plugin->getPolicyName(policyId));
+            EXPECT_FALSE(policyName.empty()) << "Policy ID " << policyId << " has empty name";
+        }
     }
 }
 
@@ -177,15 +190,18 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidPluginPassesAllValidation
 
     for(const auto& plugin : plugins)
     {
-        // API version check (validateBeforeAdding lines 55-66)
+        // API version check
         const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
         EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
 
-        // Policy ID should be non-zero
-        EXPECT_NE(plugin->policyId(), 0);
-
-        // Policy name check (validateBeforeAdding lines 82-89)
+        // Plugin name check
         EXPECT_FALSE(plugin->name().empty());
+
+        // Each policy ID should be non-zero
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            EXPECT_NE(policyId, 0);
+        }
     }
 }
 
@@ -197,16 +213,17 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ActionAfterAddingExecutesForEa
 
     const auto& plugins = _manager->getPlugins();
 
-    // For each plugin loaded, actionAfterAdding should have:
-    // 1. Inserted policy ID into _policyIds set (line 94)
-    // This is verified indirectly by ensuring no duplicate IDs exist
-
+    // For each policy across all plugins, actionAfterAdding should have inserted the
+    // policy ID into _policyIds set. Verified indirectly by ensuring no duplicates exist.
     std::set<int64_t> observedIds;
     for(const auto& plugin : plugins)
     {
-        EXPECT_EQ(observedIds.count(plugin->policyId()), 0)
-            << "Duplicate policy ID detected - actionAfterAdding may have failed";
-        observedIds.insert(plugin->policyId());
+        for(const int64_t id : plugin->getAllPolicyIds())
+        {
+            EXPECT_EQ(observedIds.count(id), 0)
+                << "Duplicate policy ID detected - actionAfterAdding may have failed";
+            observedIds.insert(id);
+        }
     }
 }
 
@@ -228,18 +245,45 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidationRunsOnEachLoadCycle)
     EXPECT_GT(count1, 0) << "Should have loaded at least one plugin";
 }
 
+TEST_F(TestHeuristicPluginManagerValidationPaths, AbsoluteReloadResetsPolicyIdTracking)
+{
+    // Regression: ABSOLUTE-mode reload must clear the derived-class policy-id
+    // index, not just _plugins. Otherwise reloading a plugin whose policy id
+    // matches one from the previous load triggers a false "already exists"
+    // failure in validateBeforeAdding.
+    _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    const size_t firstCount = _manager->getPlugins().size();
+    ASSERT_GT(firstCount, 0u) << "Test precondition: at least one plugin must load";
+
+    EXPECT_NO_THROW(_manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE));
+    EXPECT_EQ(_manager->getPlugins().size(), firstCount);
+}
+
 // ========== Constructor Path Coverage ==========
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, ConstructorSetsUpValidationInfrastructure)
 {
-    // Constructor initializes with search paths and empty _policyIds set
+    // Constructor initializes with search paths and empty _policyIds set.
+    // Assert against the freshly-constructed local manager (not the fixture's),
+    // otherwise the test is just re-checking SetUp's invariant.
     const HeuristicPluginManager manager;
 
     // Should start with no plugins
-    EXPECT_TRUE(_manager->getPlugins().empty());
+    EXPECT_TRUE(manager.getPlugins().empty());
+}
 
-    // Validation infrastructure should be ready (verified by successful construction)
-    SUCCEED();
+// ========== Destructor Path Coverage ==========
+
+TEST_F(TestHeuristicPluginManagerValidationPaths, DestructorUnloadsLoadedPluginLibraries)
+{
+    _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    ASSERT_FALSE(_manager->getPlugins().empty())
+        << "Test precondition: at least one plugin must load to exercise the unload path";
+
+    // Destruction triggers SharedLibrary teardown for each loaded plugin
+    // (dlclose / FreeLibrary). ASAN catches any leak in plugin-side static teardown.
+    EXPECT_NO_THROW(_manager.reset());
+    EXPECT_EQ(_manager, nullptr);
 }
 
 // ========== Integration with PluginManagerBase ==========
@@ -256,11 +300,15 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, ValidationIntegratesWithBaseCl
     for(const auto& plugin : plugins)
     {
         // These checks verify that validateBeforeAdding was called and passed
-        EXPECT_NE(plugin->policyId(), 0);
         EXPECT_FALSE(plugin->name().empty());
 
         const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
         EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
+
+        for(const int64_t policyId : plugin->getAllPolicyIds())
+        {
+            EXPECT_NE(policyId, 0);
+        }
     }
 }
 
@@ -273,23 +321,25 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, NoOptionalHeuristicPluginPasse
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from "
+                                  << _testPluginPath;
 
+    bool foundNoOptional = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
         if(name.find("NoOptional") != std::string::npos)
         {
+            foundNoOptional = true;
             // Should pass all validation checks
-            EXPECT_NE(plugin->policyId(), 0);
             EXPECT_FALSE(name.empty());
+            for(const int64_t policyId : plugin->getAllPolicyIds())
+            {
+                EXPECT_NE(policyId, 0);
+            }
         }
     }
-
-    // Plugin should have been loaded if it exists
-    if(!plugins.empty())
-    {
-        SUCCEED();
-    }
+    EXPECT_TRUE(foundNoOptional) << "test_no_optional_heuristic_plugin should be loaded";
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValidation)
@@ -297,144 +347,112 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from "
+                                  << _testPluginPath;
 
+    // Match the exact good-plugin name. A loose substring match would pass even if
+    // the good plugin failed to load.
+    constexpr const char* K_GOOD_PLUGIN_NAME = "TestGoodHeuristicPlugin";
+
+    bool foundGood = false;
     for(const auto& plugin : plugins)
     {
         const std::string name(plugin->name());
-        if(name.find("Good") != std::string::npos || name.find("Test") != std::string::npos)
+        if(name == K_GOOD_PLUGIN_NAME)
         {
+            foundGood = true;
             // Verify it passed all validation:
-            // 1. API version (lines 55-66)
+            // 1. API version
             const auto version = hipdnn_data_sdk::utilities::Version{plugin->apiVersion()};
             EXPECT_EQ(version.major, HIPDNN_HEURISTIC_API_VERSION_MAJOR);
 
-            // 2. Policy ID is unique and non-zero (lines 69-78)
-            EXPECT_NE(plugin->policyId(), 0);
-
-            // 3. Policy name is non-empty (lines 81-89)
+            // 2. Plugin name is non-empty
             EXPECT_FALSE(name.empty());
+
+            // 3. All policy IDs are unique and non-zero
+            for(const int64_t policyId : plugin->getAllPolicyIds())
+            {
+                EXPECT_NE(policyId, 0);
+            }
         }
     }
-
-    if(!plugins.empty())
-    {
-        SUCCEED();
-    }
+    EXPECT_TRUE(foundGood) << "test_good_heuristic_plugin should be loaded";
 }
 
 // ========== Validation Failure Tests ==========
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, BadApiVersionPluginRejected)
 {
+    // ABSOLUTE mode accepts a single plugin file path, so we can load just the bad
+    // plugin directly from the build tree instead of copying it to a temp dir.
+    const auto badPlugin
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
 
-    // Build path to bad plugin in a separate directory to isolate it
-    const auto badPluginDir = std::filesystem::temp_directory_path() / "hipdnn_bad_api_test";
-    std::filesystem::create_directories(badPluginDir);
+    // Without this precondition, loadPlugins silently no-ops on a missing file
+    // and the empty-plugins assertion below would pass vacuously.
+    ASSERT_TRUE(std::filesystem::exists(badPlugin))
+        << "Test precondition: bad-API-version plugin missing at " << badPlugin;
 
-    // Copy the bad plugin to isolated directory
-    const std::string pluginFilename
-        = hipdnn_data_sdk::utilities::getLibraryName(BAD_API_VERSION_PLUGIN);
-    const auto srcPlugin = _testPluginPath / pluginFilename;
-    const auto dstPlugin = badPluginDir / pluginFilename;
-    std::filesystem::copy_file(
-        srcPlugin, dstPlugin, std::filesystem::copy_options::overwrite_existing);
+    _manager->loadPlugins({badPlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Loading plugin with wrong API version - loadPlugins logs errors but doesn't throw
-    _manager->loadPlugins({badPluginDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-    // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Bad API version plugin should be rejected";
-
-    // Unload any resources before cleanup (Windows DLL safety)
-    _manager.reset();
-
-    // Cleanup
-    std::filesystem::remove_all(badPluginDir);
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 {
+    const auto emptyNamePlugin
+        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
 
-    // Build path to empty name plugin in a separate directory to isolate it
-    const auto emptyNameDir = std::filesystem::temp_directory_path() / "hipdnn_empty_name_test";
-    std::filesystem::create_directories(emptyNameDir);
+    ASSERT_TRUE(std::filesystem::exists(emptyNamePlugin))
+        << "Test precondition: empty-name plugin missing at " << emptyNamePlugin;
 
-    // Copy the empty name plugin to isolated directory
-    const std::string pluginFilename
-        = hipdnn_data_sdk::utilities::getLibraryName(EMPTY_NAME_PLUGIN);
-    const auto srcPlugin = _testPluginPath / pluginFilename;
-    const auto dstPlugin = emptyNameDir / pluginFilename;
-    std::filesystem::copy_file(
-        srcPlugin, dstPlugin, std::filesystem::copy_options::overwrite_existing);
+    _manager->loadPlugins({emptyNamePlugin}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
-    // Loading plugin with empty policy name - loadPlugins logs errors but doesn't throw
-    _manager->loadPlugins({emptyNameDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-    // Plugin should not have been loaded due to validation failure
     EXPECT_TRUE(_manager->getPlugins().empty()) << "Empty policy name plugin should be rejected";
-
-    // Unload any resources before cleanup (Windows DLL safety)
-    _manager.reset();
-
-    // Cleanup
-    std::filesystem::remove_all(emptyNameDir);
 }
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsRejected)
 {
+    const auto pluginA = _testPluginPath
+                         / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
+    const auto pluginB = _testPluginPath
+                         / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
 
-    // Build path to duplicate plugins in a separate directory to isolate them
-    const auto duplicateDir = std::filesystem::temp_directory_path() / "hipdnn_duplicate_id_test";
-    std::filesystem::create_directories(duplicateDir);
-
-    // Copy both duplicate plugins to isolated directory
-    const std::string pluginFilenameA
-        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
-    const std::string pluginFilenameB
-        = hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
-    const auto srcPluginA = _testPluginPath / pluginFilenameA;
-    const auto srcPluginB = _testPluginPath / pluginFilenameB;
-    const auto dstPluginA = duplicateDir / pluginFilenameA;
-    const auto dstPluginB = duplicateDir / pluginFilenameB;
-
-    if(std::filesystem::exists(srcPluginA) && std::filesystem::exists(srcPluginB))
-    {
-        std::filesystem::copy_file(
-            srcPluginA, dstPluginA, std::filesystem::copy_options::overwrite_existing);
-        std::filesystem::copy_file(
-            srcPluginB, dstPluginB, std::filesystem::copy_options::overwrite_existing);
-
-        // Load directory with both duplicate plugins - loadPlugins logs errors but doesn't throw
-        _manager->loadPlugins({duplicateDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
-
-        // Only one plugin should have loaded - the second should be rejected due to duplicate ID
-        EXPECT_EQ(_manager->getPlugins().size(), 1) << "Only first duplicate plugin should load";
-
-        // Unload plugins before cleanup (Windows keeps DLLs locked until unloaded)
-        _manager.reset();
-
-        // Cleanup
-        std::filesystem::remove_all(duplicateDir);
-    }
-    else
+    if(!std::filesystem::exists(pluginA) || !std::filesystem::exists(pluginB))
     {
         GTEST_SKIP() << "test_duplicate_policy_id plugins not found";
     }
+
+    _manager->loadPlugins({pluginA, pluginB}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+
+    // Only one plugin should have loaded - the second should be rejected due to duplicate ID.
+    const auto& plugins = _manager->getPlugins();
+    ASSERT_EQ(plugins.size(), 1u) << "Only first duplicate plugin should load";
+
+    // The survivor must be the first one offered (pluginA). Verifying the
+    // policy id pins down ordering — without this the size check would still
+    // pass if pluginA was rejected for an unrelated reason and pluginB loaded.
+    HeuristicPluginManager probeA;
+    probeA.loadPlugins({pluginA}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    ASSERT_EQ(probeA.getPlugins().size(), 1u)
+        << "pluginA should load successfully on its own to be a valid baseline";
+    EXPECT_EQ(plugins.front()->getAllPolicyIds(), probeA.getPlugins().front()->getAllPolicyIds())
+        << "Survivor should be pluginA (the first offered), not pluginB";
 }
 
 // ========== Edge Case: Empty Plugin Directory ==========
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyDirectorySkipsValidation)
 {
-
-    const std::filesystem::path emptyDir
-        = std::filesystem::temp_directory_path() / "hipdnn_empty_heur_test";
-    std::filesystem::create_directories(emptyDir);
+    // ScopedDirectory creates the dir and remove_all's it on destruction, so
+    // the temp dir is cleaned up even if an assertion below aborts.
+    const auto uniqueName = std::string("hipdnn_empty_heur_test_")
+                            + std::to_string(::testing::UnitTest::GetInstance()->random_seed());
+    const hipdnn_test_sdk::utilities::ScopedDirectory emptyDir(
+        std::filesystem::temp_directory_path() / uniqueName);
 
     // Load from empty directory - no plugins to validate
-    _manager->loadPlugins({emptyDir}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
+    _manager->loadPlugins({emptyDir.path()}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     EXPECT_TRUE(_manager->getPlugins().empty());
-
-    std::filesystem::remove(emptyDir);
 }

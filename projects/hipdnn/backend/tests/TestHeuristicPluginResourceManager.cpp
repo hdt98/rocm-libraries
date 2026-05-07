@@ -3,14 +3,13 @@
 
 /**
  * @file TestHeuristicPluginResourceManager.cpp
- * @brief Unit tests for HeuristicPluginResourceManager (RFC 0007 Part 1)
+ * @brief Unit tests for HeuristicPluginResourceManager
  *
  * These tests verify the plugin resource management layer that provides
  * per-handle plugin lifecycle management and policy lookup.
  */
 
 #include "HipdnnException.hpp"
-#include "descriptors/mocks/MockHeuristicPlugin.hpp"
 #include "plugin/HeuristicPluginManager.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
 
@@ -288,9 +287,6 @@ TEST_F(TestHeuristicPluginResourceManager, DestructorCleansUpResources)
         // Use rm
         rm->getHeuristicPolicyInfos();
     } // rm destroyed here
-
-    // If we get here without crashes, cleanup succeeded
-    SUCCEED();
 }
 
 TEST_F(TestHeuristicPluginResourceManager, MultipleDestructionsSucceed)
@@ -303,8 +299,6 @@ TEST_F(TestHeuristicPluginResourceManager, MultipleDestructionsSucceed)
         rm->getHeuristicPolicyInfos();
         // Destroyed at end of loop
     }
-
-    SUCCEED();
 }
 
 // ========== Constructor Null Pointer Tests ==========

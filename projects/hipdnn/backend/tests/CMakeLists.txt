@@ -11,16 +11,10 @@ endif()
 find_package(hip REQUIRED)
 find_package(Threads REQUIRED)
 
-set(TEST_PLUGIN1_NAME "hipdnn_test_plugin1")
-set(TEST_PLUGIN2_NAME "hipdnn_test_plugin2")
-set(TEST_NO_API_VERSION_PLUGIN_NAME "hipdnn_test_no_api_version_plugin_name")
-set(TEST_ENGINE_PLUGIN1_NAME "hipdnn_test_engine_plugin1")
-
-# Heuristic plugin test names (RFC 0007)
-# Match the names defined in tests/test_plugins/CMakeLists.txt
-set(TEST_GOOD_HEURISTIC_PLUGIN_NAME "test_good_heuristic_plugin")
-set(TEST_INCOMPLETE_HEURISTIC_API_PLUGIN_NAME "test_incomplete_heuristic_api_plugin")
-set(TEST_NO_OPTIONAL_HEURISTIC_PLUGIN_NAME "test_no_optional_heuristic_plugin")
+# Test plugin target names come from cmake/TestPluginNames.cmake (included by
+# the root CMakeLists.txt before any subdirectory). The targets themselves are
+# created later by tests/test_plugins/, but the names are needed here for
+# compile definitions and add_dependencies forward references.
 
 add_executable(
     hipdnn_backend_tests
@@ -33,7 +27,6 @@ add_executable(
     descriptors/TestEngineConfigDescriptor.cpp
     descriptors/TestEngineDescriptor.cpp
     descriptors/TestEngineHeuristicDescriptor.cpp
-    descriptors/TestEngineHeuristicDescriptorAdditional.cpp
     descriptors/TestExecutionPlanDescriptor.cpp
     descriptors/TestGraphDescriptor.cpp
     descriptors/TestTensorDescriptor.cpp
@@ -93,14 +86,15 @@ add_executable(
     descriptors/TestVariantPackDescriptor.cpp
     main.cpp
     TestEnginePluginResourceManager.cpp
+    TestExecutionPlanSerializationApi.cpp
     TestLastErrorManager.cpp
     TestBackendEnumStringUtils.cpp
     TestFlatbufferUtilities.cpp
     TestHandle.cpp
     TestHelpers.cpp
-    TestHeuristicPluginIntegration.cpp
+    IntegrationHeuristicPlugin.cpp
     TestHeuristicPolicyFramework.cpp
-    TestHeuristicPolicyPlugins.cpp
+    IntegrationHeuristicPolicyPlugins.cpp
     TestBackendLogger.cpp
     TestGraphLogger.cpp
     TestHeuristicPlugin.cpp
@@ -113,7 +107,6 @@ add_executable(
     heuristics/TestDeviceProperties.cpp
     TestPlugin.cpp
     TestSharedLibrary.cpp
-    TestStaticOrderingPolicy.cpp
     TestVersion.cpp
     utilities/TestEngineOrdering.cpp
 )
@@ -223,13 +216,6 @@ add_dependencies(hipdnn_backend_tests
     ${TEST_EMPTY_NAME_HEURISTIC_PLUGIN_NAME}
     ${TEST_DUPLICATE_POLICY_ID_A_PLUGIN_NAME}
     ${TEST_DUPLICATE_POLICY_ID_B_PLUGIN_NAME}
-)
-
-# Add dependencies on default heuristic plugins (RFC 0007)
-# These ensure Config and StaticOrdering plugins are built before tests run
-add_dependencies(hipdnn_backend_tests
-    hipdnn_heuristic_config
-    hipdnn_heuristic_static_ordering
 )
 
 add_unit_test_target(hipdnn_backend_tests ${CMAKE_CURRENT_BINARY_DIR})

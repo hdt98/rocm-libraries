@@ -1,8 +1,9 @@
 # Copyright © Advanced Micro Devices, Inc., or its affiliates.
 # SPDX-License-Identifier:  MIT
 
-# Heuristic Plugins for RFC 0007 Engine Selection Framework
+# Heuristic Plugins for the Engine Selection Framework
 
-# Well-known default policies (in order)
-add_subdirectory(config)           # First: honors graph preferences
-add_subdirectory(static_ordering)  # Second: fallback static ordering
+# Default heuristics plugin: bundles the well-known Config and StaticOrdering
+# policies behind a single shared library. Demonstrates the 1:N (one plugin →
+# multiple policies) shape of the heuristic plugin C ABI.
+add_subdirectory(default)

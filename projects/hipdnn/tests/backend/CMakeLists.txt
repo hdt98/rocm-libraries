@@ -62,6 +62,7 @@ target_compile_definitions(
             TEST_KNOBS_PLUGIN_NAME="${TEST_KNOBS_PLUGIN_NAME}"
             TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME="${TEST_KNOB_CONSTRAINT_VALIDATION_PLUGIN_NAME}"
             TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME="${TEST_INCOMPATIBLE_VERSION_PLUGIN_NAME}"
+            TEST_GOOD_HEURISTIC_PLUGIN_NAME="${TEST_GOOD_HEURISTIC_PLUGIN_NAME}"
 )
 
 # Ensure test plugins are built before tests
@@ -78,8 +79,7 @@ add_dependencies(
     test_knobs_plugin
     test_knob_constraint_validation_plugin
     test_incompatible_version_plugin
-    hipdnn_heuristic_config
-    hipdnn_heuristic_static_ordering
+    test_good_heuristic_plugin
 )
 
 clang_tidy_check(hipdnn_public_backend_tests)

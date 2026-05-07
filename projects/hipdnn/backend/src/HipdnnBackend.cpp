@@ -6,6 +6,7 @@
 #include "HipdnnException.hpp"
 #include "descriptors/BackendDescriptor.hpp"
 #include "descriptors/DescriptorFactory.hpp"
+#include "descriptors/ExecutionPlanDescriptor.hpp"
 #include "descriptors/GraphDescriptor.hpp"
 #include "descriptors/VariantDescriptor.hpp"
 #include "handle/Handle.hpp"
@@ -13,6 +14,7 @@
 #include "hipdnn_backend.h"
 #include "logging/Logging.hpp"
 #include "plugin/EnginePluginResourceManager.hpp"
+#include "plugin/HeuristicPluginResourceManager.hpp"
 
 #include <hipdnn_backend/version.h>
 #include <hipdnn_data_sdk/utilities/StringUtil.hpp>
@@ -329,6 +331,55 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t
     });
 }
 
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t
+    hipdnnBackendGetSerializedExecutionPlan_ext(hipdnnBackendDescriptor_t descriptor,
+                                                size_t requestedByteSize,
+                                                size_t* planByteSize,
+                                                uint8_t* serializedPlan)
+{
+    LOG_API_ENTRY("descriptor={}, requestedByteSize={}, planByteSize_ptr={:p}, "
+                  "serializedPlan_ptr={:p}",
+                  logPtr(descriptor),
+                  requestedByteSize,
+                  static_cast<void*>(planByteSize),
+                  static_cast<void*>(serializedPlan));
+
+    return hipdnn_backend::tryCatch([&, apiName = __func__]() {
+        throwIfInvalidDescriptor(descriptor);
+
+        auto executionPlanDesc
+            = descriptor->asDescriptor<hipdnn_backend::ExecutionPlanDescriptor>();
+        executionPlanDesc->serializeBackendPlan(requestedByteSize, planByteSize, serializedPlan);
+
+        LOG_API_SUCCESS(apiName, "planByteSize={}", *planByteSize);
+    });
+}
+
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t
+    hipdnnBackendCreateAndDeserializeExecutionPlan_ext(hipdnnHandle_t handle,
+                                                       hipdnnBackendDescriptor_t* descriptor,
+                                                       const uint8_t* serializedPlan,
+                                                       size_t planByteSize)
+{
+    LOG_API_ENTRY("handle={}, descriptor_ptr={:p}, serializedPlan_ptr={:p}, planByteSize={}",
+                  logPtr(handle),
+                  static_cast<void*>(descriptor),
+                  static_cast<const void*>(serializedPlan),
+                  planByteSize);
+
+    return hipdnn_backend::tryCatch([&, apiName = __func__]() {
+        throwIfNull(handle);
+        throwIfNull(descriptor);
+
+        auto executionPlanDesc = std::make_shared<hipdnn_backend::ExecutionPlanDescriptor>();
+        executionPlanDesc->deserializeBackendPlan(
+            handle->getPluginResourceManager(), serializedPlan, planByteSize);
+        *descriptor = HipdnnBackendDescriptor::packDescriptor(executionPlanDesc);
+
+        LOG_API_SUCCESS(apiName, "created_descriptor={}", logPtr(*descriptor));
+    });
+}
+
 HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnBackendCreateAndDeserializeJsonGraph_ext(
     hipdnnBackendDescriptor_t* descriptor, const char* jsonGraph, size_t jsonByteSize)
 {
@@ -426,6 +477,36 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetEnginePluginPaths_ext(
 
         hipdnn_backend::plugin::EnginePluginResourceManager::setPluginPaths(pathsVec, loadingMode);
         LOG_API_SUCCESS(apiName, "set_plugin_paths={}", loadingMode);
+        return HIPDNN_STATUS_SUCCESS;
+    });
+}
+
+HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnSetHeuristicPluginPaths_ext(
+    size_t numPaths, const char* const* pluginPaths, hipdnnPluginLoadingMode_ext_t loadingMode)
+{
+    LOG_API_ENTRY("numPaths={}, pluginPaths_ptr={:p}, loadingMode={}",
+                  numPaths,
+                  static_cast<const void*>(pluginPaths),
+                  loadingMode);
+
+    return hipdnn_backend::tryCatch([&, apiName = __func__] {
+        if(numPaths > 0)
+        {
+            throwIfNull(pluginPaths);
+        }
+
+        std::vector<std::filesystem::path> pathsVec;
+        pathsVec.reserve(numPaths);
+
+        for(size_t i = 0; i < numPaths; ++i)
+        {
+            throwIfNull(pluginPaths[i]);
+            pathsVec.emplace_back(pluginPaths[i]);
+        }
+
+        hipdnn_backend::plugin::HeuristicPluginResourceManager::setPluginPaths(pathsVec,
+                                                                               loadingMode);
+        LOG_API_SUCCESS(apiName, "set_heuristic_plugin_paths={}", loadingMode);
         return HIPDNN_STATUS_SUCCESS;
     });
 }
@@ -647,6 +728,9 @@ HIPDNN_BACKEND_EXPORT hipdnnStatus_t hipdnnGetHeuristicPolicyInfo_ext(hipdnnHand
         throwIfNull(pluginVersionLen);
         throwIfNull(apiVersionLen);
 
+        // Built from an unordered_map; ordering is unspecified and may change
+        // between calls. If a stable enumeration is ever required, an explicit
+        // ordering must be applied here rather than relied on from the source map.
         auto policyInfos = handle->getHeuristicPluginResourceManager()->getHeuristicPolicyInfos();
         if(policyIndex >= policyInfos.size())
         {

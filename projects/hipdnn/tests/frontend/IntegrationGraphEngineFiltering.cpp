@@ -1,11 +1,15 @@
 // Copyright © Advanced Micro Devices, Inc., or its affiliates.
 // SPDX-License-Identifier:  MIT
 
+#include <filesystem>
 #include <gtest/gtest.h>
 #include <hip/hip_runtime.h>
+#include <optional>
 
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/Tensor.hpp>
 #include <hipdnn_frontend.hpp>
+#include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
 #include <hipdnn_test_sdk/utilities/TestUtilities.hpp>
 #include <test_plugins/TestPluginConstants.hpp>
 
@@ -66,6 +70,40 @@ protected:
         Tensor<DataType> yTensor;
     };
 
+    // This suite verifies preferred_engine_id behavior, which is implemented
+    // by the Config policy hosted inside the merged DefaultHeuristicsPlugin.
+    // The frontend test main() wires in only test_good_heuristic_plugin
+    // globally, so for this suite load DefaultHeuristicsPlugin as the primary
+    // and chain test_good_heuristic_plugin as the fallback for the cases where
+    // Config returns "not applicable".
+    static void SetUpTestSuite()
+    {
+        const auto defaultPluginPath
+            = (std::filesystem::path(".") / "hipdnn_plugins" / "heuristics"
+               / hipdnn_data_sdk::utilities::getLibraryName("hipdnn_heuristic_default"))
+                  .string();
+        const std::array<const char*, 2> heuristicPaths
+            = {defaultPluginPath.c_str(),
+               hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
+        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
+                      heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+        sPolicyOrderEnv.emplace(
+            "HIPDNN_HEURISTIC_POLICY_ORDER",
+            std::string("SelectionHeuristic::Config,")
+                + hipdnn_tests::plugin_constants::testGoodHeuristicPolicyName());
+    }
+
+    static void TearDownTestSuite()
+    {
+        sPolicyOrderEnv.reset();
+        const std::array<const char*, 1> heuristicPaths
+            = {hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
+        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
+                      heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+                  HIPDNN_STATUS_SUCCESS);
+    }
+
     void SetUp() override
     {
         SKIP_IF_NO_DEVICES();
@@ -99,6 +137,9 @@ protected:
 
         return handle;
     }
+
+    static std::optional<hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter>
+        sPolicyOrderEnv;
 
     static std::shared_ptr<Graph> createSimplePointwiseGraph(const std::string& graphName,
                                                              const std::vector<int64_t>& dims)
@@ -178,6 +219,9 @@ protected:
 private:
     hipdnnHandle_t _handle = nullptr;
 };
+
+std::optional<hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter>
+    IntegrationGraphEngineFiltering::sPolicyOrderEnv;
 
 } // namespace
 

@@ -84,16 +84,19 @@ typedef enum
     HIPDNN_ATTR_ENGINEHEUR_FIND_FIRST_EXT = 105,
 
     /**
-     * @brief Ordered list of heuristic policy names for engine selection (array of strings, extension)
+     * @brief Ordered list of heuristic policy IDs for engine selection (array of int64, extension)
      *
-     * Specifies the policy order for the outer loop in RFC 0007. Each element is a UTF-8
-     * policy name string (e.g., "SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering").
-     * The backend hashes each name to an int64_t policy ID using engineNameToId.
+     * Specifies the policy order for the heuristic outer loop. Each element is an int64_t
+     * policy ID, produced by hashing a policy name (e.g., "SelectionHeuristic::Config",
+     * "SelectionHeuristic::StaticOrdering") with hipdnn_data_sdk::utilities::policyNameToId.
+     * Hashing is performed by the caller before the C ABI; the backend stores and dispatches
+     * by ID only.
      *
      * Overrides handle-level and environment variable defaults. If not set, the descriptor uses
-     * the handle's policy order, then HIPDNN_HEURISTIC_POLICY_ORDER env var, then built-in default.
+     * the handle's policy order, then HIPDNN_HEURISTIC_POLICY_ORDER env var (parsed as
+     * comma-separated names and hashed at parse time), then the built-in default.
      *
-     * Type: HIPDNN_TYPE_CHAR (null-separated string array)
+     * Type: HIPDNN_TYPE_INT64
      */
     HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT = 106,
 
@@ -148,6 +151,9 @@ typedef enum
 
     /** @brief Device properties for this plan */
     HIPDNN_ATTR_EXECUTION_PLAN_DEVICEPROP = 307,
+
+    /** @brief UIDs of tensors required by this plan */
+    HIPDNN_ATTR_EXECUTION_PLAN_TENSOR_UIDS_EXT = 308,
 
     /** @} */
 

@@ -3,29 +3,23 @@
 
 /**
  * @file TestHeuristicPolicyFramework.cpp
- * @brief Unit tests for RFC 0007 Heuristic Policy Framework
+ * @brief Unit tests for the Heuristic Policy Framework
  *
  * Tests cover:
- * - Policy enumeration and metadata
- * - Policy order resolution (descriptor/env/default)
- * - Outer loop execution (first-success-wins)
- * - Failure handling (all policies decline)
- * - Device properties serialization
+ * - Policy enumeration and metadata via the public hipdnnGetHeuristicPolicy* APIs
+ * - Default-policy loading through the resource manager
+ *
+ * Lower-level coverage (policy order resolution, outer-loop failure handling,
+ * empty-policy-list throws) lives in TestEngineHeuristicDescriptorAdditional.cpp,
+ * where the mocked plugin manager makes those paths reachable in a unit test.
  */
 
-#include "descriptors/EngineHeuristicDescriptor.hpp"
-#include "descriptors/GraphDescriptor.hpp"
 #include "handle/Handle.hpp"
-#include "heuristics/SelectionHeuristic.hpp"
 #include "plugin/HeuristicPluginResourceManager.hpp"
-
-#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 
 #include <gtest/gtest.h>
 
 using namespace hipdnn_backend;
-using namespace hipdnn_backend::heuristics;
-using namespace hipdnn_backend::plugin;
 
 class TestHeuristicPolicyFramework : public ::testing::Test
 {
@@ -136,54 +130,11 @@ TEST_F(TestHeuristicPolicyFramework, GetHeuristicPolicyInfoOutOfRangeFails)
     EXPECT_EQ(status, HIPDNN_STATUS_BAD_PARAM);
 }
 
-// ========== Policy Order Resolution Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, EnvironmentVariablePolicyOrderIsRespected)
-{
-    // Set environment variable
-    hipdnn_data_sdk::utilities::setEnv(
-        "HIPDNN_HEURISTIC_POLICY_ORDER",
-        "SelectionHeuristic::StaticOrdering,SelectionHeuristic::Config");
-
-    // Create a descriptor and check resolved order
-    auto graph = std::make_shared<GraphDescriptor>();
-    // Note: This is a simplified test - full integration would require a valid graph
-
-    // Clean up
-    hipdnn_data_sdk::utilities::unsetEnv("HIPDNN_HEURISTIC_POLICY_ORDER");
-}
-
-// ========== Policy Behavior Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, StaticOrderingPolicyNeverDeclines)
-{
-    // StaticOrdering should always succeed and provide ordered engine IDs
-    // This is a unit-level assertion about the policy's contract
-    SUCCEED() << "StaticOrdering policy is designed to never return NOT_APPLICABLE";
-}
-
-TEST_F(TestHeuristicPolicyFramework, ConfigPolicyDeclinesWhenNoPreference)
-{
-    // Config policy should decline if preferred_engine_id is not set
-    // or if the preferred engine is not in the candidate list
-    SUCCEED() << "Config policy declines when no preference or preference not in candidates";
-}
-
-// ========== Failure Handling Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, EmptyPolicyListThrowsException)
-{
-    // If no policies are loaded, finalize() should throw
-    // This would require mocking the plugin manager to return empty list
-    SUCCEED() << "Empty policy list should cause finalize() to throw";
-}
-
-TEST_F(TestHeuristicPolicyFramework, AllPoliciesDecliningThrowsException)
-{
-    // If all policies return NOT_APPLICABLE, finalize() should throw
-    // This would require synthetic policies that always decline
-    SUCCEED() << "All policies declining should cause finalize() to throw";
-}
+// Policy order resolution (descriptor / env / default), policy decline behavior,
+// and "no policy succeeds" failure paths are covered with mocked plugin managers
+// in TestEngineHeuristicDescriptorAdditional.cpp. The StaticOrdering "never
+// declines" contract is enforced by the plugin's Finalize implementation and
+// exercised in plugins/heuristics/static_ordering/tests/TestStaticOrderingPlugin.cpp.
 
 // ========== Integration Tests ==========
 
@@ -215,33 +166,6 @@ TEST_F(TestHeuristicPolicyFramework, HeuristicResourceManagerLoadsDefaultPolicie
 
     EXPECT_TRUE(hasConfig) << "Config policy should be loaded";
     EXPECT_TRUE(hasStaticOrdering) << "StaticOrdering policy should be loaded";
-}
-
-// ========== Attribute Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, PolicyOrderAttributeCanBeSetAndRetrieved)
-{
-    // This would test setting HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT
-    // and retrieving it via getAttribute
-    SUCCEED() << "Policy order attribute set/get would be tested with full descriptor";
-}
-
-// ========== Thread Safety Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, ConcurrentPolicyQueriesAreThreadSafe)
-{
-    // Multiple threads querying policy infos should not crash
-    // This would use std::thread to query concurrently
-    SUCCEED() << "Concurrent policy queries should be thread-safe";
-}
-
-// ========== Cleanup Tests ==========
-
-TEST_F(TestHeuristicPolicyFramework, ResourceManagerDestroysHandlesOnCleanup)
-{
-    // Verify that plugin handles are destroyed when resource manager is destroyed
-    // This would check via logging or mock objects
-    SUCCEED() << "Plugin handles should be destroyed on resource manager cleanup";
 }
 
 // ========== Negative Tests ==========

@@ -13,7 +13,7 @@
 #include "handle/Handle.hpp"
 #include "utilities/EngineOrdering.hpp"
 
-// RFC 0007: Heuristics framework
+// Heuristics framework
 #include "heuristics/SelectionHeuristic.hpp"
 #include "logging/Logging.hpp"
 #include "plugin/HeuristicPlugin.hpp"
@@ -23,8 +23,10 @@
 #include <hipdnn_flatbuffers_sdk/data_objects/device_properties_generated.h>
 
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 
 #include <cstdlib>
+#include <cstring>
 #include <set>
 #include <sstream>
 #include <unordered_map>
@@ -34,26 +36,28 @@ namespace hipdnn_backend
 
 std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
 {
-    // RFC 0007 Section 5.3 & 15: Policy order resolution
+    // Policy order resolution.
     // Priority: descriptor attr > handle > env > default
-    std::vector<std::string> policyNames;
+    // Storage and ABI are policy IDs (FNV-1a of the policy name); names are
+    // hashed at the point they enter the system.
 
     // 1. Descriptor attribute (highest priority)
     if(_policyOrderSet)
     {
-        policyNames = _policyOrder;
         HIPDNN_BACKEND_LOG_DEBUG("Using descriptor-level policy order: {} policies",
-                                 policyNames.size());
+                                 _policyOrder.size());
+        return _policyOrder;
     }
     // 2. Handle-level override (TODO: implement handle API)
     // else if (handle has override)
     // {
-    //     policyNames = handle->getHeuristicPolicyOrder();
+    //     return handle->getHeuristicPolicyOrder();
     // }
     // 3. Environment variable HIPDNN_HEURISTIC_POLICY_ORDER
-    else if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
+    if(const char* envPolicyOrder = std::getenv("HIPDNN_HEURISTIC_POLICY_ORDER"))
     {
-        // Parse comma-separated policy names
+        // Parse comma-separated policy names and hash to IDs
+        std::vector<int64_t> policyIds;
         const std::string envStr(envPolicyOrder);
         std::istringstream iss(envStr);
         std::string token;
@@ -64,34 +68,26 @@ std::vector<int64_t> EngineHeuristicDescriptor::resolveHeuristicPolicyOrder()
             token.erase(token.find_last_not_of(" \t\n\r") + 1);
             if(!token.empty())
             {
-                policyNames.push_back(token);
+                policyIds.push_back(hipdnn_data_sdk::utilities::policyNameToId(token));
             }
         }
         HIPDNN_BACKEND_LOG_DEBUG("Using environment variable policy order: {} policies",
-                                 policyNames.size());
+                                 policyIds.size());
+        return policyIds;
     }
-    // 4. Default policy list per RFC 0007 Section 5.3
-    else
-    {
-        policyNames = {"SelectionHeuristic::Config", "SelectionHeuristic::StaticOrdering"};
-        HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyNames.size());
-    }
-
-    // Convert policy names to IDs using engineNameToId (FNV-1a hash)
-    std::vector<int64_t> policyIds;
-    policyIds.reserve(policyNames.size());
-    for(const auto& name : policyNames)
-    {
-        policyIds.push_back(hipdnn_data_sdk::utilities::engineNameToId(name));
-    }
-
+    // 4. Default policy list
+    std::vector<int64_t> policyIds = {
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"),
+        hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"),
+    };
+    HIPDNN_BACKEND_LOG_DEBUG("Using default policy order: {} policies", policyIds.size());
     return policyIds;
 }
 
 void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orderedPolicyIds)
 {
-    // RFC 0007 Section 14.2: Ensure one SelectionHeuristic per policy slot
-    // If the policy list changed, recreate the slots
+    // Ensure one SelectionHeuristic per policy slot.
+    // If the policy list changed, recreate the slots.
 
     if(_orderedPolicyIds == orderedPolicyIds && !_policySlots.empty())
     {
@@ -105,35 +101,26 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
     auto handle = _graph->getHandle();
     auto heurRm = handle->getHeuristicPluginResourceManager();
 
-    // Create one SelectionHeuristic per policy slot
+    // Create one SelectionHeuristic per policy slot. The slot holds a
+    // shared_ptr to the resource manager so the underlying plugin and handle
+    // cannot be destroyed while the slot is alive; lookups happen by policy
+    // ID inside SelectionHeuristic.
     for(const int64_t policyId : orderedPolicyIds)
     {
-        auto pluginHandle = heurRm->getHeuristicHandleForPolicyId(policyId);
-        if(pluginHandle == nullptr)
+        if(heurRm->getHeuristicHandleForPolicyId(policyId) == nullptr)
         {
             // Policy not loaded - add null placeholder
             _policySlots.push_back(nullptr);
             continue;
         }
 
-        // Get the HeuristicPlugin for this policy
-        auto plugin = heurRm->getPluginForPolicyId(policyId);
-        if(plugin == nullptr)
-        {
-            // This shouldn't happen if handle exists, but be defensive
-            _policySlots.push_back(nullptr);
-            continue;
-        }
-
-        // Create SelectionHeuristic for this policy slot
-        _policySlots.push_back(
-            std::make_unique<heuristics::SelectionHeuristic>(plugin, pluginHandle));
+        _policySlots.push_back(std::make_unique<heuristics::SelectionHeuristic>(heurRm, policyId));
     }
 }
 
 void EngineHeuristicDescriptor::finalize()
 {
-    // RFC 0007 Section 14.2: Outer loop policy selection
+    // Outer loop policy selection
     THROW_IF_TRUE(isFinalized(),
                   HIPDNN_STATUS_BAD_PARAM,
                   "EngineHeuristicDescriptor::finalize() failed: Already finalized.");
@@ -153,8 +140,8 @@ void EngineHeuristicDescriptor::finalize()
     // Get candidate engine IDs from engine plugins
     auto candidates = engineRm->getApplicableEngineIds(_graph.get(), _findFirst);
 
-    // RFC 0007: If no engines available, finalize with empty result (no need to invoke heuristics)
-    // This is a valid state - not an error
+    // If no engines available, finalize with empty result (no need to invoke heuristics).
+    // This is a valid state - not an error.
     if(candidates.empty())
     {
         _engineIds.clear();
@@ -162,7 +149,7 @@ void EngineHeuristicDescriptor::finalize()
         return;
     }
 
-    // RFC 0007 Section 6 & 13.2: Query and serialize device properties
+    // Query and serialize device properties
     int currentDevice;
     auto status = hipGetDevice(&currentDevice);
     if(status != hipSuccess)
@@ -198,7 +185,7 @@ void EngineHeuristicDescriptor::finalize()
     devicePropsWrapper.ptr = devicePropsSerialized.data();
     devicePropsWrapper.size = devicePropsSerialized.size();
 
-    // RFC 0007 Section 13.1: Get serialized graph from GraphDescriptor
+    // Get serialized graph from GraphDescriptor
     const hipdnnPluginConstData_t serializedGraph = _graph->getSerializedGraph();
 
     // Resolve ordered policy IDs
@@ -277,10 +264,30 @@ void EngineHeuristicDescriptor::finalize()
                                     e.what());
             continue;
         }
+        catch(const std::exception& e)
+        {
+            // Plugin code is external and may throw any std-derived exception type.
+            // Treat the same as HipdnnException: log and continue.
+            HIPDNN_BACKEND_LOG_WARN("Heuristic policy at slot {} (ID {}) threw exception: {}. "
+                                    "Continuing to next policy.",
+                                    i,
+                                    _orderedPolicyIds[i],
+                                    e.what());
+            continue;
+        }
+        catch(...)
+        {
+            // Plugin may throw a non-std-derived exception; never let it cross the C ABI.
+            HIPDNN_BACKEND_LOG_WARN("Heuristic policy at slot {} (ID {}) threw unknown exception. "
+                                    "Continuing to next policy.",
+                                    i,
+                                    _orderedPolicyIds[i]);
+            continue;
+        }
     }
 
-    // RFC 0007 Section 14.2: If no policy succeeded, throw exception
-    // No hidden fallback to utilities::sortEngineIds
+    // If no policy succeeded, throw exception.
+    // No hidden fallback to utilities::sortEngineIds.
     if(!success)
     {
         throw HipdnnException(
@@ -585,30 +592,28 @@ void EngineHeuristicDescriptor::setPolicyOrder(hipdnnBackendAttributeType_t attr
                                                const void* arrayOfElements)
 {
     THROW_IF_NE(attributeType,
-                HIPDNN_TYPE_CHAR,
+                HIPDNN_TYPE_INT64,
                 HIPDNN_STATUS_BAD_PARAM,
                 "EngineHeuristicDescriptor failed to set policy order: Invalid attribute type.");
 
-    THROW_IF_NULL(arrayOfElements,
+    THROW_IF_TRUE(elementCount < 0,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "EngineHeuristicDescriptor failed to set policy order: Negative element count.");
+
+    THROW_IF_TRUE(elementCount > 0 && arrayOfElements == nullptr,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "EngineHeuristicDescriptor failed to set policy order: Null pointer.");
 
-    // Parse null-separated string array
-    const char* data = static_cast<const char*>(arrayOfElements);
-    _policyOrder.clear();
-
-    size_t offset = 0;
-    while(offset < static_cast<size_t>(elementCount))
+    if(elementCount == 0)
     {
-        const std::string policyName(data + offset);
-        if(policyName.empty())
-        {
-            break; // End of list
-        }
-        _policyOrder.push_back(policyName);
-        offset += policyName.size() + 1; // Skip null terminator
+        _policyOrder.clear();
+        _policyOrderSet = true;
+        HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: 0 policies");
+        return;
     }
 
+    const auto* data = static_cast<const int64_t*>(arrayOfElements);
+    _policyOrder.assign(data, data + elementCount);
     _policyOrderSet = true;
     HIPDNN_BACKEND_LOG_DEBUG("Set descriptor-level policy order: {} policies", _policyOrder.size());
 }
@@ -619,71 +624,38 @@ void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attr
                                                void* arrayOfElements) const
 {
     THROW_IF_NE(attributeType,
-                HIPDNN_TYPE_CHAR,
+                HIPDNN_TYPE_INT64,
                 HIPDNN_STATUS_BAD_PARAM,
                 "EngineHeuristicDescriptor failed to get policy order: Invalid attribute type.");
-
-    if(!_policyOrderSet)
-    {
-        // Return empty if not set
-        if(elementCount != nullptr)
-        {
-            *elementCount = 0;
-        }
-        return;
-    }
-
-    // Calculate total size needed for null-separated string array
-    // Format: "string1\0string2\0string3\0\0"
-    // Each string ends in \0, final extra \0 marks end of array
-    size_t totalSize = 0;
-    for(const auto& name : _policyOrder)
-    {
-        totalSize += name.size() + 1; // Include null terminator
-    }
-    totalSize += 1; // Final null terminator
-
-    // Return the count if they aren't requesting any
-    if(requestedElementCount == 0)
-    {
-        THROW_IF_NULL(elementCount,
-                      HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                      "EngineHeuristicDescriptor failed to get policy order count: Null pointer "
-                      "for element count.");
-        *elementCount = static_cast<int64_t>(totalSize);
-        return;
-    }
-
-    THROW_IF_NULL(arrayOfElements,
-                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
-                  "EngineHeuristicDescriptor failed to get policy order: Null pointer.");
 
     THROW_IF_NULL(elementCount,
                   HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
                   "EngineHeuristicDescriptor failed to get policy order: Null pointer for "
                   "element count.");
 
-    // Copy null-separated string array
-    char* output = static_cast<char*>(arrayOfElements);
-    size_t offset = 0;
-    for(const auto& name : _policyOrder)
+    THROW_IF_TRUE(requestedElementCount < 0,
+                  HIPDNN_STATUS_BAD_PARAM,
+                  "EngineHeuristicDescriptor failed to get policy order: Negative requested "
+                  "element count.");
+
+    THROW_IF_TRUE(requestedElementCount > 0 && arrayOfElements == nullptr,
+                  HIPDNN_STATUS_BAD_PARAM_NULL_POINTER,
+                  "EngineHeuristicDescriptor failed to get policy order: Null pointer.");
+
+    // The dispatcher requires isFinalized() before reaching here, so
+    // _orderedPolicyIds reflects the resolved order (descriptor > handle > env
+    // > default) actually used during finalize().
+    if(requestedElementCount == 0)
     {
-        if(offset + name.size() + 1 > static_cast<size_t>(requestedElementCount))
-        {
-            break; // Buffer too small
-        }
-        std::memcpy(output + offset, name.c_str(), name.size() + 1);
-        offset += name.size() + 1;
+        *elementCount = static_cast<int64_t>(_orderedPolicyIds.size());
+        return;
     }
 
-    // Add final null terminator
-    if(offset < static_cast<size_t>(requestedElementCount))
-    {
-        output[offset] = '\0';
-        offset++;
-    }
-
-    *elementCount = static_cast<int64_t>(offset);
+    auto* output = static_cast<int64_t*>(arrayOfElements);
+    const auto count
+        = std::min(static_cast<size_t>(requestedElementCount), _orderedPolicyIds.size());
+    std::memcpy(output, _orderedPolicyIds.data(), count * sizeof(int64_t));
+    *elementCount = static_cast<int64_t>(count);
 }
 
 std::string EngineHeuristicDescriptor::toString() const
@@ -701,7 +673,7 @@ std::string EngineHeuristicDescriptor::toString() const
             {
                 str += ", ";
             }
-            str += "\"" + _policyOrder[i] + "\"";
+            str += hipdnn_data_sdk::utilities::formatEngineIdHex(_policyOrder[i]);
         }
         str += "]";
     }

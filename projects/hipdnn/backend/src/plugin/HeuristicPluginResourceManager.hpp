@@ -39,7 +39,7 @@ class HeuristicPluginManager;
 struct HeuristicPolicyInfo
 {
     std::string policyName; ///< Canonical policy name (UTF-8)
-    int64_t policyId; ///< Stable policy ID (engineNameToId hash)
+    int64_t policyId; ///< Stable policy ID (policyNameToId hash)
     std::string pluginVersion; ///< Plugin implementation version
     std::string apiVersion; ///< Heuristic C ABI version
 };
@@ -121,7 +121,7 @@ public:
      * Returns the hipdnnHeuristicHandle_t created for the plugin that implements
      * the given policy ID. Returns nullptr if no plugin with that policy ID is loaded.
      *
-     * @param policyId The policy ID (int64_t from engineNameToId)
+     * @param policyId The policy ID (int64_t from policyNameToId)
      * @return The plugin handle, or nullptr if not found
      */
     virtual hipdnnHeuristicHandle_t getHeuristicHandleForPolicyId(int64_t policyId) const;
@@ -132,7 +132,7 @@ public:
      * Returns the HeuristicPlugin* that implements the given policy ID.
      * Returns nullptr if no plugin with that policy ID is loaded.
      *
-     * @param policyId The policy ID (int64_t from engineNameToId)
+     * @param policyId The policy ID (int64_t from policyNameToId)
      * @return The plugin pointer, or nullptr if not found
      */
     virtual const HeuristicPlugin* getPluginForPolicyId(int64_t policyId) const;
