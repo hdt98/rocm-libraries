@@ -731,45 +731,52 @@ def main(
             newGranularityFileName = os.path.join(benchmarkDataPath, "{}_{:02d}{}.gsp" \
                     .format(str(problemTypeObj), idx, csvSuffix) )
 
-            # benchmark problem size group
-            benchmarkProblemsPath = ensurePath(outputPath / BENCHMARK_PROBLEMS_DIR)
-            (resultsFileBaseFinal, benchmarkErrors) = \
-                    _benchmarkProblemType(
-                        backendConfig=backend,
-                        problemTypeConfig=problemTypeConfig,
-                        problemSizeGroupConfig=sizeGroupConfig,
-                        problemSizeGroupIdx=idx,
-                        useCache=useCache,
-                        asmToolchain=asmToolchain,
-                        srcToolchain=srcToolchain,
-                        cCompiler=cCompiler,
-                        buildTmpPath=buildTmpPath,
-                        benchmarkProblemsPath=benchmarkProblemsPath,
-                        debugConfig=debugConfig,
-                        deviceId=deviceId,
-                        gfxName=gfxName,
-                        isaInfoMap=isaInfoMap,
-                        probSolMap=probSolMap,
-                        buildOnly=buildOnly,
-                    )
-            totalTestFails += benchmarkErrors
+            # skip if possible
+            if globalParameters["ForceRedoBenchmarkProblems"] \
+                    or not os.path.exists(newResultsFileName):
 
-            if buildOnly:
-                print1("# Build-only mode: skipping result collection.")
+                # benchmark problem size group
+                benchmarkProblemsPath = ensurePath(outputPath / BENCHMARK_PROBLEMS_DIR)
+                (resultsFileBaseFinal, benchmarkErrors) = \
+                        _benchmarkProblemType(
+                            backendConfig=backend,
+                            problemTypeConfig=problemTypeConfig,
+                            problemSizeGroupConfig=sizeGroupConfig,
+                            problemSizeGroupIdx=idx,
+                            useCache=useCache,
+                            asmToolchain=asmToolchain,
+                            srcToolchain=srcToolchain,
+                            cCompiler=cCompiler,
+                            buildTmpPath=buildTmpPath,
+                            benchmarkProblemsPath=benchmarkProblemsPath,
+                            debugConfig=debugConfig,
+                            deviceId=deviceId,
+                            gfxName=gfxName,
+                            isaInfoMap=isaInfoMap,
+                            probSolMap=probSolMap,
+                            buildOnly=buildOnly,
+                        )
+                totalTestFails += benchmarkErrors
+
+                if buildOnly:
+                    print1("# Build-only mode: skipping result collection.")
+                else:
+                    print("clientExit={} {} for {}" \
+                            .format(totalTestFails, "(ERROR)" if totalTestFails else "(PASS)", \
+                            globalParameters["ConfigPath"]) )
+
+                    # copy data
+                    resultsFileBase = resultsFileBaseFinal
+                    resultsFileName = resultsFileBase + ".csv"
+                    solutionsFileName = resultsFileBase + ".yaml"
+                    granularityFileName = resultsFileBase + "_Granularity.csv"
+                    shutil.copy(resultsFileName, newResultsFileName)
+                    shutil.copy(solutionsFileName, newSolutionsFileName)
+                    if os.path.isfile(granularityFileName):
+                        shutil.copy(granularityFileName, newGranularityFileName)
             else:
-                print("clientExit={} {} for {}" \
-                        .format(totalTestFails, "(ERROR)" if totalTestFails else "(PASS)", \
-                        globalParameters["ConfigPath"]) )
-
-                # copy data
-                resultsFileBase = resultsFileBaseFinal
-                resultsFileName = resultsFileBase + ".csv"
-                solutionsFileName = resultsFileBase + ".yaml"
-                granularityFileName = resultsFileBase + "_Granularity.csv"
-                shutil.copy(resultsFileName, newResultsFileName)
-                shutil.copy(solutionsFileName, newSolutionsFileName)
-                if os.path.isfile(granularityFileName):
-                    shutil.copy(granularityFileName, newGranularityFileName)
+                print1("# {}_{:02d} already benchmarked; skipping." \
+                        .format(str(problemTypeObj), idx) )
 
     if globalParameters["ExitOnFails"] and totalTestFails:
         sys.exit(1)
