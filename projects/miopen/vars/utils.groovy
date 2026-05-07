@@ -756,7 +756,9 @@ def buildHipClangJob(Map conf=[:]){
 }
 
 def runAsanTests(String gpuLabel, String gfxFamily) {
+    def variant = env.STAGE_NAME
     node(rocmnode(gpuLabel)) {
+        setGithubStatus(variant, 'pending', 'In progress')
         try {
             withWorkingDir {
                 def asanImage = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
@@ -771,10 +773,8 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                 }
                 withDockerContainer(image: asanImage, args: dockerOpts) {
                     timeout(time: 420, unit: 'MINUTES') {
-                        // Step 1: build MIOpen from PR source with ASAN flags and install
+                        // Build MIOpen from PR source with ASAN flags and install
                         // into ROCM_PATH so miopen_gtest lands at ${ROCM_PATH}/bin/.
-                        // ROCM_PATH, THEROCK_BIN_DIR, LD_LIBRARY_PATH, HSA_XNACK are
-                        // already set in the image ENV (from Dockerfile.ASAN).
                         sh """
                             set -e
                             cd ${env.WORKSPACE}/${env.MIOPEN_DIR}
@@ -801,9 +801,7 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                             ASAN_OPTIONS=detect_leaks=0 make -j\$(nproc) install
                         """.stripIndent()
 
-                        // Step 2: run the TheRock test script with the newly installed
-                        // miopen_gtest. detect_leaks=0 to avoid known leak false-positives;
-                        // abort_on_error=1 so ASAN violations produce clear failures.
+                        // Run the TheRock test script with the newly installed miopen_gtest
                         sh """
                             set -e
                             export LD_PRELOAD=\$(\${ROCM_PATH}/llvm/bin/clang --print-file-name libclang_rt.asan-x86_64.so)
@@ -812,13 +810,22 @@ def runAsanTests(String gpuLabel, String gfxFamily) {
                             THEROCK_BIN_DIR=\${ROCM_PATH}/bin \\
                             AMDGPU_FAMILIES=${gfxFamily} \\
                             TEST_TYPE=full \\
-                            ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \\
                             python build_tools/github_actions/test_executable_scripts/test_miopen.py
                         """.stripIndent()
                     }
                 }
             }
-        } finally {
+            setGithubStatus(variant, 'success', 'Completed successfully')
+        }
+        catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+            setGithubStatus(variant, 'error', 'Job cancelled or aborted')
+            throw e
+        }
+        catch (Exception ex) {
+            setGithubStatus(variant, 'failure', 'Stage failed')
+            throw ex
+        }
+        finally {
             cleanWs()
         }
     }

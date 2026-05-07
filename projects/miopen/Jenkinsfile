@@ -162,6 +162,7 @@ def runBuildAndSingleGtestJob(Map conf=[:])
 }
 
 def buildAsanDockerImage(Map conf=[:]) {
+    def variant = env.STAGE_NAME
     env.DOCKER_BUILDKIT = 1
     def asanTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
     def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:asan_cache"
@@ -170,26 +171,38 @@ def buildAsanDockerImage(Map conf=[:]) {
 
     def dockerArgs = "--build-arg BUILD_TYPE=prebuilt " +
                      "--build-arg ASAN_ARTIFACTS_RUN_ID=\"${asanRunId}\" " +
-                     "--build-arg THEROCK_ASIC=\"${amdgpuFamilies}\" " +
+                     "--build-arg AMDGPU_FAMILIES=\"${amdgpuFamilies}\" " +
                      " -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile.ASAN "
     def buildContext = "${env.WORKSPACE}/${env.MIOPEN_DIR}/."
 
     echo "Building ASAN image ${asanTag} (run_id=${asanRunId}, families=${amdgpuFamilies})"
-    withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
-        sh """
-            docker buildx rm ci-builder || true
-            docker buildx create --name ci-builder --driver docker-container --use
-            docker buildx inspect --bootstrap
-        """.stripIndent()
-        sh """
-            DOCKER_BUILDKIT=1 docker buildx build \
-              --push \
-              --tag ${asanTag} \
-              --cache-from type=registry,ref=${cacheRef} \
-              --cache-to type=registry,ref=${cacheRef},compression=zstd,mode=min \
-              ${dockerArgs} \
-              ${buildContext}
-        """.stripIndent()
+    utils.setGithubStatus(variant, 'pending', 'In progress')
+    try {
+        withDockerRegistry([credentialsId: "docker_test_cred", url: ""]) {
+            sh """
+                docker buildx rm ci-builder || true
+                docker buildx create --name ci-builder --driver docker-container --use
+                docker buildx inspect --bootstrap
+            """.stripIndent()
+            sh """
+                DOCKER_BUILDKIT=1 docker buildx build \
+                  --push \
+                  --tag ${asanTag} \
+                  --cache-from type=registry,ref=${cacheRef} \
+                  --cache-to type=registry,ref=${cacheRef},compression=zstd,mode=min \
+                  ${dockerArgs} \
+                  ${buildContext}
+            """.stripIndent()
+        }
+        utils.setGithubStatus(variant, 'success', 'Completed successfully')
+    }
+    catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+        utils.setGithubStatus(variant, 'error', 'Job cancelled or aborted')
+        throw e
+    }
+    catch (Exception ex) {
+        utils.setGithubStatus(variant, 'failure', 'Stage failed')
+        throw ex
     }
     return asanTag
 }
@@ -773,7 +786,7 @@ pipeline {
                     node(rocmnode("docker")) {
                         try {
                             withWorkingDir {
-                                utils.buildAsanDockerImage()
+                                buildAsanDockerImage()
                             }
                         } finally {
                             cleanWs()
