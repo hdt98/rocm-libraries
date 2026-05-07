@@ -38,9 +38,8 @@ int main(int argc, char** argv)
     // active handles allowed when changing heuristic plugin paths).
     const std::array<const char*, 1> heuristicPaths
         = {hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
-    if(hipdnnSetHeuristicPluginPaths_ext(heuristicPaths.size(),
-                                         heuristicPaths.data(),
-                                         HIPDNN_PLUGIN_LOADING_ABSOLUTE)
+    if(hipdnnSetHeuristicPluginPaths_ext(
+           heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE)
        != HIPDNN_STATUS_SUCCESS)
     {
         return 1;

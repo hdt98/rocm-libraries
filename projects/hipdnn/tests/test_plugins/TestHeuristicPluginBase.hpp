@@ -352,8 +352,8 @@ public:
         }
         if(!found)
         {
-            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(
-                HIPDNN_PLUGIN_STATUS_BAD_PARAM, "unknown policy id");
+            hipdnn_plugin_sdk::PluginLastErrorManager::setLastError(HIPDNN_PLUGIN_STATUS_BAD_PARAM,
+                                                                    "unknown policy id");
             return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
 
@@ -506,8 +506,9 @@ public:
         return TestHeuristicPluginBase::getType(type);                                            \
     }                                                                                             \
                                                                                                   \
-    hipdnnPluginStatus_t hipdnnHeuristicPluginGetAllPolicyIds(                                    \
-        int64_t* policyIds, uint32_t maxPolicies, uint32_t* numPolicies)                          \
+    hipdnnPluginStatus_t hipdnnHeuristicPluginGetAllPolicyIds(int64_t* policyIds,                 \
+                                                              uint32_t maxPolicies,               \
+                                                              uint32_t* numPolicies)              \
     {                                                                                             \
         return TestHeuristicPluginBase::getAllPolicyIds(policyIds, maxPolicies, numPolicies);     \
     }                                                                                             \

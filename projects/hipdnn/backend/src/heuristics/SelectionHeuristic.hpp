@@ -60,9 +60,8 @@ public:
      * @param policyId Stable int64_t policy ID identifying the policy this
      *                 slot represents (policyNameToId hash).
      */
-    SelectionHeuristic(
-        std::shared_ptr<plugin::HeuristicPluginResourceManager> resourceManager,
-        int64_t policyId);
+    SelectionHeuristic(std::shared_ptr<plugin::HeuristicPluginResourceManager> resourceManager,
+                       int64_t policyId);
 
     /**
      * @brief Destroys the SelectionHeuristic and releases the policy descriptor.

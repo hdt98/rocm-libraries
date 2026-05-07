@@ -41,8 +41,7 @@ class HeuristicPluginManager : public PluginManagerBase<HeuristicPlugin>
 public:
     HeuristicPluginManager()
         : PluginManagerBase<HeuristicPlugin>(getPluginSearchPaths(
-              "HIPDNN_HEURISTIC_PLUGIN_DIR",
-              {std::filesystem::path("hipdnn_plugins/heuristics/")}))
+              "HIPDNN_HEURISTIC_PLUGIN_DIR", {std::filesystem::path("hipdnn_plugins/heuristics/")}))
     {
     }
 

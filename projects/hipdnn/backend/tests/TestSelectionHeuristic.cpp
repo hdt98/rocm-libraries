@@ -85,9 +85,7 @@ TEST_F(TestSelectionHeuristic, ConstructorThrowsWhenPolicyHasNoHandle)
         .WillRepeatedly(::testing::Return(nullptr));
 
     EXPECT_THROW(
-        {
-            const SelectionHeuristic heuristic(_mockResourceManager, _policyId);
-        },
+        { const SelectionHeuristic heuristic(_mockResourceManager, _policyId); },
         hipdnn_backend::HipdnnException);
 }
 
@@ -100,9 +98,7 @@ TEST_F(TestSelectionHeuristic, ConstructorThrowsWhenPolicyHasNoPlugin)
         .WillRepeatedly(::testing::Return(nullptr));
 
     EXPECT_THROW(
-        {
-            const SelectionHeuristic heuristic(_mockResourceManager, _policyId);
-        },
+        { const SelectionHeuristic heuristic(_mockResourceManager, _policyId); },
         hipdnn_backend::HipdnnException);
 }
 

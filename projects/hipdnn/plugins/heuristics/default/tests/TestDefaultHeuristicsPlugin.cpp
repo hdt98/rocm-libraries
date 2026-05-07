@@ -189,9 +189,8 @@ TEST(TestDefaultHeuristicsPluginPolicyIds, ReturnsTwoPoliciesInExpectedOrder)
 {
     uint32_t numPolicies = 0;
     std::array<int64_t, 4> ids{0, 0, 0, 0};
-    EXPECT_EQ(hipdnnHeuristicPluginGetAllPolicyIds(ids.data(),
-                                                   static_cast<uint32_t>(ids.size()),
-                                                   &numPolicies),
+    EXPECT_EQ(hipdnnHeuristicPluginGetAllPolicyIds(
+                  ids.data(), static_cast<uint32_t>(ids.size()), &numPolicies),
               HIPDNN_PLUGIN_STATUS_SUCCESS);
     ASSERT_EQ(numPolicies, 2u);
     // Order matters for the framework: Config runs first, StaticOrdering second.
@@ -244,8 +243,9 @@ TEST(TestDefaultHeuristicsPluginPolicyName, ReturnsStaticOrderingName)
 TEST(TestDefaultHeuristicsPluginPolicyName, RejectsUnknownPolicyId)
 {
     const char* name = nullptr;
-    EXPECT_EQ(hipdnnHeuristicPluginGetPolicyName(static_cast<int64_t>(0x1122334455667788ULL), &name),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(
+        hipdnnHeuristicPluginGetPolicyName(static_cast<int64_t>(0x1122334455667788ULL), &name),
+        HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 TEST(TestDefaultHeuristicsPluginPolicyName, RejectsNullOutPointer)

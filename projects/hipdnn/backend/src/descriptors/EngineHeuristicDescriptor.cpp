@@ -114,8 +114,7 @@ void EngineHeuristicDescriptor::syncPolicySlots(const std::vector<int64_t>& orde
             continue;
         }
 
-        _policySlots.push_back(
-            std::make_unique<heuristics::SelectionHeuristic>(heurRm, policyId));
+        _policySlots.push_back(std::make_unique<heuristics::SelectionHeuristic>(heurRm, policyId));
     }
 }
 
@@ -653,8 +652,8 @@ void EngineHeuristicDescriptor::getPolicyOrder(hipdnnBackendAttributeType_t attr
     }
 
     auto* output = static_cast<int64_t*>(arrayOfElements);
-    const auto count =
-        std::min(static_cast<size_t>(requestedElementCount), _orderedPolicyIds.size());
+    const auto count
+        = std::min(static_cast<size_t>(requestedElementCount), _orderedPolicyIds.size());
     std::memcpy(output, _orderedPolicyIds.data(), count * sizeof(int64_t));
     *elementCount = static_cast<int64_t>(count);
 }

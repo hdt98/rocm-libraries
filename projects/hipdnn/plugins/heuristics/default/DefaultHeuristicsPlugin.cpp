@@ -56,15 +56,15 @@ static hipdnnSeverity_t g_logLevel = HIPDNN_SEV_INFO;
 constexpr size_t LOG_BUFFER_SIZE = 1024;
 
 // Helper macro for logging
-#define DEFAULT_HEURISTICS_LOG(severity, ...)                                          \
-    do                                                                                 \
-    {                                                                                  \
-        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)                   \
-        {                                                                              \
-            std::array<char, LOG_BUFFER_SIZE> buffer;                                  \
-            snprintf(buffer.data(), buffer.size(), "[DefaultHeuristics] " __VA_ARGS__);\
-            g_loggingCallback(severity, buffer.data());                                \
-        }                                                                              \
+#define DEFAULT_HEURISTICS_LOG(severity, ...)                                           \
+    do                                                                                  \
+    {                                                                                   \
+        if(g_loggingCallback != nullptr && (severity) >= g_logLevel)                    \
+        {                                                                               \
+            std::array<char, LOG_BUFFER_SIZE> buffer;                                   \
+            snprintf(buffer.data(), buffer.size(), "[DefaultHeuristics] " __VA_ARGS__); \
+            g_loggingCallback(severity, buffer.data());                                 \
+        }                                                                               \
     } while(0)
 
 namespace
@@ -164,9 +164,8 @@ struct StaticOrderingDescriptor : PolicyDescriptor
         sortedEngineIds = candidateEngineIds;
         hipdnn_data_sdk::utilities::sortEngineIds(sortedEngineIds);
         finalized = true;
-        DEFAULT_HEURISTICS_LOG(HIPDNN_SEV_INFO,
-                               "StaticOrdering: sorted %zu engines",
-                               sortedEngineIds.size());
+        DEFAULT_HEURISTICS_LOG(
+            HIPDNN_SEV_INFO, "StaticOrdering: sorted %zu engines", sortedEngineIds.size());
         return 1;
     }
 };
@@ -328,8 +327,7 @@ int ConfigDescriptor::finalize()
     //   2. HIPDNN_ENGINE_OVERRIDE_FILE rule that matches a conv node.
     std::optional<int64_t> preferredEngineId;
     const char* preferredSource = nullptr;
-    if(auto preferredEngineIdOpt = graph->preferred_engine_id();
-       preferredEngineIdOpt.has_value())
+    if(auto preferredEngineIdOpt = graph->preferred_engine_id(); preferredEngineIdOpt.has_value())
     {
         preferredEngineId = preferredEngineIdOpt;
         preferredSource = "graph.preferred_engine_id";
@@ -351,8 +349,7 @@ int ConfigDescriptor::finalize()
         return 0;
     }
 
-    auto it = std::find(
-        candidateEngineIds.begin(), candidateEngineIds.end(), *preferredEngineId);
+    auto it = std::find(candidateEngineIds.begin(), candidateEngineIds.end(), *preferredEngineId);
     if(it == candidateEngineIds.end())
     {
         DEFAULT_HEURISTICS_LOG(HIPDNN_SEV_INFO,
@@ -525,8 +522,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicHandleDestroy(hipdnnHeuristicHandle_t handle)
 {
-    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
-        handle, DEFAULT_HEURISTICS_LOG, "HandleDestroy: null handle");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(handle, DEFAULT_HEURISTICS_LOG, "HandleDestroy: null handle");
 
     try
     {
@@ -546,10 +542,8 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicHandleSetDevi
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         handle, DEFAULT_HEURISTICS_LOG, "SetDeviceProperties: null handle");
-    HIPDNN_PLUGIN_REQUIRE_CONST_DATA(devicePropsSerialized,
-                                     true,
-                                     DEFAULT_HEURISTICS_LOG,
-                                     "SetDeviceProperties: invalid buffer");
+    HIPDNN_PLUGIN_REQUIRE_CONST_DATA(
+        devicePropsSerialized, true, DEFAULT_HEURISTICS_LOG, "SetDeviceProperties: invalid buffer");
 
     try
     {
@@ -595,8 +589,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
         }
         else
         {
-            DEFAULT_HEURISTICS_LOG(HIPDNN_SEV_ERROR,
-                                   "PolicyDescriptorCreate: unknown policy ID");
+            DEFAULT_HEURISTICS_LOG(HIPDNN_SEV_ERROR, "PolicyDescriptorCreate: unknown policy ID");
             return HIPDNN_PLUGIN_STATUS_BAD_PARAM;
         }
         *outDesc = reinterpret_cast<hipdnnHeuristicPolicyDescriptor_t>(desc.release());
@@ -633,8 +626,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetEngineIds(
     hipdnnHeuristicPolicyDescriptor_t desc, const int64_t* engineIds, size_t engineIdCount)
 {
-    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
-        desc, DEFAULT_HEURISTICS_LOG, "SetEngineIds: null descriptor");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(desc, DEFAULT_HEURISTICS_LOG, "SetEngineIds: null descriptor");
     HIPDNN_PLUGIN_REQUIRE_ARRAY(engineIds,
                                 engineIdCount,
                                 DEFAULT_HEURISTICS_LOG,
@@ -661,18 +653,17 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
 {
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         desc, DEFAULT_HEURISTICS_LOG, "SetSerializedGraph: null descriptor");
-    HIPDNN_PLUGIN_REQUIRE_CONST_DATA(serializedGraph,
-                                     false,
-                                     DEFAULT_HEURISTICS_LOG,
-                                     "SetSerializedGraph: invalid graph buffer");
+    HIPDNN_PLUGIN_REQUIRE_CONST_DATA(
+        serializedGraph, false, DEFAULT_HEURISTICS_LOG, "SetSerializedGraph: invalid graph buffer");
 
     try
     {
         auto d = reinterpret_cast<PolicyDescriptor*>(desc);
         const auto* data = reinterpret_cast<const uint8_t*>(serializedGraph->ptr);
         d->onSetSerializedGraph(data, serializedGraph->size);
-        DEFAULT_HEURISTICS_LOG(
-            HIPDNN_SEV_INFO, "SetSerializedGraph: graph received (%zu bytes)", serializedGraph->size);
+        DEFAULT_HEURISTICS_LOG(HIPDNN_SEV_INFO,
+                               "SetSerializedGraph: graph received (%zu bytes)",
+                               serializedGraph->size);
         return HIPDNN_PLUGIN_STATUS_SUCCESS;
     }
     catch(const std::exception& e)
@@ -687,8 +678,7 @@ HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t hipdnnHeuristicPolicySetSeri
 HIPDNN_HEURISTIC_PLUGIN_EXPORT hipdnnPluginStatus_t
     hipdnnHeuristicPolicyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int32_t* outApplied)
 {
-    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
-        desc, DEFAULT_HEURISTICS_LOG, "PolicyFinalize: null descriptor");
+    HIPDNN_PLUGIN_REQUIRE_NOT_NULL(desc, DEFAULT_HEURISTICS_LOG, "PolicyFinalize: null descriptor");
     HIPDNN_PLUGIN_REQUIRE_NOT_NULL(
         outApplied, DEFAULT_HEURISTICS_LOG, "PolicyFinalize: null output pointer");
 

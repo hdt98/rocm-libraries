@@ -129,11 +129,10 @@ HeuristicPluginResourceManager::HeuristicPluginResourceManager(
         for(const int64_t policyId : policyIds)
         {
             _policyIdToHandle[policyId] = handle;
-            HIPDNN_BACKEND_LOG_INFO(
-                "Registered heuristic policy ID {} ({}) from plugin '{}'",
-                policyId,
-                std::string(plugin->getPolicyName(policyId)),
-                plugin->name());
+            HIPDNN_BACKEND_LOG_INFO("Registered heuristic policy ID {} ({}) from plugin '{}'",
+                                    policyId,
+                                    std::string(plugin->getPolicyName(policyId)),
+                                    plugin->name());
         }
     }
 }

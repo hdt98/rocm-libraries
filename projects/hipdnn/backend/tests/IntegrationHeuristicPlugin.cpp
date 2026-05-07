@@ -73,9 +73,11 @@ public:
 inline auto makeScopedHandle(const HeuristicPlugin& plugin, hipdnnHeuristicHandle_t handle)
 {
     return hipdnn_data_sdk::utilities::ScopedResource<hipdnnHeuristicHandle_t>(
-        handle,
-        [p = &plugin](hipdnnHeuristicHandle_t h) {
-            if(h != nullptr) { p->destroyHandle(h); }
+        handle, [p = &plugin](hipdnnHeuristicHandle_t h) {
+            if(h != nullptr)
+            {
+                p->destroyHandle(h);
+            }
         });
 }
 
@@ -83,9 +85,11 @@ inline auto makeScopedPolicyDescriptor(const HeuristicPlugin& plugin,
                                        hipdnnHeuristicPolicyDescriptor_t desc)
 {
     return hipdnn_data_sdk::utilities::ScopedResource<hipdnnHeuristicPolicyDescriptor_t>(
-        desc,
-        [p = &plugin](hipdnnHeuristicPolicyDescriptor_t d) {
-            if(d != nullptr) { p->destroyPolicyDescriptor(d); }
+        desc, [p = &plugin](hipdnnHeuristicPolicyDescriptor_t d) {
+            if(d != nullptr)
+            {
+                p->destroyPolicyDescriptor(d);
+            }
         });
 }
 
@@ -127,8 +131,7 @@ TEST_F(IntegrationHeuristicPlugin, CompleteHandleLifecycleWithGoodPlugin)
     // Look up the good test plugin by its known policy id rather than scanning
     // — getPluginForPolicyId is non-null for any id sourced from
     // getHeuristicPolicyInfos(), so a "find the first non-null" loop is dead.
-    const auto goodPolicyId
-        = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
+    const auto goodPolicyId = hipdnn_data_sdk::utilities::policyNameToId("TestGoodHeuristicPolicy");
     const HeuristicPlugin* plugin = rm->getPluginForPolicyId(goodPolicyId);
     hipdnnHeuristicHandle_t handle = rm->getHeuristicHandleForPolicyId(goodPolicyId);
 
@@ -312,12 +315,12 @@ TEST_F(IntegrationHeuristicPlugin, MultipleDescriptorsFromSameHandle)
     // Create multiple descriptors from the same handle (RAII-wrapped so any
     // assertion abort below still releases them).
     const auto policyId = policyInfos[0].policyId;
-    const auto desc1 = makeScopedPolicyDescriptor(
-        *plugin, plugin->createPolicyDescriptor(handle, policyId));
-    const auto desc2 = makeScopedPolicyDescriptor(
-        *plugin, plugin->createPolicyDescriptor(handle, policyId));
-    const auto desc3 = makeScopedPolicyDescriptor(
-        *plugin, plugin->createPolicyDescriptor(handle, policyId));
+    const auto desc1
+        = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle, policyId));
+    const auto desc2
+        = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle, policyId));
+    const auto desc3
+        = makeScopedPolicyDescriptor(*plugin, plugin->createPolicyDescriptor(handle, policyId));
 
     EXPECT_NE(desc1.get(), nullptr);
     EXPECT_NE(desc2.get(), nullptr);

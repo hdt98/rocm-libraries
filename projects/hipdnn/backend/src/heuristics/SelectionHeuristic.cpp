@@ -25,8 +25,7 @@ SelectionHeuristic::SelectionHeuristic(
     auto pluginHandle = _resourceManager->getHeuristicHandleForPolicyId(_policyId);
     THROW_IF_FALSE(pluginHandle != nullptr,
                    HIPDNN_STATUS_BAD_PARAM,
-                   "No heuristic plugin handle loaded for policy ID "
-                       + std::to_string(_policyId));
+                   "No heuristic plugin handle loaded for policy ID " + std::to_string(_policyId));
 
     auto plugin = _resourceManager->getPluginForPolicyId(_policyId);
     THROW_IF_FALSE(plugin != nullptr,

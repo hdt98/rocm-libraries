@@ -131,7 +131,8 @@ public:
         // Set up expectations for the mock plugin
         EXPECT_CALL(*_mockHeuristicPlugin, setDeviceProperties(mockHandle, _))
             .WillRepeatedly(Return());
-        EXPECT_CALL(*_mockHeuristicPlugin, createPolicyDescriptor(mockHandle, staticOrderingPolicyId))
+        EXPECT_CALL(*_mockHeuristicPlugin,
+                    createPolicyDescriptor(mockHandle, staticOrderingPolicyId))
             .WillRepeatedly(Return(mockDescriptor));
         EXPECT_CALL(*_mockHeuristicPlugin, destroyPolicyDescriptor(mockDescriptor))
             .WillRepeatedly(Return());
@@ -801,12 +802,10 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderInvalidType)
 
     std::vector<char> buffer(256);
     int64_t count = 0;
-    ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                                  HIPDNN_TYPE_CHAR,
-                                                  256,
-                                                  &count,
-                                                  buffer.data()),
-                               HIPDNN_STATUS_BAD_PARAM);
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->getAttribute(
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_CHAR, 256, &count, buffer.data()),
+        HIPDNN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNullPointer)
@@ -855,12 +854,10 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNegativeRequestedCount)
 
     std::vector<int64_t> buffer(4);
     int64_t count = 0;
-    ASSERT_THROW_HIPDNN_STATUS(heur->getAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT,
-                                                  HIPDNN_TYPE_INT64,
-                                                  -1,
-                                                  &count,
-                                                  buffer.data()),
-                               HIPDNN_STATUS_BAD_PARAM);
+    ASSERT_THROW_HIPDNN_STATUS(
+        heur->getAttribute(
+            HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, -1, &count, buffer.data()),
+        HIPDNN_STATUS_BAD_PARAM);
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderBufferTooSmall)
@@ -1027,8 +1024,8 @@ TEST_F(TestEngineHeuristicDescriptor, SetEmptyPolicyOrder)
     // Setting an empty policy order is allowed at the attribute level; finalize()
     // would later fail because no policy can be selected, but that is exercised by
     // FinalizeWithAllPoliciesFailing. Here we only verify the attribute path.
-    ASSERT_NO_THROW(heur->setAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
+    ASSERT_NO_THROW(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
 }
 
 TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderNullElementCount)
@@ -1162,8 +1159,8 @@ TEST_F(TestEngineHeuristicDescriptor, FinalizeWithEmptyPolicyListThrows)
     // because there are no slots to try. Both paths must produce the same throw.
     auto heur = getEngineHeuristicDescriptor();
 
-    ASSERT_NO_THROW(heur->setAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
+    ASSERT_NO_THROW(
+        heur->setAttribute(HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, nullptr));
 
     setGraph();
     setHeuristicMode();

@@ -85,9 +85,8 @@ protected:
         const std::array<const char*, 2> heuristicPaths
             = {defaultPluginPath.c_str(),
                hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
-        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(heuristicPaths.size(),
-                                                    heuristicPaths.data(),
-                                                    HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
+                      heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
         sPolicyOrderEnv.emplace(
             "HIPDNN_HEURISTIC_POLICY_ORDER",
@@ -100,9 +99,8 @@ protected:
         sPolicyOrderEnv.reset();
         const std::array<const char*, 1> heuristicPaths
             = {hipdnn_tests::plugin_constants::testGoodHeuristicPluginPath().c_str()};
-        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(heuristicPaths.size(),
-                                                    heuristicPaths.data(),
-                                                    HIPDNN_PLUGIN_LOADING_ABSOLUTE),
+        ASSERT_EQ(hipdnnSetHeuristicPluginPaths_ext(
+                      heuristicPaths.size(), heuristicPaths.data(), HIPDNN_PLUGIN_LOADING_ABSOLUTE),
                   HIPDNN_STATUS_SUCCESS);
     }
 

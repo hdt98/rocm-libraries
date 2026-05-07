@@ -321,7 +321,8 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, NoOptionalHeuristicPluginPasse
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
-    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from "
+                                  << _testPluginPath;
 
     bool foundNoOptional = false;
     for(const auto& plugin : plugins)
@@ -346,7 +347,8 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, GoodHeuristicPluginPassesValid
     _manager->loadPlugins({_testPluginPath}, HIPDNN_PLUGIN_LOADING_ABSOLUTE);
 
     const auto& plugins = _manager->getPlugins();
-    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from " << _testPluginPath;
+    ASSERT_FALSE(plugins.empty()) << "Expected at least one plugin to load from "
+                                  << _testPluginPath;
 
     // Match the exact good-plugin name. A loose substring match would pass even if
     // the good plugin failed to load.
@@ -411,10 +413,10 @@ TEST_F(TestHeuristicPluginManagerValidationPaths, EmptyNamePluginRejected)
 
 TEST_F(TestHeuristicPluginManagerValidationPaths, DuplicatePolicyIdPluginsRejected)
 {
-    const auto pluginA
-        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
-    const auto pluginB
-        = _testPluginPath / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
+    const auto pluginA = _testPluginPath
+                         / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_A_PLUGIN);
+    const auto pluginB = _testPluginPath
+                         / hipdnn_data_sdk::utilities::getLibraryName(DUPLICATE_POLICY_ID_B_PLUGIN);
 
     if(!std::filesystem::exists(pluginA) || !std::filesystem::exists(pluginB))
     {

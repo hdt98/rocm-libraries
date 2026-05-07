@@ -105,8 +105,7 @@ TEST_F(TestStaticOrderingPolicy, SetEngineIdsAcceptsValidIds)
 
 TEST_F(TestStaticOrderingPolicy, SetEngineIdsAcceptsZeroCountWithNullPointer)
 {
-    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
 TEST(TestStaticOrderingPolicyInputs, SetEngineIdsRejectsNullDescriptor)
@@ -118,8 +117,7 @@ TEST(TestStaticOrderingPolicyInputs, SetEngineIdsRejectsNullDescriptor)
 
 TEST_F(TestStaticOrderingPolicy, SetEngineIdsRejectsNullPointerWithCount)
 {
-    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 3),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 3), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 // ========== SetSerializedGraph ==========
@@ -130,8 +128,7 @@ TEST_F(TestStaticOrderingPolicy, SetSerializedGraphAcceptsAnyBuffer)
 {
     const std::array<uint8_t, 3> buffer{0x01, 0x02, 0x03};
     const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
-    EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, &data),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, &data), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
 TEST(TestStaticOrderingPolicyInputs, SetSerializedGraphRejectsNullDescriptor)
@@ -196,8 +193,7 @@ TEST_F(TestStaticOrderingPolicy, FinalizeResetsByLastSetEngineIdsCall)
     const std::array<int64_t, 1> ids{MIOPEN_ENGINE_ID};
     ASSERT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, ids.data(), ids.size()),
               HIPDNN_PLUGIN_STATUS_SUCCESS);
-    ASSERT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    ASSERT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0), HIPDNN_PLUGIN_STATUS_SUCCESS);
 
     int32_t applied = -1;
     EXPECT_EQ(hipdnnHeuristicPolicyFinalize(_desc, &applied), HIPDNN_PLUGIN_STATUS_SUCCESS);

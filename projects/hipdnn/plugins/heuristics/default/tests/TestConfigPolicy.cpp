@@ -103,9 +103,12 @@ std::vector<uint8_t> buildConvFwdGraphBuffer(const std::vector<int64_t>& xDims,
 
     auto convAttrs = fb::CreateConvolutionFwdAttributesDirect(builder, X_UID, W_UID, Y_UID);
 
-    const std::vector<flatbuffers::Offset<fb::Node>> nodes{fb::CreateNodeDirect(
-        builder, "conv", fb::DataType::FLOAT, fb::NodeAttributes::ConvolutionFwdAttributes,
-        convAttrs.Union())};
+    const std::vector<flatbuffers::Offset<fb::Node>> nodes{
+        fb::CreateNodeDirect(builder,
+                             "conv",
+                             fb::DataType::FLOAT,
+                             fb::NodeAttributes::ConvolutionFwdAttributes,
+                             convAttrs.Union())};
 
     auto graphOffset = fb::CreateGraphDirect(builder,
                                              nullptr,
@@ -132,7 +135,10 @@ public:
         std::ofstream(_path) << contents;
     }
 
-    std::string path() const { return _path.string(); }
+    std::string path() const
+    {
+        return _path.string();
+    }
 
 private:
     static std::filesystem::path makeUniqueDir()
@@ -226,8 +232,7 @@ TEST_F(TestConfigPolicy, SetEngineIdsAcceptsValidIds)
 
 TEST_F(TestConfigPolicy, SetEngineIdsAcceptsZeroCountWithNullPointer)
 {
-    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 0), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
 TEST(TestConfigPolicyInputs, SetEngineIdsRejectsNullDescriptor)
@@ -239,8 +244,7 @@ TEST(TestConfigPolicyInputs, SetEngineIdsRejectsNullDescriptor)
 
 TEST_F(TestConfigPolicy, SetEngineIdsRejectsNullPointerWithCount)
 {
-    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 3),
-              HIPDNN_PLUGIN_STATUS_BAD_PARAM);
+    EXPECT_EQ(hipdnnHeuristicPolicySetEngineIds(_desc, nullptr, 3), HIPDNN_PLUGIN_STATUS_BAD_PARAM);
 }
 
 // ========== SetSerializedGraph ==========
@@ -249,8 +253,7 @@ TEST_F(TestConfigPolicy, SetSerializedGraphAcceptsValidGraphBuffer)
 {
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const hipdnnPluginConstData_t data{buffer.data(), buffer.size()};
-    EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, &data),
-              HIPDNN_PLUGIN_STATUS_SUCCESS);
+    EXPECT_EQ(hipdnnHeuristicPolicySetSerializedGraph(_desc, &data), HIPDNN_PLUGIN_STATUS_SUCCESS);
 }
 
 TEST(TestConfigPolicyInputs, SetSerializedGraphRejectsNullDescriptor)
@@ -591,8 +594,7 @@ TEST_F(TestConfigPolicy, OverrideFileRereadOnEachFinalize)
     })";
     const TempJsonOverrideFile secondFile(SECOND_RULE);
 
-    hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV,
-                                                                    firstFile.path());
+    hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV, firstFile.path());
 
     setCandidates({MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID});
     setGraph(buildConvFwdGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES));
