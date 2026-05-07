@@ -42,6 +42,10 @@ ROCSOLVER_BEGIN_NAMESPACE
 static bool constexpr use_syrk = true;
 static bool constexpr use_rocblas_trsm = true;
 
+// ---------------------------------------------------------------
+// kernel to copy the strictly upper triangular part or
+// strictly lower triangular part to array of length n * (n-1) / 2
+// ---------------------------------------------------------------
 template <typename T, typename I, typename Istride, typename UA>
 __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
                                                 bool const is_restore,
@@ -61,7 +65,7 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
     I const j_start = threadIdx.y + blockIdx.y * blockDim.y;
     I const j_inc = gridDim.y * blockDim.y;
 
-    I const i_start = threadIdx.x + blockIdx.x + blockDim.x;
+    I const i_start = threadIdx.x + blockIdx.x * blockDim.x;
     I const i_inc = gridDim.x * blockDim.x;
 
     auto idx_lower = [=](I const i, I const j) {
@@ -89,6 +93,9 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
             I const row_start = (is_strictly_lower) ? (j + 1) : 0;
             I const row_end = (is_strictly_lower) ? (n - 1) : (j - 1);
 
+            // ------------------------------
+            // note row_start <= i <= row_end
+            // ------------------------------
             for(I i = row_start + i_start; i <= row_end; i += i_inc)
             {
                 auto const ipos = (is_strictly_lower) ? idx_lower(i, j) : idx_upper(i, j);
@@ -108,7 +115,8 @@ __global__ void copy_strictly_triangular_kernel(bool const is_strictly_lower,
 }
 
 template <typename T, typename I, typename Istride, typename UA>
-static inline void copy_strictly_triangular(bool const is_strictly_lower,
+static inline void copy_strictly_triangular(hipStream_t stream,
+                                            bool const is_strictly_lower,
                                             bool const is_restore,
                                             I const n,
 
@@ -132,18 +140,12 @@ static inline void copy_strictly_triangular(bool const is_strictly_lower,
     I const nby = std::min(max_blocks, ceildiv(n, ny));
 
     copy_strictly_triangular_kernel<T, I, Istride, UA>
-        <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz)>>>(is_strictly_lower, is_restore, n,
+        <<<dim3(nbx, nby, nbz), dim3(nx, ny, nz), 0, stream>>>(is_strictly_lower, is_restore, n,
 
-                                                    A, shiftA, lda, strideA,
+                                                               A, shiftA, lda, strideA,
 
-                                                    save_A, batch_count);
+                                                               save_A, batch_count);
 }
-
-// -----------------------------------------------
-// Note that the recursive routine passes in a
-// row_offset to adjust the info value, so the
-// iinfo[] array may not be required.
-// -----------------------------------------------
 
 // --------------------------------------------------------
 // heuristic to determine whether to use recursive routine
@@ -153,8 +155,7 @@ template <typename T, typename I>
 static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[maybe_unused]] I const n)
 {
     // simple heuristic
-    // bool const is_use_recursion = (n >= 1024 );
-    bool const is_use_recursion = true;
+    bool const is_use_recursion = (n > POTRF_RECURSION_SWITCH_SIZE(T));
 
     return is_use_recursion;
 };
@@ -162,28 +163,25 @@ static inline bool use_recursion([[maybe_unused]] rocblas_fill const uplo, [[may
 template <typename T, typename I>
 static inline I split_n(I const n)
 {
-    // return std::max(I(1), n / 2);
     I const nb = POTF2_MAX_SMALL_SIZE(T);
-    I const n1 = (n <= nb)       ? std::max(I(1), n / 2)
-        : (n <= 2 * nb)          ? nb
-        : (n <= 4 * nb)          ? 2 * nb
-        : (n <= 8 * nb)          ? 4 * nb
-        : (n <= 16 * nb)         ? 8 * nb
-        : (n <= 32 * nb)         ? 16 * nb
-        : (n <= 64 * nb)         ? 32 * nb
-        : (n <= 128 * nb)        ? 64 * nb
-        : (n <= 256 * nb)        ? 128 * nb
-        : (n <= 512 * nb)        ? 256 * nb
-        : (n <= 1024 * nb)       ? 512 * nb
-        : (n <= 2 * 1024 * nb)   ? 1024 * nb
-        : (n <= 4 * 1024 * nb)   ? 2 * 1024 * nb
-        : (n <= 8 * 1024 * nb)   ? 4 * 1024 * nb
-        : (n <= 16 * 1024 * nb)  ? 8 * 1024 * nb
-        : (n <= 32 * 1024 * nb)  ? 16 * 1024 * nb
-        : (n <= 64 * 1024 * nb)  ? 32 * 1024 * nb
-        : (n <= 128 * 1024 * nb) ? 64 * 1024 * nb
-        : (n <= 256 * 1024 * nb) ? 128 * 1024 * nb
-                                 : 128 * 1024 * nb;
+
+    // ------------------------------------
+    // split at maximum of 1024 * nb may be sufficient
+    // to get good performance
+    // ------------------------------------
+    I const n1 = (n <= nb)     ? std::max(I(1), n / 2)
+        : (n <= 2 * nb)        ? nb
+        : (n <= 4 * nb)        ? 2 * nb
+        : (n <= 8 * nb)        ? 4 * nb
+        : (n <= 16 * nb)       ? 8 * nb
+        : (n <= 32 * nb)       ? 16 * nb
+        : (n <= 64 * nb)       ? 32 * nb
+        : (n <= 128 * nb)      ? 64 * nb
+        : (n <= 256 * nb)      ? 128 * nb
+        : (n <= 512 * nb)      ? 256 * nb
+        : (n <= 1024 * nb)     ? 512 * nb
+        : (n <= 2 * 1024 * nb) ? 1024 * nb
+                               : 1024 * nb;
 
     return n1;
 }
@@ -850,8 +848,21 @@ static inline rocblas_status potrf_trsm(rocblas_handle handle,
     return istat;
 }; // end potrf_trsm
 
-// special version to handle n = K * NB, and K = 2^k
+// -------------------------------------------------
+// Special version to handle known fixed sizes of
+// n = K * NB, and K = 2^k
 //
+// The algorithm is conceptually recursive but
+// implemented without using C++ recursion
+//
+// using __attribute__((always_inline)) to force inlining
+// may lead to large binaries for CPU
+//
+//
+// Note that the recursive routine passes in a
+// row_offset to adjust the info value, so the
+// iinfo[] array may not be required.
+// -----------------------------------------------
 template <int K, bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 // __attribute__((always_inline)) inline rocblas_status
 static inline rocblas_status rocsolver_potrf_NB_template(rocblas_handle handle,
@@ -881,9 +892,16 @@ static inline rocblas_status rocsolver_potrf_NB_template(rocblas_handle handle,
 
     rocblas_status istat = rocblas_status_success;
 
+    // -----------------------------
+    // terminate recursion at K == 1
+    // -----------------------------
     if constexpr(K == 1)
     {
-        assert(n == NB);
+        if(n != NB)
+        {
+            return (rocblas_status_internal_error);
+        }
+
         istat = potf2_run_small<T>(handle, uplo, n,
 
                                    A, shiftA, lda, strideA,
@@ -1237,8 +1255,7 @@ rocblas_status rocsolver_potrf_template_body(rocblas_handle handle,
 
 // ---------------------------------------------------------------
 // This is the conceptually recursive formulation of the Cholesky factorization
-// but implemented without C++ recursion
-//
+// but implemented in a non-recursive manner without using C++ recursion
 // ---------------------------------------------------------------
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
@@ -1302,16 +1319,15 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
 
             if(n1 == 1 * NB)
             {
-                rocblas_status const istat
-                    = rocsolver_potrf_NB_template<1, BATCHED, STRIDED, T, I, INFO, S, U>(
+                istat = rocsolver_potrf_NB_template<1, BATCHED, STRIDED, T, I, INFO, S, U>(
 
-                        handle, uplo, nn,
+                    handle, uplo, nn,
 
-                        A, shiftA, lda, strideA,
+                    A, shiftA, lda, strideA,
 
-                        info, batch_count,
+                    info, batch_count,
 
-                        scalars, work1, work2, work3, work4, optim_mem, row_offset);
+                    scalars, work1, work2, work3, work4, optim_mem, row_offset);
             }
             else if(n1 == 2 * NB)
             {
@@ -1526,6 +1542,9 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
         // ----------------------------
         // get ready for next iteration
         // for factorizing A22, size n2 by n2
+        //
+        // the code is using "tail recursion"
+        // where the recursive call is the final step
         // ----------------------------
         shiftA += idx2D(n1, n1, lda);
         row_offset += n1;
@@ -1536,6 +1555,7 @@ rocblas_status rocsolver_potrf_recursion_template(rocblas_handle handle,
     return istat;
 }
 
+#if(0)
 // ---------------------------------------------------------------
 // This is the recursive formulation of the Cholesky factorization
 //
@@ -1591,6 +1611,7 @@ rocblas_status rocsolver_potrf_recursion_template_org(rocblas_handle handle,
 
     // -----------------------------
     // check for special sizes for n
+    // to perform Cholesky factorization
     // -----------------------------
 
     if(n == 2 * NB)
@@ -1963,6 +1984,7 @@ rocblas_status rocsolver_potrf_recursion_template_org(rocblas_handle handle,
 
     return rocblas_status_success;
 }
+#endif
 
 template <bool BATCHED, bool STRIDED, typename T, typename I, typename INFO, typename S, typename U>
 rocblas_status rocsolver_potrf_template(rocblas_handle handle,
@@ -2043,7 +2065,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             // ---------------------------------------------------------------
             bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
             bool const is_restore = false;
-            copy_strictly_triangular(is_copy_strictly_lower, is_restore, n,
+            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n,
 
                                      A, shiftA, lda, strideA,
 
@@ -2068,7 +2090,7 @@ rocblas_status rocsolver_potrf_template(rocblas_handle handle,
             bool const is_copy_strictly_lower = (uplo == rocblas_fill_upper);
             bool const is_restore = true;
 
-            copy_strictly_triangular(is_copy_strictly_lower, is_restore, n,
+            copy_strictly_triangular(stream, is_copy_strictly_lower, is_restore, n,
 
                                      A, shiftA, lda, strideA,
 
