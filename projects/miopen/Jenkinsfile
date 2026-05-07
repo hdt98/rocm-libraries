@@ -168,10 +168,12 @@ def buildAsanDockerImage(Map conf=[:]) {
     def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:asan_cache"
     def asanRunId = conf.get("asanRunId", env.ASAN_ARTIFACTS_RUN_ID ?: "25414061404")
     def amdgpuFamilies = conf.get("amdgpuFamilies", "gfx94X-dcgpu")
+    def amdgpuArchs = conf.get("amdgpuArchs", "gfx942") 
 
     def dockerArgs = "--build-arg BUILD_TYPE=prebuilt " +
                      "--build-arg ASAN_ARTIFACTS_RUN_ID=\"${asanRunId}\" " +
                      "--build-arg AMDGPU_FAMILIES=\"${amdgpuFamilies}\" " +
+                     "--build-arg GPU_ARCHS=\"${amdgpuArchs}\" " +
                      " -f ${env.WORKSPACE}/${env.MIOPEN_DIR}/Dockerfile.ASAN "
     def buildContext = "${env.WORKSPACE}/${env.MIOPEN_DIR}/."
 
