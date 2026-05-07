@@ -39,7 +39,7 @@
 
 ROCSOLVER_BEGIN_NAMESPACE
 
-static bool constexpr use_syrk = false;
+static bool constexpr use_syrk = true;
 static bool constexpr use_rocblas_trsm = true;
 
 template <typename T, typename I, typename Istride, typename UA>
