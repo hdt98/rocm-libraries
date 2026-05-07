@@ -134,7 +134,7 @@ RUN pip install -r requirements.txt
 # ============================================================================
 FROM base AS therock_prebuilt
 
-ARG THEROCK_ASIC=gfx942-dcgpu
+ARG AMDGPU_FAMILIES=gfx94X-dcgpu
 ARG ASAN_ARTIFACTS_RUN_ID=25414061404
 ARG BUILD_JOBS=0
 
@@ -146,8 +146,7 @@ WORKDIR /TheRock
 RUN . /opt/venv/bin/activate && \
     python build_tools/install_rocm_from_artifacts.py \
         --run-id ${ASAN_ARTIFACTS_RUN_ID} \
-        --amdgpu-family ${THEROCK_ASIC} \
-        --miopen \
+        --amdgpu-family ${AMDGPU_FAMILIES} \
         --tests \
         --output-dir ${ROCM_PATH}
 
@@ -158,7 +157,7 @@ RUN . /opt/venv/bin/activate && \
 # ============================================================================
 FROM base AS therock_source_build
 
-ARG THEROCK_ASIC=gfx942
+ARG AMDGPU_FAMILIES=gfx94X-dcgpu
 ARG BUILD_JOBS=0
 
 ENV ROCM_PATH=/opt/rocm
@@ -170,7 +169,7 @@ RUN . /opt/venv/bin/activate && \
 
 RUN cmake -B build -GNinja . \
         --preset linux-release-asan \
-        -DTHEROCK_AMDGPU_FAMILIES=$THEROCK_ASIC \
+        -DTHEROCK_AMDGPU_FAMILIES=$AMDGPU_FAMILIES \
         -DBUILD_TESTING=ON \
         -DCMAKE_INSTALL_PREFIX=/opt/rocm \
         -DTHEROCK_ENABLE_ALL=OFF \
@@ -197,8 +196,9 @@ FROM base AS miopen_deps
 COPY --from=therock /opt/rocm /opt/rocm
 COPY --from=therock /opt/venv /opt/venv
 
-ARG THEROCK_ASIC=gfx942
 ARG PREFIX=/opt/rocm
+ARG AMDGPU_FAMILIES=gfx94X-dcgpu
+ARG GPU_ARCHS=gfx942
 ENV ROCM_PATH=/opt/rocm
 ARG USE_FIN="OFF"
 
@@ -211,11 +211,11 @@ ADD dev-requirements.txt /dev-requirements.txt
 # Composable Kernel install separated from rbuild 
 # Remove components that are already built by TheRock.
 RUN cd / && \
-    sed -i '/composablekernel/d; /half/d; /nlohmann/d' /requirements.txt && \
+    sed -i '/composablekernel/d; /half/d; /nlohmann/d; /rocMLIR/d;' /requirements.txt && \
     if [ "$USE_FIN" = "ON" ]; then \
-        rbuild prepare -s fin -d ${PREFIX} -DGPU_ARCHS="${THEROCK_ASIC}"; \
+        rbuild prepare -s fin -d ${PREFIX} -DGPU_ARCHS="${GPU_ARCHS}"; \
     else \
-        rbuild prepare -s develop -d ${PREFIX} -DGPU_ARCHS="${THEROCK_ASIC}"; \
+        rbuild prepare -s develop -d ${PREFIX} -DGPU_ARCHS="${GPU_ARCHS}"; \
     fi
 
 # ASAN runtime environment — must match what the instrumented binaries expect
@@ -234,7 +234,7 @@ ENV AMD_LOG_LEVEL=1
 # Expose artifact dir for test runner compatibility with TheRock's fetch_test_configurations
 ENV OUTPUT_ARTIFACTS_DIR=${ROCM_PATH}
 ENV THEROCK_BIN_DIR="${ROCM_PATH}/bin"
-ENV AMDGPU_FAMILIES=${THEROCK_ASIC}
+ENV AMDGPU_FAMILIES=${AMDGPU_FAMILIES}
 ENV TEST_TYPE=full
 ENV HIP_PLATFORM=amd
 
