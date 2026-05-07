@@ -727,7 +727,7 @@ pipeline {
                 stage('ASAN Hip Install All gfx942') {
                     when {
                         beforeAgent true
-                        expression { params.TARGET_GFX942 || params.WORKAROUND__TARGET_GFX942_MINIMUM_TEST_ENABLE }
+                        expression { params.TARGET_GFX942 }
                     }
                     steps {
                         script {
