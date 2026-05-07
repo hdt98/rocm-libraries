@@ -1,0 +1,158 @@
+# Copyright © Advanced Micro Devices, Inc., or its affiliates.
+# SPDX-License-Identifier: MIT
+#
+# TheRock superbuild (Linux) + merged compile_commands + run-clang-tidy over
+# first-party rocm-libraries sources (projects/, dnn-providers/, shared/).
+# No unit/integration tests and no artifact upload.
+#
+# Notes:
+# - Build steps mirror .github/workflows/therock-ci-linux.yml (keep in sync).
+# - Analysis uses a portable LLVM 20 toolchain (clang-tidy includes
+#   clang-analyzer-* checks). TheRock's bundled amd-llvm is built with the
+#   static analyzer disabled for faster compiler builds; that is unchanged here.
+# - Full-stack builds are large; use workflow_dispatch and optional cmake_options
+#   to narrow features when experimenting.
+
+name: TheRock Static Analysis (Linux)
+
+on:
+  workflow_dispatch:
+    inputs:
+      amdgpu_families:
+        description: "THEROCK_AMDGPU_FAMILIES (same token family as CI nightly)"
+        type: string
+        default: gfx94X-dcgpu
+      cmake_options:
+        description: "Extra CMake flags (appended like therock-ci-nightly matrix)"
+        type: string
+        default: ""
+      therock_ref:
+        description: "TheRock git ref (commit SHA)"
+        type: string
+        default: "70a6335b27d48f3781ba07eab89269f75a00f527"
+      tidy_jobs:
+        description: "Parallel jobs for run-clang-tidy"
+        type: string
+        default: "8"
+      llvm_version:
+        description: "LLVM release for clang-tidy tarball (llvmorg-X.Y.Z)"
+        type: string
+        default: "20.1.5"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis:
+    name: Build + clang-tidy (${{ inputs.amdgpu_families }})
+    runs-on: azure-linux-scale-rocm
+    timeout-minutes: 720
+    container:
+      image: ghcr.io/rocm/therock_build_manylinux_x86_64@sha256:48492540591673fdc8d51beb89bde41e7ba13cbb528f643c0a481ba42c4058f2
+      options: -v /runner/config:/home/awsconfig/
+    env:
+      CACHE_DIR: ${{ github.workspace }}/.container-cache
+      CCACHE_CONFIGPATH: ${{ github.workspace }}/.ccache/ccache.conf
+      AMDGPU_FAMILIES: ${{ inputs.amdgpu_families }}
+      TEATIME_FORCE_INTERACTIVE: "0"
+      AWS_SHARED_CREDENTIALS_FILE: /home/awsconfig/credentials.ini
+
+    steps:
+      - name: Checkout rocm-libraries
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Checkout TheRock
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ROCm/TheRock
+          path: TheRock
+          ref: ${{ inputs.therock_ref }}
+
+      - name: Install Python dependencies
+        run: pip install -r TheRock/requirements.txt
+
+      - name: Cache portable LLVM (clang-tidy)
+        id: llvm-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.llvm-tidy-toolchain
+          key: llvm-tidy-${{ inputs.llvm_version }}-clang-ubuntu22-tar
+
+      - name: Install portable LLVM for run-clang-tidy
+        if: steps.llvm-cache.outputs.cache-hit != 'true'
+        run: |
+          set -eux
+          V="${{ inputs.llvm_version }}"
+          NAME="clang+llvm-${V}-x86_64-linux-gnu-ubuntu-22.04"
+          URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${V}/${NAME}.tar.xz"
+          rm -rf "$GITHUB_WORKSPACE/.llvm-tidy-toolchain"
+          mkdir -p /tmp/llvm-dl
+          curl -fsSL "$URL" -o "/tmp/llvm-dl/${NAME}.tar.xz"
+          tar -xJf "/tmp/llvm-dl/${NAME}.tar.xz" -C "$GITHUB_WORKSPACE"
+          mv "$GITHUB_WORKSPACE/${NAME}" "$GITHUB_WORKSPACE/.llvm-tidy-toolchain"
+          rm -rf /tmp/llvm-dl
+
+      - name: Git safe.directory
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config fetch.parallel 10
+
+      - name: Setup ccache
+        run: |
+          ./TheRock/build_tools/setup_ccache.py \
+            --config-preset "github-oss-dev" \
+            --dir "$(dirname "$CCACHE_CONFIGPATH")" \
+            --local-path "$CACHE_DIR/ccache"
+
+      - name: Runner health status
+        run: ./TheRock/build_tools/health_status.py
+
+      - name: Pull DVC files (optional)
+        run: |
+          if command -v dvc &> /dev/null; then
+            LOGNAME=github-runner dvc pull -v || true
+          fi
+
+      - name: Fetch sources
+        timeout-minutes: 45
+        run: |
+          ./TheRock/build_tools/fetch_sources.py --jobs 12 --no-include-rocm-libraries --no-include-ml-frameworks \
+            ${{ contains(inputs.cmake_options, 'THEROCK_ENABLE_IREE_LIBS=ON') && '--include-iree-libs' || '' }}
+
+      - name: Configure TheRock
+        env:
+          amdgpu_families: ${{ env.AMDGPU_FAMILIES }}
+          package_version: ADHOCBUILD
+          extra_cmake_options: "-DTHEROCK_ROCM_LIBRARIES_SOURCE_DIR=../ ${{ inputs.cmake_options }}"
+          BUILD_DIR: build
+        run: python3 TheRock/build_tools/github_actions/build_configure.py
+
+      - name: Build therock-archives and therock-dist
+        run: cmake --build TheRock/build --target therock-archives therock-dist -- -k 0
+
+      - name: Merge compile_commands.json
+        run: cmake --build TheRock/build --target therock_merged_compile_commands -- -k 0
+
+      - name: Run clang-tidy on rocm-libraries first-party sources
+        run: |
+          set -eux
+          export PATH="$GITHUB_WORKSPACE/.llvm-tidy-toolchain/bin:$PATH"
+          command -v run-clang-tidy
+          test -f "$GITHUB_WORKSPACE/TheRock/compile_commands.json"
+          TIDY_CFG="$GITHUB_WORKSPACE/.github/rocm-libraries-clang-tidy.yml"
+          test -f "$TIDY_CFG"
+          # Exclude TheRock/compiler trees and third_party noise; keep projects/, dnn-providers/, shared/.
+          FILTER='.*/(projects|dnn-providers|shared)/.*\.(cpp|hpp|h|hh|cc|cxx|c|cuh|hip)$'
+          run-clang-tidy -p "$GITHUB_WORKSPACE/TheRock" \
+            -config-file="$TIDY_CFG" \
+            -j "${{ inputs.tidy_jobs }}" \
+            -quiet \
+            -source-filter "$FILTER"
+
+      - name: CCache stats
+        if: always()
+        run: ccache -s -v || true
