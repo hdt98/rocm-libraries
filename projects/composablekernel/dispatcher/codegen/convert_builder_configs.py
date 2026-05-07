@@ -4,6 +4,21 @@
 #
 # Converts CK Builder .conf config files to JSON format for the CK Dispatcher codegen.
 #
+# CK Builder instances are parameterized with Seq() thread block cluster lengths
+# and k0/k1 decompositions that control thread-to-data mappings at a level of
+# detail the dispatcher codegen does not model.  Multiple Builder instances that
+# differ only in these parameters produce identical dispatcher configurations
+# (same tile/warp/vector sizes, pipeline, scheduler, specialization).  The
+# converter therefore deduplicates the output so each unique dispatcher config
+# appears exactly once in the JSON.
+#
+# Three categories of Builder instances are skipped entirely because the
+# dispatcher codegen does not yet support them:
+#   1. Irregular vector sizes (odd values other than 1)
+#   2. V6 (compv6) pipeline — maps from old CK V5
+#   3. Multi-warp per continuous tile dimension
+#       (tile_m > warp_size * vec_a, or tile_n > warp_size * vec_b)
+#
 # Usage:
 #   python3 convert_builder_configs.py \
 #     --input ../experimental/.../configs/backward_weight/profiler/nhwgc_bf16.conf \
@@ -292,6 +307,21 @@ def convert_config_file(input_path, variant, layout, datatype, ndim):
 
         if result is not None:
             instances.append(result)
+
+    # Deduplicate: Builder instances that differ only in Seq() thread block
+    # cluster lengths or k0/k1 decomposition produce identical dispatcher
+    # configs because the converter discards these parameters.
+    seen = set()
+    unique_instances = []
+    for inst in instances:
+        key = tuple(sorted((k, str(v)) for k, v in inst.items() if k != "id"))
+        if key not in seen:
+            seen.add(key)
+            unique_instances.append(inst)
+    if len(unique_instances) < len(instances):
+        print(f"  Deduplicated: {len(instances)} -> {len(unique_instances)} "
+              f"({len(instances) - len(unique_instances)} duplicates removed)")
+    instances = unique_instances
 
     output = {
         "variant": variant,
