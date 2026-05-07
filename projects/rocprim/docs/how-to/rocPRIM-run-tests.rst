@@ -1,6 +1,6 @@
 .. meta::
-  :description: Run rocPRIM unit tests and benchmarks with CTest, multiple GPUs, and custom seeds
-  :keywords: ROCm libraries, rocPRIM, ROCm, GoogleTest, CTest, benchmarks, testing
+  :description: Run rocPRIM unit tests on multiple GPUs
+  :keywords: ROCm libraries, rocPRIM, ROCm, CTest, testing
 
 *********************************************
 Running rocPRIM unit tests over multiple GPUs
