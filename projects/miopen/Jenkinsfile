@@ -161,6 +161,27 @@ def runBuildAndSingleGtestJob(Map conf=[:])
     }
 }
 
+def runHipClangStage(Map conf=[:]) {
+    script {
+        withWorkingDir {
+            utils.buildHipClangJob(conf)
+        }
+    }
+}
+
+// Wraps the ASAN Docker build node+withWorkingDir+cleanWs boilerplate.
+def runAsanDockerBuild() {
+    node(rocmnode("docker")) {
+        try {
+            withWorkingDir {
+                buildAsanDockerImage(asanRunId: env.ASAN_ARTIFACTS_RUN_ID, amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
+            }
+        } finally {
+            cleanWs()
+        }
+    }
+}
+
 def buildAsanDockerImage(Map conf=[:]) {
     def variant = env.STAGE_NAME
     env.DOCKER_BUILDKIT = 1
@@ -468,11 +489,7 @@ pipeline {
                 stage("HIP Package") {
                     agent{ label rocmnode("nogpu") }
                     steps {
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob( package_build:true, needs_gpu:false, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(package_build:true, needs_gpu:false, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -483,11 +500,7 @@ pipeline {
                 stage('Clang Format') {
                     agent{ label rocmnode("nogpu") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(make_targets: "check_format", needs_gpu:false, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(make_targets: "check_format", needs_gpu:false, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -521,11 +534,7 @@ pipeline {
                         build_cmd = "make -j\$(nproc)"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob( build_type: 'debug', setup_flags: HipNoGPU_flags, build_cmd: build_cmd, needs_gpu:false, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(build_type: 'debug', setup_flags: HipNoGPU_flags, build_cmd: build_cmd, needs_gpu:false, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -539,11 +548,7 @@ pipeline {
                       fin_flags = "-DMIOPEN_BACKEND=HIPNOGPU"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: fin_flags, make_targets: "all", build_fin: "ON", needs_gpu:false, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: fin_flags, make_targets: "all", build_fin: "ON", needs_gpu:false, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -554,11 +559,7 @@ pipeline {
                 stage('Fp32 Hip Debug NOCK Build-Only') {
                     agent{ label rocmnode("nogpu") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob( build_type: 'debug', setup_flags: "-DMIOPEN_USE_COMPOSABLEKERNEL=Off", make_targets: "", build_install: true, needs_gpu: false, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(build_type: 'debug', setup_flags: "-DMIOPEN_USE_COMPOSABLEKERNEL=Off", make_targets: "", build_install: true, needs_gpu: false, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -582,11 +583,7 @@ pipeline {
                         build_cmd = "make -j\$(nproc) -k analyze"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_cmd: setup_cmd, build_cmd: build_cmd, needs_gpu:false, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_cmd: setup_cmd, build_cmd: build_cmd, needs_gpu:false, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -785,15 +782,7 @@ pipeline {
             }
             steps {
                 script {
-                    node(rocmnode("docker")) {
-                        try {
-                            withWorkingDir {
-                                buildAsanDockerImage(asanRunId: env.ASAN_ARTIFACTS_RUN_ID, amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
-                            }
-                        } finally {
-                            cleanWs()
-                        }
-                    }
+                    runAsanDockerBuild()
                 }
             }
         }
@@ -841,11 +830,7 @@ pipeline {
                         NOMLIR_build_cmd = "CTEST_PARALLEL_LEVEL=4 MIOPEN_LOG_LEVEL=5 make -j\$(nproc) check"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob( build_type: 'debug', setup_flags: NOMLIR_flags + gfx90a_flags, build_cmd: NOMLIR_build_cmd, test_flags: ' --verbose ', build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(build_type: 'debug', setup_flags: NOMLIR_flags + gfx90a_flags, build_cmd: NOMLIR_build_cmd, test_flags: ' --verbose ', build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -860,11 +845,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob( setup_flags: "-DBUILD_SHARED_LIBS=Off" + gfx90a_flags, mlir_build: 'OFF', build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: "-DBUILD_SHARED_LIBS=Off" + gfx90a_flags, mlir_build: 'OFF', build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -883,11 +864,7 @@ pipeline {
                         execute_cmd = "bin/test_conv2d --disable-verification-cache"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: gfx90a_flags, make_targets: make_targets, execute_cmd: execute_cmd, find_mode: "Normal", build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: gfx90a_flags, make_targets: make_targets, execute_cmd: execute_cmd, find_mode: "Normal", build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -906,11 +883,7 @@ pipeline {
                         execute_cmd = "MIOPEN_FIND_MODE=2 CTEST_PARALLEL_LEVEL=4 bin/test_conv2d --disable-verification-cache"
                     }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: gfx90a_flags, make_targets: make_targets, execute_cmd: execute_cmd, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: gfx90a_flags, make_targets: make_targets, execute_cmd: execute_cmd, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -925,11 +898,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(make_targets: Smoke_targets, setup_flags: "-DMIOPEN_USE_SQLITE_PERF_DB=On" + gfx90a_flags, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(make_targets: Smoke_targets, setup_flags: "-DMIOPEN_USE_SQLITE_PERF_DB=On" + gfx90a_flags, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -944,14 +913,10 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: "-DMIOPEN_ENABLE_FIN_INTERFACE=On" + gfx90a_flags,
-                                                            make_targets: "test_unit_FinInterface",
-                                                            execute_cmd: "bin/test_unit_FinInterface",
-                                                            gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: "-DMIOPEN_ENABLE_FIN_INTERFACE=On" + gfx90a_flags,
+                                         make_targets: "test_unit_FinInterface",
+                                         execute_cmd: "bin/test_unit_FinInterface",
+                                         gpu_family: "ci")
                     }
                     post {
                         always {
@@ -966,11 +931,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx90a") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: gfx90a_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: gfx90a_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -986,11 +947,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx942") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: gfx942_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: gfx942_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
@@ -1089,11 +1046,7 @@ pipeline {
                     }
                     agent{ label rocmnode("gfx908") }
                     steps{
-                        script {
-                            withWorkingDir {
-                                utils.buildHipClangJob(setup_flags: gfx908_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
-                            }
-                        }
+                        runHipClangStage(setup_flags: gfx908_flags, build_type: 'debug', make_targets: Smoke_targets, build_install: true, gpu_family: "ci")
                     }
                     post {
                         always {
