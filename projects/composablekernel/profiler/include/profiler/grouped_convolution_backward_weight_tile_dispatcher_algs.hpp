@@ -21,23 +21,12 @@
 #include "ck_tile/builder/conv_builder.hpp"
 #include "tile_profiler_utils.hpp"
 
-// Dispatcher headers
+// Dispatcher headers 
 #include "ck_tile/dispatcher/grouped_conv_registry.hpp"
 #include "ck_tile/dispatcher/grouped_conv_problem.hpp"
-#include "ck_tile/dispatcher/backends/generated_conv_backend.hpp"
 
-// Suppress warnings from generated kernel headers
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wheader-hygiene"
-#pragma clang diagnostic ignored "-Wunused-parameter"
-
-// Include ALL generated backward weight kernels
-#include "include_all_grouped_conv_bwd_weight_kernels.hpp"
-
-// Include registration header
-#include "register_all_grouped_conv_kernels.hpp"
-
-#pragma clang diagnostic pop
+// Forward declaration of registration function
+#include "ck_tile/dispatcher/register_all_grouped_conv_kernels.hpp"
 
 namespace ck_tile::builder::profiling {
 
@@ -203,7 +192,6 @@ run_grouped_conv_backward_weight_tile_algs(const ckt::Args<SIGNATURE>& args,
     if(!kernels_registered)
     {
         const auto arch_name = get_runtime_arch_name();
-        std::cout << "Runtime arch: " << arch_name << std::endl;
         ck_tile::dispatcher::register_all_grouped_conv_bwd_weight_kernels(arch_name);
         kernels_registered = true;
     }

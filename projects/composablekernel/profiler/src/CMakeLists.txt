@@ -172,9 +172,9 @@ if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
   set(DISPATCHER_CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/backward_weight")
   set(DISPATCHER_GEN_SCRIPT "${DISPATCHER_DIR}/scripts/generate_profiler_bwd_weight_kernels.py")
   set(DISPATCHER_KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_weight_kernels")
-  set(DISPATCHER_CONFIG_SET "tests" CACHE STRING "Dispatcher config set: tests or profiler")
+  set(DISPATCHER_CONFIG_SET "profiler" CACHE STRING "Dispatcher config set: tests or profiler")
 
-  if(NOT EXISTS ${DISPATCHER_KERNEL_DIR}/register_all_grouped_conv_kernels.hpp)
+  if(NOT EXISTS ${DISPATCHER_KERNEL_DIR}/register_all_grouped_conv_kernels.cpp)
     file(MAKE_DIRECTORY ${DISPATCHER_KERNEL_DIR})
     execute_process(
       COMMAND ${Python3_EXECUTABLE} ${DISPATCHER_GEN_SCRIPT}
@@ -207,6 +207,17 @@ if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
   endforeach()
 
   if(DISPATCHER_KERNEL_SOURCES)
+    # Add register_all.cpp to the OBJECT library alongside kernel wrappers.
+    # This keeps all generated code self-contained.
+    set(REGISTER_ALL_CPP "${DISPATCHER_KERNEL_DIR}/register_all_grouped_conv_kernels.cpp")
+    if(EXISTS "${REGISTER_ALL_CPP}")
+      list(APPEND DISPATCHER_KERNEL_SOURCES "${REGISTER_ALL_CPP}")
+      # register_all.cpp needs extra warning suppression for dispatcher registry headers
+      set_source_files_properties("${REGISTER_ALL_CPP}" PROPERTIES
+        COMPILE_OPTIONS "-Wno-ctad-maybe-unsupported;-Wno-old-style-cast"
+      )
+    endif()
+
     add_library(device_grouped_conv_bwd_weight_dispatcher_instances OBJECT ${DISPATCHER_KERNEL_SOURCES})
     target_include_directories(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE
       ${PROJECT_SOURCE_DIR}/include
@@ -226,13 +237,22 @@ if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
       target_compile_options(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE --offload-compress)
     endif()
     set_target_properties(device_grouped_conv_bwd_weight_dispatcher_instances PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    message(STATUS "Dispatcher bwd_weight instances: ${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_weight_kernels (${DISPATCHER_CONFIG_SET})")
+
+    # Progress monitoring
+    list(LENGTH DISPATCHER_KERNEL_SOURCES _TOTAL_COUNT)
+    math(EXPR _KERNEL_COUNT "${_TOTAL_COUNT} - 1")
+    message(STATUS "Dispatcher bwd_weight: ${_TOTAL_COUNT} compilation units (${_KERNEL_COUNT} kernels + registration)")
+
+    # Separate ninja target for isolated progress: ninja dispatcher_bwd_weight_lib
+    add_custom_target(dispatcher_bwd_weight_lib
+      DEPENDS device_grouped_conv_bwd_weight_dispatcher_instances
+      COMMENT "All ${_TOTAL_COUNT} dispatcher bwd_weight instances compiled."
+    )
   endif()
 
-  # Add include path and link dispatcher kernel objects to profiler
+  # Profiler only needs dispatcher API headers
   target_include_directories(${PROFILER_EXECUTABLE} PRIVATE
     ${PROJECT_SOURCE_DIR}/dispatcher/include
-    ${DISPATCHER_KERNEL_DIR}
   )
   target_compile_options(${PROFILER_EXECUTABLE} PRIVATE
     -Wno-undefined-func-template

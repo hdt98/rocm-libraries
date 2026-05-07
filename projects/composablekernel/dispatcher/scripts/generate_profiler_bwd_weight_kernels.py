@@ -8,7 +8,7 @@
 # 1. Reads JSON config files (from convert_builder_configs.py)
 # 2. Calls unified_grouped_conv_codegen.py --config-file for each JSON
 # 3. Generates include_all_grouped_conv_bwd_weight_kernels.hpp
-# 4. Generates register_all_grouped_conv_kernels.hpp
+# 4. Generates register_all_grouped_conv_kernels.cpp
 #
 # Usage:
 #   python3 generate_profiler_bwd_weight_kernels.py \
@@ -71,12 +71,24 @@ def generate_include_all_header(headers, output_dir):
     return path
 
 
-def generate_registration_header(headers, output_dir):
-    """Generate register_all_grouped_conv_kernels.hpp with registration function."""
+def generate_registration_source(headers, output_dir):
+    """Generate register_all_grouped_conv_kernels.cpp (implementation).
+
+    The declaration header is in source control at:
+    dispatcher/include/ck_tile/dispatcher/register_all_grouped_conv_kernels.hpp
+    """
+    # --- Generate the .cpp implementation file ---
     lines = [
         "// Auto-generated — do not edit",
-        "// Registration function for all generated backward weight kernels.",
-        "#pragma once",
+        "// Registration function implementation for all generated backward weight kernels.",
+        "",
+        "// Include all generated kernel headers FIRST (before dispatcher headers)",
+        "// to avoid template instantiation issues from grouped_convolution_utils.hpp",
+        "#pragma clang diagnostic push",
+        "#pragma clang diagnostic ignored \"-Wheader-hygiene\"",
+        "#pragma clang diagnostic ignored \"-Wunused-parameter\"",
+        '#include "include_all_grouped_conv_bwd_weight_kernels.hpp"',
+        "#pragma clang diagnostic pop",
         "",
         '#include "ck_tile/dispatcher/grouped_conv_registry.hpp"',
         '#include "ck_tile/dispatcher/backends/generated_conv_backend.hpp"',
@@ -204,7 +216,7 @@ def generate_registration_header(headers, output_dir):
         reg_lines.append(f"        registry.register_kernel(key, inst);")
         reg_lines.append("    }")
 
-    lines.append("inline void register_all_grouped_conv_bwd_weight_kernels(")
+    lines.append("void register_all_grouped_conv_bwd_weight_kernels(")
     lines.append("    GroupedConvRegistry& registry, const std::string& arch)")
     lines.append("{")
     lines.extend(reg_lines)
@@ -212,7 +224,7 @@ def generate_registration_header(headers, output_dir):
     lines.append("")
 
     # Convenience overload that uses singleton registry
-    lines.append("inline void register_all_grouped_conv_bwd_weight_kernels(const std::string& arch)")
+    lines.append("void register_all_grouped_conv_bwd_weight_kernels(const std::string& arch)")
     lines.append("{")
     lines.append("    auto& registry = GroupedConvRegistry::instance();")
     lines.append("    register_all_grouped_conv_bwd_weight_kernels(registry, arch);")
@@ -222,10 +234,10 @@ def generate_registration_header(headers, output_dir):
     lines.append("} // namespace ck_tile")
     lines.append("")
 
-    path = Path(output_dir) / "register_all_grouped_conv_kernels.hpp"
-    path.write_text("\n".join(lines))
-    print(f"Generated {path} ({len(headers)} registrations)")
-    return path
+    cpp_path = Path(output_dir) / "register_all_grouped_conv_kernels.cpp"
+    cpp_path.write_text("\n".join(lines))
+    print(f"Generated {cpp_path} ({len(headers)} registrations)")
+    return cpp_path
 
 
 def main():
@@ -294,9 +306,9 @@ def main():
         print("ERROR: No kernel headers generated", file=sys.stderr)
         sys.exit(1)
 
-    # Generate the two profiler headers
+    # Generate include-all header and registration source
     generate_include_all_header(headers, output_dir)
-    generate_registration_header(headers, output_dir)
+    generate_registration_source(headers, output_dir)
 
     print(f"\nDone. {len(headers)} kernels ready in {output_dir}")
 
