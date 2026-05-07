@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "convnd_fwd_common.hpp"
-
 #include "ck/tensor_operation/gpu/device/impl/device_grouped_conv_fwd_multiple_abd_xdl_waveletmodel_cshuffle_v3.hpp"
-
 #include "ck/library/utility/convolution_host_tensor_descriptor_helper.hpp"
 
 using InDataType       = ck::half_t;
