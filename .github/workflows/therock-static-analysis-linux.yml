@@ -12,10 +12,19 @@
 #   static analyzer disabled for faster compiler builds; that is unchanged here.
 # - Full-stack builds are large; use workflow_dispatch and optional cmake_options
 #   to narrow features when experimenting.
+# - pull_request (narrow paths) exists so you can test before the workflow lands on
+#   the default branch: GitHub does not offer workflow_dispatch until then.
 
 name: TheRock Static Analysis (Linux)
 
 on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - ".github/workflows/therock-static-analysis-linux.yml"
+      - ".github/rocm-libraries-clang-tidy.yml"
   workflow_dispatch:
     inputs:
       amdgpu_families:
@@ -48,7 +57,7 @@ concurrency:
 
 jobs:
   static-analysis:
-    name: Build + clang-tidy (${{ inputs.amdgpu_families }})
+    name: Build + clang-tidy (${{ github.event_name == 'workflow_dispatch' && github.event.inputs.amdgpu_families || 'gfx94X-dcgpu' }})
     runs-on: azure-linux-scale-rocm
     timeout-minutes: 720
     container:
@@ -57,7 +66,12 @@ jobs:
     env:
       CACHE_DIR: ${{ github.workspace }}/.container-cache
       CCACHE_CONFIGPATH: ${{ github.workspace }}/.ccache/ccache.conf
-      AMDGPU_FAMILIES: ${{ inputs.amdgpu_families }}
+      # workflow_dispatch uses github.event.inputs; pull_request uses defaults below.
+      AMDGPU_FAMILIES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.amdgpu_families || 'gfx94X-dcgpu' }}
+      CMAKE_OPTIONS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.cmake_options || '' }}
+      THEROCK_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.therock_ref || '70a6335b27d48f3781ba07eab89269f75a00f527' }}
+      TIDY_JOBS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tidy_jobs || '8' }}
+      LLVM_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.llvm_version || '20.1.5' }}
       TEATIME_FORCE_INTERACTIVE: "0"
       AWS_SHARED_CREDENTIALS_FILE: /home/awsconfig/credentials.ini
 
@@ -70,7 +84,7 @@ jobs:
         with:
           repository: ROCm/TheRock
           path: TheRock
-          ref: ${{ inputs.therock_ref }}
+          ref: ${{ env.THEROCK_REF }}
 
       - name: Install Python dependencies
         run: pip install -r TheRock/requirements.txt
@@ -80,13 +94,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.llvm-tidy-toolchain
-          key: llvm-tidy-${{ inputs.llvm_version }}-clang-ubuntu22-tar
+          key: llvm-tidy-${{ env.LLVM_VERSION }}-clang-ubuntu22-tar
 
       - name: Install portable LLVM for run-clang-tidy
         if: steps.llvm-cache.outputs.cache-hit != 'true'
         run: |
           set -eux
-          V="${{ inputs.llvm_version }}"
+          V="${{ env.LLVM_VERSION }}"
           NAME="clang+llvm-${V}-x86_64-linux-gnu-ubuntu-22.04"
           URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${V}/${NAME}.tar.xz"
           rm -rf "$GITHUB_WORKSPACE/.llvm-tidy-toolchain"
@@ -121,13 +135,13 @@ jobs:
         timeout-minutes: 45
         run: |
           ./TheRock/build_tools/fetch_sources.py --jobs 12 --no-include-rocm-libraries --no-include-ml-frameworks \
-            ${{ contains(inputs.cmake_options, 'THEROCK_ENABLE_IREE_LIBS=ON') && '--include-iree-libs' || '' }}
+            ${{ contains(env.CMAKE_OPTIONS, 'THEROCK_ENABLE_IREE_LIBS=ON') && '--include-iree-libs' || '' }}
 
       - name: Configure TheRock
         env:
           amdgpu_families: ${{ env.AMDGPU_FAMILIES }}
           package_version: ADHOCBUILD
-          extra_cmake_options: "-DTHEROCK_ROCM_LIBRARIES_SOURCE_DIR=../ ${{ inputs.cmake_options }}"
+          extra_cmake_options: "-DTHEROCK_ROCM_LIBRARIES_SOURCE_DIR=../ ${{ env.CMAKE_OPTIONS }}"
           BUILD_DIR: build
         run: python3 TheRock/build_tools/github_actions/build_configure.py
 
@@ -149,7 +163,7 @@ jobs:
           FILTER='.*/(projects|dnn-providers|shared)/.*\.(cpp|hpp|h|hh|cc|cxx|c|cuh|hip)$'
           run-clang-tidy -p "$GITHUB_WORKSPACE/TheRock" \
             -config-file="$TIDY_CFG" \
-            -j "${{ inputs.tidy_jobs }}" \
+            -j "${{ env.TIDY_JOBS }}" \
             -quiet \
             -source-filter "$FILTER"
 
