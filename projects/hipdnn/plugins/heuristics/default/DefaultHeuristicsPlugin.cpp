@@ -72,15 +72,15 @@ namespace
 
 int64_t configPolicyId()
 {
-    static const int64_t id = hipdnn_data_sdk::utilities::policyNameToId(CONFIG_POLICY_NAME);
-    return id;
+    static const int64_t s_id = hipdnn_data_sdk::utilities::policyNameToId(CONFIG_POLICY_NAME);
+    return s_id;
 }
 
 int64_t staticOrderingPolicyId()
 {
-    static const int64_t id
+    static const int64_t s_id
         = hipdnn_data_sdk::utilities::policyNameToId(STATIC_ORDERING_POLICY_NAME);
-    return id;
+    return s_id;
 }
 
 } // namespace
