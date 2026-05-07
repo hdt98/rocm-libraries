@@ -778,11 +778,6 @@ pipeline {
                             runAsanTests("gfx942", "gfx942")
                         }
                     }
-                    post {
-                        always {
-                            cleanWs()
-                        }
-                    }
                 }
                 // GFX1101 Tests
                 stage('Fp16 Hip Install All gfx1101') {
