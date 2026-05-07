@@ -174,7 +174,7 @@ def runAsanDockerBuild() {
     node(rocmnode("docker")) {
         try {
             withWorkingDir {
-                buildAsanDockerImage(asanRunId: env.ASAN_ARTIFACTS_RUN_ID, amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
+                buildAsanDockerImage(amdgpuFamilies: "gfx94X-dcgpu", amdgpuArchs: "gfx942")
             }
         } finally {
             cleanWs()
@@ -182,12 +182,55 @@ def runAsanDockerBuild() {
     }
 }
 
+// Note: FRAGILE - Depends on the specific job and workflow structure of TheRock's multi_arch_ci_asan.yml
+// Queries the GitHub API for the most recent completed TheRock ASAN CI run on main
+// where the "Validate Artifact Structure" job succeeded.
+def resolveAsanRunId() {
+    def override = env.ASAN_ARTIFACTS_RUN_ID?.trim()
+    if (override) {
+        echo "Using pinned ASAN_ARTIFACTS_RUN_ID=${override}"
+        return override
+    }
+    echo "Resolving latest TheRock ASAN run ID from GitHub API..."
+    def runId = null
+    withCredentials([usernamePassword(credentialsId: 'github-app-miopen', usernameVariable: 'GITHUB_APP', passwordVariable: 'GITHUB_TOKEN')]) {
+        runId = sh(returnStdout: true, script: """
+            set -e
+            RUNS=\$(curl -sf \
+              -H "Authorization: token \$GITHUB_TOKEN" \
+              "https://api.github.com/repos/ROCm/TheRock/actions/workflows/multi_arch_ci_asan.yml/runs?branch=main&status=completed&per_page=20" \
+              | jq -r '.workflow_runs[].id')
+            if [ -z "\$RUNS" ]; then
+                echo "ERROR: No completed ASAN runs found" >&2
+                exit 1
+            fi
+            for RUN_ID in \$RUNS; do
+                CONCLUSION=\$(curl -sf \
+                  -H "Authorization: token \$GITHUB_TOKEN" \
+                  "https://api.github.com/repos/ROCm/TheRock/actions/runs/\${RUN_ID}/jobs?per_page=100" \
+                  | jq -r '[.jobs[] | select(.name | contains("Validate Artifact Structure")) | .conclusion] | first // empty')
+                if [ "\$CONCLUSION" = "success" ]; then
+                    printf '%s' "\$RUN_ID"
+                    exit 0
+                fi
+            done
+            echo "ERROR: No ASAN run with a passing Validate Artifact Structure job found in the last 20 runs" >&2
+            exit 1
+        """).trim()
+    }
+    if (!runId) {
+        error("resolveAsanRunId: GitHub API returned an empty run ID")
+    }
+    echo "Resolved ASAN run ID: ${runId}"
+    return runId
+}
+
 def buildAsanDockerImage(Map conf=[:]) {
     def variant = env.STAGE_NAME
     env.DOCKER_BUILDKIT = 1
     def asanTag = "${env.MIOPEN_DOCKER_IMAGE_URL}:ci_asan"
     def cacheRef = "${env.MIOPEN_DOCKER_IMAGE_URL}-ci-docker:asan_cache"
-    def asanRunId = conf.get("asanRunId", env.ASAN_ARTIFACTS_RUN_ID ?: "25414061404")
+    def asanRunId = conf.get("asanRunId", null) ?: resolveAsanRunId()
     def amdgpuFamilies = conf.get("amdgpuFamilies", "gfx94X-dcgpu")
     def amdgpuArchs = conf.get("amdgpuArchs", "gfx942") 
 
@@ -413,8 +456,8 @@ pipeline {
             description: "Build and push rocm/miopen:ci_asan ASAN Docker image (run nightly)")
         string(
             name: "ASAN_ARTIFACTS_RUN_ID",
-            defaultValue: "25414061404",
-            description: "TheRock CI run ID for ASAN artifacts used to build rocm/miopen:ci_asan (update when a newer green ASAN build is available)")
+            defaultValue: "",
+            description: "TheRock CI run ID for ASAN artifacts (leave empty to auto-resolve the latest passing multi_arch_ci_asan.yml run on main; set to override/pin a specific run)")
         booleanParam(
             name: "RUN_NIGHTLY_TESTS",
             defaultValue: false,
