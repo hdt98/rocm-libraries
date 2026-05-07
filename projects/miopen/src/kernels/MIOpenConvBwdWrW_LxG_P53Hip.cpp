@@ -12,6 +12,186 @@
 #define UNUSED __attribute__((__unused__))
 using uint = unsigned int;
 
+#if defined(CPPCHECK)
+// cppcheck preprocesses kernel files standalone, without the -D macros the
+// solver injects at runtime-compile time. Provide non-zero defaults so the
+// preprocessor arithmetic below does not divide by zero. Runtime builds
+// supply the real values via -D and leave these defaults untouched.
+// Keep in sync with MIOpenGroupConvBwdWrW_LxG_P53Hip.cpp.
+#ifndef MLO_BATCH_SZ
+#define MLO_BATCH_SZ 1
+#endif
+#ifndef MLO_CONV_BIAS
+#define MLO_CONV_BIAS 0
+#endif
+#ifndef MLO_DIR_FORWARD
+#define MLO_DIR_FORWARD 0
+#endif
+#ifndef MLO_FILTER_PAD0
+#define MLO_FILTER_PAD0 1
+#endif
+#ifndef MLO_FILTER_PAD1
+#define MLO_FILTER_PAD1 1
+#endif
+// Filter sizes default to 2 (not 1) so unsigned expressions like
+// `j < MLO_FILTER_SIZE1 - 1` and `MLO_FILTER_SIZE0 - 1` do not become
+// degenerate/underflowing under cppcheck preprocessing.
+#ifndef MLO_FILTER_SIZE0
+#define MLO_FILTER_SIZE0 2
+#endif
+#ifndef MLO_FILTER_SIZE1
+#define MLO_FILTER_SIZE1 2
+#endif
+#ifndef MLO_FILTER_STRIDE0
+#define MLO_FILTER_STRIDE0 1
+#endif
+#ifndef MLO_FILTER_STRIDE1
+#define MLO_FILTER_STRIDE1 1
+#endif
+#ifndef MLO_GROUP_COUNTS
+#define MLO_GROUP_COUNTS 1
+#endif
+#ifndef MLO_GRP_SZ
+#define MLO_GRP_SZ 1
+#endif
+#ifndef MLO_GRP_SZ0
+#define MLO_GRP_SZ0 1
+#endif
+#ifndef MLO_GRP_SZ1
+#define MLO_GRP_SZ1 1
+#endif
+#ifndef MLO_GRP_SZ2
+#define MLO_GRP_SZ2 1
+#endif
+#ifndef MLO_HW_WAVE_SZ
+#define MLO_HW_WAVE_SZ 1
+#endif
+#ifndef MLO_IN_BATCH_STRIDE
+#define MLO_IN_BATCH_STRIDE 1
+#endif
+#ifndef MLO_IN_CHANNEL_STRIDE
+#define MLO_IN_CHANNEL_STRIDE 1
+#endif
+#ifndef MLO_IN_EXTENT1
+#define MLO_IN_EXTENT1 1
+#endif
+#ifndef MLO_IN_HEIGHT
+#define MLO_IN_HEIGHT 1
+#endif
+#ifndef MLO_IN_N_VERT_LOOPS
+#define MLO_IN_N_VERT_LOOPS 1
+#endif
+#ifndef MLO_IN_STRIDE
+#define MLO_IN_STRIDE 1
+#endif
+#ifndef MLO_IN_TILE0
+#define MLO_IN_TILE0 1
+#endif
+#ifndef MLO_IN_TILE1
+#define MLO_IN_TILE1 1
+#endif
+#ifndef MLO_IN_WIDTH
+#define MLO_IN_WIDTH 1
+#endif
+#ifndef MLO_IN_WIDTH_CHUNK
+#define MLO_IN_WIDTH_CHUNK 1
+#endif
+// Default to 1 (not 0) so unsigned comparisons like
+// `c_pix4 == MLO_IN_WIDTH_LAST_CHUNK_VALID_READ_UNITS - 1` do not underflow.
+#ifndef MLO_IN_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_READ_UNIT
+#define MLO_IN_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_READ_UNIT 1
+#endif
+#ifndef MLO_IN_WIDTH_LAST_CHUNK_VALID_READ_UNITS
+#define MLO_IN_WIDTH_LAST_CHUNK_VALID_READ_UNITS 1
+#endif
+#ifndef MLO_IN_WIDTH_N_LOOPS
+#define MLO_IN_WIDTH_N_LOOPS 1
+#endif
+#ifndef MLO_LG2_PHYS_WAVE_SZ
+#define MLO_LG2_PHYS_WAVE_SZ 0
+#endif
+#ifndef MLO_N_BATCH_LOOPS
+#define MLO_N_BATCH_LOOPS 1
+#endif
+#ifndef MLO_N_INPUTS
+#define MLO_N_INPUTS 1
+#endif
+#ifndef MLO_N_INPUTS_PER_GROUP
+#define MLO_N_INPUTS_PER_GROUP 1
+#endif
+#ifndef MLO_N_LCL_BATCHS
+#define MLO_N_LCL_BATCHS 1
+#endif
+#ifndef MLO_N_LCL_IN_MAPS
+#define MLO_N_LCL_IN_MAPS 1
+#endif
+#ifndef MLO_N_LCL_OUT_MAPS
+#define MLO_N_LCL_OUT_MAPS 1
+#endif
+#ifndef MLO_N_OUTPUTS
+#define MLO_N_OUTPUTS 1
+#endif
+#ifndef MLO_N_OUTPUTS_PER_GROUP
+#define MLO_N_OUTPUTS_PER_GROUP 1
+#endif
+#ifndef MLO_N_WAVES
+#define MLO_N_WAVES 1
+#endif
+#ifndef MLO_OUT_BATCH_STRIDE
+#define MLO_OUT_BATCH_STRIDE 1
+#endif
+#ifndef MLO_OUT_CHANNEL_STRIDE
+#define MLO_OUT_CHANNEL_STRIDE 1
+#endif
+#ifndef MLO_OUT_HEIGHT
+#define MLO_OUT_HEIGHT 1
+#endif
+#ifndef MLO_OUT_STACKS
+#define MLO_OUT_STACKS 1
+#endif
+#ifndef MLO_OUT_STRIDE
+#define MLO_OUT_STRIDE 1
+#endif
+#ifndef MLO_OUT_TILE0
+#define MLO_OUT_TILE0 1
+#endif
+#ifndef MLO_OUT_TILE1
+#define MLO_OUT_TILE1 1
+#endif
+#ifndef MLO_OUT_WIDTH
+#define MLO_OUT_WIDTH 1
+#endif
+#ifndef MLO_OUT_WIDTH_CHUNK
+#define MLO_OUT_WIDTH_CHUNK 1
+#endif
+// Default to 1 (not 0) so unsigned comparisons like
+// `spn == MLO_OUT_WIDTH_LAST_CHUNK_VALID_SPANS - 1` do not underflow.
+#ifndef MLO_OUT_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_SPAN
+#define MLO_OUT_WIDTH_LAST_CHUNK_VALID_PIXELS_IN_LAST_SPAN 1
+#endif
+#ifndef MLO_OUT_WIDTH_LAST_CHUNK_VALID_SPANS
+#define MLO_OUT_WIDTH_LAST_CHUNK_VALID_SPANS 1
+#endif
+#ifndef MLO_OUT_WIDTH_N_LOOPS
+#define MLO_OUT_WIDTH_N_LOOPS 1
+#endif
+#ifndef MLO_READ_UNIT
+#define MLO_READ_UNIT 1
+#endif
+#ifndef MLO_UT_GRP_SZ0
+#define MLO_UT_GRP_SZ0 1
+#endif
+#ifndef MLO_UT_READ_UNIT
+#define MLO_UT_READ_UNIT 1
+#endif
+#ifndef MLO_WEI_BATCH_STRIDE
+#define MLO_WEI_BATCH_STRIDE 1
+#endif
+#ifndef MLO_WEI_CHANNEL_STRIDE
+#define MLO_WEI_CHANNEL_STRIDE 1
+#endif
+#endif // defined(CPPCHECK)
+
 #if MLO_IN_TILE0 == 0
 #error "Error: (MLO_IN_TILE0 == 0)"
 #endif
