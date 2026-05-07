@@ -1,18 +1,9 @@
-/*******************************************************************************
- *
- * MIT License
- *
- * Copyright (C) 2026 Advanced Micro Devices, Inc. All rights reserved.
- *
- * (license text omitted for brevity — copy from any other client/include header)
- *
- *******************************************************************************/
+// Copyright Advanced Micro Devices, Inc., or its affiliates.
+// SPDX-License-Identifier:  MIT
 
 #pragma once
 #if HIPBLASLT_ENABLE_MXDATAGENERATOR
-// DataInitialization.hpp brings in <Tensile/ContractionProblem.hpp> and the
-// public TensileLite::Client::getThreadLocalRandInt helper that the random
-// debug fillers use.
+
 #include "DataInitialization.hpp"
 #include <mxDataGen.hpp>                          // hipDataType, generateMXInput
 #include <mxDataGenerator/dataTypeInfo.hpp>       // DGen::toFloat / toFloatPacked
@@ -188,7 +179,7 @@ namespace TensileLite
             //  Per-batch independent identity is written when the data tensor
             //  is 3D. FP8 packing == 1, so the TensorDescriptor strides are
             //  byte offsets and totalAllocatedBytes() == totalAllocatedElements().
-            //  
+            //
             // Usage:
             //    identityFP8DataAndFixScales(tensorA.dataType(),
             //                                pristineA.cpuInput.valid.get(),
