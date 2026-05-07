@@ -780,7 +780,7 @@ class KernelWriterAssembly(KernelWriter):
         self.states.nonPostLoopSgpr.append("PackKForV2")
         self.states.nonPostLoopSgpr.append("PackKForV3")
 
-    if kernel["ProblemType"]["StochasticRounding"]:
+    if kernel["ProblemType"]["StochasticRounding"] and not self.states.asmCaps["v_prng_b32"]:
       module.add(self.defineSgpr("RNDSeed", 1))
 
     if kernel["_UseSgprForGRO"]:
