@@ -55,7 +55,8 @@ class GeneticAlgorithm:
                  verbose: int = 1,
                  log_file: str = None,
                  checkpoint_path: str = None,
-                 weights: list[dict[str, list[float]]] = None):
+                 weights: list[dict[str, list[float]]] = None,
+                 weight_beta: float = 0.25):
 
         self.logger = Logger(self.name, log_file=log_file, verbose=verbose)
 
@@ -139,7 +140,7 @@ class GeneticAlgorithm:
                     raise ValueError(f"Parameter {k} weights should be an iterable with the "
                                      f"same size as the parameter space.")
                 w = np.array(w, dtype=np.float32)
-                w = np.exp(-0.25 * (w - w.min()))
+                w = np.exp(-weight_beta * (w - w.min()))
                 self.probs[k] = w / w.sum()
                 
         self.stats = {}

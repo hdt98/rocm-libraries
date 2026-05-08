@@ -304,13 +304,17 @@ class DuctileBackend(OptimizationBackend):
             seed=merged_config["seed"],
             verbose=merged_config["verbose"],
             log_file=log_file,
+            checkpoint_path=ckpt_path,
             weights=merged_config["weights"],
-            checkpoint_path=ckpt_path
+            weight_beta=merged_config["weight_beta"],
         )
 
         if ckpt_path.is_file():
-            printWarning(f"Found existing checkpoint at {ckpt_path}, resuming optimization from checkpoint")
-            ga.load(ckpt_path)
+            printWarning(f"DuctileBackend: Found existing checkpoint at {ckpt_path}, resuming optimization from checkpoint")
+            try:
+                ga.load(ckpt_path)
+            except Exception as e:
+                printWarning(f"DuctileBackend: Failed to load checkpoint: {e}. Starting fresh optimization.")
                 
         # Run GA optimization - GA internally calls _evaluate and orchestrates the loop
         best, _ = ga.optimize()
