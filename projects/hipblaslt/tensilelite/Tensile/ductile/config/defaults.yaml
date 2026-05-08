@@ -33,6 +33,7 @@ seed: 0
 verbose: 1
 log_file: optimization.log
 weights: null
+weight_beta: 0.25 # Beta parameter for weight transformation: w = exp(-beta * (w - w.min()))
 validate_best: true
 survival:
   name: fitness
@@ -64,7 +65,5 @@ mutation:
 #    group_0: 2.1 # MatrixInstruction group is more important to explore/exploit, so we increase its mutation rate, this is just an example
 #    DepthU: 2.1
 # weights' role is to increase the mutation rate for certain parameters, the final prob will be prob * w
-# after proper testing, if this is necessary we can make it self-adaptive/dynamic (diversity based)
-weight_beta: 0.25 # Beta parameter for weight transformation: w = exp(-beta * (w - w.min()))
 
 

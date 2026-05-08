@@ -70,6 +70,7 @@ def _base_ductile_merged_config(validate_best=False):
         "seed": 1,
         "verbose": 0,
         "weights": None,
+        "weight_beta": 0.25,
         "validate_best": validate_best,
     }
 
