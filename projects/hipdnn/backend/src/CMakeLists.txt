@@ -55,7 +55,7 @@ add_library(
     FlatbufferUtilities.cpp
     heuristics/BuiltInHeuristics.cpp
     heuristics/SelectionHeuristic.cpp
-    heuristics/preferred_engine/PreferredEngineResolver.cpp
+    heuristics/config/ConfigBuiltIn.cpp
     heuristics/static_ordering/StaticOrderingBuiltIn.cpp
     plugin/EnginePlugin.cpp
     plugin/EnginePluginResourceManager.cpp

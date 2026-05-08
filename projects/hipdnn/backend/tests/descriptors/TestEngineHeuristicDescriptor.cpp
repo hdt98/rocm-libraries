@@ -745,17 +745,18 @@ TEST_F(TestEngineHeuristicDescriptor, GetPolicyOrderWhenNotSet)
     ASSERT_NO_THROW(heur->finalize());
 
     // With no descriptor-level override and no env var, resolveHeuristicPolicyOrder
-    // returns the built-in default: just StaticOrdering.
+    // returns the built-in default: Config first, then StaticOrdering.
     int64_t count = 999;
     ASSERT_NO_THROW(heur->getAttribute(
         HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 0, &count, nullptr));
-    ASSERT_EQ(count, 1);
+    ASSERT_EQ(count, 2);
 
-    std::vector<int64_t> buffer(1);
+    std::vector<int64_t> buffer(2);
     ASSERT_NO_THROW(heur->getAttribute(
-        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 1, &count, buffer.data()));
-    ASSERT_EQ(count, 1);
-    EXPECT_EQ(buffer[0],
+        HIPDNN_ATTR_ENGINEHEUR_POLICY_ORDER_EXT, HIPDNN_TYPE_INT64, 2, &count, buffer.data()));
+    ASSERT_EQ(count, 2);
+    EXPECT_EQ(buffer[0], hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::Config"));
+    EXPECT_EQ(buffer[1],
               hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering"));
 }
 

@@ -71,11 +71,10 @@ protected:
 
     // This suite verifies preferred_engine_id behavior, which the frontend
     // resolves as a post-hoc reorder of the heuristic-ranked engine configs
-    // (see Graph::initializeEngineConfig). The backend's preferred-engine
-    // precursor (backend/src/heuristics/preferred_engine/) only handles the
-    // HIPDNN_ENGINE_OVERRIDE_FILE knob. We only need to chain
-    // test_good_heuristic_plugin so the heuristic loop has a ranked list to
-    // reorder against.
+    // (see Graph::initializeEngineConfig). The HIPDNN_POLICY_CONFIG_FILE_PATH
+    // env knob lives in the SelectionHeuristic::Config built-in instead. We
+    // only need to chain test_good_heuristic_plugin so the heuristic loop has
+    // a ranked list to reorder against.
     static void SetUpTestSuite()
     {
         const std::array<const char*, 1> heuristicPaths

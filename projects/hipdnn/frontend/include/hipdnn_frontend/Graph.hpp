@@ -380,12 +380,13 @@ private:
 
     Error initializeEngineConfig(hipdnnBackendDescriptor_t engineHeuristicDesc)
     {
-        // The backend's preferred-engine precursor honors HIPDNN_ENGINE_OVERRIDE_FILE
-        // ahead of the policy loop, so the heuristic-ranked list already reflects
-        // env/config-file overrides. The explicit Graph.preferred_engine_id setter
-        // is honored here as a post-hoc reorder: if the user pinned an engine and
-        // it appears in the ranked list, prefer it over index 0; otherwise log and
-        // fall back to the heuristic's choice.
+        // The backend's SelectionHeuristic::Config built-in honors
+        // HIPDNN_POLICY_CONFIG_FILE_PATH inside the policy loop, so the
+        // heuristic-ranked list already reflects env/config-file overrides.
+        // The explicit Graph.preferred_engine_id setter is honored here as a
+        // post-hoc reorder: if the user pinned an engine and it appears in
+        // the ranked list, prefer it over index 0; otherwise log and fall
+        // back to the heuristic's choice.
         std::vector<std::unique_ptr<detail::ScopedHipdnnBackendDescriptor>> engineConfigs;
         std::vector<int64_t> engineIds;
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(

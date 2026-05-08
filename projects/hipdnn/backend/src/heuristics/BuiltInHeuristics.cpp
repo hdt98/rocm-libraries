@@ -17,6 +17,7 @@
 
 #include "plugin/HeuristicPluginManager.hpp"
 
+#include "config/ConfigBuiltIn.hpp"
 #include "static_ordering/StaticOrderingBuiltIn.hpp"
 
 namespace hipdnn_backend::plugin
@@ -24,6 +25,10 @@ namespace hipdnn_backend::plugin
 
 void HeuristicPluginManager::registerBuiltIns()
 {
+    registerPlugin(
+        HeuristicPlugin::createBuiltIn(hipdnn_backend::heuristics::config::populateFunctionTable(),
+                                       "built-in:SelectionHeuristic::Config"));
+
     registerPlugin(HeuristicPlugin::createBuiltIn(
         hipdnn_backend::heuristics::static_ordering::populateFunctionTable(),
         "built-in:SelectionHeuristic::StaticOrdering"));

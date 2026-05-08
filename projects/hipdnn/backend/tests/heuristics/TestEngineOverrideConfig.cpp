@@ -5,12 +5,11 @@
  * @file TestEngineOverrideConfig.cpp
  * @brief Unit tests for the rule-matching internals of EngineOverrideConfig
  *        (op + dim + stride wildcards, exact/wildcard partition ordering,
- *        JSON parsing). The end-to-end backend behavior driven by
- *        HIPDNN_ENGINE_OVERRIDE_FILE is covered in
- *        TestPreferredEngineResolver.cpp.
+ *        JSON parsing). The end-to-end policy behavior driven by
+ *        HIPDNN_POLICY_CONFIG_FILE_PATH is covered in TestConfigBuiltIn.cpp.
  */
 
-#include "heuristics/preferred_engine/EngineOverrideConfig.hpp"
+#include "heuristics/config/EngineOverrideConfig.hpp"
 
 #include <gtest/gtest.h>
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
@@ -18,7 +17,7 @@
 #include <cstdint>
 #include <vector>
 
-using namespace hipdnn_backend::heuristics::preferred_engine;
+using namespace hipdnn_backend::heuristics::config;
 using namespace hipdnn_data_sdk::utilities;
 
 namespace
