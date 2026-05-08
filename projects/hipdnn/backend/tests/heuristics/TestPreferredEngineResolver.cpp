@@ -6,10 +6,10 @@
  * @brief Tests for the backend preferred-engine precursor that runs ahead of
  *        the heuristic policy loop in EngineHeuristicDescriptor::finalize().
  *
- * Covers the explicit Graph.preferred_engine_id branch, the
- * HIPDNN_ENGINE_OVERRIDE_FILE conv-walk branch, the precedence between the
- * two, and the miss paths (no preferred engine, preferred not in candidates,
- * invalid graph buffer).
+ * Covers the HIPDNN_ENGINE_OVERRIDE_FILE conv-walk branch and the miss paths
+ * (no override, preferred not in candidates, invalid graph buffer). The
+ * explicit Graph.preferred_engine_id setter is exercised by the frontend
+ * tests — the backend resolver no longer consumes it.
  */
 
 #include "heuristics/preferred_engine/PreferredEngineResolver.hpp"
@@ -164,7 +164,7 @@ const std::vector<int64_t> W_STRIDES{3, 1, 1, 1};
 
 TEST(TestPreferredEngineResolver, EmptyCandidatesReturnsNullopt)
 {
-    const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
+    const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(buffer), {}).has_value());
 }
 
@@ -192,49 +192,6 @@ TEST(TestPreferredEngineResolver, NoPreferredAndNoEnvOverrideReturnsNullopt)
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
     EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(buffer), candidates).has_value());
-}
-
-// ========== Explicit Graph.preferred_engine_id ==========
-
-TEST(TestPreferredEngineResolver, ExplicitPreferredEngineMovesToFrontPreservingOrder)
-{
-    const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{
-        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(result->size(), 3u);
-    EXPECT_EQ((*result)[0], CUSTOM_ENGINE_ID);
-    EXPECT_EQ((*result)[1], MIOPEN_ENGINE_ID);
-    EXPECT_EQ((*result)[2], MIOPEN_DETERMINISTIC_ID);
-}
-
-TEST(TestPreferredEngineResolver, ExplicitPreferredNotInCandidatesReturnsNullopt)
-{
-    const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-    EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(buffer), candidates).has_value());
-}
-
-TEST(TestPreferredEngineResolver, ExplicitPreferredWinsOverOverrideFile)
-{
-    // The override file would select MIOPEN_DETERMINISTIC but the explicit
-    // Graph.preferred_engine_id hint must take precedence and short-circuit
-    // before the file is consulted. The explicit graph carries no conv nodes,
-    // so a regression that fell through to the file path would silently miss
-    // and return nullopt — which would fail the assertions below.
-    const TempJsonOverrideFile json(DETERMINISTIC_RULE_JSON);
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(OVERRIDE_ENV,
-                                                                          json.path());
-
-    const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{
-        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->front(), CUSTOM_ENGINE_ID);
 }
 
 // ========== HIPDNN_ENGINE_OVERRIDE_FILE branch ==========

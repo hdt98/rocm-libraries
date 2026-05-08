@@ -153,26 +153,15 @@ std::optional<std::vector<int64_t>>
         return std::nullopt;
     }
 
-    // 1. Explicit graph.preferred_engine_id (set via the frontend setter).
-    // 2. HIPDNN_ENGINE_OVERRIDE_FILE rule matching a conv node.
-    std::optional<int64_t> preferredEngineId;
-    const char* preferredSource = nullptr;
-    if(auto preferredEngineIdOpt = graph->preferred_engine_id(); preferredEngineIdOpt.has_value())
-    {
-        preferredEngineId = preferredEngineIdOpt;
-        preferredSource = "graph.preferred_engine_id";
-    }
-    else if(auto override = matchOverrideConfig(graph, indexTensorsByUid(graph));
-            override.has_value())
-    {
-        preferredEngineId = override;
-        preferredSource = "HIPDNN_ENGINE_OVERRIDE_FILE";
-    }
-
+    // HIPDNN_ENGINE_OVERRIDE_FILE rule matching a conv node. The explicit
+    // graph.preferred_engine_id setter is handled by the frontend instead, as
+    // a post-hoc reorder of the heuristic-ranked engine configs.
+    auto preferredEngineId = matchOverrideConfig(graph, indexTensorsByUid(graph));
     if(!preferredEngineId.has_value())
     {
         return std::nullopt;
     }
+    constexpr const char* PREFERRED_SOURCE = "HIPDNN_ENGINE_OVERRIDE_FILE";
 
     auto it = std::find(candidateEngineIds.begin(), candidateEngineIds.end(), *preferredEngineId);
     if(it == candidateEngineIds.end())
@@ -180,7 +169,7 @@ std::optional<std::vector<int64_t>>
         HIPDNN_BACKEND_LOG_INFO(
             "Preferred-engine precursor: preferred engine 0x{:x} (from {}) not in candidates.",
             static_cast<uint64_t>(*preferredEngineId),
-            preferredSource);
+            PREFERRED_SOURCE);
         return std::nullopt;
     }
 
@@ -199,7 +188,7 @@ std::optional<std::vector<int64_t>>
         "Preferred-engine precursor: reordered {} engines with preferred 0x{:x} (from {}) first.",
         reordered.size(),
         static_cast<uint64_t>(*preferredEngineId),
-        preferredSource);
+        PREFERRED_SOURCE);
     return reordered;
 }
 

@@ -57,9 +57,10 @@ inline Error
     }
 
     // Fetch only the top engine config unless the caller needs the full ranked
-    // list (e.g. get_ranked_engine_ids). Preferred-engine reordering happens
-    // inside the backend precursor that runs ahead of the heuristic policy
-    // loop, so no frontend post-hoc search is needed.
+    // list (e.g. get_ranked_engine_ids, or the explicit Graph.preferred_engine_id
+    // post-hoc reorder in initializeEngineConfig). HIPDNN_ENGINE_OVERRIDE_FILE
+    // reordering happens inside the backend precursor and is already reflected
+    // in the ranked list — no extra frontend search is needed for that knob.
     const int64_t requiredCount = getAll ? availableEngineCount : 1;
     std::vector<hipdnnBackendDescriptor_t> engineConfigsShallow;
     for(size_t i = 0; i < static_cast<size_t>(requiredCount); ++i)

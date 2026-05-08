@@ -16,17 +16,18 @@ namespace hipdnn_backend::heuristics::preferred_engine
  * @brief Backend-side preferred-engine resolver (runs as a precursor to
  *        the heuristic policy loop).
  *
- * Resolves an explicitly preferred engine ID for a graph, in priority order:
- *   1. Graph.preferred_engine_id (set via the frontend setter)
- *   2. HIPDNN_ENGINE_OVERRIDE_FILE rule that matches a conv node in the graph
+ * Resolves an explicitly preferred engine ID for a graph from the
+ * HIPDNN_ENGINE_OVERRIDE_FILE rule that matches a conv node in the graph.
  *
  * If a preferred engine is resolved AND it appears in @p candidateEngineIds,
  * returns the candidate list reordered with the preferred engine first.
  * Otherwise (no preferred engine, or the preferred engine is not a candidate)
  * returns std::nullopt — the caller proceeds with the regular policy loop.
  *
- * These are first-party library knobs (env var, config file, explicit setter)
- * and live in the backend rather than as a plugin.
+ * The Graph.preferred_engine_id setter is honored by the frontend as a
+ * post-hoc reorder of the heuristic-ranked engine configs; it is *not*
+ * consumed here. This module covers only the env/config-file knob, which
+ * needs visibility into the serialized graph to match conv shapes.
  *
  * @param serializedGraph         FlatBuffer-serialized graph (must reference
  *                                a valid Graph root). nullptr is treated as

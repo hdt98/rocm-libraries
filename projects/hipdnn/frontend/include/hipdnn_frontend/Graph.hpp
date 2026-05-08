@@ -380,18 +380,39 @@ private:
 
     Error initializeEngineConfig(hipdnnBackendDescriptor_t engineHeuristicDesc)
     {
-        // The backend's preferred-engine precursor honors graph-level
-        // preferences (Graph.preferred_engine_id, HIPDNN_ENGINE_OVERRIDE_FILE,
-        // HIPDNN_DEFAULT_ENGINE) ahead of the heuristic policy loop, moving the
-        // preferred engine to the front of the result list. The frontend trusts
-        // that ordering and selects index 0.
+        // The backend's preferred-engine precursor honors HIPDNN_ENGINE_OVERRIDE_FILE
+        // ahead of the policy loop, so the heuristic-ranked list already reflects
+        // env/config-file overrides. The explicit Graph.preferred_engine_id setter
+        // is honored here as a post-hoc reorder: if the user pinned an engine and
+        // it appears in the ranked list, prefer it over index 0; otherwise log and
+        // fall back to the heuristic's choice.
         std::vector<std::unique_ptr<detail::ScopedHipdnnBackendDescriptor>> engineConfigs;
         std::vector<int64_t> engineIds;
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(
-            engineConfigs, engineIds, engineHeuristicDesc, /*getAll=*/false));
+            engineConfigs, engineIds, engineHeuristicDesc, _preferredEngineId.has_value()));
 
-        HIPDNN_FE_LOG_INFO("Selected engine id " << engineIds[0] << " for execution plan.");
-        _engineConfigDesc = std::move(engineConfigs[0]);
+        size_t selectedIndex = 0;
+        if(_preferredEngineId.has_value())
+        {
+            const int64_t preferredId = _preferredEngineId.value();
+            auto it = std::find(engineIds.begin(), engineIds.end(), preferredId);
+            if(it != engineIds.end())
+            {
+                selectedIndex = static_cast<size_t>(std::distance(engineIds.begin(), it));
+                HIPDNN_FE_LOG_INFO("Preferred engine id "
+                                   << preferredId << " found, using it for execution plan.");
+            }
+            else
+            {
+                HIPDNN_FE_LOG_INFO("Preferred engine id "
+                                   << preferredId
+                                   << " not found, using top engine config instead.");
+            }
+        }
+
+        HIPDNN_FE_LOG_INFO("Selected engine id " << engineIds[selectedIndex]
+                                                 << " for execution plan.");
+        _engineConfigDesc = std::move(engineConfigs[selectedIndex]);
 
         return {ErrorCode::OK, ""};
     }

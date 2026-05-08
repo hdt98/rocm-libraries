@@ -69,12 +69,13 @@ protected:
         Tensor<DataType> yTensor;
     };
 
-    // This suite verifies preferred_engine_id behavior, which is resolved by
-    // the backend's preferred-engine precursor (see
-    // backend/src/heuristics/preferred_engine/) — a first-party library knob
-    // that runs ahead of the heuristic policy loop. We only need to chain
-    // test_good_heuristic_plugin as the fallback policy for cases where the
-    // precursor declines (no preferred_engine_id and no env override match).
+    // This suite verifies preferred_engine_id behavior, which the frontend
+    // resolves as a post-hoc reorder of the heuristic-ranked engine configs
+    // (see Graph::initializeEngineConfig). The backend's preferred-engine
+    // precursor (backend/src/heuristics/preferred_engine/) only handles the
+    // HIPDNN_ENGINE_OVERRIDE_FILE knob. We only need to chain
+    // test_good_heuristic_plugin so the heuristic loop has a ranked list to
+    // reorder against.
     static void SetUpTestSuite()
     {
         const std::array<const char*, 1> heuristicPaths
