@@ -149,7 +149,7 @@ static void LogCmdDropout(const miopenDropoutDescriptor_t dropoutDesc,
                           const miopenTensorDescriptor_t xDesc,
                           bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         if(miopen::deref(xDesc).GetType() == miopenFloat)

@@ -33,7 +33,7 @@
 static void
 LogCmdAddLayerNorm(const miopenTensorDescriptor_t xDesc, const miopenNormMode_t mode, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(xDesc).GetType();

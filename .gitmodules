@@ -7,3 +7,6 @@
 	path = shared/tensile/HostLibraryTests/googletest
 	url = https://github.com/google/googletest.git
 	branch = master
+[submodule "projects/miopen/rlog"]
+	path = projects/miopen/rlog
+	url = https://github.com/ROCm/rlog.git

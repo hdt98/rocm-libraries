@@ -40,7 +40,7 @@ static void LogCmdGetitem(const miopenTensorDescriptor_t dyDesc,
                           uint32_t offset,
                           bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(dyDesc).GetType();

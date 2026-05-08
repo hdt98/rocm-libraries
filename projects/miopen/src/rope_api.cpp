@@ -32,7 +32,7 @@
 
 static void LogCmdRoPE(const miopenTensorDescriptor_t xDesc, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(xDesc).GetType();

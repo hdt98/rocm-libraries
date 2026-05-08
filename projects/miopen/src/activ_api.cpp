@@ -78,7 +78,7 @@ void LogCmdActivation(const miopen::TensorDescriptor& x_desc,
                       const miopen::ActivationDescriptor& activ_desc,
                       bool fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         if(x_desc.GetType() == miopenHalf)

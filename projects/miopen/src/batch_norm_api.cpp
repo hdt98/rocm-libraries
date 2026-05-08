@@ -67,7 +67,7 @@ void LogCmdBNorm(const miopenTensorDescriptor_t xDesc,
                  const miopenActivationDescriptor_t activDesc,
                  const bool useInverseVariance = false)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         const std::string& str = BnormArgsForMIOpenDriver(xDesc,
                                                           yDesc,

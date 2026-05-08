@@ -43,7 +43,7 @@ inline std::ostream& operator<<(std::ostream& os, const std::vector<size_t>& v)
 
 static void LogCmdKthvalue(const miopenTensorDescriptor_t inputDesc, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(inputDesc).GetType();

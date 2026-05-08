@@ -427,7 +427,7 @@ std::string LogCmdBnormFusion(const miopenFusionPlanDescriptor_t fusePlanDesc, i
 MIOPEN_INTERNALS_EXPORT
 void LogCmdFusion(const miopenFusionPlanDescriptor_t fusePlanDesc)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         int fusion_mode = GetFusionMode(fusePlanDesc);
         switch(fusion_mode)

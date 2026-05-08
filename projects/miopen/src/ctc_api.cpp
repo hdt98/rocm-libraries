@@ -133,7 +133,7 @@ extern "C" miopenStatus_t miopenCTCLoss(miopenHandle_t handle,
     {
         return miopenStatusNotImplemented;
     }
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         // clang-format off

@@ -45,7 +45,7 @@ static void LogCmdPReLU(const miopenTensorDescriptor_t inputDesc,
                         const miopenTensorDescriptor_t weightDesc,
                         bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(inputDesc).GetType();

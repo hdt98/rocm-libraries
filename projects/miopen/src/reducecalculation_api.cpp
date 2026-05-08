@@ -36,7 +36,7 @@ static void LogCmdReduceCalculation(const miopenTensorDescriptor_t xDesc,
                                     const miopenReduceCalculationOp_t reduceCalculationOp,
                                     bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(xDesc).GetType();

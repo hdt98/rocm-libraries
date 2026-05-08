@@ -331,7 +331,7 @@ static void LogCmdTensorOp(miopenTensorOp_t tensorOp,
                            bool is_set,
                            bool is_scale)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         if(miopen::deref(aDesc).GetType() == miopenHalf)

@@ -84,7 +84,7 @@ extern "C" miopenStatus_t miopenLRNGetWorkSpaceSize(const miopenTensorDescriptor
 static void
 LogCmdLRN(const miopenLRNDescriptor_t lrnDesc, const miopenTensorDescriptor_t xDesc, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         if(miopen::deref(xDesc).GetType() == miopenFloat)

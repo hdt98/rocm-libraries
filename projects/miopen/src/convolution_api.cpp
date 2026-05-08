@@ -492,7 +492,7 @@ void LogCmdConvolution(const miopen::TensorDescriptor& x,
                        miopenProblemDirection_t dir,
                        std::optional<uint64_t> solver_id)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         const std::string& str = ConvArgsForMIOpenDriver(x, w, conv, y, dir, solver_id);
         MIOPEN_LOG_DRIVER_CMD(str);
@@ -507,7 +507,7 @@ void LogCmdFindConvolution(const miopen::TensorDescriptor& x,
                            miopenProblemDirection_t dir,
                            std::optional<uint64_t> solver_id)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         const std::string& str = ConvArgsForMIOpenDriver(x, w, conv, y, dir, solver_id);
         MIOPEN_LOG_DRIVER_CMD(str);
@@ -522,7 +522,7 @@ void LogCmdConvolution(const miopenTensorDescriptor_t& xDesc,
                        ConvDirection conv_dir,
                        bool is_immediate)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         const auto dir              = CmdArgToDirection(conv_dir);
         const auto& [x, w, conv, y] = miopen::tie_deref(xDesc, wDesc, convDesc, yDesc);
@@ -539,7 +539,7 @@ void LogCmdFindConvolution(const miopenTensorDescriptor_t& xDesc,
                            ConvDirection conv_dir,
                            bool is_immediate)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         const auto dir              = CmdArgToDirection(conv_dir);
         const auto& [x, w, conv, y] = miopen::tie_deref(xDesc, wDesc, convDesc, yDesc);

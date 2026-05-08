@@ -31,7 +31,7 @@
 
 static void LogCmdCat(const miopenTensorDescriptor_t* xDescs, int32_t xCount, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         for(int i = 0; i < xCount; i++)
         {

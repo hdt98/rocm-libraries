@@ -1048,6 +1048,10 @@ if(MIOPEN_USE_ROCTRACER)
     target_link_libraries(MIOpen PRIVATE ${rocTracer})
 endif()
 
+target_sources(MIOpen PRIVATE ${PROJECT_SOURCE_DIR}/rlog/src/rlog.cpp)
+target_include_directories(MIOpen PRIVATE ${PROJECT_SOURCE_DIR}/rlog/include)
+target_link_libraries(MIOpen PRIVATE dl)
+
 ############################################################
 # Installation
 set(MIOPEN_CXX_HEADER_PATH)

@@ -35,7 +35,7 @@ static void LogCmdReduceExtreme(const miopenTensorDescriptor_t xDesc,
                                 const miopenReduceExtremeOp_t reduceExtremeOp,
                                 bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(xDesc).GetType();

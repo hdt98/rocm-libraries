@@ -36,7 +36,7 @@ static void LogCmdRedux(const miopen::ReduceTensorDescriptor reduceTensorDesc,
                         const void* alpha,
                         const void* beta)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
 

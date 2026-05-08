@@ -39,7 +39,7 @@ inline void Pooling_logging_cmd(const miopenPoolingDescriptor_t poolDesc,
                                 const miopenTensorDescriptor_t tensorDesc,
                                 bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         auto tensor_dim = miopen::deref(tensorDesc).GetNumDims();
         std::stringstream ss;

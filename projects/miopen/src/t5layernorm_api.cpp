@@ -33,7 +33,7 @@
 static void
 LogCmdT5LayerNorm(const miopenTensorDescriptor_t Desc, const miopenNormMode_t mode, bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(Desc).GetType();

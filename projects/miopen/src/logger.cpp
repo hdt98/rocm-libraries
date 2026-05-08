@@ -28,7 +28,9 @@
 #include <miopen/logger.hpp>
 #include <miopen/config.h>
 #include <miopen/sysinfo_utils.hpp>
+#include <rlog/client.h>
 
+#include <atomic>
 #include <cstdlib>
 #include <chrono>
 #include <fstream>
@@ -71,6 +73,70 @@ MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_ENABLE_LOGGING_ROCTX)
 MIOPEN_DECLARE_ENV_VAR_BOOL(MIOPEN_DEBUG_LOGGING_QUIETING_DISABLE)
 
 MIOPEN_DECLARE_ENV_VAR_UINT64(MIOPEN_LOG_BUFFER_SIZE, 0);
+
+namespace {
+
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+std::atomic<bool> rlogActive{false};
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+std::atomic<bool> rlogCmdActive{false};
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+bool driverCmdLineEnabled    = false;
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+bool rlogFunctionsEnabled    = true;
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+bool rlogFunctionArgsEnabled = true;
+
+static bool rlogPropertyToBool(const char* value)
+{
+    if(value == nullptr)
+        return true;
+    std::string s(value);
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    if(s == "true")
+        return true;
+    if(s == "false")
+        return false;
+    return std::atoi(value) != 0;
+}
+
+inline void onRlogActiveChanged()
+{
+    const bool baseActive =
+        (miopen::env::enabled(MIOPEN_ENABLE_LOGGING_ROCTX) || rlog::isActive()) &&
+        !(miopen::debug::LoggingQuiet &&
+          !miopen::env::enabled(MIOPEN_DEBUG_LOGGING_QUIETING_DISABLE));
+    rlogActive    = baseActive;
+    rlogCmdActive = baseActive && driverCmdLineEnabled;
+}
+
+struct RlogClient
+{
+    RlogClient()
+    {
+        rlog::init();
+        rlog::setDefaultDomain("miopen");
+        rlog::setDefaultCategory("function");
+        // Read properties before registerActiveCallback: the Hub fires the callback
+        // immediately on registration, and the callback reads these cached values.
+        driverCmdLineEnabled =
+            rlogPropertyToBool(rlog::getProperty("miopen", "driver_command_line", "false"));
+        rlogFunctionsEnabled =
+            rlogPropertyToBool(rlog::getProperty("miopen", "log_functions", "true"));
+        rlogFunctionArgsEnabled =
+            rlogPropertyToBool(rlog::getProperty("miopen", "log_function_args", "true"));
+        rlog::registerActiveCallback(&onRlogActiveChanged);
+        if(miopen::env::enabled(MIOPEN_ENABLE_LOGGING_ROCTX))
+        {
+            rlog::setEnabled(rlog::Api::Rlog, false);
+            rlog::setEnabled(rlog::Api::Roctx, true);
+        }
+    }
+};
+// NOLINTNEXTLINE (cppcoreguidelines-avoid-non-const-global-variables)
+const RlogClient rlogClient;
+
+} // namespace
 
 namespace miopen {
 
@@ -272,10 +338,12 @@ bool IsLoggingFunctionCalls()
     return env::enabled(MIOPEN_ENABLE_LOGGING) && !IsLoggingDebugQuiet();
 }
 
-bool IsLoggingToRoctx()
-{
-    return env::enabled(MIOPEN_ENABLE_LOGGING_ROCTX) && !IsLoggingDebugQuiet();
-}
+bool IsRlogFunctionsEnabled() { return rlogFunctionsEnabled; }
+bool IsRlogFunctionArgsEnabled() { return rlogFunctionArgsEnabled; }
+
+bool IsLoggingToRoctx() { return rlogActive.load(); }
+bool IsLoggingToRlogCmd() { return rlogCmdActive.load(); }
+bool IsLoggingDriverCmd() { return IsLoggingCmd() || rlogCmdActive.load(); }
 
 bool IsLogging(const LoggingLevel level, const bool disableQuieting)
 {

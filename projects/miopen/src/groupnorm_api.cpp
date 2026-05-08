@@ -34,7 +34,7 @@ static void LogCmdGroupNorm(const miopenTensorDescriptor_t xDesc,
                             uint64_t num_groups,
                             bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(xDesc).GetType();

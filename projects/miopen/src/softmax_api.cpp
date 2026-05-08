@@ -36,7 +36,7 @@ static void LogCmdSoftmax(const miopenTensorDescriptor_t xDesc,
                           const void* beta,
                           bool is_fwd)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         switch(miopen::deref(xDesc).GetType())

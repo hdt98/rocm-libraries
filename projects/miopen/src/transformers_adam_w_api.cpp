@@ -38,7 +38,7 @@ static void LogCmdTransformersAdamW(const miopenTensorDescriptor_t paramDesc,
                                     const bool correct_bias,
                                     const bool is_amp)
 {
-    if(miopen::IsLoggingCmd())
+    if(miopen::IsLoggingDriverCmd())
     {
         std::stringstream ss;
         auto dtype = miopen::deref(paramDesc).GetType();
