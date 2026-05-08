@@ -166,23 +166,6 @@ private:
 
     std::optional<int64_t> _preferredEngineId;
 
-    static std::optional<int64_t> getDefaultEngineId()
-    {
-        static const std::optional<int64_t> s_defaultId = []() -> std::optional<int64_t> {
-            auto envStr = hipdnn_data_sdk::utilities::trim(
-                hipdnn_data_sdk::utilities::getEnv("HIPDNN_DEFAULT_ENGINE"));
-            if(envStr.empty())
-            {
-                return std::nullopt;
-            }
-            auto engineId = hipdnn_data_sdk::utilities::engineNameToId(envStr);
-            HIPDNN_FE_LOG_INFO("HIPDNN_DEFAULT_ENGINE='" << envStr
-                                                         << "' mapped to engine ID: " << engineId);
-            return engineId;
-        }();
-        return s_defaultId;
-    }
-
     /// Apply validated knob settings to the engine config descriptor via
     /// the descriptor-based C API path.
     Error applyKnobSettingsToEngineConfig(const std::vector<KnobSetting>& validatedSettings)
@@ -397,38 +380,18 @@ private:
 
     Error initializeEngineConfig(hipdnnBackendDescriptor_t engineHeuristicDesc)
     {
+        // The backend's preferred-engine precursor honors graph-level
+        // preferences (Graph.preferred_engine_id, HIPDNN_ENGINE_OVERRIDE_FILE,
+        // HIPDNN_DEFAULT_ENGINE) ahead of the heuristic policy loop, moving the
+        // preferred engine to the front of the result list. The frontend trusts
+        // that ordering and selects index 0.
         std::vector<std::unique_ptr<detail::ScopedHipdnnBackendDescriptor>> engineConfigs;
         std::vector<int64_t> engineIds;
-        auto defaultEngineId = getDefaultEngineId();
         HIPDNN_CHECK_ERROR(hipdnn_frontend::detail::getEngineConfigs(
-            engineConfigs, engineIds, engineHeuristicDesc, defaultEngineId.has_value()));
+            engineConfigs, engineIds, engineHeuristicDesc, /*getAll=*/false));
 
-        // The backend's preferred-engine precursor honors graph-level
-        // preferences (Graph.preferred_engine_id, HIPDNN_ENGINE_OVERRIDE_FILE)
-        // ahead of the heuristic policy loop, moving the preferred engine to
-        // the front of the result list. The frontend trusts that ordering and
-        // selects index 0 unless HIPDNN_DEFAULT_ENGINE pins a specific engine ID.
-        size_t selectedIndex = 0;
-        if(defaultEngineId)
-        {
-            auto defaultId = defaultEngineId.value();
-            auto it = std::find(engineIds.begin(), engineIds.end(), defaultId);
-            if(it != engineIds.end())
-            {
-                selectedIndex = static_cast<size_t>(std::distance(engineIds.begin(), it));
-                HIPDNN_FE_LOG_INFO("Default engine id " << defaultId
-                                                        << " found, using it for execution plan.");
-            }
-            else
-            {
-                HIPDNN_FE_LOG_INFO("Default engine id "
-                                   << defaultId << " not found, using top engine config instead.");
-            }
-        }
-
-        HIPDNN_FE_LOG_INFO("Selected engine id " << engineIds[selectedIndex]
-                                                 << " for execution plan.");
-        _engineConfigDesc = std::move(engineConfigs[selectedIndex]);
+        HIPDNN_FE_LOG_INFO("Selected engine id " << engineIds[0] << " for execution plan.");
+        _engineConfigDesc = std::move(engineConfigs[0]);
 
         return {ErrorCode::OK, ""};
     }

@@ -6,6 +6,9 @@
 #include "EngineOverrideConfig.hpp"
 #include "logging/Logging.hpp"
 
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
+#include <hipdnn_data_sdk/utilities/StringUtil.hpp>
 #include <hipdnn_flatbuffers_sdk/data_objects/graph_generated.h>
 
 #include <flatbuffers/flatbuffers.h>
@@ -129,6 +132,20 @@ std::optional<int64_t>
     return std::nullopt;
 }
 
+/// Read HIPDNN_DEFAULT_ENGINE on every call (matches EngineOverrideConfig::loadFromEnv
+/// so tests can flip the env per case). Returns nullopt when unset / blank.
+std::optional<int64_t> resolveDefaultEngineEnv()
+{
+    static constexpr const char* ENV_VAR = "HIPDNN_DEFAULT_ENGINE";
+    const auto                   raw     = hipdnn_data_sdk::utilities::getEnv(ENV_VAR, "");
+    const auto                   trimmed = hipdnn_data_sdk::utilities::trim(raw);
+    if(trimmed.empty())
+    {
+        return std::nullopt;
+    }
+    return hipdnn_data_sdk::utilities::engineNameToId(trimmed);
+}
+
 } // namespace
 
 std::optional<std::vector<int64_t>>
@@ -157,6 +174,7 @@ std::optional<std::vector<int64_t>>
 
     // 1. Explicit graph.preferred_engine_id (set via the frontend setter).
     // 2. HIPDNN_ENGINE_OVERRIDE_FILE rule matching a conv node.
+    // 3. HIPDNN_DEFAULT_ENGINE env (last-resort hint before the policy loop).
     std::optional<int64_t> preferredEngineId;
     const char*            preferredSource = nullptr;
     if(auto preferredEngineIdOpt = graph->preferred_engine_id(); preferredEngineIdOpt.has_value())
@@ -164,14 +182,16 @@ std::optional<std::vector<int64_t>>
         preferredEngineId = preferredEngineIdOpt;
         preferredSource   = "graph.preferred_engine_id";
     }
-    else
+    else if(auto override = matchOverrideConfig(graph, indexTensorsByUid(graph));
+            override.has_value())
     {
-        const auto tensorIndex = indexTensorsByUid(graph);
-        preferredEngineId      = matchOverrideConfig(graph, tensorIndex);
-        if(preferredEngineId.has_value())
-        {
-            preferredSource = "HIPDNN_ENGINE_OVERRIDE_FILE";
-        }
+        preferredEngineId = override;
+        preferredSource   = "HIPDNN_ENGINE_OVERRIDE_FILE";
+    }
+    else if(auto defaultEngine = resolveDefaultEngineEnv(); defaultEngine.has_value())
+    {
+        preferredEngineId = defaultEngine;
+        preferredSource   = "HIPDNN_DEFAULT_ENGINE";
     }
 
     if(!preferredEngineId.has_value())
