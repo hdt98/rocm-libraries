@@ -150,7 +150,7 @@ struct FmhaFwdWrapper
 
         index_t bias_stride_batch, bias_stride_nhead, bias_stride_m;
 
-        // Only reflects compile time arch availability, 
+        // Only reflects compile time arch availability,
         // does not perform runtime descriptor validation.
         CK_TILE_HOST_DEVICE constexpr bool IsValid() const { return Kernel::kIsAvailable; }
     };
