@@ -41,9 +41,9 @@ jobs:
       - name: Checkout TheRock repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          repository: "ROCm/TheRock"
+          repository: "AaronStGeorge/TheRock"
           path: TheRock
-          ref: 70a6335b27d48f3781ba07eab89269f75a00f527 # 2026-05-03 commit
+          ref: 1ec6118fc7fd68f1d9ed1d6a03b15fd8593e22f4 # PR 1 (active --override-file CI test)
 
       - name: Install python deps
         run: |

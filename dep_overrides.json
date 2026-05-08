@@ -1,6 +1,6 @@
 {
   "submodule_overrides": {
-    "fusilli": "aeed46fe35604c9f055f35005b95dc7e8f56633e",
-    "iree":    "192602f8a7680467e608480debdb2ed6062d0f4d"
+    "fusilli": "1458571e1a5acb724600415884a51d9f9466a3ef",
+    "iree":    "09350084469f7c49e09d3f4348bdd706627eacd4"
   }
 }
