@@ -771,6 +771,20 @@ pipeline {
                     }
                 }
                 // GFX942 Tests
+                // ASAN Tests — declared first so it enters the gfx942 queue sooner
+                stage('ASAN Hip Install All gfx942') {
+                    when {
+                        beforeAgent true
+                        expression { params.TARGET_GFX942 }
+                    }
+                    agent{ label rocmnode("gfx942") }
+                    steps {
+                        script {
+                            runAsanTests("gfx942", "gfx942")
+                        }
+                    }
+                    post { always { cleanWs() } }
+                }
                 stage('Dbsync gfx942') {
                     when {
                         beforeAgent true
@@ -840,20 +854,6 @@ pipeline {
                             cleanWs()
                         }
                     }
-                }
-                // ASAN Tests
-                stage('ASAN Hip Install All gfx942') {
-                    when {
-                        beforeAgent true
-                        expression { params.TARGET_GFX942 }
-                    }
-                    agent{ label rocmnode("gfx942") }
-                    steps {
-                        script {
-                            runAsanTests("gfx942", "gfx942")
-                        }
-                    }
-                    post { always { cleanWs() } }
                 }
                 // GFX1101 Tests
                 stage('Fp16 Hip Install All gfx1101') {
