@@ -166,13 +166,34 @@ jobs:
           test -f "$GITHUB_WORKSPACE/TheRock/compile_commands.json"
           TIDY_CFG="$GITHUB_WORKSPACE/.github/rocm-libraries-clang-tidy.yml"
           test -f "$TIDY_CFG"
-          # Exclude TheRock/compiler trees and third_party noise; keep projects/, dnn-providers/, shared/.
-          FILTER='.*/(projects|dnn-providers|shared)/.*\.(cpp|hpp|h|hh|cc|cxx|c|cuh|hip)$'
-          run-clang-tidy -p "$GITHUB_WORKSPACE/TheRock" \
+          # LLVM 18 run-clang-tidy has no -source-filter; narrow via a filtered compile DB.
+          python3 <<'PY'
+          import json, os, pathlib, re, sys
+
+          ws = pathlib.Path(os.environ["GITHUB_WORKSPACE"])
+          therock = ws / "TheRock"
+          out_dir = therock / ".rocm-libs-tidy-db"
+          out_dir.mkdir(parents=True, exist_ok=True)
+          with open(therock / "compile_commands.json", encoding="utf-8") as f:
+              db = json.load(f)
+          pat = re.compile(
+              r".*/(projects|dnn-providers|shared)/.*\.(cpp|hpp|h|hh|cc|cxx|c|cuh|hip)$"
+          )
+          filtered = [
+              e for e in db
+              if isinstance(e.get("file"), str) and pat.search(e["file"])
+          ]
+          print(f"compile_commands: kept {len(filtered)} / {len(db)} entries for rocm-libraries paths", file=sys.stderr)
+          if not filtered:
+              print("error: filter matched no entries; check path layout vs compile_commands.json", file=sys.stderr)
+              sys.exit(1)
+          with open(out_dir / "compile_commands.json", "w", encoding="utf-8") as out:
+              json.dump(filtered, out)
+          PY
+          run-clang-tidy -p "$GITHUB_WORKSPACE/TheRock/.rocm-libs-tidy-db" \
             -config-file="$TIDY_CFG" \
             -j "${{ env.TIDY_JOBS }}" \
-            -quiet \
-            -source-filter "$FILTER"
+            -quiet
 
       - name: CCache stats
         if: always()
