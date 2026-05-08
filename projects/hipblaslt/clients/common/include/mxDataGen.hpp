@@ -41,6 +41,41 @@
 #include <string_view>
 #include <vector>
 
+// Selects whether `generateMXInput` populates the packed `data`/`scale`
+// buffers via the host (CPU PRNG + std::memcpy) or writes them straight
+// into device memory via `DGen::DataGeneratorGPU<DT>`.
+//
+// MXInitDevice::Cpu  -- host PRNG path. `data` and `scale` are interpreted
+//                       as host pointers. Deterministic and byte-stable
+//                       across hardware; useful as a regression baseline.
+//
+// MXInitDevice::Gpu  -- on-device PRNG path. `data` and `scale` MUST be
+//                       device pointers (typically from `hipMalloc`). The
+//                       on-device generator writes the packed bytes
+//                       directly; the returned reference float vector is
+//                       materialised on the host by reading those bytes
+//                       back and dequantising via `toFloatPacked<DT>`, so
+//                       the float reference is consistent with whatever
+//                       ended up in device memory regardless of any PRNG
+//                       differences between CPU and GPU implementations.
+//                       For the small set of matrix layouts that need the
+//                       PRNG output rearranged (anything that goes through
+//                       `getAlignedFloat`), the GPU overload silently falls
+//                       back to the CPU path internally. Only the easy
+//                       layout (`isMatrixA && isTranspose` or
+//                       `!isMatrixA && !isTranspose`) actually exercises
+//                       the GPU PRNG.
+enum class MXInitDevice
+{
+    Cpu = 0,
+    Gpu = 1,
+};
+
+// CPU-only overload (kept for callers that don't want to opt into the
+// GPU backend). Equivalent to passing `MXInitDevice::Cpu` to the overload
+// below. The optional `gfx1250Swizzle` parameter applies the gfx1250 dimk
+// scale layout to the natural-packed scales before they're written into
+// `scale`, matching what the kernel expects.
 std::vector<float> generateMXInput(hipDataType                dataType,
                                    hipDataType                scaleType,
                                    void*                      data,
@@ -54,8 +89,35 @@ std::vector<float> generateMXInput(hipDataType                dataType,
                                    int const                  scaleBlockRowSize,
                                    int const                  scaleBlockColSize,
                                    bool                       isMatrixA,
-                                   std::string_view const     initMethod = "Bounded",
-                                   float                      min_val    = -1.0f,
-                                   float                      max_val    = 1.0f);
+                                   std::string_view const     initMethod     = "Bounded",
+                                   float                      min_val        = -1.0f,
+                                   float                      max_val        = 1.0f,
+                                   bool                       gfx1250Swizzle = false);
+
+// Backend-selectable overload. `initDevice == MXInitDevice::Cpu` delegates
+// to the host PRNG path above. `initDevice == MXInitDevice::Gpu` runs the
+// kernel directly into the device buffers (data/scale must be device
+// pointers in that case); see `MXInitDevice` for the full semantics. The
+// gfx950 AITER swizzle (3-element `preSwizzleTile`) and gfx1250 dimk
+// swizzle (`gfx1250Swizzle == true`) are mutually exclusive; passing both
+// throws.
+std::vector<float> generateMXInput(hipDataType                dataType,
+                                   hipDataType                scaleType,
+                                   void*                      data,
+                                   void*                      scale,
+                                   uint64_t                   row,
+                                   uint64_t                   col,
+                                   uint64_t                   stride,
+                                   bool                       isTranspose,
+                                   const std::vector<size_t>& preSwizzleTile,
+                                   const std::vector<size_t>& preTile,
+                                   int const                  scaleBlockRowSize,
+                                   int const                  scaleBlockColSize,
+                                   bool                       isMatrixA,
+                                   MXInitDevice               initDevice,
+                                   std::string_view const     initMethod     = "Bounded",
+                                   float                      min_val        = -1.0f,
+                                   float                      max_val        = 1.0f,
+                                   bool                       gfx1250Swizzle = false);
 
 #endif
