@@ -9,3 +9,6 @@ yappi
 tox
 invoke
 numpy
+scipy
+pandas
+pydantic

@@ -8,6 +8,3 @@ simplejson
 ujson
 orjson
 yappi
-scipy
-pandas
-pydantic
