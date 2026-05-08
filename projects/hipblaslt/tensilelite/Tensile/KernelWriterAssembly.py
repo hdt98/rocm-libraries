@@ -4409,7 +4409,6 @@ class KernelWriterAssembly(KernelWriter):
 
           module.add(SCmpEQU32(src0=sgpr("ShadowLimit%s+1"%tc), src1=0, comment="are we within 2^32?"))
           module.add(SCSelectB32(dst=sgpr("Srd%s+2"%tc), src0=sgpr("ShadowLimit%s+0"%tc), src1="BufferLimit", comment="Move shadow to real if we are within 2^32"))
-          module.add(self.shiftSrd(tc))
         else:
           # put limit directly into SRD:
           module.add(scalarMultiplyBpe("Srd%s+2"%tc, stmp, float(tP["bpeGR"]), comment="Set limit to use bytes"))
@@ -4480,6 +4479,8 @@ class KernelWriterAssembly(KernelWriter):
       module.add(SSubBU32(dst=sgpr("Srd%s+1"%tc), src0=sgpr("Srd%s+1"%tc), src1=0, comment="make room for directToLDS instruction offset"))
 
     module.add(SMovB32(dst=sgpr("Srd%s+3"%tc), src="Srd127_96", comment="Set bits 127_96 in SRD"))
+    if use64bShadowLimit and not useFixedSrd2:
+      module.add(self.shiftSrd(tc))
 
     #if tP["isB"]:
     #  module.add(self.getCmpAssert(self.asmAssert.ne, sgpr("WorkGroup1"), 0xA))
@@ -5362,6 +5363,9 @@ class KernelWriterAssembly(KernelWriter):
 
     # This branch could potentially be very far e.g. > SIMM16
     module.addComment1("after InitC, skip to end of prefetch last iter if numIter==0")
+    if self.isPrefetchAcrossPersistentEnabled(kernel) and not kernel["SuppressNoLoadLoop"]:
+      module.add(SCMovB32(dst=sgpr("SkPrefetchPrimed"), src=0,
+                 comment="discard primed PAP group when current slice skips NLL"))
     # use positive offset only long jump
     with self.allocTmpSgpr(3) as tmpSgprInfo:
       module.add(self.longBranchScc1(lastIterEnd, posNeg=1, tmpSgprInfo=tmpSgprInfo))
@@ -8860,6 +8864,9 @@ class KernelWriterAssembly(KernelWriter):
                        comment="skip to unrollLoop end loop%s iter b/c numIter==0" % loopChar))
           else:
             lastIterEnd = Label("PrefetchGlobalLastIterEnd", "")
+            if self.isPrefetchAcrossPersistentEnabled(kernel):
+              module.add(SCMovB32(dst=sgpr("SkPrefetchPrimed"), src=0,
+                         comment="discard primed PAP group when current slice skips NLL"))
             # use positive offset only long jump
             with self.allocTmpSgpr(3) as tmpSgprInfo:
               module.add(self.longBranchScc1(lastIterEnd, posNeg=1, tmpSgprInfo=tmpSgprInfo))
@@ -16851,7 +16858,7 @@ class KernelWriterAssembly(KernelWriter):
     skComponent = Component.StreamK.find(self)
     module.add(self.prefetchAcrossPersistentSnapshot(kernel))
     module.add(skComponent.prefetchAcrossPersistentSetupNextTile(self, kernel, tensorParametersA, tensorParametersB, skipLroReset=True))
-    module.add(self.setupNewTile(kernel, tensorParametersA, tensorParametersB, isOptNLL=True, forPrefetchAcrossPersistent=True))
+    module.add(self.setupPrefetchAcrossPersistentLoads(kernel, tensorParametersA, tensorParametersB, isOptNLL=True))
     module.add(self.prefetchAcrossPersistentRestoreCurrentTile(kernel))
     module.add(skipLabel)
     return module
