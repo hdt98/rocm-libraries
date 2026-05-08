@@ -12,7 +12,7 @@ from pathlib import Path
 # Number of kernels per registration chunk.
 # Each chunk is one .cpp file / compilation unit.
 # TODO: What is the optimal value?
-CHUNK_SIZE = 50
+CHUNK_SIZE = 25
 
 
 def parse_kernel_metadata(kname):

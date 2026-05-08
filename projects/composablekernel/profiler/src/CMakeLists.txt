@@ -156,100 +156,19 @@ if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
 endif()
 
 
-# TODO: Move to separate CMakeLists.txt in separate directory. 
 # =============================================================================
 # CK Tile Dispatcher: Generate and compile CK Tile conv kernels
 # =============================================================================
 if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
   find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
-  # Extract first GPU target for codegen
-  string(REPLACE ";" " " _GPU_TARGETS_SPACE "${GPU_TARGETS}")
-  string(REPLACE " " ";" _GPU_TARGETS_LIST "${_GPU_TARGETS_SPACE}")
-  list(GET _GPU_TARGETS_LIST 0 _GPU_TARGET)
+  # Build dispatcher instance libraries (defines ck_dispatcher_grouped_conv_* targets)
+  add_subdirectory(
+    ${PROJECT_SOURCE_DIR}/dispatcher/library
+    ${CMAKE_CURRENT_BINARY_DIR}/dispatcher_library
+  )
 
-  set(DISPATCHER_DIR "${PROJECT_SOURCE_DIR}/dispatcher")
-  set(DISPATCHER_CODEGEN "${DISPATCHER_DIR}/codegen/unified_grouped_conv_codegen.py")
-  set(DISPATCHER_CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/backward_weight")
-  set(DISPATCHER_GEN_SCRIPT "${DISPATCHER_DIR}/scripts/generate_profiler_bwd_weight_kernels.py")
-  set(DISPATCHER_KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_weight_kernels")
-  set(DISPATCHER_CONFIG_SET "profiler" CACHE STRING "Dispatcher config set: tests or profiler")
-
-  if(NOT EXISTS ${DISPATCHER_KERNEL_DIR}/register_all_grouped_conv_kernels.cpp)
-    file(MAKE_DIRECTORY ${DISPATCHER_KERNEL_DIR})
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} ${DISPATCHER_GEN_SCRIPT}
-              --config-dir ${DISPATCHER_CONFIG_DIR}
-              --codegen ${DISPATCHER_CODEGEN}
-              --output-dir ${DISPATCHER_KERNEL_DIR}
-              --arch ${_GPU_TARGET}
-              --config-set ${DISPATCHER_CONFIG_SET}
-      RESULT_VARIABLE ret
-      OUTPUT_VARIABLE output
-      ERROR_VARIABLE error
-      WORKING_DIRECTORY ${DISPATCHER_DIR}/codegen
-    )
-    if(NOT ret EQUAL 0)
-      message(FATAL_ERROR "Dispatcher kernel generation failed.\nReturn: ${ret}\nOutput: ${output}\nError: ${error}")
-    endif()
-    message(STATUS "Dispatcher bwd_weight kernels generated: ${output}")
-  endif()
-
-  # Collect generated kernel .hpp files and create .cpp wrappers for compilation
-  file(GLOB DISPATCHER_KERNEL_HEADERS "${DISPATCHER_KERNEL_DIR}/grouped_conv_bwd_weight_*.hpp")
-  set(DISPATCHER_KERNEL_SOURCES "")
-  foreach(HEADER ${DISPATCHER_KERNEL_HEADERS})
-    get_filename_component(STEM ${HEADER} NAME_WE)
-    set(WRAPPER_CPP "${DISPATCHER_KERNEL_DIR}/${STEM}.cpp")
-    if(NOT EXISTS ${WRAPPER_CPP})
-      file(WRITE ${WRAPPER_CPP} "// Auto-generated wrapper\n#include \"${STEM}.hpp\"\n")
-    endif()
-    list(APPEND DISPATCHER_KERNEL_SOURCES ${WRAPPER_CPP})
-  endforeach()
-
-  if(DISPATCHER_KERNEL_SOURCES)
-    # Add chunked registration .cpp files and register_all.cpp
-    file(GLOB DISPATCHER_BWD_WEIGHT_REG_CPPS "${DISPATCHER_KERNEL_DIR}/register_*.cpp")
-    foreach(REG_CPP ${DISPATCHER_BWD_WEIGHT_REG_CPPS})
-      list(APPEND DISPATCHER_KERNEL_SOURCES "${REG_CPP}")
-      set_source_files_properties("${REG_CPP}" PROPERTIES
-        COMPILE_OPTIONS "-Wno-ctad-maybe-unsupported;-Wno-old-style-cast"
-      )
-    endforeach()
-
-    add_library(device_grouped_conv_bwd_weight_dispatcher_instances OBJECT ${DISPATCHER_KERNEL_SOURCES})
-    target_include_directories(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE
-      ${PROJECT_SOURCE_DIR}/include
-      ${PROJECT_SOURCE_DIR}/dispatcher/include
-      ${DISPATCHER_KERNEL_DIR}
-    )
-    target_compile_options(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE
-      -DCK_TILE_FLOAT_TO_BFLOAT16_DEFAULT=0
-      -mllvm -enable-noalias-to-md-conversion=0
-      -Wno-undefined-func-template
-      -Wno-float-equal
-      -Wno-header-hygiene
-      -Wno-unused-parameter
-      -Wno-missing-variable-declarations
-    )
-    if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
-      target_compile_options(device_grouped_conv_bwd_weight_dispatcher_instances PRIVATE --offload-compress)
-    endif()
-    set_target_properties(device_grouped_conv_bwd_weight_dispatcher_instances PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-    # Progress monitoring
-    list(LENGTH DISPATCHER_KERNEL_SOURCES _TOTAL_COUNT)
-    math(EXPR _KERNEL_COUNT "${_TOTAL_COUNT} - 1")
-    message(STATUS "Dispatcher bwd_weight: ${_TOTAL_COUNT} compilation units (${_KERNEL_COUNT} kernels + registration)")
-
-    # Separate ninja target for isolated progress: ninja dispatcher_bwd_weight_lib
-    add_custom_target(dispatcher_bwd_weight_lib
-      DEPENDS device_grouped_conv_bwd_weight_dispatcher_instances
-      COMMENT "All ${_TOTAL_COUNT} dispatcher bwd_weight instances compiled."
-    )
-  endif()
-
-  # Profiler only needs dispatcher API headers
+  # Profiler needs dispatcher API headers
   target_include_directories(${PROFILER_EXECUTABLE} PRIVATE
     ${PROJECT_SOURCE_DIR}/dispatcher/include
   )
@@ -259,167 +178,14 @@ if(CK_TILE_DISPATCHER AND SUPPORTED_GPU_TARGETS MATCHES "gfx9")
     -Wno-ctad-maybe-unsupported
     -Wno-old-style-cast
   )
-  if(TARGET device_grouped_conv_bwd_weight_dispatcher_instances)
-    target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE device_grouped_conv_bwd_weight_dispatcher_instances)
-  endif()
 
-  # --- Forward dispatcher kernels ---
-  set(DISPATCHER_FWD_CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/forward")
-  set(DISPATCHER_FWD_GEN_SCRIPT "${DISPATCHER_DIR}/scripts/generate_profiler_fwd_kernels.py")
-  set(DISPATCHER_FWD_KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_fwd_kernels")
-
-  if(NOT EXISTS ${DISPATCHER_FWD_KERNEL_DIR}/register_all_grouped_conv_kernels.cpp)
-    file(MAKE_DIRECTORY ${DISPATCHER_FWD_KERNEL_DIR})
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} ${DISPATCHER_FWD_GEN_SCRIPT}
-              --config-dir ${DISPATCHER_FWD_CONFIG_DIR}
-              --codegen ${DISPATCHER_CODEGEN}
-              --output-dir ${DISPATCHER_FWD_KERNEL_DIR}
-              --arch ${_GPU_TARGET}
-              --config-set ${DISPATCHER_CONFIG_SET}
-      RESULT_VARIABLE ret
-      OUTPUT_VARIABLE output
-      ERROR_VARIABLE error
-      WORKING_DIRECTORY ${DISPATCHER_DIR}/codegen
-    )
-    if(NOT ret EQUAL 0)
-      message(FATAL_ERROR "Dispatcher fwd kernel generation failed.\nReturn: ${ret}\nOutput: ${output}\nError: ${error}")
+  # Link all available dispatcher instance libraries
+  foreach(_VARIANT fwd bwd_weight bwd_data)
+    set(_TARGET "ck_dispatcher_grouped_conv_${_VARIANT}")
+    if(TARGET ${_TARGET})
+      target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE ${_TARGET})
     endif()
-    message(STATUS "Dispatcher fwd kernels generated: ${output}")
-  endif()
-
-  file(GLOB DISPATCHER_FWD_KERNEL_HEADERS "${DISPATCHER_FWD_KERNEL_DIR}/grouped_conv_fwd_*.hpp")
-  set(DISPATCHER_FWD_KERNEL_SOURCES "")
-  foreach(HEADER ${DISPATCHER_FWD_KERNEL_HEADERS})
-    get_filename_component(STEM ${HEADER} NAME_WE)
-    set(WRAPPER_CPP "${DISPATCHER_FWD_KERNEL_DIR}/${STEM}.cpp")
-    if(NOT EXISTS ${WRAPPER_CPP})
-      file(WRITE ${WRAPPER_CPP} "// Auto-generated wrapper\n#include \"${STEM}.hpp\"\n")
-    endif()
-    list(APPEND DISPATCHER_FWD_KERNEL_SOURCES ${WRAPPER_CPP})
   endforeach()
-
-  if(DISPATCHER_FWD_KERNEL_SOURCES)
-    file(GLOB DISPATCHER_FWD_REG_CPPS "${DISPATCHER_FWD_KERNEL_DIR}/register_*.cpp")
-    foreach(REG_CPP ${DISPATCHER_FWD_REG_CPPS})
-      list(APPEND DISPATCHER_FWD_KERNEL_SOURCES "${REG_CPP}")
-      set_source_files_properties("${REG_CPP}" PROPERTIES
-        COMPILE_OPTIONS "-Wno-ctad-maybe-unsupported;-Wno-old-style-cast"
-      )
-    endforeach()
-
-    add_library(device_grouped_conv_fwd_dispatcher_instances OBJECT ${DISPATCHER_FWD_KERNEL_SOURCES})
-    target_include_directories(device_grouped_conv_fwd_dispatcher_instances PRIVATE
-      ${PROJECT_SOURCE_DIR}/include
-      ${PROJECT_SOURCE_DIR}/dispatcher/include
-      ${DISPATCHER_FWD_KERNEL_DIR}
-    )
-    target_compile_options(device_grouped_conv_fwd_dispatcher_instances PRIVATE
-      -DCK_TILE_FLOAT_TO_BFLOAT16_DEFAULT=0
-      -mllvm -enable-noalias-to-md-conversion=0
-      -Wno-undefined-func-template
-      -Wno-float-equal
-      -Wno-header-hygiene
-      -Wno-unused-parameter
-      -Wno-missing-variable-declarations
-    )
-    if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
-      target_compile_options(device_grouped_conv_fwd_dispatcher_instances PRIVATE --offload-compress)
-    endif()
-    set_target_properties(device_grouped_conv_fwd_dispatcher_instances PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-    list(LENGTH DISPATCHER_FWD_KERNEL_SOURCES _FWD_TOTAL_COUNT)
-    math(EXPR _FWD_KERNEL_COUNT "${_FWD_TOTAL_COUNT} - 1")
-    message(STATUS "Dispatcher fwd: ${_FWD_TOTAL_COUNT} compilation units (${_FWD_KERNEL_COUNT} kernels + registration)")
-
-    add_custom_target(dispatcher_fwd_lib
-      DEPENDS device_grouped_conv_fwd_dispatcher_instances
-      COMMENT "All ${_FWD_TOTAL_COUNT} dispatcher fwd instances compiled."
-    )
-  endif()
-
-  if(TARGET device_grouped_conv_fwd_dispatcher_instances)
-    target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE device_grouped_conv_fwd_dispatcher_instances)
-  endif()
-
-  # --- Backward data dispatcher kernels ---
-  set(DISPATCHER_BWD_DATA_CONFIG_DIR "${DISPATCHER_DIR}/codegen/configs/grouped_conv/backward_data")
-  set(DISPATCHER_BWD_DATA_GEN_SCRIPT "${DISPATCHER_DIR}/scripts/generate_profiler_bwd_data_kernels.py")
-  set(DISPATCHER_BWD_DATA_KERNEL_DIR "${CMAKE_CURRENT_BINARY_DIR}/dispatcher_bwd_data_kernels")
-
-  if(NOT EXISTS ${DISPATCHER_BWD_DATA_KERNEL_DIR}/register_all_grouped_conv_kernels.cpp)
-    file(MAKE_DIRECTORY ${DISPATCHER_BWD_DATA_KERNEL_DIR})
-    execute_process(
-      COMMAND ${Python3_EXECUTABLE} ${DISPATCHER_BWD_DATA_GEN_SCRIPT}
-              --config-dir ${DISPATCHER_BWD_DATA_CONFIG_DIR}
-              --codegen ${DISPATCHER_CODEGEN}
-              --output-dir ${DISPATCHER_BWD_DATA_KERNEL_DIR}
-              --arch ${_GPU_TARGET}
-              --config-set ${DISPATCHER_CONFIG_SET}
-      RESULT_VARIABLE ret
-      OUTPUT_VARIABLE output
-      ERROR_VARIABLE error
-      WORKING_DIRECTORY ${DISPATCHER_DIR}/codegen
-    )
-    if(NOT ret EQUAL 0)
-      message(FATAL_ERROR "Dispatcher bwd_data kernel generation failed.\nReturn: ${ret}\nOutput: ${output}\nError: ${error}")
-    endif()
-    message(STATUS "Dispatcher bwd_data kernels generated: ${output}")
-  endif()
-
-  file(GLOB DISPATCHER_BWD_DATA_KERNEL_HEADERS "${DISPATCHER_BWD_DATA_KERNEL_DIR}/grouped_conv_bwd_data_*.hpp")
-  set(DISPATCHER_BWD_DATA_KERNEL_SOURCES "")
-  foreach(HEADER ${DISPATCHER_BWD_DATA_KERNEL_HEADERS})
-    get_filename_component(STEM ${HEADER} NAME_WE)
-    set(WRAPPER_CPP "${DISPATCHER_BWD_DATA_KERNEL_DIR}/${STEM}.cpp")
-    if(NOT EXISTS ${WRAPPER_CPP})
-      file(WRITE ${WRAPPER_CPP} "// Auto-generated wrapper\n#include \"${STEM}.hpp\"\n")
-    endif()
-    list(APPEND DISPATCHER_BWD_DATA_KERNEL_SOURCES ${WRAPPER_CPP})
-  endforeach()
-
-  if(DISPATCHER_BWD_DATA_KERNEL_SOURCES)
-    file(GLOB DISPATCHER_BWD_DATA_REG_CPPS "${DISPATCHER_BWD_DATA_KERNEL_DIR}/register_*.cpp")
-    foreach(REG_CPP ${DISPATCHER_BWD_DATA_REG_CPPS})
-      list(APPEND DISPATCHER_BWD_DATA_KERNEL_SOURCES "${REG_CPP}")
-      set_source_files_properties("${REG_CPP}" PROPERTIES
-        COMPILE_OPTIONS "-Wno-ctad-maybe-unsupported;-Wno-old-style-cast"
-      )
-    endforeach()
-
-    add_library(device_grouped_conv_bwd_data_dispatcher_instances OBJECT ${DISPATCHER_BWD_DATA_KERNEL_SOURCES})
-    target_include_directories(device_grouped_conv_bwd_data_dispatcher_instances PRIVATE
-      ${PROJECT_SOURCE_DIR}/include
-      ${PROJECT_SOURCE_DIR}/dispatcher/include
-      ${DISPATCHER_BWD_DATA_KERNEL_DIR}
-    )
-    target_compile_options(device_grouped_conv_bwd_data_dispatcher_instances PRIVATE
-      -DCK_TILE_FLOAT_TO_BFLOAT16_DEFAULT=0
-      -mllvm -enable-noalias-to-md-conversion=0
-      -Wno-undefined-func-template
-      -Wno-float-equal
-      -Wno-header-hygiene
-      -Wno-unused-parameter
-      -Wno-missing-variable-declarations
-    )
-    if(NOT WIN32 AND ${hip_VERSION_FLAT} GREATER 600241132)
-      target_compile_options(device_grouped_conv_bwd_data_dispatcher_instances PRIVATE --offload-compress)
-    endif()
-    set_target_properties(device_grouped_conv_bwd_data_dispatcher_instances PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
-    list(LENGTH DISPATCHER_BWD_DATA_KERNEL_SOURCES _BWD_DATA_TOTAL_COUNT)
-    math(EXPR _BWD_DATA_KERNEL_COUNT "${_BWD_DATA_TOTAL_COUNT} - 1")
-    message(STATUS "Dispatcher bwd_data: ${_BWD_DATA_TOTAL_COUNT} compilation units (${_BWD_DATA_KERNEL_COUNT} kernels + registration)")
-
-    add_custom_target(dispatcher_bwd_data_lib
-      DEPENDS device_grouped_conv_bwd_data_dispatcher_instances
-      COMMENT "All ${_BWD_DATA_TOTAL_COUNT} dispatcher bwd_data instances compiled."
-    )
-  endif()
-
-  if(TARGET device_grouped_conv_bwd_data_dispatcher_instances)
-    target_link_libraries(${PROFILER_EXECUTABLE} PRIVATE device_grouped_conv_bwd_data_dispatcher_instances)
-  endif()
 endif()
 
 set(DEVICE_INSTANCES "")
