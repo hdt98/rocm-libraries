@@ -20,8 +20,11 @@
 
 #include "logging/Logging.hpp"
 
+#include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/utilities/EngineOrdering.hpp>
+#include <hipdnn_data_sdk/utilities/PlatformUtils.hpp>
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
+#include <hipdnn_data_sdk/utilities/StringUtil.hpp>
 #include <hipdnn_plugin_sdk/HeuristicValidation.hpp>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
 #include <hipdnn_plugin_sdk/heuristic_api_version.h>
@@ -31,6 +34,9 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <sstream>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace hipdnn_backend::heuristics::static_ordering
@@ -66,6 +72,59 @@ int64_t policyId()
 {
     static const int64_t s_id = hipdnn_data_sdk::utilities::policyNameToId(POLICY_NAME);
     return s_id;
+}
+
+constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_FALLBACK_ENGINE_ORDERING";
+
+/// Parse HIPDNN_FALLBACK_ENGINE_ORDERING (comma-separated engine names) into a
+/// list of engine IDs in the order the user wrote them. Empty / unset env →
+/// empty vector (caller falls back to the legacy sortEngineIds ordering).
+/// Blank tokens are skipped; unknown engine names hash to a deterministic ID
+/// via engineNameToId — the caller filters against the candidate list, so a
+/// typo'd name simply won't match anything.
+std::vector<int64_t> parseFallbackOrderingEnv()
+{
+    const std::string raw = hipdnn_data_sdk::utilities::getEnv(FALLBACK_ORDERING_ENV, "");
+    if(hipdnn_data_sdk::utilities::trim(raw).empty())
+    {
+        return {};
+    }
+
+    std::vector<int64_t> ids;
+    std::stringstream stream(raw);
+    std::string token;
+    while(std::getline(stream, token, ','))
+    {
+        const std::string name = hipdnn_data_sdk::utilities::trim(token);
+        if(name.empty())
+        {
+            continue;
+        }
+        ids.push_back(hipdnn_data_sdk::utilities::engineNameToId(name));
+    }
+    return ids;
+}
+
+/// Restrict @p candidates to engines named in @p envOrder, preserving the env
+/// order. Engines not listed in the env are dropped — when the operator sets
+/// HIPDNN_FALLBACK_ENGINE_ORDERING they are explicitly opting out of every
+/// other engine. Names in the env that are not in @p candidates are silently
+/// skipped (the policy loop only sees engines the rest of the stack already
+/// filtered down to).
+std::vector<int64_t> applyFallbackOrdering(const std::vector<int64_t>& candidates,
+                                           const std::vector<int64_t>& envOrder)
+{
+    const std::unordered_set<int64_t> candidateSet(candidates.begin(), candidates.end());
+    std::vector<int64_t> out;
+    out.reserve(envOrder.size());
+    for(const int64_t id : envOrder)
+    {
+        if(candidateSet.count(id) != 0U)
+        {
+            out.push_back(id);
+        }
+    }
+    return out;
 }
 
 // Per-handle state. StaticOrdering does not consume device properties, but the
@@ -317,6 +376,30 @@ hipdnnPluginStatus_t policyFinalize(hipdnnHeuristicPolicyDescriptor_t desc, int3
             *outApplied = 0;
             return HIPDNN_PLUGIN_STATUS_SUCCESS;
         }
+
+        // HIPDNN_FALLBACK_ENGINE_ORDERING, when set, replaces the legacy
+        // MIOPEN-first / DETERMINISTIC-last ordering. Only engines named in
+        // the env are eligible — operators use this to constrain selection
+        // to a known-good shortlist. If the env is set but no listed engine
+        // is among the candidates the policy declines (outApplied = 0) so
+        // the policy loop can try the next plugin.
+        const auto envOrder = parseFallbackOrderingEnv();
+        if(!envOrder.empty())
+        {
+            d->sortedEngineIds = applyFallbackOrdering(d->candidateEngineIds, envOrder);
+            if(d->sortedEngineIds.empty())
+            {
+                STATIC_ORDERING_LOG(HIPDNN_SEV_WARN,
+                                    "policyFinalize: HIPDNN_FALLBACK_ENGINE_ORDERING listed no "
+                                    "engines that are candidates; declining.");
+                *outApplied = 0;
+                return HIPDNN_PLUGIN_STATUS_SUCCESS;
+            }
+            d->finalized = true;
+            *outApplied = 1;
+            return HIPDNN_PLUGIN_STATUS_SUCCESS;
+        }
+
         d->sortedEngineIds = d->candidateEngineIds;
         hipdnn_data_sdk::utilities::sortEngineIds(d->sortedEngineIds);
         d->finalized = true;

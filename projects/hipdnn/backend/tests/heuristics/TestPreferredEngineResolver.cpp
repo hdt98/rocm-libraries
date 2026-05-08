@@ -41,7 +41,6 @@ const int64_t MIOPEN_DETERMINISTIC_ID = engineNameToId("MIOPEN_ENGINE_DETERMINIS
 const int64_t CUSTOM_ENGINE_ID = engineNameToId("Plugin1::CustomEngine");
 
 constexpr const char* OVERRIDE_ENV = "HIPDNN_ENGINE_OVERRIDE_FILE";
-constexpr const char* DEFAULT_ENGINE_ENV = "HIPDNN_DEFAULT_ENGINE";
 
 /// Build a minimal serialized Graph FlatBuffer with no nodes. Pass a value to
 /// set preferred_engine_id; pass nullopt to leave it unset.
@@ -187,10 +186,8 @@ TEST(TestPreferredEngineResolver, InvalidGraphBufferReturnsNullopt)
 
 TEST(TestPreferredEngineResolver, NoPreferredAndNoEnvOverrideReturnsNullopt)
 {
-    // Make sure no override file or default engine leaks in from the environment.
+    // Make sure no override file leaks in from the environment.
     const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
-                                                                                 "");
 
     const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
     const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
@@ -341,108 +338,5 @@ TEST(TestPreferredEngineResolver, OverrideFileRereadOnEachInvocation)
         const auto second = resolvePreferredEngineOrder(toConstData(buffer), candidates);
         ASSERT_TRUE(second.has_value());
         EXPECT_EQ(second->front(), MIOPEN_ENGINE_ID);
-    }
-}
-
-// ========== HIPDNN_DEFAULT_ENGINE branch ==========
-
-TEST(TestPreferredEngineResolver, DefaultEngineEnvMovesEngineToFront)
-{
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE_DETERMINISTIC");
-
-    const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
-    const std::vector<int64_t> candidates{
-        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-    ASSERT_TRUE(result.has_value());
-    ASSERT_EQ(result->size(), 3u);
-    EXPECT_EQ((*result)[0], MIOPEN_DETERMINISTIC_ID);
-    EXPECT_EQ((*result)[1], MIOPEN_ENGINE_ID);
-    EXPECT_EQ((*result)[2], CUSTOM_ENGINE_ID);
-}
-
-TEST(TestPreferredEngineResolver, DefaultEngineEnvBlankIsTreatedAsUnset)
-{
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
-                                                                                 "   ");
-
-    const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
-    EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(buffer), candidates).has_value());
-}
-
-TEST(TestPreferredEngineResolver, DefaultEngineEnvNotInCandidatesReturnsNullopt)
-{
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE_DETERMINISTIC");
-
-    const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID};
-    EXPECT_FALSE(resolvePreferredEngineOrder(toConstData(buffer), candidates).has_value());
-}
-
-TEST(TestPreferredEngineResolver, ExplicitPreferredWinsOverDefaultEngineEnv)
-{
-    // The default engine env would select MIOPEN_DETERMINISTIC, but the explicit
-    // Graph.preferred_engine_id hint must take precedence.
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(
-        DEFAULT_ENGINE_ENV, "MIOPEN_ENGINE_DETERMINISTIC");
-
-    const auto buffer = buildGraphBuffer(CUSTOM_ENGINE_ID);
-    const std::vector<int64_t> candidates{
-        MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->front(), CUSTOM_ENGINE_ID);
-}
-
-TEST(TestPreferredEngineResolver, OverrideFileWinsOverDefaultEngineEnv)
-{
-    // The override file selects MIOPEN_DETERMINISTIC for the conv. The default
-    // engine env points at MIOPEN_ENGINE; the file rule must take precedence.
-    const TempJsonOverrideFile json(DETERMINISTIC_RULE_JSON);
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV,
-                                                                                  json.path());
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
-                                                                                 "MIOPEN_ENGINE");
-
-    const auto buffer = buildConvFwdGraphBuffer(X_DIMS, X_STRIDES, W_DIMS, W_STRIDES);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    const auto result = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->front(), MIOPEN_DETERMINISTIC_ID);
-}
-
-TEST(TestPreferredEngineResolver, DefaultEngineEnvRereadOnEachInvocation)
-{
-    // Mirrors OverrideFileRereadOnEachInvocation: per-call env reads let tests
-    // (and operators) flip HIPDNN_DEFAULT_ENGINE between invocations.
-    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter overrideEnv(OVERRIDE_ENV, "");
-    hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter defaultEnv(DEFAULT_ENGINE_ENV,
-                                                                           "MIOPEN_ENGINE");
-
-    const auto buffer = buildGraphBuffer(::flatbuffers::nullopt);
-    const std::vector<int64_t> candidates{MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
-
-    {
-        const auto first = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-        ASSERT_TRUE(first.has_value());
-        EXPECT_EQ(first->front(), MIOPEN_ENGINE_ID);
-    }
-
-    defaultEnv.setValue("MIOPEN_ENGINE_DETERMINISTIC");
-
-    {
-        const auto second = resolvePreferredEngineOrder(toConstData(buffer), candidates);
-        ASSERT_TRUE(second.has_value());
-        EXPECT_EQ(second->front(), MIOPEN_DETERMINISTIC_ID);
     }
 }

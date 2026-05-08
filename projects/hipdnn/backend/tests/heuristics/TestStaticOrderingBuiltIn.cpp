@@ -23,6 +23,7 @@
 #include <hipdnn_data_sdk/utilities/EngineNames.hpp>
 #include <hipdnn_data_sdk/utilities/PolicyNames.hpp>
 #include <hipdnn_plugin_sdk/HeuristicsPluginApi.h>
+#include <hipdnn_test_sdk/utilities/ScopedEnvironmentVariableSetter.hpp>
 
 #include <gtest/gtest.h>
 
@@ -45,6 +46,8 @@ const int64_t CUSTOM_ENGINE_ID
 
 const int64_t STATIC_ORDERING_POLICY_ID
     = hipdnn_data_sdk::utilities::policyNameToId("SelectionHeuristic::StaticOrdering");
+
+constexpr const char* FALLBACK_ORDERING_ENV = "HIPDNN_FALLBACK_ENGINE_ORDERING";
 
 class TestStaticOrderingBuiltIn : public ::testing::Test
 {
@@ -276,4 +279,104 @@ TEST_F(TestStaticOrderingBuiltIn, GetSortedClipsToCallerProvidedCapacity)
     EXPECT_EQ(count, outBuf.size());
     EXPECT_EQ(outBuf[0], MIOPEN_ENGINE_ID);
     EXPECT_EQ(outBuf[1], CUSTOM_ENGINE_ID);
+}
+
+// ========== HIPDNN_FALLBACK_ENGINE_ORDERING ==========
+// The env replaces sortEngineIds: only listed engines are eligible, in env order.
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvBlankFallsBackToDefaultOrdering)
+{
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(FALLBACK_ORDERING_ENV,
+                                                                          "   ");
+
+    const std::array<int64_t, 3> ids{MIOPEN_DETERMINISTIC_ID, CUSTOM_ENGINE_ID, MIOPEN_ENGINE_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), ids.size());
+    EXPECT_EQ(sorted.front(), MIOPEN_ENGINE_ID);
+    EXPECT_EQ(sorted.back(), MIOPEN_DETERMINISTIC_ID);
+}
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvOverridesDefaultOrdering)
+{
+    // Env order is the inverse of the default sort: CUSTOM first, then
+    // DETERMINISTIC, then MIOPEN_ENGINE last. The default would put
+    // MIOPEN_ENGINE first and DETERMINISTIC last; if the env path were
+    // ignored we would see that ordering instead.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(
+        FALLBACK_ORDERING_ENV, "Plugin1::CustomEngine,MIOPEN_ENGINE_DETERMINISTIC,MIOPEN_ENGINE");
+
+    const std::array<int64_t, 3> ids{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 3u);
+    EXPECT_EQ(sorted[0], CUSTOM_ENGINE_ID);
+    EXPECT_EQ(sorted[1], MIOPEN_DETERMINISTIC_ID);
+    EXPECT_EQ(sorted[2], MIOPEN_ENGINE_ID);
+}
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvSubsetDropsUnlistedCandidates)
+{
+    // Env names only MIOPEN_ENGINE; CUSTOM and DETERMINISTIC must be dropped
+    // from the result — the operator opted them out.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(FALLBACK_ORDERING_ENV,
+                                                                          "MIOPEN_ENGINE");
+
+    const std::array<int64_t, 3> ids{MIOPEN_DETERMINISTIC_ID, CUSTOM_ENGINE_ID, MIOPEN_ENGINE_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 1u);
+    EXPECT_EQ(sorted[0], MIOPEN_ENGINE_ID);
+}
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvTrimsTokensAndSkipsBlanks)
+{
+    // Whitespace around tokens, plus an empty token between the commas, should
+    // not affect parsing — names are trimmed and blanks are skipped.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(
+        FALLBACK_ORDERING_ENV, "  MIOPEN_ENGINE_DETERMINISTIC ,, MIOPEN_ENGINE  ");
+
+    const std::array<int64_t, 3> ids{MIOPEN_ENGINE_ID, CUSTOM_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 2u);
+    EXPECT_EQ(sorted[0], MIOPEN_DETERMINISTIC_ID);
+    EXPECT_EQ(sorted[1], MIOPEN_ENGINE_ID);
+}
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvNoListedEngineInCandidatesDeclines)
+{
+    // Env names an engine that isn't a candidate. The policy declines so the
+    // outer policy loop can try the next plugin.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(FALLBACK_ORDERING_ENV,
+                                                                          "Plugin1::CustomEngine");
+
+    const std::array<int64_t, 2> ids{MIOPEN_ENGINE_ID, MIOPEN_DETERMINISTIC_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    EXPECT_FALSE(_plugin->finalize(_desc));
+}
+
+TEST_F(TestStaticOrderingBuiltIn, FallbackEnvUnknownNameSilentlySkipped)
+{
+    // A typo'd name hashes to its own (unmatchable) ID; it should be ignored
+    // and the recognized name should still apply.
+    const hipdnn_test_sdk::utilities::ScopedEnvironmentVariableSetter env(
+        FALLBACK_ORDERING_ENV, "NotARealEngine,MIOPEN_ENGINE");
+
+    const std::array<int64_t, 2> ids{MIOPEN_DETERMINISTIC_ID, MIOPEN_ENGINE_ID};
+    _plugin->setEngineIds(_desc, ids.data(), ids.size());
+
+    ASSERT_TRUE(_plugin->finalize(_desc));
+    const auto sorted = _plugin->getSortedEngineIds(_desc);
+    ASSERT_EQ(sorted.size(), 1u);
+    EXPECT_EQ(sorted[0], MIOPEN_ENGINE_ID);
 }
